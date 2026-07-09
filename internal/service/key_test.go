@@ -270,3 +270,105 @@ func generateTestPrivateKeyPEM(t *testing.T) string {
 	require.NoError(t, err)
 	return string(pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: b}))
 }
+
+func TestKeyService_ImportEd25519PEM(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	svc := NewKeyService(db, &noopCrypto{})
+
+	_, priv, err := ed25519.GenerateKey(rand.Reader)
+	require.NoError(t, err)
+	b, err := x509.MarshalPKCS8PrivateKey(priv)
+	require.NoError(t, err)
+	pkPEM := string(pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: b}))
+
+	key, err := svc.Import("ed-import", pkPEM)
+	require.NoError(t, err)
+	assert.NotZero(t, key.ID)
+	assert.Equal(t, model.KeyTypeED25519, key.Type)
+}
+
+func TestKeyService_ImportUnsupportedKeyType(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	svc := NewKeyService(db, &noopCrypto{})
+
+	pkPEM := "-----BEGIN UNKNOWN TYPE-----\nAQ==\n-----END UNKNOWN TYPE-----"
+	_, err := svc.Import("bad", pkPEM)
+	assert.Error(t, err)
+}
+
+func TestKeyService_ImportNullBlockPEM(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	svc := NewKeyService(db, &noopCrypto{})
+
+	_, err := svc.Import("bad", "garbage-data")
+	assert.Error(t, err)
+}
+
+func TestKeyService_extractPublicKeyWithType(t *testing.T) {
+	svc := &KeyService{db: nil, crypto: &noopCrypto{}}
+
+	pkPEM := generateTestPrivateKeyPEM(t)
+	keyType, pubKey, err := svc.extractPublicKeyWithType([]byte(pkPEM))
+	require.NoError(t, err)
+	assert.Equal(t, model.KeyTypeED25519, keyType)
+	assert.NotEmpty(t, pubKey)
+}
+
+func TestKeyService_extractPublicKeyWithType_RSA(t *testing.T) {
+	svc := &KeyService{db: nil, crypto: &noopCrypto{}}
+
+	pk, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
+	pkBytes := x509.MarshalPKCS1PrivateKey(pk)
+	pkPEM := string(pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: pkBytes}))
+
+	keyType, pubKey, err := svc.extractPublicKeyWithType([]byte(pkPEM))
+	require.NoError(t, err)
+	assert.Equal(t, model.KeyTypeRSA, keyType)
+	assert.NotEmpty(t, pubKey)
+}
+
+func TestKeyService_extractPublicKeyWithType_EC(t *testing.T) {
+	svc := &KeyService{db: nil, crypto: &noopCrypto{}}
+
+	pk, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	require.NoError(t, err)
+	pkBytes, err := x509.MarshalECPrivateKey(pk)
+	require.NoError(t, err)
+	pkPEM := string(pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: pkBytes}))
+
+	keyType, pubKey, err := svc.extractPublicKeyWithType([]byte(pkPEM))
+	require.NoError(t, err)
+	assert.Equal(t, model.KeyTypeECDSA, keyType)
+	assert.NotEmpty(t, pubKey)
+}
+
+func TestKeyService_extractPublicKeyWithType_RSA_PKCS8(t *testing.T) {
+	svc := &KeyService{db: nil, crypto: &noopCrypto{}}
+
+	pk, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
+	pkBytes, err := x509.MarshalPKCS8PrivateKey(pk)
+	require.NoError(t, err)
+	pkPEM := string(pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: pkBytes}))
+
+	keyType, pubKey, err := svc.extractPublicKeyWithType([]byte(pkPEM))
+	require.NoError(t, err)
+	assert.Equal(t, model.KeyTypeRSA, keyType)
+	assert.NotEmpty(t, pubKey)
+}
+
+func TestKeyService_extractPublicKeyWithType_ECDSA_PKCS8(t *testing.T) {
+	svc := &KeyService{db: nil, crypto: &noopCrypto{}}
+
+	pk, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	require.NoError(t, err)
+	pkBytes, err := x509.MarshalPKCS8PrivateKey(pk)
+	require.NoError(t, err)
+	pkPEM := string(pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: pkBytes}))
+
+	keyType, pubKey, err := svc.extractPublicKeyWithType([]byte(pkPEM))
+	require.NoError(t, err)
+	assert.Equal(t, model.KeyTypeECDSA, keyType)
+	assert.NotEmpty(t, pubKey)
+}

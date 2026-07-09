@@ -9,11 +9,6 @@ import (
 	gossh "golang.org/x/crypto/ssh"
 )
 
-type mockServerConfig struct {
-	rejectPty   bool
-	rejectShell bool
-}
-
 func NewMockServer(t *testing.T) (string, func()) {
 	t.Helper()
 	return newMockServerWithConfig(t, false, false)

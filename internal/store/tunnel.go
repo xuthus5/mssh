@@ -3,8 +3,9 @@ package store
 import (
 	"database/sql"
 	"fmt"
-	"mssh/internal/model"
 	"time"
+
+	"mssh/internal/model"
 )
 
 func CreateTunnel(db *sql.DB, t model.Tunnel) (*model.Tunnel, error) {

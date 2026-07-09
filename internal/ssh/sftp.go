@@ -79,11 +79,11 @@ func DownloadFile(client *sftp.Client, src, dst string, onProgress ProgressFn) e
 	defer remote.Close()
 
 	localDir := filepath.Dir(dst)
-	if err := os.MkdirAll(localDir, 0700); err != nil {
+	if err := os.MkdirAll(localDir, 0o700); err != nil {
 		return fmt.Errorf("create local dir: %w", err)
 	}
 
-	local, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+	local, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
 	if err != nil {
 		return fmt.Errorf("open local: %w", err)
 	}

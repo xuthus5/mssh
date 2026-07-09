@@ -2,13 +2,14 @@ package ssh
 
 import (
 	"encoding/binary"
-	"mssh/internal/model"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"mssh/internal/model"
 )
 
 func TestNewPlayerFileNotFound(t *testing.T) {
@@ -326,4 +327,74 @@ func TestPlayerUnsupportedVersion(t *testing.T) {
 	_, err = NewPlayer(path)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "unsupported file version")
+}
+
+func TestPlayerParseHeaderTruncatedAfterMagic(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "trunc_after_magic.msshlog")
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
+	require.NoError(t, err)
+	_ = binary.Write(f, binary.LittleEndian, magicNumber)
+	_ = f.Close()
+
+	_, err = NewPlayer(path)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "read version")
+}
+
+func TestPlayerParseHeaderTruncatedAfterVersion(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "trunc_after_ver.msshlog")
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
+	require.NoError(t, err)
+	_ = binary.Write(f, binary.LittleEndian, magicNumber)
+	_ = binary.Write(f, binary.LittleEndian, fileVersion)
+	_ = f.Close()
+
+	_, err = NewPlayer(path)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "read cols")
+}
+
+func TestPlayerParseHeaderTruncatedAfterCols(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "trunc_after_cols.msshlog")
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
+	require.NoError(t, err)
+	_ = binary.Write(f, binary.LittleEndian, magicNumber)
+	_ = binary.Write(f, binary.LittleEndian, fileVersion)
+	_ = binary.Write(f, binary.LittleEndian, uint32(80))
+	_ = f.Close()
+
+	_, err = NewPlayer(path)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "read rows")
+}
+
+func TestPlayerParseHeaderTruncatedAfterRows(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "trunc_after_rows.msshlog")
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
+	require.NoError(t, err)
+	_ = binary.Write(f, binary.LittleEndian, magicNumber)
+	_ = binary.Write(f, binary.LittleEndian, fileVersion)
+	_ = binary.Write(f, binary.LittleEndian, uint32(80))
+	_ = binary.Write(f, binary.LittleEndian, uint32(24))
+	_ = f.Close()
+
+	_, err = NewPlayer(path)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "read term type length")
+}
+
+func TestPlayerParseHeaderTruncatedTermType(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "trunc_term_type.msshlog")
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
+	require.NoError(t, err)
+	_ = binary.Write(f, binary.LittleEndian, magicNumber)
+	_ = binary.Write(f, binary.LittleEndian, fileVersion)
+	_ = binary.Write(f, binary.LittleEndian, uint32(80))
+	_ = binary.Write(f, binary.LittleEndian, uint32(24))
+	_ = binary.Write(f, binary.LittleEndian, uint32(10))
+	_ = f.Close()
+
+	_, err = NewPlayer(path)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "read term type")
 }
