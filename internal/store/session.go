@@ -135,3 +135,40 @@ func DeleteSession(db *sql.DB, id int64) error {
 	}
 	return nil
 }
+
+func GetSession(db *sql.DB, id int64) (*model.Session, error) {
+	var s model.Session
+	var createdAt, updatedAt string
+	err := db.QueryRow(
+		`SELECT id, folder_id, name, host, port, username, auth_method, password, key_id, keep_alive, term_type, sort_order, created_at, updated_at
+		 FROM sessions WHERE id = ?`, id,
+	).Scan(&s.ID, &s.FolderID, &s.Name, &s.Host, &s.Port, &s.Username, &s.AuthMethod, &s.Password, &s.KeyID, &s.KeepAlive, &s.TermType, &s.SortOrder, &createdAt, &updatedAt)
+	if err != nil {
+		return nil, fmt.Errorf("get session: %w", err)
+	}
+	s.CreatedAt, _ = time.Parse("2006-01-02 15:04:05", createdAt)
+	s.UpdatedAt, _ = time.Parse("2006-01-02 15:04:05", updatedAt)
+	return &s, nil
+}
+
+func MoveFolder(db *sql.DB, id int64, newParentID *int64) error {
+	_, err := db.Exec(
+		"UPDATE session_folders SET parent_id = ?, updated_at = datetime('now') WHERE id = ?",
+		newParentID, id,
+	)
+	if err != nil {
+		return fmt.Errorf("move folder: %w", err)
+	}
+	return nil
+}
+
+func MoveSession(db *sql.DB, id int64, newFolderID *int64) error {
+	_, err := db.Exec(
+		"UPDATE sessions SET folder_id = ?, updated_at = datetime('now') WHERE id = ?",
+		newFolderID, id,
+	)
+	if err != nil {
+		return fmt.Errorf("move session: %w", err)
+	}
+	return nil
+}
