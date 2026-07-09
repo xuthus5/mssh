@@ -59,7 +59,7 @@ func TestMigrateTablesExist(t *testing.T) {
 func TestOpenDBInvalidPath(t *testing.T) {
 	tmpDir := t.TempDir()
 	filePath := tmpDir + "/file.txt"
-	err := os.WriteFile(filePath, []byte("data"), 0600)
+	err := os.WriteFile(filePath, []byte("data"), 0o600)
 	require.NoError(t, err)
 
 	db, err := OpenDB(filePath)
