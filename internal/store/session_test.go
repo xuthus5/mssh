@@ -2,9 +2,8 @@ package store
 
 import (
 	"database/sql"
-	"testing"
-
 	"mssh/internal/model"
+	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
