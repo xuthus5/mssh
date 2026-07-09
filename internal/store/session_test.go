@@ -104,6 +104,55 @@ func TestListSessionsByFolder(t *testing.T) {
 	assert.Len(t, sessions, 1)
 }
 
+func TestGetSession(t *testing.T) {
+	db := setupTestDB(t)
+	s := model.Session{Name: "web", Host: "10.0.0.1", Port: 22, Username: "root", AuthMethod: model.AuthPassword, Password: "pwd", KeepAlive: 30}
+	created, err := CreateSession(db, s)
+	require.NoError(t, err)
+
+	fetched, err := GetSession(db, created.ID)
+	require.NoError(t, err)
+	assert.Equal(t, created.ID, fetched.ID)
+	assert.Equal(t, "web", fetched.Name)
+	assert.Equal(t, "10.0.0.1", fetched.Host)
+}
+
+func TestGetSessionNotFound(t *testing.T) {
+	db := setupTestDB(t)
+	_, err := GetSession(db, 999)
+	assert.Error(t, err)
+}
+
+func TestMoveFolder(t *testing.T) {
+	db := setupTestDB(t)
+	var parent1 int64 = 1
+	folder, err := CreateFolder(db, "child", &parent1)
+	require.NoError(t, err)
+	var parent2 int64 = 2
+	err = MoveFolder(db, folder.ID, &parent2)
+	require.NoError(t, err)
+
+	folders, err := ListFolders(db)
+	require.NoError(t, err)
+	assert.Equal(t, int64(2), *folders[0].ParentID)
+}
+
+func TestMoveSession(t *testing.T) {
+	db := setupTestDB(t)
+	var folderID int64 = 1
+	s := model.Session{FolderID: &folderID, Name: "web", Host: "10.0.0.1", Port: 22, Username: "root", AuthMethod: model.AuthPassword, Password: "pwd", KeepAlive: 30}
+	created, err := CreateSession(db, s)
+	require.NoError(t, err)
+
+	var newFolderID int64 = 2
+	err = MoveSession(db, created.ID, &newFolderID)
+	require.NoError(t, err)
+
+	fetched, err := GetSession(db, created.ID)
+	require.NoError(t, err)
+	assert.Equal(t, int64(2), *fetched.FolderID)
+}
+
 func TestGetSetSetting(t *testing.T) {
 	db := setupTestDB(t)
 	v, err := GetSetting(db, "nonexistent")
