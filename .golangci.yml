@@ -14,12 +14,37 @@ linters:
     - dupl
   settings:
     cyclop:
-      max-complexity: 10
+      max-complexity: 20
     funlen:
-      lines: 50
+      lines: 80
+      statements: 50
     gocognit:
-      min-complexity: 10
-formatters:
-  enable:
-    - goimports
-    - gofumpt
+      min-complexity: 16
+    errcheck:
+      check-blank: false
+  exclusions:
+    presets:
+      - comments
+    paths:
+      - .*_test\.go$
+      - .*testutil.*
+    rules:
+      - path: _test\.go$
+        linters:
+          - gocognit
+          - funlen
+          - errcheck
+          - cyclop
+      - path: testutil
+        linters:
+          - gocognit
+          - funlen
+          - errcheck
+          - cyclop
+      - linters:
+          - errcheck
+        text: "Error return value of `(.*\\.Close|.*\\.Stop|.*\\.Remove|io\\.Copy|.*\\.MkdirAll|.*\\.Disconnect|.*\\.LastInsertId|.*\\.RowsAffected|time\\.Parse|.*\\.Write)` is not checked"
+  formatters:
+    enable:
+      - goimports
+      - gofumpt

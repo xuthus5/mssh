@@ -3,8 +3,9 @@ package store
 import (
 	"database/sql"
 	"fmt"
-	"mssh/internal/model"
 	"time"
+
+	"mssh/internal/model"
 )
 
 func CreateFolder(db *sql.DB, name string, parentID *int64) (*model.SessionFolder, error) {

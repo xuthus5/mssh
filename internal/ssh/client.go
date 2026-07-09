@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"net"
 
-	"mssh/internal/model"
-
 	gossh "golang.org/x/crypto/ssh"
+
+	"mssh/internal/model"
 )
 
 type ClientWrapper struct {

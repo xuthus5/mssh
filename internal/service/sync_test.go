@@ -144,3 +144,25 @@ func TestSyncService_SyncFromCloud(t *testing.T) {
 	err := svc.SyncFromCloud()
 	assert.NoError(t, err)
 }
+
+func TestSyncService_ExportClosedDB(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	svc := NewSyncService(db)
+	db.Close()
+
+	exportPath := filepath.Join(t.TempDir(), "export-closed.json")
+	err := svc.Export(exportPath)
+	assert.Error(t, err)
+}
+
+func TestSyncService_ImportClosedDB(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	svc := NewSyncService(db)
+	db.Close()
+
+	importPath := filepath.Join(t.TempDir(), "import-closed.json")
+	require.NoError(t, os.WriteFile(importPath, []byte(`{"sessions":[{"name":"s1","host":"10.0.0.1","port":22,"username":"root","auth_method":"password","password":"enc","keep_alive":30,"term_type":"xterm"}],"keys":[],"macros":[]}`), 0o600))
+
+	err := svc.Import(importPath)
+	assert.Error(t, err)
+}

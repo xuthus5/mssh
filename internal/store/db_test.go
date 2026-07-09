@@ -6,6 +6,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"mssh/internal/model"
 )
 
 func TestOpenDB(t *testing.T) {
@@ -76,4 +78,142 @@ func TestMigrateClosedDB(t *testing.T) {
 	db.Close()
 	err = Migrate(db)
 	assert.Error(t, err)
+}
+
+func TestStoreOperationsClosedDB(t *testing.T) { //nolint:funlen
+	tmpDir := t.TempDir()
+	db, err := OpenDB(tmpDir)
+	require.NoError(t, err)
+	_ = Migrate(db)
+	db.Close()
+
+	{
+		var pid int64 = 1
+		_, err = CreateFolder(db, "test", &pid)
+		assert.Error(t, err)
+	}
+	{
+		_, err = ListFolders(db)
+		assert.Error(t, err)
+	}
+	{
+		err = UpdateFolder(db, 1, "test")
+		assert.Error(t, err)
+	}
+	{
+		err = DeleteFolder(db, 1)
+		assert.Error(t, err)
+	}
+	{
+		err = MoveFolder(db, 1, ptrInt64(2))
+		assert.Error(t, err)
+	}
+	s := model.Session{
+		Name: "s", Host: "1.1.1.1", Port: 22, Username: "u",
+		AuthMethod: model.AuthPassword, Password: "p", KeepAlive: 30,
+	}
+	{
+		_, err = CreateSession(db, s)
+		assert.Error(t, err)
+	}
+	{
+		_, err = ListSessions(db, nil)
+		assert.Error(t, err)
+	}
+	{
+		err = UpdateSession(db, s)
+		assert.Error(t, err)
+	}
+	{
+		err = DeleteSession(db, 1)
+		assert.Error(t, err)
+	}
+	{
+		_, err = GetSession(db, 1)
+		assert.Error(t, err)
+	}
+	{
+		err = MoveSession(db, 1, ptrInt64(2))
+		assert.Error(t, err)
+	}
+	{
+		_, err = GetSetting(db, "key")
+		assert.Error(t, err)
+	}
+	{
+		err = SetSetting(db, "key", "val")
+		assert.Error(t, err)
+	}
+	k := model.SSHKey{Name: "k", Type: model.KeyTypeED25519, PrivateKey: "priv"}
+	{
+		_, err = CreateKey(db, k)
+		assert.Error(t, err)
+	}
+	{
+		_, err = ListKeys(db)
+		assert.Error(t, err)
+	}
+	{
+		_, err = GetKey(db, 1)
+		assert.Error(t, err)
+	}
+	{
+		err = DeleteKey(db, 1)
+		assert.Error(t, err)
+	}
+	tun := model.Tunnel{SessionID: 1, Name: "t", Type: model.TunnelLocal, LocalPort: 8080}
+	{
+		_, err = CreateTunnel(db, tun)
+		assert.Error(t, err)
+	}
+	{
+		_, err = ListTunnels(db)
+		assert.Error(t, err)
+	}
+	{
+		err = UpdateTunnel(db, tun)
+		assert.Error(t, err)
+	}
+	{
+		err = DeleteTunnel(db, 1)
+		assert.Error(t, err)
+	}
+	mac := model.Macro{Name: "m", Command: "c"}
+	{
+		_, err = CreateMacro(db, mac)
+		assert.Error(t, err)
+	}
+	{
+		_, err = ListMacros(db)
+		assert.Error(t, err)
+	}
+	{
+		err = UpdateMacro(db, mac)
+		assert.Error(t, err)
+	}
+	{
+		err = DeleteMacro(db, 1)
+		assert.Error(t, err)
+	}
+	th := model.Theme{Name: "t", Config: "{}"}
+	{
+		_, err = CreateTheme(db, th)
+		assert.Error(t, err)
+	}
+	{
+		_, err = ListThemes(db)
+		assert.Error(t, err)
+	}
+	{
+		err = UpdateTheme(db, th)
+		assert.Error(t, err)
+	}
+	{
+		err = DeleteTheme(db, 1)
+		assert.Error(t, err)
+	}
+}
+
+func ptrInt64(v int64) *int64 {
+	return &v
 }

@@ -2,9 +2,10 @@ package ssh
 
 import (
 	"encoding/binary"
-	"mssh/internal/model"
 	"os"
 	"time"
+
+	"mssh/internal/model"
 )
 
 const (

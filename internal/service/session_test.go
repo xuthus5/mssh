@@ -10,14 +10,14 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"mssh/internal/model"
 	"mssh/internal/service/testutil"
 	sshtestutil "mssh/internal/ssh/testutil"
 	"mssh/internal/store"
 	"mssh/pkg/event"
-
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 type mockEventBus struct {
@@ -244,6 +244,28 @@ func TestSessionService_buildAuthMethodsKeyboardInteractive(t *testing.T) {
 	sess := &model.Session{AuthMethod: model.AuthKeyboardInteractive, Password: "secret"}
 	methods := svc.buildAuthMethods(sess)
 	assert.Len(t, methods, 1)
+}
+
+func TestSessionService_buildAuthMethodsUnknown(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	svc := NewSessionService(db, newMockEventBus(), 30)
+
+	sess := &model.Session{AuthMethod: "unknown"}
+	methods := svc.buildAuthMethods(sess)
+	assert.Len(t, methods, 0)
+}
+
+func TestSessionService_buildAuthMethodsKeyInvalidKey(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	svc := NewSessionService(db, newMockEventBus(), 30)
+
+	testKey := model.SSHKey{Name: "bad-key", Type: model.KeyTypeED25519, PrivateKey: "not-a-valid-private-key"}
+	createdKey, err := store.CreateKey(db, testKey)
+	require.NoError(t, err)
+
+	sess := &model.Session{AuthMethod: model.AuthKey, KeyID: &createdKey.ID}
+	methods := svc.buildAuthMethods(sess)
+	assert.Len(t, methods, 0)
 }
 
 func TestSessionService_GetSessionNotFound(t *testing.T) {

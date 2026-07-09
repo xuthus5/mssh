@@ -5,9 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"mssh/internal/model"
 	"os"
 	"time"
+
+	"mssh/internal/model"
 )
 
 var ErrInvalidMagic = errors.New("invalid magic number")

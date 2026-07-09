@@ -2,11 +2,12 @@ package store
 
 import (
 	"database/sql"
-	"mssh/internal/model"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"mssh/internal/model"
 )
 
 func setupTestDB(t *testing.T) *sql.DB {

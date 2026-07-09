@@ -4,9 +4,9 @@ import (
 	"database/sql"
 	"testing"
 
-	"mssh/internal/store"
-
 	"github.com/stretchr/testify/require"
+
+	"mssh/internal/store"
 )
 
 func NewTestDB(t *testing.T) *sql.DB {

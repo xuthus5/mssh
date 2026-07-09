@@ -127,3 +127,11 @@ func TestPTYCloseDouble(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotPanics(t, func() { _ = ptys.Close() })
 }
+
+func TestPTYWrite_NilStdin(t *testing.T) {
+	p := &PTYSession{stdin: nil}
+	n, err := p.Write([]byte("data"))
+	assert.Error(t, err)
+	assert.Equal(t, 0, n)
+	assert.Contains(t, err.Error(), "stdin not available")
+}

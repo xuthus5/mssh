@@ -9,13 +9,13 @@ import (
 	"path/filepath"
 	"testing"
 
-	"mssh/internal/model"
-	"mssh/internal/ssh/testutil"
-
 	"github.com/pkg/sftp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	gossh "golang.org/x/crypto/ssh"
+
+	"mssh/internal/model"
+	"mssh/internal/ssh/testutil"
 )
 
 func startSFTPServer(t *testing.T) (string, func()) {
@@ -213,7 +213,7 @@ func TestUploadFile_Success(t *testing.T) {
 	tmpDir := t.TempDir()
 	srcPath := filepath.Join(tmpDir, "test.txt")
 	content := []byte("hello world test upload")
-	err := os.WriteFile(srcPath, content, 0600)
+	err := os.WriteFile(srcPath, content, 0o600)
 	require.NoError(t, err)
 
 	err = UploadFile(client, srcPath, "/uploaded.txt", nil)
@@ -235,7 +235,7 @@ func TestUploadFile_WithProgress(t *testing.T) {
 	srcPath := filepath.Join(tmpDir, "bigfile.bin")
 	content := make([]byte, 100*1024)
 	_, _ = rand.Read(content)
-	err := os.WriteFile(srcPath, content, 0600)
+	err := os.WriteFile(srcPath, content, 0o600)
 	require.NoError(t, err)
 
 	var progressCalls []int64
@@ -272,7 +272,7 @@ func TestUploadFile_CreatesRemoteDirs(t *testing.T) {
 
 	tmpDir := t.TempDir()
 	srcPath := filepath.Join(tmpDir, "test.txt")
-	err := os.WriteFile(srcPath, []byte("data"), 0600)
+	err := os.WriteFile(srcPath, []byte("data"), 0o600)
 	require.NoError(t, err)
 
 	err = UploadFile(client, srcPath, "/a/b/c/d/file.txt", nil)
@@ -503,4 +503,43 @@ func TestProgressWriter_NilCallback(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 5, n)
 	assert.Equal(t, int64(5), pw.total)
+}
+
+func TestMkdirError(t *testing.T) {
+	addr, cleanup := startSFTPServer(t)
+	defer cleanup()
+	cw, client := connectSFTP(t, addr)
+	client.Close()
+	defer cw.Close()
+
+	err := Mkdir(client, "/test")
+	assert.Error(t, err)
+}
+
+func TestUploadFile_CreateRemoteError(t *testing.T) {
+	addr, cleanup := startSFTPServer(t)
+	defer cleanup()
+	cw, client := connectSFTP(t, addr)
+	defer cw.Close()
+	defer client.Close()
+
+	err := UploadFile(client, "/nonexistent-local-file-for-upload", "/remote.txt", nil)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "open local")
+}
+
+func TestDownloadFile_OpenLocalError(t *testing.T) {
+	addr, cleanup := startSFTPServer(t)
+	defer cleanup()
+	cw, client := connectSFTP(t, addr)
+	defer cw.Close()
+	defer client.Close()
+
+	f, err := client.Create("/remote-for-dl.txt")
+	require.NoError(t, err)
+	_, _ = f.Write([]byte("data"))
+	_ = f.Close()
+
+	err = DownloadFile(client, "/remote-for-dl.txt", "/dev/null/output.txt", nil)
+	assert.Error(t, err)
 }
