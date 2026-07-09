@@ -10,9 +10,9 @@ import (
 	"mssh/internal/model"
 	"mssh/internal/ssh/testutil"
 
-	gossh "golang.org/x/crypto/ssh"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	gossh "golang.org/x/crypto/ssh"
 )
 
 func mustParsePort(addr string) int {
