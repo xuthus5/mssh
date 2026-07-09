@@ -127,6 +127,16 @@ func (s *SessionService) Disconnect(terminalID string) error {
 	return nil
 }
 
+func (s *SessionService) GetClientWrapper(connID string) (*ssh.ClientWrapper, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	wrapper, ok := s.conns[connID]
+	if !ok {
+		return nil, fmt.Errorf("connection %s not found", connID)
+	}
+	return wrapper, nil
+}
+
 func (s *SessionService) ConnectionCount() int {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
