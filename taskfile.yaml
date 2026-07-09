@@ -1,0 +1,28 @@
+version: '3'
+tasks:
+  dev:
+    desc: 启动开发模式
+    cmds:
+      - wails3 dev
+  build:
+    desc: 生产构建
+    cmds:
+      - wails3 build
+  lint:
+    desc: 运行 golangci-lint
+    cmds:
+      - golangci-lint run --timeout 5m ./...
+  fmt:
+    desc: 格式化代码
+    cmds:
+      - goimports-reviser -rm-unused -format ./...
+  test:
+    desc: 运行测试 + 覆盖率
+    cmds:
+      - go test -race -coverprofile=coverage.out -covermode=atomic ./...
+      - go tool cover -func=coverage.out | grep total
+  clean:
+    desc: 清理临时产物
+    cmds:
+      - rm -f coverage.out
+      - go clean -testcache

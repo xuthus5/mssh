@@ -1,0 +1,25 @@
+version: "2"
+run:
+  timeout: 5m
+linters:
+  enable:
+    - govet
+    - staticcheck
+    - errcheck
+    - unused
+    - ineffassign
+    - cyclop
+    - funlen
+    - gocognit
+    - dupl
+  settings:
+    cyclop:
+      max-complexity: 10
+    funlen:
+      lines: 50
+    gocognit:
+      min-complexity: 10
+formatters:
+  enable:
+    - goimports
+    - gofumpt
