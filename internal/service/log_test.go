@@ -182,3 +182,90 @@ func TestLogService_StartRecordingCreateLogError(t *testing.T) {
 	_, err := svc.StartRecording(1, 80, 24, "xterm", invalidPath)
 	assert.Error(t, err)
 }
+
+func TestLogService_ListBySessionNoMatch(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	svc := NewLogService(db)
+
+	sessionSvc := NewSessionService(db, newMockEventBus(), 30)
+	sess := model.Session{
+		Name: "test-nomatch", Host: "10.0.0.1", Port: 22, Username: "root",
+		AuthMethod: model.AuthPassword, Password: "enc", KeepAlive: 30, TermType: "xterm",
+	}
+	createdSess, err := sessionSvc.CreateSession(sess)
+	require.NoError(t, err)
+
+	dataPath := filepath.Join(t.TempDir(), "recording-nomatch.bin")
+	_, err = svc.StartRecording(createdSess.ID, 80, 24, "xterm", dataPath)
+	require.NoError(t, err)
+
+	otherID := int64(999)
+	logs, err := svc.List(&otherID)
+	require.NoError(t, err)
+	assert.Len(t, logs, 0)
+}
+
+func TestLogService_DeleteNotFound(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	svc := NewLogService(db)
+
+	err := svc.Delete(999)
+	assert.NoError(t, err)
+}
+
+func TestLogService_StopRecordingTwice(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	svc := NewLogService(db)
+
+	sessionSvc := NewSessionService(db, newMockEventBus(), 30)
+	sess := model.Session{
+		Name: "test-stoptwice", Host: "10.0.0.1", Port: 22, Username: "root",
+		AuthMethod: model.AuthPassword, Password: "enc", KeepAlive: 30, TermType: "xterm",
+	}
+	createdSess, err := sessionSvc.CreateSession(sess)
+	require.NoError(t, err)
+
+	dataPath := filepath.Join(t.TempDir(), "recording-stop2.bin")
+	logID, err := svc.StartRecording(createdSess.ID, 80, 24, "xterm", dataPath)
+	require.NoError(t, err)
+
+	err = svc.StopRecording(logID)
+	require.NoError(t, err)
+
+	err = svc.StopRecording(logID)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "not active")
+}
+
+func TestLogService_StartRecordingClosedDB(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	svc := NewLogService(db)
+
+	dataPath := filepath.Join(t.TempDir(), "recording-closed.bin")
+	db.Close()
+	_, err := svc.StartRecording(1, 80, 24, "xterm", dataPath)
+	assert.Error(t, err)
+}
+
+func TestLogService_DeleteWithDataPath(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	sessionSvc := NewSessionService(db, newMockEventBus(), 30)
+	sess := model.Session{
+		Name: "test-del-path", Host: "10.0.0.1", Port: 22, Username: "root",
+		AuthMethod: model.AuthPassword, Password: "enc", KeepAlive: 30, TermType: "xterm",
+	}
+	createdSess, err := sessionSvc.CreateSession(sess)
+	require.NoError(t, err)
+
+	dataPath := filepath.Join(t.TempDir(), "recording-del.bin")
+	svc := NewLogService(db)
+	logID, err := svc.StartRecording(createdSess.ID, 80, 24, "xterm", dataPath)
+	require.NoError(t, err)
+
+	err = svc.Delete(logID)
+	require.NoError(t, err)
+
+	logs, err := svc.List(nil)
+	require.NoError(t, err)
+	assert.Len(t, logs, 0)
+}

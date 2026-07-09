@@ -1,12 +1,13 @@
 package store
 
 import (
-	"mssh/internal/model"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"mssh/internal/model"
 )
 
 func TestCreateAndListSessionLogs(t *testing.T) {

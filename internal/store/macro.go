@@ -3,8 +3,9 @@ package store
 import (
 	"database/sql"
 	"fmt"
-	"mssh/internal/model"
 	"time"
+
+	"mssh/internal/model"
 )
 
 func CreateMacro(db *sql.DB, m model.Macro) (*model.Macro, error) {
