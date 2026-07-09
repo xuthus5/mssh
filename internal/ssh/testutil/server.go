@@ -9,7 +9,27 @@ import (
 	gossh "golang.org/x/crypto/ssh"
 )
 
+type mockServerConfig struct {
+	rejectPty   bool
+	rejectShell bool
+}
+
 func NewMockServer(t *testing.T) (string, func()) {
+	t.Helper()
+	return newMockServerWithConfig(t, false, false)
+}
+
+func NewMockServerRejectPty(t *testing.T) (string, func()) {
+	t.Helper()
+	return newMockServerWithConfig(t, true, false)
+}
+
+func NewMockServerRejectShell(t *testing.T) (string, func()) {
+	t.Helper()
+	return newMockServerWithConfig(t, false, true)
+}
+
+func newMockServerWithConfig(t *testing.T, rejectPty, rejectShell bool) (string, func()) {
 	t.Helper()
 	config := &gossh.ServerConfig{
 		NoClientAuth: true,
@@ -33,12 +53,20 @@ func NewMockServer(t *testing.T) (string, func()) {
 						for req := range requests {
 							switch req.Type {
 							case "shell":
-								req.Reply(true, nil)
-								channel.Write([]byte("mock> "))
+								if rejectShell {
+									_ = req.Reply(false, nil)
+								} else {
+									_ = req.Reply(true, nil)
+									_, _ = channel.Write([]byte("mock> "))
+								}
 							case "pty-req":
-								req.Reply(true, nil)
+								if rejectPty {
+									_ = req.Reply(false, nil)
+								} else {
+									_ = req.Reply(true, nil)
+								}
 							default:
-								req.Reply(false, nil)
+								_ = req.Reply(false, nil)
 							}
 						}
 					}()
@@ -46,5 +74,5 @@ func NewMockServer(t *testing.T) (string, func()) {
 			}
 		}
 	}()
-	return listener.Addr().String(), func() { listener.Close() }
+	return listener.Addr().String(), func() { _ = listener.Close() }
 }
