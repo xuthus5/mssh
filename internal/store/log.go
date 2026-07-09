@@ -3,8 +3,9 @@ package store
 import (
 	"database/sql"
 	"fmt"
-	"mssh/internal/model"
 	"time"
+
+	"mssh/internal/model"
 )
 
 func CreateSessionLog(db *sql.DB, l model.SessionLog) (*model.SessionLog, error) {

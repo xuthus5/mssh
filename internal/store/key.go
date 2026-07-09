@@ -3,8 +3,9 @@ package store
 import (
 	"database/sql"
 	"fmt"
-	"mssh/internal/model"
 	"time"
+
+	"mssh/internal/model"
 )
 
 func CreateKey(db *sql.DB, k model.SSHKey) (*model.SSHKey, error) {

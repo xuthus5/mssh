@@ -263,3 +263,26 @@ func TestTunnelService_LocalForward(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotZero(t, created.ID)
 }
+
+func TestTunnelService_StartConnectError(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	sessionSvc := NewSessionService(db, newMockEventBus(), 30)
+
+	sess := model.Session{
+		Name: "dead-sess", Host: "127.0.0.1", Port: 19, Username: "root",
+		AuthMethod: model.AuthPassword, Password: "enc", KeepAlive: 30, TermType: "xterm",
+	}
+	createdSess, err := sessionSvc.CreateSession(sess)
+	require.NoError(t, err)
+
+	tunnel := model.Tunnel{
+		SessionID: createdSess.ID, Name: "dead-tunnel", Type: model.TunnelDynamic,
+		LocalHost: "127.0.0.1", LocalPort: 15003,
+	}
+	svc := NewTunnelService(db, sessionSvc, newMockEventBus())
+	created, err := svc.Create(tunnel)
+	require.NoError(t, err)
+
+	err = svc.Start(created.ID)
+	assert.Error(t, err)
+}

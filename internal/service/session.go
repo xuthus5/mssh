@@ -7,12 +7,12 @@ import (
 	"fmt"
 	"sync"
 
+	gossh "golang.org/x/crypto/ssh"
+
 	"mssh/internal/model"
 	ssh "mssh/internal/ssh"
 	"mssh/internal/store"
 	"mssh/pkg/event"
-
-	gossh "golang.org/x/crypto/ssh"
 )
 
 type EventBus interface {

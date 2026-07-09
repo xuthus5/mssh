@@ -3,8 +3,9 @@ package store
 import (
 	"database/sql"
 	"fmt"
-	"mssh/internal/model"
 	"time"
+
+	"mssh/internal/model"
 )
 
 func CreateTheme(db *sql.DB, t model.Theme) (*model.Theme, error) {
