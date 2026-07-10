@@ -170,6 +170,14 @@ export function useSession() {
       const tabId = `terminal-${sessionId}`
       const session = sessions.find((s) => s.id === sessionId)
       openTab({ id: tabId, title: session?.name ?? sessionId, type: 'terminal', terminalId })
+
+      // Write connection info to terminal after mount
+      setTimeout(() => {
+        const st = useAppStore.getState().terminalPool.get(terminalId)
+        if (st?.terminal && session) {
+          st.terminal.writeln(`\x1b[1;32mConnecting to ${session.username}@${session.host}:${session.port}...\x1b[0m`)
+        }
+      }, 200)
     } catch (err) {
       console.error('[SessionService.Connect]', err)
     }
