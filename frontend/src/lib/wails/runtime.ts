@@ -1,66 +1,43 @@
-declare global {
-  interface Window {
-    wails?: {
-      Call?: {
-        ByID: (methodID: number, ...args: unknown[]) => PromiseLike<unknown>
-        ByName: (methodName: string, ...args: unknown[]) => PromiseLike<unknown>
-      }
-      Events?: {
-        On: (event: string, callback: (...args: unknown[]) => void) => () => void
-        Emit: (event: string, ...args: unknown[]) => void
-        Off: (event: string) => void
-      }
-    }
+let _ByName: ((methodName: string, ...args: unknown[]) => Promise<unknown>) | null = null
+
+function findByName(): typeof _ByName {
+  const w = (window as any).wails
+  if (!w) {
+    console.log('[wails] window.wails not found, available globals:', Object.keys(window).filter(k => k.startsWith('wails') || k.startsWith('_')))
+    return null
   }
+  const keys = Object.keys(w)
+  console.log('[wails] window.wails keys:', keys.join(', '))
+  if (w.Call?.ByName) return (m: string, ...a: unknown[]) => w.Call.ByName(m, ...a)
+  if (w.Call?.ByID) {
+    console.log('[wails] found Call.ByID, using numeric IDs')
+    // We have ByID but not ByName — still not useful without method IDs
+  }
+  if (w.ByName) return (m: string, ...a: unknown[]) => w.ByName(m, ...a)
+  console.log('[wails] no ByName/Call.ByName found. Keys:', keys.join(', '))
+  return null
 }
 
 export function isWails(): boolean {
   return typeof window !== 'undefined'
-    && typeof window.wails !== 'undefined'
-    && typeof window.wails.Call !== 'undefined'
-    && typeof window.wails.Call.ByName === 'function'
 }
 
-function waitForWails(timeoutMs = 10000): Promise<void> {
-  if (isWails()) {
-    console.log('[wails] runtime already available')
-    return Promise.resolve()
+export async function onEvent(event: string, callback: (...args: unknown[]) => void): Promise<() => void> {
+  const w = (window as any).wails
+  if (w?.Events?.On) {
+    return w.Events.On(event, callback)
   }
-  return new Promise((resolve, reject) => {
-    const start = Date.now()
-    console.log('[wails] waiting for runtime...')
-    const check = () => {
-      if (isWails()) {
-        console.log('[wails] runtime ready after', Date.now() - start, 'ms')
-        resolve()
-        return
-      }
-      if (Date.now() - start > timeoutMs) {
-        const hasWails = typeof window !== 'undefined' && !!window.wails
-        const hasCall = hasWails && !!window.wails!.Call
-        console.error('[wails] timeout after', timeoutMs, 'ms',
-          'window.wails:', typeof window.wails,
-          'Call:', typeof window.wails?.Call,
-          'ByName:', typeof window.wails?.Call?.ByName)
-        reject(new Error('Wails runtime did not load within ' + timeoutMs + 'ms'))
-        return
-      }
-      setTimeout(check, 100)
-    }
-    check()
-  })
+  return () => {}
 }
 
-export async function call(methodID: number, ...args: unknown[]): Promise<unknown> {
-  await waitForWails()
-  return window.wails!.Call!.ByID(methodID, ...args)
+export async function callByName(fqn: string, ...args: unknown[]): Promise<unknown> {
+  const fn = _ByName ?? findByName()
+  if (fn) return fn(fqn, ...args)
+  const msg = `[wails] ByName not found for ${fqn} — check console for window.wails keys`
+  console.error(msg)
+  throw new Error(msg)
 }
 
-export function onEvent(event: string, callback: (...args: unknown[]) => void): () => void {
-  if (!isWails()) {
-    return () => {}
-  }
-  return window.wails!.Events!.On(event, callback)
+export function __setByName(fn: (methodName: string, ...args: unknown[]) => Promise<unknown>) {
+  _ByName = fn
 }
-
-export { waitForWails }
