@@ -1,11 +1,45 @@
-name: mssh
-bin_name: mssh
-output_name: mssh
-app_type: desktop
-root_path: frontend
-frontend_dir: frontend
-install_script: npm install
-build_script: npm run build
-dev_watcher: npm run dev
-dev_url: http://localhost:5173
-wailsjsdir: frontend/src/lib/wails
+# This file contains the configuration for this project.
+version: '3'
+
+info:
+  companyName: "MSSH"
+  productName: "MSSH"
+  productIdentifier: "com.mssh.app"
+  description: "A cross-platform SSH client"
+  copyright: "(c) 2026, MSSH"
+  comments: "SSH Client"
+  version: "0.1.0"
+
+dev_mode:
+  root_path: .
+  log_level: warn
+  debounce: 1000
+  ignore:
+    dir:
+      - .git
+      - node_modules
+      - frontend
+      - bin
+      - build
+    file:
+      - .DS_Store
+      - .gitignore
+      - .gitkeep
+    watched_extension:
+      - "*.go"
+    git_ignore: true
+  executes:
+    - cmd: wails3 task common:install:frontend:deps
+      type: once
+    - cmd: wails3 task common:dev:frontend
+      type: background
+    - cmd: go mod tidy
+      type: blocking
+    - cmd: wails3 task build
+      type: blocking
+    - cmd: wails3 task run
+      type: primary
+
+fileAssociations: []
+
+other: []
