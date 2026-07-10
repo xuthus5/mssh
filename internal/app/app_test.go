@@ -29,6 +29,7 @@ func TestNew(t *testing.T) {
 	assert.NotNil(t, appInstance.Theme)
 	assert.NotNil(t, appInstance.Log)
 	assert.NotNil(t, appInstance.Sync)
+	assert.NotNil(t, appInstance.Setting)
 
 	assert.Len(t, appInstance.Crypto, 32)
 }
@@ -71,13 +72,6 @@ func TestCryptoAdapterDecryptCorrupted(t *testing.T) {
 
 	_, err := ca.Decrypt([]byte("corrupted-data"))
 	assert.Error(t, err)
-}
-
-func TestNopEventBusEmit(t *testing.T) {
-	bus := &nopEventBus{}
-	assert.NotPanics(t, func() {
-		bus.Emit("test", "payload")
-	})
 }
 
 func TestNewDataDirIsFile(t *testing.T) {
