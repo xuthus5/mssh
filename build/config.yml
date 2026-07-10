@@ -37,6 +37,8 @@ dev_mode:
       type: background
     - cmd: go mod tidy
       type: blocking
+    - cmd: sleep 2
+      type: blocking
     - cmd: go run .
       type: primary
 
