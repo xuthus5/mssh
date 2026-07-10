@@ -29,15 +29,15 @@ dev_mode:
       - "*.go"
     git_ignore: true
   executes:
-    - cmd: wails3 task common:install:frontend:deps
+    - cmd: npm install
+      dir: frontend
       type: once
-    - cmd: wails3 task common:dev:frontend
+    - cmd: npm run dev
+      dir: frontend
       type: background
     - cmd: go mod tidy
       type: blocking
-    - cmd: wails3 task build
-      type: blocking
-    - cmd: wails3 task run
+    - cmd: go run .
       type: primary
 
 fileAssociations: []
