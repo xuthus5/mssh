@@ -7,6 +7,7 @@ import { TerminalTab } from '@/components/terminal/TerminalTab'
 import { PlaybackTab } from '@/components/terminal/PlaybackTab'
 import FilePanel from '@/components/file/FilePanel'
 import { ToastContainer } from '@/components/ui/toast'
+import { ConnectDialog } from '@/components/layout/ConnectDialog'
 import { useAppStore } from '@/store/appStore'
 import { useFileTransfer } from '@/hooks/useFileTransfer'
 
@@ -302,6 +303,7 @@ export default function App() {
       </div>
       <StatusBar />
       <ToastContainer />
+      <ConnectDialog />
     </div>
   )
 }
