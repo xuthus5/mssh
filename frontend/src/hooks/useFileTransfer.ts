@@ -30,7 +30,7 @@ export function useFileTransfer(sessionId: number) {
     try {
       console.log('[useFileTransfer] listFiles', { sessionId, path })
       const result = await FileService.ListDir(sessionId, path)
-      setFiles(result.map((f) => ({
+      setFiles(result.map((f: any) => ({
         name: f.name,
         path: f.path,
         size: f.size,

@@ -154,7 +154,7 @@ export function useSettings() {
     try {
       console.log('[useSettings] listKeys')
       const result = await KeyService.List()
-      setKeys(result.map((k) => ({ id: String(k.id), name: k.name, type: k.type, bits: 0, publicKey: k.public_key, createdAt: k.created_at })))
+      setKeys(result.map((k: any) => ({ id: String(k.id), name: k.name, type: k.type, bits: 0, publicKey: k.public_key, createdAt: k.created_at })))
     } catch (err) {
       console.log('[useSettings] listKeys error', err)
     }
@@ -163,7 +163,7 @@ export function useSettings() {
   const generateKey = useCallback(async (name: string, type: KeyInfo['type'], bits: number) => {
     try {
       console.log('[useSettings] generateKey', { name, type, bits })
-      const result = await KeyService.Generate(name, type, bits)
+      const result = await KeyService.Generate(name, type as any, bits)
       setKeys((prev) => [...prev, { id: String(result.id), name: result.name, type: result.type, bits, publicKey: result.public_key, createdAt: result.created_at }])
     } catch (err) {
       console.log('[useSettings] generateKey error', err)

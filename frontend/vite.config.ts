@@ -6,7 +6,10 @@ import path from 'path'
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: {
-    alias: { '@': path.resolve(__dirname, './src') },
+    alias: {
+      '@': path.resolve(__dirname, './src'),
+      '/wails/runtime.js': path.resolve(__dirname, 'src/test/__mocks__/wails-runtime.ts'),
+    },
   },
   server: {
     port: parseInt(process.env.WAILS_VITE_PORT || '5173'),
@@ -14,6 +17,7 @@ export default defineConfig({
   },
   build: {
     rollupOptions: {
+      external: [/^\/wails\//],
       output: {
         manualChunks: undefined,
       },
