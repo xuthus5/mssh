@@ -1,8 +1,13 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useSession } from '@/hooks/useSession'
-import { setWailsServices, createMockWailsServices, type SessionFolder } from '@/lib/wails'
+import { setWailsServices, createLocalServices, resetWailsForTest, type SessionConfig } from '@/lib/wails'
 import { useAppStore } from '@/store/appStore'
+
+function fresh() {
+  resetWailsForTest()
+  setWailsServices(createLocalServices())
+}
 
 function resetAppStore() {
   useAppStore.setState({ tabs: [], activeTabId: null, terminalPool: new Map() })
@@ -10,7 +15,7 @@ function resetAppStore() {
 
 describe('useSession', () => {
   beforeEach(() => {
-    setWailsServices(createMockWailsServices())
+    fresh()
     resetAppStore()
   })
 
@@ -105,7 +110,7 @@ describe('useSession', () => {
   })
 
   it('handles createSession error gracefully', async () => {
-    const mock = createMockWailsServices()
+    const mock = createLocalServices()
     mock.SessionService.CreateSession = async () => { throw new Error('db error') }
     setWailsServices(mock)
 
@@ -121,7 +126,7 @@ describe('useSession', () => {
   })
 
   it('handles folders list error gracefully', async () => {
-    const mock = createMockWailsServices()
+    const mock = createLocalServices()
     mock.SessionService.ListFolders = async () => { throw new Error('db error') }
     setWailsServices(mock)
 
@@ -133,16 +138,18 @@ describe('useSession', () => {
 
 describe('useSession - loading state', () => {
   beforeEach(() => {
-    setWailsServices(createMockWailsServices())
+    fresh()
     resetAppStore()
   })
 
   it('sets loading true then false during list', async () => {
-    let resolveList: (v: SessionFolder[]) => void
-    const mock = createMockWailsServices()
-    mock.SessionService.ListFolders = () =>
-      new Promise<SessionFolder[]>((r) => { resolveList = r })
-    setWailsServices(mock)
+    let resolveList: (v: SessionConfig[]) => void
+    const svc = createLocalServices()
+    svc.SessionService.ListFolders = () =>
+      new Promise<SessionConfig[]>((r) => { resolveList = r }) as Promise<unknown> as ReturnType<typeof svc.SessionService.ListFolders>
+    // Override after getWails() caches
+    resetWailsForTest()
+    setWailsServices(svc)
 
     const { result } = renderHook(() => useSession())
     
