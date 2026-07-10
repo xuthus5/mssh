@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from 'react'
 import { useAppStore } from '@/store/appStore'
 import { SessionService, TerminalService, TunnelService } from '@/lib/wails'
+import { toast } from '@/components/ui/toast'
 
 export interface Folder {
   id: string
@@ -138,8 +139,9 @@ export function useSession() {
         termType: result!.term_type,
         folderId: result!.folder_id ? String(result!.folder_id) : null,
       }])
-    } catch (err) {
+    } catch (err: any) {
       console.log('[useSession] createSession error', err)
+      toast(`创建会话失败: ${err?.message || err}`, 'error')
     }
   }, [])
 
@@ -162,8 +164,9 @@ export function useSession() {
       } as any)
 
       setSessions((prev) => prev.map((s) => (s.id === session.id ? session : s)))
-    } catch (err) {
+    } catch (err: any) {
       console.log('[useSession] updateSession error', err)
+      toast(`更新会话失败: ${err?.message || err}`, 'error')
     }
   }, [])
 
@@ -201,8 +204,10 @@ export function useSession() {
         useAppStore.getState().setConnectionStatus(terminalId, 'connected')
         console.log('[useSession] connected', { terminalId, host: session?.host })
       }, 500)
-    } catch (err) {
+    } catch (err: any) {
       console.log('[useSession] connect error', err)
+      const msg = err?.message || String(err)
+      toast(`SSH 连接失败: ${msg}`, 'error')
     }
   }, [openTab, sessions])
 
