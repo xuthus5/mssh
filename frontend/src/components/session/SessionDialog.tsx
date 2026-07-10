@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -15,6 +15,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
+import { KeyService } from '@/lib/wails'
 import type { Session, Folder } from '@/hooks/useSession'
 
 interface Props {
@@ -25,12 +26,23 @@ interface Props {
   onSave: (data: Omit<Session, 'id'>) => void
 }
 
+interface KeyItem { id: number; name: string; type: string }
+
 const AUTH_LABELS: Record<string, string> = {
   password: '密码',
   'keyboard-interactive': '交互式认证',
   key: '密钥',
   agent: 'SSH Agent',
 }
+
+const TERM_TYPES = [
+  'xterm-256color',
+  'xterm',
+  'vt100',
+  'vt220',
+  'linux',
+  'ansi',
+]
 
 function AuthValue({ value }: { value: string }) {
   return <span>{AUTH_LABELS[value] ?? value}</span>
@@ -43,10 +55,19 @@ export default function SessionDialog({ open, onOpenChange, session, folders, on
   const [username, setUsername] = useState(session?.username ?? '')
   const [authMethod, setAuthMethod] = useState<string>(session?.authMethod ?? 'password')
   const [password, setPassword] = useState(session?.password ?? '')
-  const [keyId, setKeyId] = useState(session?.keyId ?? '')
+  const [keyId, setKeyId] = useState<string>(session?.keyId ?? '')
   const [keepAlive, setKeepAlive] = useState(session?.keepAlive?.toString() ?? '60')
   const [termType, setTermType] = useState(session?.termType ?? 'xterm-256color')
   const [folderId, setFolderId] = useState(session?.folderId ?? '')
+
+  const [keys, setKeys] = useState<KeyItem[]>([])
+
+  useEffect(() => {
+    if (!open) return
+    KeyService.List()
+      .then((list) => setKeys(list as KeyItem[]))
+      .catch(() => setKeys([]))
+  }, [open])
 
   const handleSubmit = useCallback(() => {
     const needsPassword = authMethod === 'password' || authMethod === 'keyboard-interactive'
@@ -119,19 +140,31 @@ export default function SessionDialog({ open, onOpenChange, session, folders, on
           {(authMethod === 'password' || authMethod === 'keyboard-interactive') && (
             <label className="flex flex-col gap-1.5">
               <span className="text-xs font-medium text-muted-foreground">密码</span>
-              <Input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="输入SSH密码"
-              />
+              <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="输入SSH密码" />
             </label>
           )}
 
           {authMethod === 'key' && (
             <label className="flex flex-col gap-1.5">
-              <span className="text-xs font-medium text-muted-foreground">密钥 ID</span>
-              <Input value={keyId} onChange={(e) => setKeyId(e.target.value)} placeholder="选择或输入密钥ID" />
+              <span className="text-xs font-medium text-muted-foreground">SSH 密钥</span>
+              {keys.length === 0 ? (
+                <div className="text-xs text-muted-foreground py-2 px-3 border rounded-lg border-dashed">
+                  暂无可用密钥，请先在设置 → 密钥管理中导入
+                </div>
+              ) : (
+                <Select value={keyId} onValueChange={(v) => setKeyId(v ?? '')}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="选择密钥..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {keys.map((k) => (
+                      <SelectItem key={String(k.id)} value={String(k.id)}>
+                        {k.name} <span className="text-muted-foreground ml-1 text-xs">({k.type})</span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </label>
           )}
 
@@ -159,7 +192,16 @@ export default function SessionDialog({ open, onOpenChange, session, folders, on
             </label>
             <label className="flex flex-col gap-1.5">
               <span className="text-xs font-medium text-muted-foreground">终端类型</span>
-              <Input value={termType} onChange={(e) => setTermType(e.target.value)} />
+              <Select value={termType} onValueChange={(v) => setTermType(v ?? 'xterm-256color')}>
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {TERM_TYPES.map((t) => (
+                    <SelectItem key={t} value={t}>{t}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </label>
           </div>
 
