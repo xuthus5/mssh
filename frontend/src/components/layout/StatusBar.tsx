@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useAppStore, type ConnectionStatus } from '@/store/appStore'
-import { Gauge, Clock, Circle } from 'lucide-react'
+import { Gauge, Clock, Circle, Network } from 'lucide-react'
 import TransferProgress from '@/components/file/TransferProgress'
+import TunnelDialog from '@/components/session/TunnelDialog'
+import type { Tunnel } from '@/hooks/useSession'
 
 function formatTime(date: Date): string {
   const h = date.getHours().toString().padStart(2, '0')
@@ -43,6 +45,8 @@ export default function StatusBar() {
   const transfers = useAppStore((s) => s.transfers)
   const removeTransfer = useAppStore((s) => s.removeTransfer)
   const [now, setNow] = useState(new Date())
+  const [tunnelOpen, setTunnelOpen] = useState(false)
+  const [tunnels, setTunnels] = useState<Tunnel[]>([])
 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000)
@@ -54,6 +58,18 @@ export default function StatusBar() {
     ? connectionStatus[activeTab.terminalId ?? activeTab.id]
     : undefined
   const displayStatus = activeTab ? statusText(status) : appStatus
+
+  const handleOpenTunnels = () => {
+    setTunnelOpen(true)
+  }
+
+  const handleTunnelStart = (_tunnel: Omit<Tunnel, 'id' | 'running'>) => {
+    console.log('[StatusBar] tunnel start', _tunnel)
+  }
+
+  const handleTunnelStop = (_tunnelId: string) => {
+    console.log('[StatusBar] tunnel stop', _tunnelId)
+  }
 
   console.log('[StatusBar]', {
     tabs: tabs.length,
@@ -82,6 +98,15 @@ export default function StatusBar() {
         )}
       </div>
       <div className="flex items-center gap-3">
+        <button
+          type="button"
+          className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          onClick={handleOpenTunnels}
+          title="隧道管理"
+        >
+          <Network className="h-3 w-3" />
+          隧道
+        </button>
         <span className="flex items-center gap-1">
           <Gauge className="h-3 w-3" />
           <span className="tabular-nums">0%</span>
@@ -91,6 +116,14 @@ export default function StatusBar() {
           {formatTime(now)}
         </span>
       </div>
+      <TunnelDialog
+        open={tunnelOpen}
+        onOpenChange={setTunnelOpen}
+        tunnels={tunnels}
+        onStart={handleTunnelStart}
+        onStop={handleTunnelStop}
+        sessionId={activeTab?.sessionId ? String(activeTab.sessionId) : ''}
+      />
     </footer>
   )
 }

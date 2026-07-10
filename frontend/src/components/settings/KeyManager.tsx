@@ -51,7 +51,7 @@ interface Props {
   onGenerate: (name: string, type: KeyInfo['type'], bits: number) => void
   onImport: (name: string, privateKey: string) => void
   onDelete: (id: string) => void
-  onExport: (id: string) => void
+  onExport: (id: string) => Promise<string | undefined>
 }
 
 export function KeyManager({ keys, onGenerate, onImport, onDelete, onExport }: Props) {
@@ -131,7 +131,16 @@ export function KeyManager({ keys, onGenerate, onImport, onDelete, onExport }: P
                 </TableCell>
                 <TableCell className="text-right">
                   <div className="flex justify-end gap-1">
-                    <Button size="xs" variant="ghost" onClick={() => onExport(key.id)}>
+                    <Button
+                      size="xs"
+                      variant="ghost"
+                      onClick={async () => {
+                        const pubKey = await onExport(key.id)
+                        if (pubKey) {
+                          await navigator.clipboard.writeText(pubKey)
+                        }
+                      }}
+                    >
                       导出
                     </Button>
                     <Button

@@ -1,22 +1,30 @@
 import { useCallback, useState } from 'react'
-import { Copy, ClipboardPaste, Trash2, Circle, Square, FolderOpen } from 'lucide-react'
+import { Copy, ClipboardPaste, Trash2, Circle, Square, FolderOpen, Split } from 'lucide-react'
 import { useAppStore } from '@/store/appStore'
+import { LogService } from '@/lib/wails'
 import SessionLog from '@/components/terminal/SessionLog'
 
 interface TerminalToolbarProps {
   terminalID: string
+  sessionId: number
   isRecording: boolean
+  recordingLogId: number | null
   onToggleRecording: () => void
   hostname?: string
   onOpenFiles: () => void
+  onToggleSplit: () => void
+  split: boolean
 }
 
 export function TerminalToolbar({
   terminalID,
+  sessionId,
   isRecording,
   onToggleRecording,
   hostname,
   onOpenFiles,
+  onToggleSplit,
+  split,
 }: TerminalToolbarProps) {
   const [showSessionLog, setShowSessionLog] = useState(false)
 
@@ -104,6 +112,22 @@ export function TerminalToolbar({
         <button
           type="button"
           className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-xs transition-colors ${
+            split
+              ? 'bg-primary/20 text-primary'
+              : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
+          }`}
+          onClick={onToggleSplit}
+          title="分屏"
+        >
+          <Split className="h-3 w-3" />
+          <span className="hidden sm:inline">分屏</span>
+        </button>
+
+        <div className="w-px h-4 bg-border mx-0.5" />
+
+        <button
+          type="button"
+          className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-xs transition-colors ${
             isRecording
               ? 'bg-destructive/20 text-destructive'
               : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
@@ -134,14 +158,19 @@ export function TerminalToolbar({
       {showSessionLog && (
         <div className="absolute top-8 right-2 z-50">
           <SessionLog
+            sessionId={sessionId}
             isRecording={isRecording}
-            recordings={[]}
             onToggleRecording={onToggleRecording}
-            onPlayback={(_recordingId: string) => {
-              console.log('[TerminalToolbar] playback', _recordingId)
+            onPlayback={(recordingPath: string, title: string) => {
+              const { openTab } = useAppStore.getState()
+              openTab({ id: `playback-${title}`, title, type: 'playback', terminalId: recordingPath })
             }}
-            onDeleteRecording={(_recordingId: string) => {
-              console.log('[TerminalToolbar] delete recording', _recordingId)
+            onDeleteRecording={async (logId: number) => {
+              try {
+                await LogService.Delete(logId)
+              } catch (err) {
+                console.error('[TerminalToolbar] delete recording error:', err)
+              }
             }}
           />
         </div>

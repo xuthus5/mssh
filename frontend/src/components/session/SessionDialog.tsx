@@ -15,12 +15,13 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
-import type { Session } from '@/hooks/useSession'
+import type { Session, Folder } from '@/hooks/useSession'
 
 interface Props {
   open: boolean
   onOpenChange: (open: boolean) => void
   session?: Session | null
+  folders?: Folder[]
   onSave: (data: Omit<Session, 'id'>) => void
 }
 
@@ -28,6 +29,7 @@ export default function SessionDialog({
   open,
   onOpenChange,
   session,
+  folders,
   onSave,
 }: Props) {
   const [name, setName] = useState(session?.name ?? '')
@@ -43,6 +45,7 @@ export default function SessionDialog({
     session?.keepAlive?.toString() ?? '60',
   )
   const [termType, setTermType] = useState(session?.termType ?? 'xterm-256color')
+  const [folderId, setFolderId] = useState<string>(session?.folderId ?? '')
 
   const handleSubmit = () => {
     const formData = { name, host, port, username, authMethod, keepAlive, termType }
@@ -57,7 +60,7 @@ export default function SessionDialog({
       keyId: authMethod === 'key' ? keyId : undefined,
       keepAlive: parseInt(keepAlive, 10) || 60,
       termType,
-      folderId: session?.folderId ?? null,
+      folderId: folderId || null,
     })
     onOpenChange(false)
   }
@@ -154,6 +157,29 @@ export default function SessionDialog({
                 value={keyId}
                 onChange={(e) => setKeyId(e.target.value)}
               />
+            </div>
+          )}
+          {folders && folders.length > 0 && (
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-medium text-muted-foreground">
+                分组
+              </label>
+              <Select
+                value={folderId}
+                onValueChange={(value) => setFolderId(value ?? '')}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="无分组" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">无分组</SelectItem>
+                  {folders.map((f) => (
+                    <SelectItem key={f.id} value={f.id}>
+                      {f.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           )}
           <div className="grid grid-cols-2 gap-3">

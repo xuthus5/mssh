@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useState } from 'react'
+import { useEffect, useCallback, useState, useRef } from 'react'
 import { Terminal, Shield, FileText, Keyboard } from 'lucide-react'
 import Sidebar from '@/components/layout/Sidebar'
 import TabBar from '@/components/layout/TabBar'
@@ -79,26 +79,101 @@ function FilePanelContainer({
   onClose: () => void
 }) {
   const ft = useFileTransfer(sessionId)
+  const [downloadPath, setDownloadPath] = useState('')
+  const [showDownloadInput, setShowDownloadInput] = useState(false)
+  const [pendingDownload, setPendingDownload] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     ft.listFiles('/')
   }, [sessionId])
 
+  const handleUploadClick = () => {
+    fileInputRef.current?.click()
+  }
+
+  const handleFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      ft.upload(file.name, ft.currentPath)
+      e.target.value = ''
+    }
+  }
+
+  const handleDownload = (path: string) => {
+    setPendingDownload(path)
+    setShowDownloadInput(true)
+  }
+
+  const handleConfirmDownload = () => {
+    if (pendingDownload && downloadPath.trim()) {
+      ft.download(pendingDownload, downloadPath.trim())
+      setPendingDownload(null)
+      setDownloadPath('')
+      setShowDownloadInput(false)
+    }
+  }
+
   return (
-    <FilePanel
-      open
-      onClose={onClose}
-      files={ft.files}
-      currentPath={ft.currentPath}
-      loading={ft.loading}
-      onNavigateTo={ft.navigateTo}
-      onNavigateUp={ft.navigateUp}
-      onDelete={ft.deleteFile}
-      onRename={ft.renameFile}
-      onMakeDir={ft.makeDir}
-      onUpload={() => ft.upload('/tmp/upload', ft.currentPath)}
-      onDownload={(path: string) => ft.download(path, '/tmp/download')}
-    />
+    <>
+      <input
+        ref={fileInputRef}
+        type="file"
+        className="hidden"
+        onChange={handleFileSelected}
+      />
+      <FilePanel
+        open
+        onClose={onClose}
+        files={ft.files}
+        currentPath={ft.currentPath}
+        loading={ft.loading}
+        onNavigateTo={ft.navigateTo}
+        onNavigateUp={ft.navigateUp}
+        onDelete={ft.deleteFile}
+        onRename={ft.renameFile}
+        onMakeDir={ft.makeDir}
+        onUpload={handleUploadClick}
+        onDownload={handleDownload}
+      />
+      {showDownloadInput && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-card rounded-lg border border-border p-4 w-80 flex flex-col gap-3">
+            <span className="text-sm font-medium">下载文件</span>
+            <span className="text-xs text-muted-foreground truncate">
+              远程文件: {pendingDownload}
+            </span>
+            <input
+              className="h-8 px-2 text-sm rounded border border-input bg-background outline-none"
+              placeholder="本地保存路径"
+              value={downloadPath}
+              onChange={(e) => setDownloadPath(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleConfirmDownload()
+                if (e.key === 'Escape') setShowDownloadInput(false)
+              }}
+              autoFocus
+            />
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                className="px-3 py-1.5 text-xs rounded border border-border hover:bg-muted"
+                onClick={() => setShowDownloadInput(false)}
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                className="px-3 py-1.5 text-xs rounded bg-primary text-primary-foreground hover:bg-primary/90"
+                onClick={handleConfirmDownload}
+              >
+                下载
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   )
 }
 
@@ -127,6 +202,7 @@ function TabContent() {
           <div className="flex-1 flex flex-col min-w-0">
             <TerminalTab
               terminalID={activeTab.terminalId ?? activeTab.id}
+              sessionId={activeTab.sessionId ?? 0}
               onOpenFiles={handleOpenFiles}
             />
           </div>
