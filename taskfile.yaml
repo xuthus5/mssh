@@ -7,7 +7,13 @@ tasks:
   build:
     desc: 生产构建
     cmds:
-      - wails3 build
+      - cd frontend && npm run build
+      - go build -o build/bin/mssh .
+  compile:
+    desc: 编译 Go + 构建前端（同 build）
+    cmds:
+      - cd frontend && npm run build
+      - go build -o build/bin/mssh .
   lint:
     desc: 运行 golangci-lint
     cmds:
