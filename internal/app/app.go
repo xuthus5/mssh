@@ -173,3 +173,16 @@ func (a *App) Shutdown() {
 		_ = a.DB.Close()
 	}
 }
+
+func DefaultTestLogger(t interface{ Logf(string, ...any) }) *slog.Logger {
+	return slog.New(slog.NewTextHandler(&testLogWriter{t}, &slog.HandlerOptions{Level: slog.LevelDebug}))
+}
+
+type testLogWriter struct {
+	t interface{ Logf(string, ...any) }
+}
+
+func (w *testLogWriter) Write(p []byte) (int, error) {
+	w.t.Logf("%s", p)
+	return len(p), nil
+}
