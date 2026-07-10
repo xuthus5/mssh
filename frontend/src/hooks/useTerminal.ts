@@ -70,6 +70,7 @@ export function useTerminal(
     if (containerRef.current) {
       term.open(containerRef.current)
       fitAddon.fit()
+      console.log('[useTerminal] terminal opened', { cols: term.cols, rows: term.rows, containerSize: containerRef.current.getBoundingClientRect() })
 
       if (!existing) {
         term.writeln('\x1b[1;36m╔════════════════════════════════════════╗')
