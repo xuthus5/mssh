@@ -46,7 +46,7 @@ func TestAppRealSSH(t *testing.T) {
 	assert.Equal(t, 1, a.Terminal.Count(), "terminal should be alive")
 
 	// Write a test command
-	_, err = a.Terminal.Write(terminalID, []byte("echo APP_TEST_OK\n"))
+	_, err = a.Terminal.Write(terminalID, "echo APP_TEST_OK\n")
 	require.NoError(t, err)
 	time.Sleep(500 * time.Millisecond)
 	assert.Equal(t, 1, a.Terminal.Count(), "terminal should still be alive after write")
