@@ -177,14 +177,15 @@ export function useSession() {
       const terminalId = await wails.SessionService.Connect(Number(sessionId))
       const tabId = `terminal-${sessionId}`
       const session = sessions.find((s) => s.id === sessionId)
+      useAppStore.getState().setConnectionStatus(terminalId, 'connecting')
       openTab({ id: tabId, title: session?.name ?? sessionId, type: 'terminal', terminalId })
 
-      // Write connection info to terminal after mount
       setTimeout(() => {
         const st = useAppStore.getState().terminalPool.get(terminalId)
         if (st?.terminal && session) {
           st.terminal.writeln(`\x1b[1;32mConnecting to ${session.username}@${session.host}:${session.port}...\x1b[0m`)
         }
+        useAppStore.getState().setConnectionStatus(terminalId, 'connected')
       }, 200)
     } catch (err) {
       console.log('[useSession] connect error', err)
@@ -194,8 +195,10 @@ export function useSession() {
   const disconnect = useCallback(async (sessionId: string) => {
     try {
       const wails = getWails()
+      const terminalId = `terminal-${sessionId}`
       console.log('[useSession] disconnect', sessionId)
-      await wails.SessionService.Disconnect(`terminal-${sessionId}`)
+      await wails.SessionService.Disconnect(terminalId)
+      useAppStore.getState().setConnectionStatus(terminalId, 'disconnected')
     } catch (err) {
       console.log('[useSession] disconnect error', err)
     }
