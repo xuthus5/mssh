@@ -21,20 +21,31 @@ export function isWails(): boolean {
     && typeof window.wails.Call.ByName === 'function'
 }
 
-function waitForWails(timeoutMs = 5000): Promise<void> {
-  if (isWails()) return Promise.resolve()
+function waitForWails(timeoutMs = 10000): Promise<void> {
+  if (isWails()) {
+    console.log('[wails] runtime already available')
+    return Promise.resolve()
+  }
   return new Promise((resolve, reject) => {
     const start = Date.now()
+    console.log('[wails] waiting for runtime...')
     const check = () => {
       if (isWails()) {
+        console.log('[wails] runtime ready after', Date.now() - start, 'ms')
         resolve()
         return
       }
       if (Date.now() - start > timeoutMs) {
+        const hasWails = typeof window !== 'undefined' && !!window.wails
+        const hasCall = hasWails && !!window.wails!.Call
+        console.error('[wails] timeout after', timeoutMs, 'ms',
+          'window.wails:', typeof window.wails,
+          'Call:', typeof window.wails?.Call,
+          'ByName:', typeof window.wails?.Call?.ByName)
         reject(new Error('Wails runtime did not load within ' + timeoutMs + 'ms'))
         return
       }
-      setTimeout(check, 50)
+      setTimeout(check, 100)
     }
     check()
   })

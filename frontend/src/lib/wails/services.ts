@@ -5,7 +5,11 @@ const PKG = 'mssh/internal/service'
 async function rpc(method: string, ...args: unknown[]): Promise<unknown> {
   await waitForWails()
   const fqn = `${PKG}.${method}`
-  return window.wails!.Call!.ByName(fqn, ...args)
+  const w = window.wails
+  if (!w || !w.Call || typeof w.Call.ByName !== 'function') {
+    throw new Error(`Wails runtime not ready: Call.ByName is ${typeof w?.Call?.ByName} `)
+  }
+  return w.Call.ByName(fqn, ...args)
 }
 
 export interface SessionFolder {
