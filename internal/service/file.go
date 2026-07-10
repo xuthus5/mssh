@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"sync"
 
@@ -15,25 +16,30 @@ type FileService struct {
 	eventBus EventBus
 	mu       sync.Mutex
 	tasks    map[string]context.CancelFunc
+	logger   *slog.Logger
 }
 
-func NewFileService(sessions *SessionService, eventBus EventBus) *FileService {
+func NewFileService(sessions *SessionService, eventBus EventBus, logger *slog.Logger) *FileService {
 	return &FileService{
 		sessions: sessions,
 		eventBus: eventBus,
 		tasks:    make(map[string]context.CancelFunc),
+		logger:   logger,
 	}
 }
 
 func (f *FileService) ListDir(sessionID int64, path string) ([]ssh.FileEntry, error) {
+	f.logger.Info("listing directory", "sessionID", sessionID, "path", path)
 	wrapper, connID, err := f.connect(sessionID)
 	if err != nil {
+		f.logger.Error("list dir failed", "sessionID", sessionID, "error", err)
 		return nil, fmt.Errorf("list dir: %w", err)
 	}
 	defer f.disconnect(connID)
 
 	sftpClient, err := ssh.OpenSFTP(wrapper)
 	if err != nil {
+		f.logger.Error("list dir failed", "sessionID", sessionID, "error", err)
 		return nil, fmt.Errorf("list dir: %w", err)
 	}
 	defer sftpClient.Close()
@@ -42,6 +48,7 @@ func (f *FileService) ListDir(sessionID int64, path string) ([]ssh.FileEntry, er
 }
 
 func (f *FileService) Upload(sessionID int64, localPath, remotePath string) (string, error) {
+	f.logger.Info("uploading file", "sessionID", sessionID, "localPath", localPath, "remotePath", remotePath)
 	taskID := generateTerminalID()
 
 	_, cancel := context.WithCancel(context.Background())
@@ -53,6 +60,7 @@ func (f *FileService) Upload(sessionID int64, localPath, remotePath string) (str
 	if err != nil {
 		cancel()
 		f.removeTask(taskID)
+		f.logger.Error("upload failed", "sessionID", sessionID, "error", err)
 		return "", fmt.Errorf("upload: %w", err)
 	}
 
@@ -84,6 +92,7 @@ func (f *FileService) Upload(sessionID int64, localPath, remotePath string) (str
 }
 
 func (f *FileService) Download(sessionID int64, remotePath, localPath string) (string, error) {
+	f.logger.Info("downloading file", "sessionID", sessionID, "remotePath", remotePath, "localPath", localPath)
 	taskID := generateTerminalID()
 
 	_, cancel := context.WithCancel(context.Background())
@@ -125,6 +134,7 @@ func (f *FileService) Download(sessionID int64, remotePath, localPath string) (s
 }
 
 func (f *FileService) CancelTransfer(taskID string) error {
+	f.logger.Info("cancelling transfer", "taskID", taskID)
 	f.mu.Lock()
 	cancel, ok := f.tasks[taskID]
 	if !ok {

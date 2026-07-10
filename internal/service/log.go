@@ -3,6 +3,7 @@ package service
 import (
 	"database/sql"
 	"fmt"
+	"log/slog"
 	"os"
 	"sync"
 
@@ -15,12 +16,14 @@ type LogService struct {
 	db        *sql.DB
 	mu        sync.Mutex
 	recorders map[string]*ssh.Recorder
+	logger    *slog.Logger
 }
 
-func NewLogService(db *sql.DB) *LogService {
+func NewLogService(db *sql.DB, logger *slog.Logger) *LogService {
 	return &LogService{
 		db:        db,
 		recorders: make(map[string]*ssh.Recorder),
+		logger:    logger,
 	}
 }
 
@@ -45,6 +48,7 @@ func (l *LogService) List(sessionID *int64) ([]model.SessionLog, error) {
 }
 
 func (l *LogService) StartRecording(sessionID int64, cols, rows int, termType, dataPath string) (int64, error) {
+	l.logger.Info("starting recording", "sessionID", sessionID, "cols", cols, "rows", rows, "dataPath", dataPath)
 	recorder, err := ssh.NewRecorder(dataPath, cols, rows, termType)
 	if err != nil {
 		return 0, fmt.Errorf("start recording: %w", err)
@@ -69,6 +73,7 @@ func (l *LogService) StartRecording(sessionID int64, cols, rows int, termType, d
 }
 
 func (l *LogService) StopRecording(logID int64) error {
+	l.logger.Info("stopping recording", "logID", logID)
 	l.mu.Lock()
 	recorder, ok := l.recorders[fmt.Sprintf("log-%d", logID)]
 	if ok {
@@ -88,6 +93,7 @@ func (l *LogService) GetRecording(path string) (*ssh.Player, error) {
 }
 
 func (l *LogService) Delete(id int64) error {
+	l.logger.Info("deleting log", "id", id)
 	logs, err := store.ListSessionLogs(l.db)
 	if err != nil {
 		return fmt.Errorf("delete: %w", err)

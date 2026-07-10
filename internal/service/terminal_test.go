@@ -17,22 +17,22 @@ import (
 
 func TestNewTerminalService(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	sessionSvc := NewSessionService(db, newMockEventBus(), 30)
+	sessionSvc := NewSessionService(db, newMockEventBus(), 30, testutil.NewTestLogger())
 	bus := newMockEventBus()
 
-	svc := NewTerminalService(sessionSvc, bus, 0)
+	svc := NewTerminalService(sessionSvc, bus, 0, testutil.NewTestLogger())
 	require.NotNil(t, svc)
 	assert.Equal(t, 32, svc.maxSize)
 	assert.NotNil(t, svc.ptys)
 	assert.NotNil(t, svc.conns)
 	assert.NotNil(t, svc.lastUsed)
 
-	svc2 := NewTerminalService(sessionSvc, bus, 10)
+	svc2 := NewTerminalService(sessionSvc, bus, 10, testutil.NewTestLogger())
 	assert.Equal(t, 10, svc2.maxSize)
 }
 
 func TestTerminalService_Count(t *testing.T) {
-	svc := &TerminalService{
+	svc := &TerminalService{logger: testutil.NewTestLogger(),
 		ptys:     make(map[string]*ssh.PTYSession),
 		conns:    make(map[string]*ssh.ClientWrapper),
 		lastUsed: make(map[string]time.Time),
@@ -46,7 +46,7 @@ func TestTerminalService_Count(t *testing.T) {
 func TestTerminalService_Open(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	bus := newMockEventBus()
-	sessionSvc := NewSessionService(db, bus, 30)
+	sessionSvc := NewSessionService(db, bus, 30, testutil.NewTestLogger())
 
 	addr, cleanup := sshtestutil.NewMockServer(t)
 	defer cleanup()
@@ -60,7 +60,7 @@ func TestTerminalService_Open(t *testing.T) {
 	require.NoError(t, err)
 
 	termBus := newMockEventBus()
-	termSvc := NewTerminalService(sessionSvc, termBus, 32)
+	termSvc := NewTerminalService(sessionSvc, termBus, 32, testutil.NewTestLogger())
 	ctx := context.Background()
 
 	terminalID, err := termSvc.Open(ctx, created.ID, 80, 24)
@@ -79,7 +79,7 @@ func TestTerminalService_Open(t *testing.T) {
 func TestTerminalService_OpenDefaultTermType(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	bus := newMockEventBus()
-	sessionSvc := NewSessionService(db, bus, 30)
+	sessionSvc := NewSessionService(db, bus, 30, testutil.NewTestLogger())
 
 	addr, cleanup := sshtestutil.NewMockServer(t)
 	defer cleanup()
@@ -93,7 +93,7 @@ func TestTerminalService_OpenDefaultTermType(t *testing.T) {
 	require.NoError(t, err)
 
 	termBus := newMockEventBus()
-	termSvc := NewTerminalService(sessionSvc, termBus, 32)
+	termSvc := NewTerminalService(sessionSvc, termBus, 32, testutil.NewTestLogger())
 	ctx := context.Background()
 
 	terminalID, err := termSvc.Open(ctx, created.ID, 80, 24)
@@ -104,8 +104,8 @@ func TestTerminalService_OpenDefaultTermType(t *testing.T) {
 
 func TestTerminalService_OpenSessionNotFound(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	sessionSvc := NewSessionService(db, newMockEventBus(), 30)
-	termSvc := NewTerminalService(sessionSvc, newMockEventBus(), 32)
+	sessionSvc := NewSessionService(db, newMockEventBus(), 30, testutil.NewTestLogger())
+	termSvc := NewTerminalService(sessionSvc, newMockEventBus(), 32, testutil.NewTestLogger())
 
 	ctx := context.Background()
 	_, err := termSvc.Open(ctx, 999, 80, 24)
@@ -116,7 +116,7 @@ func TestTerminalService_OpenSessionNotFound(t *testing.T) {
 func TestTerminalService_ReadCallback(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	bus := newMockEventBus()
-	sessionSvc := NewSessionService(db, bus, 30)
+	sessionSvc := NewSessionService(db, bus, 30, testutil.NewTestLogger())
 
 	addr, cleanup := sshtestutil.NewMockServer(t)
 	defer cleanup()
@@ -130,7 +130,7 @@ func TestTerminalService_ReadCallback(t *testing.T) {
 	require.NoError(t, err)
 
 	termBus := newMockEventBus()
-	termSvc := NewTerminalService(sessionSvc, termBus, 32)
+	termSvc := NewTerminalService(sessionSvc, termBus, 32, testutil.NewTestLogger())
 	ctx := context.Background()
 
 	_, err = termSvc.Open(ctx, created.ID, 80, 24)
@@ -164,7 +164,7 @@ func TestTerminalService_Write(t *testing.T) {
 	require.NoError(t, err)
 	defer pty.Close()
 
-	svc := &TerminalService{
+	svc := &TerminalService{logger: testutil.NewTestLogger(),
 		eventBus: newMockEventBus(),
 		ptys:     map[string]*ssh.PTYSession{"term-1": pty},
 		conns:    map[string]*ssh.ClientWrapper{"term-1": cw},
@@ -177,7 +177,7 @@ func TestTerminalService_Write(t *testing.T) {
 }
 
 func TestTerminalService_WriteNotFound(t *testing.T) {
-	svc := &TerminalService{
+	svc := &TerminalService{logger: testutil.NewTestLogger(),
 		ptys:     make(map[string]*ssh.PTYSession),
 		conns:    make(map[string]*ssh.ClientWrapper),
 		lastUsed: make(map[string]time.Time),
@@ -203,7 +203,7 @@ func TestTerminalService_Resize(t *testing.T) {
 	require.NoError(t, err)
 	defer pty.Close()
 
-	svc := &TerminalService{
+	svc := &TerminalService{logger: testutil.NewTestLogger(),
 		eventBus: newMockEventBus(),
 		ptys:     map[string]*ssh.PTYSession{"term-1": pty},
 		conns:    map[string]*ssh.ClientWrapper{"term-1": cw},
@@ -215,7 +215,7 @@ func TestTerminalService_Resize(t *testing.T) {
 }
 
 func TestTerminalService_ResizeNotFound(t *testing.T) {
-	svc := &TerminalService{
+	svc := &TerminalService{logger: testutil.NewTestLogger(),
 		ptys:     make(map[string]*ssh.PTYSession),
 		conns:    make(map[string]*ssh.ClientWrapper),
 		lastUsed: make(map[string]time.Time),
@@ -241,7 +241,7 @@ func TestTerminalService_Close(t *testing.T) {
 	require.NoError(t, err)
 
 	bus := newMockEventBus()
-	svc := &TerminalService{
+	svc := &TerminalService{logger: testutil.NewTestLogger(),
 		eventBus: bus,
 		ptys:     map[string]*ssh.PTYSession{"term-1": pty},
 		conns:    map[string]*ssh.ClientWrapper{"term-1": cw},
@@ -263,7 +263,7 @@ func TestTerminalService_Close(t *testing.T) {
 }
 
 func TestTerminalService_CloseNotFound(t *testing.T) {
-	svc := &TerminalService{
+	svc := &TerminalService{logger: testutil.NewTestLogger(),
 		ptys:     make(map[string]*ssh.PTYSession),
 		conns:    make(map[string]*ssh.ClientWrapper),
 		lastUsed: make(map[string]time.Time),
@@ -275,7 +275,7 @@ func TestTerminalService_CloseNotFound(t *testing.T) {
 }
 
 func TestTerminalService_EvictLRU(t *testing.T) {
-	svc := &TerminalService{
+	svc := &TerminalService{logger: testutil.NewTestLogger(),
 		eventBus: newMockEventBus(),
 		ptys:     make(map[string]*ssh.PTYSession),
 		conns:    make(map[string]*ssh.ClientWrapper),
@@ -309,7 +309,7 @@ func TestTerminalService_EvictLRU(t *testing.T) {
 func TestTerminalService_PoolLimitEnforcement(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	bus := newMockEventBus()
-	sessionSvc := NewSessionService(db, bus, 30)
+	sessionSvc := NewSessionService(db, bus, 30, testutil.NewTestLogger())
 
 	addr, cleanup := sshtestutil.NewMockServer(t)
 	defer cleanup()
@@ -323,7 +323,7 @@ func TestTerminalService_PoolLimitEnforcement(t *testing.T) {
 	require.NoError(t, err)
 
 	termBus := newMockEventBus()
-	termSvc := NewTerminalService(sessionSvc, termBus, 3)
+	termSvc := NewTerminalService(sessionSvc, termBus, 3, testutil.NewTestLogger())
 	ctx := context.Background()
 
 	id1, err := termSvc.Open(ctx, created.ID, 80, 24)
@@ -357,7 +357,7 @@ func TestTerminalService_PoolLimitEnforcement(t *testing.T) {
 func TestSessionService_GetClientWrapper(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	bus := newMockEventBus()
-	svc := NewSessionService(db, bus, 30)
+	svc := NewSessionService(db, bus, 30, testutil.NewTestLogger())
 
 	_, err := svc.GetClientWrapper("nonexistent")
 	assert.Error(t, err)
@@ -386,7 +386,7 @@ func TestSessionService_GetClientWrapper(t *testing.T) {
 func TestSessionService_GetClientWrapperAfterDisconnect(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	bus := newMockEventBus()
-	svc := NewSessionService(db, bus, 30)
+	svc := NewSessionService(db, bus, 30, testutil.NewTestLogger())
 
 	addr, cleanup := sshtestutil.NewMockServer(t)
 	defer cleanup()
