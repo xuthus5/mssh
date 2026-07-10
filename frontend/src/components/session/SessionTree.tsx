@@ -5,6 +5,9 @@ import {
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuSeparator,
+  ContextMenuSub,
+  ContextMenuSubTrigger,
+  ContextMenuSubContent,
 } from '@/components/ui/context-menu'
 import { ChevronRight, ChevronDown, Folder as FolderIcon, Server } from 'lucide-react'
 import type { Folder, Session } from '@/hooks/useSession'
@@ -17,6 +20,7 @@ interface Props {
   onDeleteSession: (sessionId: string) => void
   onEditFolder: (folder: Folder) => void
   onDeleteFolder: (folderId: string) => void
+  onMoveToFolder?: (sessionId: string, folderId: string | null) => void
 }
 
 export default function SessionTree({
@@ -27,6 +31,7 @@ export default function SessionTree({
   onDeleteSession,
   onEditFolder,
   onDeleteFolder,
+  onMoveToFolder,
 }: Props) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
 
@@ -122,6 +127,29 @@ export default function SessionTree({
           编辑
         </ContextMenuItem>
         <ContextMenuSeparator />
+        {onMoveToFolder && folders.length > 0 && (
+          <>
+            <ContextMenuSub>
+              <ContextMenuSubTrigger>移动到分组</ContextMenuSubTrigger>
+              <ContextMenuSubContent>
+                <ContextMenuItem
+                  onClick={() => onMoveToFolder(session.id, null)}
+                >
+                  无分组
+                </ContextMenuItem>
+                {folders.map((f) => (
+                  <ContextMenuItem
+                    key={f.id}
+                    onClick={() => onMoveToFolder(session.id, f.id)}
+                  >
+                    {f.name}
+                  </ContextMenuItem>
+                ))}
+              </ContextMenuSubContent>
+            </ContextMenuSub>
+            <ContextMenuSeparator />
+          </>
+        )}
         <ContextMenuItem
           variant="destructive"
           onClick={() => { console.log('[SessionTree] onDeleteSession', session.id); onDeleteSession(session.id) }}
