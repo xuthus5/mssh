@@ -6,6 +6,7 @@ export interface Tab {
   title: string
   type: 'terminal' | 'playback' | 'settings'
   terminalId?: string
+  sessionId?: number
 }
 
 export interface PooledTerminal {
@@ -13,7 +14,33 @@ export interface PooledTerminal {
   lastUsed: number
 }
 
+export interface TransferJob {
+  id: string
+  fileName: string
+  direction: 'upload' | 'download'
+  totalBytes: number
+  transferredBytes: number
+  speed: number
+  startedAt: number
+}
+
+export interface TerminalTheme {
+  background: string
+  foreground: string
+  cursor: string
+  cursorAccent: string
+  selectionBackground: string
+}
+
 export type ConnectionStatus = 'connecting' | 'connected' | 'disconnected'
+
+const DEFAULT_THEME: TerminalTheme = {
+  background: '#0d1117',
+  foreground: '#c9d1d9',
+  cursor: '#c9d1d9',
+  cursorAccent: '#0d1117',
+  selectionBackground: '#264f78',
+}
 
 export interface AppState {
   tabs: Tab[]
@@ -22,6 +49,11 @@ export interface AppState {
   maxPoolSize: number
   connectionStatus: Record<string, ConnectionStatus>
   appStatus: string
+  terminalTheme: TerminalTheme
+  transfers: TransferJob[]
+  addTransfer: (job: TransferJob) => void
+  removeTransfer: (id: string) => void
+  updateTransfer: (id: string, updates: Partial<Pick<TransferJob, 'transferredBytes' | 'speed' | 'totalBytes'>>) => void
   openTab: (tab: Tab) => void
   closeTab: (id: string) => void
   setActiveTab: (id: string) => void
@@ -31,6 +63,7 @@ export interface AppState {
   evictLRU: () => void
   setConnectionStatus: (id: string, status: ConnectionStatus) => void
   setAppStatus: (status: string) => void
+  setTerminalTheme: (theme: TerminalTheme) => void
 }
 
 const DEFAULT_MAX_POOL_SIZE = 10
@@ -42,6 +75,14 @@ export const useAppStore = create<AppState>((set, get) => ({
   maxPoolSize: DEFAULT_MAX_POOL_SIZE,
   connectionStatus: {},
   appStatus: '就绪',
+  terminalTheme: DEFAULT_THEME,
+  transfers: [],
+
+  addTransfer: (job) => set((s) => ({ transfers: [...s.transfers, job] })),
+  removeTransfer: (id) => set((s) => ({ transfers: s.transfers.filter((t) => t.id !== id) })),
+  updateTransfer: (id, updates) => set((s) => ({
+    transfers: s.transfers.map((t) => (t.id === id ? { ...t, ...updates } : t)),
+  })),
 
   openTab: (tab) => set((s) => {
     const existing = s.tabs.find((t) => t.id === tab.id)
@@ -107,4 +148,6 @@ export const useAppStore = create<AppState>((set, get) => ({
   })),
 
   setAppStatus: (status) => set({ appStatus: status }),
+
+  setTerminalTheme: (theme) => set({ terminalTheme: theme }),
 }))

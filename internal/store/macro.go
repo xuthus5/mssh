@@ -16,7 +16,10 @@ func CreateMacro(db *sql.DB, m model.Macro) (*model.Macro, error) {
 	if err != nil {
 		return nil, fmt.Errorf("create macro: %w", err)
 	}
-	id, _ := result.LastInsertId()
+	id, err := result.LastInsertId()
+	if err != nil {
+		return nil, fmt.Errorf("create macro: last insert id: %w", err)
+	}
 	m.ID = id
 	m.CreatedAt = time.Now()
 	return &m, nil
@@ -37,7 +40,10 @@ func ListMacros(db *sql.DB) ([]model.Macro, error) {
 		if err != nil {
 			return nil, fmt.Errorf("scan macro: %w", err)
 		}
-		m.CreatedAt, _ = time.Parse("2006-01-02 15:04:05", createdAt)
+		m.CreatedAt, err = time.Parse("2006-01-02 15:04:05", createdAt)
+		if err != nil {
+			return nil, fmt.Errorf("scan macro: parse created_at: %w", err)
+		}
 		macros = append(macros, m)
 	}
 	if macros == nil {

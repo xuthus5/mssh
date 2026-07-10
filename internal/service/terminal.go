@@ -16,7 +16,6 @@ import (
 type TerminalService struct {
 	mu         sync.RWMutex
 	ptys       map[string]*ssh.PTYSession
-	conns      map[string]*ssh.ClientWrapper
 	eventBus   EventBus
 	maxSize    int
 	lastUsed   map[string]time.Time
@@ -32,7 +31,6 @@ func NewTerminalService(sessionSvc *SessionService, eventBus EventBus, maxSize i
 	}
 	return &TerminalService{
 		ptys:       make(map[string]*ssh.PTYSession),
-		conns:      make(map[string]*ssh.ClientWrapper),
 		eventBus:   eventBus,
 		maxSize:    maxSize,
 		lastUsed:   make(map[string]time.Time),
@@ -86,7 +84,6 @@ func (t *TerminalService) Open(ctx context.Context, sessionID int64, cols, rows 
 		t.evictLRU()
 	}
 	t.ptys[terminalID] = pty
-	t.conns[terminalID] = wrapper
 	t.lastUsed[terminalID] = time.Now()
 	t.mu.Unlock()
 
@@ -136,11 +133,12 @@ func (t *TerminalService) Close(terminalID string) error {
 		return fmt.Errorf("terminal %s not found", terminalID)
 	}
 	delete(t.ptys, terminalID)
-	delete(t.conns, terminalID)
 	delete(t.lastUsed, terminalID)
 	t.mu.Unlock()
 
 	_ = pty.Close()
+
+	_ = t.sessionSvc.Disconnect(terminalID)
 
 	t.eventBus.Emit(event.TerminalClosed, event.ConnectionStatePayload{
 		TerminalID: terminalID,
@@ -176,10 +174,11 @@ func (t *TerminalService) evictLRU() {
 
 	pty, pok := t.ptys[oldestID]
 	delete(t.ptys, oldestID)
-	delete(t.conns, oldestID)
 	delete(t.lastUsed, oldestID)
 
 	if pok && pty != nil {
 		_ = pty.Close()
 	}
+
+	_ = t.sessionSvc.Disconnect(oldestID)
 }

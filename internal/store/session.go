@@ -16,7 +16,10 @@ func CreateFolder(db *sql.DB, name string, parentID *int64) (*model.SessionFolde
 	if err != nil {
 		return nil, fmt.Errorf("create folder: %w", err)
 	}
-	id, _ := result.LastInsertId()
+	id, err := result.LastInsertId()
+	if err != nil {
+		return nil, fmt.Errorf("create folder: last insert id: %w", err)
+	}
 	return &model.SessionFolder{ID: id, Name: name, ParentID: parentID, CreatedAt: time.Now(), UpdatedAt: time.Now()}, nil
 }
 
@@ -36,8 +39,14 @@ func ListFolders(db *sql.DB) ([]model.SessionFolder, error) {
 		if err != nil {
 			return nil, fmt.Errorf("scan folder: %w", err)
 		}
-		f.CreatedAt, _ = time.Parse("2006-01-02 15:04:05", createdAt)
-		f.UpdatedAt, _ = time.Parse("2006-01-02 15:04:05", updatedAt)
+		f.CreatedAt, err = time.Parse("2006-01-02 15:04:05", createdAt)
+		if err != nil {
+			return nil, fmt.Errorf("scan folder: parse created_at: %w", err)
+		}
+		f.UpdatedAt, err = time.Parse("2006-01-02 15:04:05", updatedAt)
+		if err != nil {
+			return nil, fmt.Errorf("scan folder: parse updated_at: %w", err)
+		}
 		folders = append(folders, f)
 	}
 	if folders == nil {
@@ -74,7 +83,10 @@ func CreateSession(db *sql.DB, s model.Session) (*model.Session, error) {
 	if err != nil {
 		return nil, fmt.Errorf("create session: %w", err)
 	}
-	id, _ := result.LastInsertId()
+	id, err := result.LastInsertId()
+	if err != nil {
+		return nil, fmt.Errorf("create session: last insert id: %w", err)
+	}
 	s.ID = id
 	s.CreatedAt = time.Now()
 	s.UpdatedAt = time.Now()
@@ -107,8 +119,14 @@ func ListSessions(db *sql.DB, folderID *int64) ([]model.Session, error) {
 		if err != nil {
 			return nil, fmt.Errorf("scan session: %w", err)
 		}
-		s.CreatedAt, _ = time.Parse("2006-01-02 15:04:05", createdAt)
-		s.UpdatedAt, _ = time.Parse("2006-01-02 15:04:05", updatedAt)
+		s.CreatedAt, err = time.Parse("2006-01-02 15:04:05", createdAt)
+		if err != nil {
+			return nil, fmt.Errorf("scan session: parse created_at: %w", err)
+		}
+		s.UpdatedAt, err = time.Parse("2006-01-02 15:04:05", updatedAt)
+		if err != nil {
+			return nil, fmt.Errorf("scan session: parse updated_at: %w", err)
+		}
 		sessions = append(sessions, s)
 	}
 	if sessions == nil {
@@ -147,8 +165,14 @@ func GetSession(db *sql.DB, id int64) (*model.Session, error) {
 	if err != nil {
 		return nil, fmt.Errorf("get session: %w", err)
 	}
-	s.CreatedAt, _ = time.Parse("2006-01-02 15:04:05", createdAt)
-	s.UpdatedAt, _ = time.Parse("2006-01-02 15:04:05", updatedAt)
+	s.CreatedAt, err = time.Parse("2006-01-02 15:04:05", createdAt)
+	if err != nil {
+		return nil, fmt.Errorf("get session: parse created_at: %w", err)
+	}
+	s.UpdatedAt, err = time.Parse("2006-01-02 15:04:05", updatedAt)
+	if err != nil {
+		return nil, fmt.Errorf("get session: parse updated_at: %w", err)
+	}
 	return &s, nil
 }
 
