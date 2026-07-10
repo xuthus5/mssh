@@ -2,6 +2,7 @@ name: mssh
 bin_name: mssh
 output_name: mssh
 app_type: desktop
+root_path: frontend
 frontend_dir: frontend
 install_script: npm install
 build_script: npm run build
