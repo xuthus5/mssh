@@ -14,9 +14,9 @@ import (
 
 func TestNewTunnelService(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	sessionSvc := NewSessionService(db, newMockEventBus(), 30)
+	sessionSvc := NewSessionService(db, newMockEventBus(), 30, testutil.NewTestLogger())
 	bus := newMockEventBus()
-	svc := NewTunnelService(db, sessionSvc, bus)
+	svc := NewTunnelService(db, sessionSvc, bus, testutil.NewTestLogger())
 	assert.NotNil(t, svc)
 	assert.NotNil(t, svc.tunnels)
 	assert.Equal(t, 0, len(svc.tunnels))
@@ -24,8 +24,8 @@ func TestNewTunnelService(t *testing.T) {
 
 func TestTunnelService_List(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	sessionSvc := NewSessionService(db, newMockEventBus(), 30)
-	svc := NewTunnelService(db, sessionSvc, newMockEventBus())
+	sessionSvc := NewSessionService(db, newMockEventBus(), 30, testutil.NewTestLogger())
+	svc := NewTunnelService(db, sessionSvc, newMockEventBus(), testutil.NewTestLogger())
 
 	tunnels, err := svc.List()
 	require.NoError(t, err)
@@ -34,8 +34,8 @@ func TestTunnelService_List(t *testing.T) {
 
 func TestTunnelService_CRUD(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	sessionSvc := NewSessionService(db, newMockEventBus(), 30)
-	svc := NewTunnelService(db, sessionSvc, newMockEventBus())
+	sessionSvc := NewSessionService(db, newMockEventBus(), 30, testutil.NewTestLogger())
+	svc := NewTunnelService(db, sessionSvc, newMockEventBus(), testutil.NewTestLogger())
 
 	sess := model.Session{
 		Name: "test", Host: "10.0.0.1", Port: 22, Username: "root",
@@ -76,7 +76,7 @@ func TestTunnelService_CRUD(t *testing.T) {
 func TestTunnelService_StartStop(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	bus := newMockEventBus()
-	sessionSvc := NewSessionService(db, bus, 30)
+	sessionSvc := NewSessionService(db, bus, 30, testutil.NewTestLogger())
 
 	addr, cleanup := sshtestutil.NewMockServer(t)
 	defer cleanup()
@@ -89,7 +89,7 @@ func TestTunnelService_StartStop(t *testing.T) {
 	createdSess, err := sessionSvc.CreateSession(sess)
 	require.NoError(t, err)
 
-	svc := NewTunnelService(db, sessionSvc, bus)
+	svc := NewTunnelService(db, sessionSvc, bus, testutil.NewTestLogger())
 
 	tunnel := model.Tunnel{
 		SessionID: createdSess.ID, Name: "socks", Type: model.TunnelDynamic,
@@ -132,8 +132,8 @@ func TestTunnelService_StartStop(t *testing.T) {
 
 func TestTunnelService_StartNotFound(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	sessionSvc := NewSessionService(db, newMockEventBus(), 30)
-	svc := NewTunnelService(db, sessionSvc, newMockEventBus())
+	sessionSvc := NewSessionService(db, newMockEventBus(), 30, testutil.NewTestLogger())
+	svc := NewTunnelService(db, sessionSvc, newMockEventBus(), testutil.NewTestLogger())
 
 	err := svc.Start(999)
 	assert.Error(t, err)
@@ -142,7 +142,7 @@ func TestTunnelService_StartNotFound(t *testing.T) {
 func TestTunnelService_StartAlreadyRunning(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	bus := newMockEventBus()
-	sessionSvc := NewSessionService(db, bus, 30)
+	sessionSvc := NewSessionService(db, bus, 30, testutil.NewTestLogger())
 
 	addr, cleanup := sshtestutil.NewMockServer(t)
 	defer cleanup()
@@ -155,7 +155,7 @@ func TestTunnelService_StartAlreadyRunning(t *testing.T) {
 	createdSess, err := sessionSvc.CreateSession(sess)
 	require.NoError(t, err)
 
-	svc := NewTunnelService(db, sessionSvc, newMockEventBus())
+	svc := NewTunnelService(db, sessionSvc, newMockEventBus(), testutil.NewTestLogger())
 
 	tunnel := model.Tunnel{
 		SessionID: createdSess.ID, Name: "dyn", Type: model.TunnelDynamic,
@@ -174,8 +174,8 @@ func TestTunnelService_StartAlreadyRunning(t *testing.T) {
 
 func TestTunnelService_StopNotRunning(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	sessionSvc := NewSessionService(db, newMockEventBus(), 30)
-	svc := NewTunnelService(db, sessionSvc, newMockEventBus())
+	sessionSvc := NewSessionService(db, newMockEventBus(), 30, testutil.NewTestLogger())
+	svc := NewTunnelService(db, sessionSvc, newMockEventBus(), testutil.NewTestLogger())
 
 	err := svc.Stop(999)
 	assert.Error(t, err)
@@ -185,7 +185,7 @@ func TestTunnelService_StopNotRunning(t *testing.T) {
 func TestTunnelService_DeleteRunning(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	bus := newMockEventBus()
-	sessionSvc := NewSessionService(db, bus, 30)
+	sessionSvc := NewSessionService(db, bus, 30, testutil.NewTestLogger())
 
 	addr, cleanup := sshtestutil.NewMockServer(t)
 	defer cleanup()
@@ -198,7 +198,7 @@ func TestTunnelService_DeleteRunning(t *testing.T) {
 	createdSess, err := sessionSvc.CreateSession(sess)
 	require.NoError(t, err)
 
-	svc := NewTunnelService(db, sessionSvc, bus)
+	svc := NewTunnelService(db, sessionSvc, bus, testutil.NewTestLogger())
 
 	tunnel := model.Tunnel{
 		SessionID: createdSess.ID, Name: "del", Type: model.TunnelDynamic,
@@ -221,9 +221,9 @@ func TestTunnelService_DeleteRunning(t *testing.T) {
 func TestTunnelService_Remote(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	bus := newMockEventBus()
-	sessionSvc := NewSessionService(db, bus, 30)
+	sessionSvc := NewSessionService(db, bus, 30, testutil.NewTestLogger())
 
-	svc := NewTunnelService(db, sessionSvc, newMockEventBus())
+	svc := NewTunnelService(db, sessionSvc, newMockEventBus(), testutil.NewTestLogger())
 
 	sess := model.Session{
 		Name: "test", Host: "10.0.0.1", Port: 22, Username: "root",
@@ -244,9 +244,9 @@ func TestTunnelService_Remote(t *testing.T) {
 func TestTunnelService_LocalForward(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	bus := newMockEventBus()
-	sessionSvc := NewSessionService(db, bus, 30)
+	sessionSvc := NewSessionService(db, bus, 30, testutil.NewTestLogger())
 
-	svc := NewTunnelService(db, sessionSvc, newMockEventBus())
+	svc := NewTunnelService(db, sessionSvc, newMockEventBus(), testutil.NewTestLogger())
 
 	sess := model.Session{
 		Name: "test", Host: "10.0.0.1", Port: 22, Username: "root",
@@ -266,7 +266,7 @@ func TestTunnelService_LocalForward(t *testing.T) {
 
 func TestTunnelService_StartConnectError(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	sessionSvc := NewSessionService(db, newMockEventBus(), 30)
+	sessionSvc := NewSessionService(db, newMockEventBus(), 30, testutil.NewTestLogger())
 
 	sess := model.Session{
 		Name: "dead-sess", Host: "127.0.0.1", Port: 19, Username: "root",
@@ -279,7 +279,7 @@ func TestTunnelService_StartConnectError(t *testing.T) {
 		SessionID: createdSess.ID, Name: "dead-tunnel", Type: model.TunnelDynamic,
 		LocalHost: "127.0.0.1", LocalPort: 15003,
 	}
-	svc := NewTunnelService(db, sessionSvc, newMockEventBus())
+	svc := NewTunnelService(db, sessionSvc, newMockEventBus(), testutil.NewTestLogger())
 	created, err := svc.Create(tunnel)
 	require.NoError(t, err)
 

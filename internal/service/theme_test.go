@@ -12,13 +12,13 @@ import (
 
 func TestNewThemeService(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	svc := NewThemeService(db)
+	svc := NewThemeService(db, testutil.NewTestLogger())
 	assert.NotNil(t, svc)
 }
 
 func TestThemeService_CRUD(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	svc := NewThemeService(db)
+	svc := NewThemeService(db, testutil.NewTestLogger())
 
 	themes, err := svc.List()
 	require.NoError(t, err)
@@ -54,7 +54,7 @@ func TestThemeService_CRUD(t *testing.T) {
 
 func TestThemeService_GetActive(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	svc := NewThemeService(db)
+	svc := NewThemeService(db, testutil.NewTestLogger())
 
 	active, err := svc.GetActive()
 	require.NoError(t, err)
@@ -63,7 +63,7 @@ func TestThemeService_GetActive(t *testing.T) {
 
 func TestThemeService_SetActive(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	svc := NewThemeService(db)
+	svc := NewThemeService(db, testutil.NewTestLogger())
 
 	err := svc.SetActive("dark")
 	require.NoError(t, err)
@@ -75,7 +75,7 @@ func TestThemeService_SetActive(t *testing.T) {
 
 func TestThemeService_SetActiveOverride(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	svc := NewThemeService(db)
+	svc := NewThemeService(db, testutil.NewTestLogger())
 
 	err := svc.SetActive("light")
 	require.NoError(t, err)
@@ -90,7 +90,7 @@ func TestThemeService_SetActiveOverride(t *testing.T) {
 
 func TestThemeService_CreateBuiltin(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	svc := NewThemeService(db)
+	svc := NewThemeService(db, testutil.NewTestLogger())
 
 	theme := model.Theme{Name: "Default", IsBuiltin: true, Config: `{}`}
 	created, err := svc.Create(theme)

@@ -45,6 +45,8 @@ export default function SessionDialog({
   const [termType, setTermType] = useState(session?.termType ?? 'xterm-256color')
 
   const handleSubmit = () => {
+    const formData = { name, host, port, username, authMethod, keepAlive, termType }
+    console.log('[SessionDialog] handleSubmit', formData)
     onSave({
       name,
       host,

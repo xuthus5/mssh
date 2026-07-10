@@ -106,6 +106,7 @@ export default function SessionTree({
           className="flex items-center gap-1 py-1 px-1 cursor-pointer hover:bg-muted/50 rounded text-sm ml-1"
           onDoubleClick={(e: MouseEvent) => {
             e.stopPropagation()
+            console.log('[SessionTree] onConnect', session.id)
             onConnect(session.id)
           }}
         >
@@ -114,16 +115,16 @@ export default function SessionTree({
         </div>
       </ContextMenuTrigger>
       <ContextMenuContent>
-        <ContextMenuItem onClick={() => onConnect(session.id)}>
+        <ContextMenuItem onClick={() => { console.log('[SessionTree] onConnect', session.id); onConnect(session.id) }}>
           连接
         </ContextMenuItem>
-        <ContextMenuItem onClick={() => onEditSession(session)}>
+        <ContextMenuItem onClick={() => { console.log('[SessionTree] onEditSession', session.id); onEditSession(session) }}>
           编辑
         </ContextMenuItem>
         <ContextMenuSeparator />
         <ContextMenuItem
           variant="destructive"
-          onClick={() => onDeleteSession(session.id)}
+          onClick={() => { console.log('[SessionTree] onDeleteSession', session.id); onDeleteSession(session.id) }}
         >
           删除
         </ContextMenuItem>

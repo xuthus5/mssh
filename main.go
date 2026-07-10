@@ -1,7 +1,7 @@
 package main
 
 import (
-	"log"
+	"log/slog"
 	"os"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
@@ -10,11 +10,16 @@ import (
 )
 
 func main() {
+	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo}))
+
+	logger.Info("starting MSSH", "dataDir", defaultDataDir())
 	appInstance, err := app.New(app.Options{
 		DataDir: defaultDataDir(),
+		Logger:  logger,
 	})
 	if err != nil {
-		log.Fatal(err)
+		logger.Error("startup failed", "error", err)
+		os.Exit(1)
 	}
 
 	wailsApp := application.New(application.Options{
@@ -45,8 +50,10 @@ func main() {
 		Height: 800,
 	})
 
+	logger.Info("MSSH started")
 	if err := wailsApp.Run(); err != nil {
-		log.Fatal(err)
+		logger.Error("MSSH run failed", "error", err)
+		os.Exit(1)
 	}
 }
 

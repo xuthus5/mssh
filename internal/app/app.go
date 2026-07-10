@@ -3,6 +3,7 @@ package app
 import (
 	"database/sql"
 	"fmt"
+	"log/slog"
 
 	"mssh/internal/crypto"
 	"mssh/internal/service"
@@ -26,6 +27,7 @@ type App struct {
 
 type Options struct {
 	DataDir string
+	Logger  *slog.Logger
 }
 
 type nopEventBus struct{}
@@ -49,16 +51,28 @@ func New(opts Options) (*App, error) {
 		return nil, fmt.Errorf("data directory is required")
 	}
 
+	logger := opts.Logger
+	if logger == nil {
+		logger = slog.Default()
+	}
+
+	logger.Info("opening database")
 	db, err := store.OpenDB(opts.DataDir)
 	if err != nil {
+		logger.Error("open database failed", "error", err)
 		return nil, fmt.Errorf("open database: %w", err)
 	}
+
+	logger.Info("running migrations")
 	if err := store.Migrate(db); err != nil {
+		logger.Error("migrate database failed", "error", err)
 		return nil, fmt.Errorf("migrate database: %w", err)
 	}
 
+	logger.Info("generating master key")
 	masterKey, err := crypto.GenerateRandomBytes(32)
 	if err != nil {
+		logger.Error("generate master key failed", "error", err)
 		return nil, fmt.Errorf("generate master key: %w", err)
 	}
 
@@ -67,18 +81,19 @@ func New(opts Options) (*App, error) {
 
 	eventBus := &nopEventBus{}
 
-	sessionSvc := service.NewSessionService(db, eventBus, 30)
-	terminalSvc := service.NewTerminalService(sessionSvc, eventBus, 32)
-	fileSvc := service.NewFileService(sessionSvc, eventBus)
-	tunnelSvc := service.NewTunnelService(db, sessionSvc, eventBus)
+	logger.Info("initializing services")
+	sessionSvc := service.NewSessionService(db, eventBus, 30, logger)
+	terminalSvc := service.NewTerminalService(sessionSvc, eventBus, 32, logger)
+	fileSvc := service.NewFileService(sessionSvc, eventBus, logger)
+	tunnelSvc := service.NewTunnelService(db, sessionSvc, eventBus, logger)
 
 	cryptoAdapter := &cryptoAdapter{key: masterKey}
-	keySvc := service.NewKeyService(db, cryptoAdapter)
+	keySvc := service.NewKeyService(db, cryptoAdapter, logger)
 
-	macroSvc := service.NewMacroService(db, terminalSvc)
-	themeSvc := service.NewThemeService(db)
-	logSvc := service.NewLogService(db)
-	syncSvc := service.NewSyncService(db)
+	macroSvc := service.NewMacroService(db, terminalSvc, logger)
+	themeSvc := service.NewThemeService(db, logger)
+	logSvc := service.NewLogService(db, logger)
+	syncSvc := service.NewSyncService(db, logger)
 
 	return &App{
 		DB:       db,

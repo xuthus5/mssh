@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -20,11 +21,12 @@ type TerminalService struct {
 	maxSize    int
 	lastUsed   map[string]time.Time
 	sessionSvc *SessionService
+	logger     *slog.Logger
 }
 
 var _openPTY = ssh.OpenPTY
 
-func NewTerminalService(sessionSvc *SessionService, eventBus EventBus, maxSize int) *TerminalService {
+func NewTerminalService(sessionSvc *SessionService, eventBus EventBus, maxSize int, logger *slog.Logger) *TerminalService {
 	if maxSize <= 0 {
 		maxSize = 32
 	}
@@ -35,22 +37,27 @@ func NewTerminalService(sessionSvc *SessionService, eventBus EventBus, maxSize i
 		maxSize:    maxSize,
 		lastUsed:   make(map[string]time.Time),
 		sessionSvc: sessionSvc,
+		logger:     logger,
 	}
 }
 
 func (t *TerminalService) Open(ctx context.Context, sessionID int64, cols, rows int) (string, error) {
+	t.logger.Info("opening terminal", "sessionID", sessionID, "cols", cols, "rows", rows)
 	connID, err := t.sessionSvc.Connect(ctx, sessionID)
 	if err != nil {
+		t.logger.Error("terminal open failed", "sessionID", sessionID, "error", err)
 		return "", fmt.Errorf("terminal open: %w", err)
 	}
 
 	wrapper, err := t.sessionSvc.GetClientWrapper(connID)
 	if err != nil {
+		t.logger.Error("terminal open failed", "sessionID", sessionID, "error", err)
 		return "", fmt.Errorf("terminal open: %w", err)
 	}
 
 	sess, err := t.sessionSvc.GetSession(sessionID)
 	if err != nil {
+		t.logger.Error("terminal open failed", "sessionID", sessionID, "error", err)
 		return "", fmt.Errorf("terminal open: %w", err)
 	}
 
@@ -61,6 +68,7 @@ func (t *TerminalService) Open(ctx context.Context, sessionID int64, cols, rows 
 
 	pty, err := _openPTY(wrapper, termType, cols, rows)
 	if err != nil {
+		t.logger.Error("terminal open failed", "sessionID", sessionID, "error", err)
 		return "", fmt.Errorf("terminal open: %w", err)
 	}
 
@@ -82,10 +90,12 @@ func (t *TerminalService) Open(ctx context.Context, sessionID int64, cols, rows 
 	t.lastUsed[terminalID] = time.Now()
 	t.mu.Unlock()
 
+	t.logger.Info("terminal opened", "terminalID", terminalID)
 	return terminalID, nil
 }
 
 func (t *TerminalService) Write(terminalID string, data []byte) (int, error) {
+	t.logger.Debug("writing to terminal", "terminalID", terminalID, "len", len(data))
 	t.mu.RLock()
 	pty, ok := t.ptys[terminalID]
 	t.mu.RUnlock()
@@ -101,6 +111,7 @@ func (t *TerminalService) Write(terminalID string, data []byte) (int, error) {
 }
 
 func (t *TerminalService) Resize(terminalID string, cols, rows int) error {
+	t.logger.Info("resizing terminal", "terminalID", terminalID, "cols", cols, "rows", rows)
 	t.mu.RLock()
 	pty, ok := t.ptys[terminalID]
 	t.mu.RUnlock()
@@ -116,10 +127,12 @@ func (t *TerminalService) Resize(terminalID string, cols, rows int) error {
 }
 
 func (t *TerminalService) Close(terminalID string) error {
+	t.logger.Info("closing terminal", "terminalID", terminalID)
 	t.mu.Lock()
 	pty, ok := t.ptys[terminalID]
 	if !ok {
 		t.mu.Unlock()
+		t.logger.Error("close terminal failed", "terminalID", terminalID, "error", "terminal not found")
 		return fmt.Errorf("terminal %s not found", terminalID)
 	}
 	delete(t.ptys, terminalID)
@@ -134,6 +147,7 @@ func (t *TerminalService) Close(terminalID string) error {
 		State:      "closed",
 	})
 
+	t.logger.Info("terminal closed", "terminalID", terminalID)
 	return nil
 }
 

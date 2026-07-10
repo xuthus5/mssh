@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"database/sql"
 	"fmt"
+	"log/slog"
 	"sync"
 
 	gossh "golang.org/x/crypto/ssh"
@@ -25,64 +26,111 @@ type SessionService struct {
 	conns     map[string]*ssh.ClientWrapper
 	eventBus  EventBus
 	keepAlive int
+	logger    *slog.Logger
 }
 
-func NewSessionService(db *sql.DB, eventBus EventBus, keepAlive int) *SessionService {
+func NewSessionService(db *sql.DB, eventBus EventBus, keepAlive int, logger *slog.Logger) *SessionService {
 	return &SessionService{
 		db:        db,
 		conns:     make(map[string]*ssh.ClientWrapper),
 		eventBus:  eventBus,
 		keepAlive: keepAlive,
+		logger:    logger,
 	}
 }
 
 func (s *SessionService) ListFolders() ([]model.SessionFolder, error) {
+	s.logger.Info("listing folders")
 	return store.ListFolders(s.db)
 }
 
 func (s *SessionService) CreateFolder(name string, parentID *int64) (*model.SessionFolder, error) {
-	return store.CreateFolder(s.db, name, parentID)
+	s.logger.Info("creating folder", "name", name, "parentID", parentID)
+	result, err := store.CreateFolder(s.db, name, parentID)
+	if err != nil {
+		s.logger.Error("create folder failed", "error", err)
+	}
+	return result, err
 }
 
 func (s *SessionService) UpdateFolder(id int64, name string) error {
-	return store.UpdateFolder(s.db, id, name)
+	s.logger.Info("updating folder", "id", id, "name", name)
+	err := store.UpdateFolder(s.db, id, name)
+	if err != nil {
+		s.logger.Error("update folder failed", "error", err)
+	}
+	return err
 }
 
 func (s *SessionService) DeleteFolder(id int64) error {
-	return store.DeleteFolder(s.db, id)
+	s.logger.Info("deleting folder", "id", id)
+	err := store.DeleteFolder(s.db, id)
+	if err != nil {
+		s.logger.Error("delete folder failed", "error", err)
+	}
+	return err
 }
 
 func (s *SessionService) MoveFolder(id int64, newParentID *int64) error {
-	return store.MoveFolder(s.db, id, newParentID)
+	s.logger.Info("moving folder", "id", id, "newParentID", newParentID)
+	err := store.MoveFolder(s.db, id, newParentID)
+	if err != nil {
+		s.logger.Error("move folder failed", "error", err)
+	}
+	return err
 }
 
 func (s *SessionService) ListSessions(folderID *int64) ([]model.Session, error) {
+	s.logger.Info("listing sessions", "folderID", folderID)
 	return store.ListSessions(s.db, folderID)
 }
 
 func (s *SessionService) CreateSession(session model.Session) (*model.Session, error) {
-	return store.CreateSession(s.db, session)
+	s.logger.Info("creating session", "name", session.Name, "authMethod", session.AuthMethod)
+	result, err := store.CreateSession(s.db, session)
+	if err != nil {
+		s.logger.Error("create session failed", "error", err)
+	}
+	return result, err
 }
 
 func (s *SessionService) UpdateSession(session model.Session) error {
-	return store.UpdateSession(s.db, session)
+	s.logger.Info("updating session", "id", session.ID, "name", session.Name)
+	err := store.UpdateSession(s.db, session)
+	if err != nil {
+		s.logger.Error("update session failed", "error", err)
+	}
+	return err
 }
 
 func (s *SessionService) DeleteSession(id int64) error {
-	return store.DeleteSession(s.db, id)
+	s.logger.Info("deleting session", "id", id)
+	err := store.DeleteSession(s.db, id)
+	if err != nil {
+		s.logger.Error("delete session failed", "error", err)
+	}
+	return err
 }
 
 func (s *SessionService) MoveSession(id int64, newFolderID *int64) error {
-	return store.MoveSession(s.db, id, newFolderID)
+	s.logger.Info("moving session", "id", id, "newFolderID", newFolderID)
+	err := store.MoveSession(s.db, id, newFolderID)
+	if err != nil {
+		s.logger.Error("move session failed", "error", err)
+	}
+	return err
 }
 
 func (s *SessionService) GetSession(id int64) (*model.Session, error) {
+	s.logger.Info("getting session", "id", id)
 	return store.GetSession(s.db, id)
 }
 
 func (s *SessionService) Connect(ctx context.Context, sessionID int64) (string, error) {
+	s.logger.Info("connecting to session", "sessionID", sessionID)
 	sess, err := store.GetSession(s.db, sessionID)
 	if err != nil {
+		s.logger.Error("connect failed", "sessionID", sessionID, "error", err)
 		return "", fmt.Errorf("connect: %w", err)
 	}
 
@@ -90,6 +138,7 @@ func (s *SessionService) Connect(ctx context.Context, sessionID int64) (string, 
 
 	wrapper, err := ssh.Connect(ctx, *sess, authMethods)
 	if err != nil {
+		s.logger.Error("connect failed", "sessionID", sessionID, "error", err)
 		return "", fmt.Errorf("connect: %w", err)
 	}
 
@@ -104,14 +153,17 @@ func (s *SessionService) Connect(ctx context.Context, sessionID int64) (string, 
 		State:      "connected",
 	})
 
+	s.logger.Info("connected to session", "sessionID", sessionID, "terminalID", terminalID)
 	return terminalID, nil
 }
 
 func (s *SessionService) Disconnect(terminalID string) error {
+	s.logger.Info("disconnecting terminal", "terminalID", terminalID)
 	s.mu.Lock()
 	wrapper, ok := s.conns[terminalID]
 	if !ok {
 		s.mu.Unlock()
+		s.logger.Error("disconnect failed", "terminalID", terminalID, "error", "terminal not found")
 		return fmt.Errorf("terminal %s not found", terminalID)
 	}
 	delete(s.conns, terminalID)
@@ -124,6 +176,7 @@ func (s *SessionService) Disconnect(terminalID string) error {
 		State:      "disconnected",
 	})
 
+	s.logger.Info("terminal disconnected", "terminalID", terminalID)
 	return nil
 }
 

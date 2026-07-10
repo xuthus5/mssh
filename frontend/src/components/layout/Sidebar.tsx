@@ -37,8 +37,10 @@ export default function Sidebar() {
   const handleSaveSession = useCallback(
     (data: Omit<Session, 'id'>) => {
       if (editingSession) {
+        console.log('[Sidebar] updateSession', { id: editingSession.id, name: data.name, authMethod: data.authMethod })
         updateSession({ ...editingSession, ...data })
       } else {
+        console.log('[Sidebar] createSession', { name: data.name, authMethod: data.authMethod })
         createSession(data)
       }
       setSessionDialogOpen(false)
@@ -49,18 +51,21 @@ export default function Sidebar() {
 
   const handleCreateFolder = () => {
     if (!folderName.trim()) return
+    console.log('[Sidebar] createFolder', folderName.trim())
     createFolder(folderName.trim(), null)
     setFolderName('')
     setFolderDialogOpen(false)
   }
 
   const handleOpenNewSession = () => {
+    console.log('[Sidebar] openNewSession')
     setEditingSession(null)
     // small delay ensures react state is flushed before opening
     setTimeout(() => setSessionDialogOpen(true), 0)
   }
 
   const handleOpenEditSession = (s: Session) => {
+    console.log('[Sidebar] openEditSession', { id: s.id, name: s.name })
     setEditingSession(s)
     setTimeout(() => setSessionDialogOpen(true), 0)
   }
@@ -95,21 +100,21 @@ export default function Sidebar() {
       {activeTab === 'sessions' && (
         <>
           <div className="px-2 py-2 flex gap-1 border-b border-border/50">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="flex-1 text-xs h-7 justify-start gap-1"
-              onClick={handleOpenNewSession}
-            >
-              <Plus className="h-3 w-3" />
-              新建会话
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-xs h-7 w-7 p-0 justify-center"
-              onClick={() => setFolderDialogOpen(true)}
-              title="新建分组"
+              <Button
+                variant="ghost"
+                size="sm"
+                className="flex-1 text-xs h-7 justify-start gap-1"
+                onClick={() => { console.log('[Sidebar] 新建会话 click'); handleOpenNewSession() }}
+              >
+                <Plus className="h-3 w-3" />
+                新建会话
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-xs h-7 w-7 p-0 justify-center"
+                onClick={() => { console.log('[Sidebar] 新建分组 click'); setFolderDialogOpen(true) }}
+                title="新建分组"
             >
               <FolderPlus className="h-3.5 w-3.5" />
             </Button>
