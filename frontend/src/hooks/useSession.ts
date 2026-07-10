@@ -124,9 +124,7 @@ export function useSession() {
         folder_id: session.folderId ? Number(session.folderId) : null,
         id: 0,
         sort_order: 0,
-        created_at: '',
-        updated_at: '',
-      })
+      } as any)
       setSessions((prev) => [...prev, {
         id: String(result!.id),
         name: result!.name,
