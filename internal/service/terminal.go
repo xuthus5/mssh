@@ -9,13 +9,14 @@ import (
 
 	"github.com/google/uuid"
 
+	"mssh/internal/model"
 	ssh "mssh/internal/ssh"
 	"mssh/pkg/event"
 )
 
 type TerminalService struct {
 	mu            sync.RWMutex
-	ptys          map[string]*ssh.PTYSession
+	ptys          map[string]ssh.PTY
 	eventBus      EventBus
 	maxSize       int
 	lastUsed      map[string]time.Time
@@ -37,7 +38,7 @@ func NewTerminalService(sessionSvc *SessionService, eventBus EventBus, maxSize i
 		maxSize = 32
 	}
 	return &TerminalService{
-		ptys:       make(map[string]*ssh.PTYSession),
+		ptys:       make(map[string]ssh.PTY),
 		eventBus:   eventBus,
 		maxSize:    maxSize,
 		lastUsed:   make(map[string]time.Time),
@@ -48,17 +49,6 @@ func NewTerminalService(sessionSvc *SessionService, eventBus EventBus, maxSize i
 
 func (t *TerminalService) Open(ctx context.Context, sessionID int64, cols, rows int) (string, error) {
 	t.logger.Info("opening terminal", "sessionID", sessionID, "cols", cols, "rows", rows)
-	connID, err := t.sessionSvc.Connect(ctx, sessionID)
-	if err != nil {
-		t.logger.Error("terminal open failed", "sessionID", sessionID, "error", err)
-		return "", fmt.Errorf("terminal open: %w", err)
-	}
-
-	wrapper, err := t.sessionSvc.GetClientWrapper(connID)
-	if err != nil {
-		t.logger.Error("terminal open failed", "sessionID", sessionID, "error", err)
-		return "", fmt.Errorf("terminal open: %w", err)
-	}
 
 	sess, err := t.sessionSvc.GetSession(sessionID)
 	if err != nil {
@@ -71,10 +61,29 @@ func (t *TerminalService) Open(ctx context.Context, sessionID int64, cols, rows 
 		termType = "xterm-256color"
 	}
 
-	pty, err := _openPTY(wrapper, termType, cols, rows)
+	connID, err := t.sessionSvc.Connect(ctx, sessionID)
+	var pty ssh.PTY
 	if err != nil {
-		t.logger.Error("terminal open failed", "sessionID", sessionID, "error", err)
-		return "", fmt.Errorf("terminal open: %w", err)
+		// Go SSH library failed — try native ssh for password auth
+		if sess.AuthMethod == model.AuthPassword && sess.Password != "" {
+			t.logger.Warn("Go SSH connect failed, trying native ssh", "host", sess.Host, "port", sess.Port)
+			pty, err = ssh.OpenNativePTY(sess.Host, sess.Port, sess.Username, sess.Password, cols, rows)
+		}
+		if err != nil {
+			t.logger.Error("terminal open failed", "sessionID", sessionID, "error", err)
+			return "", fmt.Errorf("terminal open: %w", err)
+		}
+	} else {
+		wrapper, wErr := t.sessionSvc.GetClientWrapper(connID)
+		if wErr != nil {
+			t.logger.Error("get client wrapper failed", "error", wErr)
+			return "", fmt.Errorf("terminal open: %w", wErr)
+		}
+		pty, err = _openPTY(wrapper, termType, cols, rows)
+		if err != nil {
+			t.logger.Error("terminal open failed", "sessionID", sessionID, "error", err)
+			return "", fmt.Errorf("terminal open: %w", err)
+		}
 	}
 
 	terminalID := uuid.New().String()
