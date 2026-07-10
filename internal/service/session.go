@@ -220,6 +220,18 @@ func (s *SessionService) buildAuthMethods(sess *model.Session) ([]gossh.AuthMeth
 	case model.AuthPassword:
 		s.logger.Info("using password auth", "passwordLen", len(sess.Password))
 		methods = append(methods, gossh.Password(sess.Password))
+		// Also add keyboard-interactive as fallback for PAM-based servers
+		if sess.Password != "" {
+			methods = append(methods, gossh.KeyboardInteractive(
+				func(user, instruction string, questions []string, echos []bool) ([]string, error) {
+					answers := make([]string, len(questions))
+					for i := range answers {
+						answers[i] = sess.Password
+					}
+					return answers, nil
+				},
+			))
+		}
 	case model.AuthKey:
 		if sess.KeyID != nil {
 			key, err := store.GetKey(s.db, *sess.KeyID)
