@@ -27,7 +27,7 @@ func Connect(ctx context.Context, s model.Session, auth []gossh.AuthMethod, know
 		logger = slog.Default()
 	}
 
-	logger.Info("connecting to SSH server", "host", s.Host, "port", s.Port, "user", s.Username)
+	logger.Info("connecting to SSH server", "host", s.Host, "port", s.Port, "user", s.Username, "authCount", len(auth))
 
 	hostKeyCallback, err := createHostKeyCallback(knownHostsPath)
 	if err != nil {
