@@ -90,12 +90,21 @@ export function useTerminal(
     })
 
     let unsubOutput: (() => void) | undefined
+    let eventCount = 0
     console.log('[useTerminal] subscribing to terminal:output for', terminalID)
     unsubOutput = Events.On('terminal:output', (payload: unknown) => {
+      eventCount++
       const p = payload as { terminal_id?: string; data?: string }
       if (p?.terminal_id === terminalID) {
-        if (p.data !== undefined && p.data !== null) {
+        if (p.data !== undefined && p.data !== null && p.data.length > 0) {
+          const preview = p.data.length > 60 ? p.data.slice(0, 60) + '...' : p.data
+          const hex = Array.from(new TextEncoder().encode(p.data.slice(0, 8))).map(b => b.toString(16)).join(' ')
+          if (eventCount <= 3) {
+            console.log(`[useTerminal] #${eventCount} writing ${p.data.length}B, hex: ${hex}, text: ${JSON.stringify(preview)}`)
+          }
           term.write(p.data)
+        } else if (p.data !== undefined && p.data.length === 0) {
+          if (eventCount <= 3) console.log(`[useTerminal] #${eventCount} data is empty string`)
         }
       }
     })
