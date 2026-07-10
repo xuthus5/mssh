@@ -1,8 +1,10 @@
 name: mssh
-outputfilename: mssh
-frontend:dir: frontend
-frontend:install: npm install
-frontend:build: npm run build
-frontend:dev:watcher: npm run dev
-frontend:dev:serverUrl: http://localhost:5173
+bin_name: mssh
+output_name: mssh
+app_type: desktop
+frontend_dir: frontend
+install_script: npm install
+build_script: npm run build
+dev_watcher: npm run dev
+dev_url: http://localhost:5173
 wailsjsdir: frontend/src/lib/wails
