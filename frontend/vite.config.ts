@@ -11,8 +11,8 @@ export default defineConfig({
     },
   },
   server: {
+    host: '127.0.0.1',
     port: parseInt(process.env.WAILS_VITE_PORT || '5173'),
-    strictPort: true,
   },
   test: {
     globals: true,

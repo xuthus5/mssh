@@ -3,7 +3,7 @@ tasks:
   dev:
     desc: 启动开发模式
     cmds:
-      - wails3 dev
+      - wails3 dev -port 5173
   build:
     desc: 生产构建
     cmds:
