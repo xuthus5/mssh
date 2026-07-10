@@ -19,10 +19,8 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
     css: false,
-    resolve: {
-      alias: {
-        '@wailsio/runtime': path.resolve(__dirname, 'src/test/__mocks__/wails-runtime.ts'),
-      },
+    alias: {
+      '@wailsio/runtime': path.resolve(__dirname, 'src/test/__mocks__/wails-runtime.ts'),
     },
     coverage: {
       provider: 'v8',
