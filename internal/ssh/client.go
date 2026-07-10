@@ -7,7 +7,9 @@ import (
 	"log/slog"
 	"net"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	gossh "golang.org/x/crypto/ssh"
@@ -138,4 +140,73 @@ func createHostKeyCallback(knownHostsPath string) (gossh.HostKeyCallback, error)
 		}
 		return err
 	}, nil
+}
+
+func tryNativeSSH(host string, port int, user, password string) error {
+	_, err := exec.LookPath("ssh")
+	if err != nil {
+		return fmt.Errorf("ssh command not found: %w", err)
+	}
+	// Use sshpass if available, otherwise pipe password
+	if _, err := exec.LookPath("sshpass"); err == nil {
+		cmd := exec.Command("sshpass", "-p", password,
+			"ssh", "-o", "StrictHostKeyChecking=no",
+			"-o", "UserKnownHostsFile=/dev/null",
+			"-o", "PreferredAuthentications=password",
+			"-o", "PubkeyAuthentication=no",
+			"-o", "BatchMode=yes",
+			"-p", fmt.Sprint(port),
+			fmt.Sprintf("%s@%s", user, host),
+			"exit")
+		return cmd.Run()
+	}
+	// Fallback: pipe password via stdin
+	cmd := exec.Command("ssh",
+		"-o", "StrictHostKeyChecking=no",
+		"-o", "UserKnownHostsFile=/dev/null",
+		"-o", "PreferredAuthentications=password",
+		"-o", "PubkeyAuthentication=no",
+		"-o", "BatchMode=yes",
+		"-p", fmt.Sprint(port),
+		fmt.Sprintf("%s@%s", user, host),
+		"exit")
+	cmd.Stdin = strings.NewReader(password + "\n")
+	return cmd.Run()
+}
+
+// ConnectWithFallback attempts Go SSH connection first, falls back to native ssh
+func ConnectWithFallback(ctx context.Context, s model.Session, auth []gossh.AuthMethod, knownHostsPath string, logger *slog.Logger) (*ClientWrapper, error) {
+	cw, err := Connect(ctx, s, auth, knownHostsPath, logger)
+	if err != nil && isAuthError(err) && s.AuthMethod == model.AuthPassword && s.Password != "" {
+		logger.Warn("Go SSH password auth failed, trying native ssh", "host", s.Host, "port", s.Port)
+		nativeErr := tryNativeSSH(s.Host, s.Port, s.Username, s.Password)
+		if nativeErr != nil {
+			logger.Error("native ssh also failed", "error", nativeErr)
+			return nil, err
+		}
+		// Native ssh succeeded, but we can't return a ClientWrapper from it
+		// Signal to caller that Go SSH failed but native ssh is available
+		logger.Info("native ssh connection successful, but Go library is required for PTY")
+	}
+	return cw, err
+}
+
+func isAuthError(err error) bool {
+	if err == nil {
+		return false
+	}
+	return contains(err.Error(), "unable to authenticate")
+}
+
+func contains(s, substr string) bool {
+	return len(s) >= len(substr) && searchString(s, substr)
+}
+
+func searchString(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
 }

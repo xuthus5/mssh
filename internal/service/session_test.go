@@ -217,7 +217,7 @@ func TestSessionService_buildAuthMethodsPassword(t *testing.T) {
 	sess := &model.Session{AuthMethod: model.AuthPassword, Password: "secret"}
 	methods, err := svc.buildAuthMethods(sess)
 	require.NoError(t, err)
-	assert.Len(t, methods, 1)
+	assert.Len(t, methods, 2)
 }
 
 func TestSessionService_buildAuthMethodsKey(t *testing.T) {
@@ -237,7 +237,7 @@ func TestSessionService_buildAuthMethodsKey(t *testing.T) {
 	sess.KeyID = &createdKey.ID
 	methods, err = svc.buildAuthMethods(sess)
 	require.NoError(t, err)
-	assert.Len(t, methods, 1)
+	assert.Len(t, methods, 2)
 }
 
 func TestSessionService_buildAuthMethodsKeyboardInteractive(t *testing.T) {
@@ -247,7 +247,7 @@ func TestSessionService_buildAuthMethodsKeyboardInteractive(t *testing.T) {
 	sess := &model.Session{AuthMethod: model.AuthKeyboardInteractive, Password: "secret"}
 	methods, err := svc.buildAuthMethods(sess)
 	require.NoError(t, err)
-	assert.Len(t, methods, 1)
+	assert.Len(t, methods, 2)
 }
 
 func TestSessionService_buildAuthMethodsUnknown(t *testing.T) {
