@@ -6,13 +6,18 @@ import path from 'path'
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: {
-    alias: {
-      '@': path.resolve(__dirname, './src'),
-    },
+    alias: { '@': path.resolve(__dirname, './src') },
   },
   server: {
     port: parseInt(process.env.WAILS_VITE_PORT || '5173'),
     strictPort: true,
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: undefined,
+      },
+    },
   },
   test: {
     globals: true,
@@ -22,10 +27,7 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       include: ['src/hooks/**', 'src/components/session/**', 'src/components/layout/Sidebar.tsx', 'src/store/**'],
-      thresholds: {
-        lines: 80,
-        functions: 80,
-      },
+      thresholds: { lines: 80, functions: 80 },
     },
   },
 })
