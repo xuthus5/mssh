@@ -74,14 +74,6 @@ export function ConnectDialog() {
                   已连接到 {user}@{host}:{port}
                 </p>
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                className="mt-2"
-                onClick={closeDialog}
-              >
-                关闭
-              </Button>
             </>
           )}
 
