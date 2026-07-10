@@ -16,7 +16,10 @@ func CreateTunnel(db *sql.DB, t model.Tunnel) (*model.Tunnel, error) {
 	if err != nil {
 		return nil, fmt.Errorf("create tunnel: %w", err)
 	}
-	id, _ := result.LastInsertId()
+	id, err := result.LastInsertId()
+	if err != nil {
+		return nil, fmt.Errorf("create tunnel: last insert id: %w", err)
+	}
 	t.ID = id
 	t.CreatedAt = time.Now()
 	return &t, nil
@@ -36,7 +39,10 @@ func ListTunnels(db *sql.DB) ([]model.Tunnel, error) {
 		if err != nil {
 			return nil, fmt.Errorf("scan tunnel: %w", err)
 		}
-		t.CreatedAt, _ = time.Parse("2006-01-02 15:04:05", createdAt)
+		t.CreatedAt, err = time.Parse("2006-01-02 15:04:05", createdAt)
+		if err != nil {
+			return nil, fmt.Errorf("scan tunnel: parse created_at: %w", err)
+		}
 		tunnels = append(tunnels, t)
 	}
 	if tunnels == nil {

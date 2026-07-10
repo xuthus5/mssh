@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useAppStore, type ConnectionStatus } from '@/store/appStore'
 import { Gauge, Clock, Circle } from 'lucide-react'
+import TransferProgress from '@/components/file/TransferProgress'
 
 function formatTime(date: Date): string {
   const h = date.getHours().toString().padStart(2, '0')
@@ -39,6 +40,8 @@ export default function StatusBar() {
   const activeTabId = useAppStore((s) => s.activeTabId)
   const connectionStatus = useAppStore((s) => s.connectionStatus)
   const appStatus = useAppStore((s) => s.appStatus)
+  const transfers = useAppStore((s) => s.transfers)
+  const removeTransfer = useAppStore((s) => s.removeTransfer)
   const [now, setNow] = useState(new Date())
 
   useEffect(() => {
@@ -70,6 +73,12 @@ export default function StatusBar() {
         </span>
         {activeTab && (
           <span className="text-foreground/80">{activeTab.title}</span>
+        )}
+        {transfers.length > 0 && (
+          <TransferProgress
+            transfers={transfers}
+            onCancel={(id) => removeTransfer(id)}
+          />
         )}
       </div>
       <div className="flex items-center gap-3">

@@ -129,6 +129,7 @@ export default function SessionDialog({
                 <SelectItem value="password">密码</SelectItem>
                 <SelectItem value="key">密钥</SelectItem>
                 <SelectItem value="agent">SSH Agent</SelectItem>
+                <SelectItem value="keyboard-interactive">交互式认证</SelectItem>
               </SelectContent>
             </Select>
           </div>
