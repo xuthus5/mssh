@@ -92,10 +92,11 @@ export function useTerminal(
     let unsubOutput: (() => void) | undefined
     console.log('[useTerminal] subscribing to terminal:output for', terminalID)
     unsubOutput = Events.On('terminal:output', (payload: unknown) => {
-      console.log('[useTerminal] received terminal:output', payload)
       const p = payload as { terminal_id?: string; data?: string }
-      if (p?.terminal_id === terminalID && p?.data) {
-        term.write(p.data)
+      if (p?.terminal_id === terminalID) {
+        if (p.data !== undefined && p.data !== null) {
+          term.write(p.data)
+        }
       }
     })
 
