@@ -1,32 +1,61 @@
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
-import { Circle, Square, Play } from 'lucide-react'
+import { Circle, Square, Play, Trash2 } from 'lucide-react'
+import { LogService } from '@/lib/wails'
 
-export interface RecordingInfo {
-  id: string
-  sessionId: string
-  sessionName: string
-  startedAt: string
-  endedAt: string | null
-  sizeBytes: number
+interface SessionLogEntry {
+  id: number
+  session_id: number | null
+  started_at: string
+  ended_at: string | null
+  data_path: string
 }
 
 interface Props {
+  sessionId: number
   isRecording: boolean
-  recordings: RecordingInfo[]
   onToggleRecording: () => void
-  onPlayback: (recordingId: string) => void
-  onDeleteRecording: (recordingId: string) => void
+  onPlayback: (recordingPath: string, title: string) => void
+  onDeleteRecording: (logId: number) => void
 }
 
 export default function SessionLog({
+  sessionId,
   isRecording,
-  recordings,
   onToggleRecording,
   onPlayback,
-  onDeleteRecording: _onDeleteRecording,
+  onDeleteRecording,
 }: Props) {
   const [showList, setShowList] = useState(false)
+  const [recordings, setRecordings] = useState<SessionLogEntry[]>([])
+
+  const loadRecordings = useCallback(async () => {
+    try {
+      const result = await LogService.List(sessionId)
+      setRecordings(result as SessionLogEntry[])
+    } catch (err) {
+      console.error('[SessionLog] load recordings error:', err)
+    }
+  }, [sessionId])
+
+  useEffect(() => {
+    if (showList) {
+      loadRecordings()
+    }
+  }, [showList, loadRecordings])
+
+  const handleDelete = async (logId: number) => {
+    onDeleteRecording(logId)
+    setRecordings((prev) => prev.filter((r) => r.id !== logId))
+  }
+
+  const formatTime = (ts: string) => {
+    try {
+      return new Date(ts).toLocaleString()
+    } catch {
+      return ts
+    }
+  }
 
   return (
     <div className="flex items-center gap-1">
@@ -55,28 +84,43 @@ export default function SessionLog({
         记录 ({recordings.length})
       </button>
       {showList && (
-        <div className="absolute top-8 right-2 z-50 w-64 max-h-48 overflow-y-auto rounded-lg border border-border bg-popover shadow-md p-2">
+        <div className="absolute top-8 right-2 z-50 w-72 max-h-64 overflow-y-auto rounded-lg border border-border bg-popover shadow-md p-2">
           {recordings.length === 0 ? (
             <p className="text-xs text-muted-foreground p-2">暂无录制记录</p>
           ) : (
             recordings.map((r) => (
               <div
                 key={r.id}
-                className="flex items-center justify-between px-2 py-1 rounded hover:bg-muted/50"
+                className="flex items-center justify-between px-2 py-1.5 rounded hover:bg-muted/50"
               >
-                <div className="flex flex-col">
-                  <span className="text-xs">{r.sessionName}</span>
+                <div className="flex flex-col min-w-0 flex-1 mr-1">
+                  <span className="text-xs truncate">
+                    录制 #{r.id}
+                  </span>
                   <span className="text-[10px] text-muted-foreground">
-                    {r.startedAt}
+                    {formatTime(r.started_at)}
                   </span>
                 </div>
-                <Button
-                  size="xs"
-                  variant="ghost"
-                  onClick={() => onPlayback(r.id)}
-                >
-                  <Play className="h-3 w-3" />
-                </Button>
+                <div className="flex items-center gap-0.5 flex-shrink-0">
+                  <Button
+                    size="xs"
+                    variant="ghost"
+                    onClick={() => {
+                      onPlayback(r.data_path, `回放 #${r.id}`)
+                      setShowList(false)
+                    }}
+                  >
+                    <Play className="h-3 w-3" />
+                  </Button>
+                  <Button
+                    size="xs"
+                    variant="ghost"
+                    className="text-destructive"
+                    onClick={() => handleDelete(r.id)}
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </div>
               </div>
             ))
           )}

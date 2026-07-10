@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from 'react'
 import { SettingService, KeyService, SyncService } from '@/lib/wails'
+import { useAppStore } from '@/store/appStore'
 
 export interface GeneralSettings {
   maxPoolSize: number
@@ -79,6 +80,32 @@ export function useSettings() {
       console.log('[useSettings] saveTheme')
       await SettingService.SetSetting('theme', JSON.stringify(t))
       setTheme(t)
+      useAppStore.getState().setTerminalTheme({
+        background: t.background,
+        foreground: t.foreground,
+        cursor: t.cursorColor,
+        cursorAccent: t.background,
+        selectionBackground: '#264f78',
+        cursorStyle: t.cursorStyle,
+        fontFamily: t.fontFamily,
+        fontSize: t.fontSize,
+        ansiBlack: t.ansi[0] ?? '#000000',
+        ansiRed: t.ansi[1] ?? '#cd0000',
+        ansiGreen: t.ansi[2] ?? '#00cd00',
+        ansiYellow: t.ansi[3] ?? '#cdcd00',
+        ansiBlue: t.ansi[4] ?? '#0000ee',
+        ansiMagenta: t.ansi[5] ?? '#cd00cd',
+        ansiCyan: t.ansi[6] ?? '#00cdcd',
+        ansiWhite: t.ansi[7] ?? '#e5e5e5',
+        ansiBrightBlack: t.ansi[8] ?? '#7f7f7f',
+        ansiBrightRed: t.ansi[9] ?? '#ff0000',
+        ansiBrightGreen: t.ansi[10] ?? '#00ff00',
+        ansiBrightYellow: t.ansi[11] ?? '#ffff00',
+        ansiBrightBlue: t.ansi[12] ?? '#5c5cff',
+        ansiBrightMagenta: t.ansi[13] ?? '#ff00ff',
+        ansiBrightCyan: t.ansi[14] ?? '#00ffff',
+        ansiBrightWhite: t.ansi[15] ?? '#ffffff',
+      })
     } catch (err) {
       console.log('[useSettings] saveTheme error', err)
     }
@@ -88,7 +115,36 @@ export function useSettings() {
     try {
       console.log('[useSettings] loadTheme')
       const raw = await SettingService.GetSetting('theme')
-      if (raw) setTheme(JSON.parse(raw))
+      if (raw) {
+        const t: TerminalTheme = JSON.parse(raw)
+        setTheme(t)
+        useAppStore.getState().setTerminalTheme({
+          background: t.background,
+          foreground: t.foreground,
+          cursor: t.cursorColor,
+          cursorAccent: t.background,
+          selectionBackground: '#264f78',
+          cursorStyle: t.cursorStyle,
+          fontFamily: t.fontFamily,
+          fontSize: t.fontSize,
+          ansiBlack: t.ansi[0] ?? '#000000',
+          ansiRed: t.ansi[1] ?? '#cd0000',
+          ansiGreen: t.ansi[2] ?? '#00cd00',
+          ansiYellow: t.ansi[3] ?? '#cdcd00',
+          ansiBlue: t.ansi[4] ?? '#0000ee',
+          ansiMagenta: t.ansi[5] ?? '#cd00cd',
+          ansiCyan: t.ansi[6] ?? '#00cdcd',
+          ansiWhite: t.ansi[7] ?? '#e5e5e5',
+          ansiBrightBlack: t.ansi[8] ?? '#7f7f7f',
+          ansiBrightRed: t.ansi[9] ?? '#ff0000',
+          ansiBrightGreen: t.ansi[10] ?? '#00ff00',
+          ansiBrightYellow: t.ansi[11] ?? '#ffff00',
+          ansiBrightBlue: t.ansi[12] ?? '#5c5cff',
+          ansiBrightMagenta: t.ansi[13] ?? '#ff00ff',
+          ansiBrightCyan: t.ansi[14] ?? '#00ffff',
+          ansiBrightWhite: t.ansi[15] ?? '#ffffff',
+        })
+      }
     } catch (err) {
       console.log('[useSettings] loadTheme error', err)
     }

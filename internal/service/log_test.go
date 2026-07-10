@@ -14,14 +14,14 @@ import (
 
 func TestNewLogService(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	svc := NewLogService(db, testutil.NewTestLogger())
+	svc := NewLogService(db, t.TempDir(), testutil.NewTestLogger())
 	assert.NotNil(t, svc)
 	assert.NotNil(t, svc.recorders)
 }
 
 func TestLogService_List(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	svc := NewLogService(db, testutil.NewTestLogger())
+	svc := NewLogService(db, t.TempDir(), testutil.NewTestLogger())
 
 	logs, err := svc.List(nil)
 	require.NoError(t, err)
@@ -39,7 +39,7 @@ func TestLogService_ListBySession(t *testing.T) {
 	require.NoError(t, err)
 
 	dataPath := filepath.Join(t.TempDir(), "recording.bin")
-	svc := NewLogService(db, testutil.NewTestLogger())
+	svc := NewLogService(db, t.TempDir(), testutil.NewTestLogger())
 
 	logID, err := svc.StartRecording(createdSess.ID, 80, 24, "xterm", dataPath)
 	require.NoError(t, err)
@@ -53,7 +53,7 @@ func TestLogService_ListBySession(t *testing.T) {
 
 func TestLogService_StartRecording(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	svc := NewLogService(db, testutil.NewTestLogger())
+	svc := NewLogService(db, t.TempDir(), testutil.NewTestLogger())
 
 	sessionSvc := NewSessionService(db, newMockEventBus(), 30, "", testutil.NewTestLogger())
 	sess := model.Session{
@@ -78,7 +78,7 @@ func TestLogService_StartRecording(t *testing.T) {
 
 func TestLogService_StopRecording(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	svc := NewLogService(db, testutil.NewTestLogger())
+	svc := NewLogService(db, t.TempDir(), testutil.NewTestLogger())
 
 	sessionSvc := NewSessionService(db, newMockEventBus(), 30, "", testutil.NewTestLogger())
 	sess := model.Session{
@@ -102,7 +102,7 @@ func TestLogService_StopRecording(t *testing.T) {
 
 func TestLogService_StopRecordingNotActive(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	svc := NewLogService(db, testutil.NewTestLogger())
+	svc := NewLogService(db, t.TempDir(), testutil.NewTestLogger())
 
 	err := svc.StopRecording(999)
 	assert.Error(t, err)
@@ -111,7 +111,7 @@ func TestLogService_StopRecordingNotActive(t *testing.T) {
 
 func TestLogService_GetRecording(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	svc := NewLogService(db, testutil.NewTestLogger())
+	svc := NewLogService(db, t.TempDir(), testutil.NewTestLogger())
 
 	sessionSvc := NewSessionService(db, newMockEventBus(), 30, "", testutil.NewTestLogger())
 	sess := model.Session{
@@ -144,7 +144,7 @@ func TestLogService_GetRecording(t *testing.T) {
 
 func TestLogService_GetRecordingInvalidFile(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	svc := NewLogService(db, testutil.NewTestLogger())
+	svc := NewLogService(db, t.TempDir(), testutil.NewTestLogger())
 
 	_, err := svc.GetRecording("/nonexistent/path/recording.bin")
 	assert.Error(t, err)
@@ -152,7 +152,7 @@ func TestLogService_GetRecordingInvalidFile(t *testing.T) {
 
 func TestLogService_Delete(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	svc := NewLogService(db, testutil.NewTestLogger())
+	svc := NewLogService(db, t.TempDir(), testutil.NewTestLogger())
 
 	sessionSvc := NewSessionService(db, newMockEventBus(), 30, "", testutil.NewTestLogger())
 	sess := model.Session{
@@ -176,7 +176,7 @@ func TestLogService_Delete(t *testing.T) {
 
 func TestLogService_StartRecordingCreateLogError(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	svc := NewLogService(db, testutil.NewTestLogger())
+	svc := NewLogService(db, t.TempDir(), testutil.NewTestLogger())
 
 	invalidPath := filepath.Join(t.TempDir(), "nonexistent-subdir", "rec.bin")
 	_, err := svc.StartRecording(1, 80, 24, "xterm", invalidPath)
@@ -185,7 +185,7 @@ func TestLogService_StartRecordingCreateLogError(t *testing.T) {
 
 func TestLogService_ListBySessionNoMatch(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	svc := NewLogService(db, testutil.NewTestLogger())
+	svc := NewLogService(db, t.TempDir(), testutil.NewTestLogger())
 
 	sessionSvc := NewSessionService(db, newMockEventBus(), 30, "", testutil.NewTestLogger())
 	sess := model.Session{
@@ -207,7 +207,7 @@ func TestLogService_ListBySessionNoMatch(t *testing.T) {
 
 func TestLogService_DeleteNotFound(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	svc := NewLogService(db, testutil.NewTestLogger())
+	svc := NewLogService(db, t.TempDir(), testutil.NewTestLogger())
 
 	err := svc.Delete(999)
 	assert.NoError(t, err)
@@ -215,7 +215,7 @@ func TestLogService_DeleteNotFound(t *testing.T) {
 
 func TestLogService_StopRecordingTwice(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	svc := NewLogService(db, testutil.NewTestLogger())
+	svc := NewLogService(db, t.TempDir(), testutil.NewTestLogger())
 
 	sessionSvc := NewSessionService(db, newMockEventBus(), 30, "", testutil.NewTestLogger())
 	sess := model.Session{
@@ -239,7 +239,7 @@ func TestLogService_StopRecordingTwice(t *testing.T) {
 
 func TestLogService_StartRecordingClosedDB(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	svc := NewLogService(db, testutil.NewTestLogger())
+	svc := NewLogService(db, t.TempDir(), testutil.NewTestLogger())
 
 	dataPath := filepath.Join(t.TempDir(), "recording-closed.bin")
 	db.Close()
@@ -258,7 +258,7 @@ func TestLogService_DeleteWithDataPath(t *testing.T) {
 	require.NoError(t, err)
 
 	dataPath := filepath.Join(t.TempDir(), "recording-del.bin")
-	svc := NewLogService(db, testutil.NewTestLogger())
+	svc := NewLogService(db, t.TempDir(), testutil.NewTestLogger())
 	logID, err := svc.StartRecording(createdSess.ID, 80, 24, "xterm", dataPath)
 	require.NoError(t, err)
 

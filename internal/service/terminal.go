@@ -14,16 +14,23 @@ import (
 )
 
 type TerminalService struct {
-	mu         sync.RWMutex
-	ptys       map[string]*ssh.PTYSession
-	eventBus   EventBus
-	maxSize    int
-	lastUsed   map[string]time.Time
-	sessionSvc *SessionService
-	logger     *slog.Logger
+	mu            sync.RWMutex
+	ptys          map[string]*ssh.PTYSession
+	eventBus      EventBus
+	maxSize       int
+	lastUsed      map[string]time.Time
+	sessionSvc    *SessionService
+	outputHandler func(terminalID string, data []byte)
+	logger        *slog.Logger
 }
 
 var _openPTY = ssh.OpenPTY
+
+func (t *TerminalService) SetOutputHandler(fn func(terminalID string, data []byte)) {
+	t.mu.Lock()
+	t.outputHandler = fn
+	t.mu.Unlock()
+}
 
 func NewTerminalService(sessionSvc *SessionService, eventBus EventBus, maxSize int, logger *slog.Logger) *TerminalService {
 	if maxSize <= 0 {
@@ -77,6 +84,12 @@ func (t *TerminalService) Open(ctx context.Context, sessionID int64, cols, rows 
 			TerminalID: terminalID,
 			Data:       data,
 		})
+		t.mu.RLock()
+		handler := t.outputHandler
+		t.mu.RUnlock()
+		if handler != nil {
+			handler(terminalID, data)
+		}
 	})
 
 	t.mu.Lock()

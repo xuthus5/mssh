@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, useEffect } from 'react'
 import { Plus, FolderPlus, Search, Settings } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -17,14 +17,7 @@ import { useSession, type Session, type Folder } from '@/hooks/useSession'
 import { useSettings } from '@/hooks/useSettings'
 import type { CommandItem } from '@/components/session/QuickCommands'
 import { useAppStore } from '@/store/appStore'
-
-const DEFAULT_COMMANDS: Omit<CommandItem, 'id'>[] = [
-  { name: '系统信息', shortcut: '', command: 'uname -a' },
-  { name: '磁盘使用', shortcut: '', command: 'df -h' },
-  { name: '内存使用', shortcut: '', command: 'free -m' },
-  { name: '进程列表', shortcut: '', command: 'ps aux' },
-  { name: '网络连接', shortcut: '', command: 'ss -tlnp' },
-]
+import { MacroService } from '@/lib/wails'
 
 type SidebarTab = 'sessions' | 'macros'
 
@@ -36,19 +29,36 @@ export default function Sidebar() {
   const [editingSession, setEditingSession] = useState<Session | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [macros, setMacros] = useState<CommandItem[]>([])
 
   const {
     folders,
     sessions,
     createFolder,
     deleteFolder,
+    updateFolder,
     createSession,
     updateSession,
     deleteSession,
+    moveSession,
     connect,
   } = useSession()
 
   const settings = useSettings()
+
+  useEffect(() => {
+    MacroService.List()
+      .then((result) => {
+        const items = (result as { id?: number; name?: string; shortcut?: string; command?: string }[]).map((m) => ({
+          id: String(m.id ?? ''),
+          name: m.name ?? '',
+          shortcut: m.shortcut ?? '',
+          command: m.command ?? '',
+        }))
+        setMacros(items)
+      })
+      .catch((err) => { console.error('[Sidebar] list macros error', err) })
+  }, [])
 
   const filteredFolders = useMemo(
     () =>
@@ -107,6 +117,43 @@ export default function Sidebar() {
     setEditingSession(s)
     setTimeout(() => setSessionDialogOpen(true), 0)
   }
+
+  const handleMacroExecute = useCallback((cmd: string) => {
+    const activeTabId = useAppStore.getState().activeTabId
+    if (!activeTabId) return
+    const activeTab = useAppStore.getState().tabs.find((t) => t.id === activeTabId)
+    const terminalId = activeTab?.terminalId ?? activeTabId
+    console.log('[Sidebar] MacroService.Execute', terminalId, cmd)
+    MacroService.Execute(terminalId, cmd).catch((err) => {
+      console.error('[Sidebar] execute macro error', err)
+    })
+  }, [])
+
+  const handleMacroAdd = useCallback(async (item: Omit<CommandItem, 'id'>) => {
+    try {
+      console.log('[Sidebar] MacroService.Create', item)
+      const result = (await MacroService.Create(item)) as { id?: number; name?: string; shortcut?: string; command?: string }
+      const newItem: CommandItem = {
+        id: String(result.id ?? ''),
+        name: result.name ?? item.name,
+        shortcut: result.shortcut ?? item.shortcut,
+        command: result.command ?? item.command,
+      }
+      setMacros((prev) => [...prev, newItem])
+    } catch (err) {
+      console.error('[Sidebar] create macro error', err)
+    }
+  }, [])
+
+  const handleMacroDelete = useCallback(async (id: string) => {
+    try {
+      console.log('[Sidebar] MacroService.Delete', id)
+      await MacroService.Delete(Number(id))
+      setMacros((prev) => prev.filter((m) => m.id !== id))
+    } catch (err) {
+      console.error('[Sidebar] delete macro error', err)
+    }
+  }, [])
 
   return (
     <aside className="w-[280px] flex-shrink-0 flex flex-col border-r border-border bg-card">
@@ -188,8 +235,14 @@ export default function Sidebar() {
               onConnect={connect}
               onEditSession={handleOpenEditSession}
               onDeleteSession={deleteSession}
-              onEditFolder={(f: Folder) => console.debug('[folder/edit]', f)}
+              onEditFolder={(f: Folder) => {
+                const newName = prompt('修改分组名称', f.name)
+                if (newName && newName.trim() !== '' && newName !== f.name) {
+                  updateFolder(f.id, newName.trim())
+                }
+              }}
               onDeleteFolder={deleteFolder}
+              onMoveToFolder={moveSession}
             />
           </div>
         </>
@@ -198,24 +251,11 @@ export default function Sidebar() {
       {activeTab === 'macros' && (
         <div className="flex-1 min-h-0">
           <QuickCommands
-            commands={DEFAULT_COMMANDS.map((c, i) => ({
-              ...c,
-              id: `default-${i}`,
-            }))}
-            onExecute={(cmd: string) => {
-              console.log('[macro/execute]', cmd)
-              const activeTabId = useAppStore.getState().activeTabId
-              if (activeTabId) {
-                const pool = useAppStore.getState().terminalPool
-                for (const [, entry] of pool) {
-                  entry.terminal.writeln(cmd)
-                  return
-                }
-              }
-            }}
-            onAdd={(item) => console.log('[macro/add]', item)}
-            onDelete={(id: string) => console.log('[macro/delete]', id)}
-            showAddForm={false}
+            commands={macros}
+            onExecute={handleMacroExecute}
+            onAdd={handleMacroAdd}
+            onDelete={handleMacroDelete}
+            showAddForm
           />
         </div>
       )}
@@ -225,6 +265,7 @@ export default function Sidebar() {
         open={sessionDialogOpen}
         onOpenChange={(v) => { setSessionDialogOpen(v); if (!v) setEditingSession(null) }}
         session={editingSession}
+        folders={folders}
         onSave={handleSaveSession}
       />
 
