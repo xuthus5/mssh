@@ -82,7 +82,7 @@ func (t *TerminalService) Open(ctx context.Context, sessionID int64, cols, rows 
 	pty.SetReadCallback(func(data []byte) {
 		t.eventBus.Emit(event.TerminalOutput, event.TerminalOutputPayload{
 			TerminalID: terminalID,
-			Data:       data,
+			Data:       string(data),
 		})
 		t.mu.RLock()
 		handler := t.outputHandler
