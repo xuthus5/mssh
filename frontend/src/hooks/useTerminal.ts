@@ -43,9 +43,12 @@ export function useTerminal(
 
     if (containerRef.current) {
       term.open(containerRef.current)
-      fitAddon.fit()
-      term.focus()
-      console.log('[useTerminal] terminal opened', { cols: term.cols, rows: term.rows, containerSize: containerRef.current.getBoundingClientRect() })
+      // Delay fit to ensure DOM is laid out
+      setTimeout(() => {
+        fitAddon.fit()
+        term.focus()
+        console.log('[useTerminal] terminal opened', { cols: term.cols, rows: term.rows })
+      }, 100)
 
       term.writeln('\x1b[1;36m╔════════════════════════════════════════╗')
       term.writeln('\x1b[1;36m║          Welcome to MSSH              ║')
