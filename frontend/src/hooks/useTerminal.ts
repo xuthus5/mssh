@@ -90,13 +90,14 @@ export function useTerminal(
       TerminalService.Write(terminalID, bytes).catch(() => {})
     })
 
-    const unsubOutput = onEvent('terminal:output', (payload: unknown) => {
+    let unsubOutput: (() => void) | undefined
+    onEvent('terminal:output', (payload: unknown) => {
       const p = payload as { terminal_id?: string; data?: number[] }
       if (p?.terminal_id === terminalID && p?.data) {
         const bytes = new Uint8Array(p.data)
         term.write(bytes)
       }
-    })
+    }).then((unsub) => { unsubOutput = unsub })
 
     const resizeObs = new ResizeObserver(() => {
       if (containerRef.current) {
@@ -109,7 +110,7 @@ export function useTerminal(
 
     return () => {
       dataDispose.dispose()
-      unsubOutput()
+      unsubOutput?.()
       resizeObs.disconnect()
       try {
         const el = term.element

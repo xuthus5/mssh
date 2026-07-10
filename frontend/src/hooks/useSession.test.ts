@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useSession } from '@/hooks/useSession'
-import { useAppStore } from '@/store/appStore'
 import { createWailsMock } from '@/test/setup'
+import { useAppStore } from '@/store/appStore'
+import type { SessionConfig } from '@/lib/wails'
 
 let _counter = 0
 function nextId() { return ++_counter }
