@@ -10,6 +10,7 @@ import (
 	"database/sql"
 	"encoding/pem"
 	"fmt"
+	"log/slog"
 
 	gossh "golang.org/x/crypto/ssh"
 
@@ -25,17 +26,20 @@ type KeyCrypto interface {
 type KeyService struct {
 	db     *sql.DB
 	crypto KeyCrypto
+	logger *slog.Logger
 }
 
-func NewKeyService(db *sql.DB, crypto KeyCrypto) *KeyService {
-	return &KeyService{db: db, crypto: crypto}
+func NewKeyService(db *sql.DB, crypto KeyCrypto, logger *slog.Logger) *KeyService {
+	return &KeyService{db: db, crypto: crypto, logger: logger}
 }
 
 func (k *KeyService) List() ([]model.SSHKey, error) {
+	k.logger.Info("listing keys")
 	return store.ListKeys(k.db)
 }
 
 func (k *KeyService) Generate(name string, keyType model.KeyType, bits int) (*model.SSHKey, error) {
+	k.logger.Info("generating key", "name", name, "keyType", keyType, "bits", bits)
 	var privPEM []byte
 	var pubSSH string
 	var err error
@@ -69,6 +73,7 @@ func (k *KeyService) Generate(name string, keyType model.KeyType, bits int) (*mo
 }
 
 func (k *KeyService) Import(name, privateKeyPEM string) (*model.SSHKey, error) {
+	k.logger.Info("importing key", "name", name)
 	keyType, pubKey, err := k.extractPublicKeyWithType([]byte(privateKeyPEM))
 	if err != nil {
 		return nil, fmt.Errorf("import key: %w", err)
@@ -89,6 +94,7 @@ func (k *KeyService) Import(name, privateKeyPEM string) (*model.SSHKey, error) {
 }
 
 func (k *KeyService) Delete(id int64) error {
+	k.logger.Info("deleting key", "id", id)
 	return store.DeleteKey(k.db, id)
 }
 

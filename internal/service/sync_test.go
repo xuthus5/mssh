@@ -14,16 +14,16 @@ import (
 
 func TestNewSyncService(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	svc := NewSyncService(db)
+	svc := NewSyncService(db, testutil.NewTestLogger())
 	assert.NotNil(t, svc)
 }
 
 func TestSyncService_ExportImport(t *testing.T) {
 	db := testutil.NewTestDB(t)
 
-	sessionSvc := NewSessionService(db, newMockEventBus(), 30)
-	keySvc := NewKeyService(db, &noopCrypto{})
-	macroSvc := NewMacroService(db, nil)
+	sessionSvc := NewSessionService(db, newMockEventBus(), 30, testutil.NewTestLogger())
+	keySvc := NewKeyService(db, &noopCrypto{}, testutil.NewTestLogger())
+	macroSvc := NewMacroService(db, nil, testutil.NewTestLogger())
 
 	sess := model.Session{
 		Name: "s1", Host: "10.0.0.1", Port: 22, Username: "root",
@@ -42,7 +42,7 @@ func TestSyncService_ExportImport(t *testing.T) {
 	require.NoError(t, err)
 	_ = createdMacro
 
-	svc := NewSyncService(db)
+	svc := NewSyncService(db, testutil.NewTestLogger())
 
 	exportPath := filepath.Join(t.TempDir(), "export.json")
 	err = svc.Export(exportPath)
@@ -55,22 +55,22 @@ func TestSyncService_ExportImport(t *testing.T) {
 	assert.Contains(t, string(data), `"m1"`)
 
 	db2 := testutil.NewTestDB(t)
-	svc2 := NewSyncService(db2)
+	svc2 := NewSyncService(db2, testutil.NewTestLogger())
 
 	err = svc2.Import(exportPath)
 	require.NoError(t, err)
 
-	s2, err := NewSessionService(db2, newMockEventBus(), 30).ListSessions(nil)
+	s2, err := NewSessionService(db2, newMockEventBus(), 30, testutil.NewTestLogger()).ListSessions(nil)
 	require.NoError(t, err)
 	assert.Len(t, s2, 1)
 	assert.Equal(t, "s1", s2[0].Name)
 
-	k2, err := NewKeyService(db2, &noopCrypto{}).List()
+	k2, err := NewKeyService(db2, &noopCrypto{}, testutil.NewTestLogger()).List()
 	require.NoError(t, err)
 	assert.Len(t, k2, 1)
 	assert.Equal(t, "k1", k2[0].Name)
 
-	m2, err := NewMacroService(db2, nil).List()
+	m2, err := NewMacroService(db2, nil, testutil.NewTestLogger()).List()
 	require.NoError(t, err)
 	assert.Len(t, m2, 1)
 	assert.Equal(t, "m1", m2[0].Name)
@@ -78,7 +78,7 @@ func TestSyncService_ExportImport(t *testing.T) {
 
 func TestSyncService_ExportEmpty(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	svc := NewSyncService(db)
+	svc := NewSyncService(db, testutil.NewTestLogger())
 
 	exportPath := filepath.Join(t.TempDir(), "empty.json")
 	err := svc.Export(exportPath)
@@ -93,7 +93,7 @@ func TestSyncService_ExportEmpty(t *testing.T) {
 
 func TestSyncService_ImportInvalidPath(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	svc := NewSyncService(db)
+	svc := NewSyncService(db, testutil.NewTestLogger())
 
 	err := svc.Import("/nonexistent/import.json")
 	assert.Error(t, err)
@@ -101,7 +101,7 @@ func TestSyncService_ImportInvalidPath(t *testing.T) {
 
 func TestSyncService_ImportInvalidJSON(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	svc := NewSyncService(db)
+	svc := NewSyncService(db, testutil.NewTestLogger())
 
 	badPath := filepath.Join(t.TempDir(), "bad.json")
 	require.NoError(t, os.WriteFile(badPath, []byte("not json"), 0o600))
@@ -112,7 +112,7 @@ func TestSyncService_ImportInvalidJSON(t *testing.T) {
 
 func TestSyncService_ImportEmptyData(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	svc := NewSyncService(db)
+	svc := NewSyncService(db, testutil.NewTestLogger())
 
 	emptyPath := filepath.Join(t.TempDir(), "empty.json")
 	require.NoError(t, os.WriteFile(emptyPath, []byte(`{"sessions":[],"keys":[],"macros":[]}`), 0o600))
@@ -123,7 +123,7 @@ func TestSyncService_ImportEmptyData(t *testing.T) {
 
 func TestSyncService_ExportToInvalidPath(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	svc := NewSyncService(db)
+	svc := NewSyncService(db, testutil.NewTestLogger())
 
 	err := svc.Export("/nonexistent-dir/export.json")
 	assert.Error(t, err)
@@ -131,7 +131,7 @@ func TestSyncService_ExportToInvalidPath(t *testing.T) {
 
 func TestSyncService_SyncToCloud(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	svc := NewSyncService(db)
+	svc := NewSyncService(db, testutil.NewTestLogger())
 
 	err := svc.SyncToCloud()
 	assert.NoError(t, err)
@@ -139,7 +139,7 @@ func TestSyncService_SyncToCloud(t *testing.T) {
 
 func TestSyncService_SyncFromCloud(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	svc := NewSyncService(db)
+	svc := NewSyncService(db, testutil.NewTestLogger())
 
 	err := svc.SyncFromCloud()
 	assert.NoError(t, err)
@@ -147,7 +147,7 @@ func TestSyncService_SyncFromCloud(t *testing.T) {
 
 func TestSyncService_ExportClosedDB(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	svc := NewSyncService(db)
+	svc := NewSyncService(db, testutil.NewTestLogger())
 	db.Close()
 
 	exportPath := filepath.Join(t.TempDir(), "export-closed.json")
@@ -157,7 +157,7 @@ func TestSyncService_ExportClosedDB(t *testing.T) {
 
 func TestSyncService_ImportClosedDB(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	svc := NewSyncService(db)
+	svc := NewSyncService(db, testutil.NewTestLogger())
 	db.Close()
 
 	importPath := filepath.Join(t.TempDir(), "import-closed.json")

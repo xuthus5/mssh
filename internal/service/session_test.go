@@ -61,7 +61,7 @@ func (m *mockEventBus) LastEvent() *CapturedEvent {
 func TestSessionService_FolderCRUD(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	bus := newMockEventBus()
-	svc := NewSessionService(db, bus, 30)
+	svc := NewSessionService(db, bus, 30, testutil.NewTestLogger())
 
 	folders, err := svc.ListFolders()
 	require.NoError(t, err)
@@ -96,7 +96,7 @@ func TestSessionService_FolderCRUD(t *testing.T) {
 func TestSessionService_SessionCRUD(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	bus := newMockEventBus()
-	svc := NewSessionService(db, bus, 30)
+	svc := NewSessionService(db, bus, 30, testutil.NewTestLogger())
 
 	sessions, err := svc.ListSessions(nil)
 	require.NoError(t, err)
@@ -141,7 +141,7 @@ func TestSessionService_SessionCRUD(t *testing.T) {
 func TestSessionService_ConnectDisconnect(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	bus := newMockEventBus()
-	svc := NewSessionService(db, bus, 30)
+	svc := NewSessionService(db, bus, 30, testutil.NewTestLogger())
 
 	addr, cleanup := sshtestutil.NewMockServer(t)
 	defer cleanup()
@@ -184,7 +184,7 @@ func TestSessionService_ConnectDisconnect(t *testing.T) {
 func TestSessionService_ConnectSessionNotFound(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	bus := newMockEventBus()
-	svc := NewSessionService(db, bus, 30)
+	svc := NewSessionService(db, bus, 30, testutil.NewTestLogger())
 
 	ctx := context.Background()
 	_, err := svc.Connect(ctx, 999)
@@ -194,7 +194,7 @@ func TestSessionService_ConnectSessionNotFound(t *testing.T) {
 func TestSessionService_DisconnectUnknown(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	bus := newMockEventBus()
-	svc := NewSessionService(db, bus, 30)
+	svc := NewSessionService(db, bus, 30, testutil.NewTestLogger())
 
 	err := svc.Disconnect("nonexistent")
 	assert.Error(t, err)
@@ -204,7 +204,7 @@ func TestSessionService_DisconnectUnknown(t *testing.T) {
 func TestSessionService_NewSessionService(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	bus := newMockEventBus()
-	svc := NewSessionService(db, bus, 60)
+	svc := NewSessionService(db, bus, 60, testutil.NewTestLogger())
 	assert.Equal(t, 60, svc.keepAlive)
 	assert.NotNil(t, svc.conns)
 	assert.Equal(t, 0, len(svc.conns))
@@ -212,7 +212,7 @@ func TestSessionService_NewSessionService(t *testing.T) {
 
 func TestSessionService_buildAuthMethodsPassword(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	svc := NewSessionService(db, newMockEventBus(), 30)
+	svc := NewSessionService(db, newMockEventBus(), 30, testutil.NewTestLogger())
 
 	sess := &model.Session{AuthMethod: model.AuthPassword, Password: "secret"}
 	methods := svc.buildAuthMethods(sess)
@@ -221,7 +221,7 @@ func TestSessionService_buildAuthMethodsPassword(t *testing.T) {
 
 func TestSessionService_buildAuthMethodsKey(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	svc := NewSessionService(db, newMockEventBus(), 30)
+	svc := NewSessionService(db, newMockEventBus(), 30, testutil.NewTestLogger())
 
 	sess := &model.Session{AuthMethod: model.AuthKey, KeyID: ptr(int64(999))}
 	methods := svc.buildAuthMethods(sess)
@@ -239,7 +239,7 @@ func TestSessionService_buildAuthMethodsKey(t *testing.T) {
 
 func TestSessionService_buildAuthMethodsKeyboardInteractive(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	svc := NewSessionService(db, newMockEventBus(), 30)
+	svc := NewSessionService(db, newMockEventBus(), 30, testutil.NewTestLogger())
 
 	sess := &model.Session{AuthMethod: model.AuthKeyboardInteractive, Password: "secret"}
 	methods := svc.buildAuthMethods(sess)
@@ -248,7 +248,7 @@ func TestSessionService_buildAuthMethodsKeyboardInteractive(t *testing.T) {
 
 func TestSessionService_buildAuthMethodsUnknown(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	svc := NewSessionService(db, newMockEventBus(), 30)
+	svc := NewSessionService(db, newMockEventBus(), 30, testutil.NewTestLogger())
 
 	sess := &model.Session{AuthMethod: "unknown"}
 	methods := svc.buildAuthMethods(sess)
@@ -257,7 +257,7 @@ func TestSessionService_buildAuthMethodsUnknown(t *testing.T) {
 
 func TestSessionService_buildAuthMethodsKeyInvalidKey(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	svc := NewSessionService(db, newMockEventBus(), 30)
+	svc := NewSessionService(db, newMockEventBus(), 30, testutil.NewTestLogger())
 
 	testKey := model.SSHKey{Name: "bad-key", Type: model.KeyTypeED25519, PrivateKey: "not-a-valid-private-key"}
 	createdKey, err := store.CreateKey(db, testKey)
@@ -270,7 +270,7 @@ func TestSessionService_buildAuthMethodsKeyInvalidKey(t *testing.T) {
 
 func TestSessionService_GetSessionNotFound(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	svc := NewSessionService(db, newMockEventBus(), 30)
+	svc := NewSessionService(db, newMockEventBus(), 30, testutil.NewTestLogger())
 
 	_, err := svc.GetSession(999)
 	assert.Error(t, err)

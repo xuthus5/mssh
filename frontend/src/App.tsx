@@ -9,6 +9,8 @@ function TabContent() {
   const activeTabId = useAppStore((s) => s.activeTabId)
   const activeTab = tabs.find((t) => t.id === activeTabId)
 
+  console.log('[App] activeTab', activeTab?.type ?? 'none', activeTabId)
+
   if (!activeTab) {
     return (
       <div className="flex-1 min-h-0 flex items-center justify-center bg-background">
