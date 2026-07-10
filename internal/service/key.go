@@ -11,6 +11,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"log/slog"
+	"strings"
 
 	gossh "golang.org/x/crypto/ssh"
 
@@ -195,6 +196,23 @@ func (k *KeyService) extractPublicKeyWithType(privateKeyPEM []byte) (model.KeyTy
 		default:
 			return "", "", fmt.Errorf("unsupported key type in PKCS#8")
 		}
+	case "OPENSSH PRIVATE KEY":
+		signer, err := gossh.ParsePrivateKey(privateKeyPEM)
+		if err != nil {
+			return "", "", fmt.Errorf("parse OpenSSH key: %w", err)
+		}
+		pubStr := signer.PublicKey().Type()
+		switch {
+		case strings.HasPrefix(pubStr, "ssh-rsa"):
+			keyType = model.KeyTypeRSA
+		case strings.HasPrefix(pubStr, "ssh-ed25519"):
+			keyType = model.KeyTypeED25519
+		case strings.HasPrefix(pubStr, "ecdsa-"):
+			keyType = model.KeyTypeECDSA
+		default:
+			return "", "", fmt.Errorf("unsupported key type: %s", pubStr)
+		}
+		return keyType, string(gossh.MarshalAuthorizedKey(signer.PublicKey())), nil
 	default:
 		return "", "", fmt.Errorf("unsupported key type: %s", block.Type)
 	}

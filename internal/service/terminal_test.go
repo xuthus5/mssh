@@ -17,7 +17,7 @@ import (
 
 func TestNewTerminalService(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	sessionSvc := NewSessionService(db, newMockEventBus(), 30, "", testutil.NewTestLogger())
+	sessionSvc := NewSessionService(db, newMockEventBus(), 30, "", nil, testutil.NewTestLogger())
 	bus := newMockEventBus()
 
 	svc := NewTerminalService(sessionSvc, bus, 0, testutil.NewTestLogger())
@@ -44,7 +44,7 @@ func TestTerminalService_Count(t *testing.T) {
 func TestTerminalService_Open(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	bus := newMockEventBus()
-	sessionSvc := NewSessionService(db, bus, 30, "", testutil.NewTestLogger())
+	sessionSvc := NewSessionService(db, bus, 30, "", nil, testutil.NewTestLogger())
 
 	addr, cleanup := sshtestutil.NewMockServer(t)
 	defer cleanup()
@@ -75,7 +75,7 @@ func TestTerminalService_Open(t *testing.T) {
 func TestTerminalService_OpenDefaultTermType(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	bus := newMockEventBus()
-	sessionSvc := NewSessionService(db, bus, 30, "", testutil.NewTestLogger())
+	sessionSvc := NewSessionService(db, bus, 30, "", nil, testutil.NewTestLogger())
 
 	addr, cleanup := sshtestutil.NewMockServer(t)
 	defer cleanup()
@@ -100,7 +100,7 @@ func TestTerminalService_OpenDefaultTermType(t *testing.T) {
 
 func TestTerminalService_OpenSessionNotFound(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	sessionSvc := NewSessionService(db, newMockEventBus(), 30, "", testutil.NewTestLogger())
+	sessionSvc := NewSessionService(db, newMockEventBus(), 30, "", nil, testutil.NewTestLogger())
 	termSvc := NewTerminalService(sessionSvc, newMockEventBus(), 32, testutil.NewTestLogger())
 
 	ctx := context.Background()
@@ -112,7 +112,7 @@ func TestTerminalService_OpenSessionNotFound(t *testing.T) {
 func TestTerminalService_ReadCallback(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	bus := newMockEventBus()
-	sessionSvc := NewSessionService(db, bus, 30, "", testutil.NewTestLogger())
+	sessionSvc := NewSessionService(db, bus, 30, "", nil, testutil.NewTestLogger())
 
 	addr, cleanup := sshtestutil.NewMockServer(t)
 	defer cleanup()
@@ -234,7 +234,7 @@ func TestTerminalService_Close(t *testing.T) {
 
 	bus := newMockEventBus()
 	db := testutil.NewTestDB(t)
-	sessionSvc := NewSessionService(db, bus, 30, "", testutil.NewTestLogger())
+	sessionSvc := NewSessionService(db, bus, 30, "", nil, testutil.NewTestLogger())
 
 	svc := &TerminalService{logger: testutil.NewTestLogger(),
 		eventBus:  bus,
@@ -274,7 +274,7 @@ func TestTerminalService_CloseNotFound(t *testing.T) {
 
 func TestTerminalService_EvictLRU(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	sessionSvc := NewSessionService(db, newMockEventBus(), 30, "", testutil.NewTestLogger())
+	sessionSvc := NewSessionService(db, newMockEventBus(), 30, "", nil, testutil.NewTestLogger())
 
 	svc := &TerminalService{logger: testutil.NewTestLogger(),
 		eventBus:   newMockEventBus(),
@@ -307,7 +307,7 @@ func TestTerminalService_EvictLRU(t *testing.T) {
 func TestTerminalService_PoolLimitEnforcement(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	bus := newMockEventBus()
-	sessionSvc := NewSessionService(db, bus, 30, "", testutil.NewTestLogger())
+	sessionSvc := NewSessionService(db, bus, 30, "", nil, testutil.NewTestLogger())
 
 	addr, cleanup := sshtestutil.NewMockServer(t)
 	defer cleanup()
@@ -355,7 +355,7 @@ func TestTerminalService_PoolLimitEnforcement(t *testing.T) {
 func TestSessionService_GetClientWrapper(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	bus := newMockEventBus()
-	svc := NewSessionService(db, bus, 30, "", testutil.NewTestLogger())
+	svc := NewSessionService(db, bus, 30, "", nil, testutil.NewTestLogger())
 
 	_, err := svc.GetClientWrapper("nonexistent")
 	assert.Error(t, err)
@@ -384,7 +384,7 @@ func TestSessionService_GetClientWrapper(t *testing.T) {
 func TestSessionService_GetClientWrapperAfterDisconnect(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	bus := newMockEventBus()
-	svc := NewSessionService(db, bus, 30, "", testutil.NewTestLogger())
+	svc := NewSessionService(db, bus, 30, "", nil, testutil.NewTestLogger())
 
 	addr, cleanup := sshtestutil.NewMockServer(t)
 	defer cleanup()
