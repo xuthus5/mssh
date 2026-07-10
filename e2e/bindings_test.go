@@ -227,3 +227,52 @@ func TestGoServiceMethodsExist(t *testing.T) {
 	}
 	assert.Greater(t, len(serviceToMethods), 5, "expected at least 6 services in bindings")
 }
+
+// TestBindingsNotInsideSource verifies generated binding files are NOT inside Vite's src/ tree.
+// The barrel index.ts is allowed, but generated service bindings must live in frontend/bindings/.
+func TestBindingsNotInsideSource(t *testing.T) {
+	sourcesPath := filepath.Join("..", "frontend", "src", "lib", "wails")
+	entries, err := os.Stat(sourcesPath)
+	if err != nil {
+		return // directory doesn't exist — OK
+	}
+	assert.True(t, entries.IsDir())
+
+	// Check that NO generated binding files exist here (only the barrel index.ts is allowed)
+	serviceDir := filepath.Join(sourcesPath, "mssh", "internal", "service")
+	_, err = os.Stat(serviceDir)
+	assert.True(t, os.IsNotExist(err),
+		"generated bindings found at %s — they must be in frontend/bindings/, not inside src/", serviceDir)
+}
+
+// TestBindingsUseNpmRuntime verifies generated bindings import from @wailsio/runtime
+// NOT from /wails/runtime.js (absolute path). The latter cannot be resolved by Vite.
+func TestBindingsUseNpmRuntime(t *testing.T) {
+	bindingsDir := filepath.Join("..", "frontend", "bindings", "mssh", "internal", "service")
+	entries, err := os.ReadDir(bindingsDir)
+	require.NoError(t, err)
+
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".ts") || entry.Name() == "index.ts" {
+			continue
+		}
+		content, err := os.ReadFile(filepath.Join(bindingsDir, entry.Name()))
+		require.NoError(t, err)
+
+		assert.False(t, strings.Contains(string(content), `"/wails/runtime.js"`),
+			"%s imports from /wails/runtime.js — regenerate WITHOUT -b flag: wails3 generate bindings -ts -names -d frontend/bindings/ .", entry.Name())
+
+		assert.True(t, strings.Contains(string(content), `"@wailsio/runtime"`),
+			"%s does not import from @wailsio/runtime — regenerate WITHOUT -b flag", entry.Name())
+	}
+}
+
+// TestWailsRuntimeNpmInstalled verifies @wailsio/runtime is a dependency in package.json.
+func TestWailsRuntimeNpmInstalled(t *testing.T) {
+	pkgPath := filepath.Join("..", "frontend", "package.json")
+	content, err := os.ReadFile(pkgPath)
+	require.NoError(t, err)
+
+	assert.True(t, strings.Contains(string(content), `"@wailsio/runtime"`),
+		"@wailsio/runtime not found in package.json — run: npm install @wailsio/runtime")
+}
