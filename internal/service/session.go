@@ -103,7 +103,7 @@ func (s *SessionService) CreateSession(session model.Session) (*model.Session, e
 }
 
 func (s *SessionService) UpdateSession(session model.Session) error {
-	s.logger.Info("updating session", "id", session.ID, "name", session.Name)
+	s.logger.Info("updating session", "id", session.ID, "name", session.Name, "passwordLen", len(session.Password))
 	err := store.UpdateSession(s.db, session)
 	if err != nil {
 		s.logger.Error("update session failed", "error", err)
