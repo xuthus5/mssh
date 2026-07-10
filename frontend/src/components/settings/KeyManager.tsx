@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useState, useMemo, type FormEvent } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -25,6 +25,27 @@ import {
 } from '@/components/ui/select'
 import type { KeyInfo } from '@/hooks/useSettings'
 
+const bitsOptions: Record<string, { value: string; label: string }[]> = {
+  rsa: [
+    { value: '2048', label: '2048' },
+    { value: '4096', label: '4096' },
+  ],
+  ed25519: [
+    { value: '256', label: '256' },
+  ],
+  ecdsa: [
+    { value: '256', label: '256 (P-256)' },
+    { value: '384', label: '384 (P-384)' },
+    { value: '521', label: '521 (P-521)' },
+  ],
+}
+
+const defaultBits: Record<string, string> = {
+  rsa: '2048',
+  ed25519: '256',
+  ecdsa: '256',
+}
+
 interface Props {
   keys: KeyInfo[]
   onGenerate: (name: string, type: KeyInfo['type'], bits: number) => void
@@ -42,6 +63,8 @@ export function KeyManager({ keys, onGenerate, onImport, onDelete, onExport }: P
   const [importName, setImportName] = useState('')
   const [importKey, setImportKey] = useState('')
 
+  const currentBitsOptions = useMemo(() => bitsOptions[genType] ?? [], [genType])
+
   const handleGenerate = (e: FormEvent) => {
     e.preventDefault()
     onGenerate(genName, genType as KeyInfo['type'], parseInt(genBits, 10) || 256)
@@ -55,6 +78,12 @@ export function KeyManager({ keys, onGenerate, onImport, onDelete, onExport }: P
     setShowImport(false)
     setImportName('')
     setImportKey('')
+  }
+
+  const handleTypeChange = (value: string | null) => {
+    const v = value ?? 'ed25519'
+    setGenType(v)
+    setGenBits(defaultBits[v] ?? '256')
   }
 
   const typeLabel = (t: string) => {
@@ -137,7 +166,7 @@ export function KeyManager({ keys, onGenerate, onImport, onDelete, onExport }: P
               <label className="text-xs font-medium text-muted-foreground">
                 类型
               </label>
-              <Select value={genType} onValueChange={(value) => setGenType(value ?? '')}>
+              <Select value={genType} onValueChange={handleTypeChange}>
                 <SelectTrigger className="w-full">
                   <SelectValue />
                 </SelectTrigger>
@@ -152,16 +181,16 @@ export function KeyManager({ keys, onGenerate, onImport, onDelete, onExport }: P
               <label className="text-xs font-medium text-muted-foreground">
                 位数
               </label>
-              <Select value={genBits} onValueChange={(value) => setGenBits(value ?? '')}>
+              <Select value={genBits} onValueChange={(value) => setGenBits(value ?? '256')}>
                 <SelectTrigger className="w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="256">256</SelectItem>
-                  <SelectItem value="384">384</SelectItem>
-                  <SelectItem value="521">521</SelectItem>
-                  <SelectItem value="2048">2048 (RSA)</SelectItem>
-                  <SelectItem value="4096">4096 (RSA)</SelectItem>
+                  {currentBitsOptions.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

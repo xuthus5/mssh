@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo } from 'react'
-import { Plus, FolderPlus, Search } from 'lucide-react'
+import { Plus, FolderPlus, Search, Settings } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -12,7 +12,9 @@ import {
 import SessionTree from '@/components/session/SessionTree'
 import SessionDialog from '@/components/session/SessionDialog'
 import QuickCommands from '@/components/session/QuickCommands'
+import SettingsDialog from '@/components/settings/SettingsDialog'
 import { useSession, type Session, type Folder } from '@/hooks/useSession'
+import { useSettings } from '@/hooks/useSettings'
 import type { CommandItem } from '@/components/session/QuickCommands'
 import { useAppStore } from '@/store/appStore'
 
@@ -33,6 +35,7 @@ export default function Sidebar() {
   const [folderName, setFolderName] = useState('')
   const [editingSession, setEditingSession] = useState<Session | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
+  const [settingsOpen, setSettingsOpen] = useState(false)
 
   const {
     folders,
@@ -44,6 +47,8 @@ export default function Sidebar() {
     deleteSession,
     connect,
   } = useSession()
+
+  const settings = useSettings()
 
   const filteredFolders = useMemo(
     () =>
@@ -94,7 +99,6 @@ export default function Sidebar() {
   const handleOpenNewSession = () => {
     console.log('[Sidebar] openNewSession')
     setEditingSession(null)
-    // small delay ensures react state is flushed before opening
     setTimeout(() => setSessionDialogOpen(true), 0)
   }
 
@@ -129,6 +133,9 @@ export default function Sidebar() {
         >
           宏
         </button>
+        <Button variant="ghost" size="icon-sm" className="mx-1" onClick={() => setSettingsOpen(true)} title="设置">
+          <Settings className="h-4 w-4" />
+        </Button>
       </div>
 
       {activeTab === 'sessions' && (
@@ -251,6 +258,24 @@ export default function Sidebar() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <SettingsDialog
+        open={settingsOpen}
+        onOpenChange={setSettingsOpen}
+        general={settings.general}
+        theme={settings.theme}
+        keys={settings.keys}
+        sync={settings.sync}
+        onSaveGeneral={settings.saveGeneral}
+        onSaveTheme={settings.saveTheme}
+        onGenerateKey={settings.generateKey}
+        onImportKey={settings.importKey}
+        onDeleteKey={settings.deleteKey}
+        onExportKey={settings.exportKey}
+        onSaveSync={settings.saveSync}
+        onExportConfig={settings.exportConfig}
+        onImportConfig={settings.importConfig}
+      />
     </aside>
   )
 }

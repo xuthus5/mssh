@@ -51,6 +51,10 @@ func main() {
 		Height: 800,
 	})
 
+	wailsApp.OnShutdown(func() {
+		appInstance.Shutdown()
+	})
+
 	logger.Info("MSSH started")
 	if err := wailsApp.Run(); err != nil {
 		logger.Error("MSSH run failed", "error", err)

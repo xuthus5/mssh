@@ -170,7 +170,7 @@ export function useSession() {
       const tabId = `terminal-${sessionId}`
       const session = sessions.find((s) => s.id === sessionId)
       useAppStore.getState().setConnectionStatus(terminalId, 'connecting')
-      openTab({ id: tabId, title: session?.name ?? sessionId, type: 'terminal', terminalId })
+      openTab({ id: tabId, title: session?.name ?? sessionId, type: 'terminal', terminalId, sessionId: Number(sessionId) })
 
       setTimeout(() => {
         const st = useAppStore.getState().terminalPool.get(terminalId)

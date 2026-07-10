@@ -171,7 +171,10 @@ export function useSettings() {
   const exportConfig = useCallback(async () => {
     try {
       console.log('[useSettings] exportConfig')
-      await SyncService.Export('/tmp/mssh-export.json')
+      const path = await pickSaveFilePath('mssh-export.json')
+      if (path) {
+        await SyncService.Export(path)
+      }
     } catch (err) {
       console.log('[useSettings] exportConfig error', err)
     }
@@ -180,7 +183,10 @@ export function useSettings() {
   const importConfig = useCallback(async () => {
     try {
       console.log('[useSettings] importConfig')
-      await SyncService.Import('/tmp/mssh-import.json')
+      const path = await pickOpenFilePath()
+      if (path) {
+        await SyncService.Import(path)
+      }
     } catch (err) {
       console.log('[useSettings] importConfig error', err)
     }
@@ -189,4 +195,30 @@ export function useSettings() {
   useEffect(() => { loadGeneral(); loadTheme(); listKeys(); loadSync() }, [loadGeneral, loadTheme, listKeys, loadSync])
 
   return { general, theme, keys, sync, saveGeneral, saveTheme, listKeys, generateKey, importKey, deleteKey, exportKey, saveSync, exportConfig, importConfig }
+}
+
+async function pickSaveFilePath(suggestedName: string): Promise<string | null> {
+  try {
+    const handle = await (window as unknown as { showSaveFilePicker?: (opts: { suggestedName: string }) => Promise<FileSystemFileHandle> }).showSaveFilePicker?.({ suggestedName })
+    if (handle) {
+      return handle.name
+    }
+  } catch {
+    // Fallback to prompt if API unsupported or user cancelled
+  }
+  const name = prompt('输入保存文件名:', suggestedName)
+  return name ?? null
+}
+
+async function pickOpenFilePath(): Promise<string | null> {
+  try {
+    const [handle] = await (window as unknown as { showOpenFilePicker?: () => Promise<FileSystemFileHandle[]> }).showOpenFilePicker?.() ?? [{ name: null }]
+    if (handle?.name) {
+      return handle.name
+    }
+  } catch {
+    // Fallback to prompt if API unsupported or user cancelled
+  }
+  const name = prompt('输入导入文件名:', 'mssh-import.json')
+  return name ?? null
 }

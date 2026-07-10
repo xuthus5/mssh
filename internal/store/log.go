@@ -22,7 +22,10 @@ func CreateSessionLog(db *sql.DB, l model.SessionLog) (*model.SessionLog, error)
 	if err != nil {
 		return nil, fmt.Errorf("create session log: %w", err)
 	}
-	id, _ := result.LastInsertId()
+	id, err := result.LastInsertId()
+	if err != nil {
+		return nil, fmt.Errorf("create session log: last insert id: %w", err)
+	}
 	l.ID = id
 	return &l, nil
 }
@@ -42,9 +45,15 @@ func ListSessionLogs(db *sql.DB) ([]model.SessionLog, error) {
 		if err != nil {
 			return nil, fmt.Errorf("scan session log: %w", err)
 		}
-		l.StartedAt, _ = time.Parse("2006-01-02 15:04:05", startedAt)
+		l.StartedAt, err = time.Parse("2006-01-02 15:04:05", startedAt)
+		if err != nil {
+			return nil, fmt.Errorf("scan session log: parse started_at: %w", err)
+		}
 		if endedAt != nil {
-			t, _ := time.Parse("2006-01-02 15:04:05", *endedAt)
+			t, err := time.Parse("2006-01-02 15:04:05", *endedAt)
+			if err != nil {
+				return nil, fmt.Errorf("scan session log: parse ended_at: %w", err)
+			}
 			l.EndedAt = &t
 		}
 		logs = append(logs, l)

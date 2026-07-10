@@ -32,6 +32,7 @@ func TestNew(t *testing.T) {
 	assert.NotNil(t, appInstance.Setting)
 
 	assert.Len(t, appInstance.Crypto, 32)
+	assert.NotNil(t, appInstance.Keychain)
 }
 
 func TestNewEmptyDataDir(t *testing.T) {
@@ -85,4 +86,35 @@ func TestNewDataDirIsFile(t *testing.T) {
 func TestNewDataDirContainsNullByte(t *testing.T) {
 	_, err := New(Options{DataDir: "/tmp/\x00invalid"})
 	assert.Error(t, err)
+}
+
+func TestMasterKeyPersistence(t *testing.T) {
+	dataDir := filepath.Join(t.TempDir(), ".mssh")
+	err := os.MkdirAll(dataDir, 0o700)
+	require.NoError(t, err)
+
+	app1, err := New(Options{DataDir: dataDir})
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = app1.DB.Close() })
+	key1 := string(app1.Crypto)
+
+	app2, err := New(Options{DataDir: dataDir})
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = app2.DB.Close() })
+
+	assert.Equal(t, key1, string(app2.Crypto), "master key should persist between sessions")
+}
+
+func TestApp_Shutdown(t *testing.T) {
+	dataDir := filepath.Join(t.TempDir(), ".mssh")
+	err := os.MkdirAll(dataDir, 0o700)
+	require.NoError(t, err)
+
+	appInstance, err := New(Options{DataDir: dataDir})
+	require.NoError(t, err)
+
+	appInstance.Shutdown()
+
+	pingErr := appInstance.DB.Ping()
+	assert.Error(t, pingErr, "db should be closed after shutdown")
 }

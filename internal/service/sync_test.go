@@ -21,7 +21,7 @@ func TestNewSyncService(t *testing.T) {
 func TestSyncService_ExportImport(t *testing.T) {
 	db := testutil.NewTestDB(t)
 
-	sessionSvc := NewSessionService(db, newMockEventBus(), 30, testutil.NewTestLogger())
+	sessionSvc := NewSessionService(db, newMockEventBus(), 30, "", testutil.NewTestLogger())
 	keySvc := NewKeyService(db, &noopCrypto{}, testutil.NewTestLogger())
 	macroSvc := NewMacroService(db, nil, testutil.NewTestLogger())
 
@@ -60,7 +60,7 @@ func TestSyncService_ExportImport(t *testing.T) {
 	err = svc2.Import(exportPath)
 	require.NoError(t, err)
 
-	s2, err := NewSessionService(db2, newMockEventBus(), 30, testutil.NewTestLogger()).ListSessions(nil)
+	s2, err := NewSessionService(db2, newMockEventBus(), 30, "", testutil.NewTestLogger()).ListSessions(nil)
 	require.NoError(t, err)
 	assert.Len(t, s2, 1)
 	assert.Equal(t, "s1", s2[0].Name)

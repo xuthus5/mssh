@@ -6,6 +6,7 @@ import (
 	"crypto/rsa"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"strconv"
 	"strings"
@@ -274,7 +275,7 @@ func connectToSSH(t *testing.T, addr string) *ClientWrapper {
 	t.Helper()
 	s := model.Session{Host: "127.0.0.1", Port: mustParsePort(addr), Username: "test"}
 	ctx := context.Background()
-	cw, err := Connect(ctx, s, nil)
+	cw, err := Connect(ctx, s, nil, "", slog.Default())
 	require.NoError(t, err)
 	t.Cleanup(func() { cw.Close() })
 	return cw
