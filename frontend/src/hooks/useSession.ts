@@ -44,10 +44,11 @@ export function useSession() {
     setLoading(true)
     try {
       const wails = getWails()
+      console.log('[useSession] listFolders')
       const result = await wails.SessionService.ListFolders()
       setFolders(result.map((f) => ({ id: String(f.id), name: f.name, parentId: f.parent_id ? String(f.parent_id) : null })))
     } catch (err) {
-      console.error('[SessionService.ListFolders]', err)
+      console.log('[useSession] listFolders error', err)
     } finally {
       setLoading(false)
     }
@@ -56,20 +57,22 @@ export function useSession() {
   const createFolder = useCallback(async (name: string, parentId: string | null) => {
     try {
       const wails = getWails()
+      console.log('[useSession] createFolder', { name, parentId })
       const result = await wails.SessionService.CreateFolder(name, parentId ? Number(parentId) : null)
       setFolders((prev) => [...prev, { id: String(result.id), name: result.name, parentId: result.parent_id ? String(result.parent_id) : null }])
     } catch (err) {
-      console.error('[SessionService.CreateFolder]', err)
+      console.log('[useSession] createFolder error', err)
     }
   }, [])
 
   const deleteFolder = useCallback(async (id: string) => {
     try {
       const wails = getWails()
+      console.log('[useSession] deleteFolder', id)
       await wails.SessionService.DeleteFolder(Number(id))
       setFolders((prev) => prev.filter((f) => f.id !== id))
     } catch (err) {
-      console.error('[SessionService.DeleteFolder]', err)
+      console.log('[useSession] deleteFolder error', err)
     }
   }, [])
 
@@ -77,6 +80,7 @@ export function useSession() {
     setLoading(true)
     try {
       const wails = getWails()
+      console.log('[useSession] listSessions')
       const result = await wails.SessionService.ListSessions()
       setSessions(result.map((s) => ({
         id: String(s.id),
@@ -92,7 +96,7 @@ export function useSession() {
         folderId: s.folder_id ? String(s.folder_id) : null,
       })))
     } catch (err) {
-      console.error('[SessionService.ListSessions]', err)
+      console.log('[useSession] listSessions error', err)
     } finally {
       setLoading(false)
     }
@@ -101,6 +105,7 @@ export function useSession() {
   const createSession = useCallback(async (session: Omit<Session, 'id'>) => {
     try {
       const wails = getWails()
+      console.log('[useSession] createSession', { name: session.name, authMethod: session.authMethod })
       const result = await wails.SessionService.CreateSession({
         name: session.name,
         host: session.host,
@@ -127,13 +132,14 @@ export function useSession() {
         folderId: result.folder_id ? String(result.folder_id) : null,
       }])
     } catch (err) {
-      console.error('[SessionService.CreateSession]', err)
+      console.log('[useSession] createSession error', err)
     }
   }, [])
 
   const updateSession = useCallback(async (session: Session) => {
     try {
       const wails = getWails()
+      console.log('[useSession] updateSession', { id: session.id, name: session.name, authMethod: session.authMethod })
       await wails.SessionService.UpdateSession({
         id: Number(session.id),
         name: session.name,
@@ -149,23 +155,25 @@ export function useSession() {
       })
       setSessions((prev) => prev.map((s) => (s.id === session.id ? session : s)))
     } catch (err) {
-      console.error('[SessionService.UpdateSession]', err)
+      console.log('[useSession] updateSession error', err)
     }
   }, [])
 
   const deleteSession = useCallback(async (id: string) => {
     try {
       const wails = getWails()
+      console.log('[useSession] deleteSession', id)
       await wails.SessionService.DeleteSession(Number(id))
       setSessions((prev) => prev.filter((s) => s.id !== id))
     } catch (err) {
-      console.error('[SessionService.DeleteSession]', err)
+      console.log('[useSession] deleteSession error', err)
     }
   }, [])
 
   const connect = useCallback(async (sessionId: string) => {
     try {
       const wails = getWails()
+      console.log('[useSession] connect', sessionId)
       const terminalId = await wails.SessionService.Connect(Number(sessionId))
       const tabId = `terminal-${sessionId}`
       const session = sessions.find((s) => s.id === sessionId)
@@ -179,26 +187,28 @@ export function useSession() {
         }
       }, 200)
     } catch (err) {
-      console.error('[SessionService.Connect]', err)
+      console.log('[useSession] connect error', err)
     }
   }, [openTab, sessions])
 
   const disconnect = useCallback(async (sessionId: string) => {
     try {
       const wails = getWails()
+      console.log('[useSession] disconnect', sessionId)
       await wails.SessionService.Disconnect(`terminal-${sessionId}`)
     } catch (err) {
-      console.error('[SessionService.Disconnect]', err)
+      console.log('[useSession] disconnect error', err)
     }
   }, [])
 
   const listTunnels = useCallback(async (sessionId: string) => {
     try {
       const wails = getWails()
+      console.log('[useSession] listTunnels', sessionId)
       const result = await wails.TunnelService.List()
       setTunnels(result as Tunnel[])
     } catch (err) {
-      console.error('[TunnelService.List]', sessionId, err)
+      console.log('[useSession] listTunnels error', err)
     }
   }, [])
 

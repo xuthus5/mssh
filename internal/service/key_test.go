@@ -39,13 +39,13 @@ func (e *errCrypto) Decrypt(_ []byte) ([]byte, error) {
 
 func TestNewKeyService(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	svc := NewKeyService(db, &noopCrypto{})
+	svc := NewKeyService(db, &noopCrypto{}, testutil.NewTestLogger())
 	assert.NotNil(t, svc)
 }
 
 func TestKeyService_List(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	svc := NewKeyService(db, &noopCrypto{})
+	svc := NewKeyService(db, &noopCrypto{}, testutil.NewTestLogger())
 
 	keys, err := svc.List()
 	require.NoError(t, err)
@@ -54,7 +54,7 @@ func TestKeyService_List(t *testing.T) {
 
 func TestKeyService_GenerateED25519(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	svc := NewKeyService(db, &noopCrypto{})
+	svc := NewKeyService(db, &noopCrypto{}, testutil.NewTestLogger())
 
 	key, err := svc.Generate("mykey", model.KeyTypeED25519, 0)
 	require.NoError(t, err)
@@ -68,7 +68,7 @@ func TestKeyService_GenerateED25519(t *testing.T) {
 
 func TestKeyService_GenerateRSA(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	svc := NewKeyService(db, &noopCrypto{})
+	svc := NewKeyService(db, &noopCrypto{}, testutil.NewTestLogger())
 
 	key, err := svc.Generate("myrsa", model.KeyTypeRSA, 2048)
 	require.NoError(t, err)
@@ -79,7 +79,7 @@ func TestKeyService_GenerateRSA(t *testing.T) {
 
 func TestKeyService_GenerateRSADefault(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	svc := NewKeyService(db, &noopCrypto{})
+	svc := NewKeyService(db, &noopCrypto{}, testutil.NewTestLogger())
 
 	key, err := svc.Generate("myrsa-default", model.KeyTypeRSA, 0)
 	require.NoError(t, err)
@@ -89,7 +89,7 @@ func TestKeyService_GenerateRSADefault(t *testing.T) {
 
 func TestKeyService_GenerateECDSA(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	svc := NewKeyService(db, &noopCrypto{})
+	svc := NewKeyService(db, &noopCrypto{}, testutil.NewTestLogger())
 
 	key, err := svc.Generate("myecdsa", model.KeyTypeECDSA, 0)
 	require.NoError(t, err)
@@ -100,7 +100,7 @@ func TestKeyService_GenerateECDSA(t *testing.T) {
 
 func TestKeyService_GenerateUnknownType(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	svc := NewKeyService(db, &noopCrypto{})
+	svc := NewKeyService(db, &noopCrypto{}, testutil.NewTestLogger())
 
 	_, err := svc.Generate("bad", "unknown", 0)
 	assert.Error(t, err)
@@ -109,7 +109,7 @@ func TestKeyService_GenerateUnknownType(t *testing.T) {
 
 func TestKeyService_Import(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	svc := NewKeyService(db, &noopCrypto{})
+	svc := NewKeyService(db, &noopCrypto{}, testutil.NewTestLogger())
 
 	pkPEM := generateTestPrivateKeyPEM(t)
 
@@ -123,7 +123,7 @@ func TestKeyService_Import(t *testing.T) {
 
 func TestKeyService_ImportInvalidPEM(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	svc := NewKeyService(db, &noopCrypto{})
+	svc := NewKeyService(db, &noopCrypto{}, testutil.NewTestLogger())
 
 	_, err := svc.Import("bad", "not-a-pem")
 	assert.Error(t, err)
@@ -132,7 +132,7 @@ func TestKeyService_ImportInvalidPEM(t *testing.T) {
 
 func TestKeyService_ImportRSAPEM(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	svc := NewKeyService(db, &noopCrypto{})
+	svc := NewKeyService(db, &noopCrypto{}, testutil.NewTestLogger())
 
 	pk, err := rsa.GenerateKey(rand.Reader, 2048)
 	require.NoError(t, err)
@@ -146,7 +146,7 @@ func TestKeyService_ImportRSAPEM(t *testing.T) {
 
 func TestKeyService_ImportECPEM(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	svc := NewKeyService(db, &noopCrypto{})
+	svc := NewKeyService(db, &noopCrypto{}, testutil.NewTestLogger())
 
 	pk, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	require.NoError(t, err)
@@ -161,7 +161,7 @@ func TestKeyService_ImportECPEM(t *testing.T) {
 
 func TestKeyService_Delete(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	svc := NewKeyService(db, &noopCrypto{})
+	svc := NewKeyService(db, &noopCrypto{}, testutil.NewTestLogger())
 
 	key, err := svc.Generate("todelete", model.KeyTypeED25519, 0)
 	require.NoError(t, err)
@@ -176,7 +176,7 @@ func TestKeyService_Delete(t *testing.T) {
 
 func TestKeyService_DeleteNotFound(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	svc := NewKeyService(db, &noopCrypto{})
+	svc := NewKeyService(db, &noopCrypto{}, testutil.NewTestLogger())
 
 	err := svc.Delete(999)
 	assert.NoError(t, err)
@@ -184,7 +184,7 @@ func TestKeyService_DeleteNotFound(t *testing.T) {
 
 func TestKeyService_ExportPublicKey(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	svc := NewKeyService(db, &noopCrypto{})
+	svc := NewKeyService(db, &noopCrypto{}, testutil.NewTestLogger())
 
 	key, err := svc.Generate("export-test", model.KeyTypeED25519, 0)
 	require.NoError(t, err)
@@ -196,7 +196,7 @@ func TestKeyService_ExportPublicKey(t *testing.T) {
 
 func TestKeyService_ExportPublicKeyNotFound(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	svc := NewKeyService(db, &noopCrypto{})
+	svc := NewKeyService(db, &noopCrypto{}, testutil.NewTestLogger())
 
 	_, err := svc.ExportPublicKey(999)
 	assert.Error(t, err)
@@ -205,7 +205,7 @@ func TestKeyService_ExportPublicKeyNotFound(t *testing.T) {
 
 func TestKeyService_ListAfterGenerate(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	svc := NewKeyService(db, &noopCrypto{})
+	svc := NewKeyService(db, &noopCrypto{}, testutil.NewTestLogger())
 
 	_, err := svc.Generate("k1", model.KeyTypeED25519, 0)
 	require.NoError(t, err)
@@ -221,7 +221,7 @@ func TestKeyService_EncryptError(t *testing.T) {
 	db := testutil.NewTestDB(t)
 
 	ec := &errCrypto{}
-	svc := &KeyService{db: db, crypto: ec}
+	svc := &KeyService{db: db, crypto: ec, logger: testutil.NewTestLogger()}
 
 	_, err := svc.Generate("test", model.KeyTypeED25519, 0)
 	assert.Error(t, err)
@@ -231,7 +231,7 @@ func TestKeyService_ImportEncryptError(t *testing.T) {
 	db := testutil.NewTestDB(t)
 
 	ec := &errCrypto{}
-	svc := &KeyService{db: db, crypto: ec}
+	svc := &KeyService{db: db, crypto: ec, logger: testutil.NewTestLogger()}
 
 	pkPEM := generateTestPrivateKeyPEM(t)
 	_, err := svc.Import("test", pkPEM)
@@ -239,21 +239,21 @@ func TestKeyService_ImportEncryptError(t *testing.T) {
 }
 
 func TestKeyService_extractPublicKey_InvalidPEM(t *testing.T) {
-	svc := &KeyService{db: nil, crypto: &noopCrypto{}}
+	svc := &KeyService{db: nil, crypto: &noopCrypto{}, logger: testutil.NewTestLogger()}
 
 	_, err := svc.extractPublicKey([]byte("not a pem"))
 	assert.Error(t, err)
 }
 
 func TestKeyService_extractPublicKey_UnknownBlockType(t *testing.T) {
-	svc := &KeyService{db: nil, crypto: &noopCrypto{}}
+	svc := &KeyService{db: nil, crypto: &noopCrypto{}, logger: testutil.NewTestLogger()}
 
 	_, err := svc.extractPublicKey([]byte("-----BEGIN UNKNOWN-----\nAQ==\n-----END UNKNOWN-----"))
 	assert.Error(t, err)
 }
 
 func TestKeyService_extractPublicKey_OpenSSHFormat(t *testing.T) {
-	svc := &KeyService{db: nil, crypto: &noopCrypto{}}
+	svc := &KeyService{db: nil, crypto: &noopCrypto{}, logger: testutil.NewTestLogger()}
 
 	pkPEM := generateTestPrivateKeyPEM(t)
 	pubKey, err := svc.extractPublicKey([]byte(pkPEM))
@@ -273,7 +273,7 @@ func generateTestPrivateKeyPEM(t *testing.T) string {
 
 func TestKeyService_ImportEd25519PEM(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	svc := NewKeyService(db, &noopCrypto{})
+	svc := NewKeyService(db, &noopCrypto{}, testutil.NewTestLogger())
 
 	_, priv, err := ed25519.GenerateKey(rand.Reader)
 	require.NoError(t, err)
@@ -289,7 +289,7 @@ func TestKeyService_ImportEd25519PEM(t *testing.T) {
 
 func TestKeyService_ImportUnsupportedKeyType(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	svc := NewKeyService(db, &noopCrypto{})
+	svc := NewKeyService(db, &noopCrypto{}, testutil.NewTestLogger())
 
 	pkPEM := "-----BEGIN UNKNOWN TYPE-----\nAQ==\n-----END UNKNOWN TYPE-----"
 	_, err := svc.Import("bad", pkPEM)
@@ -298,14 +298,14 @@ func TestKeyService_ImportUnsupportedKeyType(t *testing.T) {
 
 func TestKeyService_ImportNullBlockPEM(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	svc := NewKeyService(db, &noopCrypto{})
+	svc := NewKeyService(db, &noopCrypto{}, testutil.NewTestLogger())
 
 	_, err := svc.Import("bad", "garbage-data")
 	assert.Error(t, err)
 }
 
 func TestKeyService_extractPublicKeyWithType(t *testing.T) {
-	svc := &KeyService{db: nil, crypto: &noopCrypto{}}
+	svc := &KeyService{db: nil, crypto: &noopCrypto{}, logger: testutil.NewTestLogger()}
 
 	pkPEM := generateTestPrivateKeyPEM(t)
 	keyType, pubKey, err := svc.extractPublicKeyWithType([]byte(pkPEM))
@@ -315,7 +315,7 @@ func TestKeyService_extractPublicKeyWithType(t *testing.T) {
 }
 
 func TestKeyService_extractPublicKeyWithType_RSA(t *testing.T) {
-	svc := &KeyService{db: nil, crypto: &noopCrypto{}}
+	svc := &KeyService{db: nil, crypto: &noopCrypto{}, logger: testutil.NewTestLogger()}
 
 	pk, err := rsa.GenerateKey(rand.Reader, 2048)
 	require.NoError(t, err)
@@ -329,7 +329,7 @@ func TestKeyService_extractPublicKeyWithType_RSA(t *testing.T) {
 }
 
 func TestKeyService_extractPublicKeyWithType_EC(t *testing.T) {
-	svc := &KeyService{db: nil, crypto: &noopCrypto{}}
+	svc := &KeyService{db: nil, crypto: &noopCrypto{}, logger: testutil.NewTestLogger()}
 
 	pk, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	require.NoError(t, err)
@@ -344,7 +344,7 @@ func TestKeyService_extractPublicKeyWithType_EC(t *testing.T) {
 }
 
 func TestKeyService_extractPublicKeyWithType_RSA_PKCS8(t *testing.T) {
-	svc := &KeyService{db: nil, crypto: &noopCrypto{}}
+	svc := &KeyService{db: nil, crypto: &noopCrypto{}, logger: testutil.NewTestLogger()}
 
 	pk, err := rsa.GenerateKey(rand.Reader, 2048)
 	require.NoError(t, err)
@@ -359,7 +359,7 @@ func TestKeyService_extractPublicKeyWithType_RSA_PKCS8(t *testing.T) {
 }
 
 func TestKeyService_extractPublicKeyWithType_ECDSA_PKCS8(t *testing.T) {
-	svc := &KeyService{db: nil, crypto: &noopCrypto{}}
+	svc := &KeyService{db: nil, crypto: &noopCrypto{}, logger: testutil.NewTestLogger()}
 
 	pk, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	require.NoError(t, err)

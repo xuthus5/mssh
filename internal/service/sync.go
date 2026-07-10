@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 
 	"mssh/internal/model"
@@ -11,11 +12,12 @@ import (
 )
 
 type SyncService struct {
-	db *sql.DB
+	db     *sql.DB
+	logger *slog.Logger
 }
 
-func NewSyncService(db *sql.DB) *SyncService {
-	return &SyncService{db: db}
+func NewSyncService(db *sql.DB, logger *slog.Logger) *SyncService {
+	return &SyncService{db: db, logger: logger}
 }
 
 type ExportData struct {
@@ -25,6 +27,7 @@ type ExportData struct {
 }
 
 func (s *SyncService) Export(path string) error {
+	s.logger.Info("exporting data", "path", path)
 	sessions, err := store.ListSessions(s.db, nil)
 	if err != nil {
 		return fmt.Errorf("export: %w", err)
@@ -57,6 +60,7 @@ func (s *SyncService) Export(path string) error {
 }
 
 func (s *SyncService) Import(path string) error {
+	s.logger.Info("importing data", "path", path)
 	file, err := os.Open(path)
 	if err != nil {
 		return fmt.Errorf("import: %w", err)
