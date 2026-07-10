@@ -1,15 +1,22 @@
 import '@testing-library/jest-dom/vitest'
 
 export function createWailsMock() {
-  const handler = new Map<number, (...args: any[]) => Promise<any>>()
+  const handler = new Map<string, (...args: any[]) => Promise<any>>()
 
   Object.defineProperty(window, 'wails', {
     value: {
       Call: {
         ByID: async (id: number, ...args: any[]) => {
-          const fn = handler.get(id)
+          const fn = handler.get(String(id))
           if (!fn) {
             throw new Error(`No mock handler for method ID ${id}`)
+          }
+          return fn(...args)
+        },
+        ByName: async (name: string, ...args: any[]) => {
+          const fn = handler.get(name)
+          if (!fn) {
+            throw new Error(`No mock handler for method ${name}`)
           }
           return fn(...args)
         },
@@ -27,8 +34,8 @@ export function createWailsMock() {
   })
 
   return {
-    onMethod: (id: number, fn: (...args: any[]) => Promise<any>) => {
-      handler.set(id, fn)
+    onMethod: (key: string, fn: (...args: any[]) => Promise<any>) => {
+      handler.set(key, fn)
     },
     clear: () => handler.clear(),
   }

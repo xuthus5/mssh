@@ -2,7 +2,8 @@ declare global {
   interface Window {
     wails: {
       Call: {
-        ByID: (id: number, ...args: unknown[]) => Promise<unknown>
+        ByID: (methodID: number, ...args: unknown[]) => PromiseLike<unknown> & { cancel?: () => void }
+        ByName: (methodName: string, ...args: unknown[]) => PromiseLike<unknown> & { cancel?: () => void }
       }
       Events: {
         On: (event: string, callback: (...args: unknown[]) => void) => () => void
@@ -13,20 +14,14 @@ declare global {
   }
 }
 
-const WailsError = 'Wails runtime not available - please run with wails3 dev or wails3 build'
-
 export function isWails(): boolean {
-  return typeof window !== 'undefined' && !!window.wails
-}
-
-export function requireWails(): void {
-  if (!isWails()) {
-    throw new Error(WailsError)
-  }
+  return typeof window !== 'undefined' && typeof window.wails !== 'undefined'
 }
 
 export async function call(methodID: number, ...args: unknown[]): Promise<unknown> {
-  requireWails()
+  if (!isWails()) {
+    throw new Error('Wails runtime not available - run with wails3 dev or wails3 build')
+  }
   return window.wails.Call.ByID(methodID, ...args)
 }
 

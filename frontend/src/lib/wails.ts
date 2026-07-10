@@ -15,6 +15,7 @@ import {
   type FileEntry,
   type KeyInfo,
 } from './wails/services'
+import { MethodID } from './wails/methodID'
 
 export {
   SessionService,
@@ -29,6 +30,7 @@ export {
   SyncService,
   isWails,
   onEvent,
+  MethodID,
 }
 
 export type { SessionFolder, SessionConfig, FileEntry, KeyInfo }
