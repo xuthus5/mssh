@@ -26,7 +26,12 @@ export const useConnectDialog = create<ConnectDialogState>((set) => ({
   error: '',
   fingerprint: '',
   openDialog: (host, port, user) => set({ open: true, state: 'connecting', host, port, user, error: '', fingerprint: '' }),
-  setState: (s) => set({ state: s }),
+  setState: (s) => {
+    set({ state: s })
+    if (s === 'connected') {
+      setTimeout(() => { set({ open: false, state: 'idle' }) }, 500)
+    }
+  },
   setError: (msg) => set({ state: 'failed', error: msg }),
   setFingerprint: (fp) => set({ fingerprint: fp }),
   closeDialog: () => set({ open: false, state: 'idle' }),
