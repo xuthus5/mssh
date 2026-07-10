@@ -130,7 +130,7 @@ func New(opts Options) (*App, error) {
 		persistMasterKey(opts.DataDir, masterKey, keychain, logger)
 	}
 
-	eventBus := event.NewWailsEventBus()
+	eventBus := event.NewWailsEventBus(logger)
 
 	logger.Info("initializing services")
 	sessionSvc := service.NewSessionService(db, eventBus, 30, opts.DataDir, logger)
