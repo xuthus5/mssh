@@ -1,25 +1,33 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useSession } from '@/hooks/useSession'
-import { setWailsServices, createLocalServices, resetWailsForTest, type SessionConfig } from '@/lib/wails'
 import { useAppStore } from '@/store/appStore'
+import { createWailsMock } from '@/test/setup'
+import { MethodID } from '@/lib/wails/methodID'
 
-function fresh() {
-  resetWailsForTest()
-  setWailsServices(createLocalServices())
-}
+let _counter = 0
+function nextId() { return ++_counter }
 
 function resetAppStore() {
   useAppStore.setState({ tabs: [], activeTabId: null, terminalPool: new Map() })
 }
 
 describe('useSession', () => {
+  let mock: ReturnType<typeof createWailsMock>
+
   beforeEach(() => {
-    fresh()
+    mock = createWailsMock()
     resetAppStore()
+    _counter = 0
   })
 
   it('creates a folder and adds it to state', async () => {
+    mock.onMethod(MethodID.SessionService_ListFolders, async () => [])
+    mock.onMethod(MethodID.SessionService_ListSessions, async () => [])
+    mock.onMethod(MethodID.SessionService_CreateFolder, async (name: any, parentId: any) => ({
+      id: nextId(), name, parent_id: parentId ?? null,
+    }))
+
     const { result } = renderHook(() => useSession())
 
     await act(async () => {
@@ -32,16 +40,30 @@ describe('useSession', () => {
   })
 
   it('deletes a folder and removes it from state', async () => {
+    const folderId = nextId()
+    mock.onMethod(MethodID.SessionService_ListFolders, async () => [{ id: folderId, name: 'test', parent_id: null }])
+    mock.onMethod(MethodID.SessionService_ListSessions, async () => [])
+    mock.onMethod(MethodID.SessionService_CreateFolder, async (name: any, parentId: any) => ({
+      id: folderId, name, parent_id: parentId ?? null,
+    }))
+    mock.onMethod(MethodID.SessionService_DeleteFolder, async () => {})
+
     const { result } = renderHook(() => useSession())
-    await act(async () => { await result.current.createFolder('test', null) })
+
+    await act(async () => { await result.current.listFolders() })
     expect(result.current.folders).toHaveLength(1)
 
-    const folderId = result.current.folders[0].id
-    await act(async () => { await result.current.deleteFolder(folderId) })
+    await act(async () => { await result.current.deleteFolder(String(folderId)) })
     expect(result.current.folders).toHaveLength(0)
   })
 
   it('creates a session and adds it to state', async () => {
+    mock.onMethod(MethodID.SessionService_ListFolders, async () => [])
+    mock.onMethod(MethodID.SessionService_ListSessions, async () => [])
+    mock.onMethod(MethodID.SessionService_CreateSession, async (s: any) => {
+      return Object.assign({}, s, { id: nextId() })
+    })
+
     const { result } = renderHook(() => useSession())
 
     await act(async () => {
@@ -59,13 +81,21 @@ describe('useSession', () => {
   })
 
   it('updates a session', async () => {
-    const { result } = renderHook(() => useSession())
-    await act(async () => {
-      await result.current.createSession({
-        name: 'old', host: '1.1.1.1', port: 22, username: 'u',
-        authMethod: 'password', keepAlive: 30, termType: 'xterm', folderId: null,
-      })
+    const sessionId = nextId()
+    const baseSession = {
+      id: sessionId, name: 'old', host: '1.1.1.1', port: 22, username: 'u',
+      auth_method: 'password', keep_alive: 30, term_type: 'xterm', folder_id: null,
+    }
+    mock.onMethod(MethodID.SessionService_ListFolders, async () => [])
+    mock.onMethod(MethodID.SessionService_ListSessions, async () => [baseSession])
+    mock.onMethod(MethodID.SessionService_CreateSession, async (s: any) => {
+      return Object.assign({}, s, { id: sessionId })
     })
+    mock.onMethod(MethodID.SessionService_UpdateSession, async () => {})
+
+    const { result } = renderHook(() => useSession())
+
+    await act(async () => { await result.current.listSessions() })
     const s = result.current.sessions[0]
 
     await act(async () => {
@@ -77,7 +107,16 @@ describe('useSession', () => {
   })
 
   it('deletes a session and removes it from state', async () => {
+    const sessionId = nextId()
+    mock.onMethod(MethodID.SessionService_ListFolders, async () => [])
+    mock.onMethod(MethodID.SessionService_ListSessions, async () => [])
+    mock.onMethod(MethodID.SessionService_CreateSession, async (s: any) => {
+      return Object.assign({}, s, { id: sessionId })
+    })
+    mock.onMethod(MethodID.SessionService_DeleteSession, async () => {})
+
     const { result } = renderHook(() => useSession())
+
     await act(async () => {
       await result.current.createSession({
         name: 'tmp', host: 'x', port: 22, username: 'u',
@@ -91,46 +130,55 @@ describe('useSession', () => {
   })
 
   it('connect opens a tab in the store', async () => {
+    const sessionId = nextId()
+    mock.onMethod(MethodID.SessionService_ListFolders, async () => [])
+    mock.onMethod(MethodID.SessionService_ListSessions, async () => [])
+    mock.onMethod(MethodID.SessionService_CreateSession, async (s: any) => {
+      return Object.assign({}, s, { id: sessionId })
+    })
+    mock.onMethod(MethodID.SessionService_Connect, async () => 'term-abc')
+
     const { result } = renderHook(() => useSession())
+
     await act(async () => {
       await result.current.createSession({
         name: 'srv', host: '10.0.0.1', port: 22, username: 'root',
         authMethod: 'password', keepAlive: 30, termType: 'xterm', folderId: null,
       })
     })
-    const sessionId = result.current.sessions[0].id
+    const sid = result.current.sessions[0].id
 
-    await act(async () => { await result.current.connect(sessionId) })
+    await act(async () => { await result.current.connect(sid) })
 
     const store = useAppStore.getState()
     expect(store.tabs).toHaveLength(1)
     expect(store.tabs[0].type).toBe('terminal')
     expect(store.tabs[0].title).toBe('srv')
-    expect(store.activeTabId).toBe(`terminal-${sessionId}`)
+    expect(store.activeTabId).toBe(`terminal-${sid}`)
   })
 
   it('handles createSession error gracefully', async () => {
-    const mock = createLocalServices()
-    mock.SessionService.CreateSession = async () => { throw new Error('db error') }
-    setWailsServices(mock)
+    mock.onMethod(MethodID.SessionService_ListFolders, async () => [])
+    mock.onMethod(MethodID.SessionService_ListSessions, async () => [])
+    mock.onMethod(MethodID.SessionService_CreateSession, async () => { throw new Error('db error') })
 
     const { result } = renderHook(() => useSession())
+
     await act(async () => {
       await result.current.createSession({
         name: 'x', host: 'x', port: 22, username: 'x',
         authMethod: 'password', keepAlive: 30, termType: 'xterm', folderId: null,
       })
     })
-    // Should not throw, state unchanged
     expect(result.current.sessions).toHaveLength(0)
   })
 
   it('handles folders list error gracefully', async () => {
-    const mock = createLocalServices()
-    mock.SessionService.ListFolders = async () => { throw new Error('db error') }
-    setWailsServices(mock)
+    mock.onMethod(MethodID.SessionService_ListFolders, async () => { throw new Error('db error') })
+    mock.onMethod(MethodID.SessionService_ListSessions, async () => [])
 
     const { result } = renderHook(() => useSession())
+
     await act(async () => { await result.current.listFolders() })
     expect(result.current.folders).toHaveLength(0)
   })
@@ -138,24 +186,20 @@ describe('useSession', () => {
 
 describe('useSession - loading state', () => {
   beforeEach(() => {
-    fresh()
     resetAppStore()
   })
 
   it('sets loading true then false during list', async () => {
-    let resolveList: (v: SessionConfig[]) => void
-    const svc = createLocalServices()
-    svc.SessionService.ListFolders = () =>
-      new Promise<SessionConfig[]>((r) => { resolveList = r }) as Promise<unknown> as ReturnType<typeof svc.SessionService.ListFolders>
-    // Override after getWails() caches
-    resetWailsForTest()
-    setWailsServices(svc)
+    let resolveList: (v: any[]) => void
+    const mock = createWailsMock()
+    mock.onMethod(MethodID.SessionService_ListFolders, () =>
+      new Promise<any[]>((r) => { resolveList = r }))
+    mock.onMethod(MethodID.SessionService_ListSessions, () =>
+      new Promise<any[]>((_r) => {}))
 
     const { result } = renderHook(() => useSession())
-    
-    // loading is true while the promise is pending
+
     await act(async () => {})
-    // resolve to trigger finally
     await act(async () => { resolveList!([]) })
     await act(async () => {})
 

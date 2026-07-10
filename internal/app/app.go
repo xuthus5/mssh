@@ -8,6 +8,7 @@ import (
 	"mssh/internal/crypto"
 	"mssh/internal/service"
 	"mssh/internal/store"
+	"mssh/pkg/event"
 )
 
 type App struct {
@@ -23,16 +24,13 @@ type App struct {
 	Theme    *service.ThemeService
 	Log      *service.LogService
 	Sync     *service.SyncService
+	Setting  *service.SettingService
 }
 
 type Options struct {
 	DataDir string
 	Logger  *slog.Logger
 }
-
-type nopEventBus struct{}
-
-func (n *nopEventBus) Emit(_ string, _ interface{}) {}
 
 type cryptoAdapter struct {
 	key []byte
@@ -79,7 +77,7 @@ func New(opts Options) (*App, error) {
 	keychain := crypto.NewKeychainAdapter()
 	_ = keychain
 
-	eventBus := &nopEventBus{}
+	eventBus := event.NewWailsEventBus()
 
 	logger.Info("initializing services")
 	sessionSvc := service.NewSessionService(db, eventBus, 30, logger)
@@ -94,6 +92,7 @@ func New(opts Options) (*App, error) {
 	themeSvc := service.NewThemeService(db, logger)
 	logSvc := service.NewLogService(db, logger)
 	syncSvc := service.NewSyncService(db, logger)
+	settingSvc := service.NewSettingService(db, logger)
 
 	return &App{
 		DB:       db,
@@ -107,5 +106,6 @@ func New(opts Options) (*App, error) {
 		Theme:    themeSvc,
 		Log:      logSvc,
 		Sync:     syncSvc,
+		Setting:  settingSvc,
 	}, nil
 }
