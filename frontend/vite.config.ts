@@ -16,7 +16,7 @@ export default defineConfig({
   },
   build: {
     rollupOptions: {
-      external: [/^\/wails\//],
+      external: ['/wails/runtime.js'],
       output: {
         manualChunks: undefined,
       },
