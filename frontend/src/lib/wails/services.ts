@@ -1,18 +1,11 @@
-import { call as wcall } from './runtime'
+import { waitForWails } from './runtime'
 
 const PKG = 'mssh/internal/service'
 
-function call(methodName: string, ...args: unknown[]): Promise<unknown> {
-  return wcall(-1, `${PKG}.${methodName}`, ...args)
-}
-
-// Use ByName via the Call namespace
 async function rpc(method: string, ...args: unknown[]): Promise<unknown> {
-  if (typeof window === 'undefined' || !window.wails) {
-    throw new Error('Wails runtime not available')
-  }
+  await waitForWails()
   const fqn = `${PKG}.${method}`
-  return window.wails.Call.ByName(fqn, ...args)
+  return window.wails!.Call!.ByName(fqn, ...args)
 }
 
 export interface SessionFolder {
