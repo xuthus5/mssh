@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useSettings } from '@/hooks/useSettings'
 import { createWailsMock } from '@/test/setup'
-import { MethodID } from '@/lib/wails/methodID'
 
 let _counter = 0
 function nextId() { return ++_counter }
@@ -16,13 +15,13 @@ describe('useSettings', () => {
     _settings = {}
     _counter = 0
 
-    mock.onMethod(MethodID.SettingService_GetSetting, async (key: string) => {
+    mock.onMethod('mssh/internal/service.SettingService.GetSetting', async (key: string) => {
       return _settings[key] ?? ''
     })
-    mock.onMethod(MethodID.SettingService_SetSetting, async (key: string, value: string) => {
+    mock.onMethod('mssh/internal/service.SettingService.SetSetting', async (key: string, value: string) => {
       _settings[key] = value
     })
-    mock.onMethod(MethodID.KeyService_List, async () => [])
+    mock.onMethod('mssh/internal/service.KeyService.List', async () => [])
   })
 
   it('loads default general settings', async () => {
@@ -55,7 +54,7 @@ describe('useSettings', () => {
   })
 
   it('generates a key and adds to state', async () => {
-    mock.onMethod(MethodID.KeyService_Generate, async (name: string, keyType: string, bits: number) => ({
+    mock.onMethod('mssh/internal/service.KeyService.Generate', async (name: string, keyType: string, bits: number) => ({
       id: nextId(), name, type: keyType, public_key: 'mock-pub', created_at: new Date().toISOString(),
     }))
 
@@ -67,10 +66,10 @@ describe('useSettings', () => {
   })
 
   it('deletes a key and removes from state', async () => {
-    mock.onMethod(MethodID.KeyService_Generate, async (name: string, keyType: string, bits: number) => ({
+    mock.onMethod('mssh/internal/service.KeyService.Generate', async (name: string, keyType: string, bits: number) => ({
       id: nextId(), name, type: keyType, public_key: 'mock-pub', created_at: new Date().toISOString(),
     }))
-    mock.onMethod(MethodID.KeyService_Delete, async () => {})
+    mock.onMethod('mssh/internal/service.KeyService.Delete', async () => {})
 
     const { result } = renderHook(() => useSettings())
     await act(async () => { await result.current.generateKey('k1', 'rsa', 2048) })
@@ -81,7 +80,7 @@ describe('useSettings', () => {
   })
 
   it('imports a key and adds to state', async () => {
-    mock.onMethod(MethodID.KeyService_Import, async (name: string) => ({
+    mock.onMethod('mssh/internal/service.KeyService.Import', async (name: string) => ({
       id: nextId(), name, type: 'rsa', public_key: 'mock-pub', created_at: new Date().toISOString(),
     }))
 
@@ -92,10 +91,10 @@ describe('useSettings', () => {
   })
 
   it('exports a key returns public key string', async () => {
-    mock.onMethod(MethodID.KeyService_Generate, async (name: string, keyType: string, bits: number) => ({
+    mock.onMethod('mssh/internal/service.KeyService.Generate', async (name: string, keyType: string, bits: number) => ({
       id: nextId(), name, type: keyType, public_key: 'mock-pub', created_at: new Date().toISOString(),
     }))
-    mock.onMethod(MethodID.KeyService_ExportPublicKey, async () => 'mock-key')
+    mock.onMethod('mssh/internal/service.KeyService.ExportPublicKey', async () => 'mock-key')
 
     const { result } = renderHook(() => useSettings())
     await act(async () => { await result.current.generateKey('ek', 'rsa', 2048) })
@@ -117,7 +116,7 @@ describe('useSettings', () => {
   })
 
   it('handles generateKey error gracefully', async () => {
-    mock.onMethod(MethodID.KeyService_Generate, async () => { throw new Error('key gen failed') })
+    mock.onMethod('mssh/internal/service.KeyService.Generate', async () => { throw new Error('key gen failed') })
 
     const { result } = renderHook(() => useSettings())
     await act(async () => { await result.current.generateKey('bad', 'rsa', 1024) })

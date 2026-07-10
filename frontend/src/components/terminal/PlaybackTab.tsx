@@ -71,7 +71,7 @@ export function PlaybackTab({ recordingId, title }: Props) {
       resizeObs.observe(containerRef.current)
     }
 
-    LogService.GetRecording(recordingId).then((data) => {
+    LogService.GetRecording(Number(recordingId)).then((data) => {
       if (disposed) return
       const player = data as PlayerData
       if (player?.entries) {

@@ -3,7 +3,6 @@ import { renderHook, act } from '@testing-library/react'
 import { useSession } from '@/hooks/useSession'
 import { useAppStore } from '@/store/appStore'
 import { createWailsMock } from '@/test/setup'
-import { MethodID } from '@/lib/wails/methodID'
 
 let _counter = 0
 function nextId() { return ++_counter }
@@ -22,9 +21,9 @@ describe('useSession', () => {
   })
 
   it('creates a folder and adds it to state', async () => {
-    mock.onMethod(MethodID.SessionService_ListFolders, async () => [])
-    mock.onMethod(MethodID.SessionService_ListSessions, async () => [])
-    mock.onMethod(MethodID.SessionService_CreateFolder, async (name: any, parentId: any) => ({
+    mock.onMethod('mssh/internal/service.SessionService.ListFolders', async () => [])
+    mock.onMethod('mssh/internal/service.SessionService.ListSessions', async () => [])
+    mock.onMethod('mssh/internal/service.SessionService.CreateFolder', async (name: any, parentId: any) => ({
       id: nextId(), name, parent_id: parentId ?? null,
     }))
 
@@ -41,12 +40,12 @@ describe('useSession', () => {
 
   it('deletes a folder and removes it from state', async () => {
     const folderId = nextId()
-    mock.onMethod(MethodID.SessionService_ListFolders, async () => [{ id: folderId, name: 'test', parent_id: null }])
-    mock.onMethod(MethodID.SessionService_ListSessions, async () => [])
-    mock.onMethod(MethodID.SessionService_CreateFolder, async (name: any, parentId: any) => ({
+    mock.onMethod('mssh/internal/service.SessionService.ListFolders', async () => [{ id: folderId, name: 'test', parent_id: null }])
+    mock.onMethod('mssh/internal/service.SessionService.ListSessions', async () => [])
+    mock.onMethod('mssh/internal/service.SessionService.CreateFolder', async (name: any, parentId: any) => ({
       id: folderId, name, parent_id: parentId ?? null,
     }))
-    mock.onMethod(MethodID.SessionService_DeleteFolder, async () => {})
+    mock.onMethod('mssh/internal/service.SessionService.DeleteFolder', async () => {})
 
     const { result } = renderHook(() => useSession())
 
@@ -58,9 +57,9 @@ describe('useSession', () => {
   })
 
   it('creates a session and adds it to state', async () => {
-    mock.onMethod(MethodID.SessionService_ListFolders, async () => [])
-    mock.onMethod(MethodID.SessionService_ListSessions, async () => [])
-    mock.onMethod(MethodID.SessionService_CreateSession, async (s: any) => {
+    mock.onMethod('mssh/internal/service.SessionService.ListFolders', async () => [])
+    mock.onMethod('mssh/internal/service.SessionService.ListSessions', async () => [])
+    mock.onMethod('mssh/internal/service.SessionService.CreateSession', async (s: any) => {
       return Object.assign({}, s, { id: nextId() })
     })
 
@@ -86,12 +85,12 @@ describe('useSession', () => {
       id: sessionId, name: 'old', host: '1.1.1.1', port: 22, username: 'u',
       auth_method: 'password', keep_alive: 30, term_type: 'xterm', folder_id: null,
     }
-    mock.onMethod(MethodID.SessionService_ListFolders, async () => [])
-    mock.onMethod(MethodID.SessionService_ListSessions, async () => [baseSession])
-    mock.onMethod(MethodID.SessionService_CreateSession, async (s: any) => {
+    mock.onMethod('mssh/internal/service.SessionService.ListFolders', async () => [])
+    mock.onMethod('mssh/internal/service.SessionService.ListSessions', async () => [baseSession])
+    mock.onMethod('mssh/internal/service.SessionService.CreateSession', async (s: any) => {
       return Object.assign({}, s, { id: sessionId })
     })
-    mock.onMethod(MethodID.SessionService_UpdateSession, async () => {})
+    mock.onMethod('mssh/internal/service.SessionService.UpdateSession', async () => {})
 
     const { result } = renderHook(() => useSession())
 
@@ -108,12 +107,12 @@ describe('useSession', () => {
 
   it('deletes a session and removes it from state', async () => {
     const sessionId = nextId()
-    mock.onMethod(MethodID.SessionService_ListFolders, async () => [])
-    mock.onMethod(MethodID.SessionService_ListSessions, async () => [])
-    mock.onMethod(MethodID.SessionService_CreateSession, async (s: any) => {
+    mock.onMethod('mssh/internal/service.SessionService.ListFolders', async () => [])
+    mock.onMethod('mssh/internal/service.SessionService.ListSessions', async () => [])
+    mock.onMethod('mssh/internal/service.SessionService.CreateSession', async (s: any) => {
       return Object.assign({}, s, { id: sessionId })
     })
-    mock.onMethod(MethodID.SessionService_DeleteSession, async () => {})
+    mock.onMethod('mssh/internal/service.SessionService.DeleteSession', async () => {})
 
     const { result } = renderHook(() => useSession())
 
@@ -131,12 +130,12 @@ describe('useSession', () => {
 
   it('connect opens a tab in the store', async () => {
     const sessionId = nextId()
-    mock.onMethod(MethodID.SessionService_ListFolders, async () => [])
-    mock.onMethod(MethodID.SessionService_ListSessions, async () => [])
-    mock.onMethod(MethodID.SessionService_CreateSession, async (s: any) => {
+    mock.onMethod('mssh/internal/service.SessionService.ListFolders', async () => [])
+    mock.onMethod('mssh/internal/service.SessionService.ListSessions', async () => [])
+    mock.onMethod('mssh/internal/service.SessionService.CreateSession', async (s: any) => {
       return Object.assign({}, s, { id: sessionId })
     })
-    mock.onMethod(MethodID.SessionService_Connect, async () => 'term-abc')
+    mock.onMethod('mssh/internal/service.SessionService.Connect', async () => 'term-abc')
 
     const { result } = renderHook(() => useSession())
 
@@ -158,9 +157,9 @@ describe('useSession', () => {
   })
 
   it('handles createSession error gracefully', async () => {
-    mock.onMethod(MethodID.SessionService_ListFolders, async () => [])
-    mock.onMethod(MethodID.SessionService_ListSessions, async () => [])
-    mock.onMethod(MethodID.SessionService_CreateSession, async () => { throw new Error('db error') })
+    mock.onMethod('mssh/internal/service.SessionService.ListFolders', async () => [])
+    mock.onMethod('mssh/internal/service.SessionService.ListSessions', async () => [])
+    mock.onMethod('mssh/internal/service.SessionService.CreateSession', async () => { throw new Error('db error') })
 
     const { result } = renderHook(() => useSession())
 
@@ -174,8 +173,8 @@ describe('useSession', () => {
   })
 
   it('handles folders list error gracefully', async () => {
-    mock.onMethod(MethodID.SessionService_ListFolders, async () => { throw new Error('db error') })
-    mock.onMethod(MethodID.SessionService_ListSessions, async () => [])
+    mock.onMethod('mssh/internal/service.SessionService.ListFolders', async () => { throw new Error('db error') })
+    mock.onMethod('mssh/internal/service.SessionService.ListSessions', async () => [])
 
     const { result } = renderHook(() => useSession())
 
@@ -192,9 +191,9 @@ describe('useSession - loading state', () => {
   it('sets loading true then false during list', async () => {
     let resolveList: (v: any[]) => void
     const mock = createWailsMock()
-    mock.onMethod(MethodID.SessionService_ListFolders, () =>
+    mock.onMethod('mssh/internal/service.SessionService.ListFolders', () =>
       new Promise<any[]>((r) => { resolveList = r }))
-    mock.onMethod(MethodID.SessionService_ListSessions, () =>
+    mock.onMethod('mssh/internal/service.SessionService.ListSessions', () =>
       new Promise<any[]>((_r) => {}))
 
     const { result } = renderHook(() => useSession())
