@@ -14,6 +14,9 @@ export default defineConfig({
     port: parseInt(process.env.WAILS_VITE_PORT || '5173'),
     strictPort: true,
   },
+  optimizeDeps: {
+    exclude: ['/wails/runtime.js'],
+  },
   build: {
     rollupOptions: {
       external: ['/wails/runtime.js'],
