@@ -133,12 +133,12 @@ func New(opts Options) (*App, error) {
 	eventBus := event.NewWailsEventBus(logger)
 
 	logger.Info("initializing services")
-	sessionSvc := service.NewSessionService(db, eventBus, 30, opts.DataDir, logger)
+	cryptoAdapter := &cryptoAdapter{key: masterKey}
+	sessionSvc := service.NewSessionService(db, eventBus, 30, opts.DataDir, cryptoAdapter, logger)
 	terminalSvc := service.NewTerminalService(sessionSvc, eventBus, 32, logger)
 	fileSvc := service.NewFileService(sessionSvc, eventBus, logger)
 	tunnelSvc := service.NewTunnelService(db, sessionSvc, eventBus, logger)
 
-	cryptoAdapter := &cryptoAdapter{key: masterKey}
 	keySvc := service.NewKeyService(db, cryptoAdapter, logger)
 
 	macroSvc := service.NewMacroService(db, terminalSvc, logger)
