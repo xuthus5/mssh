@@ -4,7 +4,6 @@ import { FitAddon } from '@xterm/addon-fit'
 import { WebglAddon } from '@xterm/addon-webgl'
 import { useAppStore } from '@/store/appStore'
 import { TerminalService } from '@/lib/wails'
-import { onEvent } from '@/lib/wails/runtime'
 
 export function useTerminal(
   terminalID: string,
@@ -86,18 +85,20 @@ export function useTerminal(
 
     const dataDispose = term.onData((data) => {
       store.updateLastUsed(terminalID)
-      const bytes = Array.from(new TextEncoder().encode(data))
-      TerminalService.Write(terminalID, bytes).catch(() => {})
+      TerminalService.Write(terminalID, data).catch((_err: unknown) => {})
     })
 
     let unsubOutput: (() => void) | undefined
-    onEvent('terminal:output', (payload: unknown) => {
-      const p = payload as { terminal_id?: string; data?: number[] }
-      if (p?.terminal_id === terminalID && p?.data) {
-        const bytes = new Uint8Array(p.data)
-        term.write(bytes)
-      }
-    }).then((unsub) => { unsubOutput = unsub })
+    const w = (window as any).wails
+    if (w?.Events?.On) {
+      unsubOutput = w.Events.On('terminal:output', (payload: unknown) => {
+        const p = payload as { terminal_id?: string; data?: number[] }
+        if (p?.terminal_id === terminalID && p?.data) {
+          const bytes = new Uint8Array(p.data)
+          term.write(bytes)
+        }
+      })
+    }
 
     const resizeObs = new ResizeObserver(() => {
       if (containerRef.current) {
