@@ -94,7 +94,7 @@ func (s *SessionService) ListSessions(folderID *int64) ([]model.Session, error) 
 }
 
 func (s *SessionService) CreateSession(session model.Session) (*model.Session, error) {
-	s.logger.Info("creating session", "name", session.Name, "authMethod", session.AuthMethod)
+	s.logger.Info("creating session", "name", session.Name, "authMethod", session.AuthMethod, "passwordLen", len(session.Password))
 	result, err := store.CreateSession(s.db, session)
 	if err != nil {
 		s.logger.Error("create session failed", "error", err)
@@ -218,6 +218,7 @@ func (s *SessionService) buildAuthMethods(sess *model.Session) ([]gossh.AuthMeth
 
 	switch sess.AuthMethod {
 	case model.AuthPassword:
+		s.logger.Info("using password auth", "passwordLen", len(sess.Password))
 		methods = append(methods, gossh.Password(sess.Password))
 	case model.AuthKey:
 		if sess.KeyID != nil {
