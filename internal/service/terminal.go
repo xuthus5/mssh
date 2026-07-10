@@ -104,7 +104,7 @@ func (t *TerminalService) Open(ctx context.Context, sessionID int64, cols, rows 
 	return terminalID, nil
 }
 
-func (t *TerminalService) Write(terminalID string, data []byte) (int, error) {
+func (t *TerminalService) Write(terminalID string, data string) (int, error) {
 	t.logger.Debug("writing to terminal", "terminalID", terminalID, "len", len(data))
 	t.mu.RLock()
 	pty, ok := t.ptys[terminalID]
@@ -117,7 +117,7 @@ func (t *TerminalService) Write(terminalID string, data []byte) (int, error) {
 	t.lastUsed[terminalID] = time.Now()
 	t.mu.Unlock()
 
-	return pty.Write(data)
+	return pty.Write([]byte(data))
 }
 
 func (t *TerminalService) Resize(terminalID string, cols, rows int) error {

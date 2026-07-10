@@ -34,7 +34,7 @@ func TestPasswordSSH(t *testing.T) {
 	time.Sleep(1 * time.Second)
 	assert.Equal(t, 1, a.Terminal.Count(), "terminal alive")
 
-	_, err = a.Terminal.Write(terminalID, []byte("echo PASSWORD_SSH_OK\n"))
+	_, err = a.Terminal.Write(terminalID, "echo PASSWORD_SSH_OK\n")
 	require.NoError(t, err)
 	t.Logf("Command written to terminal")
 
