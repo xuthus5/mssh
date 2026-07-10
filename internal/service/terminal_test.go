@@ -166,7 +166,7 @@ func TestTerminalService_Write(t *testing.T) {
 		lastUsed: map[string]time.Time{"term-1": time.Now()},
 	}
 
-	n, err := svc.Write("term-1", []byte("ls\n"))
+	n, err := svc.Write("term-1", "ls\n")
 	require.NoError(t, err)
 	assert.Equal(t, 3, n)
 }
@@ -177,7 +177,7 @@ func TestTerminalService_WriteNotFound(t *testing.T) {
 		lastUsed: make(map[string]time.Time),
 	}
 
-	_, err := svc.Write("nonexistent", []byte("data"))
+	_, err := svc.Write("nonexistent", "data")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "not found")
 }
@@ -345,7 +345,7 @@ func TestTerminalService_PoolLimitEnforcement(t *testing.T) {
 
 	assert.Equal(t, 3, termSvc.Count(), "pool should not exceed maxSize")
 
-	_, err = termSvc.Write(id1, []byte("x"))
+	_, err = termSvc.Write(id1, "x")
 	assert.Error(t, err, "evicted terminal should not be writable")
 
 	_ = id2
