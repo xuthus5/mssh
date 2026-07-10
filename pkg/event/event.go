@@ -13,7 +13,7 @@ const (
 
 type TerminalOutputPayload struct {
 	TerminalID string `json:"terminal_id"`
-	Data       []byte `json:"data"`
+	Data       string `json:"data"`
 }
 
 type ConnectionStatePayload struct {
