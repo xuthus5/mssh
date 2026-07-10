@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from 'react'
 import { useAppStore } from '@/store/appStore'
+import { getWails } from '@/lib/wails'
 
 export interface Folder {
   id: string
@@ -42,121 +43,166 @@ export function useSession() {
   const listFolders = useCallback(async () => {
     setLoading(true)
     try {
-      console.debug('[Wails:SessionService.ListFolders]')
-      // const result = await Wails.SessionService.ListFolders()
-      // setFolders(result)
+      const wails = getWails()
+      const result = await wails.SessionService.ListFolders()
+      setFolders(result.map((f) => ({ id: String(f.id), name: f.name, parentId: f.parent_id ? String(f.parent_id) : null })))
+    } catch (err) {
+      console.error('[SessionService.ListFolders]', err)
     } finally {
       setLoading(false)
     }
   }, [])
 
   const createFolder = useCallback(async (name: string, parentId: string | null) => {
-    console.debug('[Wails:SessionService.CreateFolder]', name, parentId)
-    const newFolder: Folder = {
-      id: `folder-${Date.now()}`,
-      name,
-      parentId,
+    try {
+      const wails = getWails()
+      const result = await wails.SessionService.CreateFolder(name, parentId ? Number(parentId) : null)
+      setFolders((prev) => [...prev, { id: String(result.id), name: result.name, parentId: result.parent_id ? String(result.parent_id) : null }])
+    } catch (err) {
+      console.error('[SessionService.CreateFolder]', err)
     }
-    setFolders((prev) => [...prev, newFolder])
   }, [])
 
   const deleteFolder = useCallback(async (id: string) => {
-    console.debug('[Wails:SessionService.DeleteFolder]', id)
-    // await Wails.SessionService.DeleteFolder(id)
-    setFolders((prev) => prev.filter((f) => f.id !== id))
+    try {
+      const wails = getWails()
+      await wails.SessionService.DeleteFolder(Number(id))
+      setFolders((prev) => prev.filter((f) => f.id !== id))
+    } catch (err) {
+      console.error('[SessionService.DeleteFolder]', err)
+    }
   }, [])
 
   const listSessions = useCallback(async () => {
     setLoading(true)
     try {
-      console.debug('[Wails:SessionService.ListSessions]')
-      // const result = await Wails.SessionService.ListSessions()
-      // setSessions(result)
+      const wails = getWails()
+      const result = await wails.SessionService.ListSessions()
+      setSessions(result.map((s) => ({
+        id: String(s.id),
+        name: s.name,
+        host: s.host,
+        port: s.port,
+        username: s.username,
+        authMethod: s.auth_method as Session['authMethod'],
+        password: s.password,
+        keyId: s.key_id ? String(s.key_id) : undefined,
+        keepAlive: s.keep_alive,
+        termType: s.term_type,
+        folderId: s.folder_id ? String(s.folder_id) : null,
+      })))
+    } catch (err) {
+      console.error('[SessionService.ListSessions]', err)
     } finally {
       setLoading(false)
     }
   }, [])
 
   const createSession = useCallback(async (session: Omit<Session, 'id'>) => {
-    console.debug('[Wails:SessionService.CreateSession]', session)
-    const newSession: Session = {
-      ...session,
-      id: `session-${Date.now()}`,
+    try {
+      const wails = getWails()
+      const result = await wails.SessionService.CreateSession({
+        name: session.name,
+        host: session.host,
+        port: session.port,
+        username: session.username,
+        auth_method: session.authMethod,
+        password: session.password,
+        key_id: session.keyId ? Number(session.keyId) : undefined,
+        keep_alive: session.keepAlive,
+        term_type: session.termType,
+        folder_id: session.folderId ? Number(session.folderId) : null,
+      })
+      setSessions((prev) => [...prev, {
+        id: String(result.id),
+        name: result.name,
+        host: result.host,
+        port: result.port,
+        username: result.username,
+        authMethod: result.auth_method as Session['authMethod'],
+        password: result.password,
+        keyId: result.key_id ? String(result.key_id) : undefined,
+        keepAlive: result.keep_alive,
+        termType: result.term_type,
+        folderId: result.folder_id ? String(result.folder_id) : null,
+      }])
+    } catch (err) {
+      console.error('[SessionService.CreateSession]', err)
     }
-    setSessions((prev) => [...prev, newSession])
   }, [])
 
   const updateSession = useCallback(async (session: Session) => {
-    console.debug('[Wails:SessionService.UpdateSession]', session)
-    // await Wails.SessionService.UpdateSession(session)
-    setSessions((prev) => prev.map((s) => (s.id === session.id ? session : s)))
+    try {
+      const wails = getWails()
+      await wails.SessionService.UpdateSession({
+        id: Number(session.id),
+        name: session.name,
+        host: session.host,
+        port: session.port,
+        username: session.username,
+        auth_method: session.authMethod,
+        password: session.password,
+        key_id: session.keyId ? Number(session.keyId) : undefined,
+        keep_alive: session.keepAlive,
+        term_type: session.termType,
+        folder_id: session.folderId ? Number(session.folderId) : null,
+      })
+      setSessions((prev) => prev.map((s) => (s.id === session.id ? session : s)))
+    } catch (err) {
+      console.error('[SessionService.UpdateSession]', err)
+    }
   }, [])
 
   const deleteSession = useCallback(async (id: string) => {
-    console.debug('[Wails:SessionService.DeleteSession]', id)
-    // await Wails.SessionService.DeleteSession(id)
-    setSessions((prev) => prev.filter((s) => s.id !== id))
+    try {
+      const wails = getWails()
+      await wails.SessionService.DeleteSession(Number(id))
+      setSessions((prev) => prev.filter((s) => s.id !== id))
+    } catch (err) {
+      console.error('[SessionService.DeleteSession]', err)
+    }
   }, [])
 
-  const connect = useCallback(
-    async (sessionId: string) => {
-      console.debug('[Wails:SessionService.Connect]', sessionId)
+  const connect = useCallback(async (sessionId: string) => {
+    try {
+      const wails = getWails()
+      const terminalId = await wails.SessionService.Connect(Number(sessionId))
       const tabId = `terminal-${sessionId}`
       const session = sessions.find((s) => s.id === sessionId)
-      openTab({
-        id: tabId,
-        title: session?.name ?? sessionId,
-        type: 'terminal',
-        terminalId: tabId,
-      })
-    },
-    [openTab, sessions],
-  )
+      openTab({ id: tabId, title: session?.name ?? sessionId, type: 'terminal', terminalId })
+    } catch (err) {
+      console.error('[SessionService.Connect]', err)
+    }
+  }, [openTab, sessions])
 
   const disconnect = useCallback(async (sessionId: string) => {
-    console.debug('[Wails:SessionService.Disconnect]', sessionId)
+    try {
+      const wails = getWails()
+      await wails.SessionService.Disconnect(`terminal-${sessionId}`)
+    } catch (err) {
+      console.error('[SessionService.Disconnect]', err)
+    }
   }, [])
 
   const listTunnels = useCallback(async (sessionId: string) => {
-    console.debug('[Wails:SessionService.ListTunnels]', sessionId)
-    // const result = await Wails.SessionService.ListTunnels(sessionId)
-    // setTunnels(result)
-  }, [])
-
-  const startTunnel = useCallback(async (tunnel: Omit<Tunnel, 'id' | 'running'>) => {
-    console.debug('[Wails:SessionService.StartTunnel]', tunnel)
-    // const result = await Wails.SessionService.StartTunnel(tunnel)
-    // setTunnels((prev) => [...prev, result])
-  }, [])
-
-  const stopTunnel = useCallback(async (tunnelId: string) => {
-    console.debug('[Wails:SessionService.StopTunnel]', tunnelId)
-    // await Wails.SessionService.StopTunnel(tunnelId)
-    setTunnels((prev) => prev.map((t) => (t.id === tunnelId ? { ...t, running: false } : t)))
+    try {
+      const wails = getWails()
+      const result = await wails.TunnelService.List()
+      setTunnels(result as Tunnel[])
+    } catch (err) {
+      console.error('[TunnelService.List]', sessionId, err)
+    }
   }, [])
 
   useEffect(() => {
     listFolders()
     listSessions()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [listFolders, listSessions])
 
   return {
-    folders,
-    sessions,
-    tunnels,
-    loading,
-    listFolders,
-    createFolder,
-    deleteFolder,
-    listSessions,
-    createSession,
-    updateSession,
-    deleteSession,
-    connect,
-    disconnect,
-    listTunnels,
-    startTunnel,
-    stopTunnel,
+    folders, sessions, tunnels, loading,
+    listFolders, createFolder, deleteFolder,
+    listSessions, createSession, updateSession, deleteSession,
+    connect, disconnect, listTunnels,
   }
 }

@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useState } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -44,8 +44,7 @@ export default function SessionDialog({
   )
   const [termType, setTermType] = useState(session?.termType ?? 'xterm-256color')
 
-  const handleSubmit = (e: FormEvent) => {
-    e.preventDefault()
+  const handleSubmit = () => {
     onSave({
       name,
       host,
@@ -67,7 +66,7 @@ export default function SessionDialog({
         <DialogHeader>
           <DialogTitle>{session ? '编辑会话' : '新建会话'}</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+        <form onSubmit={(e) => { e.preventDefault(); handleSubmit() }} className="flex flex-col gap-3">
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-medium text-muted-foreground">
               名称
@@ -176,7 +175,7 @@ export default function SessionDialog({
             </div>
           </div>
           <DialogFooter showCloseButton>
-            <Button type="submit">
+            <Button onClick={handleSubmit}>
               {session ? '保存' : '创建'}
             </Button>
           </DialogFooter>
