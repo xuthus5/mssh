@@ -91,7 +91,9 @@ export function useTerminal(
     let unsubOutput: (() => void) | undefined
     const w = (window as any).wails
     if (w?.Events?.On) {
+      console.log('[useTerminal] subscribing to terminal:output for', terminalID)
       unsubOutput = w.Events.On('terminal:output', (payload: unknown) => {
+        console.log('[useTerminal] received terminal:output', payload)
         const p = payload as { terminal_id?: string; data?: string }
         if (p?.terminal_id === terminalID && p?.data) {
           term.write(p.data)

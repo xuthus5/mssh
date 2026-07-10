@@ -7,7 +7,7 @@ import (
 )
 
 func TestWailsEventBusEmitNoPanic(t *testing.T) {
-	bus := NewWailsEventBus()
+	bus := NewWailsEventBus(nil)
 	assert.NotPanics(t, func() {
 		bus.Emit("test", "payload")
 	})

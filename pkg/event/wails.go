@@ -1,17 +1,27 @@
 package event
 
-import "github.com/wailsapp/wails/v3/pkg/application"
+import (
+	"log/slog"
 
-type WailsEventBus struct{}
+	"github.com/wailsapp/wails/v3/pkg/application"
+)
 
-func NewWailsEventBus() *WailsEventBus {
-	return &WailsEventBus{}
+type WailsEventBus struct {
+	logger *slog.Logger
+}
+
+func NewWailsEventBus(logger *slog.Logger) *WailsEventBus {
+	return &WailsEventBus{logger: logger}
 }
 
 func (w *WailsEventBus) Emit(name string, payload interface{}) {
 	app := application.Get()
 	if app == nil {
+		if w.logger != nil {
+			w.logger.Warn("event dropped — no Wails application", "event", name)
+		}
 		return
 	}
+	w.logger.Debug("emitting event", "name", name)
 	app.Event.Emit(name, payload)
 }
