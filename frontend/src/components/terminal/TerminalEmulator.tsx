@@ -1,5 +1,6 @@
 import { useRef } from 'react'
 import { useTerminal } from '@/hooks/useTerminal'
+import '@xterm/xterm/css/xterm.css'
 
 interface Props {
   terminalID: string
@@ -14,7 +15,11 @@ export function TerminalEmulator({ terminalID, className }: Props) {
     <div
       ref={containerRef}
       className={className}
-      style={{ width: '100%', height: '100%' }}
+      style={{
+        width: '100%',
+        height: '100%',
+        overflow: 'hidden',
+      }}
     />
   )
 }
