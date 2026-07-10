@@ -45,7 +45,7 @@ export function useSession() {
     try {
       console.log('[useSession] listFolders')
       const result = await SessionService.ListFolders()
-      setFolders(result.map((f: any) => ({ id: String(f.id), name: f.name, parentId: f.parent_id ? String(f.parent_id) : null })))
+      setFolders(result!.map((f: any) => ({ id: String(f.id), name: f.name, parentId: f.parent_id ? String(f.parent_id) : null })))
     } catch (err) {
       console.log('[useSession] listFolders error', err)
     } finally {
@@ -57,7 +57,7 @@ export function useSession() {
     try {
       console.log('[useSession] createFolder', { name, parentId })
       const result = await SessionService.CreateFolder(name, parentId ? Number(parentId) : null)
-      setFolders((prev) => [...prev, { id: String(result.id), name: result.name, parentId: result.parent_id ? String(result.parent_id) : null }])
+      setFolders((prev) => [...prev, { id: String(result!.id), name: result!.name, parentId: result!.parent_id ? String(result!.parent_id) : null }])
     } catch (err) {
       console.log('[useSession] createFolder error', err)
     }
@@ -88,7 +88,7 @@ export function useSession() {
     try {
       console.log('[useSession] listSessions')
       const result = await SessionService.ListSessions(null)
-      setSessions(result.map((s: any) => ({
+      setSessions(result!.map((s: any) => ({
         id: String(s.id),
         name: s.name,
         host: s.host,
@@ -128,17 +128,17 @@ export function useSession() {
         updated_at: '',
       })
       setSessions((prev) => [...prev, {
-        id: String(result.id),
-        name: result.name,
-        host: result.host,
-        port: result.port,
-        username: result.username,
-        authMethod: result.auth_method as Session['authMethod'],
-        password: result.password,
-        keyId: result.key_id ? String(result.key_id) : undefined,
-        keepAlive: result.keep_alive,
-        termType: result.term_type,
-        folderId: result.folder_id ? String(result.folder_id) : null,
+        id: String(result!.id),
+        name: result!.name,
+        host: result!.host,
+        port: result!.port,
+        username: result!.username,
+        authMethod: result!.auth_method as Session['authMethod'],
+        password: result!.password,
+        keyId: result!.key_id ? String(result!.key_id) : undefined,
+        keepAlive: result!.keep_alive,
+        termType: result!.term_type,
+        folderId: result!.folder_id ? String(result!.folder_id) : null,
       }])
     } catch (err) {
       console.log('[useSession] createSession error', err)
@@ -226,7 +226,7 @@ export function useSession() {
     try {
       console.log('[useSession] listTunnels', _sessionId)
       const result = await TunnelService.List()
-      setTunnels(result as Tunnel[])
+      setTunnels(result as unknown as Tunnel[])
     } catch (err) {
       console.log('[useSession] listTunnels error', err)
     }

@@ -15,9 +15,9 @@ import (
 // TestBindingGeneration verifies the generated TypeScript bindings exist
 // and contain the correct method signatures for all registered services.
 func TestBindingGeneration(t *testing.T) {
-	bindingsDir := filepath.Join("..", "frontend", "src", "lib", "wails", "mssh", "internal", "service")
+	bindingsDir := filepath.Join("..", "frontend", "bindings", "mssh", "internal", "service")
 	entries, err := os.ReadDir(bindingsDir)
-	require.NoError(t, err, "bindings directory not found — run: wails3 generate bindings -ts -names -b -d frontend/src/lib/wails/ .")
+	require.NoError(t, err, "bindings directory not found — run: wails3 generate bindings -ts -names -d frontend/bindings/ .")
 
 	expectedServices := map[string]int{
 		"sessionservice.ts":   13, // Connect, ConnectionCount, CreateFolder, CreateSession, DeleteFolder, DeleteSession, Disconnect, GetSession, ListFolders, ListSessions, MoveFolder, MoveSession, UpdateFolder, UpdateSession
@@ -53,19 +53,19 @@ func TestBindingGeneration(t *testing.T) {
 			count := strings.Count(string(content), "export function")
 			t.Logf("  %s: %d exported methods (min expected: %d)", name, count, minMethods)
 			assert.GreaterOrEqual(t, count, minMethods,
-				"%s has %d exported methods, expected at least %d — run: wails3 generate bindings -ts -names -b -d frontend/src/lib/wails/ .", name, count, minMethods)
+				"%s has %d exported methods, expected at least %d — run: wails3 generate bindings -ts -names -d frontend/bindings/ .", name, count, minMethods)
 		}
 	}
 
 	for svc := range expectedServices {
-		assert.True(t, foundServices[svc], "missing binding file: %s — run: wails3 generate bindings -ts -names -b -d frontend/src/lib/wails/ .", svc)
+		assert.True(t, foundServices[svc], "missing binding file: %s — run: wails3 generate bindings -ts -names -d frontend/bindings/ .", svc)
 	}
 }
 
 // TestBindingFQNMatchesGo verifies that each FQN in the generated bindings
 // matches the pattern: "mssh/internal/service.{Service}.{Method}"
 func TestBindingFQNMatchesGo(t *testing.T) {
-	bindingsDir := filepath.Join("..", "frontend", "src", "lib", "wails", "mssh", "internal", "service")
+	bindingsDir := filepath.Join("..", "frontend", "bindings", "mssh", "internal", "service")
 	entries, err := os.ReadDir(bindingsDir)
 	require.NoError(t, err)
 
@@ -172,7 +172,7 @@ func TestRpcContract_FNVHash(t *testing.T) {
 // This is a cross-reference check between generated bindings and Go code.
 func TestGoServiceMethodsExist(t *testing.T) {
 	// Read each generated binding file
-	bindingsDir := filepath.Join("..", "frontend", "src", "lib", "wails", "mssh", "internal", "service")
+	bindingsDir := filepath.Join("..", "frontend", "bindings", "mssh", "internal", "service")
 	entries, err := os.ReadDir(bindingsDir)
 	require.NoError(t, err)
 

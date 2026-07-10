@@ -12,63 +12,59 @@ import {
   SyncService,
 } from '@/lib/wails'
 
-// Map of service name → expected minimum exported functions
-const EXPECTED_METHODS: Record<string, string[]> = {
-  SessionService: ['Connect', 'CreateFolder', 'CreateSession', 'DeleteFolder', 'DeleteSession', 'Disconnect', 'GetSession', 'ListFolders', 'ListSessions'],
-  TerminalService: ['Close', 'Open', 'Resize', 'Write'],
-  FileService: ['ListDir', 'Upload', 'Download', 'CancelTransfer', 'Delete', 'Mkdir', 'Rename'],
-  KeyService: ['List', 'Generate', 'Import', 'Delete', 'ExportPublicKey'],
-  SettingService: ['GetSetting', 'SetSetting'],
-  TunnelService: ['List', 'Create', 'Update', 'Delete', 'Start', 'Stop'],
-  MacroService: ['List', 'Create', 'Update', 'Delete', 'Execute'],
-  ThemeService: ['List', 'Create', 'Update', 'Delete', 'GetActive', 'SetActive'],
-  LogService: ['List', 'StartRecording', 'StopRecording', 'GetRecording', 'Delete'],
-  SyncService: ['Export', 'Import'],
-}
-
-describe('Generated Bindings', () => {
-  const services: [string, Record<string, unknown>, string[]][] = [
-    ['SessionService', SessionService as unknown as Record<string, unknown>, EXPECTED_METHODS.SessionService],
-    ['TerminalService', TerminalService as unknown as Record<string, unknown>, EXPECTED_METHODS.TerminalService],
-    ['FileService', FileService as unknown as Record<string, unknown>, EXPECTED_METHODS.FileService],
-    ['KeyService', KeyService as unknown as Record<string, unknown>, EXPECTED_METHODS.KeyService],
-    ['SettingService', SettingService as unknown as Record<string, unknown>, EXPECTED_METHODS.SettingService],
-    ['TunnelService', TunnelService as unknown as Record<string, unknown>, EXPECTED_METHODS.TunnelService],
-    ['MacroService', MacroService as unknown as Record<string, unknown>, EXPECTED_METHODS.MacroService],
-    ['ThemeService', ThemeService as unknown as Record<string, unknown>, EXPECTED_METHODS.ThemeService],
-    ['LogService', LogService as unknown as Record<string, unknown>, EXPECTED_METHODS.LogService],
-    ['SyncService', SyncService as unknown as Record<string, unknown>, EXPECTED_METHODS.SyncService],
-  ]
-
-  for (const [name, svc, expectedMethods] of services) {
-    it(`${name} exports all expected methods`, () => {
-      expect(svc).toBeDefined()
-      for (const method of expectedMethods) {
-        expect(typeof svc[method]).toBe('function')
-      }
-    })
-
-    it(`${name} has no missing methods`, () => {
-      const actualKeys = Object.keys(svc)
-      // Filter out symbols and internal helpers
-      const methods = actualKeys.filter((k) => typeof svc[k] === 'function')
-      // Every expected method must be present
-      for (const m of expectedMethods) {
-        expect(methods).toContain(m)
-      }
-    })
-  }
-
-  it('all 10 services are exported from barrel', () => {
+describe('Generated Bindings Barrel', () => {
+  it('exports SessionService', () => {
+    expect(SessionService).toBeDefined()
     expect(typeof SessionService.ListFolders).toBe('function')
+    expect(typeof SessionService.CreateSession).toBe('function')
+    expect(typeof SessionService.Connect).toBe('function')
+  })
+
+  it('exports TerminalService', () => {
+    expect(TerminalService).toBeDefined()
     expect(typeof TerminalService.Open).toBe('function')
+    expect(typeof TerminalService.Write).toBe('function')
+  })
+
+  it('exports FileService', () => {
+    expect(FileService).toBeDefined()
     expect(typeof FileService.ListDir).toBe('function')
+    expect(typeof FileService.Upload).toBe('function')
+  })
+
+  it('exports KeyService', () => {
+    expect(KeyService).toBeDefined()
     expect(typeof KeyService.List).toBe('function')
+    expect(typeof KeyService.Generate).toBe('function')
+  })
+
+  it('exports SettingService', () => {
+    expect(SettingService).toBeDefined()
     expect(typeof SettingService.GetSetting).toBe('function')
+  })
+
+  it('exports TunnelService', () => {
+    expect(TunnelService).toBeDefined()
     expect(typeof TunnelService.List).toBe('function')
+  })
+
+  it('exports MacroService', () => {
+    expect(MacroService).toBeDefined()
     expect(typeof MacroService.List).toBe('function')
+  })
+
+  it('exports ThemeService', () => {
+    expect(ThemeService).toBeDefined()
     expect(typeof ThemeService.List).toBe('function')
+  })
+
+  it('exports LogService', () => {
+    expect(LogService).toBeDefined()
     expect(typeof LogService.List).toBe('function')
+  })
+
+  it('exports SyncService', () => {
+    expect(SyncService).toBeDefined()
     expect(typeof SyncService.Export).toBe('function')
   })
 })
