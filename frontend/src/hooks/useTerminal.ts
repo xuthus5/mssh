@@ -92,10 +92,9 @@ export function useTerminal(
     const w = (window as any).wails
     if (w?.Events?.On) {
       unsubOutput = w.Events.On('terminal:output', (payload: unknown) => {
-        const p = payload as { terminal_id?: string; data?: number[] }
+        const p = payload as { terminal_id?: string; data?: string }
         if (p?.terminal_id === terminalID && p?.data) {
-          const bytes = new Uint8Array(p.data)
-          term.write(bytes)
+          term.write(p.data)
         }
       })
     }
