@@ -3,6 +3,7 @@ import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { WebglAddon } from '@xterm/addon-webgl'
 import { useAppStore } from '@/store/appStore'
+import { onEvent } from '@/lib/wails'
 
 export function useTerminal(
   terminalID: string,
@@ -52,7 +53,6 @@ export function useTerminal(
       term.open(containerRef.current)
       fitAddon.fit()
 
-      // Write welcome banner when terminal is first created (not pooled)
       if (!existing) {
         term.writeln('\x1b[1;36m╔════════════════════════════════════════╗')
         term.writeln('\x1b[1;36m║          Welcome to MSSH              ║')
@@ -72,6 +72,14 @@ export function useTerminal(
       console.log('[Terminal] input:', JSON.stringify(data))
     })
 
+    const disposeEvent = onEvent('terminal:output', (payload: unknown) => {
+      const p = payload as { terminal_id?: string; data?: number[] }
+      if (p?.terminal_id === terminalID && p?.data) {
+        const bytes = new Uint8Array(p.data)
+        term.write(bytes)
+      }
+    })
+
     const resizeObs = new ResizeObserver(() => {
       if (containerRef.current) {
         fitAddon.fit()
@@ -83,6 +91,7 @@ export function useTerminal(
 
     return () => {
       dataDispose.dispose()
+      disposeEvent()
       resizeObs.disconnect()
       try {
         const el = term.element
