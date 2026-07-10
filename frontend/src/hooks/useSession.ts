@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from 'react'
 import { useAppStore } from '@/store/appStore'
 import { SessionService, TerminalService, TunnelService } from '@/lib/wails'
 import { useConnectDialog } from '@/store/connectDialog'
+import { toast } from '@/components/ui/toast'
 
 export interface Folder {
   id: string
