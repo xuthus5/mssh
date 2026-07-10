@@ -22,6 +22,6 @@ func (w *WailsEventBus) Emit(name string, payload interface{}) {
 		}
 		return
 	}
-	w.logger.Debug("emitting event", "name", name)
+	w.logger.Info("emitting event", "name", name)
 	app.Event.Emit(name, payload)
 }
