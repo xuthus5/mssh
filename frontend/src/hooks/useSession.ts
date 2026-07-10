@@ -112,7 +112,12 @@ export function useSession() {
 
   const createSession = useCallback(async (session: Omit<Session, 'id'>) => {
     try {
-      console.log('[useSession] createSession', { name: session.name, authMethod: session.authMethod })
+      console.log('[useSession] createSession', {
+        name: session.name,
+        authMethod: session.authMethod,
+        passwordLen: session.password?.length ?? 0,
+        host: session.host,
+      })
       const result = await SessionService.CreateSession({
         name: session.name,
         host: session.host,
@@ -148,7 +153,13 @@ export function useSession() {
 
   const updateSession = useCallback(async (session: Session) => {
     try {
-      console.log('[useSession] updateSession', { id: session.id, name: session.name, authMethod: session.authMethod })
+      console.log('[useSession] updateSession', {
+        id: session.id,
+        name: session.name,
+        authMethod: session.authMethod,
+        passwordLen: session.password?.length ?? 0,
+        host: session.host,
+      })
       await SessionService.UpdateSession({
         id: Number(session.id),
         name: session.name,
