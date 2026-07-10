@@ -15,48 +15,22 @@ export function useTerminal(
   const store = useAppStore()
 
   useEffect(() => {
-    const existing = store.terminalPool.get(terminalID)
-    const theme = store.terminalTheme
     const term =
-      existing?.terminal ??
       new Terminal({
         cursorBlink: true,
-        cursorStyle: theme.cursorStyle,
-        fontSize: theme.fontSize,
-        fontFamily: theme.fontFamily,
+        cursorStyle: 'bar',
+        fontSize: 14,
+        fontFamily: '"JetBrains Mono", "Cascadia Code", monospace',
         theme: {
-          background: theme.background,
-          foreground: theme.foreground,
-          cursor: theme.cursor,
-          cursorAccent: theme.cursorAccent,
-          selectionBackground: theme.selectionBackground,
-          black: theme.ansiBlack,
-          red: theme.ansiRed,
-          green: theme.ansiGreen,
-          yellow: theme.ansiYellow,
-          blue: theme.ansiBlue,
-          magenta: theme.ansiMagenta,
-          cyan: theme.ansiCyan,
-          white: theme.ansiWhite,
-          brightBlack: theme.ansiBrightBlack,
-          brightRed: theme.ansiBrightRed,
-          brightGreen: theme.ansiBrightGreen,
-          brightYellow: theme.ansiBrightYellow,
-          brightBlue: theme.ansiBrightBlue,
-          brightMagenta: theme.ansiBrightMagenta,
-          brightCyan: theme.ansiBrightCyan,
-          brightWhite: theme.ansiBrightWhite,
+          background: '#0d1117',
+          foreground: '#c9d1d9',
+          cursor: '#c9d1d9',
+          cursorAccent: '#0d1117',
         },
-        allowProposedApi: true,
-        allowTransparency: false,
         scrollback: 10000,
       })
 
     termRef.current = term
-
-    if (!existing) {
-      store.registerTerminal(terminalID, term)
-    }
 
     const fitAddon = new FitAddon()
     term.loadAddon(fitAddon)
@@ -70,19 +44,17 @@ export function useTerminal(
     if (containerRef.current) {
       term.open(containerRef.current)
       fitAddon.fit()
+      term.focus()
       console.log('[useTerminal] terminal opened', { cols: term.cols, rows: term.rows, containerSize: containerRef.current.getBoundingClientRect() })
 
-      if (!existing) {
-        term.writeln('\x1b[1;36m╔════════════════════════════════════════╗')
-        term.writeln('\x1b[1;36m║          Welcome to MSSH              ║')
-        term.writeln('\x1b[1;36m║    Secure Shell Client & Manager      ║')
-        term.writeln('\x1b[1;36m╚════════════════════════════════════════╝\x1b[0m')
-        term.writeln('')
-        term.writeln('\x1b[33mWaiting for SSH connection...\x1b[0m')
-        term.writeln('\x1b[90mType to begin — input is sent to remote host once connected\x1b[0m')
-        term.writeln('')
-        store.setConnectionStatus(terminalID, 'disconnected')
-      }
+      term.writeln('\x1b[1;36m╔════════════════════════════════════════╗')
+      term.writeln('\x1b[1;36m║          Welcome to MSSH              ║')
+      term.writeln('\x1b[1;36m║    Secure Shell Client & Manager      ║')
+      term.writeln('\x1b[1;36m╚════════════════════════════════════════╝\x1b[0m')
+      term.writeln('')
+      term.writeln('\x1b[33mWaiting for SSH connection...\x1b[0m')
+      term.writeln('')
+      store.setConnectionStatus(terminalID, 'disconnected')
     }
 
     const dataDispose = term.onData((data) => {
@@ -132,7 +104,8 @@ export function useTerminal(
         // Ignore cleanup errors
       }
     }
-  }, [terminalID, containerRef, store])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [terminalID])
 
   useEffect(() => {
     const unsub = useAppStore.subscribe((state, prevState) => {
