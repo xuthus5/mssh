@@ -37,7 +37,7 @@ interface Props {
   onGenerateKey: (name: string, type: KeyInfo['type'], bits: number) => void
   onImportKey: (name: string, privateKey: string) => void
   onDeleteKey: (id: string) => void
-  onExportKey: (id: string) => void
+  onExportKey: (id: string) => Promise<string | undefined>
   onSaveSync: (c: SyncConfig) => void
   onExportConfig: () => void
   onImportConfig: () => void

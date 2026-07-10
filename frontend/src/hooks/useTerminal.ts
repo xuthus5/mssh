@@ -13,23 +13,39 @@ export function useTerminal(
   const termRef = useRef<Terminal | null>(null)
 
   const store = useAppStore()
-  const theme = useAppStore((s) => s.terminalTheme)
 
   useEffect(() => {
     const existing = store.terminalPool.get(terminalID)
+    const theme = store.terminalTheme
     const term =
       existing?.terminal ??
       new Terminal({
         cursorBlink: true,
-        cursorStyle: 'bar',
-        fontSize: 14,
-        fontFamily: '"JetBrains Mono", "Cascadia Code", monospace',
+        cursorStyle: theme.cursorStyle,
+        fontSize: theme.fontSize,
+        fontFamily: theme.fontFamily,
         theme: {
           background: theme.background,
           foreground: theme.foreground,
           cursor: theme.cursor,
           cursorAccent: theme.cursorAccent,
           selectionBackground: theme.selectionBackground,
+          black: theme.ansiBlack,
+          red: theme.ansiRed,
+          green: theme.ansiGreen,
+          yellow: theme.ansiYellow,
+          blue: theme.ansiBlue,
+          magenta: theme.ansiMagenta,
+          cyan: theme.ansiCyan,
+          white: theme.ansiWhite,
+          brightBlack: theme.ansiBrightBlack,
+          brightRed: theme.ansiBrightRed,
+          brightGreen: theme.ansiBrightGreen,
+          brightYellow: theme.ansiBrightYellow,
+          brightBlue: theme.ansiBrightBlue,
+          brightMagenta: theme.ansiBrightMagenta,
+          brightCyan: theme.ansiBrightCyan,
+          brightWhite: theme.ansiBrightWhite,
         },
         allowProposedApi: true,
         allowTransparency: false,
@@ -105,6 +121,42 @@ export function useTerminal(
       }
     }
   }, [terminalID, containerRef, store])
+
+  useEffect(() => {
+    const unsub = useAppStore.subscribe((state, prevState) => {
+      const t = termRef.current
+      if (!t) return
+      if (state.terminalTheme === prevState.terminalTheme) return
+      const tm = state.terminalTheme
+      t.options.cursorStyle = tm.cursorStyle
+      t.options.fontSize = tm.fontSize
+      t.options.fontFamily = tm.fontFamily
+      t.options.theme = {
+        background: tm.background,
+        foreground: tm.foreground,
+        cursor: tm.cursor,
+        cursorAccent: tm.cursorAccent,
+        selectionBackground: tm.selectionBackground,
+        black: tm.ansiBlack,
+        red: tm.ansiRed,
+        green: tm.ansiGreen,
+        yellow: tm.ansiYellow,
+        blue: tm.ansiBlue,
+        magenta: tm.ansiMagenta,
+        cyan: tm.ansiCyan,
+        white: tm.ansiWhite,
+        brightBlack: tm.ansiBrightBlack,
+        brightRed: tm.ansiBrightRed,
+        brightGreen: tm.ansiBrightGreen,
+        brightYellow: tm.ansiBrightYellow,
+        brightBlue: tm.ansiBrightBlue,
+        brightMagenta: tm.ansiBrightMagenta,
+        brightCyan: tm.ansiBrightCyan,
+        brightWhite: tm.ansiBrightWhite,
+      }
+    })
+    return unsub
+  }, [])
 
   return termRef
 }

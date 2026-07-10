@@ -30,6 +30,25 @@ export interface TerminalTheme {
   cursor: string
   cursorAccent: string
   selectionBackground: string
+  cursorStyle: 'block' | 'underline' | 'bar'
+  fontFamily: string
+  fontSize: number
+  ansiBlack: string
+  ansiRed: string
+  ansiGreen: string
+  ansiYellow: string
+  ansiBlue: string
+  ansiMagenta: string
+  ansiCyan: string
+  ansiWhite: string
+  ansiBrightBlack: string
+  ansiBrightRed: string
+  ansiBrightGreen: string
+  ansiBrightYellow: string
+  ansiBrightBlue: string
+  ansiBrightMagenta: string
+  ansiBrightCyan: string
+  ansiBrightWhite: string
 }
 
 export type ConnectionStatus = 'connecting' | 'connected' | 'disconnected'
@@ -40,6 +59,25 @@ const DEFAULT_THEME: TerminalTheme = {
   cursor: '#c9d1d9',
   cursorAccent: '#0d1117',
   selectionBackground: '#264f78',
+  cursorStyle: 'bar',
+  fontFamily: '"JetBrains Mono", "Cascadia Code", monospace',
+  fontSize: 14,
+  ansiBlack: '#000000',
+  ansiRed: '#cd0000',
+  ansiGreen: '#00cd00',
+  ansiYellow: '#cdcd00',
+  ansiBlue: '#0000ee',
+  ansiMagenta: '#cd00cd',
+  ansiCyan: '#00cdcd',
+  ansiWhite: '#e5e5e5',
+  ansiBrightBlack: '#7f7f7f',
+  ansiBrightRed: '#ff0000',
+  ansiBrightGreen: '#00ff00',
+  ansiBrightYellow: '#ffff00',
+  ansiBrightBlue: '#5c5cff',
+  ansiBrightMagenta: '#ff00ff',
+  ansiBrightCyan: '#00ffff',
+  ansiBrightWhite: '#ffffff',
 }
 
 export interface AppState {

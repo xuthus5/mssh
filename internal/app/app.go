@@ -143,9 +143,13 @@ func New(opts Options) (*App, error) {
 
 	macroSvc := service.NewMacroService(db, terminalSvc, logger)
 	themeSvc := service.NewThemeService(db, logger)
-	logSvc := service.NewLogService(db, logger)
+	logSvc := service.NewLogService(db, opts.DataDir, logger)
 	syncSvc := service.NewSyncService(db, logger)
 	settingSvc := service.NewSettingService(db, logger)
+
+	terminalSvc.SetOutputHandler(func(terminalID string, data []byte) {
+		logSvc.HandleOutput(terminalID, data)
+	})
 
 	return &App{
 		DB:       db,

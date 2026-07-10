@@ -215,6 +215,12 @@ export const LogService = {
   StopRecording(logId: number): Promise<void> {
     return call(MethodID.LogService_StopRecording, logId) as Promise<void>
   },
+  StartTerminalRecording(terminalId: string, sessionId: number, cols: number, rows: number, termType: string): Promise<number> {
+    return call(MethodID.LogService_StartTerminalRecording, terminalId, sessionId, cols, rows, termType) as Promise<number>
+  },
+  StopTerminalRecording(terminalId: string): Promise<void> {
+    return call(MethodID.LogService_StopTerminalRecording, terminalId) as Promise<void>
+  },
   GetRecording(path: string): Promise<unknown> {
     return call(MethodID.LogService_GetRecording, path) as Promise<unknown>
   },

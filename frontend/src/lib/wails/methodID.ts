@@ -37,6 +37,8 @@ export const MethodID = {
   LogService_List: 3642585073,
   LogService_StartRecording: 3912519914,
   LogService_StopRecording: 1190074524,
+  LogService_StartTerminalRecording: 3345868617,
+  LogService_StopTerminalRecording: 3495887146,
   LogService_GetRecording: 2695165794,
   LogService_Delete: 3223317530,
   SyncService_Export: 1437628422,

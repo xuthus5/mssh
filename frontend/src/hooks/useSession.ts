@@ -73,6 +73,16 @@ export function useSession() {
     }
   }, [])
 
+  const updateFolder = useCallback(async (id: string, name: string) => {
+    try {
+      console.log('[useSession] updateFolder', id, name)
+      await SessionService.UpdateFolder(Number(id), name)
+      setFolders((prev) => prev.map((f) => (f.id === id ? { ...f, name } : f)))
+    } catch (err) {
+      console.log('[useSession] updateFolder error', err)
+    }
+  }, [])
+
   const listSessions = useCallback(async () => {
     setLoading(true)
     try {
@@ -163,6 +173,16 @@ export function useSession() {
     }
   }, [])
 
+  const moveSession = useCallback(async (id: string, folderId: string | null) => {
+    try {
+      console.log('[useSession] moveSession', id, folderId)
+      await SessionService.MoveSession(Number(id), folderId ? Number(folderId) : null)
+      setSessions((prev) => prev.map((s) => (s.id === id ? { ...s, folderId } : s)))
+    } catch (err) {
+      console.log('[useSession] moveSession error', err)
+    }
+  }, [])
+
   const connect = useCallback(async (sessionId: string) => {
     try {
       console.log('[useSession] connect', sessionId)
@@ -212,8 +232,8 @@ export function useSession() {
 
   return {
     folders, sessions, tunnels, loading,
-    listFolders, createFolder, deleteFolder,
-    listSessions, createSession, updateSession, deleteSession,
+    listFolders, createFolder, deleteFolder, updateFolder,
+    listSessions, createSession, updateSession, deleteSession, moveSession,
     connect, disconnect, listTunnels,
   }
 }
