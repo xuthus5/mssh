@@ -1,11 +1,12 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useSettings } from '@/hooks/useSettings'
-import { setWailsServices, createMockWailsServices } from '@/lib/wails'
+import { setWailsServices, createLocalServices, resetWailsForTest } from '@/lib/wails'
 
 describe('useSettings', () => {
   beforeEach(() => {
-    setWailsServices(createMockWailsServices())
+    resetWailsForTest()
+    setWailsServices(createLocalServices())
   })
 
   it('loads default general settings', async () => {
@@ -69,7 +70,7 @@ describe('useSettings', () => {
       const r = await result.current.exportKey(result.current.keys[0].id)
       if (r) exported = r
     })
-    expect(exported).toBe('mock-public-key')
+    expect(exported).toBe('mock-key')
   })
 
   it('saves sync config', async () => {
@@ -82,9 +83,10 @@ describe('useSettings', () => {
   })
 
   it('handles generateKey error gracefully', async () => {
-    const mock = createMockWailsServices()
-    mock.KeyService.Generate = async () => { throw new Error('key gen failed') }
-    setWailsServices(mock)
+    const svc = createLocalServices()
+    svc.KeyService.Generate = async () => { throw new Error('key gen failed') }
+    resetWailsForTest()
+    setWailsServices(svc)
 
     const { result } = renderHook(() => useSettings())
     await act(async () => { await result.current.generateKey('bad', 'rsa', 1024) })

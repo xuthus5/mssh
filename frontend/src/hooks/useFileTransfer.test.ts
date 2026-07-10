@@ -1,22 +1,24 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useFileTransfer } from '@/hooks/useFileTransfer'
-import { setWailsServices, createMockWailsServices } from '@/lib/wails'
+import { setWailsServices, createLocalServices, resetWailsForTest } from '@/lib/wails'
 
 const SESSION_ID = 1
 
 describe('useFileTransfer', () => {
   beforeEach(() => {
-    setWailsServices(createMockWailsServices())
+    resetWailsForTest()
+    setWailsServices(createLocalServices())
   })
 
   it('listFiles sets files from service', async () => {
-    const mock = createMockWailsServices()
-    mock.FileService.ListDir = async () => [
+    const svc = createLocalServices()
+    svc.FileService.ListDir = async () => [
       { name: 'readme.md', path: '/readme.md', size: 100, is_dir: false, mod_time: '2024-01-01' },
       { name: 'src', path: '/src', size: 0, is_dir: true, mod_time: '2024-01-01' },
     ]
-    setWailsServices(mock)
+    resetWailsForTest()
+    setWailsServices(svc)
 
     const { result } = renderHook(() => useFileTransfer(SESSION_ID))
     await act(async () => { await result.current.listFiles('/') })
@@ -57,15 +59,16 @@ describe('useFileTransfer', () => {
   })
 
   it('deleteFile removes from list', async () => {
-    const mock = createMockWailsServices()
+    const svc = createLocalServices()
     const files = [
       { name: 'a.txt', path: '/a.txt', size: 10, is_dir: false, mod_time: '' },
       { name: 'b.txt', path: '/b.txt', size: 20, is_dir: false, mod_time: '' },
     ]
     let deleted = false
-    mock.FileService.ListDir = async () => deleted ? [files[1]] : files
-    mock.FileService.Delete = async () => { deleted = true }
-    setWailsServices(mock)
+    svc.FileService.ListDir = async () => deleted ? [files[1]] : files
+    svc.FileService.Delete = async () => { deleted = true }
+    resetWailsForTest()
+    setWailsServices(svc)
 
     const { result } = renderHook(() => useFileTransfer(SESSION_ID))
     await act(async () => { await result.current.listFiles('/') })
@@ -77,10 +80,11 @@ describe('useFileTransfer', () => {
   })
 
   it('navigateUp goes to parent directory', async () => {
-    const mock = createMockWailsServices()
+    const svc = createLocalServices()
     const paths: string[] = []
-    mock.FileService.ListDir = async (_, path) => { paths.push(path); return [] }
-    setWailsServices(mock)
+    svc.FileService.ListDir = async (_, path) => { paths.push(path); return [] }
+    resetWailsForTest()
+    setWailsServices(svc)
 
     const { result } = renderHook(() => useFileTransfer(SESSION_ID))
     await act(async () => { await result.current.listFiles('/home/user') })
@@ -93,9 +97,10 @@ describe('useFileTransfer', () => {
 
   it('makeDir triggers listFiles on current path', async () => {
     const called: string[] = []
-    const mock = createMockWailsServices()
-    mock.FileService.Mkdir = async (_, p) => { called.push(p) }
-    setWailsServices(mock)
+    const svc = createLocalServices()
+    svc.FileService.Mkdir = async (_, p) => { called.push(p) }
+    resetWailsForTest()
+    setWailsServices(svc)
 
     const { result } = renderHook(() => useFileTransfer(SESSION_ID))
     await act(async () => { await result.current.listFiles('/home') })
@@ -105,9 +110,10 @@ describe('useFileTransfer', () => {
   })
 
   it('handles listFiles error gracefully', async () => {
-    const mock = createMockWailsServices()
-    mock.FileService.ListDir = async () => { throw new Error('permission denied') }
-    setWailsServices(mock)
+    const svc = createLocalServices()
+    svc.FileService.ListDir = async () => { throw new Error('permission denied') }
+    resetWailsForTest()
+    setWailsServices(svc)
 
     const { result } = renderHook(() => useFileTransfer(SESSION_ID))
     await act(async () => { await result.current.listFiles('/') })
