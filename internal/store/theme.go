@@ -16,7 +16,10 @@ func CreateTheme(db *sql.DB, t model.Theme) (*model.Theme, error) {
 	if err != nil {
 		return nil, fmt.Errorf("create theme: %w", err)
 	}
-	id, _ := result.LastInsertId()
+	id, err := result.LastInsertId()
+	if err != nil {
+		return nil, fmt.Errorf("create theme: last insert id: %w", err)
+	}
 	t.ID = id
 	t.CreatedAt = time.Now()
 	return &t, nil
@@ -36,7 +39,10 @@ func ListThemes(db *sql.DB) ([]model.Theme, error) {
 		if err != nil {
 			return nil, fmt.Errorf("scan theme: %w", err)
 		}
-		t.CreatedAt, _ = time.Parse("2006-01-02 15:04:05", createdAt)
+		t.CreatedAt, err = time.Parse("2006-01-02 15:04:05", createdAt)
+		if err != nil {
+			return nil, fmt.Errorf("scan theme: parse created_at: %w", err)
+		}
 		themes = append(themes, t)
 	}
 	if themes == nil {

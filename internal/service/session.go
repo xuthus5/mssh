@@ -6,9 +6,13 @@ import (
 	"database/sql"
 	"fmt"
 	"log/slog"
+	"net"
+	"os"
+	"path/filepath"
 	"sync"
 
 	gossh "golang.org/x/crypto/ssh"
+	"golang.org/x/crypto/ssh/agent"
 
 	"mssh/internal/model"
 	ssh "mssh/internal/ssh"
@@ -26,15 +30,17 @@ type SessionService struct {
 	conns     map[string]*ssh.ClientWrapper
 	eventBus  EventBus
 	keepAlive int
+	dataDir   string
 	logger    *slog.Logger
 }
 
-func NewSessionService(db *sql.DB, eventBus EventBus, keepAlive int, logger *slog.Logger) *SessionService {
+func NewSessionService(db *sql.DB, eventBus EventBus, keepAlive int, dataDir string, logger *slog.Logger) *SessionService {
 	return &SessionService{
 		db:        db,
 		conns:     make(map[string]*ssh.ClientWrapper),
 		eventBus:  eventBus,
 		keepAlive: keepAlive,
+		dataDir:   dataDir,
 		logger:    logger,
 	}
 }
@@ -134,9 +140,18 @@ func (s *SessionService) Connect(ctx context.Context, sessionID int64) (string, 
 		return "", fmt.Errorf("connect: %w", err)
 	}
 
-	authMethods := s.buildAuthMethods(sess)
+	authMethods, err := s.buildAuthMethods(sess)
+	if err != nil {
+		s.logger.Error("build auth methods failed", "error", err)
+		return "", fmt.Errorf("connect: %w", err)
+	}
 
-	wrapper, err := ssh.Connect(ctx, *sess, authMethods)
+	knownHostsPath := ""
+	if s.dataDir != "" {
+		knownHostsPath = filepath.Join(s.dataDir, "known_hosts")
+	}
+
+	wrapper, err := ssh.Connect(ctx, *sess, authMethods, knownHostsPath, s.logger)
 	if err != nil {
 		s.logger.Error("connect failed", "sessionID", sessionID, "error", err)
 		return "", fmt.Errorf("connect: %w", err)
@@ -196,7 +211,7 @@ func (s *SessionService) ConnectionCount() int {
 	return len(s.conns)
 }
 
-func (s *SessionService) buildAuthMethods(sess *model.Session) []gossh.AuthMethod {
+func (s *SessionService) buildAuthMethods(sess *model.Session) ([]gossh.AuthMethod, error) {
 	var methods []gossh.AuthMethod
 
 	switch sess.AuthMethod {
@@ -221,9 +236,24 @@ func (s *SessionService) buildAuthMethods(sess *model.Session) []gossh.AuthMetho
 				return answers, nil
 			},
 		))
+	case model.AuthAgent:
+		socketPath := os.Getenv("SSH_AUTH_SOCK")
+		if socketPath == "" {
+			return nil, fmt.Errorf("SSH_AUTH_SOCK not set")
+		}
+		sock, err := net.Dial("unix", socketPath)
+		if err != nil {
+			return nil, fmt.Errorf("ssh agent: %w", err)
+		}
+		agentClient := agent.NewClient(sock)
+		signers, err := agentClient.Signers()
+		if err != nil {
+			return nil, fmt.Errorf("ssh agent signers: %w", err)
+		}
+		methods = append(methods, gossh.PublicKeys(signers...))
 	}
 
-	return methods
+	return methods, nil
 }
 
 func generateTerminalID() string {

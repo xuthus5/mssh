@@ -1,23 +1,46 @@
-import { useRef, useEffect, useState } from 'react'
+import { useRef, useEffect, useState, useCallback } from 'react'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { Button } from '@/components/ui/button'
 import { Slider } from '@/components/ui/slider'
 import { Play, Pause } from 'lucide-react'
+import { LogService } from '@/lib/wails'
+
+interface RecordingEntry {
+  timestamp: number
+  type: number
+  data: number[]
+}
+
+interface PlayerData {
+  cols: number
+  rows: number
+  term_type: string
+  entries: RecordingEntry[]
+}
 
 interface Props {
   recordingId: string
   title: string
 }
 
-export function PlaybackTab({ recordingId: _recordingId, title }: Props) {
+export function PlaybackTab({ recordingId, title }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const termRef = useRef<Terminal | null>(null)
   const [playing, setPlaying] = useState(false)
   const [speed, setSpeed] = useState(1)
   const [progress, setProgress] = useState(0)
+  const [entries, setEntries] = useState<RecordingEntry[]>([])
+  const playbackRef = useRef<{ timer: ReturnType<typeof setInterval> | null; index: number; startTime: number; pausedAt: number }>({
+    timer: null,
+    index: 0,
+    startTime: 0,
+    pausedAt: 0,
+  })
 
   useEffect(() => {
+    let disposed = false
+
     const term = new Terminal({
       cursorBlink: false,
       disableStdin: true,
@@ -48,28 +71,81 @@ export function PlaybackTab({ recordingId: _recordingId, title }: Props) {
       resizeObs.observe(containerRef.current)
     }
 
-    console.debug('[PlaybackTab] init', _recordingId)
+    LogService.GetRecording(recordingId).then((data) => {
+      if (disposed) return
+      const player = data as PlayerData
+      if (player?.entries) {
+        setEntries(player.entries)
+        term.writeln(`\x1b[1;36mRecording: ${title}\x1b[0m`)
+        term.writeln(`\x1b[90m${player.entries.length} entries ready for playback\x1b[0m`)
+      } else {
+        term.writeln('\x1b[33mNo recording data found\x1b[0m')
+      }
+    }).catch((err) => {
+      if (disposed) return
+      console.error('[PlaybackTab] GetRecording error:', err)
+      term.writeln('\x1b[31mFailed to load recording\x1b[0m')
+    })
 
     return () => {
+      disposed = true
+      const p = playbackRef.current
+      if (p.timer) {
+        clearInterval(p.timer)
+      }
       resizeObs.disconnect()
       term.dispose()
     }
-  }, [_recordingId])
+  }, [recordingId, title])
 
-  const togglePlay = () => {
+  const togglePlay = useCallback(() => {
+    if (entries.length === 0) return
+
     const next = !playing
     setPlaying(next)
-    console.debug(
-      '[Wails:RecordingService.' + (next ? 'Play' : 'Pause') + ']',
-      _recordingId,
-    )
-  }
 
-  const handleSpeedChange = (value: number | number[]) => {
+    const p = playbackRef.current
+    const term = termRef.current
+    if (!term) return
+
+    if (next) {
+      const now = Date.now()
+      p.startTime = now - p.pausedAt
+      p.timer = setInterval(() => {
+        const elapsed = (Date.now() - p.startTime) * speed
+        let newIndex = p.index
+
+        while (newIndex < entries.length && entries[newIndex].timestamp <= elapsed) {
+          const entry = entries[newIndex]
+          if (entry.data && entry.data.length > 0) {
+            term.write(new Uint8Array(entry.data))
+          }
+          newIndex++
+        }
+
+        p.index = newIndex
+        const pct = entries.length > 0 ? Math.min(100, Math.round((newIndex / entries.length) * 100)) : 0
+        setProgress(pct)
+
+        if (newIndex >= entries.length) {
+          clearInterval(p.timer!)
+          p.timer = null
+          setPlaying(false)
+        }
+      }, 16)
+    } else {
+      if (p.timer) {
+        clearInterval(p.timer)
+        p.timer = null
+      }
+      p.pausedAt = Date.now() - p.startTime
+    }
+  }, [playing, entries, speed])
+
+  const handleSpeedChange = useCallback((value: number | number[]) => {
     const v = typeof value === 'number' ? value : value[0]
     setSpeed(v)
-    console.debug('[Wails:RecordingService.SetSpeed]', _recordingId, v)
-  }
+  }, [])
 
   return (
     <div className="flex flex-col h-full">

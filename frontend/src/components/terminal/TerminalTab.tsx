@@ -3,7 +3,13 @@ import { TerminalEmulator } from '@/components/terminal/TerminalEmulator'
 import { TerminalToolbar } from '@/components/terminal/TerminalToolbar'
 import { useAppStore } from '@/store/appStore'
 
-export function TerminalTab({ terminalID }: { terminalID: string }) {
+export function TerminalTab({
+  terminalID,
+  onOpenFiles,
+}: {
+  terminalID: string
+  onOpenFiles: () => void
+}) {
   const [isRecording, setIsRecording] = useState(false)
   const tabs = useAppStore((s) => s.tabs)
   const activeTabId = useAppStore((s) => s.activeTabId)
@@ -24,6 +30,7 @@ export function TerminalTab({ terminalID }: { terminalID: string }) {
         isRecording={isRecording}
         onToggleRecording={handleToggleRecording}
         hostname={activeTab?.title}
+        onOpenFiles={onOpenFiles}
       />
       <div className="flex-1">
         <TerminalEmulator terminalID={terminalID} />

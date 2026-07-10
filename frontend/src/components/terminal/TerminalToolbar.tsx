@@ -1,12 +1,14 @@
-import { useCallback } from 'react'
-import { Copy, ClipboardPaste, Trash2, Circle, Square } from 'lucide-react'
+import { useCallback, useState } from 'react'
+import { Copy, ClipboardPaste, Trash2, Circle, Square, FolderOpen } from 'lucide-react'
 import { useAppStore } from '@/store/appStore'
+import SessionLog from '@/components/terminal/SessionLog'
 
 interface TerminalToolbarProps {
   terminalID: string
   isRecording: boolean
   onToggleRecording: () => void
   hostname?: string
+  onOpenFiles: () => void
 }
 
 export function TerminalToolbar({
@@ -14,7 +16,10 @@ export function TerminalToolbar({
   isRecording,
   onToggleRecording,
   hostname,
+  onOpenFiles,
 }: TerminalToolbarProps) {
+  const [showSessionLog, setShowSessionLog] = useState(false)
+
   const getTerminal = useCallback(() => {
     const entry = useAppStore.getState().terminalPool.get(terminalID)
     return entry?.terminal ?? null
@@ -86,6 +91,18 @@ export function TerminalToolbar({
 
         <button
           type="button"
+          className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors"
+          onClick={onOpenFiles}
+          title="文件管理"
+        >
+          <FolderOpen className="h-3 w-3" />
+          <span className="hidden sm:inline">文件</span>
+        </button>
+
+        <div className="w-px h-4 bg-border mx-0.5" />
+
+        <button
+          type="button"
           className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-xs transition-colors ${
             isRecording
               ? 'bg-destructive/20 text-destructive'
@@ -103,7 +120,32 @@ export function TerminalToolbar({
             {isRecording ? '录制中' : '录制'}
           </span>
         </button>
+
+        <button
+          type="button"
+          className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors"
+          onClick={() => setShowSessionLog(!showSessionLog)}
+          title="录制记录"
+        >
+          记录
+        </button>
       </div>
+
+      {showSessionLog && (
+        <div className="absolute top-8 right-2 z-50">
+          <SessionLog
+            isRecording={isRecording}
+            recordings={[]}
+            onToggleRecording={onToggleRecording}
+            onPlayback={(_recordingId: string) => {
+              console.log('[TerminalToolbar] playback', _recordingId)
+            }}
+            onDeleteRecording={(_recordingId: string) => {
+              console.log('[TerminalToolbar] delete recording', _recordingId)
+            }}
+          />
+        </div>
+      )}
     </div>
   )
 }

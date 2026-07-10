@@ -1,10 +1,14 @@
-import { useEffect } from 'react'
+import { useEffect, useCallback, useState } from 'react'
 import { Terminal, Shield, FileText, Keyboard } from 'lucide-react'
 import Sidebar from '@/components/layout/Sidebar'
 import TabBar from '@/components/layout/TabBar'
 import StatusBar from '@/components/layout/StatusBar'
 import { TerminalTab } from '@/components/terminal/TerminalTab'
+import { PlaybackTab } from '@/components/terminal/PlaybackTab'
+import FilePanel from '@/components/file/FilePanel'
+import { ToastContainer } from '@/components/ui/toast'
 import { useAppStore } from '@/store/appStore'
+import { useFileTransfer } from '@/hooks/useFileTransfer'
 
 function WelcomeScreen() {
   return (
@@ -67,12 +71,50 @@ function WelcomeScreen() {
   )
 }
 
+function FilePanelContainer({
+  sessionId,
+  onClose,
+}: {
+  sessionId: number
+  onClose: () => void
+}) {
+  const ft = useFileTransfer(sessionId)
+
+  useEffect(() => {
+    ft.listFiles('/')
+  }, [sessionId])
+
+  return (
+    <FilePanel
+      open
+      onClose={onClose}
+      files={ft.files}
+      currentPath={ft.currentPath}
+      loading={ft.loading}
+      onNavigateTo={ft.navigateTo}
+      onNavigateUp={ft.navigateUp}
+      onDelete={ft.deleteFile}
+      onRename={ft.renameFile}
+      onMakeDir={ft.makeDir}
+      onUpload={() => ft.upload('/tmp/upload', ft.currentPath)}
+      onDownload={(path: string) => ft.download(path, '/tmp/download')}
+    />
+  )
+}
+
 function TabContent() {
   const tabs = useAppStore((s) => s.tabs)
   const activeTabId = useAppStore((s) => s.activeTabId)
   const activeTab = tabs.find((t) => t.id === activeTabId)
+  const [filePanelSessionId, setFilePanelSessionId] = useState<number | null>(null)
 
   console.log('[App] activeTab', activeTab?.type ?? 'none', activeTabId ?? 'none')
+
+  const handleOpenFiles = useCallback(() => {
+    if (activeTab?.sessionId) {
+      setFilePanelSessionId((prev) => (prev === activeTab.sessionId ? null : activeTab.sessionId!))
+    }
+  }, [activeTab?.sessionId])
 
   if (!activeTab) {
     return <WelcomeScreen />
@@ -81,18 +123,32 @@ function TabContent() {
   switch (activeTab.type) {
     case 'terminal':
       return (
-        <TerminalTab terminalID={activeTab.terminalId ?? activeTab.id} />
+        <div className="flex-1 min-h-0 flex">
+          <div className="flex-1 flex flex-col min-w-0">
+            <TerminalTab
+              terminalID={activeTab.terminalId ?? activeTab.id}
+              onOpenFiles={handleOpenFiles}
+            />
+          </div>
+          {filePanelSessionId !== null && (
+            <FilePanelContainer
+              sessionId={filePanelSessionId}
+              onClose={() => setFilePanelSessionId(null)}
+            />
+          )}
+        </div>
+      )
+    case 'playback':
+      return (
+        <PlaybackTab
+          recordingId={activeTab.terminalId ?? activeTab.id}
+          title={activeTab.title}
+        />
       )
     case 'settings':
       return (
         <div className="flex-1 min-h-0 flex items-center justify-center">
           <p className="text-sm text-muted-foreground">设置</p>
-        </div>
-      )
-    case 'playback':
-      return (
-        <div className="flex-1 min-h-0 flex items-center justify-center">
-          <p className="text-sm text-muted-foreground">回放</p>
         </div>
       )
     default:
@@ -169,6 +225,7 @@ export default function App() {
         </main>
       </div>
       <StatusBar />
+      <ToastContainer />
     </div>
   )
 }

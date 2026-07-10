@@ -3,7 +3,8 @@ import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { WebglAddon } from '@xterm/addon-webgl'
 import { useAppStore } from '@/store/appStore'
-import { onEvent } from '@/lib/wails'
+import { TerminalService } from '@/lib/wails'
+import { onEvent } from '@/lib/wails/runtime'
 
 export function useTerminal(
   terminalID: string,
@@ -12,6 +13,7 @@ export function useTerminal(
   const termRef = useRef<Terminal | null>(null)
 
   const store = useAppStore()
+  const theme = useAppStore((s) => s.terminalTheme)
 
   useEffect(() => {
     const existing = store.terminalPool.get(terminalID)
@@ -23,11 +25,11 @@ export function useTerminal(
         fontSize: 14,
         fontFamily: '"JetBrains Mono", "Cascadia Code", monospace',
         theme: {
-          background: '#0d1117',
-          foreground: '#c9d1d9',
-          cursor: '#c9d1d9',
-          cursorAccent: '#0d1117',
-          selectionBackground: '#264f78',
+          background: theme.background,
+          foreground: theme.foreground,
+          cursor: theme.cursor,
+          cursorAccent: theme.cursorAccent,
+          selectionBackground: theme.selectionBackground,
         },
         allowProposedApi: true,
         allowTransparency: false,
@@ -60,7 +62,7 @@ export function useTerminal(
         term.writeln('\x1b[1;36m╚════════════════════════════════════════╝\x1b[0m')
         term.writeln('')
         term.writeln('\x1b[33mWaiting for SSH connection...\x1b[0m')
-        term.writeln('\x1b[90mType to begin — input is echoed locally until connected\x1b[0m')
+        term.writeln('\x1b[90mType to begin — input is sent to remote host once connected\x1b[0m')
         term.writeln('')
         store.setConnectionStatus(terminalID, 'disconnected')
       }
@@ -68,11 +70,11 @@ export function useTerminal(
 
     const dataDispose = term.onData((data) => {
       store.updateLastUsed(terminalID)
-      term.write(data)
-      console.log('[Terminal] input:', JSON.stringify(data))
+      const bytes = Array.from(new TextEncoder().encode(data))
+      TerminalService.Write(terminalID, bytes).catch(() => {})
     })
 
-    const disposeEvent = onEvent('terminal:output', (payload: unknown) => {
+    const unsubOutput = onEvent('terminal:output', (payload: unknown) => {
       const p = payload as { terminal_id?: string; data?: number[] }
       if (p?.terminal_id === terminalID && p?.data) {
         const bytes = new Uint8Array(p.data)
@@ -91,7 +93,7 @@ export function useTerminal(
 
     return () => {
       dataDispose.dispose()
-      disposeEvent()
+      unsubOutput()
       resizeObs.disconnect()
       try {
         const el = term.element

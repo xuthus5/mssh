@@ -14,11 +14,11 @@ import (
 var ErrInvalidMagic = errors.New("invalid magic number")
 
 type Player struct {
-	cols     int
-	rows     int
-	termType string
-	entries  []model.RecordingEntry
-	file     *os.File
+	Cols             int                    `json:"cols"`
+	Rows             int                    `json:"rows"`
+	TermType         string                 `json:"term_type"`
+	RecordingEntries []model.RecordingEntry `json:"entries"`
+	file             *os.File
 }
 
 func NewPlayer(path string) (*Player, error) {
@@ -72,9 +72,9 @@ func (p *Player) parseHeader(r io.Reader) error {
 			return fmt.Errorf("read term type: %w", err)
 		}
 	}
-	p.cols = int(cols)
-	p.rows = int(rows)
-	p.termType = string(termTypeBytes)
+	p.Cols = int(cols)
+	p.Rows = int(rows)
+	p.TermType = string(termTypeBytes)
 	return nil
 }
 
@@ -87,7 +87,7 @@ func (p *Player) parseEntries(r io.Reader) error {
 		if err != nil {
 			return err
 		}
-		p.entries = append(p.entries, entry)
+		p.RecordingEntries = append(p.RecordingEntries, entry)
 	}
 }
 
@@ -120,11 +120,11 @@ func (p *Player) readEntry(r io.Reader) (model.RecordingEntry, error) {
 }
 
 func (p *Player) Header() (cols, rows int, termType string) {
-	return p.cols, p.rows, p.termType
+	return p.Cols, p.Rows, p.TermType
 }
 
 func (p *Player) Entries() []model.RecordingEntry {
-	return p.entries
+	return p.RecordingEntries
 }
 
 func (p *Player) Close() error {

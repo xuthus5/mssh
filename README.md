@@ -33,7 +33,17 @@ wails3 dev
 
 ### Test
 ```bash
+# Backend
 go test -race -cover ./...
+
+# Frontend
+cd frontend && npm test
+```
+
+### Build
+```bash
+go build ./...
+cd frontend && npm run build
 ```
 
 ### Lint

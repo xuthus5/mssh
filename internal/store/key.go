@@ -16,7 +16,10 @@ func CreateKey(db *sql.DB, k model.SSHKey) (*model.SSHKey, error) {
 	if err != nil {
 		return nil, fmt.Errorf("create key: %w", err)
 	}
-	id, _ := result.LastInsertId()
+	id, err := result.LastInsertId()
+	if err != nil {
+		return nil, fmt.Errorf("create key: last insert id: %w", err)
+	}
 	k.ID = id
 	k.CreatedAt = time.Now()
 	return &k, nil
@@ -37,7 +40,10 @@ func ListKeys(db *sql.DB) ([]model.SSHKey, error) {
 		if err != nil {
 			return nil, fmt.Errorf("scan key: %w", err)
 		}
-		k.CreatedAt, _ = time.Parse("2006-01-02 15:04:05", createdAt)
+		k.CreatedAt, err = time.Parse("2006-01-02 15:04:05", createdAt)
+		if err != nil {
+			return nil, fmt.Errorf("scan key: parse created_at: %w", err)
+		}
 		keys = append(keys, k)
 	}
 	if keys == nil {
@@ -63,6 +69,9 @@ func GetKey(db *sql.DB, id int64) (*model.SSHKey, error) {
 	if err != nil {
 		return nil, fmt.Errorf("get key: %w", err)
 	}
-	k.CreatedAt, _ = time.Parse("2006-01-02 15:04:05", createdAt)
+	k.CreatedAt, err = time.Parse("2006-01-02 15:04:05", createdAt)
+	if err != nil {
+		return nil, fmt.Errorf("get key: parse created_at: %w", err)
+	}
 	return &k, nil
 }

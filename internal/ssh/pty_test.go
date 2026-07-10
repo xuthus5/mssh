@@ -2,6 +2,7 @@ package ssh
 
 import (
 	"context"
+	"log/slog"
 	"sync"
 	"testing"
 	"time"
@@ -18,7 +19,7 @@ func TestOpenPTY(t *testing.T) {
 	defer cleanup()
 	s := model.Session{Host: "127.0.0.1", Port: mustParsePort(addr), Username: "test", TermType: "xterm-256color"}
 	ctx := context.Background()
-	cw, err := Connect(ctx, s, nil)
+	cw, err := Connect(ctx, s, nil, "", slog.Default())
 	require.NoError(t, err)
 	defer cw.Close()
 	ptys, err := OpenPTY(cw, s.TermType, 80, 24)
@@ -32,7 +33,7 @@ func TestOpenPTY_ClosedWrapper(t *testing.T) {
 	defer cleanup()
 	s := model.Session{Host: "127.0.0.1", Port: mustParsePort(addr), Username: "test", TermType: "xterm"}
 	ctx := context.Background()
-	cw, err := Connect(ctx, s, nil)
+	cw, err := Connect(ctx, s, nil, "", slog.Default())
 	require.NoError(t, err)
 	cw.Close()
 	_, err = OpenPTY(cw, s.TermType, 80, 24)
@@ -45,7 +46,7 @@ func TestOpenPTY_RejectPty(t *testing.T) {
 	defer cleanup()
 	s := model.Session{Host: "127.0.0.1", Port: mustParsePort(addr), Username: "test", TermType: "xterm"}
 	ctx := context.Background()
-	cw, err := Connect(ctx, s, nil)
+	cw, err := Connect(ctx, s, nil, "", slog.Default())
 	require.NoError(t, err)
 	defer cw.Close()
 	_, err = OpenPTY(cw, s.TermType, 80, 24)
@@ -58,7 +59,7 @@ func TestOpenPTY_RejectShell(t *testing.T) {
 	defer cleanup()
 	s := model.Session{Host: "127.0.0.1", Port: mustParsePort(addr), Username: "test", TermType: "xterm"}
 	ctx := context.Background()
-	cw, err := Connect(ctx, s, nil)
+	cw, err := Connect(ctx, s, nil, "", slog.Default())
 	require.NoError(t, err)
 	defer cw.Close()
 	_, err = OpenPTY(cw, s.TermType, 80, 24)
@@ -71,7 +72,7 @@ func TestPTYWrite(t *testing.T) {
 	defer cleanup()
 	s := model.Session{Host: "127.0.0.1", Port: mustParsePort(addr), Username: "test", TermType: "xterm"}
 	ctx := context.Background()
-	cw, _ := Connect(ctx, s, nil)
+	cw, _ := Connect(ctx, s, nil, "", slog.Default())
 	defer cw.Close()
 	ptys, _ := OpenPTY(cw, s.TermType, 80, 24)
 	defer ptys.Close()
@@ -85,7 +86,7 @@ func TestPTYReadCallback(t *testing.T) {
 	defer cleanup()
 	s := model.Session{Host: "127.0.0.1", Port: mustParsePort(addr), Username: "test", TermType: "xterm"}
 	ctx := context.Background()
-	cw, _ := Connect(ctx, s, nil)
+	cw, _ := Connect(ctx, s, nil, "", slog.Default())
 	defer cw.Close()
 	ptys, _ := OpenPTY(cw, s.TermType, 80, 24)
 	defer ptys.Close()
@@ -107,7 +108,7 @@ func TestPTYResize(t *testing.T) {
 	defer cleanup()
 	s := model.Session{Host: "127.0.0.1", Port: mustParsePort(addr), Username: "test", TermType: "xterm"}
 	ctx := context.Background()
-	cw, _ := Connect(ctx, s, nil)
+	cw, _ := Connect(ctx, s, nil, "", slog.Default())
 	defer cw.Close()
 	ptys, _ := OpenPTY(cw, s.TermType, 80, 24)
 	defer ptys.Close()
@@ -120,7 +121,7 @@ func TestPTYCloseDouble(t *testing.T) {
 	defer cleanup()
 	s := model.Session{Host: "127.0.0.1", Port: mustParsePort(addr), Username: "test", TermType: "xterm"}
 	ctx := context.Background()
-	cw, _ := Connect(ctx, s, nil)
+	cw, _ := Connect(ctx, s, nil, "", slog.Default())
 	defer cw.Close()
 	ptys, _ := OpenPTY(cw, s.TermType, 80, 24)
 	err := ptys.Close()

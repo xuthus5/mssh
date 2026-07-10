@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
+	"log/slog"
 	"net"
 	"os"
 	"path/filepath"
@@ -80,7 +81,7 @@ func connectSFTP(t *testing.T, addr string) (cw *ClientWrapper, client *sftp.Cli
 	t.Helper()
 	s := model.Session{Host: "127.0.0.1", Port: mustParsePort(addr), Username: "test"}
 	ctx := context.Background()
-	cw, err := Connect(ctx, s, nil)
+	cw, err := Connect(ctx, s, nil, "", slog.Default())
 	require.NoError(t, err)
 	client, err = OpenSFTP(cw)
 	require.NoError(t, err)
@@ -101,7 +102,7 @@ func TestOpenSFTP_ClosedWrapper(t *testing.T) {
 	defer cleanup()
 	s := model.Session{Host: "127.0.0.1", Port: mustParsePort(addr), Username: "test"}
 	ctx := context.Background()
-	cw, err := Connect(ctx, s, nil)
+	cw, err := Connect(ctx, s, nil, "", slog.Default())
 	require.NoError(t, err)
 	cw.Close()
 	_, err = OpenSFTP(cw)
@@ -114,7 +115,7 @@ func TestOpenSFTP_NonSFTPServer(t *testing.T) {
 	defer cleanup()
 	s := model.Session{Host: "127.0.0.1", Port: mustParsePort(addr), Username: "test"}
 	ctx := context.Background()
-	cw, err := Connect(ctx, s, nil)
+	cw, err := Connect(ctx, s, nil, "", slog.Default())
 	require.NoError(t, err)
 	defer cw.Close()
 	_, err = OpenSFTP(cw)
