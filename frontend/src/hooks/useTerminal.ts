@@ -1,4 +1,4 @@
-import { useEffect, type RefObject } from 'react'
+import { useEffect, useRef, type RefObject } from 'react'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { WebglAddon } from '@xterm/addon-webgl'
@@ -8,12 +8,14 @@ export function useTerminal(
   terminalID: string,
   containerRef: RefObject<HTMLDivElement | null>,
 ) {
+  const termRef = useRef<Terminal | null>(null)
+
   const store = useAppStore()
 
   useEffect(() => {
-    const pooled = store.terminalPool.get(terminalID)
+    const existing = store.terminalPool.get(terminalID)
     const term =
-      pooled?.terminal ??
+      existing?.terminal ??
       new Terminal({
         cursorBlink: true,
         cursorStyle: 'bar',
@@ -22,13 +24,18 @@ export function useTerminal(
         theme: {
           background: '#0d1117',
           foreground: '#c9d1d9',
+          cursor: '#c9d1d9',
+          cursorAccent: '#0d1117',
+          selectionBackground: '#264f78',
         },
         allowProposedApi: true,
         allowTransparency: false,
         scrollback: 10000,
       })
 
-    if (!pooled) {
+    termRef.current = term
+
+    if (!existing) {
       store.registerTerminal(terminalID, term)
     }
 
@@ -44,18 +51,26 @@ export function useTerminal(
     if (containerRef.current) {
       term.open(containerRef.current)
       fitAddon.fit()
+
+      // Write welcome banner when terminal is first created (not pooled)
+      if (!existing) {
+        term.writeln('\x1b[1;36m╔══════════════════════════════════╗')
+        term.writeln('\x1b[1;36m║         MSSH Terminal           ║')
+        term.writeln('\x1b[1;36m╚══════════════════════════════════╝\x1b[0m')
+        term.writeln('')
+        term.writeln('\x1b[33mReady. Waiting for SSH connection...\x1b[0m')
+        term.writeln('')
+      }
     }
 
     const dataDispose = term.onData((data) => {
       store.updateLastUsed(terminalID)
-      // Wails binding stub: Wails.TerminalService.Write(terminalID, data)
-      console.debug('[terminal:input]', terminalID, data)
+      // TODO: wire to Wails terminal service
     })
 
     const resizeObs = new ResizeObserver(() => {
       if (containerRef.current) {
         fitAddon.fit()
-        // Wails binding stub: Wails.TerminalService.Resize(terminalID, term.cols, term.rows)
       }
     })
     if (containerRef.current) {
@@ -75,4 +90,6 @@ export function useTerminal(
       }
     }
   }, [terminalID, containerRef, store])
+
+  return termRef
 }
