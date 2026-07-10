@@ -8,7 +8,6 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
-      '/wails/runtime.js': path.resolve(__dirname, 'src/test/__mocks__/wails-runtime.ts'),
     },
   },
   server: {
@@ -28,6 +27,11 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
     css: false,
+    resolve: {
+      alias: {
+        '/wails/runtime.js': path.resolve(__dirname, 'src/test/__mocks__/wails-runtime.ts'),
+      },
+    },
     coverage: {
       provider: 'v8',
       include: ['src/hooks/**', 'src/components/session/**', 'src/components/layout/Sidebar.tsx', 'src/store/**'],
