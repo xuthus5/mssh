@@ -35,7 +35,7 @@ func TestConstantsFollowNamingConvention(t *testing.T) {
 }
 
 func TestTerminalOutputPayload_JSON(t *testing.T) {
-	p := TerminalOutputPayload{TerminalID: "term-1", Data: []byte("hello")}
+	p := TerminalOutputPayload{TerminalID: "term-1", Data: "hello"}
 	data, err := json.Marshal(p)
 	assert.NoError(t, err)
 
