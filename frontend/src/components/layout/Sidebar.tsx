@@ -1,6 +1,14 @@
 import { useState, useCallback } from 'react'
-import { Plus } from 'lucide-react'
+import { Plus, FolderPlus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog'
 import SessionTree from '@/components/session/SessionTree'
 import SessionDialog from '@/components/session/SessionDialog'
 import QuickCommands from '@/components/session/QuickCommands'
@@ -10,12 +18,15 @@ type SidebarTab = 'sessions' | 'macros'
 
 export default function Sidebar() {
   const [activeTab, setActiveTab] = useState<SidebarTab>('sessions')
-  const [dialogOpen, setDialogOpen] = useState(false)
+  const [sessionDialogOpen, setSessionDialogOpen] = useState(false)
+  const [folderDialogOpen, setFolderDialogOpen] = useState(false)
+  const [folderName, setFolderName] = useState('')
   const [editingSession, setEditingSession] = useState<Session | null>(null)
 
   const {
     folders,
     sessions,
+    createFolder,
     deleteFolder,
     createSession,
     updateSession,
@@ -30,20 +41,28 @@ export default function Sidebar() {
       } else {
         createSession(data)
       }
-      setDialogOpen(false)
+      setSessionDialogOpen(false)
       setEditingSession(null)
     },
     [editingSession, createSession, updateSession],
   )
 
+  const handleCreateFolder = () => {
+    if (!folderName.trim()) return
+    createFolder(folderName.trim(), null)
+    setFolderName('')
+    setFolderDialogOpen(false)
+  }
+
   const handleOpenNewSession = () => {
     setEditingSession(null)
-    setDialogOpen(true)
+    // small delay ensures react state is flushed before opening
+    setTimeout(() => setSessionDialogOpen(true), 0)
   }
 
   const handleOpenEditSession = (s: Session) => {
     setEditingSession(s)
-    setDialogOpen(true)
+    setTimeout(() => setSessionDialogOpen(true), 0)
   }
 
   return (
@@ -85,6 +104,15 @@ export default function Sidebar() {
               <Plus className="h-3 w-3" />
               新建会话
             </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-xs h-7 w-7 p-0 justify-center"
+              onClick={() => setFolderDialogOpen(true)}
+              title="新建分组"
+            >
+              <FolderPlus className="h-3.5 w-3.5" />
+            </Button>
           </div>
           <div className="flex-1 min-h-0">
             <SessionTree
@@ -112,11 +140,43 @@ export default function Sidebar() {
       )}
 
       <SessionDialog
-        open={dialogOpen}
-        onOpenChange={setDialogOpen}
+        key={sessionDialogOpen ? 'open' : 'closed'}
+        open={sessionDialogOpen}
+        onOpenChange={(v) => { setSessionDialogOpen(v); if (!v) setEditingSession(null) }}
         session={editingSession}
         onSave={handleSaveSession}
       />
+
+      <Dialog open={folderDialogOpen} onOpenChange={setFolderDialogOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>新建分组</DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-medium text-muted-foreground">
+                分组名称
+              </label>
+              <Input
+                value={folderName}
+                onChange={(e) => setFolderName(e.target.value)}
+                placeholder="例如：生产环境"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleCreateFolder()
+                }}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setFolderDialogOpen(false)}>
+              取消
+            </Button>
+            <Button onClick={handleCreateFolder}>
+              创建
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </aside>
   )
 }

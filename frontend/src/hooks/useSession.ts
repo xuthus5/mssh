@@ -52,8 +52,12 @@ export function useSession() {
 
   const createFolder = useCallback(async (name: string, parentId: string | null) => {
     console.debug('[Wails:SessionService.CreateFolder]', name, parentId)
-    // const result = await Wails.SessionService.CreateFolder(name, parentId)
-    // setFolders((prev) => [...prev, result])
+    const newFolder: Folder = {
+      id: `folder-${Date.now()}`,
+      name,
+      parentId,
+    }
+    setFolders((prev) => [...prev, newFolder])
   }, [])
 
   const deleteFolder = useCallback(async (id: string) => {
@@ -75,8 +79,11 @@ export function useSession() {
 
   const createSession = useCallback(async (session: Omit<Session, 'id'>) => {
     console.debug('[Wails:SessionService.CreateSession]', session)
-    // const result = await Wails.SessionService.CreateSession(session)
-    // setSessions((prev) => [...prev, result])
+    const newSession: Session = {
+      ...session,
+      id: `session-${Date.now()}`,
+    }
+    setSessions((prev) => [...prev, newSession])
   }, [])
 
   const updateSession = useCallback(async (session: Session) => {
