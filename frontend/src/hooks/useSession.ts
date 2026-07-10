@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from 'react'
 import { useAppStore } from '@/store/appStore'
 import { SessionService, TerminalService, TunnelService } from '@/lib/wails'
 import { toast } from '@/components/ui/toast'
+import { useConnectDialog } from '@/store/connectDialog'
 
 export interface Folder {
   id: string
@@ -191,22 +192,29 @@ export function useSession() {
   }, [])
 
   const connect = useCallback(async (sessionId: string) => {
+    const session = sessions.find((s) => s.id === sessionId)
+    if (!session) return
+
+    const dialog = useConnectDialog.getState()
+    dialog.openDialog(session.host, session.port, session.username)
+
     try {
       console.log('[useSession] connect', sessionId)
       // TerminalService.Open does SSH connect + PTY open in one call
       const terminalId = await TerminalService.Open(Number(sessionId), 80, 24)
       const tabId = `terminal-${sessionId}`
-      const session = sessions.find((s) => s.id === sessionId)
       useAppStore.getState().setConnectionStatus(terminalId, 'connecting')
-      openTab({ id: tabId, title: session?.name ?? sessionId, type: 'terminal', terminalId, sessionId: Number(sessionId) })
+      openTab({ id: tabId, title: session.name, type: 'terminal', terminalId, sessionId: Number(sessionId) })
 
+      dialog.setState('connected')
       setTimeout(() => {
         useAppStore.getState().setConnectionStatus(terminalId, 'connected')
-        console.log('[useSession] connected', { terminalId, host: session?.host })
+        console.log('[useSession] connected', { terminalId, host: session.host })
       }, 500)
     } catch (err: any) {
       console.log('[useSession] connect error', err)
       const msg = err?.message || String(err)
+      dialog.setError(msg)
       toast(`SSH 连接失败: ${msg}`, 'error')
     }
   }, [openTab, sessions])
