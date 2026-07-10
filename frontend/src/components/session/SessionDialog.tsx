@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -25,189 +25,146 @@ interface Props {
   onSave: (data: Omit<Session, 'id'>) => void
 }
 
-export default function SessionDialog({
-  open,
-  onOpenChange,
-  session,
-  folders,
-  onSave,
-}: Props) {
+const AUTH_LABELS: Record<string, string> = {
+  password: '密码',
+  'keyboard-interactive': '交互式认证',
+  key: '密钥',
+  agent: 'SSH Agent',
+}
+
+function AuthValue({ value }: { value: string }) {
+  return <span>{AUTH_LABELS[value] ?? value}</span>
+}
+
+export default function SessionDialog({ open, onOpenChange, session, folders, onSave }: Props) {
   const [name, setName] = useState(session?.name ?? '')
   const [host, setHost] = useState(session?.host ?? '')
   const [port, setPort] = useState(session?.port?.toString() ?? '22')
   const [username, setUsername] = useState(session?.username ?? '')
-  const [authMethod, setAuthMethod] = useState<string>(
-    session?.authMethod ?? 'password',
-  )
+  const [authMethod, setAuthMethod] = useState<string>(session?.authMethod ?? 'password')
   const [password, setPassword] = useState(session?.password ?? '')
   const [keyId, setKeyId] = useState(session?.keyId ?? '')
-  const [keepAlive, setKeepAlive] = useState(
-    session?.keepAlive?.toString() ?? '60',
-  )
+  const [keepAlive, setKeepAlive] = useState(session?.keepAlive?.toString() ?? '60')
   const [termType, setTermType] = useState(session?.termType ?? 'xterm-256color')
-  const [folderId, setFolderId] = useState<string>(session?.folderId ?? '')
+  const [folderId, setFolderId] = useState(session?.folderId ?? '')
 
-  const handleSubmit = () => {
-    const formData = { name, host, port, username, authMethod, keepAlive, termType }
-    console.log('[SessionDialog] handleSubmit', formData)
+  const handleSubmit = useCallback(() => {
+    const needsPassword = authMethod === 'password' || authMethod === 'keyboard-interactive'
     onSave({
-      name,
-      host,
+      name: name.trim(),
+      host: host.trim(),
       port: parseInt(port, 10) || 22,
-      username,
-      authMethod: authMethod as Session['authMethod'],
-      password: authMethod === 'password' ? password : undefined,
+      username: username.trim(),
+      authMethod: authMethod as any,
+      password: needsPassword ? password : undefined,
       keyId: authMethod === 'key' ? keyId : undefined,
       keepAlive: parseInt(keepAlive, 10) || 60,
-      termType,
+      termType: termType.trim() || 'xterm-256color',
       folderId: folderId || null,
     })
     onOpenChange(false)
-  }
+  }, [name, host, port, username, authMethod, password, keyId, keepAlive, termType, folderId, onSave, onOpenChange])
+
+  const isEditing = !!session
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>{session ? '编辑会话' : '新建会话'}</DialogTitle>
+          <DialogTitle>{isEditing ? '编辑会话' : '新建会话'}</DialogTitle>
         </DialogHeader>
-        <form onSubmit={(e) => { e.preventDefault(); handleSubmit() }} className="flex flex-col gap-3">
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-medium text-muted-foreground">
-              名称
-            </label>
-            <Input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-            />
-          </div>
+
+        <form
+          onSubmit={(e) => { e.preventDefault(); handleSubmit() }}
+          className="flex flex-col gap-3"
+        >
+          <label className="flex flex-col gap-1.5">
+            <span className="text-xs font-medium text-muted-foreground">名称</span>
+            <Input value={name} onChange={(e) => setName(e.target.value)} required autoFocus />
+          </label>
+
           <div className="grid grid-cols-2 gap-3">
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-medium text-muted-foreground">
-                主机
-              </label>
-              <Input
-                value={host}
-                onChange={(e) => setHost(e.target.value)}
-                required
-              />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-medium text-muted-foreground">
-                端口
-              </label>
-              <Input
-                type="number"
-                value={port}
-                onChange={(e) => setPort(e.target.value)}
-                required
-              />
-            </div>
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-medium text-muted-foreground">
-              用户名
+            <label className="flex flex-col gap-1.5">
+              <span className="text-xs font-medium text-muted-foreground">主机</span>
+              <Input value={host} onChange={(e) => setHost(e.target.value)} required placeholder="192.168.1.1" />
             </label>
-            <Input
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              required
-            />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-medium text-muted-foreground">
-              认证方式
+            <label className="flex flex-col gap-1.5">
+              <span className="text-xs font-medium text-muted-foreground">端口</span>
+              <Input type="number" value={port} onChange={(e) => setPort(e.target.value)} required min={1} max={65535} />
             </label>
-            <Select
-              value={authMethod}
-              onValueChange={(value) =>
-                setAuthMethod(value ?? '')
-              }
-            >
+          </div>
+
+          <label className="flex flex-col gap-1.5">
+            <span className="text-xs font-medium text-muted-foreground">用户名</span>
+            <Input value={username} onChange={(e) => setUsername(e.target.value)} required placeholder="root" />
+          </label>
+
+          <label className="flex flex-col gap-1.5">
+            <span className="text-xs font-medium text-muted-foreground">认证方式</span>
+            <Select value={authMethod} onValueChange={(v) => setAuthMethod(v ?? 'password')}>
               <SelectTrigger className="w-full">
-                <SelectValue />
+                <SelectValue>
+                  <AuthValue value={authMethod} />
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="password">密码</SelectItem>
                 <SelectItem value="keyboard-interactive">交互式认证</SelectItem>
                 <SelectItem value="key">密钥</SelectItem>
                 <SelectItem value="agent">SSH Agent</SelectItem>
-                <SelectItem value="keyboard-interactive">交互式认证</SelectItem>
               </SelectContent>
             </Select>
-          </div>
-          {authMethod === 'password' && (
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-medium text-muted-foreground">
-                密码
-              </label>
+          </label>
+
+          {(authMethod === 'password' || authMethod === 'keyboard-interactive') && (
+            <label className="flex flex-col gap-1.5">
+              <span className="text-xs font-medium text-muted-foreground">密码</span>
               <Input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                placeholder="输入SSH密码"
               />
-            </div>
+            </label>
           )}
+
           {authMethod === 'key' && (
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-medium text-muted-foreground">
-                密钥 ID
-              </label>
-              <Input
-                value={keyId}
-                onChange={(e) => setKeyId(e.target.value)}
-              />
-            </div>
+            <label className="flex flex-col gap-1.5">
+              <span className="text-xs font-medium text-muted-foreground">密钥 ID</span>
+              <Input value={keyId} onChange={(e) => setKeyId(e.target.value)} placeholder="选择或输入密钥ID" />
+            </label>
           )}
+
           {folders && folders.length > 0 && (
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-medium text-muted-foreground">
-                分组
-              </label>
-              <Select
-                value={folderId}
-                onValueChange={(value) => setFolderId(value ?? '')}
-              >
+            <label className="flex flex-col gap-1.5">
+              <span className="text-xs font-medium text-muted-foreground">分组</span>
+              <Select value={folderId} onValueChange={(v) => setFolderId(v ?? '')}>
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="无分组" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="">无分组</SelectItem>
                   {folders.map((f) => (
-                    <SelectItem key={f.id} value={f.id}>
-                      {f.name}
-                    </SelectItem>
+                    <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-            </div>
+            </label>
           )}
+
           <div className="grid grid-cols-2 gap-3">
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-medium text-muted-foreground">
-                保活间隔 (秒)
-              </label>
-              <Input
-                type="number"
-                value={keepAlive}
-                onChange={(e) => setKeepAlive(e.target.value)}
-              />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-medium text-muted-foreground">
-                终端类型
-              </label>
-              <Input
-                value={termType}
-                onChange={(e) => setTermType(e.target.value)}
-              />
-            </div>
+            <label className="flex flex-col gap-1.5">
+              <span className="text-xs font-medium text-muted-foreground">保活间隔 (秒)</span>
+              <Input type="number" value={keepAlive} onChange={(e) => setKeepAlive(e.target.value)} min={0} />
+            </label>
+            <label className="flex flex-col gap-1.5">
+              <span className="text-xs font-medium text-muted-foreground">终端类型</span>
+              <Input value={termType} onChange={(e) => setTermType(e.target.value)} />
+            </label>
           </div>
+
           <DialogFooter showCloseButton>
-            <Button onClick={handleSubmit}>
-              {session ? '保存' : '创建'}
-            </Button>
+            <Button onClick={handleSubmit}>{isEditing ? '保存' : '创建连接'}</Button>
           </DialogFooter>
         </form>
       </DialogContent>
