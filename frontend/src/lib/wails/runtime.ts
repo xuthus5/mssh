@@ -1,21 +1,19 @@
 let _ByName: ((methodName: string, ...args: unknown[]) => Promise<unknown>) | null = null
 
-function findByName(): typeof _ByName {
-  const w = (window as any).wails
-  if (!w) {
-    console.log('[wails] window.wails not found, available globals:', Object.keys(window).filter(k => k.startsWith('wails') || k.startsWith('_')))
-    return null
+async function waitForRuntime(): Promise<NonNullable<typeof _ByName>> {
+  // Wait for the inline loader in index.html to finish
+  const w = (window as any).__wailsRuntime
+  if (w) {
+    if (w.Call?.ByName) return (m: string, ...a: unknown[]) => w.Call.ByName(m, ...a)
+    if (w.ByName) return (m: string, ...a: unknown[]) => w.ByName(m, ...a)
   }
-  const keys = Object.keys(w)
-  console.log('[wails] window.wails keys:', keys.join(', '))
-  if (w.Call?.ByName) return (m: string, ...a: unknown[]) => w.Call.ByName(m, ...a)
-  if (w.Call?.ByID) {
-    console.log('[wails] found Call.ByID, using numeric IDs')
-    // We have ByID but not ByName — still not useful without method IDs
+  // If not available yet, wait for the __wailsReady promise
+  const mod = await (window as any).__wailsReady
+  if (mod) {
+    if (mod.Call?.ByName) return (m: string, ...a: unknown[]) => mod.Call.ByName(m, ...a)
+    if (mod.ByName) return (m: string, ...a: unknown[]) => mod.ByName(m, ...a)
   }
-  if (w.ByName) return (m: string, ...a: unknown[]) => w.ByName(m, ...a)
-  console.log('[wails] no ByName/Call.ByName found. Keys:', keys.join(', '))
-  return null
+  throw new Error('Wails runtime not available')
 }
 
 export function isWails(): boolean {
@@ -27,15 +25,19 @@ export async function onEvent(event: string, callback: (...args: unknown[]) => v
   if (w?.Events?.On) {
     return w.Events.On(event, callback)
   }
+  const runtime = (window as any).__wailsRuntime
+  if (runtime?.Events?.On) {
+    return runtime.Events.On(event, callback)
+  }
   return () => {}
 }
 
 export async function callByName(fqn: string, ...args: unknown[]): Promise<unknown> {
-  const fn = _ByName ?? findByName()
+  const fn = _ByName
   if (fn) return fn(fqn, ...args)
-  const msg = `[wails] ByName not found for ${fqn} — check console for window.wails keys`
-  console.error(msg)
-  throw new Error(msg)
+
+  _ByName = await waitForRuntime()
+  return _ByName(fqn, ...args)
 }
 
 export function __setByName(fn: (methodName: string, ...args: unknown[]) => Promise<unknown>) {
