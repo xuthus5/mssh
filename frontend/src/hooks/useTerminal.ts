@@ -92,9 +92,9 @@ export function useTerminal(
     let unsubOutput: (() => void) | undefined
     let eventCount = 0
     console.log('[useTerminal] subscribing to terminal:output for', terminalID)
-    unsubOutput = Events.On('terminal:output', (payload: unknown) => {
+    unsubOutput = Events.On('terminal:output', (wailsEvent: any) => {
       eventCount++
-      const p = payload as { terminal_id?: string; data?: string }
+      const p = wailsEvent?.data as { terminal_id?: string; data?: string } | undefined
       if (p?.terminal_id === terminalID) {
         if (p.data !== undefined && p.data !== null && p.data.length > 0) {
           const preview = p.data.length > 60 ? p.data.slice(0, 60) + '...' : p.data
