@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react'
 import { useAppStore } from '@/store/appStore'
-import { SessionService, TunnelService } from '@/lib/wails'
+import { SessionService, TerminalService, TunnelService } from '@/lib/wails'
 
 export interface Folder {
   id: string
@@ -193,7 +193,8 @@ export function useSession() {
   const connect = useCallback(async (sessionId: string) => {
     try {
       console.log('[useSession] connect', sessionId)
-      const terminalId = await SessionService.Connect(Number(sessionId))
+      // TerminalService.Open does SSH connect + PTY open in one call
+      const terminalId = await TerminalService.Open(Number(sessionId), 80, 24)
       const tabId = `terminal-${sessionId}`
       const session = sessions.find((s) => s.id === sessionId)
       useAppStore.getState().setConnectionStatus(terminalId, 'connecting')
@@ -202,10 +203,10 @@ export function useSession() {
       setTimeout(() => {
         const st = useAppStore.getState().terminalPool.get(terminalId)
         if (st?.terminal && session) {
-          st.terminal.writeln(`\x1b[1;32mConnecting to ${session.username}@${session.host}:${session.port}...\x1b[0m`)
+          st.terminal.writeln(`\x1b[1;32mConnected to ${session.username}@${session.host}:${session.port}\x1b[0m`)
         }
         useAppStore.getState().setConnectionStatus(terminalId, 'connected')
-      }, 200)
+      }, 500)
     } catch (err) {
       console.log('[useSession] connect error', err)
     }
