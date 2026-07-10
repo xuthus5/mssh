@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useFileTransfer } from '@/hooks/useFileTransfer'
 import { createWailsMock } from '@/test/setup'
-import { MethodID } from '@/lib/wails/methodID'
 
 const SESSION_ID = 1
 
@@ -18,7 +17,7 @@ describe('useFileTransfer', () => {
       { name: 'readme.md', path: '/readme.md', size: 100, is_dir: false, mod_time: '2024-01-01' },
       { name: 'src', path: '/src', size: 0, is_dir: true, mod_time: '2024-01-01' },
     ]
-    mock.onMethod(MethodID.FileService_ListDir, async () => files)
+    mock.onMethod('mssh/internal/service.FileService.ListDir', async () => files)
 
     const { result } = renderHook(() => useFileTransfer(SESSION_ID))
     await act(async () => { await result.current.listFiles('/') })
@@ -32,7 +31,7 @@ describe('useFileTransfer', () => {
   })
 
   it('upload creates a transfer job', async () => {
-    mock.onMethod(MethodID.FileService_Upload, async () => 'task-1')
+    mock.onMethod('mssh/internal/service.FileService.Upload', async () => 'task-1')
 
     const { result } = renderHook(() => useFileTransfer(SESSION_ID))
     await act(async () => { await result.current.upload('/local/file.txt', '/remote/file.txt') })
@@ -43,7 +42,7 @@ describe('useFileTransfer', () => {
   })
 
   it('download creates a transfer job', async () => {
-    mock.onMethod(MethodID.FileService_Download, async () => 'task-2')
+    mock.onMethod('mssh/internal/service.FileService.Download', async () => 'task-2')
 
     const { result } = renderHook(() => useFileTransfer(SESSION_ID))
     await act(async () => { await result.current.download('/remote/file.txt', '/local/file.txt') })
@@ -54,8 +53,8 @@ describe('useFileTransfer', () => {
   })
 
   it('cancelTransfer removes transfer job', async () => {
-    mock.onMethod(MethodID.FileService_Upload, async () => 'task-1')
-    mock.onMethod(MethodID.FileService_CancelTransfer, async () => {})
+    mock.onMethod('mssh/internal/service.FileService.Upload', async () => 'task-1')
+    mock.onMethod('mssh/internal/service.FileService.CancelTransfer', async () => {})
 
     const { result } = renderHook(() => useFileTransfer(SESSION_ID))
     await act(async () => { await result.current.upload('/a', '/b') })
@@ -71,8 +70,8 @@ describe('useFileTransfer', () => {
       { name: 'b.txt', path: '/b.txt', size: 20, is_dir: false, mod_time: '' },
     ]
     let deleted = false
-    mock.onMethod(MethodID.FileService_ListDir, async () => deleted ? [files[1]] : files)
-    mock.onMethod(MethodID.FileService_Delete, async () => { deleted = true })
+    mock.onMethod('mssh/internal/service.FileService.ListDir', async () => deleted ? [files[1]] : files)
+    mock.onMethod('mssh/internal/service.FileService.Delete', async () => { deleted = true })
 
     const { result } = renderHook(() => useFileTransfer(SESSION_ID))
     await act(async () => { await result.current.listFiles('/') })
@@ -85,7 +84,7 @@ describe('useFileTransfer', () => {
 
   it('navigateUp goes to parent directory', async () => {
     const paths: string[] = []
-    mock.onMethod(MethodID.FileService_ListDir, async (_sid: any, path: any) => {
+    mock.onMethod('mssh/internal/service.FileService.ListDir', async (_sid: any, path: any) => {
       paths.push(path)
       return []
     })
@@ -100,8 +99,8 @@ describe('useFileTransfer', () => {
 
   it('makeDir triggers listFiles on current path', async () => {
     const called: string[] = []
-    mock.onMethod(MethodID.FileService_ListDir, async () => [])
-    mock.onMethod(MethodID.FileService_Mkdir, async (_sid: any, p: any) => { called.push(p) })
+    mock.onMethod('mssh/internal/service.FileService.ListDir', async () => [])
+    mock.onMethod('mssh/internal/service.FileService.Mkdir', async (_sid: any, p: any) => { called.push(p) })
 
     const { result } = renderHook(() => useFileTransfer(SESSION_ID))
     await act(async () => { await result.current.listFiles('/home') })
@@ -111,7 +110,7 @@ describe('useFileTransfer', () => {
   })
 
   it('handles listFiles error gracefully', async () => {
-    mock.onMethod(MethodID.FileService_ListDir, async () => { throw new Error('permission denied') })
+    mock.onMethod('mssh/internal/service.FileService.ListDir', async () => { throw new Error('permission denied') })
 
     const { result } = renderHook(() => useFileTransfer(SESSION_ID))
     await act(async () => { await result.current.listFiles('/') })
