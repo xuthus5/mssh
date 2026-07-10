@@ -159,9 +159,8 @@ export function useSession() {
         term_type: session.termType,
         folder_id: session.folderId ? Number(session.folderId) : null,
         sort_order: 0,
-        created_at: '',
-        updated_at: '',
-      })
+      } as any)
+
       setSessions((prev) => prev.map((s) => (s.id === session.id ? session : s)))
     } catch (err) {
       console.log('[useSession] updateSession error', err)
