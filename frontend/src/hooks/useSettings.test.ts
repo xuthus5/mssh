@@ -1,12 +1,28 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useSettings } from '@/hooks/useSettings'
-import { setWailsServices, createLocalServices, resetWailsForTest } from '@/lib/wails'
+import { createWailsMock } from '@/test/setup'
+import { MethodID } from '@/lib/wails/methodID'
+
+let _counter = 0
+function nextId() { return ++_counter }
 
 describe('useSettings', () => {
+  let mock: ReturnType<typeof createWailsMock>
+  let _settings: Record<string, string>
+
   beforeEach(() => {
-    resetWailsForTest()
-    setWailsServices(createLocalServices())
+    mock = createWailsMock()
+    _settings = {}
+    _counter = 0
+
+    mock.onMethod(MethodID.SettingService_GetSetting, async (key: string) => {
+      return _settings[key] ?? ''
+    })
+    mock.onMethod(MethodID.SettingService_SetSetting, async (key: string, value: string) => {
+      _settings[key] = value
+    })
+    mock.onMethod(MethodID.KeyService_List, async () => [])
   })
 
   it('loads default general settings', async () => {
@@ -39,6 +55,10 @@ describe('useSettings', () => {
   })
 
   it('generates a key and adds to state', async () => {
+    mock.onMethod(MethodID.KeyService_Generate, async (name: string, keyType: string, bits: number) => ({
+      id: nextId(), name, type: keyType, public_key: 'mock-pub', created_at: new Date().toISOString(),
+    }))
+
     const { result } = renderHook(() => useSettings())
     await act(async () => { await result.current.generateKey('my-key', 'ed25519', 256) })
     expect(result.current.keys).toHaveLength(1)
@@ -47,6 +67,11 @@ describe('useSettings', () => {
   })
 
   it('deletes a key and removes from state', async () => {
+    mock.onMethod(MethodID.KeyService_Generate, async (name: string, keyType: string, bits: number) => ({
+      id: nextId(), name, type: keyType, public_key: 'mock-pub', created_at: new Date().toISOString(),
+    }))
+    mock.onMethod(MethodID.KeyService_Delete, async () => {})
+
     const { result } = renderHook(() => useSettings())
     await act(async () => { await result.current.generateKey('k1', 'rsa', 2048) })
     expect(result.current.keys).toHaveLength(1)
@@ -56,6 +81,10 @@ describe('useSettings', () => {
   })
 
   it('imports a key and adds to state', async () => {
+    mock.onMethod(MethodID.KeyService_Import, async (name: string) => ({
+      id: nextId(), name, type: 'rsa', public_key: 'mock-pub', created_at: new Date().toISOString(),
+    }))
+
     const { result } = renderHook(() => useSettings())
     await act(async () => { await result.current.importKey('imported', '-----BEGIN RSA...') })
     expect(result.current.keys).toHaveLength(1)
@@ -63,6 +92,11 @@ describe('useSettings', () => {
   })
 
   it('exports a key returns public key string', async () => {
+    mock.onMethod(MethodID.KeyService_Generate, async (name: string, keyType: string, bits: number) => ({
+      id: nextId(), name, type: keyType, public_key: 'mock-pub', created_at: new Date().toISOString(),
+    }))
+    mock.onMethod(MethodID.KeyService_ExportPublicKey, async () => 'mock-key')
+
     const { result } = renderHook(() => useSettings())
     await act(async () => { await result.current.generateKey('ek', 'rsa', 2048) })
     let exported = ''
@@ -83,10 +117,7 @@ describe('useSettings', () => {
   })
 
   it('handles generateKey error gracefully', async () => {
-    const svc = createLocalServices()
-    svc.KeyService.Generate = async () => { throw new Error('key gen failed') }
-    resetWailsForTest()
-    setWailsServices(svc)
+    mock.onMethod(MethodID.KeyService_Generate, async () => { throw new Error('key gen failed') })
 
     const { result } = renderHook(() => useSettings())
     await act(async () => { await result.current.generateKey('bad', 'rsa', 1024) })

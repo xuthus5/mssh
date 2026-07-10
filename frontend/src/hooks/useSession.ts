@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react'
 import { useAppStore } from '@/store/appStore'
-import { getWails } from '@/lib/wails'
+import { SessionService, TunnelService } from '@/lib/wails'
 
 export interface Folder {
   id: string
@@ -43,9 +43,8 @@ export function useSession() {
   const listFolders = useCallback(async () => {
     setLoading(true)
     try {
-      const wails = getWails()
       console.log('[useSession] listFolders')
-      const result = await wails.SessionService.ListFolders()
+      const result = await SessionService.ListFolders()
       setFolders(result.map((f) => ({ id: String(f.id), name: f.name, parentId: f.parent_id ? String(f.parent_id) : null })))
     } catch (err) {
       console.log('[useSession] listFolders error', err)
@@ -56,9 +55,8 @@ export function useSession() {
 
   const createFolder = useCallback(async (name: string, parentId: string | null) => {
     try {
-      const wails = getWails()
       console.log('[useSession] createFolder', { name, parentId })
-      const result = await wails.SessionService.CreateFolder(name, parentId ? Number(parentId) : null)
+      const result = await SessionService.CreateFolder(name, parentId ? Number(parentId) : null)
       setFolders((prev) => [...prev, { id: String(result.id), name: result.name, parentId: result.parent_id ? String(result.parent_id) : null }])
     } catch (err) {
       console.log('[useSession] createFolder error', err)
@@ -67,9 +65,8 @@ export function useSession() {
 
   const deleteFolder = useCallback(async (id: string) => {
     try {
-      const wails = getWails()
       console.log('[useSession] deleteFolder', id)
-      await wails.SessionService.DeleteFolder(Number(id))
+      await SessionService.DeleteFolder(Number(id))
       setFolders((prev) => prev.filter((f) => f.id !== id))
     } catch (err) {
       console.log('[useSession] deleteFolder error', err)
@@ -79,9 +76,8 @@ export function useSession() {
   const listSessions = useCallback(async () => {
     setLoading(true)
     try {
-      const wails = getWails()
       console.log('[useSession] listSessions')
-      const result = await wails.SessionService.ListSessions()
+      const result = await SessionService.ListSessions()
       setSessions(result.map((s) => ({
         id: String(s.id),
         name: s.name,
@@ -104,9 +100,8 @@ export function useSession() {
 
   const createSession = useCallback(async (session: Omit<Session, 'id'>) => {
     try {
-      const wails = getWails()
       console.log('[useSession] createSession', { name: session.name, authMethod: session.authMethod })
-      const result = await wails.SessionService.CreateSession({
+      const result = await SessionService.CreateSession({
         name: session.name,
         host: session.host,
         port: session.port,
@@ -138,9 +133,8 @@ export function useSession() {
 
   const updateSession = useCallback(async (session: Session) => {
     try {
-      const wails = getWails()
       console.log('[useSession] updateSession', { id: session.id, name: session.name, authMethod: session.authMethod })
-      await wails.SessionService.UpdateSession({
+      await SessionService.UpdateSession({
         id: Number(session.id),
         name: session.name,
         host: session.host,
@@ -161,9 +155,8 @@ export function useSession() {
 
   const deleteSession = useCallback(async (id: string) => {
     try {
-      const wails = getWails()
       console.log('[useSession] deleteSession', id)
-      await wails.SessionService.DeleteSession(Number(id))
+      await SessionService.DeleteSession(Number(id))
       setSessions((prev) => prev.filter((s) => s.id !== id))
     } catch (err) {
       console.log('[useSession] deleteSession error', err)
@@ -172,9 +165,8 @@ export function useSession() {
 
   const connect = useCallback(async (sessionId: string) => {
     try {
-      const wails = getWails()
       console.log('[useSession] connect', sessionId)
-      const terminalId = await wails.SessionService.Connect(Number(sessionId))
+      const terminalId = await SessionService.Connect(Number(sessionId))
       const tabId = `terminal-${sessionId}`
       const session = sessions.find((s) => s.id === sessionId)
       useAppStore.getState().setConnectionStatus(terminalId, 'connecting')
@@ -194,21 +186,19 @@ export function useSession() {
 
   const disconnect = useCallback(async (sessionId: string) => {
     try {
-      const wails = getWails()
       const terminalId = `terminal-${sessionId}`
       console.log('[useSession] disconnect', sessionId)
-      await wails.SessionService.Disconnect(terminalId)
+      await SessionService.Disconnect(terminalId)
       useAppStore.getState().setConnectionStatus(terminalId, 'disconnected')
     } catch (err) {
       console.log('[useSession] disconnect error', err)
     }
   }, [])
 
-  const listTunnels = useCallback(async (sessionId: string) => {
+  const listTunnels = useCallback(async (_sessionId: string) => {
     try {
-      const wails = getWails()
-      console.log('[useSession] listTunnels', sessionId)
-      const result = await wails.TunnelService.List()
+      console.log('[useSession] listTunnels', _sessionId)
+      const result = await TunnelService.List()
       setTunnels(result as Tunnel[])
     } catch (err) {
       console.log('[useSession] listTunnels error', err)
