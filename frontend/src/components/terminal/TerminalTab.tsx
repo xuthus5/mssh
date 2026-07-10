@@ -1,9 +1,30 @@
+import { useState, useCallback } from 'react'
 import { TerminalEmulator } from '@/components/terminal/TerminalEmulator'
+import { TerminalToolbar } from '@/components/terminal/TerminalToolbar'
+import { useAppStore } from '@/store/appStore'
 
 export function TerminalTab({ terminalID }: { terminalID: string }) {
+  const [isRecording, setIsRecording] = useState(false)
+  const tabs = useAppStore((s) => s.tabs)
+  const activeTabId = useAppStore((s) => s.activeTabId)
+  const activeTab = tabs.find((t) => t.id === activeTabId)
+
+  const handleToggleRecording = useCallback(() => {
+    setIsRecording((prev) => {
+      const next = !prev
+      console.log('[TerminalTab] recording:', next ? 'started' : 'stopped')
+      return next
+    })
+  }, [])
+
   return (
     <div className="flex flex-col h-full">
-      <div className="flex items-center gap-1 h-8 px-2 bg-muted/30 border-b" />
+      <TerminalToolbar
+        terminalID={terminalID}
+        isRecording={isRecording}
+        onToggleRecording={handleToggleRecording}
+        hostname={activeTab?.title}
+      />
       <div className="flex-1">
         <TerminalEmulator terminalID={terminalID} />
       </div>

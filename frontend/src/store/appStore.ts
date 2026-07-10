@@ -13,11 +13,15 @@ export interface PooledTerminal {
   lastUsed: number
 }
 
+export type ConnectionStatus = 'connecting' | 'connected' | 'disconnected'
+
 export interface AppState {
   tabs: Tab[]
   activeTabId: string | null
   terminalPool: Map<string, PooledTerminal>
   maxPoolSize: number
+  connectionStatus: Record<string, ConnectionStatus>
+  appStatus: string
   openTab: (tab: Tab) => void
   closeTab: (id: string) => void
   setActiveTab: (id: string) => void
@@ -25,6 +29,8 @@ export interface AppState {
   unregisterTerminal: (id: string) => void
   updateLastUsed: (id: string) => void
   evictLRU: () => void
+  setConnectionStatus: (id: string, status: ConnectionStatus) => void
+  setAppStatus: (status: string) => void
 }
 
 const DEFAULT_MAX_POOL_SIZE = 10
@@ -34,6 +40,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   activeTabId: null,
   terminalPool: new Map(),
   maxPoolSize: DEFAULT_MAX_POOL_SIZE,
+  connectionStatus: {},
+  appStatus: '就绪',
 
   openTab: (tab) => set((s) => {
     const existing = s.tabs.find((t) => t.id === tab.id)
@@ -93,4 +101,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     pool.delete(oldestId)
     return { terminalPool: pool }
   }),
+
+  setConnectionStatus: (id, status) => set((s) => ({
+    connectionStatus: { ...s.connectionStatus, [id]: status },
+  })),
+
+  setAppStatus: (status) => set({ appStatus: status }),
 }))

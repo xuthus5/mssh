@@ -1,5 +1,5 @@
-import { useState, useCallback } from 'react'
-import { Plus, FolderPlus } from 'lucide-react'
+import { useState, useCallback, useMemo } from 'react'
+import { Plus, FolderPlus, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -13,6 +13,16 @@ import SessionTree from '@/components/session/SessionTree'
 import SessionDialog from '@/components/session/SessionDialog'
 import QuickCommands from '@/components/session/QuickCommands'
 import { useSession, type Session, type Folder } from '@/hooks/useSession'
+import type { CommandItem } from '@/components/session/QuickCommands'
+import { useAppStore } from '@/store/appStore'
+
+const DEFAULT_COMMANDS: Omit<CommandItem, 'id'>[] = [
+  { name: '系统信息', shortcut: '', command: 'uname -a' },
+  { name: '磁盘使用', shortcut: '', command: 'df -h' },
+  { name: '内存使用', shortcut: '', command: 'free -m' },
+  { name: '进程列表', shortcut: '', command: 'ps aux' },
+  { name: '网络连接', shortcut: '', command: 'ss -tlnp' },
+]
 
 type SidebarTab = 'sessions' | 'macros'
 
@@ -22,6 +32,7 @@ export default function Sidebar() {
   const [folderDialogOpen, setFolderDialogOpen] = useState(false)
   const [folderName, setFolderName] = useState('')
   const [editingSession, setEditingSession] = useState<Session | null>(null)
+  const [searchQuery, setSearchQuery] = useState('')
 
   const {
     folders,
@@ -33,6 +44,29 @@ export default function Sidebar() {
     deleteSession,
     connect,
   } = useSession()
+
+  const filteredFolders = useMemo(
+    () =>
+      searchQuery.trim()
+        ? folders.filter((f) =>
+            f.name.toLowerCase().includes(searchQuery.toLowerCase()),
+          )
+        : folders,
+    [folders, searchQuery],
+  )
+
+  const filteredSessions = useMemo(
+    () =>
+      searchQuery.trim()
+        ? sessions.filter(
+            (s) =>
+              s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+              s.host.toLowerCase().includes(searchQuery.toLowerCase()) ||
+              s.username.toLowerCase().includes(searchQuery.toLowerCase()),
+          )
+        : sessions,
+    [sessions, searchQuery],
+  )
 
   const handleSaveSession = useCallback(
     (data: Omit<Session, 'id'>) => {
@@ -99,7 +133,17 @@ export default function Sidebar() {
 
       {activeTab === 'sessions' && (
         <>
-          <div className="px-2 py-2 flex gap-1 border-b border-border/50">
+          <div className="px-2 py-2 flex flex-col gap-1.5 border-b border-border/50">
+            <div className="relative">
+              <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+              <Input
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="搜索会话..."
+                className="h-7 pl-7 text-xs"
+              />
+            </div>
+            <div className="flex gap-1 items-center">
               <Button
                 variant="ghost"
                 size="sm"
@@ -115,14 +159,25 @@ export default function Sidebar() {
                 className="text-xs h-7 w-7 p-0 justify-center"
                 onClick={() => { console.log('[Sidebar] 新建分组 click'); setFolderDialogOpen(true) }}
                 title="新建分组"
-            >
-              <FolderPlus className="h-3.5 w-3.5" />
-            </Button>
+              >
+                <FolderPlus className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          </div>
+          <div className="flex items-center justify-between px-3 py-1 border-b border-border/30">
+            <span className="text-[11px] text-muted-foreground">
+              共 {sessions.length} 个会话
+            </span>
+            {searchQuery.trim() && (
+              <span className="text-[10px] text-muted-foreground/60">
+                已筛选
+              </span>
+            )}
           </div>
           <div className="flex-1 min-h-0">
             <SessionTree
-              folders={folders}
-              sessions={sessions}
+              folders={filteredFolders}
+              sessions={filteredSessions}
               onConnect={connect}
               onEditSession={handleOpenEditSession}
               onDeleteSession={deleteSession}
@@ -136,10 +191,24 @@ export default function Sidebar() {
       {activeTab === 'macros' && (
         <div className="flex-1 min-h-0">
           <QuickCommands
-            commands={[]}
-            onExecute={(cmd: string) => console.debug('[macro]', cmd)}
-            onAdd={(item) => console.debug('[macro/add]', item)}
-            onDelete={(id: string) => console.debug('[macro/delete]', id)}
+            commands={DEFAULT_COMMANDS.map((c, i) => ({
+              ...c,
+              id: `default-${i}`,
+            }))}
+            onExecute={(cmd: string) => {
+              console.log('[macro/execute]', cmd)
+              const activeTabId = useAppStore.getState().activeTabId
+              if (activeTabId) {
+                const pool = useAppStore.getState().terminalPool
+                for (const [, entry] of pool) {
+                  entry.terminal.writeln(cmd)
+                  return
+                }
+              }
+            }}
+            onAdd={(item) => console.log('[macro/add]', item)}
+            onDelete={(id: string) => console.log('[macro/delete]', id)}
+            showAddForm={false}
           />
         </div>
       )}

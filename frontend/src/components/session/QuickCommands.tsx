@@ -23,6 +23,7 @@ interface Props {
   onExecute: (command: string) => void
   onAdd: (item: Omit<CommandItem, 'id'>) => void
   onDelete: (id: string) => void
+  showAddForm?: boolean
 }
 
 export default function QuickCommands({
@@ -30,6 +31,7 @@ export default function QuickCommands({
   onExecute,
   onAdd,
   onDelete,
+  showAddForm = true,
 }: Props) {
   const [showAdd, setShowAdd] = useState(false)
   const [name, setName] = useState('')
@@ -51,9 +53,11 @@ export default function QuickCommands({
         <span className="text-xs font-medium text-muted-foreground">
           快捷命令
         </span>
-        <Button size="xs" variant="ghost" onClick={() => setShowAdd(!showAdd)}>
-          <Plus className="h-3 w-3" />
-        </Button>
+        {showAddForm && (
+          <Button size="xs" variant="ghost" onClick={() => setShowAdd(!showAdd)}>
+            <Plus className="h-3 w-3" />
+          </Button>
+        )}
       </div>
       {showAdd && (
         <div className="flex flex-col gap-1.5 mb-2 p-2 rounded-lg border border-border">

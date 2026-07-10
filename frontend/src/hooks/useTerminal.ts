@@ -54,18 +54,22 @@ export function useTerminal(
 
       // Write welcome banner when terminal is first created (not pooled)
       if (!existing) {
-        term.writeln('\x1b[1;36m╔══════════════════════════════════╗')
-        term.writeln('\x1b[1;36m║         MSSH Terminal           ║')
-        term.writeln('\x1b[1;36m╚══════════════════════════════════╝\x1b[0m')
+        term.writeln('\x1b[1;36m╔════════════════════════════════════════╗')
+        term.writeln('\x1b[1;36m║          Welcome to MSSH              ║')
+        term.writeln('\x1b[1;36m║    Secure Shell Client & Manager      ║')
+        term.writeln('\x1b[1;36m╚════════════════════════════════════════╝\x1b[0m')
         term.writeln('')
-        term.writeln('\x1b[33mReady. Waiting for SSH connection...\x1b[0m')
+        term.writeln('\x1b[33mWaiting for SSH connection...\x1b[0m')
+        term.writeln('\x1b[90mType to begin — input is echoed locally until connected\x1b[0m')
         term.writeln('')
+        store.setConnectionStatus(terminalID, 'disconnected')
       }
     }
 
     const dataDispose = term.onData((data) => {
       store.updateLastUsed(terminalID)
-      // TODO: wire to Wails terminal service
+      term.write(data)
+      console.log('[Terminal] input:', JSON.stringify(data))
     })
 
     const resizeObs = new ResizeObserver(() => {
