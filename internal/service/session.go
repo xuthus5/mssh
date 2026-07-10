@@ -31,16 +31,18 @@ type SessionService struct {
 	eventBus  EventBus
 	keepAlive int
 	dataDir   string
+	crypto    KeyCrypto
 	logger    *slog.Logger
 }
 
-func NewSessionService(db *sql.DB, eventBus EventBus, keepAlive int, dataDir string, logger *slog.Logger) *SessionService {
+func NewSessionService(db *sql.DB, eventBus EventBus, keepAlive int, dataDir string, crypto KeyCrypto, logger *slog.Logger) *SessionService {
 	return &SessionService{
 		db:        db,
 		conns:     make(map[string]*ssh.ClientWrapper),
 		eventBus:  eventBus,
 		keepAlive: keepAlive,
 		dataDir:   dataDir,
+		crypto:    crypto,
 		logger:    logger,
 	}
 }
@@ -221,7 +223,17 @@ func (s *SessionService) buildAuthMethods(sess *model.Session) ([]gossh.AuthMeth
 		if sess.KeyID != nil {
 			key, err := store.GetKey(s.db, *sess.KeyID)
 			if err == nil {
-				if signer, signErr := gossh.ParsePrivateKey([]byte(key.PrivateKey)); signErr == nil {
+				var signer gossh.Signer
+				var signErr error
+				if s.crypto != nil {
+					decrypted, decErr := s.crypto.Decrypt([]byte(key.PrivateKey))
+					if decErr == nil {
+						signer, signErr = gossh.ParsePrivateKey(decrypted)
+					}
+				} else {
+					signer, signErr = gossh.ParsePrivateKey([]byte(key.PrivateKey))
+				}
+				if signErr == nil {
 					methods = append(methods, gossh.PublicKeys(signer))
 				}
 			}
