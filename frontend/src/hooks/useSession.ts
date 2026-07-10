@@ -1,7 +1,6 @@
 import { useState, useCallback, useEffect } from 'react'
 import { useAppStore } from '@/store/appStore'
 import { SessionService, TerminalService, TunnelService } from '@/lib/wails'
-import { toast } from '@/components/ui/toast'
 import { useConnectDialog } from '@/store/connectDialog'
 
 export interface Folder {
@@ -215,7 +214,6 @@ export function useSession() {
       console.log('[useSession] connect error', err)
       const msg = err?.message || String(err)
       dialog.setError(msg)
-      toast(`SSH 连接失败: ${msg}`, 'error')
     }
   }, [openTab, sessions])
 
