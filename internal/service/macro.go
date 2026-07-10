@@ -43,7 +43,7 @@ func (m *MacroService) Execute(terminalID, command string) error {
 	if m.terminals == nil {
 		return fmt.Errorf("execute macro: no terminal service available")
 	}
-	_, err := m.terminals.Write(terminalID, []byte(command))
+	_, err := m.terminals.Write(terminalID, command)
 	if err != nil {
 		return fmt.Errorf("execute macro: %w", err)
 	}

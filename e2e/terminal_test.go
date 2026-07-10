@@ -63,7 +63,7 @@ func TestTerminalOutputFlow(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify we can write to the terminal
-	n, err := a.Terminal.Write(terminalID, []byte("echo hello\n"))
+	n, err := a.Terminal.Write(terminalID, "echo hello\n")
 	require.NoError(t, err)
 	assert.Equal(t, 11, n)
 
