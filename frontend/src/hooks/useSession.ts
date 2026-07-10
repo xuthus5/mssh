@@ -201,11 +201,8 @@ export function useSession() {
       openTab({ id: tabId, title: session?.name ?? sessionId, type: 'terminal', terminalId, sessionId: Number(sessionId) })
 
       setTimeout(() => {
-        const st = useAppStore.getState().terminalPool.get(terminalId)
-        if (st?.terminal && session) {
-          st.terminal.writeln(`\x1b[1;32mConnected to ${session.username}@${session.host}:${session.port}\x1b[0m`)
-        }
         useAppStore.getState().setConnectionStatus(terminalId, 'connected')
+        console.log('[useSession] connected', { terminalId, host: session?.host })
       }, 500)
     } catch (err) {
       console.log('[useSession] connect error', err)
