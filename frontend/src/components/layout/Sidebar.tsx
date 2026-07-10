@@ -48,7 +48,7 @@ export default function Sidebar() {
 
   useEffect(() => {
     MacroService.List()
-      .then((result) => {
+      .then((result: any) => {
         const items = (result as { id?: number; name?: string; shortcut?: string; command?: string }[]).map((m) => ({
           id: String(m.id ?? ''),
           name: m.name ?? '',
@@ -57,7 +57,7 @@ export default function Sidebar() {
         }))
         setMacros(items)
       })
-      .catch((err) => { console.error('[Sidebar] list macros error', err) })
+      .catch((err: unknown) => { console.error('[Sidebar] list macros error', err) })
   }, [])
 
   const filteredFolders = useMemo(
@@ -124,7 +124,7 @@ export default function Sidebar() {
     const activeTab = useAppStore.getState().tabs.find((t) => t.id === activeTabId)
     const terminalId = activeTab?.terminalId ?? activeTabId
     console.log('[Sidebar] MacroService.Execute', terminalId, cmd)
-    MacroService.Execute(terminalId, cmd).catch((err) => {
+    MacroService.Execute(terminalId, cmd).catch((err: unknown) => {
       console.error('[Sidebar] execute macro error', err)
     })
   }, [])
@@ -132,7 +132,7 @@ export default function Sidebar() {
   const handleMacroAdd = useCallback(async (item: Omit<CommandItem, 'id'>) => {
     try {
       console.log('[Sidebar] MacroService.Create', item)
-      const result = (await MacroService.Create(item)) as { id?: number; name?: string; shortcut?: string; command?: string }
+      const result = (await MacroService.Create(item as any)) as { id?: number; name?: string; shortcut?: string; command?: string }
       const newItem: CommandItem = {
         id: String(result.id ?? ''),
         name: result.name ?? item.name,

@@ -71,7 +71,7 @@ export function PlaybackTab({ recordingId, title }: Props) {
       resizeObs.observe(containerRef.current)
     }
 
-    LogService.GetRecording(Number(recordingId)).then((data) => {
+    LogService.GetRecording(String(recordingId)).then((data: any) => {
       if (disposed) return
       const player = data as PlayerData
       if (player?.entries) {
@@ -81,7 +81,7 @@ export function PlaybackTab({ recordingId, title }: Props) {
       } else {
         term.writeln('\x1b[33mNo recording data found\x1b[0m')
       }
-    }).catch((err) => {
+    }).catch((err: unknown) => {
       if (disposed) return
       console.error('[PlaybackTab] GetRecording error:', err)
       term.writeln('\x1b[31mFailed to load recording\x1b[0m')

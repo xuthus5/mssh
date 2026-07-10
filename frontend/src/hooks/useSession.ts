@@ -45,7 +45,7 @@ export function useSession() {
     try {
       console.log('[useSession] listFolders')
       const result = await SessionService.ListFolders()
-      setFolders(result.map((f) => ({ id: String(f.id), name: f.name, parentId: f.parent_id ? String(f.parent_id) : null })))
+      setFolders(result.map((f: any) => ({ id: String(f.id), name: f.name, parentId: f.parent_id ? String(f.parent_id) : null })))
     } catch (err) {
       console.log('[useSession] listFolders error', err)
     } finally {
@@ -87,8 +87,8 @@ export function useSession() {
     setLoading(true)
     try {
       console.log('[useSession] listSessions')
-      const result = await SessionService.ListSessions()
-      setSessions(result.map((s) => ({
+      const result = await SessionService.ListSessions(null)
+      setSessions(result.map((s: any) => ({
         id: String(s.id),
         name: s.name,
         host: s.host,
@@ -116,12 +116,16 @@ export function useSession() {
         host: session.host,
         port: session.port,
         username: session.username,
-        auth_method: session.authMethod,
+        auth_method: session.authMethod as any,
         password: session.password,
-        key_id: session.keyId ? Number(session.keyId) : undefined,
+        key_id: session.keyId ? Number(session.keyId) : null,
         keep_alive: session.keepAlive,
         term_type: session.termType,
         folder_id: session.folderId ? Number(session.folderId) : null,
+        id: 0,
+        sort_order: 0,
+        created_at: '',
+        updated_at: '',
       })
       setSessions((prev) => [...prev, {
         id: String(result.id),
@@ -150,12 +154,15 @@ export function useSession() {
         host: session.host,
         port: session.port,
         username: session.username,
-        auth_method: session.authMethod,
+        auth_method: session.authMethod as any,
         password: session.password,
-        key_id: session.keyId ? Number(session.keyId) : undefined,
+        key_id: session.keyId ? Number(session.keyId) : null,
         keep_alive: session.keepAlive,
         term_type: session.termType,
         folder_id: session.folderId ? Number(session.folderId) : null,
+        sort_order: 0,
+        created_at: '',
+        updated_at: '',
       })
       setSessions((prev) => prev.map((s) => (s.id === session.id ? session : s)))
     } catch (err) {
