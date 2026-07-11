@@ -16,11 +16,13 @@ describe('useDraggableDialog', () => {
     expect(element.style.left).toBe('260px')
     expect(element.style.top).toBe('140px')
     expect(element.style.transform).toBe('none')
+    expect(element.style.translate).toBe('none')
 
     rerender({ open: false })
     expect(element.style.left).toBe('')
     expect(element.style.top).toBe('')
     expect(element.style.transform).toBe('')
+    expect(element.style.translate).toBe('')
     rerender({ open: true })
   })
 
