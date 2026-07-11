@@ -5,11 +5,12 @@ import '@xterm/xterm/css/xterm.css'
 interface Props {
   terminalID: string
   className?: string
+  active: boolean
 }
 
-export function TerminalEmulator({ terminalID, className }: Props) {
+export function TerminalEmulator({ terminalID, className, active }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
-  useTerminal(terminalID, containerRef)
+  useTerminal(terminalID, containerRef, active)
 
   return (
     <div

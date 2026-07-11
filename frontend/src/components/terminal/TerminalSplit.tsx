@@ -3,16 +3,19 @@ import { X, Columns2, Rows2 } from 'lucide-react'
 import { TerminalEmulator } from '@/components/terminal/TerminalEmulator'
 import { TerminalService } from '@/lib/wails'
 import { logger } from '@/lib/logger'
+import { useAppStore } from '@/store/appStore'
 
 interface Props {
   primaryID: string
   sessionId: number
+  active: boolean
 }
 
-export function TerminalSplit({ primaryID, sessionId }: Props) {
+export function TerminalSplit({ primaryID, sessionId, active }: Props) {
   const [splitID, setSplitID] = useState<string | null>(null)
   const [direction, setDirection] = useState<'horizontal' | 'vertical'>('horizontal')
   const splitIDRef = useRef<string | null>(null)
+  const activePaneID = useAppStore((state) => state.activePaneId)
 
   useEffect(() => {
     let cancelled = false
@@ -90,11 +93,11 @@ export function TerminalSplit({ primaryID, sessionId }: Props) {
         style={{ flexDirection: direction === 'horizontal' ? 'row' : 'column' }}
       >
         <div className="flex-1 min-h-0 min-w-0 border-r border-border/50">
-          <TerminalEmulator terminalID={primaryID} />
+          <TerminalEmulator terminalID={primaryID} active={active && activePaneID !== splitID} />
         </div>
         {splitID && (
           <div className="flex-1 min-h-0 min-w-0">
-            <TerminalEmulator terminalID={splitID} />
+            <TerminalEmulator terminalID={splitID} active={active && activePaneID === splitID} />
           </div>
         )}
       </div>

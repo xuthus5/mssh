@@ -15,10 +15,13 @@ interface TerminalOutputEvent {
 export function useTerminal(
   terminalID: string,
   containerRef: RefObject<HTMLDivElement | null>,
+  active: boolean,
 ) {
   const termRef = useRef<Terminal | null>(null)
   const storeRef = useRef(useAppStore.getState())
+  const activeRef = useRef(active)
   storeRef.current = useAppStore.getState()
+  activeRef.current = active
 
   useEffect(() => {
     const initialTheme = useAppStore.getState().terminalTheme
@@ -41,8 +44,10 @@ export function useTerminal(
       term.loadAddon(fitAddon)
       initialResizeTimer = window.setTimeout(() => {
         fitAddon.fit()
-        term.focus()
-        storeRef.current.setActivePane(terminalID)
+        if (activeRef.current) {
+          term.focus()
+          storeRef.current.setActivePane(terminalID)
+        }
         TerminalService.Resize(terminalID, term.cols, term.rows).catch((err: unknown) => {
           logger.error('terminal initial resize error', err)
         })
@@ -101,6 +106,13 @@ export function useTerminal(
       term.dispose()
     }
   }, [terminalID, containerRef])
+
+  useEffect(() => {
+    const term = termRef.current
+    if (!term) return
+    if (active) term.focus()
+    else term.blur()
+  }, [active])
 
   useEffect(() => {
     const unsub = useAppStore.subscribe((state, prevState) => {

@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { TerminalEmulator } from '@/components/terminal/TerminalEmulator'
 import { TerminalSplit } from '@/components/terminal/TerminalSplit'
 import { TerminalToolbar } from '@/components/terminal/TerminalToolbar'
@@ -11,18 +11,23 @@ export function TerminalTab({
   terminalID,
   sessionId,
   onOpenFiles,
+  active,
 }: {
   terminalID: string
   sessionId: number
   onOpenFiles: () => void
+  active: boolean
 }) {
   const [split, setSplit] = useState(false)
   const tabs = useAppStore((s) => s.tabs)
-  const activeTabId = useAppStore((s) => s.activeTabId)
-  const activeTab = tabs.find((t) => t.id === activeTabId)
+  const currentTab = tabs.find((tab) => tab.terminalId === terminalID || tab.id === terminalID)
   const recordingState = useAppStore((s) => s.recordingState[terminalID] ?? 'idle')
   const setRecordingState = useAppStore((s) => s.setRecordingState)
   const isRecording = recordingState === 'recording' || recordingState === 'stopping'
+
+  useEffect(() => {
+    if (active) useAppStore.getState().setActivePane(terminalID)
+  }, [active, terminalID])
 
   const handleToggleRecording = useCallback(async () => {
     if (!isRecording) {
@@ -63,16 +68,16 @@ export function TerminalTab({
         isRecording={isRecording}
         recordingLogId={null}
         onToggleRecording={handleToggleRecording}
-        hostname={activeTab?.title}
+        hostname={currentTab?.title}
         onOpenFiles={onOpenFiles}
         onToggleSplit={handleToggleSplit}
         split={split}
       />
       <div className="flex-1">
-        {split && activeTab?.sessionId ? (
-          <TerminalSplit primaryID={terminalID} sessionId={activeTab.sessionId} />
+        {split && currentTab?.sessionId ? (
+          <TerminalSplit primaryID={terminalID} sessionId={currentTab.sessionId} active={active} />
         ) : (
-          <TerminalEmulator terminalID={terminalID} />
+          <TerminalEmulator terminalID={terminalID} active={active} />
         )}
       </div>
     </div>
