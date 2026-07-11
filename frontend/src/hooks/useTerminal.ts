@@ -5,30 +5,35 @@ import { WebglAddon } from '@xterm/addon-webgl'
 import { useAppStore } from '@/store/appStore'
 import { TerminalService } from '@/lib/wails'
 import { Events } from '@wailsio/runtime'
+import { logger } from '@/lib/logger'
+
+interface TerminalOutputEvent {
+  terminal_id?: string
+  data?: string
+}
 
 export function useTerminal(
   terminalID: string,
   containerRef: RefObject<HTMLDivElement | null>,
 ) {
   const termRef = useRef<Terminal | null>(null)
-
-  const store = useAppStore()
+  const storeRef = useRef(useAppStore.getState())
+  storeRef.current = useAppStore.getState()
 
   useEffect(() => {
-    const term =
-      new Terminal({
-        cursorBlink: true,
-        cursorStyle: 'bar',
-        fontSize: 14,
-        fontFamily: '"JetBrains Mono", "Cascadia Code", monospace',
-        theme: {
-          background: '#0d1117',
-          foreground: '#c9d1d9',
-          cursor: '#c9d1d9',
-          cursorAccent: '#0d1117',
-        },
-        scrollback: 10000,
-      })
+    const term = new Terminal({
+      cursorBlink: true,
+      cursorStyle: 'bar',
+      fontSize: 14,
+      fontFamily: '"JetBrains Mono", "Cascadia Code", monospace',
+      theme: {
+        background: '#0d1117',
+        foreground: '#c9d1d9',
+        cursor: '#c9d1d9',
+        cursorAccent: '#0d1117',
+      },
+      scrollback: 10000,
+    })
 
     termRef.current = term
 
@@ -43,11 +48,10 @@ export function useTerminal(
 
     if (containerRef.current) {
       term.open(containerRef.current)
-      // Delay fit to ensure DOM is laid out
       setTimeout(() => {
         fitAddon.fit()
         term.focus()
-        console.log('[useTerminal] terminal opened', { cols: term.cols, rows: term.rows })
+        logger.debug('terminal opened', { cols: term.cols, rows: term.rows })
       }, 100)
 
       term.writeln('\x1b[1;36m╔════════════════════════════════════════╗')
@@ -57,30 +61,28 @@ export function useTerminal(
       term.writeln('')
       term.writeln('\x1b[33mWaiting for SSH connection...\x1b[0m')
       term.writeln('')
-      store.setConnectionStatus(terminalID, 'disconnected')
+      storeRef.current.setConnectionStatus(terminalID, 'disconnected')
     }
 
     const dataDispose = term.onData((data) => {
-      store.updateLastUsed(terminalID)
-      TerminalService.Write(terminalID, data).catch((_err: unknown) => {})
+      storeRef.current.updateLastUsed(terminalID)
+      TerminalService.Write(terminalID, data).catch((err: unknown) => {
+        logger.error('terminal write error', err)
+      })
     })
 
-    let unsubOutput: (() => void) | undefined
     let eventCount = 0
-    console.log('[useTerminal] subscribing to terminal:output for', terminalID)
-    unsubOutput = Events.On('terminal:output', (wailsEvent: any) => {
+    logger.debug('subscribing to terminal:output for', terminalID)
+    const unsubOutput = Events.On('terminal:output', (wailsEvent: { data?: TerminalOutputEvent }) => {
       eventCount++
-      const p = wailsEvent?.data as { terminal_id?: string; data?: string } | undefined
+      const p = wailsEvent?.data
       if (p?.terminal_id === terminalID) {
         if (p.data !== undefined && p.data !== null && p.data.length > 0) {
-          const preview = p.data.length > 60 ? p.data.slice(0, 60) + '...' : p.data
-          const hex = Array.from(new TextEncoder().encode(p.data.slice(0, 8))).map(b => b.toString(16)).join(' ')
           if (eventCount <= 3) {
-            console.log(`[useTerminal] #${eventCount} writing ${p.data.length}B, hex: ${hex}, text: ${JSON.stringify(preview)}`)
+            const preview = p.data.length > 60 ? p.data.slice(0, 60) + '...' : p.data
+            logger.debug(`#${eventCount} writing ${p.data.length}B`, { text: preview })
           }
           term.write(p.data)
-        } else if (p.data !== undefined && p.data.length === 0) {
-          if (eventCount <= 3) console.log(`[useTerminal] #${eventCount} data is empty string`)
         }
       }
     })
@@ -96,7 +98,7 @@ export function useTerminal(
 
     return () => {
       dataDispose.dispose()
-      unsubOutput?.()
+      unsubOutput()
       resizeObs.disconnect()
       try {
         const el = term.element
@@ -107,8 +109,7 @@ export function useTerminal(
         // Ignore cleanup errors
       }
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [terminalID])
+  }, [terminalID, containerRef])
 
   useEffect(() => {
     const unsub = useAppStore.subscribe((state, prevState) => {

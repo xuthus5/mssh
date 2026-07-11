@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/context-menu'
 import { ChevronRight, ChevronDown, Folder as FolderIcon, Server } from 'lucide-react'
 import type { Folder, Session } from '@/hooks/useSession'
+import { logger } from '@/lib/logger'
 
 interface Props {
   folders: Folder[]
@@ -111,7 +112,7 @@ export default function SessionTree({
           className="flex items-center gap-1 py-1 px-1 cursor-pointer hover:bg-muted/50 rounded text-sm ml-1"
           onDoubleClick={(e: MouseEvent) => {
             e.stopPropagation()
-            console.log('[SessionTree] onConnect', session.id)
+            logger.debug('SessionTree: onConnect', session.id)
             onConnect(session.id)
           }}
         >
@@ -120,10 +121,10 @@ export default function SessionTree({
         </div>
       </ContextMenuTrigger>
       <ContextMenuContent>
-        <ContextMenuItem onClick={() => { console.log('[SessionTree] onConnect', session.id); onConnect(session.id) }}>
+        <ContextMenuItem onClick={() => { logger.debug('SessionTree: onConnect', session.id); onConnect(session.id) }}>
           连接
         </ContextMenuItem>
-        <ContextMenuItem onClick={() => { console.log('[SessionTree] onEditSession', session.id); onEditSession(session) }}>
+        <ContextMenuItem onClick={() => { logger.debug('SessionTree: onEditSession', session.id); onEditSession(session) }}>
           编辑
         </ContextMenuItem>
         <ContextMenuSeparator />
@@ -152,7 +153,7 @@ export default function SessionTree({
         )}
         <ContextMenuItem
           variant="destructive"
-          onClick={() => { console.log('[SessionTree] onDeleteSession', session.id); onDeleteSession(session.id) }}
+          onClick={() => { logger.debug('SessionTree: onDeleteSession', session.id); onDeleteSession(session.id) }}
         >
           删除
         </ContextMenuItem>

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { X, Columns2, Rows2 } from 'lucide-react'
 import { TerminalEmulator } from '@/components/terminal/TerminalEmulator'
 import { TerminalService } from '@/lib/wails'
+import { logger } from '@/lib/logger'
 
 interface Props {
   primaryID: string
@@ -22,7 +23,7 @@ export function TerminalSplit({ primaryID, sessionId }: Props) {
         splitIDRef.current = id
         setSplitID(id)
       } catch (err) {
-        console.error('[TerminalSplit] failed to open split', err)
+        logger.error('TerminalSplit: failed to open split', err)
       }
     }
     openSplit()

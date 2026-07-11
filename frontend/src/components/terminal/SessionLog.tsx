@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Circle, Square, Play, Trash2 } from 'lucide-react'
 import { LogService } from '@/lib/wails'
+import { logger } from '@/lib/logger'
 
 interface SessionLogEntry {
   id: number
@@ -34,7 +35,7 @@ export default function SessionLog({
       const result = await LogService.List(sessionId)
       setRecordings(result as SessionLogEntry[])
     } catch (err) {
-      console.error('[SessionLog] load recordings error:', err)
+      logger.error('SessionLog: load recordings error:', err)
     }
   }, [sessionId])
 

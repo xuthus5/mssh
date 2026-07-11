@@ -3,6 +3,7 @@ import { Copy, ClipboardPaste, Trash2, Circle, Square, FolderOpen, Split } from 
 import { useAppStore } from '@/store/appStore'
 import { LogService } from '@/lib/wails'
 import SessionLog from '@/components/terminal/SessionLog'
+import { logger } from '@/lib/logger'
 
 interface TerminalToolbarProps {
   terminalID: string
@@ -37,7 +38,7 @@ export function TerminalToolbar({
     const term = getTerminal()
     if (!term) return
     const selection = term.getSelection()
-    console.log('[TerminalToolbar] copy:', selection ? selection.length : 0, 'chars')
+    logger.debug('TerminalToolbar: copy:', selection ? selection.length : 0, 'chars')
     if (selection) {
       await navigator.clipboard.writeText(selection)
     }
@@ -47,14 +48,14 @@ export function TerminalToolbar({
     const term = getTerminal()
     if (!term) return
     const text = await navigator.clipboard.readText()
-    console.log('[TerminalToolbar] paste:', text.length, 'chars')
+    logger.debug('TerminalToolbar: paste:', text.length, 'chars')
     term.paste(text)
   }, [getTerminal])
 
   const handleClear = useCallback(() => {
     const term = getTerminal()
     if (!term) return
-    console.log('[TerminalToolbar] clear')
+    logger.debug('TerminalToolbar: clear')
     term.clear()
   }, [getTerminal])
 
@@ -169,7 +170,7 @@ export function TerminalToolbar({
               try {
                 await LogService.Delete(logId)
               } catch (err) {
-                console.error('[TerminalToolbar] delete recording error:', err)
+                logger.error('TerminalToolbar: delete recording error:', err)
               }
             }}
           />

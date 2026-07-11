@@ -76,7 +76,7 @@ export default function SessionDialog({ open, onOpenChange, session, folders, on
       host: host.trim(),
       port: parseInt(port, 10) || 22,
       username: username.trim(),
-      authMethod: authMethod as any,
+      authMethod: authMethod as Session["authMethod"],
       password: needsPassword ? password : undefined,
       keyId: authMethod === 'key' ? keyId : undefined,
       keepAlive: parseInt(keepAlive, 10) || 60,

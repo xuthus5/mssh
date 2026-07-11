@@ -4,6 +4,7 @@ import { TerminalSplit } from '@/components/terminal/TerminalSplit'
 import { TerminalToolbar } from '@/components/terminal/TerminalToolbar'
 import { useAppStore } from '@/store/appStore'
 import { LogService } from '@/lib/wails'
+import { logger } from '@/lib/logger'
 
 export function TerminalTab({
   terminalID,
@@ -31,13 +32,13 @@ export function TerminalTab({
         setRecordingLogId(logId)
         setIsRecording(true)
       } catch (err) {
-        console.error('[TerminalTab] start recording failed:', err)
+        logger.error('TerminalTab: start recording failed:', err)
       }
     } else {
       try {
         await LogService.StopTerminalRecording(terminalID)
       } catch (err) {
-        console.error('[TerminalTab] stop recording failed:', err)
+        logger.error('TerminalTab: stop recording failed:', err)
       }
       setIsRecording(false)
       setRecordingLogId(null)

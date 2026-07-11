@@ -1,5 +1,7 @@
 import { useState, useCallback } from 'react'
 import { FileService } from '@/lib/wails'
+import { logger } from '@/lib/logger'
+import type { FileEntry } from '../../bindings/mssh/internal/ssh/models'
 
 export interface FileInfo {
   name: string
@@ -19,6 +21,16 @@ export interface TransferJob {
   startedAt: number
 }
 
+function mapFileEntry(f: FileEntry): FileInfo {
+  return {
+    name: f.name,
+    path: f.path,
+    size: f.size,
+    modified: f.mod_time,
+    isDir: f.is_dir,
+  }
+}
+
 export function useFileTransfer(sessionId: number) {
   const [files, setFiles] = useState<FileInfo[]>([])
   const [currentPath, setCurrentPath] = useState('/')
@@ -28,18 +40,11 @@ export function useFileTransfer(sessionId: number) {
   const listFiles = useCallback(async (path: string) => {
     setLoading(true)
     try {
-      console.log('[useFileTransfer] listFiles', { sessionId, path })
       const result = await FileService.ListDir(sessionId, path)
-      setFiles(result!.map((f: any) => ({
-        name: f.name,
-        path: f.path,
-        size: f.size,
-        modified: f.mod_time,
-        isDir: f.is_dir,
-      })))
+      setFiles((result ?? []).map(mapFileEntry))
       setCurrentPath(path)
     } catch (err) {
-      console.log('[useFileTransfer] listFiles error', err)
+      logger.error('listFiles error', err)
     } finally {
       setLoading(false)
     }
@@ -53,7 +58,6 @@ export function useFileTransfer(sessionId: number) {
 
   const upload = useCallback(async (localPath: string, remotePath: string) => {
     try {
-      console.log('[useFileTransfer] upload', { sessionId, localPath, remotePath })
       const taskId = await FileService.Upload(sessionId, localPath, remotePath)
       setTransfers((prev) => [...prev, {
         id: taskId,
@@ -62,13 +66,12 @@ export function useFileTransfer(sessionId: number) {
         totalBytes: 0, transferredBytes: 0, speed: 0, startedAt: Date.now(),
       }])
     } catch (err) {
-      console.log('[useFileTransfer] upload error', err)
+      logger.error('upload error', err)
     }
   }, [sessionId])
 
   const download = useCallback(async (remotePath: string, localPath: string) => {
     try {
-      console.log('[useFileTransfer] download', { sessionId, remotePath, localPath })
       const taskId = await FileService.Download(sessionId, remotePath, localPath)
       setTransfers((prev) => [...prev, {
         id: taskId,
@@ -77,48 +80,44 @@ export function useFileTransfer(sessionId: number) {
         totalBytes: 0, transferredBytes: 0, speed: 0, startedAt: Date.now(),
       }])
     } catch (err) {
-      console.log('[useFileTransfer] download error', err)
+      logger.error('download error', err)
     }
   }, [sessionId])
 
   const deleteFile = useCallback(async (path: string) => {
     try {
-      console.log('[useFileTransfer] deleteFile', { sessionId, path })
       await FileService.Delete(sessionId, path)
       setFiles((prev) => prev.filter((f) => f.path !== path))
       listFiles(currentPath)
     } catch (err) {
-      console.log('[useFileTransfer] deleteFile error', err)
+      logger.error('deleteFile error', err)
     }
   }, [sessionId, currentPath, listFiles])
 
   const renameFile = useCallback(async (oldPath: string, newName: string) => {
     try {
-      console.log('[useFileTransfer] renameFile', { sessionId, oldPath, newName })
       await FileService.Rename(sessionId, oldPath, newName)
       listFiles(currentPath)
     } catch (err) {
-      console.log('[useFileTransfer] renameFile error', err)
+      logger.error('renameFile error', err)
     }
   }, [sessionId, currentPath, listFiles])
 
   const makeDir = useCallback(async (name: string) => {
     try {
-      console.log('[useFileTransfer] makeDir', { sessionId, name })
       await FileService.Mkdir(sessionId, `${currentPath}/${name}`.replace('//', '/'))
       listFiles(currentPath)
     } catch (err) {
-      console.log('[useFileTransfer] makeDir error', err)
+      logger.error('makeDir error', err)
     }
   }, [sessionId, currentPath, listFiles])
 
   const cancelTransfer = useCallback(async (jobId: string) => {
     try {
-      console.log('[useFileTransfer] cancelTransfer', jobId)
       await FileService.CancelTransfer(jobId)
       setTransfers((prev) => prev.filter((t) => t.id !== jobId))
     } catch (err) {
-      console.log('[useFileTransfer] cancelTransfer error', err)
+      logger.error('cancelTransfer error', err)
     }
   }, [])
 

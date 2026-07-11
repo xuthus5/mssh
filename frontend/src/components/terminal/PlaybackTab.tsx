@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Slider } from '@/components/ui/slider'
 import { Play, Pause } from 'lucide-react'
 import { LogService } from '@/lib/wails'
+import { logger } from '@/lib/logger'
 
 interface RecordingEntry {
   timestamp: number
@@ -71,9 +72,9 @@ export function PlaybackTab({ recordingId, title }: Props) {
       resizeObs.observe(containerRef.current)
     }
 
-    LogService.GetRecording(String(recordingId)).then((data: any) => {
+    LogService.GetRecording(String(recordingId)).then((data) => {
       if (disposed) return
-      const player = data as PlayerData
+      const player = data as PlayerData | null
       if (player?.entries) {
         setEntries(player.entries)
         term.writeln(`\x1b[1;36mRecording: ${title}\x1b[0m`)
@@ -83,7 +84,7 @@ export function PlaybackTab({ recordingId, title }: Props) {
       }
     }).catch((err: unknown) => {
       if (disposed) return
-      console.error('[PlaybackTab] GetRecording error:', err)
+      logger.error('PlaybackTab: GetRecording error:', err)
       term.writeln('\x1b[31mFailed to load recording\x1b[0m')
     })
 

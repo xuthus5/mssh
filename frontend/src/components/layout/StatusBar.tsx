@@ -4,6 +4,7 @@ import { Gauge, Clock, Circle, Network } from 'lucide-react'
 import TransferProgress from '@/components/file/TransferProgress'
 import TunnelDialog from '@/components/session/TunnelDialog'
 import type { Tunnel } from '@/hooks/useSession'
+import { logger } from '@/lib/logger'
 
 function formatTime(date: Date): string {
   const h = date.getHours().toString().padStart(2, '0')
@@ -64,14 +65,14 @@ export default function StatusBar() {
   }
 
   const handleTunnelStart = (_tunnel: Omit<Tunnel, 'id' | 'running'>) => {
-    console.log('[StatusBar] tunnel start', _tunnel)
+    logger.debug('StatusBar: tunnel start', _tunnel)
   }
 
   const handleTunnelStop = (_tunnelId: string) => {
-    console.log('[StatusBar] tunnel stop', _tunnelId)
+    logger.debug('StatusBar: tunnel stop', _tunnelId)
   }
 
-  console.log('[StatusBar]', {
+  logger.debug('[StatusBar]', {
     tabs: tabs.length,
     activeTabId,
     status: displayStatus,

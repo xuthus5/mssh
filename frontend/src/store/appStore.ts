@@ -1,5 +1,7 @@
 import { create } from 'zustand'
 import { Terminal } from '@xterm/xterm'
+import { TerminalService } from '@/lib/wails'
+import { logger } from '@/lib/logger'
 
 export interface Tab {
   id: string
@@ -104,7 +106,7 @@ export interface AppState {
   setTerminalTheme: (theme: TerminalTheme) => void
 }
 
-const DEFAULT_MAX_POOL_SIZE = 10
+const DEFAULT_MAX_POOL_SIZE = 32
 
 export const useAppStore = create<AppState>((set, get) => ({
   tabs: [],
@@ -129,14 +131,24 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
     return { tabs: [...s.tabs, tab], activeTabId: tab.id }
   }),
-  closeTab: (id) => set((s) => {
-    const newTabs = s.tabs.filter((t) => t.id !== id)
-    let newActive = s.activeTabId
-    if (s.activeTabId === id) {
-      newActive = newTabs.length > 0 ? newTabs[newTabs.length - 1].id : null
+  closeTab: (id) => {
+    const state = get()
+    const tab = state.tabs.find((t) => t.id === id)
+    if (tab?.terminalId) {
+      TerminalService.Close(tab.terminalId).catch((err: unknown) => {
+        logger.error('closeTab: close terminal error', err)
+      })
+      state.unregisterTerminal(tab.terminalId)
     }
-    return { tabs: newTabs, activeTabId: newActive }
-  }),
+    set((s) => {
+      const newTabs = s.tabs.filter((t) => t.id !== id)
+      let newActive = s.activeTabId
+      if (s.activeTabId === id) {
+        newActive = newTabs.length > 0 ? newTabs[newTabs.length - 1].id : null
+      }
+      return { tabs: newTabs, activeTabId: newActive }
+    })
+  },
   setActiveTab: (id) => set({ activeTabId: id }),
 
   registerTerminal: (id, terminal) => set((s) => {
@@ -178,6 +190,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (!oldestId) return {}
     const pool = new Map(s.terminalPool)
     pool.delete(oldestId)
+    TerminalService.Close(oldestId).catch((err: unknown) => {
+      logger.error('evictLRU: close terminal error', err)
+    })
     return { terminalPool: pool }
   }),
 
