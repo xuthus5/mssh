@@ -31,7 +31,7 @@ func TestSettingServiceTypedAPI(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	svc := NewSettingService(db, testutil.NewTestLogger())
 	entry := model.Setting{Key: "appearance.color_mode", Namespace: "appearance", Value: `"dark"`, ValueType: "string", Version: 1}
-	require.NoError(t, svc.Set(entry))
+	require.NoError(t, svc.Set(model.SettingInputFrom(entry)))
 	loaded, err := svc.Get(entry.Key)
 	require.NoError(t, err)
 	require.NotNil(t, loaded)
@@ -46,7 +46,8 @@ func TestSettingServiceTypedCollections(t *testing.T) {
 		{Key: "appearance.color_mode", Namespace: "appearance", Value: `"dark"`, ValueType: "string", Version: 1},
 		{Key: "appearance.font_size", Namespace: "appearance", Value: `14`, ValueType: "number", Version: 1},
 	}
-	require.NoError(t, svc.SetMany(settings))
+	inputs := []model.SettingInput{model.SettingInputFrom(settings[0]), model.SettingInputFrom(settings[1])}
+	require.NoError(t, svc.SetMany(inputs))
 
 	loaded, err := svc.GetMany([]string{settings[0].Key, settings[1].Key})
 	require.NoError(t, err)

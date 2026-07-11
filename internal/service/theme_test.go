@@ -25,7 +25,7 @@ func TestThemeService_CRUD(t *testing.T) {
 	assert.Len(t, themes, 0)
 
 	theme := model.Theme{Name: "Dark", IsBuiltin: false, Config: `{"bg":"#000"}`}
-	created, err := svc.Create(theme)
+	created, err := svc.Create(model.ThemeInputFrom(theme))
 	require.NoError(t, err)
 	assert.NotZero(t, created.ID)
 	assert.Equal(t, "Dark", created.Name)
@@ -37,7 +37,7 @@ func TestThemeService_CRUD(t *testing.T) {
 
 	created.Name = "Dracula"
 	created.Config = `{"bg":"#282a36"}`
-	err = svc.Update(*created)
+	err = svc.Update(model.ThemeInputFrom(*created))
 	require.NoError(t, err)
 
 	themes, err = svc.List()
@@ -93,7 +93,7 @@ func TestThemeService_CreateBuiltin(t *testing.T) {
 	svc := NewThemeService(db, testutil.NewTestLogger())
 
 	theme := model.Theme{Name: "Default", IsBuiltin: true, Config: `{}`}
-	created, err := svc.Create(theme)
+	created, err := svc.Create(model.ThemeInputFrom(theme))
 	require.NoError(t, err)
 	assert.True(t, created.IsBuiltin)
 }

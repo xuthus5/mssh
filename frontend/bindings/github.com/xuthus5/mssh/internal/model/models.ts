@@ -77,6 +77,47 @@ export class Macro {
     }
 }
 
+export class MacroInput {
+    "id": number;
+    "name": string;
+    "command": string;
+    "shortcut": string;
+    "delay_ms": number;
+    "sort_order": number;
+
+    /** Creates a new MacroInput instance. */
+    constructor($$source: Partial<MacroInput> = {}) {
+        if (!("id" in $$source)) {
+            this["id"] = 0;
+        }
+        if (!("name" in $$source)) {
+            this["name"] = "";
+        }
+        if (!("command" in $$source)) {
+            this["command"] = "";
+        }
+        if (!("shortcut" in $$source)) {
+            this["shortcut"] = "";
+        }
+        if (!("delay_ms" in $$source)) {
+            this["delay_ms"] = 0;
+        }
+        if (!("sort_order" in $$source)) {
+            this["sort_order"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new MacroInput instance from a string or object.
+     */
+    static createFrom($$source: any = {}): MacroInput {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new MacroInput($$parsedSource as Partial<MacroInput>);
+    }
+}
+
 export enum RecordType {
     /**
      * The Go zero value for the underlying type of the enum.
@@ -273,6 +314,65 @@ export class SessionFolder {
     }
 }
 
+export class SessionInput {
+    "id": number;
+    "folder_id": number | null;
+    "name": string;
+    "host": string;
+    "port": number;
+    "username": string;
+    "auth_method": AuthMethod;
+    "password"?: string;
+    "key_id"?: number | null;
+    "keep_alive": number;
+    "term_type": string;
+    "sort_order": number;
+
+    /** Creates a new SessionInput instance. */
+    constructor($$source: Partial<SessionInput> = {}) {
+        if (!("id" in $$source)) {
+            this["id"] = 0;
+        }
+        if (!("folder_id" in $$source)) {
+            this["folder_id"] = null;
+        }
+        if (!("name" in $$source)) {
+            this["name"] = "";
+        }
+        if (!("host" in $$source)) {
+            this["host"] = "";
+        }
+        if (!("port" in $$source)) {
+            this["port"] = 0;
+        }
+        if (!("username" in $$source)) {
+            this["username"] = "";
+        }
+        if (!("auth_method" in $$source)) {
+            this["auth_method"] = AuthMethod.$zero;
+        }
+        if (!("keep_alive" in $$source)) {
+            this["keep_alive"] = 0;
+        }
+        if (!("term_type" in $$source)) {
+            this["term_type"] = "";
+        }
+        if (!("sort_order" in $$source)) {
+            this["sort_order"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new SessionInput instance from a string or object.
+     */
+    static createFrom($$source: any = {}): SessionInput {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new SessionInput($$parsedSource as Partial<SessionInput>);
+    }
+}
+
 export class SessionLog {
     "id": number;
     "session_id": number | null;
@@ -348,6 +448,43 @@ export class Setting {
     }
 }
 
+export class SettingInput {
+    "key": string;
+    "namespace": string;
+    "value": string;
+    "value_type": string;
+    "version": number;
+
+    /** Creates a new SettingInput instance. */
+    constructor($$source: Partial<SettingInput> = {}) {
+        if (!("key" in $$source)) {
+            this["key"] = "";
+        }
+        if (!("namespace" in $$source)) {
+            this["namespace"] = "";
+        }
+        if (!("value" in $$source)) {
+            this["value"] = "";
+        }
+        if (!("value_type" in $$source)) {
+            this["value_type"] = "";
+        }
+        if (!("version" in $$source)) {
+            this["version"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new SettingInput instance from a string or object.
+     */
+    static createFrom($$source: any = {}): SettingInput {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new SettingInput($$parsedSource as Partial<SettingInput>);
+    }
+}
+
 export class Theme {
     "id": number;
     "name": string;
@@ -382,6 +519,39 @@ export class Theme {
     static createFrom($$source: any = {}): Theme {
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         return new Theme($$parsedSource as Partial<Theme>);
+    }
+}
+
+export class ThemeInput {
+    "id": number;
+    "name": string;
+    "is_builtin": boolean;
+    "config": string;
+
+    /** Creates a new ThemeInput instance. */
+    constructor($$source: Partial<ThemeInput> = {}) {
+        if (!("id" in $$source)) {
+            this["id"] = 0;
+        }
+        if (!("name" in $$source)) {
+            this["name"] = "";
+        }
+        if (!("is_builtin" in $$source)) {
+            this["is_builtin"] = false;
+        }
+        if (!("config" in $$source)) {
+            this["config"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new ThemeInput instance from a string or object.
+     */
+    static createFrom($$source: any = {}): ThemeInput {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new ThemeInput($$parsedSource as Partial<ThemeInput>);
     }
 }
 
@@ -429,6 +599,49 @@ export class Tunnel {
     static createFrom($$source: any = {}): Tunnel {
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         return new Tunnel($$parsedSource as Partial<Tunnel>);
+    }
+}
+
+export class TunnelInput {
+    "id": number;
+    "session_id": number;
+    "name": string;
+    "type": TunnelType;
+    "local_host"?: string;
+    "local_port": number;
+    "remote_host"?: string;
+    "remote_port": number;
+
+    /** Creates a new TunnelInput instance. */
+    constructor($$source: Partial<TunnelInput> = {}) {
+        if (!("id" in $$source)) {
+            this["id"] = 0;
+        }
+        if (!("session_id" in $$source)) {
+            this["session_id"] = 0;
+        }
+        if (!("name" in $$source)) {
+            this["name"] = "";
+        }
+        if (!("type" in $$source)) {
+            this["type"] = TunnelType.$zero;
+        }
+        if (!("local_port" in $$source)) {
+            this["local_port"] = 0;
+        }
+        if (!("remote_port" in $$source)) {
+            this["remote_port"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new TunnelInput instance from a string or object.
+     */
+    static createFrom($$source: any = {}): TunnelInput {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new TunnelInput($$parsedSource as Partial<TunnelInput>);
     }
 }
 
