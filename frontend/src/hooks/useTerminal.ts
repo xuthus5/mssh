@@ -1,7 +1,6 @@
 import { useEffect, useRef, type RefObject } from 'react'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
-import { WebglAddon } from '@xterm/addon-webgl'
 import { useAppStore } from '@/store/appStore'
 import { TerminalService } from '@/lib/wails'
 import { Events } from '@wailsio/runtime'
@@ -43,12 +42,6 @@ export function useTerminal(
     if (containerRef.current) {
       term.open(containerRef.current)
       term.loadAddon(fitAddon)
-      try {
-        const webglAddon = new WebglAddon()
-        term.loadAddon(webglAddon)
-      } catch {
-        // WebGL not available, fallback to Canvas renderer
-      }
       initialResizeTimer = window.setTimeout(() => {
         fitAddon.fit()
         term.focus()
