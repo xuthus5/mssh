@@ -29,6 +29,7 @@ type App struct {
 	Sync     *service.SyncService
 	Setting  *service.SettingService
 	About    *service.AboutService
+	Font     *service.FontService
 }
 
 type Options struct {
@@ -141,7 +142,6 @@ func New(opts Options) (*App, error) {
 	tunnelSvc := service.NewTunnelService(db, sessionSvc, eventBus, logger)
 
 	keySvc := service.NewKeyService(db, cryptoAdapter, logger)
-
 	macroSvc := service.NewMacroService(db, terminalSvc, logger)
 	themeSvc := service.NewThemeService(db, logger)
 	logSvc := service.NewLogService(db, opts.DataDir, logger)
@@ -169,6 +169,7 @@ func New(opts Options) (*App, error) {
 		Sync:     syncSvc,
 		Setting:  service.NewSettingService(db, logger),
 		About:    service.NewAboutService(),
+		Font:     service.NewFontService(logger),
 	}, nil
 }
 
