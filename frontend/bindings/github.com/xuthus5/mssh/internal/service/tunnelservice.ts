@@ -9,8 +9,8 @@ import { Call as $Call, CancellablePromise as $CancellablePromise, Create as $Cr
 // @ts-ignore: Unused imports
 import * as model$0 from "../model/models.js";
 
-export function Create(tunnel: model$0.Tunnel): $CancellablePromise<model$0.Tunnel | null> {
-    return $Call.ByName("github.com/xuthus5/mssh/internal/service.TunnelService.Create", tunnel).then(($result: any) => {
+export function Create(input: model$0.TunnelInput): $CancellablePromise<model$0.Tunnel | null> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.TunnelService.Create", input).then(($result: any) => {
         return $$createType1($result);
     });
 }
@@ -33,8 +33,8 @@ export function Stop(tunnelID: number): $CancellablePromise<void> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.TunnelService.Stop", tunnelID);
 }
 
-export function Update(tunnel: model$0.Tunnel): $CancellablePromise<void> {
-    return $Call.ByName("github.com/xuthus5/mssh/internal/service.TunnelService.Update", tunnel);
+export function Update(input: model$0.TunnelInput): $CancellablePromise<void> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.TunnelService.Update", input);
 }
 
 // Private type creation functions

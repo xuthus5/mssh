@@ -9,8 +9,8 @@ import { Call as $Call, CancellablePromise as $CancellablePromise, Create as $Cr
 // @ts-ignore: Unused imports
 import * as model$0 from "../model/models.js";
 
-export function Create(theme: model$0.Theme): $CancellablePromise<model$0.Theme | null> {
-    return $Call.ByName("github.com/xuthus5/mssh/internal/service.ThemeService.Create", theme).then(($result: any) => {
+export function Create(input: model$0.ThemeInput): $CancellablePromise<model$0.Theme | null> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.ThemeService.Create", input).then(($result: any) => {
         return $$createType1($result);
     });
 }
@@ -33,8 +33,8 @@ export function SetActive(themeID: string): $CancellablePromise<void> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.ThemeService.SetActive", themeID);
 }
 
-export function Update(theme: model$0.Theme): $CancellablePromise<void> {
-    return $Call.ByName("github.com/xuthus5/mssh/internal/service.ThemeService.Update", theme);
+export function Update(input: model$0.ThemeInput): $CancellablePromise<void> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.ThemeService.Update", input);
 }
 
 // Private type creation functions

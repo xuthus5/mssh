@@ -105,7 +105,8 @@ func (s *SessionService) ListSessions(folderID *int64) ([]model.Session, error) 
 	return store.ListSessions(s.db, folderID)
 }
 
-func (s *SessionService) CreateSession(session model.Session) (*model.Session, error) {
+func (s *SessionService) CreateSession(input model.SessionInput) (*model.Session, error) {
+	session := input.Session()
 	s.logger.Info("creating session", "name", session.Name, "authMethod", session.AuthMethod, "passwordLen", len(session.Password))
 	result, err := store.CreateSession(s.db, session)
 	if err != nil {
@@ -114,7 +115,8 @@ func (s *SessionService) CreateSession(session model.Session) (*model.Session, e
 	return result, err
 }
 
-func (s *SessionService) UpdateSession(session model.Session) error {
+func (s *SessionService) UpdateSession(input model.SessionInput) error {
+	session := input.Session()
 	s.logger.Info("updating session", "id", session.ID, "name", session.Name, "passwordLen", len(session.Password))
 	err := store.UpdateSession(s.db, session)
 	if err != nil {

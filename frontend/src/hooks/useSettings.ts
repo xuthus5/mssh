@@ -5,11 +5,11 @@ import { logger } from '@/lib/logger'
 import { KeyType } from '../../bindings/github.com/xuthus5/mssh/internal/model/models'
 import { Dialogs } from '@wailsio/runtime'
 import { toast } from '@/components/ui/toast'
-import type { Setting } from '../../bindings/github.com/xuthus5/mssh/internal/model/models'
+import type { Setting, SettingInput } from '../../bindings/github.com/xuthus5/mssh/internal/model/models'
 
-function settingEntry(key: string, value: unknown): Setting {
+function settingEntry(key: string, value: unknown): SettingInput {
   const valueType = value === null ? 'null' : Array.isArray(value) ? 'array' : typeof value === 'object' ? 'object' : typeof value
-  return { key, namespace: key.split('.')[0], value: JSON.stringify(value), value_type: valueType, version: 1, updated_at: '' } as Setting
+  return { key, namespace: key.split('.')[0], value: JSON.stringify(value), value_type: valueType, version: 1 }
 }
 
 function settingValue<T>(settings: { [_ in string]?: Setting }, key: string, fallback: T): T {

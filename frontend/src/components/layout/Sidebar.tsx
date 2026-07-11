@@ -18,7 +18,7 @@ import { useSettings } from '@/hooks/useSettings'
 import type { CommandItem } from '@/components/session/QuickCommands'
 import { useAppStore } from '@/store/appStore'
 import { MacroService } from '@/lib/wails'
-import type { Macro } from '../../../bindings/github.com/xuthus5/mssh/internal/model/models'
+import type { Macro, MacroInput } from '../../../bindings/github.com/xuthus5/mssh/internal/model/models'
 import { logger } from '@/lib/logger'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -170,7 +170,8 @@ export default function Sidebar() {
   const handleMacroAdd = useCallback(async (item: Omit<CommandItem, 'id'>) => {
     try {
       logger.debug('Sidebar: MacroService.Create', item)
-      const result = await MacroService.Create({ name: item.name, command: item.command, shortcut: item.shortcut, id: 0, delay_ms: 0, sort_order: 0, created_at: '' } as Macro)
+      const input = { name: item.name, command: item.command, shortcut: item.shortcut, id: 0, delay_ms: 0, sort_order: 0 } satisfies MacroInput
+      const result = await MacroService.Create(input)
       const newItem: CommandItem = {
         id: String(result?.id ?? ''),
         name: result?.name ?? item.name,

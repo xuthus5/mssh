@@ -141,7 +141,7 @@ func TestSessionService_SessionCRUD(t *testing.T) {
 		Name: "web-server", Host: "10.0.0.1", Port: 22, Username: "root",
 		AuthMethod: model.AuthPassword, Password: "encrypted", KeepAlive: 30, TermType: "xterm-256color",
 	}
-	created, err := svc.CreateSession(sess)
+	created, err := svc.CreateSession(model.SessionInputFrom(sess))
 	require.NoError(t, err)
 	assert.NotZero(t, created.ID)
 
@@ -155,7 +155,7 @@ func TestSessionService_SessionCRUD(t *testing.T) {
 	assert.Equal(t, created.ID, fetched.ID)
 
 	created.Name = "db-server"
-	err = svc.UpdateSession(*created)
+	err = svc.UpdateSession(model.SessionInputFrom(*created))
 	require.NoError(t, err)
 
 	fetched, err = svc.GetSession(created.ID)
@@ -186,7 +186,7 @@ func TestSessionService_ConnectDisconnect(t *testing.T) {
 		Name: "test", Host: "127.0.0.1", Port: port, Username: "root",
 		AuthMethod: model.AuthPassword, Password: "", KeepAlive: 30, TermType: "xterm-256color",
 	}
-	created, err := svc.CreateSession(sess)
+	created, err := svc.CreateSession(model.SessionInputFrom(sess))
 	require.NoError(t, err)
 
 	ctx := context.Background()

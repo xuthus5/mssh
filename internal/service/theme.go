@@ -21,12 +21,14 @@ func (t *ThemeService) List() ([]model.Theme, error) {
 	return store.ListThemes(t.db)
 }
 
-func (t *ThemeService) Create(theme model.Theme) (*model.Theme, error) {
+func (t *ThemeService) Create(input model.ThemeInput) (*model.Theme, error) {
+	theme := input.Theme()
 	t.logger.Info("creating theme", "name", theme.Name)
 	return store.CreateTheme(t.db, theme)
 }
 
-func (t *ThemeService) Update(theme model.Theme) error {
+func (t *ThemeService) Update(input model.ThemeInput) error {
+	theme := input.Theme()
 	t.logger.Info("updating theme", "id", theme.ID, "name", theme.Name)
 	return store.UpdateTheme(t.db, theme)
 }
