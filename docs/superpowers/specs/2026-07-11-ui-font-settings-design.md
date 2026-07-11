@@ -20,16 +20,19 @@
 `GeneralSettings` 增加：
 
 - `uiFontFamily: string`
+- `uiFontFallbackFamily: string`
 - `uiFontSize: number`
 
 数据库设置键：
 
 - `appearance.ui_font_family`
+- `appearance.ui_font_fallback_family`
 - `appearance.ui_font_size`
 
 默认值：
 
 - 字体家族：`Geist Variable`
+- Fallback 字体：`sans-serif`
 - 字体大小：`14`
 
 字体大小在前后端统一限制为 `12–24px`。无效或缺失的持久化值回退到默认值。
@@ -55,7 +58,7 @@
 - `--app-font-family`
 - `--app-font-size`
 
-`html` 使用这两个变量控制应用字体。终端组件继续读取 `terminal.theme.fontFamily` 与 `terminal.theme.fontSize`，不得引用应用字体变量。
+`html` 使用这些变量控制应用字体，最终字体栈为“主字体、Fallback 字体、`sans-serif`”。主字体与 Fallback 字体相同时，Fallback 自动规范化为 `sans-serif`。终端组件继续读取 `terminal.theme.fontFamily` 与 `terminal.theme.fontSize`，不得引用应用字体变量。
 
 新增字体设置辅助模块，负责：
 

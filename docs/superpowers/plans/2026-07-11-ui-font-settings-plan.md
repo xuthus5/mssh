@@ -4,6 +4,8 @@
 
 **Goal:** 在通用设置中提供跨平台系统字体选择和界面字号配置，并支持即时预览、取消恢复、保存与启动恢复。
 
+**Extension:** 增加单个可配置 Fallback 字体，字体栈固定为“主字体、Fallback 字体、`sans-serif`”，并禁止主备字体相同。
+
 **Architecture:** Go `FontService` 负责发现字体目录、解析字体家族并缓存结果；React `useSettings` 负责字体配置加载与持久化；独立字体样式辅助模块负责校验和 CSS 变量应用；设置弹窗只管理表单草稿与恢复语义。
 
 **Tech Stack:** Go 1.26、Wails v3、`golang.org/x/image/font/sfnt`、React 19、TypeScript、Vitest、Tailwind CSS v4、shadcn/ui。
