@@ -19,6 +19,7 @@ vi.mock('@/lib/wails', () => ({
 }))
 
 import { WindowTitleBar } from '@/components/layout/WindowTitleBar'
+import { useAppStore } from '@/store/appStore'
 
 describe('WindowTitleBar', () => {
   beforeEach(() => {
@@ -27,6 +28,7 @@ describe('WindowTitleBar', () => {
     setSetting.mockResolvedValue(undefined)
     localStorage.clear()
     document.documentElement.classList.remove('light')
+    useAppStore.setState({ sidebarTab: 'sessions' })
   })
 
   it('routes window controls to the Wails runtime', async () => {
@@ -63,5 +65,15 @@ describe('WindowTitleBar', () => {
     await userEvent.click(screen.getByRole('button', { name: '打开设置' }))
     expect(listener).toHaveBeenCalledOnce()
     window.removeEventListener('mssh:open-settings', listener)
+  })
+
+  it('switches the sidebar navigation from the window title bar', async () => {
+    render(<WindowTitleBar />)
+    expect(screen.getByRole('tab', { name: '会话' })).toHaveAttribute('aria-selected', 'true')
+
+    await userEvent.click(screen.getByRole('tab', { name: '宏' }))
+
+    expect(useAppStore.getState().sidebarTab).toBe('macros')
+    expect(screen.queryByText('Secure Shell Client')).not.toBeInTheDocument()
   })
 })

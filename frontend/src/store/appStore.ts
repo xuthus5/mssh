@@ -57,6 +57,7 @@ export interface TerminalTheme {
 }
 
 export type ConnectionStatus = 'connecting' | 'connected' | 'disconnected'
+export type SidebarTab = 'sessions' | 'macros'
 
 const DEFAULT_THEME: TerminalTheme = {
   background: '#0d1117',
@@ -97,6 +98,7 @@ export interface AppState {
   activePaneId: string | null
   recordingState: Record<string, 'idle' | 'starting' | 'recording' | 'stopping' | 'error'>
   tunnelState: Record<string, 'running' | 'stopped'>
+  sidebarTab: SidebarTab
   addTransfer: (job: TransferJob) => void
   removeTransfer: (id: string) => void
   updateTransfer: (id: string, updates: Partial<Pick<TransferJob, 'transferredBytes' | 'speed' | 'totalBytes' | 'eta' | 'status' | 'error'>>) => void
@@ -115,6 +117,7 @@ export interface AppState {
   setAppStatus: (status: string) => void
   setTerminalTheme: (theme: TerminalTheme) => void
   setMaxPoolSize: (size: number) => void
+  setSidebarTab: (tab: SidebarTab) => void
 }
 
 const DEFAULT_MAX_POOL_SIZE = 32
@@ -131,6 +134,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   activePaneId: null,
   recordingState: {},
   tunnelState: {},
+  sidebarTab: 'sessions',
 
   addTransfer: (job) => set((s) => ({ transfers: [...s.transfers, job] })),
   removeTransfer: (id) => set((s) => ({ transfers: s.transfers.filter((t) => t.id !== id) })),
@@ -248,4 +252,5 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   setTerminalTheme: (theme) => set({ terminalTheme: theme }),
   setMaxPoolSize: (maxPoolSize) => set({ maxPoolSize }),
+  setSidebarTab: (sidebarTab) => set({ sidebarTab }),
 }))
