@@ -1,3 +1,10 @@
+
+export const Create = {
+  Array: (fn: any) => (data: any) => (data ?? []).map(fn),
+  Nullable: (fn: any) => (data: any) => data ? fn(data) : null,
+  ByteSlice: (data: any) => data ?? [],
+}
+
 const handlers = new Map<string, (...args: any[]) => Promise<any>>()
 const eventCallbacks = new Map<string, Array<(event: any) => void>>()
 
