@@ -1,3 +1,9 @@
 build/bin/
+coverage.out
+coverage.html
 .idea
 .opencode
+frontend/node_modules/
+frontend/dist/
+*.msshlog
+*.log
