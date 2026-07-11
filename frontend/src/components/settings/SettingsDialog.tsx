@@ -20,6 +20,7 @@ import { SyncPanel } from '@/components/settings/SyncPanel'
 import type { GeneralSettings, TerminalTheme, KeyInfo, SyncConfig } from '@/hooks/useSettings'
 import type { Folder, Session } from '@/hooks/useSession'
 import { FolderManager } from '@/components/settings/FolderManager'
+import { useDraggableDialog } from '@/hooks/useDraggableDialog'
 
 const TERMINAL_TYPE_OPTIONS = ['xterm-256color', 'xterm', 'vt100', 'linux'].map((value) => ({ value, label: value }))
 
@@ -74,6 +75,7 @@ export default function SettingsDialog({
     general.defaultTermType,
   )
   const [saving, setSaving] = useState(false)
+  const draggable = useDraggableDialog(open)
 
   useEffect(() => {
     setMaxPoolSize(general.maxPoolSize.toString())
@@ -93,8 +95,8 @@ export default function SettingsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex h-[min(720px,calc(100dvh-3rem))] max-h-[calc(100dvh-3rem)] flex-col overflow-hidden sm:max-w-3xl">
-        <DialogHeader>
+      <DialogContent ref={draggable.contentRef} style={draggable.style} className="flex h-[min(720px,calc(100dvh-3rem))] max-h-[calc(100dvh-3rem)] flex-col overflow-hidden sm:max-w-3xl">
+        <DialogHeader data-testid="settings-drag-handle" {...draggable.dragHandleProps} className="-mx-4 -mt-4 cursor-move touch-none select-none rounded-t-xl border-b border-border px-4 py-3 active:cursor-grabbing">
           <DialogTitle>设置</DialogTitle>
         </DialogHeader>
         <Tabs value={tab} onValueChange={setTab} orientation="vertical" className="min-h-0 flex-1 flex-row gap-4 overflow-hidden">
