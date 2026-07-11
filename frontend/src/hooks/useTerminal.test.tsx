@@ -22,10 +22,6 @@ vi.mock('@xterm/addon-fit', () => ({
   FitAddon: class { name = 'fit'; fit() {} },
 }))
 
-vi.mock('@xterm/addon-webgl', () => ({
-  WebglAddon: class { name = 'webgl' },
-}))
-
 vi.mock('@/lib/wails', () => ({
   TerminalService: { Resize: vi.fn(async () => {}), Write: vi.fn(async () => {}), Close: vi.fn(async () => {}) },
 }))
@@ -47,7 +43,7 @@ describe('useTerminal', () => {
 
     const { unmount } = renderHook(() => useTerminal('term-1', containerRef))
 
-    expect(calls.slice(0, 3)).toEqual(['open', 'load:fit', 'load:webgl'])
+    expect(calls).toEqual(['open', 'load:fit'])
     act(() => unmount())
     expect(calls.at(-1)).toBe('dispose')
   })
