@@ -210,7 +210,8 @@ func TestLogService_DeleteNotFound(t *testing.T) {
 	svc := NewLogService(db, t.TempDir(), testutil.NewTestLogger())
 
 	err := svc.Delete(999)
-	assert.NoError(t, err)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "delete")
 }
 
 func TestLogService_StopRecordingTwice(t *testing.T) {
@@ -268,4 +269,66 @@ func TestLogService_DeleteWithDataPath(t *testing.T) {
 	logs, err := svc.List(nil)
 	require.NoError(t, err)
 	assert.Len(t, logs, 0)
+}
+
+func TestLogService_StartTerminalRecording(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	svc := NewLogService(db, t.TempDir(), testutil.NewTestLogger())
+
+	sessionSvc := NewSessionService(db, newMockEventBus(), 30, "", nil, testutil.NewTestLogger())
+	sess := model.Session{
+		Name: "test-term-rec", Host: "10.0.0.1", Port: 22, Username: "root",
+		AuthMethod: model.AuthPassword, Password: "enc", KeepAlive: 30, TermType: "xterm",
+	}
+	createdSess, err := sessionSvc.CreateSession(sess)
+	require.NoError(t, err)
+
+	logID, err := svc.StartTerminalRecording("term-test-1", createdSess.ID, 80, 24, "xterm")
+	require.NoError(t, err)
+	assert.NotZero(t, logID)
+
+	err = svc.StopTerminalRecording("term-test-1")
+	require.NoError(t, err)
+
+	err = svc.StopTerminalRecording("term-test-1")
+	assert.Error(t, err)
+}
+
+func TestLogService_StopTerminalRecordingNotFound(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	svc := NewLogService(db, t.TempDir(), testutil.NewTestLogger())
+
+	err := svc.StopTerminalRecording("nonexistent")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "not active")
+}
+
+func TestLogService_HandleOutput(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	svc := NewLogService(db, t.TempDir(), testutil.NewTestLogger())
+
+	sessionSvc := NewSessionService(db, newMockEventBus(), 30, "", nil, testutil.NewTestLogger())
+	sess := model.Session{
+		Name: "test-handle-out", Host: "10.0.0.1", Port: 22, Username: "root",
+		AuthMethod: model.AuthPassword, Password: "enc", KeepAlive: 30, TermType: "xterm",
+	}
+	createdSess, err := sessionSvc.CreateSession(sess)
+	require.NoError(t, err)
+
+	_, err = svc.StartTerminalRecording("term-out", createdSess.ID, 80, 24, "xterm")
+	require.NoError(t, err)
+
+	svc.HandleOutput("term-out", []byte("hello output"))
+	svc.HandleOutput("nonexistent", []byte("no-op"))
+
+	err = svc.StopTerminalRecording("term-out")
+	require.NoError(t, err)
+}
+
+func TestLogService_GetRecordingNotFound(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	svc := NewLogService(db, t.TempDir(), testutil.NewTestLogger())
+
+	_, err := svc.GetRecording("/nonexistent/recording.bin")
+	assert.Error(t, err)
 }
