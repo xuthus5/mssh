@@ -6,6 +6,8 @@ import { Slider } from '@/components/ui/slider'
 import { Play, Pause } from 'lucide-react'
 import { LogService } from '@/lib/wails'
 import { logger } from '@/lib/logger'
+import { useAppStore } from '@/store/appStore'
+import { xtermTheme } from '@/lib/terminalTheme'
 
 interface RecordingEntry {
   timestamp: number
@@ -42,16 +44,14 @@ export function PlaybackTab({ recordingId, title }: Props) {
 
   useEffect(() => {
     let disposed = false
+    const terminalTheme = useAppStore.getState().terminalTheme
 
     const term = new Terminal({
       cursorBlink: false,
       disableStdin: true,
-      fontSize: 14,
-      fontFamily: '"JetBrains Mono", "Cascadia Code", monospace',
-      theme: {
-        background: '#0d1117',
-        foreground: '#c9d1d9',
-      },
+      fontSize: terminalTheme.fontSize,
+      fontFamily: terminalTheme.fontFamily,
+      theme: xtermTheme(terminalTheme),
       scrollback: 10000,
     })
     termRef.current = term
