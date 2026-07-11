@@ -95,11 +95,93 @@ func Migrate(db *sql.DB) error {
 			data_path  TEXT NOT NULL
 		)`,
 	}
-	for _, m := range migrations {
-		_, err := db.Exec(m)
-		if err != nil {
+	if err := executeMigrations(db, migrations); err != nil {
+		return err
+	}
+	if err := ensureDefaultFolderSchema(db); err != nil {
+		return fmt.Errorf("migration: %w", err)
+	}
+	return nil
+}
+
+func executeMigrations(db *sql.DB, migrations []string) error {
+	for _, migration := range migrations {
+		if _, err := db.Exec(migration); err != nil {
 			return fmt.Errorf("migration: %w", err)
 		}
 	}
 	return nil
+}
+
+func ensureDefaultFolderSchema(db *sql.DB) error {
+	hasColumn, err := folderDefaultColumnExists(db)
+	if err != nil {
+		return err
+	}
+	if !hasColumn {
+		if _, err := db.Exec("ALTER TABLE session_folders ADD COLUMN is_default INTEGER NOT NULL DEFAULT 0"); err != nil {
+			return err
+		}
+	}
+	defaultID, err := resolveDefaultFolderID(db)
+	if err != nil {
+		return err
+	}
+	if _, err = db.Exec("UPDATE session_folders SET is_default = CASE WHEN id = ? THEN 1 ELSE 0 END", defaultID); err != nil {
+		return err
+	}
+	_, err = db.Exec("UPDATE sessions SET folder_id = ? WHERE folder_id IS NULL", defaultID)
+	return err
+}
+
+func folderDefaultColumnExists(db *sql.DB) (bool, error) {
+	rows, err := db.Query("PRAGMA table_info(session_folders)")
+	if err != nil {
+		return false, err
+	}
+	hasColumn := false
+	for rows.Next() {
+		var cid int
+		var name, columnType string
+		var notNull, primaryKey int
+		var defaultValue any
+		if err := rows.Scan(&cid, &name, &columnType, &notNull, &defaultValue, &primaryKey); err != nil {
+			_ = rows.Close()
+			return false, err
+		}
+		if name == "is_default" {
+			hasColumn = true
+		}
+	}
+	if err := rows.Close(); err != nil {
+		return false, err
+	}
+	return hasColumn, nil
+}
+
+func resolveDefaultFolderID(db *sql.DB) (int64, error) {
+	var defaultID sql.NullInt64
+	if err := db.QueryRow("SELECT id FROM session_folders WHERE is_default = 1 ORDER BY id LIMIT 1").Scan(&defaultID); err != nil && err != sql.ErrNoRows {
+		return 0, err
+	}
+	if !defaultID.Valid {
+		var firstID sql.NullInt64
+		if err := db.QueryRow("SELECT id FROM session_folders ORDER BY id LIMIT 1").Scan(&firstID); err != nil && err != sql.ErrNoRows {
+			return 0, err
+		}
+		if firstID.Valid {
+			defaultID = firstID
+		} else {
+			result, err := db.Exec("INSERT INTO session_folders (name, is_default) VALUES ('默认分组', 1)")
+			if err != nil {
+				return 0, err
+			}
+			id, err := result.LastInsertId()
+			if err != nil {
+				return 0, err
+			}
+			defaultID = sql.NullInt64{Int64: id, Valid: true}
+		}
+	}
+	return defaultID.Int64, nil
 }

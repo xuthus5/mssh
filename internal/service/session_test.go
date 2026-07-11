@@ -80,22 +80,22 @@ func TestSessionService_FolderCRUD(t *testing.T) {
 
 	folders, err := svc.ListFolders()
 	require.NoError(t, err)
-	assert.Len(t, folders, 0)
+	require.Len(t, folders, 1)
+	assert.True(t, folders[0].IsDefault)
 
-	var parentID int64 = 0
-	folder, err := svc.CreateFolder("生产环境", &parentID)
+	folder, err := svc.CreateFolder("生产环境", nil)
 	require.NoError(t, err)
 	assert.Equal(t, "生产环境", folder.Name)
 
 	folders, err = svc.ListFolders()
 	require.NoError(t, err)
-	assert.Len(t, folders, 1)
+	assert.Len(t, folders, 2)
 
 	err = svc.UpdateFolder(folder.ID, "开发环境")
 	require.NoError(t, err)
 	folders, err = svc.ListFolders()
 	require.NoError(t, err)
-	assert.Equal(t, "开发环境", folders[0].Name)
+	assert.Equal(t, "开发环境", folders[1].Name)
 
 	var newParent int64 = 1
 	err = svc.MoveFolder(folder.ID, &newParent)
@@ -105,7 +105,27 @@ func TestSessionService_FolderCRUD(t *testing.T) {
 	require.NoError(t, err)
 	folders, err = svc.ListFolders()
 	require.NoError(t, err)
-	assert.Len(t, folders, 0)
+	assert.Len(t, folders, 1)
+}
+
+func TestSessionService_SetDefaultFolder(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	svc := NewSessionService(db, newMockEventBus(), 30, "", nil, testutil.NewTestLogger())
+	folder, err := svc.CreateFolder("生产环境", nil)
+	require.NoError(t, err)
+	require.NoError(t, svc.SetDefaultFolder(folder.ID))
+	folders, err := svc.ListFolders()
+	require.NoError(t, err)
+	for _, item := range folders {
+		assert.Equal(t, item.ID == folder.ID, item.IsDefault)
+	}
+}
+
+func TestSessionService_SetDefaultFolderError(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	svc := NewSessionService(db, newMockEventBus(), 30, "", nil, testutil.NewTestLogger())
+	require.NoError(t, db.Close())
+	assert.Error(t, svc.SetDefaultFolder(1))
 }
 
 func TestSessionService_SessionCRUD(t *testing.T) {

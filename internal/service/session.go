@@ -86,6 +86,11 @@ func (s *SessionService) DeleteFolder(id int64) error {
 	return err
 }
 
+func (s *SessionService) SetDefaultFolder(id int64) error {
+	s.logger.Info("setting default folder", "id", id)
+	return store.SetDefaultFolder(s.db, id)
+}
+
 func (s *SessionService) MoveFolder(id int64, newParentID *int64) error {
 	s.logger.Info("moving folder", "id", id, "newParentID", newParentID)
 	err := store.MoveFolder(s.db, id, newParentID)
