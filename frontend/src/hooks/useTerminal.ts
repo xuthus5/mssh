@@ -46,9 +46,10 @@ export function useTerminal(
       // WebGL not available, fallback to Canvas renderer
     }
 
+    let initialResizeTimer: number | undefined
     if (containerRef.current) {
       term.open(containerRef.current)
-      setTimeout(() => {
+      initialResizeTimer = window.setTimeout(() => {
         fitAddon.fit()
         term.focus()
         storeRef.current.setActivePane(terminalID)
@@ -100,6 +101,7 @@ export function useTerminal(
     }
 
     return () => {
+      if (initialResizeTimer !== undefined) window.clearTimeout(initialResizeTimer)
       dataDispose.dispose()
       unsubOutput()
       resizeObs.disconnect()

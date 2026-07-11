@@ -168,7 +168,6 @@ export const useAppStore = create<AppState>((set, get) => ({
     const terminalId = tab?.terminalId
     if (terminalId) {
       const pool = new Map(s.terminalPool)
-      pool.get(terminalId)?.terminal.dispose()
       pool.delete(terminalId)
       const connectionStatus = { ...s.connectionStatus }
       delete connectionStatus[terminalId]
