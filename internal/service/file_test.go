@@ -98,7 +98,7 @@ func createSFTPFileService(t *testing.T, sftpCtx *mockSFTPContext) (*FileService
 		Name: "sftp-test", Host: "127.0.0.1", Port: port, Username: "test",
 		AuthMethod: model.AuthPassword, Password: "", KeepAlive: 30, TermType: "xterm-256color",
 	}
-	created, err := sessionSvc.CreateSession(sess)
+	created, err := sessionSvc.CreateSession(model.SessionInputFrom(sess))
 	require.NoError(t, err)
 
 	svc := NewFileService(sessionSvc, newMockEventBus(), testutil.NewTestLogger())
@@ -129,7 +129,7 @@ func TestFileService_IntegratedSFTP(t *testing.T) {
 		Name: "sftp-integrated", Host: "127.0.0.1", Port: port, Username: "test",
 		AuthMethod: model.AuthPassword, Password: "", KeepAlive: 30, TermType: "xterm-256color",
 	}
-	created, err := sessionSvc.CreateSession(sess)
+	created, err := sessionSvc.CreateSession(model.SessionInputFrom(sess))
 	require.NoError(t, err)
 
 	svc := NewFileService(sessionSvc, newMockEventBus(), testutil.NewTestLogger())
@@ -182,7 +182,7 @@ func TestFileService_ListDir(t *testing.T) {
 		Name: "test-file", Host: "127.0.0.1", Port: port, Username: "root",
 		AuthMethod: model.AuthPassword, Password: "", KeepAlive: 30, TermType: "xterm-256color",
 	}
-	created, err := sessionSvc.CreateSession(sess)
+	created, err := sessionSvc.CreateSession(model.SessionInputFrom(sess))
 	require.NoError(t, err)
 
 	svc := NewFileService(sessionSvc, newMockEventBus(), testutil.NewTestLogger())
@@ -214,7 +214,7 @@ func TestFileService_Delete(t *testing.T) {
 		Name: "test-file", Host: "127.0.0.1", Port: port, Username: "root",
 		AuthMethod: model.AuthPassword, Password: "", KeepAlive: 30, TermType: "xterm-256color",
 	}
-	created, err := sessionSvc.CreateSession(sess)
+	created, err := sessionSvc.CreateSession(model.SessionInputFrom(sess))
 	require.NoError(t, err)
 
 	svc := NewFileService(sessionSvc, newMockEventBus(), testutil.NewTestLogger())
@@ -236,7 +236,7 @@ func TestFileService_Mkdir(t *testing.T) {
 		Name: "test-file", Host: "127.0.0.1", Port: port, Username: "root",
 		AuthMethod: model.AuthPassword, Password: "", KeepAlive: 30, TermType: "xterm-256color",
 	}
-	created, err := sessionSvc.CreateSession(sess)
+	created, err := sessionSvc.CreateSession(model.SessionInputFrom(sess))
 	require.NoError(t, err)
 
 	svc := NewFileService(sessionSvc, newMockEventBus(), testutil.NewTestLogger())
@@ -258,7 +258,7 @@ func TestFileService_Rename(t *testing.T) {
 		Name: "test-file", Host: "127.0.0.1", Port: port, Username: "root",
 		AuthMethod: model.AuthPassword, Password: "", KeepAlive: 30, TermType: "xterm-256color",
 	}
-	created, err := sessionSvc.CreateSession(sess)
+	created, err := sessionSvc.CreateSession(model.SessionInputFrom(sess))
 	require.NoError(t, err)
 
 	svc := NewFileService(sessionSvc, newMockEventBus(), testutil.NewTestLogger())
@@ -280,7 +280,7 @@ func TestFileService_Upload(t *testing.T) {
 		Name: "test-upload", Host: "127.0.0.1", Port: port, Username: "root",
 		AuthMethod: model.AuthPassword, Password: "", KeepAlive: 30, TermType: "xterm-256color",
 	}
-	created, err := sessionSvc.CreateSession(sess)
+	created, err := sessionSvc.CreateSession(model.SessionInputFrom(sess))
 	require.NoError(t, err)
 
 	tmpFile := filepath.Join(t.TempDir(), "upload.dat")
@@ -321,7 +321,7 @@ func TestFileService_Download(t *testing.T) {
 		Name: "test-dl", Host: "127.0.0.1", Port: port, Username: "root",
 		AuthMethod: model.AuthPassword, Password: "", KeepAlive: 30, TermType: "xterm-256color",
 	}
-	created, err := sessionSvc.CreateSession(sess)
+	created, err := sessionSvc.CreateSession(model.SessionInputFrom(sess))
 	require.NoError(t, err)
 
 	b := newMockEventBus()
@@ -357,7 +357,7 @@ func TestFileService_CancelTransfer(t *testing.T) {
 		Name: "test-cancel", Host: "127.0.0.1", Port: port, Username: "root",
 		AuthMethod: model.AuthPassword, Password: "", KeepAlive: 30, TermType: "xterm-256color",
 	}
-	created, err := sessionSvc.CreateSession(sess)
+	created, err := sessionSvc.CreateSession(model.SessionInputFrom(sess))
 	require.NoError(t, err)
 
 	tmpFile := filepath.Join(t.TempDir(), "upload.dat")

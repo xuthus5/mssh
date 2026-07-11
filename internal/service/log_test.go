@@ -35,7 +35,7 @@ func TestLogService_ListBySession(t *testing.T) {
 		Name: "test-log", Host: "10.0.0.1", Port: 22, Username: "root",
 		AuthMethod: model.AuthPassword, Password: "enc", KeepAlive: 30, TermType: "xterm",
 	}
-	createdSess, err := sessionSvc.CreateSession(sess)
+	createdSess, err := sessionSvc.CreateSession(model.SessionInputFrom(sess))
 	require.NoError(t, err)
 
 	dataPath := filepath.Join(t.TempDir(), "recording.bin")
@@ -60,7 +60,7 @@ func TestLogService_StartRecording(t *testing.T) {
 		Name: "test-rec", Host: "10.0.0.1", Port: 22, Username: "root",
 		AuthMethod: model.AuthPassword, Password: "enc", KeepAlive: 30, TermType: "xterm",
 	}
-	createdSess, err := sessionSvc.CreateSession(sess)
+	createdSess, err := sessionSvc.CreateSession(model.SessionInputFrom(sess))
 	require.NoError(t, err)
 
 	dataPath := filepath.Join(t.TempDir(), "recording.bin")
@@ -85,7 +85,7 @@ func TestLogService_StopRecording(t *testing.T) {
 		Name: "test-stop", Host: "10.0.0.1", Port: 22, Username: "root",
 		AuthMethod: model.AuthPassword, Password: "enc", KeepAlive: 30, TermType: "xterm",
 	}
-	createdSess, err := sessionSvc.CreateSession(sess)
+	createdSess, err := sessionSvc.CreateSession(model.SessionInputFrom(sess))
 	require.NoError(t, err)
 
 	dataPath := filepath.Join(t.TempDir(), "recording.bin")
@@ -118,7 +118,7 @@ func TestLogService_GetRecording(t *testing.T) {
 		Name: "test-get", Host: "10.0.0.1", Port: 22, Username: "root",
 		AuthMethod: model.AuthPassword, Password: "enc", KeepAlive: 30, TermType: "xterm",
 	}
-	createdSess, err := sessionSvc.CreateSession(sess)
+	createdSess, err := sessionSvc.CreateSession(model.SessionInputFrom(sess))
 	require.NoError(t, err)
 
 	dataPath := filepath.Join(t.TempDir(), "recording.bin")
@@ -159,7 +159,7 @@ func TestLogService_Delete(t *testing.T) {
 		Name: "test-del", Host: "10.0.0.1", Port: 22, Username: "root",
 		AuthMethod: model.AuthPassword, Password: "enc", KeepAlive: 30, TermType: "xterm",
 	}
-	createdSess, err := sessionSvc.CreateSession(sess)
+	createdSess, err := sessionSvc.CreateSession(model.SessionInputFrom(sess))
 	require.NoError(t, err)
 
 	dataPath := filepath.Join(t.TempDir(), "recording.bin")
@@ -192,7 +192,7 @@ func TestLogService_ListBySessionNoMatch(t *testing.T) {
 		Name: "test-nomatch", Host: "10.0.0.1", Port: 22, Username: "root",
 		AuthMethod: model.AuthPassword, Password: "enc", KeepAlive: 30, TermType: "xterm",
 	}
-	createdSess, err := sessionSvc.CreateSession(sess)
+	createdSess, err := sessionSvc.CreateSession(model.SessionInputFrom(sess))
 	require.NoError(t, err)
 
 	dataPath := filepath.Join(t.TempDir(), "recording-nomatch.bin")
@@ -223,7 +223,7 @@ func TestLogService_StopRecordingTwice(t *testing.T) {
 		Name: "test-stoptwice", Host: "10.0.0.1", Port: 22, Username: "root",
 		AuthMethod: model.AuthPassword, Password: "enc", KeepAlive: 30, TermType: "xterm",
 	}
-	createdSess, err := sessionSvc.CreateSession(sess)
+	createdSess, err := sessionSvc.CreateSession(model.SessionInputFrom(sess))
 	require.NoError(t, err)
 
 	dataPath := filepath.Join(t.TempDir(), "recording-stop2.bin")
@@ -255,7 +255,7 @@ func TestLogService_DeleteWithDataPath(t *testing.T) {
 		Name: "test-del-path", Host: "10.0.0.1", Port: 22, Username: "root",
 		AuthMethod: model.AuthPassword, Password: "enc", KeepAlive: 30, TermType: "xterm",
 	}
-	createdSess, err := sessionSvc.CreateSession(sess)
+	createdSess, err := sessionSvc.CreateSession(model.SessionInputFrom(sess))
 	require.NoError(t, err)
 
 	dataPath := filepath.Join(t.TempDir(), "recording-del.bin")
@@ -280,7 +280,7 @@ func TestLogService_StartTerminalRecording(t *testing.T) {
 		Name: "test-term-rec", Host: "10.0.0.1", Port: 22, Username: "root",
 		AuthMethod: model.AuthPassword, Password: "enc", KeepAlive: 30, TermType: "xterm",
 	}
-	createdSess, err := sessionSvc.CreateSession(sess)
+	createdSess, err := sessionSvc.CreateSession(model.SessionInputFrom(sess))
 	require.NoError(t, err)
 
 	logID, err := svc.StartTerminalRecording("term-test-1", createdSess.ID, 80, 24, "xterm")
@@ -307,7 +307,7 @@ func TestLogService_StopTerminalRecordingIfActive(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	svc := NewLogService(db, t.TempDir(), testutil.NewTestLogger())
 	sessionSvc := NewSessionService(db, newMockEventBus(), 30, "", nil, testutil.NewTestLogger())
-	created, err := sessionSvc.CreateSession(model.Session{
+	created, err := sessionSvc.CreateSession(model.SessionInput{
 		Name: "conditional-stop", Host: "127.0.0.1", Port: 22, Username: "root",
 		AuthMethod: model.AuthPassword, KeepAlive: 30, TermType: "xterm",
 	})
@@ -328,7 +328,7 @@ func TestLogService_HandleOutput(t *testing.T) {
 		Name: "test-handle-out", Host: "10.0.0.1", Port: 22, Username: "root",
 		AuthMethod: model.AuthPassword, Password: "enc", KeepAlive: 30, TermType: "xterm",
 	}
-	createdSess, err := sessionSvc.CreateSession(sess)
+	createdSess, err := sessionSvc.CreateSession(model.SessionInputFrom(sess))
 	require.NoError(t, err)
 
 	_, err = svc.StartTerminalRecording("term-out", createdSess.ID, 80, 24, "xterm")

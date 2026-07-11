@@ -41,12 +41,14 @@ func (t *TunnelService) List() ([]model.Tunnel, error) {
 	return store.ListTunnels(t.db)
 }
 
-func (t *TunnelService) Create(tunnel model.Tunnel) (*model.Tunnel, error) {
+func (t *TunnelService) Create(input model.TunnelInput) (*model.Tunnel, error) {
+	tunnel := input.Tunnel()
 	t.logger.Info("creating tunnel", "name", tunnel.Name, "type", tunnel.Type)
 	return store.CreateTunnel(t.db, tunnel)
 }
 
-func (t *TunnelService) Update(tunnel model.Tunnel) error {
+func (t *TunnelService) Update(input model.TunnelInput) error {
+	tunnel := input.Tunnel()
 	t.logger.Info("updating tunnel", "id", tunnel.ID, "name", tunnel.Name)
 	return store.UpdateTunnel(t.db, tunnel)
 }

@@ -28,7 +28,7 @@ export function WindowTitleBar() {
     document.documentElement.classList.toggle('light', nextMode === 'light')
     localStorage.setItem('mssh:color-mode', nextMode)
     setColorMode(nextMode)
-    void SettingService.Set({ key: 'appearance.color_mode', namespace: 'appearance', value: JSON.stringify(nextMode), value_type: 'string', version: 1, updated_at: '' }).catch((error: unknown) => {
+    void SettingService.Set({ key: 'appearance.color_mode', namespace: 'appearance', value: JSON.stringify(nextMode), value_type: 'string', version: 1 }).catch((error: unknown) => {
       document.documentElement.classList.toggle('light', colorMode === 'light')
       localStorage.setItem('mssh:color-mode', colorMode)
       setColorMode(colorMode)

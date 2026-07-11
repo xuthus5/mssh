@@ -35,11 +35,11 @@ export function List($namespace: string): $CancellablePromise<model$0.Setting[]>
     });
 }
 
-export function Set(setting: model$0.Setting): $CancellablePromise<void> {
+export function Set(setting: model$0.SettingInput): $CancellablePromise<void> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.SettingService.Set", setting);
 }
 
-export function SetMany(settings: model$0.Setting[]): $CancellablePromise<void> {
+export function SetMany(settings: model$0.SettingInput[]): $CancellablePromise<void> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.SettingService.SetMany", settings);
 }
 

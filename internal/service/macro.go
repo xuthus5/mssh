@@ -23,12 +23,14 @@ func (m *MacroService) List() ([]model.Macro, error) {
 	return store.ListMacros(m.db)
 }
 
-func (m *MacroService) Create(macro model.Macro) (*model.Macro, error) {
+func (m *MacroService) Create(input model.MacroInput) (*model.Macro, error) {
+	macro := input.Macro()
 	m.logger.Info("creating macro", "name", macro.Name)
 	return store.CreateMacro(m.db, macro)
 }
 
-func (m *MacroService) Update(macro model.Macro) error {
+func (m *MacroService) Update(input model.MacroInput) error {
+	macro := input.Macro()
 	m.logger.Info("updating macro", "id", macro.ID, "name", macro.Name)
 	return store.UpdateMacro(m.db, macro)
 }

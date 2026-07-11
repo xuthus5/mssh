@@ -30,8 +30,8 @@ export function CreateFolder(name: string, parentID: number | null): $Cancellabl
     });
 }
 
-export function CreateSession(session: model$0.Session): $CancellablePromise<model$0.Session | null> {
-    return $Call.ByName("github.com/xuthus5/mssh/internal/service.SessionService.CreateSession", session).then(($result: any) => {
+export function CreateSession(input: model$0.SessionInput): $CancellablePromise<model$0.Session | null> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.SessionService.CreateSession", input).then(($result: any) => {
         return $$createType3($result);
     });
 }
@@ -92,8 +92,8 @@ export function UpdateFolder(id: number, name: string): $CancellablePromise<void
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.SessionService.UpdateFolder", id, name);
 }
 
-export function UpdateSession(session: model$0.Session): $CancellablePromise<void> {
-    return $Call.ByName("github.com/xuthus5/mssh/internal/service.SessionService.UpdateSession", session);
+export function UpdateSession(input: model$0.SessionInput): $CancellablePromise<void> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.SessionService.UpdateSession", input);
 }
 
 // Private type creation functions

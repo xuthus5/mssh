@@ -27,7 +27,7 @@ func TestMacroService_CRUD(t *testing.T) {
 	assert.Len(t, macros, 0)
 
 	macro := model.Macro{Name: "hello", Command: "echo hello\n", Shortcut: "Ctrl+H", DelayMs: 100}
-	created, err := svc.Create(macro)
+	created, err := svc.Create(model.MacroInputFrom(macro))
 	require.NoError(t, err)
 	assert.NotZero(t, created.ID)
 	assert.Equal(t, "hello", created.Name)
@@ -38,7 +38,7 @@ func TestMacroService_CRUD(t *testing.T) {
 
 	created.Name = "world"
 	created.Command = "echo world\n"
-	err = svc.Update(*created)
+	err = svc.Update(model.MacroInputFrom(*created))
 	require.NoError(t, err)
 
 	macros, err = svc.List()
@@ -86,7 +86,7 @@ func TestMacroService_ExecuteWithTerminal(t *testing.T) {
 		Name: "test-macro-exec", Host: "127.0.0.1", Port: port, Username: "root",
 		AuthMethod: model.AuthPassword, Password: "", KeepAlive: 30, TermType: "xterm",
 	}
-	created, err := sessionSvc.CreateSession(sess)
+	created, err := sessionSvc.CreateSession(model.SessionInputFrom(sess))
 	require.NoError(t, err)
 
 	termSvc := NewTerminalService(sessionSvc, newMockEventBus(), 32, testutil.NewTestLogger())
@@ -105,7 +105,7 @@ func TestMacroService_CreateWithShortcut(t *testing.T) {
 	svc := NewMacroService(db, nil, testutil.NewTestLogger())
 
 	macro := model.Macro{Name: "copy", Command: "cp -r\n", Shortcut: "Ctrl+Shift+C", DelayMs: 50, SortOrder: 1}
-	created, err := svc.Create(macro)
+	created, err := svc.Create(model.MacroInputFrom(macro))
 	require.NoError(t, err)
 	assert.Equal(t, "Ctrl+Shift+C", created.Shortcut)
 	assert.Equal(t, 50, created.DelayMs)

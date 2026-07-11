@@ -9,8 +9,8 @@ import { Call as $Call, CancellablePromise as $CancellablePromise, Create as $Cr
 // @ts-ignore: Unused imports
 import * as model$0 from "../model/models.js";
 
-export function Create(macro: model$0.Macro): $CancellablePromise<model$0.Macro | null> {
-    return $Call.ByName("github.com/xuthus5/mssh/internal/service.MacroService.Create", macro).then(($result: any) => {
+export function Create(input: model$0.MacroInput): $CancellablePromise<model$0.Macro | null> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.MacroService.Create", input).then(($result: any) => {
         return $$createType1($result);
     });
 }
@@ -29,8 +29,8 @@ export function List(): $CancellablePromise<model$0.Macro[]> {
     });
 }
 
-export function Update(macro: model$0.Macro): $CancellablePromise<void> {
-    return $Call.ByName("github.com/xuthus5/mssh/internal/service.MacroService.Update", macro);
+export function Update(input: model$0.MacroInput): $CancellablePromise<void> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.MacroService.Update", input);
 }
 
 // Private type creation functions

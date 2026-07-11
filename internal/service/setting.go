@@ -25,12 +25,16 @@ func (s *SettingService) List(namespace string) ([]model.Setting, error) {
 	return store.ListSettings(s.db, namespace)
 }
 
-func (s *SettingService) Set(setting model.Setting) error {
-	return store.SetSettings(s.db, []model.Setting{setting})
+func (s *SettingService) Set(setting model.SettingInput) error {
+	return store.SetSettings(s.db, []model.Setting{setting.Setting()})
 }
 
-func (s *SettingService) SetMany(settings []model.Setting) error {
-	return store.SetSettings(s.db, settings)
+func (s *SettingService) SetMany(settings []model.SettingInput) error {
+	entries := make([]model.Setting, len(settings))
+	for index, setting := range settings {
+		entries[index] = setting.Setting()
+	}
+	return store.SetSettings(s.db, entries)
 }
 
 func (s *SettingService) Delete(key string) error { return store.DeleteSetting(s.db, key) }

@@ -29,7 +29,7 @@ func TestSyncService_ExportImport(t *testing.T) {
 		Name: "s1", Host: "10.0.0.1", Port: 22, Username: "root",
 		AuthMethod: model.AuthPassword, Password: "enc", KeepAlive: 30, TermType: "xterm",
 	}
-	createdSess, err := sessionSvc.CreateSession(sess)
+	createdSess, err := sessionSvc.CreateSession(model.SessionInputFrom(sess))
 	require.NoError(t, err)
 	assert.NotZero(t, createdSess.ID)
 
@@ -38,7 +38,7 @@ func TestSyncService_ExportImport(t *testing.T) {
 	_ = createdKey
 
 	macro := model.Macro{Name: "m1", Command: "ls\n"}
-	createdMacro, err := macroSvc.Create(macro)
+	createdMacro, err := macroSvc.Create(model.MacroInputFrom(macro))
 	require.NoError(t, err)
 	_ = createdMacro
 

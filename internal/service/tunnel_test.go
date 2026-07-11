@@ -41,14 +41,14 @@ func TestTunnelService_CRUD(t *testing.T) {
 		Name: "test", Host: "10.0.0.1", Port: 22, Username: "root",
 		AuthMethod: model.AuthPassword, Password: "enc", KeepAlive: 30, TermType: "xterm",
 	}
-	createdSess, err := sessionSvc.CreateSession(sess)
+	createdSess, err := sessionSvc.CreateSession(model.SessionInputFrom(sess))
 	require.NoError(t, err)
 
 	tunnel := model.Tunnel{
 		SessionID: createdSess.ID, Name: "web", Type: model.TunnelLocal,
 		LocalHost: "127.0.0.1", LocalPort: 8080, RemoteHost: "remote", RemotePort: 80,
 	}
-	created, err := svc.Create(tunnel)
+	created, err := svc.Create(model.TunnelInputFrom(tunnel))
 	require.NoError(t, err)
 	assert.NotZero(t, created.ID)
 	assert.Equal(t, "web", created.Name)
@@ -58,7 +58,7 @@ func TestTunnelService_CRUD(t *testing.T) {
 	assert.Len(t, list, 1)
 
 	created.Name = "api"
-	err = svc.Update(*created)
+	err = svc.Update(model.TunnelInputFrom(*created))
 	require.NoError(t, err)
 
 	list, err = svc.List()
@@ -86,7 +86,7 @@ func TestTunnelService_StartStop(t *testing.T) {
 		Name: "test-tunnel", Host: "127.0.0.1", Port: port, Username: "root",
 		AuthMethod: model.AuthPassword, Password: "", KeepAlive: 30, TermType: "xterm-256color",
 	}
-	createdSess, err := sessionSvc.CreateSession(sess)
+	createdSess, err := sessionSvc.CreateSession(model.SessionInputFrom(sess))
 	require.NoError(t, err)
 
 	svc := NewTunnelService(db, sessionSvc, bus, testutil.NewTestLogger())
@@ -95,7 +95,7 @@ func TestTunnelService_StartStop(t *testing.T) {
 		SessionID: createdSess.ID, Name: "socks", Type: model.TunnelDynamic,
 		LocalHost: "127.0.0.1", LocalPort: 15000,
 	}
-	created, err := svc.Create(tunnel)
+	created, err := svc.Create(model.TunnelInputFrom(tunnel))
 	require.NoError(t, err)
 
 	err = svc.Start(created.ID)
@@ -152,7 +152,7 @@ func TestTunnelService_StartAlreadyRunning(t *testing.T) {
 		Name: "test-tunnel", Host: "127.0.0.1", Port: port, Username: "root",
 		AuthMethod: model.AuthPassword, Password: "", KeepAlive: 30, TermType: "xterm-256color",
 	}
-	createdSess, err := sessionSvc.CreateSession(sess)
+	createdSess, err := sessionSvc.CreateSession(model.SessionInputFrom(sess))
 	require.NoError(t, err)
 
 	svc := NewTunnelService(db, sessionSvc, newMockEventBus(), testutil.NewTestLogger())
@@ -161,7 +161,7 @@ func TestTunnelService_StartAlreadyRunning(t *testing.T) {
 		SessionID: createdSess.ID, Name: "dyn", Type: model.TunnelDynamic,
 		LocalHost: "127.0.0.1", LocalPort: 15001,
 	}
-	created, err := svc.Create(tunnel)
+	created, err := svc.Create(model.TunnelInputFrom(tunnel))
 	require.NoError(t, err)
 
 	err = svc.Start(created.ID)
@@ -195,7 +195,7 @@ func TestTunnelService_DeleteRunning(t *testing.T) {
 		Name: "test-tunnel", Host: "127.0.0.1", Port: port, Username: "root",
 		AuthMethod: model.AuthPassword, Password: "", KeepAlive: 30, TermType: "xterm-256color",
 	}
-	createdSess, err := sessionSvc.CreateSession(sess)
+	createdSess, err := sessionSvc.CreateSession(model.SessionInputFrom(sess))
 	require.NoError(t, err)
 
 	svc := NewTunnelService(db, sessionSvc, bus, testutil.NewTestLogger())
@@ -204,7 +204,7 @@ func TestTunnelService_DeleteRunning(t *testing.T) {
 		SessionID: createdSess.ID, Name: "del", Type: model.TunnelDynamic,
 		LocalHost: "127.0.0.1", LocalPort: 15002,
 	}
-	created, err := svc.Create(tunnel)
+	created, err := svc.Create(model.TunnelInputFrom(tunnel))
 	require.NoError(t, err)
 
 	err = svc.Start(created.ID)
@@ -229,14 +229,14 @@ func TestTunnelService_Remote(t *testing.T) {
 		Name: "test", Host: "10.0.0.1", Port: 22, Username: "root",
 		AuthMethod: model.AuthPassword, Password: "enc", KeepAlive: 30, TermType: "xterm",
 	}
-	createdSess, err := sessionSvc.CreateSession(sess)
+	createdSess, err := sessionSvc.CreateSession(model.SessionInputFrom(sess))
 	require.NoError(t, err)
 
 	tunnel := model.Tunnel{
 		SessionID: createdSess.ID, Name: "remote", Type: model.TunnelRemote,
 		LocalHost: "127.0.0.1", LocalPort: 9000, RemoteHost: "remote", RemotePort: 9000,
 	}
-	created, err := svc.Create(tunnel)
+	created, err := svc.Create(model.TunnelInputFrom(tunnel))
 	require.NoError(t, err)
 	assert.NotZero(t, created.ID)
 }
@@ -252,14 +252,14 @@ func TestTunnelService_LocalForward(t *testing.T) {
 		Name: "test", Host: "10.0.0.1", Port: 22, Username: "root",
 		AuthMethod: model.AuthPassword, Password: "enc", KeepAlive: 30, TermType: "xterm",
 	}
-	createdSess, err := sessionSvc.CreateSession(sess)
+	createdSess, err := sessionSvc.CreateSession(model.SessionInputFrom(sess))
 	require.NoError(t, err)
 
 	tunnel := model.Tunnel{
 		SessionID: createdSess.ID, Name: "local", Type: model.TunnelLocal,
 		LocalHost: "127.0.0.1", LocalPort: 5000, RemoteHost: "remote", RemotePort: 5000,
 	}
-	created, err := svc.Create(tunnel)
+	created, err := svc.Create(model.TunnelInputFrom(tunnel))
 	require.NoError(t, err)
 	assert.NotZero(t, created.ID)
 }
@@ -272,7 +272,7 @@ func TestTunnelService_StartConnectError(t *testing.T) {
 		Name: "dead-sess", Host: "127.0.0.1", Port: 19, Username: "root",
 		AuthMethod: model.AuthPassword, Password: "enc", KeepAlive: 30, TermType: "xterm",
 	}
-	createdSess, err := sessionSvc.CreateSession(sess)
+	createdSess, err := sessionSvc.CreateSession(model.SessionInputFrom(sess))
 	require.NoError(t, err)
 
 	tunnel := model.Tunnel{
@@ -280,7 +280,7 @@ func TestTunnelService_StartConnectError(t *testing.T) {
 		LocalHost: "127.0.0.1", LocalPort: 15003,
 	}
 	svc := NewTunnelService(db, sessionSvc, newMockEventBus(), testutil.NewTestLogger())
-	created, err := svc.Create(tunnel)
+	created, err := svc.Create(model.TunnelInputFrom(tunnel))
 	require.NoError(t, err)
 
 	err = svc.Start(created.ID)
