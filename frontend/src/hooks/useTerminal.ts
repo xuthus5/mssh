@@ -18,6 +18,8 @@ export function useTerminal(
   active: boolean,
 ) {
   const termRef = useRef<Terminal | null>(null)
+  const fitAddonRef = useRef<FitAddon | null>(null)
+  const activationFrameRef = useRef<number | null>(null)
   const storeRef = useRef(useAppStore.getState())
   const activeRef = useRef(active)
   storeRef.current = useAppStore.getState()
@@ -37,20 +39,19 @@ export function useTerminal(
     termRef.current = term
 
     const fitAddon = new FitAddon()
+    fitAddonRef.current = fitAddon
 
     let initialResizeTimer: number | undefined
     if (containerRef.current) {
       term.open(containerRef.current)
       term.loadAddon(fitAddon)
       initialResizeTimer = window.setTimeout(() => {
+        if (!activeRef.current || !containerRef.current || containerRef.current.clientWidth === 0 || containerRef.current.clientHeight === 0) return
         fitAddon.fit()
-        if (activeRef.current) {
-          term.focus()
-          storeRef.current.setActivePane(terminalID)
-        }
-        TerminalService.Resize(terminalID, term.cols, term.rows).catch((err: unknown) => {
-          logger.error('terminal initial resize error', err)
-        })
+        term.refresh(0, term.rows - 1)
+        term.focus()
+        storeRef.current.setActivePane(terminalID)
+        void TerminalService.Resize(terminalID, term.cols, term.rows).catch((err: unknown) => logger.error('terminal initial resize error', err))
         logger.debug('terminal opened', { cols: term.cols, rows: term.rows })
       }, 100)
       storeRef.current.registerTerminal(terminalID, term)
@@ -84,11 +85,10 @@ export function useTerminal(
     })
 
     const resizeObs = new ResizeObserver(() => {
-      if (containerRef.current) {
+      if (activeRef.current && containerRef.current && containerRef.current.clientWidth > 0 && containerRef.current.clientHeight > 0) {
         fitAddon.fit()
-        TerminalService.Resize(terminalID, term.cols, term.rows).catch((err: unknown) => {
-          logger.error('terminal resize error', err)
-        })
+        term.refresh(0, term.rows - 1)
+        void TerminalService.Resize(terminalID, term.cols, term.rows).catch((err: unknown) => logger.error('terminal resize error', err))
       }
     })
     if (containerRef.current) {
@@ -97,6 +97,8 @@ export function useTerminal(
 
     return () => {
       if (initialResizeTimer !== undefined) window.clearTimeout(initialResizeTimer)
+      if (activationFrameRef.current !== null) window.cancelAnimationFrame(activationFrameRef.current)
+      fitAddonRef.current = null
       dataDispose.dispose()
       unsubOutput()
       resizeObs.disconnect()
@@ -110,8 +112,23 @@ export function useTerminal(
   useEffect(() => {
     const term = termRef.current
     if (!term) return
-    if (active) term.focus()
-    else term.blur()
+    if (!active) {
+      if (activationFrameRef.current !== null) window.cancelAnimationFrame(activationFrameRef.current)
+      activationFrameRef.current = null
+      term.blur()
+      return
+    }
+    activationFrameRef.current = window.requestAnimationFrame(() => {
+      activationFrameRef.current = null
+      const container = containerRef.current
+      const fitAddon = fitAddonRef.current
+      if (!container || !fitAddon || container.clientWidth === 0 || container.clientHeight === 0) return
+      fitAddon.fit()
+      term.refresh(0, term.rows - 1)
+      term.focus()
+      storeRef.current.setActivePane(terminalID)
+      void TerminalService.Resize(terminalID, term.cols, term.rows).catch((err: unknown) => logger.error('terminal activation resize error', err))
+    })
   }, [active])
 
   useEffect(() => {
