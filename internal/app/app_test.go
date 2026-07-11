@@ -33,6 +33,7 @@ func TestNew(t *testing.T) {
 	assert.NotNil(t, appInstance.Log)
 	assert.NotNil(t, appInstance.Sync)
 	assert.NotNil(t, appInstance.Setting)
+	assert.NotNil(t, appInstance.Font)
 
 	assert.Len(t, appInstance.Crypto, 32)
 	assert.NotNil(t, appInstance.Keychain)

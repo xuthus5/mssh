@@ -12,6 +12,7 @@ A cross-platform SSH client built with Go + Wails v3 + React + xterm.js.
 - SSH key generation and management
 - Session recording and playback
 - Customizable terminal themes
+- Searchable system font and size settings for the application interface
 - Quick command macros
 - Explicit host-key fingerprint trust and connection cancellation
 - About page with GitHub release update checks

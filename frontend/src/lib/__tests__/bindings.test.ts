@@ -11,6 +11,7 @@ import {
   LogService,
   SyncService,
   AboutService,
+  FontService,
 } from '@/lib/wails'
 
 describe('Generated Bindings Barrel', () => {
@@ -72,5 +73,10 @@ describe('Generated Bindings Barrel', () => {
   it('exports AboutService', () => {
     expect(AboutService).toBeDefined()
     expect(typeof AboutService.CheckUpdate).toBe('function')
+  })
+
+  it('exports FontService', () => {
+    expect(FontService).toBeDefined()
+    expect(typeof FontService.List).toBe('function')
   })
 })

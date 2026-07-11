@@ -321,10 +321,13 @@ export default function Sidebar() {
         open={settingsOpen}
         onOpenChange={setSettingsOpen}
         general={settings.general}
+        systemFonts={settings.systemFonts}
         theme={settings.theme}
         keys={settings.keys}
         sync={settings.sync}
         onSaveGeneral={settings.saveGeneral}
+        onPreviewUIFont={settings.previewUIFont}
+        onRestoreUIFont={settings.restoreUIFont}
         onSaveTheme={settings.saveTheme}
         onGenerateKey={settings.generateKey}
         onImportKey={settings.importKey}

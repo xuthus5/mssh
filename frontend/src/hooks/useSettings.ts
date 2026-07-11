@@ -1,11 +1,12 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { SettingService, KeyService, SyncService, TerminalService } from '@/lib/wails'
+import { SettingService, KeyService, SyncService, TerminalService, FontService } from '@/lib/wails'
 import { useAppStore } from '@/store/appStore'
 import { logger } from '@/lib/logger'
 import { KeyType } from '../../bindings/github.com/xuthus5/mssh/internal/model/models'
 import { Dialogs } from '@wailsio/runtime'
 import { toast } from '@/components/ui/toast'
 import type { Setting, SettingInput } from '../../bindings/github.com/xuthus5/mssh/internal/model/models'
+import { applyUIFont, clampUIFontSize, DEFAULT_UI_FONT_FAMILY, DEFAULT_UI_FONT_SIZE, normalizeUIFontFamily } from '@/lib/uiFont'
 
 function settingEntry(key: string, value: unknown): SettingInput {
   const valueType = value === null ? 'null' : Array.isArray(value) ? 'array' : typeof value === 'object' ? 'object' : typeof value
@@ -22,6 +23,8 @@ export interface GeneralSettings {
   maxPoolSize: number
   defaultKeepAlive: number
   defaultTermType: string
+  uiFontFamily: string
+  uiFontSize: number
 }
 
 export interface TerminalTheme {
@@ -58,7 +61,8 @@ const DEFAULT_THEME: TerminalTheme = {
 }
 
 export function useSettings() {
-  const [general, setGeneral] = useState<GeneralSettings>({ maxPoolSize: 10, defaultKeepAlive: 60, defaultTermType: 'xterm-256color' })
+  const [general, setGeneral] = useState<GeneralSettings>({ maxPoolSize: 10, defaultKeepAlive: 60, defaultTermType: 'xterm-256color', uiFontFamily: DEFAULT_UI_FONT_FAMILY, uiFontSize: DEFAULT_UI_FONT_SIZE })
+  const [systemFonts, setSystemFonts] = useState<string[]>([])
   const [theme, setTheme] = useState<TerminalTheme>(DEFAULT_THEME)
   const [keys, setKeys] = useState<KeyInfo[]>([])
   const [sync, setSync] = useState<SyncConfig>({ enabled: false, url: '', username: '', password: '' })
@@ -67,32 +71,56 @@ export function useSettings() {
   const loadGeneral = useCallback(async () => {
     try {
       logger.debug('loadGeneral')
-      const settings = await SettingService.GetMany(['terminal.max_pool_size', 'terminal.default_keep_alive', 'terminal.default_term_type'])
-      setGeneral({
+      const settings = await SettingService.GetMany(['terminal.max_pool_size', 'terminal.default_keep_alive', 'terminal.default_term_type', 'appearance.ui_font_family', 'appearance.ui_font_size'])
+      const loaded = {
         maxPoolSize: settingValue(settings, 'terminal.max_pool_size', 10),
         defaultKeepAlive: settingValue(settings, 'terminal.default_keep_alive', 60),
         defaultTermType: settingValue(settings, 'terminal.default_term_type', 'xterm-256color'),
-      })
+        uiFontFamily: normalizeUIFontFamily(settingValue(settings, 'appearance.ui_font_family', DEFAULT_UI_FONT_FAMILY)),
+        uiFontSize: clampUIFontSize(settingValue(settings, 'appearance.ui_font_size', DEFAULT_UI_FONT_SIZE)),
+      }
+      applyUIFont({ family: loaded.uiFontFamily, size: loaded.uiFontSize })
+      setGeneral(loaded)
     } catch (err) {
       logger.debug('loadGeneral error', err)
     }
   }, [])
 
   const saveGeneral = useCallback(async (settings: GeneralSettings) => {
+    const normalized = { ...settings, uiFontFamily: normalizeUIFontFamily(settings.uiFontFamily), uiFontSize: clampUIFontSize(settings.uiFontSize) }
     try {
-      logger.debug('saveGeneral', settings)
+      logger.debug('saveGeneral', normalized)
       await Promise.all([SettingService.SetMany([
-        settingEntry('terminal.max_pool_size', settings.maxPoolSize), settingEntry('terminal.default_keep_alive', settings.defaultKeepAlive), settingEntry('terminal.default_term_type', settings.defaultTermType),
-      ]), TerminalService.SetMaxSize(settings.maxPoolSize)])
-      setGeneral(settings)
-      useAppStore.getState().setMaxPoolSize(settings.maxPoolSize)
+        settingEntry('terminal.max_pool_size', normalized.maxPoolSize), settingEntry('terminal.default_keep_alive', normalized.defaultKeepAlive), settingEntry('terminal.default_term_type', normalized.defaultTermType), settingEntry('appearance.ui_font_family', normalized.uiFontFamily), settingEntry('appearance.ui_font_size', normalized.uiFontSize),
+      ]), TerminalService.SetMaxSize(normalized.maxPoolSize)])
+      applyUIFont({ family: normalized.uiFontFamily, size: normalized.uiFontSize })
+      setGeneral(normalized)
+      useAppStore.getState().setMaxPoolSize(normalized.maxPoolSize)
       toast('通用设置已保存', 'success')
     } catch (err) {
+      applyUIFont({ family: general.uiFontFamily, size: general.uiFontSize })
       logger.debug('saveGeneral error', err)
       toast(`保存设置失败: ${err instanceof Error ? err.message : String(err)}`, 'error')
       throw err
     }
+  }, [general])
+
+  const loadSystemFonts = useCallback(async () => {
+    try {
+      setSystemFonts(await FontService.List())
+    } catch (err) {
+      logger.debug('loadSystemFonts error', err)
+      setSystemFonts(['sans-serif'])
+    }
   }, [])
+
+  const previewUIFont = useCallback((fontFamily: string, fontSize: number) => {
+    applyUIFont({ family: fontFamily, size: fontSize })
+  }, [])
+
+  const restoreUIFont = useCallback(() => {
+    applyUIFont({ family: general.uiFontFamily, size: general.uiFontSize })
+  }, [general.uiFontFamily, general.uiFontSize])
 
   const saveTheme = useCallback(async (t: TerminalTheme) => {
     try {
@@ -271,7 +299,7 @@ export function useSettings() {
     }
   }, [])
 
-  useEffect(() => { loadGeneral(); loadTheme(); listKeys(); loadSync() }, [loadGeneral, loadTheme, listKeys, loadSync])
+  useEffect(() => { loadGeneral(); loadTheme(); listKeys(); loadSync(); loadSystemFonts() }, [loadGeneral, loadTheme, listKeys, loadSync, loadSystemFonts])
 
-  return { general, theme, keys, sync, saveGeneral, saveTheme, listKeys, generateKey, importKey, deleteKey, exportKey, saveSync, exportConfig, importConfig }
+  return { general, theme, keys, sync, systemFonts, saveGeneral, previewUIFont, restoreUIFont, saveTheme, listKeys, generateKey, importKey, deleteKey, exportKey, saveSync, exportConfig, importConfig }
 }
