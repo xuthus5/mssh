@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo, useEffect } from 'react'
-import { Plus, FolderPlus, Search, Settings } from 'lucide-react'
+import { Plus, FolderPlus, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -73,6 +73,12 @@ export default function Sidebar() {
         setMacros(items)
       })
       .catch((err: unknown) => { logger.error('Sidebar: list macros error', err) })
+  }, [])
+
+  useEffect(() => {
+    const openSettings = () => setSettingsOpen(true)
+    window.addEventListener('mssh:open-settings', openSettings)
+    return () => window.removeEventListener('mssh:open-settings', openSettings)
   }, [])
 
   useEffect(() => {
@@ -212,9 +218,6 @@ export default function Sidebar() {
         >
           宏
         </button>
-        <Button variant="ghost" size="icon-sm" className="mx-1" onClick={() => setSettingsOpen(true)} title="设置">
-          <Settings className="h-4 w-4" />
-        </Button>
       </div>
 
       {activeTab === 'sessions' && (

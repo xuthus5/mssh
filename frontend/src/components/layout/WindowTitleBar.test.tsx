@@ -15,7 +15,11 @@ vi.mock('@wailsio/runtime', () => ({
 import { WindowTitleBar } from '@/components/layout/WindowTitleBar'
 
 describe('WindowTitleBar', () => {
-  beforeEach(() => vi.clearAllMocks())
+  beforeEach(() => {
+    vi.clearAllMocks()
+    localStorage.clear()
+    document.documentElement.classList.remove('light')
+  })
 
   it('routes window controls to the Wails runtime', async () => {
     const user = userEvent.setup()
@@ -32,5 +36,22 @@ describe('WindowTitleBar', () => {
     render(<WindowTitleBar />)
     await userEvent.dblClick(screen.getByTestId('window-drag-region'))
     expect(toggleMaximise).toHaveBeenCalledOnce()
+  })
+
+  it('toggles and persists the application colour mode', async () => {
+    render(<WindowTitleBar />)
+    await userEvent.click(screen.getByRole('button', { name: '切换到浅色模式' }))
+    expect(document.documentElement).toHaveClass('light')
+    expect(localStorage.getItem('mssh:color-mode')).toBe('light')
+    expect(screen.getByRole('button', { name: '切换到深色模式' })).toBeInTheDocument()
+  })
+
+  it('requests the settings dialog from the title bar', async () => {
+    const listener = vi.fn()
+    window.addEventListener('mssh:open-settings', listener)
+    render(<WindowTitleBar />)
+    await userEvent.click(screen.getByRole('button', { name: '打开设置' }))
+    expect(listener).toHaveBeenCalledOnce()
+    window.removeEventListener('mssh:open-settings', listener)
   })
 })
