@@ -6,7 +6,7 @@ import { KeyType } from '../../bindings/github.com/xuthus5/mssh/internal/model/m
 import { Dialogs } from '@wailsio/runtime'
 import { toast } from '@/components/ui/toast'
 import type { Setting, SettingInput } from '../../bindings/github.com/xuthus5/mssh/internal/model/models'
-import { applyUIFont, clampUIFontSize, DEFAULT_UI_FONT_FAMILY, DEFAULT_UI_FONT_SIZE, normalizeUIFontFamily } from '@/lib/uiFont'
+import { applyUIFont, clampUIFontSize, DEFAULT_UI_FONT_FALLBACK_FAMILY, DEFAULT_UI_FONT_FAMILY, DEFAULT_UI_FONT_SIZE, normalizeUIFontFallbackFamily, normalizeUIFontFamily } from '@/lib/uiFont'
 
 function settingEntry(key: string, value: unknown): SettingInput {
   const valueType = value === null ? 'null' : Array.isArray(value) ? 'array' : typeof value === 'object' ? 'object' : typeof value
@@ -24,6 +24,7 @@ export interface GeneralSettings {
   defaultKeepAlive: number
   defaultTermType: string
   uiFontFamily: string
+  uiFontFallbackFamily: string
   uiFontSize: number
 }
 
@@ -61,7 +62,7 @@ const DEFAULT_THEME: TerminalTheme = {
 }
 
 export function useSettings() {
-  const [general, setGeneral] = useState<GeneralSettings>({ maxPoolSize: 10, defaultKeepAlive: 60, defaultTermType: 'xterm-256color', uiFontFamily: DEFAULT_UI_FONT_FAMILY, uiFontSize: DEFAULT_UI_FONT_SIZE })
+  const [general, setGeneral] = useState<GeneralSettings>({ maxPoolSize: 10, defaultKeepAlive: 60, defaultTermType: 'xterm-256color', uiFontFamily: DEFAULT_UI_FONT_FAMILY, uiFontFallbackFamily: DEFAULT_UI_FONT_FALLBACK_FAMILY, uiFontSize: DEFAULT_UI_FONT_SIZE })
   const [systemFonts, setSystemFonts] = useState<string[]>([])
   const [theme, setTheme] = useState<TerminalTheme>(DEFAULT_THEME)
   const [keys, setKeys] = useState<KeyInfo[]>([])
@@ -71,15 +72,17 @@ export function useSettings() {
   const loadGeneral = useCallback(async () => {
     try {
       logger.debug('loadGeneral')
-      const settings = await SettingService.GetMany(['terminal.max_pool_size', 'terminal.default_keep_alive', 'terminal.default_term_type', 'appearance.ui_font_family', 'appearance.ui_font_size'])
+      const settings = await SettingService.GetMany(['terminal.max_pool_size', 'terminal.default_keep_alive', 'terminal.default_term_type', 'appearance.ui_font_family', 'appearance.ui_font_fallback_family', 'appearance.ui_font_size'])
+      const uiFontFamily = normalizeUIFontFamily(settingValue(settings, 'appearance.ui_font_family', DEFAULT_UI_FONT_FAMILY))
       const loaded = {
         maxPoolSize: settingValue(settings, 'terminal.max_pool_size', 10),
         defaultKeepAlive: settingValue(settings, 'terminal.default_keep_alive', 60),
         defaultTermType: settingValue(settings, 'terminal.default_term_type', 'xterm-256color'),
-        uiFontFamily: normalizeUIFontFamily(settingValue(settings, 'appearance.ui_font_family', DEFAULT_UI_FONT_FAMILY)),
+        uiFontFamily,
+        uiFontFallbackFamily: normalizeUIFontFallbackFamily(settingValue(settings, 'appearance.ui_font_fallback_family', DEFAULT_UI_FONT_FALLBACK_FAMILY), uiFontFamily),
         uiFontSize: clampUIFontSize(settingValue(settings, 'appearance.ui_font_size', DEFAULT_UI_FONT_SIZE)),
       }
-      applyUIFont({ family: loaded.uiFontFamily, size: loaded.uiFontSize })
+      applyUIFont({ family: loaded.uiFontFamily, fallbackFamily: loaded.uiFontFallbackFamily, size: loaded.uiFontSize })
       setGeneral(loaded)
     } catch (err) {
       logger.debug('loadGeneral error', err)
@@ -87,18 +90,19 @@ export function useSettings() {
   }, [])
 
   const saveGeneral = useCallback(async (settings: GeneralSettings) => {
-    const normalized = { ...settings, uiFontFamily: normalizeUIFontFamily(settings.uiFontFamily), uiFontSize: clampUIFontSize(settings.uiFontSize) }
+    const uiFontFamily = normalizeUIFontFamily(settings.uiFontFamily)
+    const normalized = { ...settings, uiFontFamily, uiFontFallbackFamily: normalizeUIFontFallbackFamily(settings.uiFontFallbackFamily, uiFontFamily), uiFontSize: clampUIFontSize(settings.uiFontSize) }
     try {
       logger.debug('saveGeneral', normalized)
       await Promise.all([SettingService.SetMany([
-        settingEntry('terminal.max_pool_size', normalized.maxPoolSize), settingEntry('terminal.default_keep_alive', normalized.defaultKeepAlive), settingEntry('terminal.default_term_type', normalized.defaultTermType), settingEntry('appearance.ui_font_family', normalized.uiFontFamily), settingEntry('appearance.ui_font_size', normalized.uiFontSize),
+        settingEntry('terminal.max_pool_size', normalized.maxPoolSize), settingEntry('terminal.default_keep_alive', normalized.defaultKeepAlive), settingEntry('terminal.default_term_type', normalized.defaultTermType), settingEntry('appearance.ui_font_family', normalized.uiFontFamily), settingEntry('appearance.ui_font_fallback_family', normalized.uiFontFallbackFamily), settingEntry('appearance.ui_font_size', normalized.uiFontSize),
       ]), TerminalService.SetMaxSize(normalized.maxPoolSize)])
-      applyUIFont({ family: normalized.uiFontFamily, size: normalized.uiFontSize })
+      applyUIFont({ family: normalized.uiFontFamily, fallbackFamily: normalized.uiFontFallbackFamily, size: normalized.uiFontSize })
       setGeneral(normalized)
       useAppStore.getState().setMaxPoolSize(normalized.maxPoolSize)
       toast('通用设置已保存', 'success')
     } catch (err) {
-      applyUIFont({ family: general.uiFontFamily, size: general.uiFontSize })
+      applyUIFont({ family: general.uiFontFamily, fallbackFamily: general.uiFontFallbackFamily, size: general.uiFontSize })
       logger.debug('saveGeneral error', err)
       toast(`保存设置失败: ${err instanceof Error ? err.message : String(err)}`, 'error')
       throw err
@@ -114,13 +118,13 @@ export function useSettings() {
     }
   }, [])
 
-  const previewUIFont = useCallback((fontFamily: string, fontSize: number) => {
-    applyUIFont({ family: fontFamily, size: fontSize })
+  const previewUIFont = useCallback((fontFamily: string, fallbackFamily: string, fontSize: number) => {
+    applyUIFont({ family: fontFamily, fallbackFamily, size: fontSize })
   }, [])
 
   const restoreUIFont = useCallback(() => {
-    applyUIFont({ family: general.uiFontFamily, size: general.uiFontSize })
-  }, [general.uiFontFamily, general.uiFontSize])
+    applyUIFont({ family: general.uiFontFamily, fallbackFamily: general.uiFontFallbackFamily, size: general.uiFontSize })
+  }, [general.uiFontFamily, general.uiFontFallbackFamily, general.uiFontSize])
 
   const saveTheme = useCallback(async (t: TerminalTheme) => {
     try {
