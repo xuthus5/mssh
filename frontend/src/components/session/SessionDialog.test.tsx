@@ -29,17 +29,18 @@ describe('SessionDialog', () => {
 
   it('shows password field by default (auth=password)', () => {
     render(<SessionDialog {...defaultProps} />)
-    expect(screen.getByText('密码')).toBeInTheDocument()
+    expect(screen.getAllByText('密码').length).toBeGreaterThan(0)
   })
 
   it('shows key ID field when switching to key auth', async () => {
     const user = userEvent.setup()
     render(<SessionDialog {...defaultProps} />)
 
-    await user.click(screen.getByRole('combobox'))
+    const comboboxes = screen.getAllByRole('combobox')
+    await user.click(comboboxes[0])
     await user.click(screen.getByRole('option', { name: '密钥' }))
 
-    expect(screen.getByText('密钥 ID')).toBeInTheDocument()
+    expect(screen.getByText('SSH 密钥')).toBeInTheDocument()
   })
 
   it('fills form with existing session data when editing', () => {
@@ -68,7 +69,7 @@ describe('SessionDialog', () => {
     await user.clear(inputs[2])
     await user.type(inputs[2], 'root')
 
-    await user.click(screen.getByRole('button', { name: '创建' }))
+    await user.click(screen.getByRole('button', { name: '创建连接' }))
 
     expect(defaultProps.onSave).toHaveBeenCalledWith(
       expect.objectContaining({

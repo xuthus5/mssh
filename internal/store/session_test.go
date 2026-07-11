@@ -165,3 +165,31 @@ func TestGetSetSetting(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "32", v)
 }
+
+func TestCreateSessionClosedDB(t *testing.T) {
+	db := setupTestDB(t)
+	db.Close()
+	_, err := CreateSession(db, model.Session{Name: "x", Host: "1.1.1.1", Port: 22, Username: "u", AuthMethod: model.AuthPassword, KeepAlive: 30})
+	assert.Error(t, err)
+}
+
+func TestListSessionsClosedDB(t *testing.T) {
+	db := setupTestDB(t)
+	db.Close()
+	_, err := ListSessions(db, nil)
+	assert.Error(t, err)
+}
+
+func TestGetSessionClosedDB(t *testing.T) {
+	db := setupTestDB(t)
+	db.Close()
+	_, err := GetSession(db, 1)
+	assert.Error(t, err)
+}
+
+func TestListFoldersClosedDB(t *testing.T) {
+	db := setupTestDB(t)
+	db.Close()
+	_, err := ListFolders(db)
+	assert.Error(t, err)
+}

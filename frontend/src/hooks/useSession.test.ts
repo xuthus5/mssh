@@ -134,6 +134,7 @@ describe('useSession', () => {
       return Object.assign({}, s, { id: sessionId })
     })
     __registerHandler('mssh/internal/service.SessionService.Connect', async () => 'term-abc')
+    __registerHandler('mssh/internal/service.TerminalService.Open', async () => 'term-abc')
 
     const { result } = renderHook(() => useSession())
 

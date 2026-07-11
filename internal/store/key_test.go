@@ -75,3 +75,24 @@ func TestListKeysEmpty(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, keys, 0)
 }
+
+func TestGetKeyClosedDB(t *testing.T) {
+	db := setupTestDB(t)
+	db.Close()
+	_, err := GetKey(db, 1)
+	assert.Error(t, err)
+}
+
+func TestDeleteKeyClosedDB(t *testing.T) {
+	db := setupTestDB(t)
+	db.Close()
+	err := DeleteKey(db, 1)
+	assert.Error(t, err)
+}
+
+func TestListKeysClosedDB(t *testing.T) {
+	db := setupTestDB(t)
+	db.Close()
+	_, err := ListKeys(db)
+	assert.Error(t, err)
+}
