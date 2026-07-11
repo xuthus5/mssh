@@ -10,6 +10,7 @@ const general = {
   uiFontFamily: 'Arial',
   uiFontFallbackFamily: 'Segoe UI',
   uiFontSize: 14,
+  windowOpacity: 100,
 }
 
 function settingsProps() {
@@ -24,6 +25,8 @@ function settingsProps() {
     onSaveGeneral: vi.fn(async () => {}),
     onPreviewUIFont: vi.fn(),
     onRestoreUIFont: vi.fn(),
+    onPreviewWindowOpacity: vi.fn(),
+    onRestoreWindowOpacity: vi.fn(),
     onSaveTheme: vi.fn(),
     onGenerateKey: vi.fn(),
     onImportKey: vi.fn(),
@@ -93,6 +96,20 @@ describe('SettingsDialog interface font settings', () => {
     await userEvent.keyboard('{Escape}')
 
     expect(props.onRestoreUIFont).toHaveBeenCalledOnce()
+    expect(props.onRestoreWindowOpacity).toHaveBeenCalledOnce()
     expect(props.onOpenChange).toHaveBeenCalledWith(false)
+  })
+
+  it('previews application opacity and exposes the compatibility warning', async () => {
+    const props = settingsProps()
+    render(<SettingsDialog {...props} />)
+
+    const opacityInput = screen.getByLabelText('应用透明度百分比')
+    await userEvent.clear(opacityInput)
+    await userEvent.type(opacityInput, '72')
+
+    expect(props.onPreviewWindowOpacity).toHaveBeenLastCalledWith(72)
+    await userEvent.hover(screen.getByRole('button', { name: '透明度兼容性说明' }))
+    expect(await screen.findByText('部分桌面环境不支持窗口透明度合成显示。')).toBeInTheDocument()
   })
 })

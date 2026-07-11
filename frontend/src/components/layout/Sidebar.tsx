@@ -328,6 +328,8 @@ export default function Sidebar() {
         onSaveGeneral={settings.saveGeneral}
         onPreviewUIFont={settings.previewUIFont}
         onRestoreUIFont={settings.restoreUIFont}
+        onPreviewWindowOpacity={settings.previewWindowOpacity}
+        onRestoreWindowOpacity={settings.restoreWindowOpacity}
         onSaveTheme={settings.saveTheme}
         onGenerateKey={settings.generateKey}
         onImportKey={settings.importKey}

@@ -7,6 +7,7 @@ import { Dialogs } from '@wailsio/runtime'
 import { toast } from '@/components/ui/toast'
 import type { Setting, SettingInput } from '../../bindings/github.com/xuthus5/mssh/internal/model/models'
 import { applyUIFont, clampUIFontSize, DEFAULT_UI_FONT_FALLBACK_FAMILY, DEFAULT_UI_FONT_FAMILY, DEFAULT_UI_FONT_SIZE, normalizeUIFontFallbackFamily, normalizeUIFontFamily } from '@/lib/uiFont'
+import { applyWindowOpacity, clampWindowOpacity, DEFAULT_WINDOW_OPACITY } from '@/lib/uiOpacity'
 
 function settingEntry(key: string, value: unknown): SettingInput {
   const valueType = value === null ? 'null' : Array.isArray(value) ? 'array' : typeof value === 'object' ? 'object' : typeof value
@@ -26,6 +27,7 @@ export interface GeneralSettings {
   uiFontFamily: string
   uiFontFallbackFamily: string
   uiFontSize: number
+  windowOpacity: number
 }
 
 export interface TerminalTheme {
@@ -62,7 +64,7 @@ const DEFAULT_THEME: TerminalTheme = {
 }
 
 export function useSettings() {
-  const [general, setGeneral] = useState<GeneralSettings>({ maxPoolSize: 10, defaultKeepAlive: 60, defaultTermType: 'xterm-256color', uiFontFamily: DEFAULT_UI_FONT_FAMILY, uiFontFallbackFamily: DEFAULT_UI_FONT_FALLBACK_FAMILY, uiFontSize: DEFAULT_UI_FONT_SIZE })
+  const [general, setGeneral] = useState<GeneralSettings>({ maxPoolSize: 10, defaultKeepAlive: 60, defaultTermType: 'xterm-256color', uiFontFamily: DEFAULT_UI_FONT_FAMILY, uiFontFallbackFamily: DEFAULT_UI_FONT_FALLBACK_FAMILY, uiFontSize: DEFAULT_UI_FONT_SIZE, windowOpacity: DEFAULT_WINDOW_OPACITY })
   const [systemFonts, setSystemFonts] = useState<string[]>([])
   const [theme, setTheme] = useState<TerminalTheme>(DEFAULT_THEME)
   const [keys, setKeys] = useState<KeyInfo[]>([])
@@ -72,7 +74,7 @@ export function useSettings() {
   const loadGeneral = useCallback(async () => {
     try {
       logger.debug('loadGeneral')
-      const settings = await SettingService.GetMany(['terminal.max_pool_size', 'terminal.default_keep_alive', 'terminal.default_term_type', 'appearance.ui_font_family', 'appearance.ui_font_fallback_family', 'appearance.ui_font_size'])
+      const settings = await SettingService.GetMany(['terminal.max_pool_size', 'terminal.default_keep_alive', 'terminal.default_term_type', 'appearance.ui_font_family', 'appearance.ui_font_fallback_family', 'appearance.ui_font_size', 'appearance.window_opacity'])
       const uiFontFamily = normalizeUIFontFamily(settingValue(settings, 'appearance.ui_font_family', DEFAULT_UI_FONT_FAMILY))
       const loaded = {
         maxPoolSize: settingValue(settings, 'terminal.max_pool_size', 10),
@@ -81,8 +83,10 @@ export function useSettings() {
         uiFontFamily,
         uiFontFallbackFamily: normalizeUIFontFallbackFamily(settingValue(settings, 'appearance.ui_font_fallback_family', DEFAULT_UI_FONT_FALLBACK_FAMILY), uiFontFamily),
         uiFontSize: clampUIFontSize(settingValue(settings, 'appearance.ui_font_size', DEFAULT_UI_FONT_SIZE)),
+        windowOpacity: clampWindowOpacity(settingValue(settings, 'appearance.window_opacity', DEFAULT_WINDOW_OPACITY)),
       }
       applyUIFont({ family: loaded.uiFontFamily, fallbackFamily: loaded.uiFontFallbackFamily, size: loaded.uiFontSize })
+      applyWindowOpacity(loaded.windowOpacity)
       setGeneral(loaded)
     } catch (err) {
       logger.debug('loadGeneral error', err)
@@ -91,18 +95,20 @@ export function useSettings() {
 
   const saveGeneral = useCallback(async (settings: GeneralSettings) => {
     const uiFontFamily = normalizeUIFontFamily(settings.uiFontFamily)
-    const normalized = { ...settings, uiFontFamily, uiFontFallbackFamily: normalizeUIFontFallbackFamily(settings.uiFontFallbackFamily, uiFontFamily), uiFontSize: clampUIFontSize(settings.uiFontSize) }
+    const normalized = { ...settings, uiFontFamily, uiFontFallbackFamily: normalizeUIFontFallbackFamily(settings.uiFontFallbackFamily, uiFontFamily), uiFontSize: clampUIFontSize(settings.uiFontSize), windowOpacity: clampWindowOpacity(settings.windowOpacity) }
     try {
       logger.debug('saveGeneral', normalized)
       await Promise.all([SettingService.SetMany([
-        settingEntry('terminal.max_pool_size', normalized.maxPoolSize), settingEntry('terminal.default_keep_alive', normalized.defaultKeepAlive), settingEntry('terminal.default_term_type', normalized.defaultTermType), settingEntry('appearance.ui_font_family', normalized.uiFontFamily), settingEntry('appearance.ui_font_fallback_family', normalized.uiFontFallbackFamily), settingEntry('appearance.ui_font_size', normalized.uiFontSize),
+        settingEntry('terminal.max_pool_size', normalized.maxPoolSize), settingEntry('terminal.default_keep_alive', normalized.defaultKeepAlive), settingEntry('terminal.default_term_type', normalized.defaultTermType), settingEntry('appearance.ui_font_family', normalized.uiFontFamily), settingEntry('appearance.ui_font_fallback_family', normalized.uiFontFallbackFamily), settingEntry('appearance.ui_font_size', normalized.uiFontSize), settingEntry('appearance.window_opacity', normalized.windowOpacity),
       ]), TerminalService.SetMaxSize(normalized.maxPoolSize)])
       applyUIFont({ family: normalized.uiFontFamily, fallbackFamily: normalized.uiFontFallbackFamily, size: normalized.uiFontSize })
+      applyWindowOpacity(normalized.windowOpacity)
       setGeneral(normalized)
       useAppStore.getState().setMaxPoolSize(normalized.maxPoolSize)
       toast('通用设置已保存', 'success')
     } catch (err) {
       applyUIFont({ family: general.uiFontFamily, fallbackFamily: general.uiFontFallbackFamily, size: general.uiFontSize })
+      applyWindowOpacity(general.windowOpacity)
       logger.debug('saveGeneral error', err)
       toast(`保存设置失败: ${err instanceof Error ? err.message : String(err)}`, 'error')
       throw err
@@ -125,6 +131,10 @@ export function useSettings() {
   const restoreUIFont = useCallback(() => {
     applyUIFont({ family: general.uiFontFamily, fallbackFamily: general.uiFontFallbackFamily, size: general.uiFontSize })
   }, [general.uiFontFamily, general.uiFontFallbackFamily, general.uiFontSize])
+
+  const previewWindowOpacity = useCallback((opacity: number) => applyWindowOpacity(opacity), [])
+
+  const restoreWindowOpacity = useCallback(() => applyWindowOpacity(general.windowOpacity), [general.windowOpacity])
 
   const saveTheme = useCallback(async (t: TerminalTheme) => {
     try {
@@ -305,5 +315,5 @@ export function useSettings() {
 
   useEffect(() => { loadGeneral(); loadTheme(); listKeys(); loadSync(); loadSystemFonts() }, [loadGeneral, loadTheme, listKeys, loadSync, loadSystemFonts])
 
-  return { general, theme, keys, sync, systemFonts, saveGeneral, previewUIFont, restoreUIFont, saveTheme, listKeys, generateKey, importKey, deleteKey, exportKey, saveSync, exportConfig, importConfig }
+  return { general, theme, keys, sync, systemFonts, saveGeneral, previewUIFont, restoreUIFont, previewWindowOpacity, restoreWindowOpacity, saveTheme, listKeys, generateKey, importKey, deleteKey, exportKey, saveSync, exportConfig, importConfig }
 }

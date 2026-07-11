@@ -23,6 +23,7 @@ describe('application entry', () => {
 
     await waitFor(() => expect(render).toHaveBeenCalledTimes(1))
     const element = render.mock.calls[0][0]
-    expect(element.type.name).toBe('default')
+    expect(element.type.name).toBe('TooltipProvider')
+    expect(element.props.children.type.name).toBe('default')
   })
 })
