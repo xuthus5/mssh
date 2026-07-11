@@ -37,6 +37,9 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+  --scrollbar-track: color-mix(in oklch, var(--background) 92%, transparent);
+  --scrollbar-thumb: color-mix(in oklch, var(--muted-foreground) 42%, transparent);
+  --scrollbar-thumb-hover: color-mix(in oklch, var(--muted-foreground) 68%, transparent);
 }
 
 @theme inline {
@@ -97,4 +100,35 @@ body {
   html {
     @apply font-sans;
   }
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+}
+
+*::-webkit-scrollbar-thumb {
+  min-height: 32px;
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: var(--scrollbar-thumb);
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+  background-clip: padding-box;
+}
+
+.xterm .xterm-viewport {
+  background-color: var(--background) !important;
 }
