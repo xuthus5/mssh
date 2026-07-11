@@ -11,6 +11,7 @@ import { useFileTransfer } from '@/hooks/useFileTransfer'
 import { logger } from '@/lib/logger'
 import { toast } from '@/components/ui/toast'
 import { Spinner } from '@/components/ui/spinner'
+import { WindowTitleBar } from '@/components/layout/WindowTitleBar'
 
 const TerminalTab = lazy(() => import('@/components/terminal/TerminalTab').then((module) => ({ default: module.TerminalTab })))
 const PlaybackTab = lazy(() => import('@/components/terminal/PlaybackTab').then((module) => ({ default: module.PlaybackTab })))
@@ -256,6 +257,7 @@ export default function App() {
 
   return (
     <div className="flex flex-col h-screen w-screen bg-background">
+      <WindowTitleBar />
       <div className="flex flex-1 min-h-0">
         <Sidebar />
         <main className="flex-1 flex flex-col min-w-0">
