@@ -12,6 +12,10 @@ import * as model$0 from "../model/models.js";
 // @ts-ignore: Unused imports
 import * as ssh$0 from "../ssh/models.js";
 
+export function CancelConnect(attemptID: string): $CancellablePromise<void> {
+    return $Call.ByName("mssh/internal/service.SessionService.CancelConnect", attemptID);
+}
+
 export function Connect(sessionID: number): $CancellablePromise<string> {
     return $Call.ByName("mssh/internal/service.SessionService.Connect", sessionID);
 }
@@ -30,6 +34,10 @@ export function CreateSession(session: model$0.Session): $CancellablePromise<mod
     return $Call.ByName("mssh/internal/service.SessionService.CreateSession", session).then(($result: any) => {
         return $$createType3($result);
     });
+}
+
+export function DecideHostKey(attemptID: string, accept: boolean): $CancellablePromise<void> {
+    return $Call.ByName("mssh/internal/service.SessionService.DecideHostKey", attemptID, accept);
 }
 
 export function DeleteFolder(id: number): $CancellablePromise<void> {

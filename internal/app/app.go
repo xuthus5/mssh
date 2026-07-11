@@ -150,6 +150,9 @@ func New(opts Options) (*App, error) {
 	terminalSvc.SetOutputHandler(func(terminalID string, data []byte) {
 		logSvc.HandleOutput(terminalID, data)
 	})
+	terminalSvc.SetCloseHandler(func(terminalID string) {
+		_ = logSvc.StopTerminalRecordingIfActive(terminalID)
+	})
 
 	return &App{
 		DB:       db,

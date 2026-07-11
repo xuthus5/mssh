@@ -73,7 +73,7 @@ describe('appStore', () => {
     const { addTransfer, updateTransfer, removeTransfer } = useAppStore.getState()
     addTransfer({
       id: 't1', fileName: 'test.txt', direction: 'upload',
-      totalBytes: 100, transferredBytes: 0, speed: 0, startedAt: Date.now(),
+      totalBytes: 100, transferredBytes: 0, speed: 0, eta: 0, status: 'queued', startedAt: Date.now(),
     })
     expect(useAppStore.getState().transfers).toHaveLength(1)
     updateTransfer('t1', { transferredBytes: 50, speed: 1024 })

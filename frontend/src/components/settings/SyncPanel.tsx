@@ -3,6 +3,7 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import type { SyncConfig } from '@/hooks/useSettings'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 
 interface Props {
   sync: SyncConfig
@@ -44,10 +45,15 @@ export function SyncPanel({ sync, onSave, onExport, onImport }: Props) {
       </div>
       <div className="border-t border-border pt-4">
         <h4 className="text-sm font-medium mb-3">云同步</h4>
+        <Alert className="mb-3">
+          <AlertTitle>云同步暂不可用</AlertTitle>
+          <AlertDescription>当前版本仅支持本地配置导入和导出。</AlertDescription>
+        </Alert>
         <form onSubmit={handleSubmit} className="flex flex-col gap-3">
           <div className="flex items-center gap-2">
             <Checkbox
               checked={enabled}
+              disabled
               onCheckedChange={(checked) =>
                 setEnabled(checked === true)
               }
@@ -62,7 +68,7 @@ export function SyncPanel({ sync, onSave, onExport, onImport }: Props) {
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               placeholder="https://sync.example.com/api"
-              disabled={!enabled}
+              disabled
             />
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -73,7 +79,7 @@ export function SyncPanel({ sync, onSave, onExport, onImport }: Props) {
               <Input
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                disabled={!enabled}
+                disabled
               />
             </div>
             <div className="flex flex-col gap-1.5">
@@ -84,12 +90,12 @@ export function SyncPanel({ sync, onSave, onExport, onImport }: Props) {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                disabled={!enabled}
+                disabled
               />
             </div>
           </div>
           <div className="flex justify-end">
-            <Button type="submit" size="sm" disabled={!enabled}>
+            <Button type="submit" size="sm" disabled>
               保存同步配置
             </Button>
           </div>
