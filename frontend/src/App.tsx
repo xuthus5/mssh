@@ -169,6 +169,7 @@ function TabContent() {
                   terminalID={tab.terminalId ?? tab.id}
                   sessionId={tab.sessionId ?? 0}
                   onOpenFiles={handleOpenFiles}
+                  active={active}
                 />
               </div>
               {active && filePanelSessionId !== null && (
