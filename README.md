@@ -31,7 +31,7 @@ cd frontend && npm install
 
 ### Run
 ```bash
-task dev
+CGO_ENABLED=1 PATH=/root/.govm/go/bin:$PATH wails3 dev
 ```
 
 Wails requires CGO on Linux. If running the CLI directly, use
