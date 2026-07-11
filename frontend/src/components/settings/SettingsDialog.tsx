@@ -13,19 +13,15 @@ import {
 } from '@/components/ui/tabs'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+import { LabeledSelect } from '@/components/ui/labeled-select'
 import { ThemeEditor } from '@/components/settings/ThemeEditor'
 import { KeyManager } from '@/components/settings/KeyManager'
 import { SyncPanel } from '@/components/settings/SyncPanel'
 import type { GeneralSettings, TerminalTheme, KeyInfo, SyncConfig } from '@/hooks/useSettings'
 import type { Folder, Session } from '@/hooks/useSession'
 import { FolderManager } from '@/components/settings/FolderManager'
+
+const TERMINAL_TYPE_OPTIONS = ['xterm-256color', 'xterm', 'vt100', 'linux'].map((value) => ({ value, label: value }))
 
 interface Props {
   open: boolean
@@ -137,22 +133,7 @@ export default function SettingsDialog({
                 <label className="text-xs font-medium text-muted-foreground">
                   默认终端类型
                 </label>
-                <Select
-                  value={defaultTermType}
-                  onValueChange={(value) => setDefaultTermType(value ?? '')}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="xterm-256color">
-                      xterm-256color
-                    </SelectItem>
-                    <SelectItem value="xterm">xterm</SelectItem>
-                    <SelectItem value="vt100">vt100</SelectItem>
-                    <SelectItem value="linux">linux</SelectItem>
-                  </SelectContent>
-                </Select>
+                <LabeledSelect value={defaultTermType} options={TERMINAL_TYPE_OPTIONS} onValueChange={setDefaultTermType} />
               </div>
               <div className="flex justify-end">
                 <Button type="submit" size="sm" disabled={saving}>
