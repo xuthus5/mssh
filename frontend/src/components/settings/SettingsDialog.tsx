@@ -21,6 +21,7 @@ import type { GeneralSettings, TerminalTheme, KeyInfo, SyncConfig } from '@/hook
 import type { Folder, Session } from '@/hooks/useSession'
 import { FolderManager } from '@/components/settings/FolderManager'
 import { useDraggableDialog } from '@/hooks/useDraggableDialog'
+import { AboutPanel } from '@/components/settings/AboutPanel'
 
 const TERMINAL_TYPE_OPTIONS = ['xterm-256color', 'xterm', 'vt100', 'linux'].map((value) => ({ value, label: value }))
 
@@ -106,6 +107,7 @@ export default function SettingsDialog({
             <TabsTrigger value="keys">密钥</TabsTrigger>
             <TabsTrigger value="folders">分组</TabsTrigger>
             <TabsTrigger value="sync">同步</TabsTrigger>
+            <TabsTrigger value="about">关于</TabsTrigger>
           </TabsList>
           <TabsContent value="general" className="min-h-0 min-w-0 overflow-y-auto overscroll-contain pr-2">
             <form onSubmit={handleSaveGeneral} className="flex flex-col gap-3 pt-2">
@@ -165,6 +167,7 @@ export default function SettingsDialog({
               onImport={onImportConfig}
             />
           </TabsContent>
+          <TabsContent value="about" className="min-h-0 min-w-0 overflow-y-auto overscroll-contain pr-2"><AboutPanel /></TabsContent>
         </Tabs>
       </DialogContent>
     </Dialog>

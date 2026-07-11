@@ -10,6 +10,7 @@ import {
   ThemeService,
   LogService,
   SyncService,
+  AboutService,
 } from '@/lib/wails'
 
 describe('Generated Bindings Barrel', () => {
@@ -66,5 +67,10 @@ describe('Generated Bindings Barrel', () => {
   it('exports SyncService', () => {
     expect(SyncService).toBeDefined()
     expect(typeof SyncService.Export).toBe('function')
+  })
+
+  it('exports AboutService', () => {
+    expect(AboutService).toBeDefined()
+    expect(typeof AboutService.CheckUpdate).toBe('function')
   })
 })

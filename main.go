@@ -38,6 +38,7 @@ func main() {
 			application.NewService(appInstance.Log),
 			application.NewService(appInstance.Sync),
 			application.NewService(appInstance.Setting),
+			application.NewService(appInstance.About),
 		},
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(os.DirFS("./frontend/dist")),
