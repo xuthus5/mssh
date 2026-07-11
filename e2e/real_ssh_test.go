@@ -1,3 +1,5 @@
+//go:build e2e
+
 package e2e_test
 
 import (
@@ -8,9 +10,8 @@ import (
 	"testing"
 	"time"
 
-	gossh "golang.org/x/crypto/ssh"
-
 	"github.com/stretchr/testify/require"
+	gossh "golang.org/x/crypto/ssh"
 )
 
 func TestRealSSH(t *testing.T) {
@@ -109,10 +110,18 @@ func TestRealSSH(t *testing.T) {
 	<-done
 }
 
-func min(a, b int) int { if a < b { return a }; return b }
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
 func contains(s, sub string) bool {
 	for i := 0; i <= len(s)-len(sub); i++ {
-		if s[i:i+len(sub)] == sub { return true }
+		if s[i:i+len(sub)] == sub {
+			return true
+		}
 	}
 	return false
 }
