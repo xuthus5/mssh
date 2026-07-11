@@ -48,6 +48,10 @@ export function StopTerminalRecording(terminalID: string): $CancellablePromise<v
     return $Call.ByName("mssh/internal/service.LogService.StopTerminalRecording", terminalID);
 }
 
+export function StopTerminalRecordingIfActive(terminalID: string): $CancellablePromise<void> {
+    return $Call.ByName("mssh/internal/service.LogService.StopTerminalRecordingIfActive", terminalID);
+}
+
 // Private type creation functions
 const $$createType0 = ssh$0.Player.createFrom;
 const $$createType1 = $Create.Nullable($$createType0);

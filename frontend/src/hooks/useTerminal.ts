@@ -51,18 +51,18 @@ export function useTerminal(
       setTimeout(() => {
         fitAddon.fit()
         term.focus()
+        storeRef.current.setActivePane(terminalID)
+        TerminalService.Resize(terminalID, term.cols, term.rows).catch((err: unknown) => {
+          logger.error('terminal initial resize error', err)
+        })
         logger.debug('terminal opened', { cols: term.cols, rows: term.rows })
       }, 100)
-
-      term.writeln('\x1b[1;36m╔════════════════════════════════════════╗')
-      term.writeln('\x1b[1;36m║          Welcome to MSSH              ║')
-      term.writeln('\x1b[1;36m║    Secure Shell Client & Manager      ║')
-      term.writeln('\x1b[1;36m╚════════════════════════════════════════╝\x1b[0m')
-      term.writeln('')
-      term.writeln('\x1b[33mWaiting for SSH connection...\x1b[0m')
-      term.writeln('')
-      storeRef.current.setConnectionStatus(terminalID, 'disconnected')
+      storeRef.current.registerTerminal(terminalID, term)
     }
+
+    const focusHandler = () => storeRef.current.setActivePane(terminalID)
+    containerRef.current?.addEventListener('focusin', focusHandler)
+    containerRef.current?.addEventListener('pointerdown', focusHandler)
 
     const dataDispose = term.onData((data) => {
       storeRef.current.updateLastUsed(terminalID)
@@ -90,6 +90,9 @@ export function useTerminal(
     const resizeObs = new ResizeObserver(() => {
       if (containerRef.current) {
         fitAddon.fit()
+        TerminalService.Resize(terminalID, term.cols, term.rows).catch((err: unknown) => {
+          logger.error('terminal resize error', err)
+        })
       }
     })
     if (containerRef.current) {
@@ -100,14 +103,10 @@ export function useTerminal(
       dataDispose.dispose()
       unsubOutput()
       resizeObs.disconnect()
-      try {
-        const el = term.element
-        if (el?.parentNode) {
-          el.parentNode.removeChild(el)
-        }
-      } catch {
-        // Ignore cleanup errors
-      }
+      containerRef.current?.removeEventListener('focusin', focusHandler)
+      containerRef.current?.removeEventListener('pointerdown', focusHandler)
+      storeRef.current.unregisterTerminal(terminalID)
+      term.dispose()
     }
   }, [terminalID, containerRef])
 

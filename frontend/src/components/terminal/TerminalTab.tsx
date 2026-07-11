@@ -5,6 +5,7 @@ import { TerminalToolbar } from '@/components/terminal/TerminalToolbar'
 import { useAppStore } from '@/store/appStore'
 import { LogService } from '@/lib/wails'
 import { logger } from '@/lib/logger'
+import { toast } from '@/components/ui/toast'
 
 export function TerminalTab({
   terminalID,
@@ -15,35 +16,40 @@ export function TerminalTab({
   sessionId: number
   onOpenFiles: () => void
 }) {
-  const [isRecording, setIsRecording] = useState(false)
-  const [recordingLogId, setRecordingLogId] = useState<number | null>(null)
   const [split, setSplit] = useState(false)
   const tabs = useAppStore((s) => s.tabs)
   const activeTabId = useAppStore((s) => s.activeTabId)
   const activeTab = tabs.find((t) => t.id === activeTabId)
+  const recordingState = useAppStore((s) => s.recordingState[terminalID] ?? 'idle')
+  const setRecordingState = useAppStore((s) => s.setRecordingState)
+  const isRecording = recordingState === 'recording' || recordingState === 'stopping'
 
   const handleToggleRecording = useCallback(async () => {
     if (!isRecording) {
+      setRecordingState(terminalID, 'starting')
       const terminalEntry = useAppStore.getState().terminalPool.get(terminalID)
       const cols = terminalEntry?.terminal.cols ?? 80
       const rows = terminalEntry?.terminal.rows ?? 24
       try {
-        const logId = await LogService.StartTerminalRecording(terminalID, sessionId, cols, rows, 'xterm-256color')
-        setRecordingLogId(logId)
-        setIsRecording(true)
+        await LogService.StartTerminalRecording(terminalID, sessionId, cols, rows, 'xterm-256color')
+        setRecordingState(terminalID, 'recording')
       } catch (err) {
         logger.error('TerminalTab: start recording failed:', err)
+        setRecordingState(terminalID, 'error')
+        toast(`开始录制失败: ${err instanceof Error ? err.message : String(err)}`, 'error')
       }
     } else {
+      setRecordingState(terminalID, 'stopping')
       try {
         await LogService.StopTerminalRecording(terminalID)
+        setRecordingState(terminalID, 'idle')
       } catch (err) {
         logger.error('TerminalTab: stop recording failed:', err)
+        setRecordingState(terminalID, 'recording')
+        toast(`停止录制失败: ${err instanceof Error ? err.message : String(err)}`, 'error')
       }
-      setIsRecording(false)
-      setRecordingLogId(null)
     }
-  }, [isRecording, terminalID, sessionId])
+  }, [isRecording, terminalID, sessionId, setRecordingState])
 
   const handleToggleSplit = useCallback(() => {
     setSplit((prev) => !prev)
@@ -55,7 +61,7 @@ export function TerminalTab({
         terminalID={terminalID}
         sessionId={sessionId}
         isRecording={isRecording}
-        recordingLogId={recordingLogId}
+        recordingLogId={null}
         onToggleRecording={handleToggleRecording}
         hostname={activeTab?.title}
         onOpenFiles={onOpenFiles}
