@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
+	"github.com/wailsapp/wails/v3/pkg/events"
 
 	"github.com/xuthus5/mssh/internal/app"
 )
@@ -46,7 +47,13 @@ func main() {
 		},
 	})
 
-	wailsApp.Window.NewWithOptions(mainWindowOptions())
+	mainWindow := wailsApp.Window.NewWithOptions(mainWindowOptions())
+	mainWindow.OnWindowEvent(events.Common.WindowFilesDropped, func(event *application.WindowEvent) {
+		wailsApp.Event.Emit("sftp:files-dropped", map[string]any{
+			"files":   event.Context().DroppedFiles(),
+			"details": event.Context().DropTargetDetails(),
+		})
+	})
 
 	wailsApp.OnShutdown(func() {
 		appInstance.Shutdown()
@@ -61,10 +68,11 @@ func main() {
 
 func mainWindowOptions() application.WebviewWindowOptions {
 	return application.WebviewWindowOptions{
-		Title:     "MSSH",
-		Width:     1280,
-		Height:    800,
-		Frameless: true,
+		Title:          "MSSH",
+		Width:          1280,
+		Height:         800,
+		Frameless:      true,
+		EnableFileDrop: true,
 		Linux: application.LinuxWindow{
 			WebviewGpuPolicy: application.WebviewGpuPolicyNever,
 		},

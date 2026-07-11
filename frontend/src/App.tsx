@@ -1,5 +1,5 @@
 import { useEffect, useCallback, useState, lazy, Suspense } from 'react'
-import { Dialogs } from '@wailsio/runtime'
+import { Dialogs, Events } from '@wailsio/runtime'
 import { Terminal, Shield, FileText, Keyboard } from 'lucide-react'
 import Sidebar from '@/components/layout/Sidebar'
 import TabBar from '@/components/layout/TabBar'
@@ -86,10 +86,18 @@ function FilePanelContainer({
   onClose: () => void
 }) {
   const ft = useFileTransfer(sessionId)
+  const dropTargetId = `sftp-drop-zone-${sessionId}`
 
   useEffect(() => {
     ft.listFiles('/')
   }, [sessionId])
+
+  useEffect(() => Events.On('sftp:files-dropped', (event: { data?: { files?: string[]; details?: { id?: string } } }) => {
+    const files = event.data?.files ?? []
+    const targetID = event.data?.details?.id
+    if (files.length === 0 || (targetID && targetID !== dropTargetId)) return
+    void ft.uploadMany(files, ft.currentPath)
+  }), [dropTargetId, ft.currentPath, ft.uploadMany])
 
   const handleUploadClick = async () => {
     const selected = await Dialogs.OpenFile({
@@ -126,6 +134,7 @@ function FilePanelContainer({
         onMakeDir={ft.makeDir}
         onUpload={handleUploadClick}
         onDownload={(path) => { void handleDownload(path) }}
+        dropTargetId={dropTargetId}
       /></Suspense>
   )
 }

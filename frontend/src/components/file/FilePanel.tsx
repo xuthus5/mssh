@@ -29,6 +29,7 @@ interface Props {
   onMakeDir: (name: string) => void
   onUpload: () => void
   onDownload: (path: string) => void
+  dropTargetId: string
 }
 
 export default function FilePanel({
@@ -44,6 +45,7 @@ export default function FilePanel({
   onMakeDir,
   onUpload,
   onDownload,
+  dropTargetId,
   error,
 }: Props) {
   const [mkdirName, setMkdirName] = useState('')
@@ -81,7 +83,8 @@ export default function FilePanel({
     )
 
   return (
-    <aside className="w-[340px] flex-shrink-0 flex flex-col border-l border-border bg-card">
+    <aside id={dropTargetId} data-file-drop-target className="group/drop relative w-[340px] flex-shrink-0 flex flex-col border-l border-border bg-card file-drop-target-active:ring-2 file-drop-target-active:ring-inset file-drop-target-active:ring-primary">
+      <div className="pointer-events-none absolute inset-3 z-40 hidden place-items-center rounded-xl border-2 border-dashed border-primary bg-background/90 text-sm font-medium text-primary shadow-sm group-[.file-drop-target-active]/drop:grid">释放文件以上传到当前目录</div>
       <div className="flex items-center justify-between px-3 py-2 border-b border-border">
         <span className="text-sm font-medium">文件管理</span>
         <Button size="xs" variant="ghost" onClick={onClose}>
