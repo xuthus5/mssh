@@ -88,3 +88,66 @@ func DeleteSessionLog(db *sql.DB, id int64) error {
 	}
 	return nil
 }
+
+// GetSessionLog retrieves a single session log by ID.
+func GetSessionLog(db *sql.DB, id int64) (*model.SessionLog, error) {
+	var l model.SessionLog
+	var startedAt string
+	var endedAt *string
+	err := db.QueryRow(
+		"SELECT id, session_id, started_at, ended_at, data_path FROM session_logs WHERE id = ?", id,
+	).Scan(&l.ID, &l.SessionID, &startedAt, &endedAt, &l.DataPath)
+	if err != nil {
+		return nil, fmt.Errorf("get session log: %w", err)
+	}
+	l.StartedAt, err = time.Parse("2006-01-02 15:04:05", startedAt)
+	if err != nil {
+		return nil, fmt.Errorf("get session log: parse started_at: %w", err)
+	}
+	if endedAt != nil {
+		t, err := time.Parse("2006-01-02 15:04:05", *endedAt)
+		if err != nil {
+			return nil, fmt.Errorf("get session log: parse ended_at: %w", err)
+		}
+		l.EndedAt = &t
+	}
+	return &l, nil
+}
+
+// ListSessionLogsBySession lists session logs filtered by session ID at the SQL layer.
+func ListSessionLogsBySession(db *sql.DB, sessionID int64) ([]model.SessionLog, error) {
+	rows, err := db.Query(
+		"SELECT id, session_id, started_at, ended_at, data_path FROM session_logs WHERE session_id = ? ORDER BY started_at DESC",
+		sessionID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list session logs by session: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+	var logs []model.SessionLog
+	for rows.Next() {
+		var l model.SessionLog
+		var startedAt string
+		var endedAt *string
+		err := rows.Scan(&l.ID, &l.SessionID, &startedAt, &endedAt, &l.DataPath)
+		if err != nil {
+			return nil, fmt.Errorf("scan session log: %w", err)
+		}
+		l.StartedAt, err = time.Parse("2006-01-02 15:04:05", startedAt)
+		if err != nil {
+			return nil, fmt.Errorf("scan session log: parse started_at: %w", err)
+		}
+		if endedAt != nil {
+			t, err := time.Parse("2006-01-02 15:04:05", *endedAt)
+			if err != nil {
+				return nil, fmt.Errorf("scan session log: parse ended_at: %w", err)
+			}
+			l.EndedAt = &t
+		}
+		logs = append(logs, l)
+	}
+	if logs == nil {
+		logs = []model.SessionLog{}
+	}
+	return logs, rows.Err()
+}

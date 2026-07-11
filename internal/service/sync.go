@@ -41,8 +41,15 @@ func (s *SyncService) Export(path string) error {
 		return fmt.Errorf("export: %w", err)
 	}
 
+	// Strip sensitive fields from sessions before export.
+	safeSessions := make([]model.Session, len(sessions))
+	for i, sess := range sessions {
+		sess.Password = ""
+		safeSessions[i] = sess
+	}
+
 	data := ExportData{
-		Sessions: sessions,
+		Sessions: safeSessions,
 		Keys:     keys,
 		Macros:   macros,
 	}
@@ -51,7 +58,7 @@ func (s *SyncService) Export(path string) error {
 	if err != nil {
 		return fmt.Errorf("export: %w", err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	if err := json.NewEncoder(file).Encode(data); err != nil {
 		return fmt.Errorf("export: %w", err)
@@ -65,7 +72,7 @@ func (s *SyncService) Import(path string) error {
 	if err != nil {
 		return fmt.Errorf("import: %w", err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	var data ExportData
 	if err := json.NewDecoder(file).Decode(&data); err != nil {
@@ -98,9 +105,9 @@ func (s *SyncService) Import(path string) error {
 }
 
 func (s *SyncService) SyncToCloud() error {
-	return nil
+	return fmt.Errorf("cloud sync not implemented")
 }
 
 func (s *SyncService) SyncFromCloud() error {
-	return nil
+	return fmt.Errorf("cloud sync not implemented")
 }

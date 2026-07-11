@@ -9,6 +9,9 @@ import (
 	"github.com/pkg/sftp"
 )
 
+// SFTPClient is an alias for the SFTP client, exported for use by the service layer.
+type SFTPClient = sftp.Client
+
 type FileEntry struct {
 	Name    string `json:"name"`
 	Path    string `json:"path"`
@@ -123,6 +126,15 @@ func Rename(client *sftp.Client, oldname, newname string) error {
 		return fmt.Errorf("rename %s -> %s: %w", oldname, newname, err)
 	}
 	return nil
+}
+
+// RemoteFileSize returns the size in bytes of a remote file, or an error.
+func RemoteFileSize(client *SFTPClient, path string) (int64, error) {
+	info, err := client.Stat(path)
+	if err != nil {
+		return 0, fmt.Errorf("stat remote %s: %w", path, err)
+	}
+	return info.Size(), nil
 }
 
 type progressWriter struct {
