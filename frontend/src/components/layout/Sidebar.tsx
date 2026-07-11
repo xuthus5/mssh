@@ -26,6 +26,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import { useResizablePanel } from '@/hooks/useResizablePanel'
 
 type SidebarTab = 'sessions' | 'macros'
 
@@ -40,6 +41,7 @@ export default function Sidebar() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [macros, setMacros] = useState<CommandItem[]>([])
   const [deleteTarget, setDeleteTarget] = useState<{ type: 'session' | 'folder'; id: string; name: string } | null>(null)
+  const { width, resizeHandleProps } = useResizablePanel()
 
   const {
     folders,
@@ -195,7 +197,8 @@ export default function Sidebar() {
   }, [])
 
   return (
-    <aside className="w-[280px] flex-shrink-0 flex flex-col border-r border-border bg-card">
+    <aside style={{ width }} className="relative flex-shrink-0 flex flex-col border-r border-border bg-card">
+      <div {...resizeHandleProps} className="absolute inset-y-0 -right-1 z-20 w-2 cursor-col-resize touch-none outline-none after:absolute after:inset-y-0 after:left-1/2 after:w-px after:-translate-x-1/2 after:bg-transparent hover:after:bg-primary/60 focus-visible:after:bg-primary active:after:bg-primary" />
       <div className="flex border-b border-border">
         <button
           type="button"
