@@ -41,6 +41,20 @@ describe('useFileTransfer', () => {
     expect(result.current.transfers[0].fileName).toBe('file.txt')
   })
 
+  it('uploads every dropped file to the current remote directory', async () => {
+    const uploads: string[] = []
+    __registerHandler('github.com/xuthus5/mssh/internal/service.FileService.Upload', async (_sessionID: number, localPath: string) => {
+      uploads.push(localPath)
+      return `task-${uploads.length}`
+    })
+    const { result } = renderHook(() => useFileTransfer(SESSION_ID))
+
+    await act(async () => { await result.current.uploadMany(['/tmp/a.txt', '/tmp/b.txt'], '/remote') })
+
+    expect(uploads).toEqual(['/tmp/a.txt', '/tmp/b.txt'])
+    expect(result.current.transfers).toHaveLength(2)
+  })
+
   it('download creates a transfer job', async () => {
     __registerHandler('github.com/xuthus5/mssh/internal/service.FileService.Download', async () => 'task-2')
 
