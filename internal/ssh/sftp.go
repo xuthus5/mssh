@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path"
 	"path/filepath"
 
 	"github.com/pkg/sftp"
@@ -40,7 +41,7 @@ func ListDir(client *sftp.Client, path string) ([]FileEntry, error) {
 	for _, e := range entries {
 		files = append(files, FileEntry{
 			Name:    e.Name(),
-			Path:    filepath.Join(path, e.Name()),
+			Path:    remotePathJoin(path, e.Name()),
 			Size:    e.Size(),
 			IsDir:   e.IsDir(),
 			ModTime: e.ModTime().Format("2006-01-02 15:04:05"),
@@ -64,7 +65,7 @@ func UploadFileContext(ctx context.Context, client *sftp.Client, src, dst string
 		return fmt.Errorf("stat local: %w", err)
 	}
 
-	remoteDir := filepath.Dir(dst)
+	remoteDir := remotePathDir(dst)
 	if remoteDir != "." && remoteDir != "/" {
 		if err := client.MkdirAll(remoteDir); err != nil {
 			return fmt.Errorf("create remote dir: %w", err)
@@ -86,6 +87,14 @@ func UploadFileContext(ctx context.Context, client *sftp.Client, src, dst string
 		return fmt.Errorf("copy: %w", err)
 	}
 	return nil
+}
+
+func remotePathJoin(base, name string) string {
+	return path.Join(base, name)
+}
+
+func remotePathDir(remotePath string) string {
+	return path.Dir(remotePath)
 }
 
 func DownloadFile(client *sftp.Client, src, dst string, onProgress ProgressFn) error {
