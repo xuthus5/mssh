@@ -17,6 +17,7 @@ describe('useDraggableDialog', () => {
     expect(result.current.style.transform).toContain('40px')
 
     rerender({ open: false })
+    expect(result.current.style.transform).toContain('0px')
     rerender({ open: true })
     expect(result.current.style.transform).toContain('0px')
   })
