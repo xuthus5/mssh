@@ -97,19 +97,19 @@ export default function SettingsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle>设置</DialogTitle>
         </DialogHeader>
-        <Tabs value={tab} onValueChange={setTab}>
-          <TabsList>
+        <Tabs value={tab} onValueChange={setTab} orientation="vertical" className="min-h-[420px] flex-row gap-4">
+          <TabsList className="w-36 shrink-0 self-stretch justify-start rounded-xl border bg-muted/40 p-2">
             <TabsTrigger value="general">通用</TabsTrigger>
             <TabsTrigger value="appearance">外观</TabsTrigger>
             <TabsTrigger value="keys">密钥</TabsTrigger>
             <TabsTrigger value="folders">分组</TabsTrigger>
             <TabsTrigger value="sync">同步</TabsTrigger>
           </TabsList>
-          <TabsContent value="general">
+          <TabsContent value="general" className="min-w-0 overflow-y-auto pr-1">
             <form onSubmit={handleSaveGeneral} className="flex flex-col gap-3 pt-2">
               <div className="grid grid-cols-2 gap-3">
                 <div className="flex flex-col gap-1.5">
@@ -161,10 +161,10 @@ export default function SettingsDialog({
               </div>
             </form>
           </TabsContent>
-          <TabsContent value="appearance">
+          <TabsContent value="appearance" className="min-w-0 overflow-y-auto pr-1">
             <ThemeEditor theme={theme} onSave={onSaveTheme} />
           </TabsContent>
-          <TabsContent value="keys">
+          <TabsContent value="keys" className="min-w-0 overflow-y-auto pr-1">
             <KeyManager
               keys={keys}
               onGenerate={onGenerateKey}
@@ -173,8 +173,8 @@ export default function SettingsDialog({
               onExport={onExportKey}
             />
           </TabsContent>
-          <TabsContent value="folders"><FolderManager folders={folders} sessions={sessions} onCreate={onCreateFolder} onRename={onRenameFolder} onSetDefault={onSetDefaultFolder} onDelete={onDeleteFolder} /></TabsContent>
-          <TabsContent value="sync">
+          <TabsContent value="folders" className="min-w-0 overflow-y-auto pr-1"><FolderManager folders={folders} sessions={sessions} onCreate={onCreateFolder} onRename={onRenameFolder} onSetDefault={onSetDefaultFolder} onDelete={onDeleteFolder} /></TabsContent>
+          <TabsContent value="sync" className="min-w-0 overflow-y-auto pr-1">
             <SyncPanel
               sync={sync}
               onSave={onSaveSync}
