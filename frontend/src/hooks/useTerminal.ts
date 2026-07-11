@@ -38,17 +38,17 @@ export function useTerminal(
     termRef.current = term
 
     const fitAddon = new FitAddon()
-    term.loadAddon(fitAddon)
-    try {
-      const webglAddon = new WebglAddon()
-      term.loadAddon(webglAddon)
-    } catch {
-      // WebGL not available, fallback to Canvas renderer
-    }
 
     let initialResizeTimer: number | undefined
     if (containerRef.current) {
       term.open(containerRef.current)
+      term.loadAddon(fitAddon)
+      try {
+        const webglAddon = new WebglAddon()
+        term.loadAddon(webglAddon)
+      } catch {
+        // WebGL not available, fallback to Canvas renderer
+      }
       initialResizeTimer = window.setTimeout(() => {
         fitAddon.fit()
         term.focus()
