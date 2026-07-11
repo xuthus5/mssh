@@ -12,6 +12,7 @@ import * as _ThemeService from '../../../bindings/github.com/xuthus5/mssh/intern
 import * as _LogService from '../../../bindings/github.com/xuthus5/mssh/internal/service/logservice'
 import * as _SyncService from '../../../bindings/github.com/xuthus5/mssh/internal/service/syncservice'
 import * as _AboutService from '../../../bindings/github.com/xuthus5/mssh/internal/service/aboutservice'
+import * as _FontService from '../../../bindings/github.com/xuthus5/mssh/internal/service/fontservice'
 
 export const SessionService = _SessionService
 export const TerminalService = _TerminalService
@@ -24,3 +25,4 @@ export const ThemeService = _ThemeService
 export const LogService = _LogService
 export const SyncService = _SyncService
 export const AboutService = _AboutService
+export const FontService = _FontService

@@ -3,6 +3,7 @@
 
 import * as AboutService from "./aboutservice.js";
 import * as FileService from "./fileservice.js";
+import * as FontService from "./fontservice.js";
 import * as KeyService from "./keyservice.js";
 import * as LogService from "./logservice.js";
 import * as MacroService from "./macroservice.js";
@@ -15,6 +16,7 @@ import * as TunnelService from "./tunnelservice.js";
 export {
     AboutService,
     FileService,
+    FontService,
     KeyService,
     LogService,
     MacroService,
