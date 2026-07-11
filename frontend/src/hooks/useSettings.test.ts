@@ -17,6 +17,7 @@ describe('useSettings', () => {
     writtenSettings = []
     document.documentElement.style.removeProperty('--app-font-family')
     document.documentElement.style.removeProperty('--app-font-size')
+    document.documentElement.style.removeProperty('--app-opacity')
 
     __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.GetSetting', async (key: string) => {
       return _settings[key] ?? ''
@@ -42,13 +43,14 @@ describe('useSettings', () => {
     expect(result.current.general.uiFontFamily).toBe('Geist Variable')
     expect(result.current.general.uiFontFallbackFamily).toBe('sans-serif')
     expect(result.current.general.uiFontSize).toBe(14)
+    expect(result.current.general.windowOpacity).toBe(100)
     expect(result.current.systemFonts).toEqual(['Arial', 'Segoe UI'])
   })
 
   it('saves general settings and updates state', async () => {
     const { result } = renderHook(() => useSettings())
     await act(async () => {
-      await result.current.saveGeneral({ maxPoolSize: 32, defaultKeepAlive: 120, defaultTermType: 'xterm', uiFontFamily: 'Segoe UI', uiFontFallbackFamily: 'Microsoft YaHei', uiFontSize: 16 })
+      await result.current.saveGeneral({ maxPoolSize: 32, defaultKeepAlive: 120, defaultTermType: 'xterm', uiFontFamily: 'Segoe UI', uiFontFallbackFamily: 'Microsoft YaHei', uiFontSize: 16, windowOpacity: 82 })
     })
     expect(result.current.general.maxPoolSize).toBe(32)
     expect(result.current.general.defaultKeepAlive).toBe(120)
@@ -56,10 +58,13 @@ describe('useSettings', () => {
     expect(result.current.general.uiFontFamily).toBe('Segoe UI')
     expect(result.current.general.uiFontFallbackFamily).toBe('Microsoft YaHei')
     expect(result.current.general.uiFontSize).toBe(16)
+    expect(result.current.general.windowOpacity).toBe(82)
     expect(writtenSettings).toContainEqual(expect.objectContaining({ key: 'appearance.ui_font_family', value: '"Segoe UI"' }))
     expect(writtenSettings).toContainEqual(expect.objectContaining({ key: 'appearance.ui_font_fallback_family', value: '"Microsoft YaHei"' }))
     expect(writtenSettings).toContainEqual(expect.objectContaining({ key: 'appearance.ui_font_size', value: '16' }))
+    expect(writtenSettings).toContainEqual(expect.objectContaining({ key: 'appearance.window_opacity', value: '82' }))
     expect(document.documentElement.style.getPropertyValue('--app-font-family')).toBe('"Segoe UI", "Microsoft YaHei", sans-serif')
+    expect(document.documentElement.style.getPropertyValue('--app-opacity')).toBe('0.82')
     expect(writtenSettings).not.toContainEqual(expect.objectContaining({ updated_at: expect.anything() }))
   })
 
@@ -67,6 +72,7 @@ describe('useSettings', () => {
     _settings['appearance.ui_font_family'] = '"Arial"'
     _settings['appearance.ui_font_fallback_family'] = '"Segoe UI"'
     _settings['appearance.ui_font_size'] = '18'
+    _settings['appearance.window_opacity'] = '76'
 
     const { result } = renderHook(() => useSettings())
     await act(async () => {})
@@ -74,8 +80,10 @@ describe('useSettings', () => {
     expect(result.current.general.uiFontFamily).toBe('Arial')
     expect(result.current.general.uiFontFallbackFamily).toBe('Segoe UI')
     expect(result.current.general.uiFontSize).toBe(18)
+    expect(result.current.general.windowOpacity).toBe(76)
     expect(document.documentElement.style.getPropertyValue('--app-font-family')).toBe('"Arial", "Segoe UI", sans-serif')
     expect(document.documentElement.style.getPropertyValue('--app-font-size')).toBe('18px')
+    expect(document.documentElement.style.getPropertyValue('--app-opacity')).toBe('0.76')
   })
 
   it('saveTheme persists to settings', async () => {
