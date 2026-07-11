@@ -2,15 +2,21 @@ version: '3'
 tasks:
   dev:
     desc: 启动开发模式
+    env:
+      CGO_ENABLED: '1'
     cmds:
       - wails3 dev -port 5173
   build:
     desc: 生产构建
+    env:
+      CGO_ENABLED: '1'
     cmds:
       - cd frontend && npm run build
       - go build -o build/bin/mssh .
   compile:
     desc: 编译 Go + 构建前端（同 build）
+    env:
+      CGO_ENABLED: '1'
     cmds:
       - cd frontend && npm run build
       - go build -o build/bin/mssh .
