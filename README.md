@@ -6,12 +6,13 @@ A cross-platform SSH client built with Go + Wails v3 + React + xterm.js.
 
 - Tabbed terminal sessions with split view
 - Session management (folders, SSH password/key/agent auth)
-- SFTP file transfer with progress tracking
+- SFTP file transfer with native file dialogs, progress, ETA, and cancellation
 - Port forwarding (local/remote/dynamic)
 - SSH key generation and management
 - Session recording and playback
 - Customizable terminal themes
 - Quick command macros
+- Explicit host-key fingerprint trust and connection cancellation
 
 ## Development
 
@@ -33,20 +34,22 @@ wails3 dev
 
 ### Test
 ```bash
-# Backend
-go test -race -cover ./...
+# Backend (race detection and project coverage gate)
+go test -race -coverprofile=coverage.out -covermode=atomic \
+  -coverpkg=./internal/...,./pkg/... ./internal/... ./pkg/...
+go tool cover -func=coverage.out | tail -1
 
 # Frontend
-cd frontend && npm test
+cd frontend && npx vitest run && npx tsc -b --noEmit
 ```
 
 ### Build
 ```bash
-go build ./...
-cd frontend && npm run build
+wails3 build
 ```
 
 ### Lint
 ```bash
+goimports-reviser -rm-unused -format ./...
 golangci-lint run ./...
 ```

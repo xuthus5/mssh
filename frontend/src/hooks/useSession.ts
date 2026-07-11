@@ -76,14 +76,17 @@ export function useSession() {
   const [sessions, setSessions] = useState<Session[]>([])
   const [tunnels, setTunnels] = useState<Tunnel[]>([])
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
 
   const listFolders = useCallback(async () => {
     setLoading(true)
+    setError('')
     try {
       const result = await SessionService.ListFolders()
       setFolders((result ?? []).map(mapFolder))
     } catch (err) {
       logger.error('listFolders error', err)
+      setError(err instanceof Error ? err.message : String(err))
     } finally {
       setLoading(false)
     }
@@ -120,11 +123,13 @@ export function useSession() {
 
   const listSessions = useCallback(async () => {
     setLoading(true)
+    setError('')
     try {
       const result = await SessionService.ListSessions(null)
       setSessions((result ?? []).map(mapSession))
     } catch (err) {
       logger.error('listSessions error', err)
+      setError(err instanceof Error ? err.message : String(err))
     } finally {
       setLoading(false)
     }
@@ -153,6 +158,7 @@ export function useSession() {
       const msg = err instanceof Error ? err.message : String(err)
       logger.error('createSession error', err)
       toast(`创建会话失败: ${msg}`, 'error')
+      throw err
     }
   }, [])
 
@@ -177,6 +183,7 @@ export function useSession() {
       const msg = err instanceof Error ? err.message : String(err)
       logger.error('updateSession error', err)
       toast(`更新会话失败: ${msg}`, 'error')
+      throw err
     }
   }, [])
 
@@ -203,19 +210,16 @@ export function useSession() {
     if (!session) return
 
     const dialog = useConnectDialog.getState()
-    dialog.openDialog(session.host, session.port, session.username)
+    dialog.openDialog(session.host, session.port, session.username, () => { void connect(sessionId) })
 
     try {
       const terminalId = await TerminalService.Open(Number(sessionId), 80, 24)
       const tabId = `terminal-${sessionId}`
-      useAppStore.getState().setConnectionStatus(terminalId, 'connecting')
+      useAppStore.getState().setConnectionStatus(terminalId, 'connected')
       openTab({ id: tabId, title: session.name, type: 'terminal', terminalId, sessionId: Number(sessionId) })
 
       dialog.setState('connected')
-      setTimeout(() => {
-        useAppStore.getState().setConnectionStatus(terminalId, 'connected')
-        logger.info('connected', { terminalId, host: session.host })
-      }, 500)
+      logger.info('connected', { terminalId, host: session.host })
     } catch (err) {
       logger.error('connect error', err)
       const msg = err instanceof Error ? err.message : String(err)
@@ -248,7 +252,7 @@ export function useSession() {
   }, [listFolders, listSessions])
 
   return {
-    folders, sessions, tunnels, loading,
+    folders, sessions, tunnels, loading, error,
     listFolders, createFolder, deleteFolder, updateFolder,
     listSessions, createSession, updateSession, deleteSession, moveSession,
     connect, disconnect, listTunnels,

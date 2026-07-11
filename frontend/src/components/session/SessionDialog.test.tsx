@@ -69,7 +69,7 @@ describe('SessionDialog', () => {
     await user.clear(inputs[2])
     await user.type(inputs[2], 'root')
 
-    await user.click(screen.getByRole('button', { name: '创建连接' }))
+    await user.click(screen.getByRole('button', { name: '创建会话' }))
 
     expect(defaultProps.onSave).toHaveBeenCalledWith(
       expect.objectContaining({

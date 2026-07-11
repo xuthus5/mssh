@@ -28,6 +28,7 @@ type SessionService struct {
 	db        *sql.DB
 	mu        sync.RWMutex
 	conns     map[string]*ssh.ClientWrapper
+	attempts  map[string]*connectAttempt
 	eventBus  EventBus
 	keepAlive int
 	dataDir   string
@@ -35,10 +36,16 @@ type SessionService struct {
 	logger    *slog.Logger
 }
 
+type connectAttempt struct {
+	cancel   context.CancelFunc
+	decision chan bool
+}
+
 func NewSessionService(db *sql.DB, eventBus EventBus, keepAlive int, dataDir string, crypto KeyCrypto, logger *slog.Logger) *SessionService {
 	return &SessionService{
 		db:        db,
 		conns:     make(map[string]*ssh.ClientWrapper),
+		attempts:  make(map[string]*connectAttempt),
 		eventBus:  eventBus,
 		keepAlive: keepAlive,
 		dataDir:   dataDir,
@@ -136,6 +143,13 @@ func (s *SessionService) GetSession(id int64) (*model.Session, error) {
 
 func (s *SessionService) Connect(ctx context.Context, sessionID int64) (string, error) {
 	s.logger.Info("connecting to session", "sessionID", sessionID)
+	connectCtx, cancel := context.WithCancel(ctx)
+	attemptID := s.registerConnectAttempt(cancel)
+	defer s.finishConnectAttempt(attemptID)
+	s.eventBus.Emit(event.ConnectionAttempt, event.ConnectionStatePayload{
+		AttemptID: attemptID,
+		State:     "connecting",
+	})
 	sess, err := store.GetSession(s.db, sessionID)
 	if err != nil {
 		s.logger.Error("connect failed", "sessionID", sessionID, "error", err)
@@ -154,17 +168,10 @@ func (s *SessionService) Connect(ctx context.Context, sessionID int64) (string, 
 	}
 
 	onNewHostKey := func(hostname, algorithm, fingerprint string) bool {
-		terminalIDHint := ""
-		s.eventBus.Emit(event.HostKeyFingerprint, event.HostKeyPayload{
-			TerminalID:  terminalIDHint,
-			Hostname:    hostname,
-			Fingerprint: fingerprint,
-			Algorithm:   algorithm,
-		})
-		return true
+		return s.awaitHostKeyDecision(connectCtx, attemptID, hostname, algorithm, fingerprint)
 	}
 
-	wrapper, err := ssh.ConnectWithVerifier(ctx, *sess, authMethods, knownHostsPath, onNewHostKey, s.logger)
+	wrapper, err := ssh.ConnectWithVerifier(connectCtx, *sess, authMethods, knownHostsPath, onNewHostKey, s.logger)
 	if err != nil {
 		s.logger.Error("connect failed", "sessionID", sessionID, "error", err)
 		return "", fmt.Errorf("connect: %w", err)
@@ -178,11 +185,79 @@ func (s *SessionService) Connect(ctx context.Context, sessionID int64) (string, 
 
 	s.eventBus.Emit(event.ConnectionState, event.ConnectionStatePayload{
 		TerminalID: terminalID,
+		AttemptID:  attemptID,
 		State:      "connected",
 	})
 
 	s.logger.Info("connected to session", "sessionID", sessionID, "terminalID", terminalID)
 	return terminalID, nil
+}
+
+func (s *SessionService) registerConnectAttempt(cancel context.CancelFunc) string {
+	attemptID := generateConnectionAttemptID()
+	s.mu.Lock()
+	s.attempts[attemptID] = &connectAttempt{
+		cancel:   cancel,
+		decision: make(chan bool, 1),
+	}
+	s.mu.Unlock()
+	return attemptID
+}
+
+func (s *SessionService) finishConnectAttempt(attemptID string) {
+	s.mu.Lock()
+	delete(s.attempts, attemptID)
+	s.mu.Unlock()
+}
+
+func (s *SessionService) awaitHostKeyDecision(ctx context.Context, attemptID, hostname, algorithm, fingerprint string) bool {
+	s.mu.RLock()
+	attempt, ok := s.attempts[attemptID]
+	s.mu.RUnlock()
+	if !ok {
+		return false
+	}
+	s.eventBus.Emit(event.HostKeyFingerprint, event.HostKeyPayload{
+		AttemptID:   attemptID,
+		Hostname:    hostname,
+		Fingerprint: fingerprint,
+		Algorithm:   algorithm,
+	})
+	select {
+	case accept := <-attempt.decision:
+		return accept
+	case <-ctx.Done():
+		return false
+	}
+}
+
+func (s *SessionService) DecideHostKey(attemptID string, accept bool) error {
+	s.mu.RLock()
+	attempt, ok := s.attempts[attemptID]
+	s.mu.RUnlock()
+	if !ok {
+		return fmt.Errorf("connection attempt %s not found", attemptID)
+	}
+	select {
+	case attempt.decision <- accept:
+		return nil
+	default:
+		return fmt.Errorf("host key decision already provided for attempt %s", attemptID)
+	}
+}
+
+func (s *SessionService) CancelConnect(attemptID string) error {
+	s.mu.Lock()
+	attempt, ok := s.attempts[attemptID]
+	if ok {
+		delete(s.attempts, attemptID)
+	}
+	s.mu.Unlock()
+	if !ok {
+		return fmt.Errorf("connection attempt %s not found", attemptID)
+	}
+	attempt.cancel()
+	return nil
 }
 
 func (s *SessionService) Disconnect(terminalID string) error {
@@ -311,4 +386,10 @@ func generateTerminalID() string {
 	b := make([]byte, 8)
 	_, _ = rand.Read(b)
 	return fmt.Sprintf("term-%x", b)
+}
+
+func generateConnectionAttemptID() string {
+	b := make([]byte, 8)
+	_, _ = rand.Read(b)
+	return fmt.Sprintf("connect-%x", b)
 }

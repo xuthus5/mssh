@@ -30,9 +30,15 @@ export function TerminalToolbar({
   const [showSessionLog, setShowSessionLog] = useState(false)
 
   const getTerminal = useCallback(() => {
-    const entry = useAppStore.getState().terminalPool.get(terminalID)
+    const state = useAppStore.getState()
+    const targetID = state.activePaneId ?? terminalID
+    const entry = state.terminalPool.get(targetID)
     return entry?.terminal ?? null
   }, [terminalID])
+
+  const restoreFocus = useCallback(() => {
+    getTerminal()?.focus()
+  }, [getTerminal])
 
   const handleCopy = useCallback(async () => {
     const term = getTerminal()
@@ -42,7 +48,8 @@ export function TerminalToolbar({
     if (selection) {
       await navigator.clipboard.writeText(selection)
     }
-  }, [getTerminal])
+    restoreFocus()
+  }, [getTerminal, restoreFocus])
 
   const handlePaste = useCallback(async () => {
     const term = getTerminal()
@@ -50,14 +57,16 @@ export function TerminalToolbar({
     const text = await navigator.clipboard.readText()
     logger.debug('TerminalToolbar: paste:', text.length, 'chars')
     term.paste(text)
-  }, [getTerminal])
+    restoreFocus()
+  }, [getTerminal, restoreFocus])
 
   const handleClear = useCallback(() => {
     const term = getTerminal()
     if (!term) return
     logger.debug('TerminalToolbar: clear')
     term.clear()
-  }, [getTerminal])
+    restoreFocus()
+  }, [getTerminal, restoreFocus])
 
   return (
     <div className="flex items-center gap-1 h-8 px-2 bg-muted/30 border-b flex-shrink-0">

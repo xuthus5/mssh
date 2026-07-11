@@ -23,6 +23,9 @@ export interface TransferJob {
   totalBytes: number
   transferredBytes: number
   speed: number
+  eta: number
+  status: 'queued' | 'running' | 'completed' | 'failed' | 'cancelled'
+  error?: string
   startedAt: number
 }
 
@@ -91,19 +94,27 @@ export interface AppState {
   appStatus: string
   terminalTheme: TerminalTheme
   transfers: TransferJob[]
+  activePaneId: string | null
+  recordingState: Record<string, 'idle' | 'starting' | 'recording' | 'stopping' | 'error'>
+  tunnelState: Record<string, 'running' | 'stopped'>
   addTransfer: (job: TransferJob) => void
   removeTransfer: (id: string) => void
-  updateTransfer: (id: string, updates: Partial<Pick<TransferJob, 'transferredBytes' | 'speed' | 'totalBytes'>>) => void
+  updateTransfer: (id: string, updates: Partial<Pick<TransferJob, 'transferredBytes' | 'speed' | 'totalBytes' | 'eta' | 'status' | 'error'>>) => void
   openTab: (tab: Tab) => void
   closeTab: (id: string) => void
+  removeTabLocal: (id: string) => void
   setActiveTab: (id: string) => void
   registerTerminal: (id: string, terminal: Terminal) => void
   unregisterTerminal: (id: string) => void
   updateLastUsed: (id: string) => void
   evictLRU: () => void
   setConnectionStatus: (id: string, status: ConnectionStatus) => void
+  setActivePane: (id: string | null) => void
+  setRecordingState: (id: string, state: AppState['recordingState'][string]) => void
+  setTunnelState: (id: string, state: AppState['tunnelState'][string]) => void
   setAppStatus: (status: string) => void
   setTerminalTheme: (theme: TerminalTheme) => void
+  setMaxPoolSize: (size: number) => void
 }
 
 const DEFAULT_MAX_POOL_SIZE = 32
@@ -117,6 +128,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   appStatus: '就绪',
   terminalTheme: DEFAULT_THEME,
   transfers: [],
+  activePaneId: null,
+  recordingState: {},
+  tunnelState: {},
 
   addTransfer: (job) => set((s) => ({ transfers: [...s.transfers, job] })),
   removeTransfer: (id) => set((s) => ({ transfers: s.transfers.filter((t) => t.id !== id) })),
@@ -149,6 +163,30 @@ export const useAppStore = create<AppState>((set, get) => ({
       return { tabs: newTabs, activeTabId: newActive }
     })
   },
+  removeTabLocal: (id) => set((s) => {
+    const tab = s.tabs.find((item) => item.id === id)
+    const terminalId = tab?.terminalId
+    if (terminalId) {
+      const pool = new Map(s.terminalPool)
+      pool.get(terminalId)?.terminal.dispose()
+      pool.delete(terminalId)
+      const connectionStatus = { ...s.connectionStatus }
+      delete connectionStatus[terminalId]
+      const recordingState = { ...s.recordingState }
+      delete recordingState[terminalId]
+      const tabs = s.tabs.filter((item) => item.id !== id)
+      return {
+        tabs,
+        terminalPool: pool,
+        connectionStatus,
+        recordingState,
+        activePaneId: s.activePaneId === terminalId ? null : s.activePaneId,
+        activeTabId: s.activeTabId === id ? (tabs.at(-1)?.id ?? null) : s.activeTabId,
+      }
+    }
+    const tabs = s.tabs.filter((item) => item.id !== id)
+    return { tabs, activeTabId: s.activeTabId === id ? (tabs.at(-1)?.id ?? null) : s.activeTabId }
+  }),
   setActiveTab: (id) => set({ activeTabId: id }),
 
   registerTerminal: (id, terminal) => set((s) => {
@@ -199,8 +237,16 @@ export const useAppStore = create<AppState>((set, get) => ({
   setConnectionStatus: (id, status) => set((s) => ({
     connectionStatus: { ...s.connectionStatus, [id]: status },
   })),
+  setActivePane: (id) => set({ activePaneId: id }),
+  setRecordingState: (id, state) => set((s) => ({
+    recordingState: { ...s.recordingState, [id]: state },
+  })),
+  setTunnelState: (id, state) => set((s) => ({
+    tunnelState: { ...s.tunnelState, [id]: state },
+  })),
 
   setAppStatus: (status) => set({ appStatus: status }),
 
   setTerminalTheme: (theme) => set({ terminalTheme: theme }),
+  setMaxPoolSize: (maxPoolSize) => set({ maxPoolSize }),
 }))

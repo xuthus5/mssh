@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { X } from 'lucide-react'
 
 export interface Toast {
   id: string
@@ -41,21 +42,22 @@ export function ToastContainer() {
   if (toasts.length === 0) return null
 
   return (
-    <div className="fixed bottom-12 right-4 z-[9999] flex flex-col gap-2 pointer-events-none">
+    <div className="fixed bottom-12 right-4 flex flex-col gap-2 pointer-events-none" aria-live="polite" aria-atomic="false">
       {toasts.map((t) => {
         const bg = {
-          info: 'bg-blue-600',
+          info: 'bg-secondary text-secondary-foreground',
           error: 'bg-destructive',
-          success: 'bg-green-600',
-          warning: 'bg-yellow-600',
+          success: 'bg-primary text-primary-foreground',
+          warning: 'bg-accent text-accent-foreground',
         }[t.type]
         return (
           <div
             key={t.id}
-            className={`${bg} text-white px-4 py-2 rounded-lg shadow-lg text-sm pointer-events-auto cursor-pointer animate-in slide-in-from-right`}
-            onClick={() => removeToast(t.id)}
+            className={`${bg} flex items-center gap-3 px-4 py-2 rounded-lg shadow-lg text-sm pointer-events-auto animate-in slide-in-from-right`}
+            role={t.type === 'error' ? 'alert' : 'status'}
           >
-            {t.message}
+            <span>{t.message}</span>
+            <button type="button" aria-label="关闭通知" onClick={() => removeToast(t.id)}><X className="size-4" /></button>
           </div>
         )
       })}

@@ -1,8 +1,10 @@
 import { useState, useCallback, useEffect } from 'react'
-import { SettingService, KeyService, SyncService } from '@/lib/wails'
+import { SettingService, KeyService, SyncService, TerminalService } from '@/lib/wails'
 import { useAppStore } from '@/store/appStore'
 import { logger } from '@/lib/logger'
 import { KeyType } from '../../bindings/mssh/internal/model/models'
+import { Dialogs } from '@wailsio/runtime'
+import { toast } from '@/components/ui/toast'
 
 export interface GeneralSettings {
   maxPoolSize: number
@@ -52,9 +54,11 @@ export function useSettings() {
   const loadGeneral = useCallback(async () => {
     try {
       logger.debug('loadGeneral')
-      const maxPoolSize = await SettingService.GetSetting('max_pool_size')
-      const keepAlive = await SettingService.GetSetting('default_keep_alive')
-      const termType = await SettingService.GetSetting('default_term_type')
+      const [maxPoolSize, keepAlive, termType] = await Promise.all([
+        SettingService.GetSetting('max_pool_size'),
+        SettingService.GetSetting('default_keep_alive'),
+        SettingService.GetSetting('default_term_type'),
+      ])
       setGeneral({
         maxPoolSize: maxPoolSize ? Number(maxPoolSize) : 10,
         defaultKeepAlive: keepAlive ? Number(keepAlive) : 60,
@@ -68,12 +72,19 @@ export function useSettings() {
   const saveGeneral = useCallback(async (settings: GeneralSettings) => {
     try {
       logger.debug('saveGeneral', settings)
-      await SettingService.SetSetting('max_pool_size', String(settings.maxPoolSize))
-      await SettingService.SetSetting('default_keep_alive', String(settings.defaultKeepAlive))
-      await SettingService.SetSetting('default_term_type', settings.defaultTermType)
+      await Promise.all([
+        SettingService.SetSetting('max_pool_size', String(settings.maxPoolSize)),
+        SettingService.SetSetting('default_keep_alive', String(settings.defaultKeepAlive)),
+        SettingService.SetSetting('default_term_type', settings.defaultTermType),
+        TerminalService.SetMaxSize(settings.maxPoolSize),
+      ])
       setGeneral(settings)
+      useAppStore.getState().setMaxPoolSize(settings.maxPoolSize)
+      toast('通用设置已保存', 'success')
     } catch (err) {
       logger.debug('saveGeneral error', err)
+      toast(`保存设置失败: ${err instanceof Error ? err.message : String(err)}`, 'error')
+      throw err
     }
   }, [])
 
@@ -222,9 +233,11 @@ export function useSettings() {
   const loadSync = useCallback(async () => {
     try {
       logger.debug('loadSync')
-      const enabled = await SettingService.GetSetting('sync_enabled')
-      const url = await SettingService.GetSetting('sync_url')
-      const username = await SettingService.GetSetting('sync_username')
+      const [enabled, url, username] = await Promise.all([
+        SettingService.GetSetting('sync_enabled'),
+        SettingService.GetSetting('sync_url'),
+        SettingService.GetSetting('sync_username'),
+      ])
       setSync({ enabled: enabled === 'true', url: url || '', username: username || '', password: '' })
     } catch (err) {
       logger.debug('loadSync error', err)
@@ -234,7 +247,7 @@ export function useSettings() {
   const exportConfig = useCallback(async () => {
     try {
       logger.debug('exportConfig')
-      const path = await pickSaveFilePath('mssh-export.json')
+      const path = await Dialogs.SaveFile({ Title: '导出 MSSH 配置', Filename: 'mssh-export.json', CanCreateDirectories: true })
       if (path) {
         await SyncService.Export(path)
       }
@@ -246,7 +259,8 @@ export function useSettings() {
   const importConfig = useCallback(async () => {
     try {
       logger.debug('importConfig')
-      const path = await pickOpenFilePath()
+      const selected = await Dialogs.OpenFile({ Title: '导入 MSSH 配置', CanChooseFiles: true, AllowsMultipleSelection: false, Filters: [{ DisplayName: 'JSON', Pattern: '*.json' }] })
+      const path = typeof selected === 'string' ? selected : selected[0]
       if (path) {
         await SyncService.Import(path)
       }
@@ -258,30 +272,4 @@ export function useSettings() {
   useEffect(() => { loadGeneral(); loadTheme(); listKeys(); loadSync() }, [loadGeneral, loadTheme, listKeys, loadSync])
 
   return { general, theme, keys, sync, saveGeneral, saveTheme, listKeys, generateKey, importKey, deleteKey, exportKey, saveSync, exportConfig, importConfig }
-}
-
-async function pickSaveFilePath(suggestedName: string): Promise<string | null> {
-  try {
-    const handle = await (window as unknown as { showSaveFilePicker?: (opts: { suggestedName: string }) => Promise<FileSystemFileHandle> }).showSaveFilePicker?.({ suggestedName })
-    if (handle) {
-      return handle.name
-    }
-  } catch {
-    // Fallback to prompt if API unsupported or user cancelled
-  }
-  const name = prompt('输入保存文件名:', suggestedName)
-  return name ?? null
-}
-
-async function pickOpenFilePath(): Promise<string | null> {
-  try {
-    const [handle] = await (window as unknown as { showOpenFilePicker?: () => Promise<FileSystemFileHandle[]> }).showOpenFilePicker?.() ?? [{ name: null }]
-    if (handle?.name) {
-      return handle.name
-    }
-  } catch {
-    // Fallback to prompt if API unsupported or user cancelled
-  }
-  const name = prompt('输入导入文件名:', 'mssh-import.json')
-  return name ?? null
 }

@@ -1,16 +1,20 @@
-import { useEffect, useCallback, useState, useRef } from 'react'
+import { useEffect, useCallback, useState, lazy, Suspense } from 'react'
+import { Dialogs } from '@wailsio/runtime'
 import { Terminal, Shield, FileText, Keyboard } from 'lucide-react'
 import Sidebar from '@/components/layout/Sidebar'
 import TabBar from '@/components/layout/TabBar'
 import StatusBar from '@/components/layout/StatusBar'
-import { TerminalTab } from '@/components/terminal/TerminalTab'
-import { PlaybackTab } from '@/components/terminal/PlaybackTab'
-import FilePanel from '@/components/file/FilePanel'
 import { ToastContainer } from '@/components/ui/toast'
 import { ConnectDialog } from '@/components/layout/ConnectDialog'
 import { useAppStore } from '@/store/appStore'
 import { useFileTransfer } from '@/hooks/useFileTransfer'
 import { logger } from '@/lib/logger'
+import { toast } from '@/components/ui/toast'
+import { Spinner } from '@/components/ui/spinner'
+
+const TerminalTab = lazy(() => import('@/components/terminal/TerminalTab').then((module) => ({ default: module.TerminalTab })))
+const PlaybackTab = lazy(() => import('@/components/terminal/PlaybackTab').then((module) => ({ default: module.PlaybackTab })))
+const FilePanel = lazy(() => import('@/components/file/FilePanel'))
 
 function WelcomeScreen() {
   return (
@@ -81,101 +85,47 @@ function FilePanelContainer({
   onClose: () => void
 }) {
   const ft = useFileTransfer(sessionId)
-  const [downloadPath, setDownloadPath] = useState('')
-  const [showDownloadInput, setShowDownloadInput] = useState(false)
-  const [pendingDownload, setPendingDownload] = useState<string | null>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     ft.listFiles('/')
   }, [sessionId])
 
-  const handleUploadClick = () => {
-    fileInputRef.current?.click()
+  const handleUploadClick = async () => {
+    const selected = await Dialogs.OpenFile({
+      Title: '选择要上传的文件',
+      CanChooseFiles: true,
+      CanChooseDirectories: false,
+      AllowsMultipleSelection: false,
+    })
+    const localPath = typeof selected === 'string' ? selected : selected[0]
+    if (localPath) await ft.upload(localPath, ft.currentPath)
   }
 
-  const handleFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) {
-      ft.upload(file.name, ft.currentPath)
-      e.target.value = ''
-    }
-  }
-
-  const handleDownload = (path: string) => {
-    setPendingDownload(path)
-    setShowDownloadInput(true)
-  }
-
-  const handleConfirmDownload = () => {
-    if (pendingDownload && downloadPath.trim()) {
-      ft.download(pendingDownload, downloadPath.trim())
-      setPendingDownload(null)
-      setDownloadPath('')
-      setShowDownloadInput(false)
-    }
+  const handleDownload = async (remotePath: string) => {
+    const localPath = await Dialogs.SaveFile({
+      Title: '选择下载位置',
+      Filename: remotePath.split('/').pop() ?? 'download',
+      CanCreateDirectories: true,
+    })
+    if (localPath) await ft.download(remotePath, localPath)
   }
 
   return (
-    <>
-      <input
-        ref={fileInputRef}
-        type="file"
-        className="hidden"
-        onChange={handleFileSelected}
-      />
-      <FilePanel
+    <Suspense fallback={<div className="w-[340px] grid place-items-center border-l"><Spinner /></div>}><FilePanel
         open
         onClose={onClose}
         files={ft.files}
         currentPath={ft.currentPath}
         loading={ft.loading}
+        error={ft.error}
         onNavigateTo={ft.navigateTo}
         onNavigateUp={ft.navigateUp}
         onDelete={ft.deleteFile}
         onRename={ft.renameFile}
         onMakeDir={ft.makeDir}
         onUpload={handleUploadClick}
-        onDownload={handleDownload}
-      />
-      {showDownloadInput && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-card rounded-lg border border-border p-4 w-80 flex flex-col gap-3">
-            <span className="text-sm font-medium">下载文件</span>
-            <span className="text-xs text-muted-foreground truncate">
-              远程文件: {pendingDownload}
-            </span>
-            <input
-              className="h-8 px-2 text-sm rounded border border-input bg-background outline-none"
-              placeholder="本地保存路径"
-              value={downloadPath}
-              onChange={(e) => setDownloadPath(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') handleConfirmDownload()
-                if (e.key === 'Escape') setShowDownloadInput(false)
-              }}
-              autoFocus
-            />
-            <div className="flex justify-end gap-2">
-              <button
-                type="button"
-                className="px-3 py-1.5 text-xs rounded border border-border hover:bg-muted"
-                onClick={() => setShowDownloadInput(false)}
-              >
-                取消
-              </button>
-              <button
-                type="button"
-                className="px-3 py-1.5 text-xs rounded bg-primary text-primary-foreground hover:bg-primary/90"
-                onClick={handleConfirmDownload}
-              >
-                下载
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </>
+        onDownload={(path) => { void handleDownload(path) }}
+      /></Suspense>
   )
 }
 
@@ -197,82 +147,89 @@ function TabContent() {
     return <WelcomeScreen />
   }
 
-  switch (activeTab.type) {
-    case 'terminal':
-      return (
-        <div className="flex-1 min-h-0 flex">
-          <div className="flex-1 flex flex-col min-w-0">
-            <TerminalTab
-              terminalID={activeTab.terminalId ?? activeTab.id}
-              sessionId={activeTab.sessionId ?? 0}
-              onOpenFiles={handleOpenFiles}
-            />
+  return (
+    <div className="flex-1 min-h-0 relative">
+      {tabs.map((tab) => {
+        const active = tab.id === activeTabId
+        if (tab.type === 'terminal') {
+          return (
+            <div key={tab.id} className={active ? 'absolute inset-0 flex' : 'absolute inset-0 hidden'}>
+              <div className="flex-1 flex flex-col min-w-0">
+                <TerminalTab
+                  terminalID={tab.terminalId ?? tab.id}
+                  sessionId={tab.sessionId ?? 0}
+                  onOpenFiles={handleOpenFiles}
+                />
+              </div>
+              {active && filePanelSessionId !== null && (
+                <FilePanelContainer sessionId={filePanelSessionId} onClose={() => setFilePanelSessionId(null)} />
+              )}
+            </div>
+          )
+        }
+        if (!active) return null
+        if (tab.type === 'playback') {
+          return <PlaybackTab key={tab.id} recordingId={tab.terminalId ?? tab.id} title={tab.title} />
+        }
+        return (
+          <div key={tab.id} className="absolute inset-0 flex items-center justify-center">
+            <p className="text-sm text-muted-foreground">设置</p>
           </div>
-          {filePanelSessionId !== null && (
-            <FilePanelContainer
-              sessionId={filePanelSessionId}
-              onClose={() => setFilePanelSessionId(null)}
-            />
-          )}
-        </div>
-      )
-    case 'playback':
-      return (
-        <PlaybackTab
-          recordingId={activeTab.terminalId ?? activeTab.id}
-          title={activeTab.title}
-        />
-      )
-    case 'settings':
-      return (
-        <div className="flex-1 min-h-0 flex items-center justify-center">
-          <p className="text-sm text-muted-foreground">设置</p>
-        </div>
-      )
-    default:
-      return null
-  }
+        )
+      })}
+    </div>
+  )
 }
 
 export default function App() {
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       const state = useAppStore.getState()
+      const target = e.target as HTMLElement | null
+      const editable = target?.matches('input, textarea, select, [contenteditable="true"]') ?? false
+      const commandKey = e.ctrlKey || e.metaKey
 
-      if (e.ctrlKey && e.shiftKey && e.key === 'C') {
+      if (editable) return
+
+      if (commandKey && !e.shiftKey && e.key.toLowerCase() === 'n') {
+        e.preventDefault()
+        window.dispatchEvent(new CustomEvent('mssh:new-session'))
+      }
+
+      if (commandKey && e.shiftKey && e.key.toLowerCase() === 'c') {
         e.preventDefault()
         const activeTab = state.tabs.find((t) => t.id === state.activeTabId)
         if (activeTab) {
-          const entry = state.terminalPool.get(activeTab.terminalId ?? activeTab.id)
+            const entry = state.terminalPool.get(state.activePaneId ?? activeTab.terminalId ?? activeTab.id)
           if (entry) {
             const sel = entry.terminal.getSelection()
             if (sel) {
-              navigator.clipboard.writeText(sel).catch(() => {})
+              navigator.clipboard.writeText(sel).catch((err: unknown) => toast(`复制失败: ${err instanceof Error ? err.message : String(err)}`, 'error'))
               logger.debug('Shortcut: Ctrl+Shift+C: copied selection')
             }
           }
         }
       }
 
-      if (e.ctrlKey && e.shiftKey && e.key === 'V') {
+      if (commandKey && e.shiftKey && e.key.toLowerCase() === 'v') {
         e.preventDefault()
         const activeTab = state.tabs.find((t) => t.id === state.activeTabId)
         if (activeTab) {
-          const entry = state.terminalPool.get(activeTab.terminalId ?? activeTab.id)
+            const entry = state.terminalPool.get(state.activePaneId ?? activeTab.terminalId ?? activeTab.id)
           if (entry) {
             navigator.clipboard.readText().then((text) => {
               entry.terminal.paste(text)
               logger.debug('Shortcut: Ctrl+Shift+V: pasted')
-            }).catch(() => {})
+            }).catch((err: unknown) => toast(`粘贴失败: ${err instanceof Error ? err.message : String(err)}`, 'error'))
           }
         }
       }
 
-      if (e.ctrlKey && e.shiftKey && e.key === 'L') {
+      if (commandKey && e.shiftKey && e.key.toLowerCase() === 'l') {
         e.preventDefault()
         const activeTab = state.tabs.find((t) => t.id === state.activeTabId)
         if (activeTab) {
-          const entry = state.terminalPool.get(activeTab.terminalId ?? activeTab.id)
+            const entry = state.terminalPool.get(state.activePaneId ?? activeTab.terminalId ?? activeTab.id)
           if (entry) {
             entry.terminal.clear()
             logger.debug('Shortcut: Ctrl+Shift+L: cleared')
@@ -280,11 +237,15 @@ export default function App() {
         }
       }
 
-      if (e.ctrlKey && e.key === 'w') {
+      if (commandKey && !e.shiftKey && e.key.toLowerCase() === 'w') {
         e.preventDefault()
         if (state.activeTabId) {
-          logger.debug('Shortcut: Ctrl+W: close tab', state.activeTabId)
-          state.closeTab(state.activeTabId)
+          const activeTab = state.tabs.find((tab) => tab.id === state.activeTabId)
+          if (activeTab?.terminalId && (state.connectionStatus[activeTab.terminalId] === 'connected' || state.recordingState[activeTab.terminalId] === 'recording')) {
+            toast('请使用标签关闭按钮确认终止活动连接', 'warning')
+          } else {
+            state.closeTab(state.activeTabId)
+          }
         }
       }
     }
@@ -299,7 +260,7 @@ export default function App() {
         <Sidebar />
         <main className="flex-1 flex flex-col min-w-0">
           <TabBar />
-          <TabContent />
+      <Suspense fallback={<div className="flex-1 grid place-items-center"><Spinner /></div>}><TabContent /></Suspense>
         </main>
       </div>
       <StatusBar />

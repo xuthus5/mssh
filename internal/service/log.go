@@ -132,6 +132,19 @@ func (l *LogService) StopTerminalRecording(terminalID string) error {
 	return recorder.Close()
 }
 
+func (l *LogService) StopTerminalRecordingIfActive(terminalID string) error {
+	l.mu.Lock()
+	recorder, ok := l.recorders[terminalID]
+	if ok {
+		delete(l.recorders, terminalID)
+	}
+	l.mu.Unlock()
+	if !ok {
+		return nil
+	}
+	return recorder.Close()
+}
+
 func (l *LogService) HandleOutput(terminalID string, data []byte) {
 	l.mu.Lock()
 	recorder, ok := l.recorders[terminalID]

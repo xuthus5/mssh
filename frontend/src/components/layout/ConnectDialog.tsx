@@ -9,11 +9,11 @@ import {
 import { useConnectDialog } from '@/store/connectDialog'
 
 export function ConnectDialog() {
-  const { open, state, host, port, user, error, fingerprint, closeDialog } =
+  const { open, state, host, port, user, error, fingerprint, algorithm, retry, closeDialog, acceptHostKey, rejectHostKey, cancelConnection } =
     useConnectDialog()
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { if (!v) closeDialog() }}>
+    <Dialog open={open} onOpenChange={(v) => { if (!v && state === 'failed') closeDialog() }}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>SSH 连接</DialogTitle>
@@ -21,7 +21,7 @@ export function ConnectDialog() {
 
         <div className="flex flex-col items-center gap-3 py-6">
           {/* Connecting state */}
-          {state === 'connecting' && (
+          {(state === 'connecting' || state === 'cancelling') && (
             <>
               <div className="relative">
                 <Loader2 className="h-10 w-10 text-blue-500 animate-spin" />
@@ -34,14 +34,17 @@ export function ConnectDialog() {
                   正在连接到 {user}@{host}:{port}
                 </p>
                 <p className="text-xs text-muted-foreground mt-2">
-                  SSH 握手进行中...
+                  {state === 'cancelling' ? '正在取消连接...' : 'SSH 握手进行中...'}
                 </p>
               </div>
+              <Button variant="outline" size="sm" disabled={state === 'cancelling'} onClick={() => { void cancelConnection() }}>
+                取消连接
+              </Button>
             </>
           )}
 
           {/* Fingerprint confirm state */}
-          {fingerprint && (
+          {state === 'awaiting-host-key' && fingerprint && (
             <>
               <Fingerprint className="h-10 w-10 text-yellow-500" />
               <div className="text-sm text-center">
@@ -52,12 +55,13 @@ export function ConnectDialog() {
                 <div className="mt-3 p-2 bg-muted rounded text-xs font-mono break-all">
                   {fingerprint}
                 </div>
+                {algorithm && <p className="mt-2 text-xs text-muted-foreground">算法：{algorithm}</p>}
               </div>
               <div className="flex gap-2 mt-2">
-                <Button variant="outline" size="sm" onClick={closeDialog}>
-                  取消
+                <Button variant="outline" size="sm" onClick={() => { void rejectHostKey() }}>
+                  拒绝
                 </Button>
-                <Button size="sm" onClick={closeDialog}>
+                <Button size="sm" onClick={() => { void acceptHostKey() }}>
                   信任并连接
                 </Button>
               </div>
@@ -95,6 +99,11 @@ export function ConnectDialog() {
               >
                 关闭
               </Button>
+              {retry && (
+                <Button size="sm" onClick={() => { closeDialog(); retry() }}>
+                  重试
+                </Button>
+              )}
             </>
           )}
         </div>

@@ -12,6 +12,9 @@ import * as ssh$0 from "../../../golang.org/x/crypto/ssh/models.js";
 // @ts-ignore: Unused imports
 import * as model$0 from "../model/models.js";
 
+/**
+ * ClientWrapper wraps an SSH client with keep-alive lifecycle management.
+ */
 export class ClientWrapper {
     "Inner": ssh$0.Client | null;
 

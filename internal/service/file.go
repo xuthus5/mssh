@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -60,7 +61,7 @@ func (f *FileService) Upload(sessionID int64, localPath, remotePath string) (str
 	f.logger.Info("uploading file", "sessionID", sessionID, "localPath", localPath, "remotePath", remotePath)
 	taskID := generateFileTaskID()
 
-	_, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(context.Background())
 	f.mu.Lock()
 	f.tasks[taskID] = cancel
 	f.mu.Unlock()
@@ -88,16 +89,27 @@ func (f *FileService) Upload(sessionID int64, localPath, remotePath string) (str
 		}
 		defer func() { _ = sftpClient.Close() }()
 
+		temporaryPath := remotePath + ".mssh-partial-" + taskID
 		size := f.getFileSize(localPath)
-		uploadErr := ssh.UploadFile(sftpClient, localPath, remotePath, func(transferred, _ int64) {
+		uploadErr := ssh.UploadFileContext(ctx, sftpClient, localPath, temporaryPath, func(transferred, _ int64) {
 			f.reportProgress(taskID, transferred, size)
 		})
 
 		if uploadErr != nil {
+			_ = ssh.RemoveFile(sftpClient, temporaryPath)
+			if errors.Is(uploadErr, context.Canceled) {
+				f.emitTransferCancelled(taskID)
+				return
+			}
 			f.emitTransferError(taskID, uploadErr)
 			return
 		}
-		f.eventBus.Emit(event.TransferComplete, event.TransferProgressPayload{TaskID: taskID, Percent: 100})
+		if renameErr := ssh.Rename(sftpClient, temporaryPath, remotePath); renameErr != nil {
+			_ = ssh.RemoveFile(sftpClient, temporaryPath)
+			f.emitTransferError(taskID, renameErr)
+			return
+		}
+		f.eventBus.Emit(event.TransferComplete, event.TransferProgressPayload{TaskID: taskID, Status: "completed", Transferred: size, Total: size, Percent: 100})
 	}()
 
 	return taskID, nil
@@ -108,7 +120,7 @@ func (f *FileService) Download(sessionID int64, remotePath, localPath string) (s
 	f.logger.Info("downloading file", "sessionID", sessionID, "remotePath", remotePath, "localPath", localPath)
 	taskID := generateFileTaskID()
 
-	_, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(context.Background())
 	f.mu.Lock()
 	f.tasks[taskID] = cancel
 	f.mu.Unlock()
@@ -136,15 +148,24 @@ func (f *FileService) Download(sessionID int64, remotePath, localPath string) (s
 		defer func() { _ = sftpClient.Close() }()
 
 		size := f.getRemoteFileSize(sftpClient, remotePath)
-		downloadErr := ssh.DownloadFile(sftpClient, remotePath, localPath, func(transferred, _ int64) {
+		partialPath := localPath + ".partial"
+		downloadErr := ssh.DownloadFileContext(ctx, sftpClient, remotePath, partialPath, func(transferred, _ int64) {
 			f.reportProgress(taskID, transferred, size)
 		})
 
 		if downloadErr != nil {
+			if errors.Is(downloadErr, context.Canceled) {
+				f.emitTransferCancelled(taskID)
+				return
+			}
 			f.emitTransferError(taskID, downloadErr)
 			return
 		}
-		f.eventBus.Emit(event.TransferComplete, event.TransferProgressPayload{TaskID: taskID, Percent: 100})
+		if renameErr := os.Rename(partialPath, localPath); renameErr != nil {
+			f.emitTransferError(taskID, fmt.Errorf("finalize download: %w", renameErr))
+			return
+		}
+		f.eventBus.Emit(event.TransferComplete, event.TransferProgressPayload{TaskID: taskID, Status: "completed", Transferred: size, Total: size, Percent: 100})
 	}()
 
 	return taskID, nil
@@ -159,7 +180,6 @@ func (f *FileService) CancelTransfer(taskID string) error {
 		f.mu.Unlock()
 		return fmt.Errorf("task %s not found", taskID)
 	}
-	delete(f.tasks, taskID)
 	f.mu.Unlock()
 	cancel()
 	return nil
@@ -277,10 +297,13 @@ func (f *FileService) reportProgress(taskID string, transferred, total int64) {
 	}
 
 	f.eventBus.Emit(event.TransferProgress, event.TransferProgressPayload{
-		TaskID:  taskID,
-		Percent: percent,
-		Speed:   speed,
-		ETA:     eta,
+		TaskID:      taskID,
+		Status:      "running",
+		Transferred: transferred,
+		Total:       total,
+		Percent:     percent,
+		Speed:       speed,
+		ETA:         eta,
 	})
 }
 
@@ -288,7 +311,15 @@ func (f *FileService) reportProgress(taskID string, transferred, total int64) {
 func (f *FileService) emitTransferError(taskID string, err error) {
 	f.eventBus.Emit(event.TransferError, event.TransferErrorPayload{
 		TaskID: taskID,
+		Status: "failed",
 		Error:  err.Error(),
+	})
+}
+
+func (f *FileService) emitTransferCancelled(taskID string) {
+	f.eventBus.Emit(event.TransferComplete, event.TransferProgressPayload{
+		TaskID: taskID,
+		Status: "cancelled",
 	})
 }
 

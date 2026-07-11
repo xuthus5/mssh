@@ -22,6 +22,7 @@ interface Props {
   onEditFolder: (folder: Folder) => void
   onDeleteFolder: (folderId: string) => void
   onMoveToFolder?: (sessionId: string, folderId: string | null) => void
+  revealAll?: boolean
 }
 
 export default function SessionTree({
@@ -33,6 +34,7 @@ export default function SessionTree({
   onEditFolder,
   onDeleteFolder,
   onMoveToFolder,
+  revealAll = false,
 }: Props) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
 
@@ -57,15 +59,23 @@ export default function SessionTree({
   const renderFolder = (folder: Folder) => {
     const children = getChildFolders(folder.id)
     const folderSessions = getFolderSessions(folder.id)
-    const isExpanded = expanded.has(folder.id)
+    const isExpanded = revealAll || expanded.has(folder.id)
 
     return (
       <div key={folder.id}>
         <ContextMenu>
           <ContextMenuTrigger>
             <div
+              role="treeitem"
+              tabIndex={0}
+              aria-expanded={isExpanded}
               className="flex items-center gap-1 py-1 px-1 cursor-pointer hover:bg-muted/50 rounded text-sm"
               onClick={() => toggleFolder(folder.id)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') toggleFolder(folder.id)
+                if (event.key === 'ArrowRight' && !isExpanded) toggleFolder(folder.id)
+                if (event.key === 'ArrowLeft' && isExpanded) toggleFolder(folder.id)
+              }}
             >
               <span className="flex-shrink-0">
                 {isExpanded ? (
@@ -109,11 +119,16 @@ export default function SessionTree({
     <ContextMenu key={session.id}>
       <ContextMenuTrigger>
         <div
+          role="treeitem"
+          tabIndex={0}
           className="flex items-center gap-1 py-1 px-1 cursor-pointer hover:bg-muted/50 rounded text-sm ml-1"
           onDoubleClick={(e: MouseEvent) => {
             e.stopPropagation()
             logger.debug('SessionTree: onConnect', session.id)
             onConnect(session.id)
+          }}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') onConnect(session.id)
           }}
         >
           <Server className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
@@ -162,7 +177,7 @@ export default function SessionTree({
   )
 
   return (
-    <div className="flex flex-col h-full p-2">
+    <div role="tree" aria-label="会话列表" className="flex flex-col h-full p-2">
       <div className="text-xs font-medium text-muted-foreground mb-2 px-1">
         会话列表
       </div>

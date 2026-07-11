@@ -13,6 +13,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -51,6 +52,15 @@ func (m *mockEventBus) Events() []CapturedEvent {
 	result := make([]CapturedEvent, len(m.events))
 	copy(result, m.events)
 	return result
+}
+
+func (m *mockEventBus) hasEvent(name string) bool {
+	for _, captured := range m.Events() {
+		if captured.Name == name {
+			return true
+		}
+	}
+	return false
 }
 
 func (m *mockEventBus) LastEvent() *CapturedEvent {
@@ -180,8 +190,8 @@ func TestSessionService_ConnectDisconnect(t *testing.T) {
 	assert.Equal(t, 0, svc.ConnectionCount())
 
 	allEvents := bus.Events()
-	assert.Len(t, allEvents, 2)
-	discPayload, ok := allEvents[1].Payload.(event.ConnectionStatePayload)
+	assert.Len(t, allEvents, 3)
+	discPayload, ok := allEvents[2].Payload.(event.ConnectionStatePayload)
 	require.True(t, ok)
 	assert.Equal(t, "disconnected", discPayload.State)
 }
@@ -457,4 +467,67 @@ func TestSessionService_buildAuthMethodsAgentSuccess(t *testing.T) {
 	methods, err := svc.buildAuthMethods(sess)
 	require.NoError(t, err)
 	assert.NotEmpty(t, methods)
+}
+
+func TestSessionServiceHostKeyDecisionAccept(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	bus := newMockEventBus()
+	svc := NewSessionService(db, bus, 30, t.TempDir(), nil, testutil.NewTestLogger())
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	attemptID := svc.registerConnectAttempt(cancel)
+	defer svc.finishConnectAttempt(attemptID)
+
+	result := make(chan bool, 1)
+	go func() {
+		result <- svc.awaitHostKeyDecision(ctx, attemptID, "example.com", "ssh-ed25519", "SHA256:test")
+	}()
+
+	require.Eventually(t, func() bool {
+		return bus.hasEvent(event.HostKeyFingerprint)
+	}, time.Second, 10*time.Millisecond)
+	require.NoError(t, svc.DecideHostKey(attemptID, true))
+	assert.True(t, <-result)
+}
+
+func TestSessionServiceHostKeyDecisionReject(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	svc := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	attemptID := svc.registerConnectAttempt(cancel)
+	defer svc.finishConnectAttempt(attemptID)
+
+	result := make(chan bool, 1)
+	go func() {
+		result <- svc.awaitHostKeyDecision(ctx, attemptID, "example.com", "ssh-ed25519", "SHA256:test")
+	}()
+
+	require.NoError(t, svc.DecideHostKey(attemptID, false))
+	assert.False(t, <-result)
+}
+
+func TestSessionServiceCancelConnect(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	svc := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
+
+	cancelled := make(chan struct{})
+	attemptID := svc.registerConnectAttempt(func() { close(cancelled) })
+	require.NoError(t, svc.CancelConnect(attemptID))
+	select {
+	case <-cancelled:
+	case <-time.After(time.Second):
+		t.Fatal("connection attempt was not cancelled")
+	}
+	assert.Error(t, svc.CancelConnect(attemptID))
+}
+
+func TestSessionServiceHostKeyDecisionUnknownAttempt(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	svc := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
+
+	assert.Error(t, svc.DecideHostKey("missing", true))
+	assert.Error(t, svc.CancelConnect("missing"))
 }

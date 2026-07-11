@@ -303,6 +303,22 @@ func TestLogService_StopTerminalRecordingNotFound(t *testing.T) {
 	assert.Contains(t, err.Error(), "not active")
 }
 
+func TestLogService_StopTerminalRecordingIfActive(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	svc := NewLogService(db, t.TempDir(), testutil.NewTestLogger())
+	sessionSvc := NewSessionService(db, newMockEventBus(), 30, "", nil, testutil.NewTestLogger())
+	created, err := sessionSvc.CreateSession(model.Session{
+		Name: "conditional-stop", Host: "127.0.0.1", Port: 22, Username: "root",
+		AuthMethod: model.AuthPassword, KeepAlive: 30, TermType: "xterm",
+	})
+	require.NoError(t, err)
+
+	_, err = svc.StartTerminalRecording("term-conditional", created.ID, 80, 24, "xterm")
+	require.NoError(t, err)
+	require.NoError(t, svc.StopTerminalRecordingIfActive("term-conditional"))
+	require.NoError(t, svc.StopTerminalRecordingIfActive("term-conditional"))
+}
+
 func TestLogService_HandleOutput(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	svc := NewLogService(db, t.TempDir(), testutil.NewTestLogger())

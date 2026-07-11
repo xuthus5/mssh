@@ -32,11 +32,12 @@ export function PlaybackTab({ recordingId, title }: Props) {
   const [speed, setSpeed] = useState(1)
   const [progress, setProgress] = useState(0)
   const [entries, setEntries] = useState<RecordingEntry[]>([])
-  const playbackRef = useRef<{ timer: ReturnType<typeof setInterval> | null; index: number; startTime: number; pausedAt: number }>({
+  const speedRef = useRef(1)
+  const playbackRef = useRef<{ timer: ReturnType<typeof setInterval> | null; index: number; position: number; lastTick: number }>({
     timer: null,
     index: 0,
-    startTime: 0,
-    pausedAt: 0,
+    position: 0,
+    lastTick: 0,
   })
 
   useEffect(() => {
@@ -110,13 +111,14 @@ export function PlaybackTab({ recordingId, title }: Props) {
     if (!term) return
 
     if (next) {
-      const now = Date.now()
-      p.startTime = now - p.pausedAt
+      p.lastTick = Date.now()
       p.timer = setInterval(() => {
-        const elapsed = (Date.now() - p.startTime) * speed
+        const now = Date.now()
+        p.position += (now - p.lastTick) * speedRef.current
+        p.lastTick = now
         let newIndex = p.index
 
-        while (newIndex < entries.length && entries[newIndex].timestamp <= elapsed) {
+        while (newIndex < entries.length && entries[newIndex].timestamp <= p.position) {
           const entry = entries[newIndex]
           if (entry.data && entry.data.length > 0) {
             term.write(new Uint8Array(entry.data))
@@ -125,7 +127,8 @@ export function PlaybackTab({ recordingId, title }: Props) {
         }
 
         p.index = newIndex
-        const pct = entries.length > 0 ? Math.min(100, Math.round((newIndex / entries.length) * 100)) : 0
+        const duration = entries.at(-1)?.timestamp ?? 0
+        const pct = duration > 0 ? Math.min(100, Math.round((p.position / duration) * 100)) : 0
         setProgress(pct)
 
         if (newIndex >= entries.length) {
@@ -139,14 +142,33 @@ export function PlaybackTab({ recordingId, title }: Props) {
         clearInterval(p.timer)
         p.timer = null
       }
-      p.pausedAt = Date.now() - p.startTime
     }
-  }, [playing, entries, speed])
+  }, [playing, entries])
 
   const handleSpeedChange = useCallback((value: number | number[]) => {
     const v = typeof value === 'number' ? value : value[0]
     setSpeed(v)
+    speedRef.current = v
   }, [])
+
+  const seek = useCallback((percentage: number) => {
+    const term = termRef.current
+    if (!term || entries.length === 0) return
+    const duration = entries.at(-1)?.timestamp ?? 0
+    const position = duration * Math.max(0, Math.min(100, percentage)) / 100
+    const p = playbackRef.current
+    term.reset()
+    let index = 0
+    while (index < entries.length && entries[index].timestamp <= position) {
+      const entry = entries[index]
+      if (entry.data?.length) term.write(new Uint8Array(entry.data))
+      index++
+    }
+    p.index = index
+    p.position = position
+    p.lastTick = Date.now()
+    setProgress(percentage)
+  }, [entries])
 
   return (
     <div className="flex flex-col h-full">
@@ -174,9 +196,9 @@ export function PlaybackTab({ recordingId, title }: Props) {
           max={100}
           onValueChange={(value: number | readonly number[]) => {
             if (typeof value === 'number') {
-              setProgress(value)
+              seek(value)
             } else if (value.length > 0) {
-              setProgress(value[0])
+              seek(value[0])
             }
           }}
           className="flex-1"

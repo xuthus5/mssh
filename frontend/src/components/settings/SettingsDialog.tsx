@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useState, useEffect, type FormEvent } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -32,7 +32,7 @@ interface Props {
   theme: TerminalTheme
   keys: KeyInfo[]
   sync: SyncConfig
-  onSaveGeneral: (s: GeneralSettings) => void
+  onSaveGeneral: (s: GeneralSettings) => Promise<void>
   onSaveTheme: (t: TerminalTheme) => void
   onGenerateKey: (name: string, type: KeyInfo['type'], bits: number) => void
   onImportKey: (name: string, privateKey: string) => void
@@ -68,14 +68,22 @@ export default function SettingsDialog({
   const [defaultTermType, setDefaultTermType] = useState(
     general.defaultTermType,
   )
+  const [saving, setSaving] = useState(false)
 
-  const handleSaveGeneral = (e: FormEvent) => {
+  useEffect(() => {
+    setMaxPoolSize(general.maxPoolSize.toString())
+    setDefaultKeepAlive(general.defaultKeepAlive.toString())
+    setDefaultTermType(general.defaultTermType)
+  }, [general])
+
+  const handleSaveGeneral = async (e: FormEvent) => {
     e.preventDefault()
-    onSaveGeneral({
-      maxPoolSize: parseInt(maxPoolSize, 10) || 10,
-      defaultKeepAlive: parseInt(defaultKeepAlive, 10) || 60,
-      defaultTermType,
-    })
+    setSaving(true)
+    try {
+      await onSaveGeneral({ maxPoolSize: parseInt(maxPoolSize, 10) || 10, defaultKeepAlive: parseInt(defaultKeepAlive, 10) || 60, defaultTermType })
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -137,8 +145,8 @@ export default function SettingsDialog({
                 </Select>
               </div>
               <div className="flex justify-end">
-                <Button type="submit" size="sm">
-                  保存
+                <Button type="submit" size="sm" disabled={saving}>
+                  {saving ? '保存中...' : '保存'}
                 </Button>
               </div>
             </form>

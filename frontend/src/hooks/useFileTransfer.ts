@@ -1,7 +1,10 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import { FileService } from '@/lib/wails'
 import { logger } from '@/lib/logger'
 import type { FileEntry } from '../../bindings/mssh/internal/ssh/models'
+import { useAppStore } from '@/store/appStore'
+export type { TransferJob } from '@/store/appStore'
+import { toast } from '@/components/ui/toast'
 
 export interface FileInfo {
   name: string
@@ -9,16 +12,6 @@ export interface FileInfo {
   size: number
   modified: string
   isDir: boolean
-}
-
-export interface TransferJob {
-  id: string
-  fileName: string
-  direction: 'upload' | 'download'
-  totalBytes: number
-  transferredBytes: number
-  speed: number
-  startedAt: number
 }
 
 function mapFileEntry(f: FileEntry): FileInfo {
@@ -34,19 +27,25 @@ function mapFileEntry(f: FileEntry): FileInfo {
 export function useFileTransfer(sessionId: number) {
   const [files, setFiles] = useState<FileInfo[]>([])
   const [currentPath, setCurrentPath] = useState('/')
-  const [transfers, setTransfers] = useState<TransferJob[]>([])
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const requestID = useRef(0)
+  const transfers = useAppStore((state) => state.transfers)
 
   const listFiles = useCallback(async (path: string) => {
     setLoading(true)
+    setError('')
+    const currentRequest = ++requestID.current
     try {
       const result = await FileService.ListDir(sessionId, path)
+      if (currentRequest !== requestID.current) return
       setFiles((result ?? []).map(mapFileEntry))
       setCurrentPath(path)
     } catch (err) {
       logger.error('listFiles error', err)
+      if (currentRequest === requestID.current) setError(err instanceof Error ? err.message : String(err))
     } finally {
-      setLoading(false)
+      if (currentRequest === requestID.current) setLoading(false)
     }
   }, [sessionId])
 
@@ -58,29 +57,33 @@ export function useFileTransfer(sessionId: number) {
 
   const upload = useCallback(async (localPath: string, remotePath: string) => {
     try {
-      const taskId = await FileService.Upload(sessionId, localPath, remotePath)
-      setTransfers((prev) => [...prev, {
+      const fileName = localPath.split(/[\\/]/).pop() ?? localPath
+      const targetPath = `${remotePath.replace(/\/$/, '')}/${fileName}`
+      const taskId = await FileService.Upload(sessionId, localPath, targetPath)
+      useAppStore.getState().addTransfer({
         id: taskId,
-        fileName: localPath.split('/').pop() ?? localPath,
+        fileName,
         direction: 'upload',
-        totalBytes: 0, transferredBytes: 0, speed: 0, startedAt: Date.now(),
-      }])
+        totalBytes: 0, transferredBytes: 0, speed: 0, eta: 0, status: 'queued', startedAt: Date.now(),
+      })
     } catch (err) {
       logger.error('upload error', err)
+      toast(`上传失败: ${err instanceof Error ? err.message : String(err)}`, 'error')
     }
   }, [sessionId])
 
   const download = useCallback(async (remotePath: string, localPath: string) => {
     try {
       const taskId = await FileService.Download(sessionId, remotePath, localPath)
-      setTransfers((prev) => [...prev, {
+      useAppStore.getState().addTransfer({
         id: taskId,
         fileName: remotePath.split('/').pop() ?? remotePath,
         direction: 'download',
-        totalBytes: 0, transferredBytes: 0, speed: 0, startedAt: Date.now(),
-      }])
+        totalBytes: 0, transferredBytes: 0, speed: 0, eta: 0, status: 'queued', startedAt: Date.now(),
+      })
     } catch (err) {
       logger.error('download error', err)
+      toast(`下载失败: ${err instanceof Error ? err.message : String(err)}`, 'error')
     }
   }, [sessionId])
 
@@ -115,14 +118,13 @@ export function useFileTransfer(sessionId: number) {
   const cancelTransfer = useCallback(async (jobId: string) => {
     try {
       await FileService.CancelTransfer(jobId)
-      setTransfers((prev) => prev.filter((t) => t.id !== jobId))
     } catch (err) {
       logger.error('cancelTransfer error', err)
     }
   }, [])
 
   return {
-    files, currentPath, transfers, loading,
+    files, currentPath, transfers, loading, error,
     listFiles, navigateTo, navigateUp,
     upload, download, deleteFile, renameFile, makeDir, cancelTransfer,
   }
