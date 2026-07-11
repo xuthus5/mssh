@@ -1,10 +1,22 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { SettingService, KeyService, SyncService, TerminalService } from '@/lib/wails'
 import { useAppStore } from '@/store/appStore'
 import { logger } from '@/lib/logger'
 import { KeyType } from '../../bindings/github.com/xuthus5/mssh/internal/model/models'
 import { Dialogs } from '@wailsio/runtime'
 import { toast } from '@/components/ui/toast'
+import type { Setting } from '../../bindings/github.com/xuthus5/mssh/internal/model/models'
+
+function settingEntry(key: string, value: unknown): Setting {
+  const valueType = value === null ? 'null' : Array.isArray(value) ? 'array' : typeof value === 'object' ? 'object' : typeof value
+  return { key, namespace: key.split('.')[0], value: JSON.stringify(value), value_type: valueType, version: 1, updated_at: '' } as Setting
+}
+
+function settingValue<T>(settings: { [_ in string]?: Setting }, key: string, fallback: T): T {
+  const raw = settings[key]?.value
+  if (!raw) return fallback
+  try { return JSON.parse(raw) as T } catch { return fallback }
+}
 
 export interface GeneralSettings {
   maxPoolSize: number
@@ -50,19 +62,16 @@ export function useSettings() {
   const [theme, setTheme] = useState<TerminalTheme>(DEFAULT_THEME)
   const [keys, setKeys] = useState<KeyInfo[]>([])
   const [sync, setSync] = useState<SyncConfig>({ enabled: false, url: '', username: '', password: '' })
+  const syncRevision = useRef(0)
 
   const loadGeneral = useCallback(async () => {
     try {
       logger.debug('loadGeneral')
-      const [maxPoolSize, keepAlive, termType] = await Promise.all([
-        SettingService.GetSetting('max_pool_size'),
-        SettingService.GetSetting('default_keep_alive'),
-        SettingService.GetSetting('default_term_type'),
-      ])
+      const settings = await SettingService.GetMany(['terminal.max_pool_size', 'terminal.default_keep_alive', 'terminal.default_term_type'])
       setGeneral({
-        maxPoolSize: maxPoolSize ? Number(maxPoolSize) : 10,
-        defaultKeepAlive: keepAlive ? Number(keepAlive) : 60,
-        defaultTermType: termType || 'xterm-256color',
+        maxPoolSize: settingValue(settings, 'terminal.max_pool_size', 10),
+        defaultKeepAlive: settingValue(settings, 'terminal.default_keep_alive', 60),
+        defaultTermType: settingValue(settings, 'terminal.default_term_type', 'xterm-256color'),
       })
     } catch (err) {
       logger.debug('loadGeneral error', err)
@@ -72,12 +81,9 @@ export function useSettings() {
   const saveGeneral = useCallback(async (settings: GeneralSettings) => {
     try {
       logger.debug('saveGeneral', settings)
-      await Promise.all([
-        SettingService.SetSetting('max_pool_size', String(settings.maxPoolSize)),
-        SettingService.SetSetting('default_keep_alive', String(settings.defaultKeepAlive)),
-        SettingService.SetSetting('default_term_type', settings.defaultTermType),
-        TerminalService.SetMaxSize(settings.maxPoolSize),
-      ])
+      await Promise.all([SettingService.SetMany([
+        settingEntry('terminal.max_pool_size', settings.maxPoolSize), settingEntry('terminal.default_keep_alive', settings.defaultKeepAlive), settingEntry('terminal.default_term_type', settings.defaultTermType),
+      ]), TerminalService.SetMaxSize(settings.maxPoolSize)])
       setGeneral(settings)
       useAppStore.getState().setMaxPoolSize(settings.maxPoolSize)
       toast('通用设置已保存', 'success')
@@ -91,7 +97,7 @@ export function useSettings() {
   const saveTheme = useCallback(async (t: TerminalTheme) => {
     try {
       logger.debug('saveTheme')
-      await SettingService.SetSetting('theme', JSON.stringify(t))
+      await SettingService.Set(settingEntry('terminal.theme', t))
       setTheme(t)
       useAppStore.getState().setTerminalTheme({
         background: t.background,
@@ -127,9 +133,9 @@ export function useSettings() {
   const loadTheme = useCallback(async () => {
     try {
       logger.debug('loadTheme')
-      const raw = await SettingService.GetSetting('theme')
-      if (raw) {
-        const t: TerminalTheme = JSON.parse(raw)
+      const setting = await SettingService.Get('terminal.theme')
+      if (setting) {
+        const t: TerminalTheme = JSON.parse(setting.value)
         setTheme(t)
         useAppStore.getState().setTerminalTheme({
           background: t.background,
@@ -220,10 +226,9 @@ export function useSettings() {
 
   const saveSync = useCallback(async (config: SyncConfig) => {
     try {
+      syncRevision.current++
       logger.debug('saveSync', { enabled: config.enabled, url: config.url })
-      await SettingService.SetSetting('sync_enabled', String(config.enabled))
-      await SettingService.SetSetting('sync_url', config.url)
-      await SettingService.SetSetting('sync_username', config.username)
+      await SettingService.SetMany([settingEntry('sync.enabled', config.enabled), settingEntry('sync.url', config.url), settingEntry('sync.username', config.username)])
       setSync(config)
     } catch (err) {
       logger.debug('saveSync error', err)
@@ -232,13 +237,10 @@ export function useSettings() {
 
   const loadSync = useCallback(async () => {
     try {
+      const revision = syncRevision.current
       logger.debug('loadSync')
-      const [enabled, url, username] = await Promise.all([
-        SettingService.GetSetting('sync_enabled'),
-        SettingService.GetSetting('sync_url'),
-        SettingService.GetSetting('sync_username'),
-      ])
-      setSync({ enabled: enabled === 'true', url: url || '', username: username || '', password: '' })
+      const settings = await SettingService.GetMany(['sync.enabled', 'sync.url', 'sync.username'])
+      if (revision === syncRevision.current) setSync({ enabled: settingValue(settings, 'sync.enabled', false), url: settingValue(settings, 'sync.url', ''), username: settingValue(settings, 'sync.username', ''), password: '' })
     } catch (err) {
       logger.debug('loadSync error', err)
     }

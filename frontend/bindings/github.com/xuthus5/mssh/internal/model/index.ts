@@ -11,6 +11,7 @@ export {
     Session,
     SessionFolder,
     SessionLog,
+    Setting,
     Theme,
     Tunnel,
     TunnelType

@@ -3,6 +3,11 @@ export const Create = {
   Array: (fn: any) => (data: any) => (data ?? []).map(fn),
   Nullable: (fn: any) => (data: any) => data ? fn(data) : null,
   ByteSlice: (data: any) => data ?? [],
+  Any: (data: any) => data,
+  Map: (_keyFn: any, valueFn: any) => (data: Record<string, any> | null) => {
+    if (!data) return {}
+    return Object.fromEntries(Object.entries(data).map(([key, value]) => [key, valueFn(value)]))
+  },
 }
 
 const handlers = new Map<string, (...args: any[]) => Promise<any>>()

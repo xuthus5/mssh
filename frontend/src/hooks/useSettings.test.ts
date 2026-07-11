@@ -20,6 +20,10 @@ describe('useSettings', () => {
     __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.SetSetting', async (key: string, value: string) => {
       _settings[key] = value
     })
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.Get', async (key: string) => _settings[key] === undefined ? null : ({ key, namespace: key.split('.')[0], value: _settings[key], value_type: 'string', version: 1, updated_at: '' }))
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.GetMany', async (keys: string[]) => Object.fromEntries(keys.filter((key) => _settings[key] !== undefined).map((key) => [key, { key, namespace: key.split('.')[0], value: _settings[key], value_type: 'string', version: 1, updated_at: '' }])))
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.Set', async (setting: any) => { _settings[setting.key] = setting.value })
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.SetMany', async (settings: any[]) => { settings.forEach((setting) => { _settings[setting.key] = setting.value }) })
     __registerHandler('github.com/xuthus5/mssh/internal/service.KeyService.List', async () => [])
     __registerHandler('github.com/xuthus5/mssh/internal/service.TerminalService.SetMaxSize', async () => {})
   })

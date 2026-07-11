@@ -2,6 +2,8 @@ import { Minus, Moon, Settings, Square, Sun, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Window } from '@wailsio/runtime'
 import { logger } from '@/lib/logger'
+import { SettingService } from '@/lib/wails'
+import { toast } from '@/components/ui/toast'
 
 function runWindowAction(name: string, action: () => Promise<unknown>) {
   void action().catch((error: unknown) => logger.error(`window ${name} failed`, error))
@@ -14,11 +16,25 @@ export function WindowTitleBar() {
     document.documentElement.classList.toggle('light', colorMode === 'light')
   }, [colorMode])
 
+  useEffect(() => {
+    SettingService.Get('appearance.color_mode').then((setting) => {
+      const savedMode = setting ? JSON.parse(setting.value) : null
+      if (savedMode === 'light' || savedMode === 'dark') setColorMode(savedMode)
+    }).catch((error: unknown) => logger.error('load colour mode failed', error))
+  }, [])
+
   const toggleColorMode = () => {
     const nextMode = colorMode === 'dark' ? 'light' : 'dark'
     document.documentElement.classList.toggle('light', nextMode === 'light')
     localStorage.setItem('mssh:color-mode', nextMode)
     setColorMode(nextMode)
+    void SettingService.Set({ key: 'appearance.color_mode', namespace: 'appearance', value: JSON.stringify(nextMode), value_type: 'string', version: 1, updated_at: '' }).catch((error: unknown) => {
+      document.documentElement.classList.toggle('light', colorMode === 'light')
+      localStorage.setItem('mssh:color-mode', colorMode)
+      setColorMode(colorMode)
+      toast('主题设置保存失败，已恢复原主题', 'error')
+      logger.error('save colour mode failed', error)
+    })
   }
 
   return <header className="flex h-9 shrink-0 select-none items-stretch border-b border-border bg-card">
