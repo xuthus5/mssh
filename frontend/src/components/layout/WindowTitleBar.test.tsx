@@ -7,7 +7,7 @@ const { minimise, toggleMaximise, close, getSetting, setSetting } = vi.hoisted((
   toggleMaximise: vi.fn(async () => {}),
   close: vi.fn(async () => {}),
   getSetting: vi.fn(async () => ''),
-  setSetting: vi.fn(async () => {}),
+  setSetting: vi.fn(async (_setting: unknown) => {}),
 }))
 
 vi.mock('@wailsio/runtime', () => ({
@@ -52,6 +52,7 @@ describe('WindowTitleBar', () => {
     expect(document.documentElement).toHaveClass('light')
     expect(localStorage.getItem('mssh:color-mode')).toBe('light')
     expect(setSetting).toHaveBeenCalledWith(expect.objectContaining({ key: 'appearance.color_mode', value: '"light"' }))
+    expect(setSetting.mock.calls[0][0]).not.toHaveProperty('updated_at')
     expect(screen.getByRole('button', { name: '切换到深色模式' })).toBeInTheDocument()
   })
 

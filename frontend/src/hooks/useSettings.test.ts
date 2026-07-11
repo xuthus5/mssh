@@ -8,11 +8,13 @@ function nextId() { return ++_counter }
 
 describe('useSettings', () => {
   let _settings: Record<string, string>
+  let writtenSettings: any[]
 
   beforeEach(() => {
     __clearHandlers()
     _settings = {}
     _counter = 0
+    writtenSettings = []
 
     __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.GetSetting', async (key: string) => {
       return _settings[key] ?? ''
@@ -22,8 +24,8 @@ describe('useSettings', () => {
     })
     __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.Get', async (key: string) => _settings[key] === undefined ? null : ({ key, namespace: key.split('.')[0], value: _settings[key], value_type: 'string', version: 1, updated_at: '' }))
     __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.GetMany', async (keys: string[]) => Object.fromEntries(keys.filter((key) => _settings[key] !== undefined).map((key) => [key, { key, namespace: key.split('.')[0], value: _settings[key], value_type: 'string', version: 1, updated_at: '' }])))
-    __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.Set', async (setting: any) => { _settings[setting.key] = setting.value })
-    __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.SetMany', async (settings: any[]) => { settings.forEach((setting) => { _settings[setting.key] = setting.value }) })
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.Set', async (setting: any) => { writtenSettings.push(setting); _settings[setting.key] = setting.value })
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.SetMany', async (settings: any[]) => { writtenSettings.push(...settings); settings.forEach((setting) => { _settings[setting.key] = setting.value }) })
     __registerHandler('github.com/xuthus5/mssh/internal/service.KeyService.List', async () => [])
     __registerHandler('github.com/xuthus5/mssh/internal/service.TerminalService.SetMaxSize', async () => {})
   })
@@ -44,6 +46,7 @@ describe('useSettings', () => {
     expect(result.current.general.maxPoolSize).toBe(32)
     expect(result.current.general.defaultKeepAlive).toBe(120)
     expect(result.current.general.defaultTermType).toBe('xterm')
+    expect(writtenSettings).not.toContainEqual(expect.objectContaining({ updated_at: expect.anything() }))
   })
 
   it('saveTheme persists to settings', async () => {

@@ -6,7 +6,7 @@ import TunnelDialog from '@/components/session/TunnelDialog'
 import type { Tunnel } from '@/hooks/useSession'
 import { logger } from '@/lib/logger'
 import { FileService, TunnelService } from '@/lib/wails'
-import type { Tunnel as BindingTunnel } from '../../../bindings/github.com/xuthus5/mssh/internal/model/models'
+import { TunnelType, type TunnelInput } from '../../../bindings/github.com/xuthus5/mssh/internal/model/models'
 import { toast } from '@/components/ui/toast'
 
 function formatTime(date: Date): string {
@@ -91,10 +91,10 @@ export default function StatusBar() {
       let id = Number((tunnel as Tunnel).id)
       if (!id) {
         const created = await TunnelService.Create({
-          id: 0, name: `${tunnel.type}-${tunnel.localPort}`, session_id: Number(tunnel.sessionId), type: tunnel.type,
+          id: 0, name: `${tunnel.type}-${tunnel.localPort}`, session_id: Number(tunnel.sessionId), type: ({ local: TunnelType.TunnelLocal, remote: TunnelType.TunnelRemote, dynamic: TunnelType.TunnelDynamic })[tunnel.type],
           local_host: tunnel.localAddress, local_port: tunnel.localPort,
-          remote_host: tunnel.remoteAddress, remote_port: tunnel.remotePort, auto_start: false, created_at: '',
-        } as BindingTunnel)
+          remote_host: tunnel.remoteAddress, remote_port: tunnel.remotePort,
+        } satisfies TunnelInput)
         if (!created) throw new Error('创建隧道失败')
         id = created.id
       }

@@ -4,7 +4,7 @@ import { SessionService, TerminalService, TunnelService } from '@/lib/wails'
 import { useConnectDialog } from '@/store/connectDialog'
 import { toast } from '@/components/ui/toast'
 import { logger } from '@/lib/logger'
-import type { Session as BindingSession, Tunnel as BindingTunnel } from '../../bindings/github.com/xuthus5/mssh/internal/model/models'
+import type { Session as BindingSession, SessionInput, Tunnel as BindingTunnel } from '../../bindings/github.com/xuthus5/mssh/internal/model/models'
 
 export interface Folder {
   id: string
@@ -152,7 +152,7 @@ export function useSession() {
         host: session.host,
         port: session.port,
         username: session.username,
-        auth_method: session.authMethod as BindingSession['auth_method'],
+        auth_method: session.authMethod as SessionInput['auth_method'],
         password: session.password,
         key_id: session.keyId ? Number(session.keyId) : null,
         keep_alive: session.keepAlive,
@@ -160,7 +160,7 @@ export function useSession() {
         folder_id: session.folderId ? Number(session.folderId) : null,
         id: 0,
         sort_order: 0,
-      } as BindingSession)
+      } satisfies SessionInput)
       if (result) {
         setSessions((prev) => [...prev, mapSession(result)])
       }
@@ -180,14 +180,14 @@ export function useSession() {
         host: session.host,
         port: session.port,
         username: session.username,
-        auth_method: session.authMethod as BindingSession['auth_method'],
+        auth_method: session.authMethod as SessionInput['auth_method'],
         password: session.password,
         key_id: session.keyId ? Number(session.keyId) : null,
         keep_alive: session.keepAlive,
         term_type: session.termType,
         folder_id: session.folderId ? Number(session.folderId) : null,
         sort_order: 0,
-      } as BindingSession)
+      } satisfies SessionInput)
       setSessions((prev) => prev.map((s) => (s.id === session.id ? session : s)))
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)

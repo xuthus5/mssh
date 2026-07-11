@@ -61,7 +61,7 @@ func TestTerminalService_Open(t *testing.T) {
 		Name: "test-open", Host: "127.0.0.1", Port: port, Username: "root",
 		AuthMethod: model.AuthPassword, Password: "", KeepAlive: 30, TermType: "xterm-256color",
 	}
-	created, err := sessionSvc.CreateSession(sess)
+	created, err := sessionSvc.CreateSession(model.SessionInputFrom(sess))
 	require.NoError(t, err)
 
 	termBus := newMockEventBus()
@@ -108,7 +108,7 @@ func TestTerminalService_OpenDefaultTermType(t *testing.T) {
 		Name: "test-open-default", Host: "127.0.0.1", Port: port, Username: "root",
 		AuthMethod: model.AuthPassword, Password: "", KeepAlive: 30, TermType: "",
 	}
-	created, err := sessionSvc.CreateSession(sess)
+	created, err := sessionSvc.CreateSession(model.SessionInputFrom(sess))
 	require.NoError(t, err)
 
 	termBus := newMockEventBus()
@@ -145,7 +145,7 @@ func TestTerminalService_ReadCallback(t *testing.T) {
 		Name: "test-cb", Host: "127.0.0.1", Port: port, Username: "root",
 		AuthMethod: model.AuthPassword, Password: "", KeepAlive: 30, TermType: "xterm",
 	}
-	created, err := sessionSvc.CreateSession(sess)
+	created, err := sessionSvc.CreateSession(model.SessionInputFrom(sess))
 	require.NoError(t, err)
 
 	termBus := newMockEventBus()
@@ -340,7 +340,7 @@ func TestTerminalService_PoolLimitEnforcement(t *testing.T) {
 		Name: "test-pool", Host: "127.0.0.1", Port: port, Username: "root",
 		AuthMethod: model.AuthPassword, Password: "", KeepAlive: 30, TermType: "xterm",
 	}
-	created, err := sessionSvc.CreateSession(sess)
+	created, err := sessionSvc.CreateSession(model.SessionInputFrom(sess))
 	require.NoError(t, err)
 
 	termBus := newMockEventBus()
@@ -392,7 +392,7 @@ func TestSessionService_GetClientWrapper(t *testing.T) {
 		Name: "test-gcw", Host: "127.0.0.1", Port: port, Username: "root",
 		AuthMethod: model.AuthPassword, Password: "", KeepAlive: 30, TermType: "xterm",
 	}
-	created, err := svc.CreateSession(sess)
+	created, err := svc.CreateSession(model.SessionInputFrom(sess))
 	require.NoError(t, err)
 
 	ctx := context.Background()
@@ -417,7 +417,7 @@ func TestSessionService_GetClientWrapperAfterDisconnect(t *testing.T) {
 		Name: "test-gcwd", Host: "127.0.0.1", Port: port, Username: "root",
 		AuthMethod: model.AuthPassword, Password: "", KeepAlive: 30, TermType: "xterm",
 	}
-	created, err := svc.CreateSession(sess)
+	created, err := svc.CreateSession(model.SessionInputFrom(sess))
 	require.NoError(t, err)
 
 	ctx := context.Background()
