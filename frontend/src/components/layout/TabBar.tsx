@@ -1,6 +1,7 @@
 import { useRef, useState, useEffect, useCallback } from 'react'
 import { X, Circle } from 'lucide-react'
 import { useAppStore, type ConnectionStatus } from '@/store/appStore'
+import { logger } from '@/lib/logger'
 
 const contextMenuItems: Array<{
   label: string
@@ -47,7 +48,7 @@ export default function TabBar() {
   const closeOthers = useCallback(
     (keepId: string) => {
       const others = tabs.filter((t) => t.id !== keepId)
-      console.log('[TabBar] closeOthers: found', others.length, 'other tabs')
+      logger.debug('TabBar: closeOthers: found', others.length, 'other tabs')
       for (const t of others) {
         closeTab(t.id)
       }
@@ -59,7 +60,7 @@ export default function TabBar() {
     (e: React.MouseEvent, tabId: string) => {
       e.preventDefault()
       setContextMenu({ visible: true, x: e.clientX, y: e.clientY, tabId })
-      console.log('[TabBar] contextMenu', tabId)
+      logger.debug('TabBar: contextMenu', tabId)
     },
     [],
   )
@@ -79,7 +80,7 @@ export default function TabBar() {
   const handleMenuAction = useCallback(
     (action: 'close' | 'closeOthers', tabId: string) => {
       if (action === 'close') {
-        console.log('[TabBar] contextMenu: close', tabId)
+        logger.debug('TabBar: contextMenu: close', tabId)
         closeTab(tabId)
       } else {
         closeOthers(tabId)
@@ -120,7 +121,7 @@ export default function TabBar() {
               }`}
               onClick={(e) => {
                 e.stopPropagation()
-                console.log('[TabBar] close', tab.id)
+                logger.debug('TabBar: close', tab.id)
                 closeTab(tab.id)
               }}
             >

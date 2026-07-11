@@ -44,8 +44,7 @@ export default function FilePanel({
   const [showMkdir, setShowMkdir] = useState(false)
 
   useEffect(() => {
-    if (mkdirName) setMkdirName('')
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    setMkdirName('')
   }, [currentPath])
 
   const handleMkdirSubmit = (e: FormEvent) => {
