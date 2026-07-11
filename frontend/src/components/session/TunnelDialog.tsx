@@ -8,13 +8,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+import { LabeledSelect } from '@/components/ui/labeled-select'
 import {
   Table,
   TableBody,
@@ -33,6 +27,12 @@ interface Props {
   onStop: (tunnelId: string) => void
   sessionId: string
 }
+
+const TUNNEL_TYPE_OPTIONS = [
+  { value: 'local', label: '本地转发' },
+  { value: 'remote', label: '远程转发' },
+  { value: 'dynamic', label: '动态转发' },
+]
 
 export default function TunnelDialog({
   open,
@@ -97,16 +97,7 @@ export default function TunnelDialog({
                 <label className="text-xs font-medium text-muted-foreground">
                   类型
                 </label>
-                <Select value={type} onValueChange={(value) => setType(value ?? '')}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="local">本地转发</SelectItem>
-                    <SelectItem value="remote">远程转发</SelectItem>
-                    <SelectItem value="dynamic">动态转发</SelectItem>
-                  </SelectContent>
-                </Select>
+                <LabeledSelect value={type} options={TUNNEL_TYPE_OPTIONS} onValueChange={setType} />
               </div>
               {type !== 'dynamic' && (
                 <>

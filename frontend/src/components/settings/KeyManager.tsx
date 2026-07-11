@@ -16,13 +16,7 @@ import {
 } from '@/components/ui/table'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+import { LabeledSelect } from '@/components/ui/labeled-select'
 import type { KeyInfo } from '@/hooks/useSettings'
 
 const bitsOptions: Record<string, { value: string; label: string }[]> = {
@@ -45,6 +39,12 @@ const defaultBits: Record<string, string> = {
   ed25519: '256',
   ecdsa: '256',
 }
+
+const KEY_TYPE_OPTIONS = [
+  { value: 'rsa', label: 'RSA' },
+  { value: 'ed25519', label: 'Ed25519' },
+  { value: 'ecdsa', label: 'ECDSA' },
+]
 
 interface Props {
   keys: KeyInfo[]
@@ -175,33 +175,13 @@ export function KeyManager({ keys, onGenerate, onImport, onDelete, onExport }: P
               <label className="text-xs font-medium text-muted-foreground">
                 类型
               </label>
-              <Select value={genType} onValueChange={handleTypeChange}>
-                <SelectTrigger className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="rsa">RSA</SelectItem>
-                  <SelectItem value="ed25519">Ed25519</SelectItem>
-                  <SelectItem value="ecdsa">ECDSA</SelectItem>
-                </SelectContent>
-              </Select>
+              <LabeledSelect value={genType} options={KEY_TYPE_OPTIONS} onValueChange={handleTypeChange} />
             </div>
             <div className="flex flex-col gap-1.5">
               <label className="text-xs font-medium text-muted-foreground">
                 位数
               </label>
-              <Select value={genBits} onValueChange={(value) => setGenBits(value ?? '256')}>
-                <SelectTrigger className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {currentBitsOptions.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <LabeledSelect value={genBits} options={currentBitsOptions} onValueChange={setGenBits} />
             </div>
             <DialogFooter showCloseButton>
               <Button type="submit">生成</Button>
