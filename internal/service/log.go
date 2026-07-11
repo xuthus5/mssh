@@ -32,23 +32,10 @@ func NewLogService(db *sql.DB, dataDir string, logger *slog.Logger) *LogService 
 }
 
 func (l *LogService) List(sessionID *int64) ([]model.SessionLog, error) {
-	logs, err := store.ListSessionLogs(l.db)
-	if err != nil {
-		return nil, err
-	}
 	if sessionID == nil {
-		return logs, nil
+		return store.ListSessionLogs(l.db)
 	}
-	var filtered []model.SessionLog
-	for _, log := range logs {
-		if log.SessionID != nil && *log.SessionID == *sessionID {
-			filtered = append(filtered, log)
-		}
-	}
-	if filtered == nil {
-		filtered = []model.SessionLog{}
-	}
-	return filtered, nil
+	return store.ListSessionLogsBySession(l.db, *sessionID)
 }
 
 func (l *LogService) StartRecording(sessionID int64, cols, rows int, termType, dataPath string) (int64, error) {
@@ -161,25 +148,17 @@ func (l *LogService) GetRecording(path string) (*ssh.Player, error) {
 
 func (l *LogService) Delete(id int64) error {
 	l.logger.Info("deleting log", "id", id)
-	logs, err := store.ListSessionLogs(l.db)
+	log, err := store.GetSessionLog(l.db, id)
 	if err != nil {
 		return fmt.Errorf("delete: %w", err)
-	}
-
-	var dataPath string
-	for _, log := range logs {
-		if log.ID == id {
-			dataPath = log.DataPath
-			break
-		}
 	}
 
 	if err := store.DeleteSessionLog(l.db, id); err != nil {
 		return fmt.Errorf("delete: %w", err)
 	}
 
-	if dataPath != "" {
-		_ = os.Remove(dataPath)
+	if log.DataPath != "" {
+		_ = os.Remove(log.DataPath)
 	}
 
 	return nil

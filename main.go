@@ -3,6 +3,7 @@ package main
 import (
 	"log/slog"
 	"os"
+	"path/filepath"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 
@@ -67,5 +68,5 @@ func defaultDataDir() string {
 	if err != nil {
 		return ".mssh"
 	}
-	return home + "/.mssh"
+	return filepath.Join(home, ".mssh")
 }

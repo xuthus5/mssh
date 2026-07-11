@@ -30,7 +30,7 @@ func ListFolders(db *sql.DB) ([]model.SessionFolder, error) {
 	if err != nil {
 		return nil, fmt.Errorf("list folders: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var folders []model.SessionFolder
 	for rows.Next() {
 		var f model.SessionFolder
@@ -110,7 +110,7 @@ func ListSessions(db *sql.DB, folderID *int64) ([]model.Session, error) {
 	if err != nil {
 		return nil, fmt.Errorf("list sessions: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var sessions []model.Session
 	for rows.Next() {
 		var s model.Session

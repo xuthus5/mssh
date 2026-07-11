@@ -14,9 +14,8 @@ import (
 )
 
 type TunnelState struct {
-	ID       int64
-	closed   func() error
-	listener interface{}
+	ID     int64
+	closed func() error
 }
 
 type TunnelService struct {
@@ -119,7 +118,7 @@ func (t *TunnelService) Start(tunnelID int64) error {
 		RemotePort: found.RemotePort,
 	}
 
-	listener, closeFn, err := ssh.StartForward(wrapper, cfg)
+	_, closeFn, err := ssh.StartForward(wrapper, cfg)
 	if err != nil {
 		_ = t.sessions.Disconnect(connID)
 		return fmt.Errorf("tunnel start: %w", err)
@@ -127,9 +126,8 @@ func (t *TunnelService) Start(tunnelID int64) error {
 
 	t.mu.Lock()
 	t.tunnels[tunnelID] = &TunnelState{
-		ID:       tunnelID,
-		listener: listener,
-		closed:   closeFn,
+		ID:     tunnelID,
+		closed: closeFn,
 	}
 	t.mu.Unlock()
 
