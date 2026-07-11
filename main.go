@@ -47,9 +47,10 @@ func main() {
 	})
 
 	wailsApp.Window.NewWithOptions(application.WebviewWindowOptions{
-		Title:  "MSSH",
-		Width:  1280,
-		Height: 800,
+		Title:     "MSSH",
+		Width:     1280,
+		Height:    800,
+		Frameless: true,
 	})
 
 	wailsApp.OnShutdown(func() {
