@@ -95,7 +95,7 @@ export default function SettingsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent ref={draggable.contentRef} style={draggable.style} className="flex h-[min(720px,calc(100dvh-3rem))] max-h-[calc(100dvh-3rem)] flex-col overflow-hidden sm:max-w-3xl">
+      <DialogContent ref={draggable.contentRef} className="flex h-[min(720px,calc(100dvh-3rem))] max-h-[calc(100dvh-3rem)] flex-col overflow-hidden sm:max-w-3xl">
         <DialogHeader data-testid="settings-drag-handle" {...draggable.dragHandleProps} className="-mx-4 -mt-4 cursor-move touch-none select-none rounded-t-xl border-b border-border px-4 py-3 active:cursor-grabbing">
           <DialogTitle>设置</DialogTitle>
         </DialogHeader>
