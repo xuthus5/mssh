@@ -48,6 +48,12 @@ function AuthValue({ value }: { value: string }) {
   return <span>{AUTH_LABELS[value] ?? value}</span>
 }
 
+function FolderValue({ folderId, folders }: { folderId: string; folders: Folder[] }) {
+  const folder = folders.find((item) => item.id === folderId)
+  if (!folder) return <span>无分组</span>
+  return <span>{folder.name}{folder.isDefault ? '（默认）' : ''}</span>
+}
+
 export default function SessionDialog({ open, onOpenChange, session, folders, onSave }: Props) {
   const [name, setName] = useState(session?.name ?? '')
   const [host, setHost] = useState(session?.host ?? '')
@@ -182,7 +188,9 @@ export default function SessionDialog({ open, onOpenChange, session, folders, on
               <span className="text-xs font-medium text-muted-foreground">分组</span>
               <Select value={folderId} onValueChange={(v) => setFolderId(v ?? '')}>
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder="无分组" />
+                  <SelectValue placeholder="无分组">
+                    <FolderValue folderId={folderId} folders={folders} />
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {folders.map((f) => (
