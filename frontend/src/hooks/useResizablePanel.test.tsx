@@ -24,4 +24,17 @@ describe('useResizablePanel', () => {
     const { result } = renderHook(() => useResizablePanel())
     expect(result.current.width).toBe(480)
   })
+
+  it('collapses, persists, and restores the previous width', () => {
+    const { result } = renderHook(() => useResizablePanel())
+    act(() => result.current.resizeHandleProps.onDoubleClick())
+    act(() => result.current.toggleCollapsed())
+    expect(result.current.collapsed).toBe(true)
+    expect(result.current.displayedWidth).toBe(0)
+    expect(localStorage.getItem('mssh:sidebar-collapsed')).toBe('true')
+
+    act(() => result.current.toggleCollapsed())
+    expect(result.current.collapsed).toBe(false)
+    expect(result.current.displayedWidth).toBe(280)
+  })
 })
