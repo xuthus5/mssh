@@ -28,10 +28,8 @@ import {
 } from '@/components/ui/alert-dialog'
 import { useResizablePanel } from '@/hooks/useResizablePanel'
 
-type SidebarTab = 'sessions' | 'macros'
-
 export default function Sidebar() {
-  const [activeTab, setActiveTab] = useState<SidebarTab>('sessions')
+  const activeTab = useAppStore((state) => state.sidebarTab)
   const [sessionDialogOpen, setSessionDialogOpen] = useState(false)
   const [folderDialogOpen, setFolderDialogOpen] = useState(false)
   const [folderName, setFolderName] = useState('')
@@ -200,31 +198,6 @@ export default function Sidebar() {
     <div style={{ width: displayedWidth }} className="relative shrink-0 transition-[width] duration-200 ease-out">
       <aside style={{ width }} aria-hidden={collapsed} inert={collapsed ? true : undefined} className={`relative flex h-full flex-col border-r border-border bg-card transition-transform duration-200 ease-out ${collapsed ? '-translate-x-full pointer-events-none' : 'translate-x-0'}`}>
       <div {...resizeHandleProps} className="absolute inset-y-0 -right-1 z-20 w-2 cursor-col-resize touch-none outline-none after:absolute after:inset-y-0 after:left-1/2 after:w-px after:-translate-x-1/2 after:bg-transparent hover:after:bg-primary/60 focus-visible:after:bg-primary active:after:bg-primary" />
-      <div className="flex border-b border-border">
-        <button
-          type="button"
-          className={`flex-1 px-4 py-2.5 text-sm font-medium transition-colors ${
-            activeTab === 'sessions'
-              ? 'bg-background text-foreground border-b-2 border-primary'
-              : 'text-muted-foreground hover:text-foreground'
-          }`}
-          onClick={() => setActiveTab('sessions')}
-        >
-          会话
-        </button>
-        <button
-          type="button"
-          className={`flex-1 px-4 py-2.5 text-sm font-medium transition-colors ${
-            activeTab === 'macros'
-              ? 'bg-background text-foreground border-b-2 border-primary'
-              : 'text-muted-foreground hover:text-foreground'
-          }`}
-          onClick={() => setActiveTab('macros')}
-        >
-          宏
-        </button>
-      </div>
-
       {activeTab === 'sessions' && (
         <>
           <div className="px-2 py-2 flex flex-col gap-1.5 border-b border-border/50">
