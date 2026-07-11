@@ -9,8 +9,8 @@ import (
 
 	"github.com/google/uuid"
 
-	ssh "mssh/internal/ssh"
-	"mssh/pkg/event"
+	ssh "github.com/xuthus5/mssh/internal/ssh"
+	"github.com/xuthus5/mssh/pkg/event"
 )
 
 type TerminalService struct {

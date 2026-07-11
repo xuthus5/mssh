@@ -10,27 +10,27 @@ import { Call as $Call, CancellablePromise as $CancellablePromise, Create as $Cr
 import * as model$0 from "../model/models.js";
 
 export function Delete(id: number): $CancellablePromise<void> {
-    return $Call.ByName("mssh/internal/service.KeyService.Delete", id);
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.KeyService.Delete", id);
 }
 
 export function ExportPublicKey(id: number): $CancellablePromise<string> {
-    return $Call.ByName("mssh/internal/service.KeyService.ExportPublicKey", id);
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.KeyService.ExportPublicKey", id);
 }
 
 export function Generate(name: string, keyType: model$0.KeyType, bits: number): $CancellablePromise<model$0.SSHKey | null> {
-    return $Call.ByName("mssh/internal/service.KeyService.Generate", name, keyType, bits).then(($result: any) => {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.KeyService.Generate", name, keyType, bits).then(($result: any) => {
         return $$createType1($result);
     });
 }
 
 export function Import(name: string, privateKeyPEM: string): $CancellablePromise<model$0.SSHKey | null> {
-    return $Call.ByName("mssh/internal/service.KeyService.Import", name, privateKeyPEM).then(($result: any) => {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.KeyService.Import", name, privateKeyPEM).then(($result: any) => {
         return $$createType1($result);
     });
 }
 
 export function List(): $CancellablePromise<model$0.SSHKey[]> {
-    return $Call.ByName("mssh/internal/service.KeyService.List").then(($result: any) => {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.KeyService.List").then(($result: any) => {
         return $$createType2($result);
     });
 }

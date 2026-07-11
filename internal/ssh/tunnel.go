@@ -6,7 +6,7 @@ import (
 	"net"
 	"sync"
 
-	"mssh/internal/model"
+	"github.com/xuthus5/mssh/internal/model"
 )
 
 type ForwardConfig struct {

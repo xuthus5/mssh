@@ -4,7 +4,7 @@ import { SessionService, TerminalService, TunnelService } from '@/lib/wails'
 import { useConnectDialog } from '@/store/connectDialog'
 import { toast } from '@/components/ui/toast'
 import { logger } from '@/lib/logger'
-import type { Session as BindingSession, Tunnel as BindingTunnel } from '../../bindings/mssh/internal/model/models'
+import type { Session as BindingSession, Tunnel as BindingTunnel } from '../../bindings/github.com/xuthus5/mssh/internal/model/models'
 
 export interface Folder {
   id: string

@@ -8,7 +8,7 @@ import (
 	"os"
 	"time"
 
-	"mssh/internal/model"
+	"github.com/xuthus5/mssh/internal/model"
 )
 
 var ErrInvalidMagic = errors.New("invalid magic number")

@@ -6,17 +6,17 @@
 import { Call as $Call, CancellablePromise as $CancellablePromise, Create as $Create } from "@wailsio/runtime";
 
 export function Export(path: string): $CancellablePromise<void> {
-    return $Call.ByName("mssh/internal/service.SyncService.Export", path);
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.SyncService.Export", path);
 }
 
 export function Import(path: string): $CancellablePromise<void> {
-    return $Call.ByName("mssh/internal/service.SyncService.Import", path);
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.SyncService.Import", path);
 }
 
 export function SyncFromCloud(): $CancellablePromise<void> {
-    return $Call.ByName("mssh/internal/service.SyncService.SyncFromCloud");
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.SyncService.SyncFromCloud");
 }
 
 export function SyncToCloud(): $CancellablePromise<void> {
-    return $Call.ByName("mssh/internal/service.SyncService.SyncToCloud");
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.SyncService.SyncToCloud");
 }

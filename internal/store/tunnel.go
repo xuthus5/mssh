@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"mssh/internal/model"
+	"github.com/xuthus5/mssh/internal/model"
 )
 
 func CreateTunnel(db *sql.DB, t model.Tunnel) (*model.Tunnel, error) {

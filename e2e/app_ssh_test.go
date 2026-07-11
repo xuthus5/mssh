@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"mssh/internal/model"
+	"github.com/xuthus5/mssh/internal/model"
 )
 
 func TestAppRealSSH(t *testing.T) {

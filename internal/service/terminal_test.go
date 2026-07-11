@@ -8,11 +8,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"mssh/internal/model"
-	"mssh/internal/service/testutil"
-	ssh "mssh/internal/ssh"
-	sshtestutil "mssh/internal/ssh/testutil"
-	"mssh/pkg/event"
+	"github.com/xuthus5/mssh/internal/model"
+	"github.com/xuthus5/mssh/internal/service/testutil"
+	ssh "github.com/xuthus5/mssh/internal/ssh"
+	sshtestutil "github.com/xuthus5/mssh/internal/ssh/testutil"
+	"github.com/xuthus5/mssh/pkg/event"
 )
 
 func TestNewTerminalService(t *testing.T) {

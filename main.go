@@ -7,7 +7,7 @@ import (
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 
-	"mssh/internal/app"
+	"github.com/xuthus5/mssh/internal/app"
 )
 
 func main() {

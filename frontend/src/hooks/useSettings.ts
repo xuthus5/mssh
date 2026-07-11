@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect } from 'react'
 import { SettingService, KeyService, SyncService, TerminalService } from '@/lib/wails'
 import { useAppStore } from '@/store/appStore'
 import { logger } from '@/lib/logger'
-import { KeyType } from '../../bindings/mssh/internal/model/models'
+import { KeyType } from '../../bindings/github.com/xuthus5/mssh/internal/model/models'
 import { Dialogs } from '@wailsio/runtime'
 import { toast } from '@/components/ui/toast'
 
