@@ -240,6 +240,12 @@ func TestListDir_Subdirectory(t *testing.T) {
 	assert.Equal(t, "/sub/file.txt", entries[0].Path)
 }
 
+func TestRemotePathHelpersAlwaysUsePOSIXSeparators(t *testing.T) {
+	assert.Equal(t, "/home/user/file.txt", remotePathJoin("/home/user", "file.txt"))
+	assert.Equal(t, "/home/user", remotePathDir("/home/user/file.txt"))
+	assert.NotContains(t, remotePathJoin("/home/user", "folder"), `\`)
+}
+
 func TestUploadFile_Success(t *testing.T) {
 	addr, cleanup := startSFTPServer(t)
 	defer cleanup()
