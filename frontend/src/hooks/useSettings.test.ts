@@ -40,6 +40,7 @@ describe('useSettings', () => {
     expect(result.current.general.defaultKeepAlive).toBe(60)
     expect(result.current.general.defaultTermType).toBe('xterm-256color')
     expect(result.current.general.uiFontFamily).toBe('Geist Variable')
+    expect(result.current.general.uiFontFallbackFamily).toBe('sans-serif')
     expect(result.current.general.uiFontSize).toBe(14)
     expect(result.current.systemFonts).toEqual(['Arial', 'Segoe UI'])
   })
@@ -47,29 +48,33 @@ describe('useSettings', () => {
   it('saves general settings and updates state', async () => {
     const { result } = renderHook(() => useSettings())
     await act(async () => {
-      await result.current.saveGeneral({ maxPoolSize: 32, defaultKeepAlive: 120, defaultTermType: 'xterm', uiFontFamily: 'Segoe UI', uiFontSize: 16 })
+      await result.current.saveGeneral({ maxPoolSize: 32, defaultKeepAlive: 120, defaultTermType: 'xterm', uiFontFamily: 'Segoe UI', uiFontFallbackFamily: 'Microsoft YaHei', uiFontSize: 16 })
     })
     expect(result.current.general.maxPoolSize).toBe(32)
     expect(result.current.general.defaultKeepAlive).toBe(120)
     expect(result.current.general.defaultTermType).toBe('xterm')
     expect(result.current.general.uiFontFamily).toBe('Segoe UI')
+    expect(result.current.general.uiFontFallbackFamily).toBe('Microsoft YaHei')
     expect(result.current.general.uiFontSize).toBe(16)
     expect(writtenSettings).toContainEqual(expect.objectContaining({ key: 'appearance.ui_font_family', value: '"Segoe UI"' }))
+    expect(writtenSettings).toContainEqual(expect.objectContaining({ key: 'appearance.ui_font_fallback_family', value: '"Microsoft YaHei"' }))
     expect(writtenSettings).toContainEqual(expect.objectContaining({ key: 'appearance.ui_font_size', value: '16' }))
-    expect(document.documentElement.style.getPropertyValue('--app-font-family')).toBe('"Segoe UI", sans-serif')
+    expect(document.documentElement.style.getPropertyValue('--app-font-family')).toBe('"Segoe UI", "Microsoft YaHei", sans-serif')
     expect(writtenSettings).not.toContainEqual(expect.objectContaining({ updated_at: expect.anything() }))
   })
 
   it('loads and applies persisted interface font settings', async () => {
     _settings['appearance.ui_font_family'] = '"Arial"'
+    _settings['appearance.ui_font_fallback_family'] = '"Segoe UI"'
     _settings['appearance.ui_font_size'] = '18'
 
     const { result } = renderHook(() => useSettings())
     await act(async () => {})
 
     expect(result.current.general.uiFontFamily).toBe('Arial')
+    expect(result.current.general.uiFontFallbackFamily).toBe('Segoe UI')
     expect(result.current.general.uiFontSize).toBe(18)
-    expect(document.documentElement.style.getPropertyValue('--app-font-family')).toBe('"Arial", sans-serif')
+    expect(document.documentElement.style.getPropertyValue('--app-font-family')).toBe('"Arial", "Segoe UI", sans-serif')
     expect(document.documentElement.style.getPropertyValue('--app-font-size')).toBe('18px')
   })
 

@@ -35,7 +35,7 @@ interface Props {
   keys: KeyInfo[]
   sync: SyncConfig
   onSaveGeneral: (s: GeneralSettings) => Promise<void>
-  onPreviewUIFont: (fontFamily: string, fontSize: number) => void
+  onPreviewUIFont: (fontFamily: string, fallbackFamily: string, fontSize: number) => void
   onRestoreUIFont: () => void
   onSaveTheme: (t: TerminalTheme) => void
   onGenerateKey: (name: string, type: KeyInfo['type'], bits: number) => void
@@ -83,6 +83,7 @@ export default function SettingsDialog({
     general.defaultTermType,
   )
   const [uiFontFamily, setUIFontFamily] = useState(general.uiFontFamily)
+  const [uiFontFallbackFamily, setUIFontFallbackFamily] = useState(general.uiFontFallbackFamily)
   const [uiFontSize, setUIFontSize] = useState(general.uiFontSize.toString())
   const [fontDirty, setFontDirty] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -93,13 +94,21 @@ export default function SettingsDialog({
     setDefaultKeepAlive(general.defaultKeepAlive.toString())
     setDefaultTermType(general.defaultTermType)
     setUIFontFamily(general.uiFontFamily)
+    setUIFontFallbackFamily(general.uiFontFallbackFamily)
     setUIFontSize(general.uiFontSize.toString())
     setFontDirty(false)
   }, [general])
 
-  const previewFont = (fontFamily: string, fontSize: string) => {
+  const previewFont = (fontFamily: string, fallbackFamily: string, fontSize: string) => {
     setFontDirty(true)
-    onPreviewUIFont(fontFamily, parseInt(fontSize, 10) || 14)
+    onPreviewUIFont(fontFamily, fallbackFamily, parseInt(fontSize, 10) || 14)
+  }
+
+  const selectPrimaryFont = (fontFamily: string) => {
+    const fallbackFamily = fontFamily === uiFontFallbackFamily ? 'sans-serif' : uiFontFallbackFamily
+    setUIFontFamily(fontFamily)
+    setUIFontFallbackFamily(fallbackFamily)
+    previewFont(fontFamily, fallbackFamily, uiFontSize)
   }
 
   const handleOpenChange = (nextOpen: boolean) => {
@@ -111,7 +120,7 @@ export default function SettingsDialog({
     e.preventDefault()
     setSaving(true)
     try {
-      await onSaveGeneral({ maxPoolSize: parseInt(maxPoolSize, 10) || 10, defaultKeepAlive: parseInt(defaultKeepAlive, 10) || 60, defaultTermType, uiFontFamily, uiFontSize: parseInt(uiFontSize, 10) || 14 })
+      await onSaveGeneral({ maxPoolSize: parseInt(maxPoolSize, 10) || 10, defaultKeepAlive: parseInt(defaultKeepAlive, 10) || 60, defaultTermType, uiFontFamily, uiFontFallbackFamily, uiFontSize: parseInt(uiFontSize, 10) || 14 })
       setFontDirty(false)
     } finally {
       setSaving(false)
@@ -168,19 +177,23 @@ export default function SettingsDialog({
                   <h3 className="text-sm font-medium text-foreground">界面字体</h3>
                   <p className="mt-1 text-xs text-muted-foreground">仅调整应用界面，终端字体继续使用独立主题配置。</p>
                 </div>
-                <div className="grid grid-cols-[minmax(0,1fr)_7rem] gap-3">
+                <div className="grid grid-cols-2 gap-3">
                   <div className="flex min-w-0 flex-col gap-1.5">
                     <label className="text-xs font-medium text-muted-foreground">字体类型</label>
-                    <SearchableSelect ariaLabel="界面字体" value={uiFontFamily} options={systemFonts.includes(uiFontFamily) ? systemFonts : [uiFontFamily, ...systemFonts]} onValueChange={(value) => { setUIFontFamily(value); previewFont(value, uiFontSize) }} placeholder="搜索系统字体" />
+                    <SearchableSelect ariaLabel="界面字体" value={uiFontFamily} options={systemFonts.includes(uiFontFamily) ? systemFonts : [uiFontFamily, ...systemFonts]} onValueChange={selectPrimaryFont} placeholder="搜索系统字体" />
+                  </div>
+                  <div className="flex min-w-0 flex-col gap-1.5">
+                    <label className="text-xs font-medium text-muted-foreground">Fallback 字体</label>
+                    <SearchableSelect ariaLabel="Fallback 字体" value={uiFontFallbackFamily} options={systemFonts.includes(uiFontFallbackFamily) ? systemFonts : [uiFontFallbackFamily, ...systemFonts]} disabledValues={[uiFontFamily]} onValueChange={(value) => { setUIFontFallbackFamily(value); previewFont(uiFontFamily, value, uiFontSize) }} placeholder="搜索备用字体" />
                   </div>
                   <div className="flex flex-col gap-1.5">
                     <label htmlFor="ui-font-size" className="text-xs font-medium text-muted-foreground">界面字号</label>
-                    <Input id="ui-font-size" type="number" min={12} max={24} value={uiFontSize} onChange={(event) => { setUIFontSize(event.target.value); previewFont(uiFontFamily, event.target.value) }} />
+                    <Input id="ui-font-size" type="number" min={12} max={24} value={uiFontSize} onChange={(event) => { setUIFontSize(event.target.value); previewFont(uiFontFamily, uiFontFallbackFamily, event.target.value) }} />
                   </div>
                 </div>
-                <div className="mt-3 rounded-lg border border-border bg-background px-3 py-2" style={{ fontFamily: `${JSON.stringify(uiFontFamily)}, sans-serif`, fontSize: `${parseInt(uiFontSize, 10) || 14}px` }}>
-                  <p className="text-foreground">MSSH 安全连接 · Secure Shell 0123456789</p>
-                  <p className="mt-1 text-xs text-muted-foreground">中文、English 与数字预览</p>
+                <div className="mt-3 rounded-lg border border-border bg-background px-3 py-2" style={{ fontFamily: `${JSON.stringify(uiFontFamily)}, ${JSON.stringify(uiFontFallbackFamily)}, sans-serif`, fontSize: `${parseInt(uiFontSize, 10) || 14}px` }}>
+                  <p className="text-foreground">MSSH 安全连接 · Secure Shell 0123456789 → ✓ ★</p>
+                  <p className="mt-1 text-xs text-muted-foreground">中文、English、数字与符号预览</p>
                 </div>
               </section>
               <div className="flex justify-end">
