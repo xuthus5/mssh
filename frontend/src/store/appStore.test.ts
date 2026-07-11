@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { useAppStore } from '@/store/appStore'
 import { __registerHandler, __clearHandlers } from '@/test/__mocks__/wails-runtime'
 
@@ -39,6 +39,19 @@ describe('appStore', () => {
     expect(useAppStore.getState().terminalPool.has('term-1')).toBe(true)
 
     unregisterTerminal('term-1')
+    expect(useAppStore.getState().terminalPool.has('term-1')).toBe(false)
+  })
+
+  it('removes a remotely closed tab without disposing the React-owned terminal', () => {
+    const dispose = vi.fn()
+    const terminal = { dispose } as unknown as import('@xterm/xterm').Terminal
+    const store = useAppStore.getState()
+    store.openTab({ id: 'tab-1', title: 'Test', type: 'terminal', terminalId: 'term-1' })
+    store.registerTerminal('term-1', terminal)
+
+    store.removeTabLocal('tab-1')
+
+    expect(dispose).not.toHaveBeenCalled()
     expect(useAppStore.getState().terminalPool.has('term-1')).toBe(false)
   })
 
