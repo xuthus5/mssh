@@ -7,13 +7,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+import { LabeledSelect } from '@/components/ui/labeled-select'
 import { Button } from '@/components/ui/button'
 import { KeyService } from '@/lib/wails'
 import type { Session, Folder } from '@/hooks/useSession'
@@ -28,12 +22,12 @@ interface Props {
 
 interface KeyItem { id: number; name: string; type: string }
 
-const AUTH_LABELS: Record<string, string> = {
-  password: '密码',
-  'keyboard-interactive': '交互式认证',
-  key: '密钥',
-  agent: 'SSH Agent',
-}
+const AUTH_OPTIONS = [
+  { value: 'password', label: '密码' },
+  { value: 'keyboard-interactive', label: '交互式认证' },
+  { value: 'key', label: '密钥' },
+  { value: 'agent', label: 'SSH Agent' },
+]
 
 const TERM_TYPES = [
   'xterm-256color',
@@ -43,16 +37,6 @@ const TERM_TYPES = [
   'linux',
   'ansi',
 ]
-
-function AuthValue({ value }: { value: string }) {
-  return <span>{AUTH_LABELS[value] ?? value}</span>
-}
-
-function FolderValue({ folderId, folders }: { folderId: string; folders: Folder[] }) {
-  const folder = folders.find((item) => item.id === folderId)
-  if (!folder) return <span>无分组</span>
-  return <span>{folder.name}{folder.isDefault ? '（默认）' : ''}</span>
-}
 
 export default function SessionDialog({ open, onOpenChange, session, folders, onSave }: Props) {
   const [name, setName] = useState(session?.name ?? '')
@@ -65,6 +49,11 @@ export default function SessionDialog({ open, onOpenChange, session, folders, on
   const [keepAlive, setKeepAlive] = useState(session?.keepAlive?.toString() ?? '60')
   const [termType, setTermType] = useState(session?.termType ?? 'xterm-256color')
   const defaultFolderID = folders?.find((folder) => folder.isDefault)?.id ?? ''
+  const folderOptions = (folders ?? []).map((folder) => ({
+    value: folder.id,
+    label: `${folder.name}${folder.isDefault ? '（默认）' : ''}`,
+  }))
+  const termOptions = TERM_TYPES.map((termTypeOption) => ({ value: termTypeOption, label: termTypeOption }))
   const [folderId, setFolderId] = useState(session?.folderId ?? defaultFolderID)
 
   useEffect(() => {
@@ -72,6 +61,7 @@ export default function SessionDialog({ open, onOpenChange, session, folders, on
   }, [open, session?.folderId, defaultFolderID])
 
   const [keys, setKeys] = useState<KeyItem[]>([])
+  const keyOptions = keys.map((key) => ({ value: String(key.id), label: `${key.name} (${key.type})` }))
   const [pending, setPending] = useState(false)
   const [submitError, setSubmitError] = useState('')
 
@@ -137,19 +127,7 @@ export default function SessionDialog({ open, onOpenChange, session, folders, on
 
           <label className="flex flex-col gap-1.5">
             <span className="text-xs font-medium text-muted-foreground">认证方式</span>
-            <Select value={authMethod} onValueChange={(v) => setAuthMethod(v ?? 'password')}>
-              <SelectTrigger className="w-full">
-                <SelectValue>
-                  <AuthValue value={authMethod} />
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="password">密码</SelectItem>
-                <SelectItem value="keyboard-interactive">交互式认证</SelectItem>
-                <SelectItem value="key">密钥</SelectItem>
-                <SelectItem value="agent">SSH Agent</SelectItem>
-              </SelectContent>
-            </Select>
+            <LabeledSelect value={authMethod} options={AUTH_OPTIONS} onValueChange={setAuthMethod} />
           </label>
 
           {(authMethod === 'password' || authMethod === 'keyboard-interactive') && (
@@ -167,18 +145,7 @@ export default function SessionDialog({ open, onOpenChange, session, folders, on
                   暂无可用密钥，请先在设置 → 密钥管理中导入
                 </div>
               ) : (
-                <Select value={keyId} onValueChange={(v) => setKeyId(v ?? '')}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="选择密钥..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {keys.map((k) => (
-                      <SelectItem key={String(k.id)} value={String(k.id)}>
-                        {k.name} <span className="text-muted-foreground ml-1 text-xs">({k.type})</span>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <LabeledSelect value={keyId} options={keyOptions} onValueChange={setKeyId} placeholder="选择密钥..." />
               )}
             </label>
           )}
@@ -186,18 +153,7 @@ export default function SessionDialog({ open, onOpenChange, session, folders, on
           {folders && folders.length > 0 && (
             <label className="flex flex-col gap-1.5">
               <span className="text-xs font-medium text-muted-foreground">分组</span>
-              <Select value={folderId} onValueChange={(v) => setFolderId(v ?? '')}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="无分组">
-                    <FolderValue folderId={folderId} folders={folders} />
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {folders.map((f) => (
-                    <SelectItem key={f.id} value={f.id}>{f.name}{f.isDefault ? '（默认）' : ''}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <LabeledSelect value={folderId} options={folderOptions} onValueChange={setFolderId} placeholder="无分组" />
             </label>
           )}
 
@@ -208,16 +164,7 @@ export default function SessionDialog({ open, onOpenChange, session, folders, on
             </label>
             <label className="flex flex-col gap-1.5">
               <span className="text-xs font-medium text-muted-foreground">终端类型</span>
-              <Select value={termType} onValueChange={(v) => setTermType(v ?? 'xterm-256color')}>
-                <SelectTrigger className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {TERM_TYPES.map((t) => (
-                    <SelectItem key={t} value={t}>{t}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <LabeledSelect value={termType} options={termOptions} onValueChange={setTermType} />
             </label>
           </div>
 

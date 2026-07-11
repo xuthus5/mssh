@@ -1,13 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+import { LabeledSelect } from '@/components/ui/labeled-select'
 import type { TerminalTheme } from '@/hooks/useSettings'
 
 interface ThemePreset {
@@ -17,6 +11,12 @@ interface ThemePreset {
   cursorColor: string
   ansi: string[]
 }
+
+const CURSOR_STYLE_OPTIONS = [
+  { value: 'block', label: '方块' },
+  { value: 'underline', label: '下划线' },
+  { value: 'bar', label: '竖线' },
+]
 
 const THEME_PRESETS: ThemePreset[] = [
   {
@@ -206,16 +206,7 @@ export function ThemeEditor({ theme, onSave }: Props) {
           <label className="text-xs font-medium text-muted-foreground">
             光标样式
           </label>
-          <Select value={cursorStyle} onValueChange={(value) => setCursorStyle(value ?? '')}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="block">方块</SelectItem>
-              <SelectItem value="underline">下划线</SelectItem>
-              <SelectItem value="bar">竖线</SelectItem>
-            </SelectContent>
-          </Select>
+          <LabeledSelect value={cursorStyle} options={CURSOR_STYLE_OPTIONS} onValueChange={setCursorStyle} />
         </div>
       </div>
       <div className="flex flex-col gap-1.5">
