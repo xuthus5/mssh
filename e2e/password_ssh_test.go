@@ -1,3 +1,5 @@
+//go:build e2e
+
 package e2e_test
 
 import (
@@ -5,10 +7,10 @@ import (
 	"testing"
 	"time"
 
-	"mssh/internal/model"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"mssh/internal/model"
 )
 
 func TestPasswordSSH(t *testing.T) {

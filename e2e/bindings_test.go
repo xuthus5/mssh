@@ -1,3 +1,5 @@
+//go:build e2e
+
 package e2e_test
 
 import (
@@ -20,7 +22,7 @@ func TestBindingGeneration(t *testing.T) {
 	require.NoError(t, err, "bindings directory not found — run: wails3 generate bindings -ts -names -d frontend/bindings/ .")
 
 	expectedServices := map[string]int{
-		"sessionservice.ts":   13, // Connect, ConnectionCount, CreateFolder, CreateSession, DeleteFolder, DeleteSession, Disconnect, GetSession, ListFolders, ListSessions, MoveFolder, MoveSession, UpdateFolder, UpdateSession
+		"sessionservice.ts":  13, // Connect, ConnectionCount, CreateFolder, CreateSession, DeleteFolder, DeleteSession, Disconnect, GetSession, ListFolders, ListSessions, MoveFolder, MoveSession, UpdateFolder, UpdateSession
 		"terminalservice.ts": 5,  // Close, Count, Open, Resize, Write
 		"fileservice.ts":     7,  // CancelTransfer, Delete, Download, ListDir, Mkdir, Rename, Upload
 		"keyservice.ts":      5,  // Delete, ExportPublicKey, Generate, Import, List
