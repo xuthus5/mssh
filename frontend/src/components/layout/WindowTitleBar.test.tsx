@@ -2,14 +2,20 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { minimise, toggleMaximise, close } = vi.hoisted(() => ({
+const { minimise, toggleMaximise, close, getSetting, setSetting } = vi.hoisted(() => ({
   minimise: vi.fn(async () => {}),
   toggleMaximise: vi.fn(async () => {}),
   close: vi.fn(async () => {}),
+  getSetting: vi.fn(async () => ''),
+  setSetting: vi.fn(async () => {}),
 }))
 
 vi.mock('@wailsio/runtime', () => ({
   Window: { Minimise: minimise, ToggleMaximise: toggleMaximise, Close: close },
+}))
+
+vi.mock('@/lib/wails', () => ({
+  SettingService: { Get: getSetting, Set: setSetting },
 }))
 
 import { WindowTitleBar } from '@/components/layout/WindowTitleBar'
@@ -17,6 +23,8 @@ import { WindowTitleBar } from '@/components/layout/WindowTitleBar'
 describe('WindowTitleBar', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    getSetting.mockResolvedValue('')
+    setSetting.mockResolvedValue(undefined)
     localStorage.clear()
     document.documentElement.classList.remove('light')
   })
@@ -43,6 +51,7 @@ describe('WindowTitleBar', () => {
     await userEvent.click(screen.getByRole('button', { name: '切换到浅色模式' }))
     expect(document.documentElement).toHaveClass('light')
     expect(localStorage.getItem('mssh:color-mode')).toBe('light')
+    expect(setSetting).toHaveBeenCalledWith(expect.objectContaining({ key: 'appearance.color_mode', value: '"light"' }))
     expect(screen.getByRole('button', { name: '切换到深色模式' })).toBeInTheDocument()
   })
 

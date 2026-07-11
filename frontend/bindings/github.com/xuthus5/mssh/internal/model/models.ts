@@ -307,6 +307,47 @@ export class SessionLog {
     }
 }
 
+export class Setting {
+    "key": string;
+    "namespace": string;
+    "value": string;
+    "value_type": string;
+    "version": number;
+    "updated_at": string;
+
+    /** Creates a new Setting instance. */
+    constructor($$source: Partial<Setting> = {}) {
+        if (!("key" in $$source)) {
+            this["key"] = "";
+        }
+        if (!("namespace" in $$source)) {
+            this["namespace"] = "";
+        }
+        if (!("value" in $$source)) {
+            this["value"] = "";
+        }
+        if (!("value_type" in $$source)) {
+            this["value_type"] = "";
+        }
+        if (!("version" in $$source)) {
+            this["version"] = 0;
+        }
+        if (!("updated_at" in $$source)) {
+            this["updated_at"] = "0001-01-01T00:00:00.000Z";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new Setting instance from a string or object.
+     */
+    static createFrom($$source: any = {}): Setting {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new Setting($$parsedSource as Partial<Setting>);
+    }
+}
+
 export class Theme {
     "id": number;
     "name": string;
