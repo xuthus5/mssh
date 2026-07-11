@@ -21,6 +21,7 @@ A cross-platform SSH client built with Go + Wails v3 + React + xterm.js.
 - Go 1.26+
 - Node.js 20+
 - Wails v3 CLI
+- Linux: GTK4 and WebKitGTK development packages required by Wails
 
 ### Setup
 ```bash
@@ -30,8 +31,12 @@ cd frontend && npm install
 
 ### Run
 ```bash
-wails3 dev
+task dev
 ```
+
+Wails requires CGO on Linux. If running the CLI directly, use
+`CGO_ENABLED=1 wails3 dev`. An `undefined: pointer` error from Wails indicates
+that CGO was disabled in the current shell or persisted Go environment.
 
 ### Test
 ```bash
@@ -46,7 +51,7 @@ cd frontend && npx vitest run && npx tsc -b --noEmit
 
 ### Build
 ```bash
-wails3 build
+CGO_ENABLED=1 wails3 build
 ```
 
 ### Lint
