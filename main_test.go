@@ -13,5 +13,6 @@ func TestMainWindowOptionsUseStableLinuxRendering(t *testing.T) {
 	assert.Equal(t, 1280, options.Width)
 	assert.Equal(t, 800, options.Height)
 	assert.True(t, options.Frameless)
+	assert.True(t, options.EnableFileDrop)
 	assert.Equal(t, application.WebviewGpuPolicyNever, options.Linux.WebviewGpuPolicy)
 }

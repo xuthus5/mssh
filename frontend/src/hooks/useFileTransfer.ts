@@ -72,6 +72,10 @@ export function useFileTransfer(sessionId: number) {
     }
   }, [sessionId])
 
+  const uploadMany = useCallback(async (localPaths: string[], remotePath: string) => {
+    await Promise.all(localPaths.map((localPath) => upload(localPath, remotePath)))
+  }, [upload])
+
   const download = useCallback(async (remotePath: string, localPath: string) => {
     try {
       const taskId = await FileService.Download(sessionId, remotePath, localPath)
@@ -126,6 +130,6 @@ export function useFileTransfer(sessionId: number) {
   return {
     files, currentPath, transfers, loading, error,
     listFiles, navigateTo, navigateUp,
-    upload, download, deleteFile, renameFile, makeDir, cancelTransfer,
+    upload, uploadMany, download, deleteFile, renameFile, makeDir, cancelTransfer,
   }
 }
