@@ -13,12 +13,17 @@ describe('useDraggableDialog', () => {
       result.current.dragHandleProps.onPointerDown({ button: 0, pointerId: 1, clientX: 300, clientY: 150, preventDefault() {} } as never)
       window.dispatchEvent(new PointerEvent('pointermove', { pointerId: 1, clientX: 360, clientY: 190 }))
     })
-    expect(result.current.style.transform).toContain('60px')
-    expect(result.current.style.transform).toContain('40px')
+    expect(result.current.style?.transform).toContain('60px')
+    expect(result.current.style?.transform).toContain('40px')
 
     rerender({ open: false })
-    expect(result.current.style.transform).toContain('0px')
+    expect(result.current.style).toBeUndefined()
     rerender({ open: true })
-    expect(result.current.style.transform).toContain('0px')
+    expect(result.current.style).toBeUndefined()
+  })
+
+  it('keeps the dialog native centered style untouched before dragging', () => {
+    const { result } = renderHook(() => useDraggableDialog(true))
+    expect(result.current.style).toBeUndefined()
   })
 })

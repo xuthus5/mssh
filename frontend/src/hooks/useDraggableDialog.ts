@@ -51,6 +51,8 @@ export function useDraggableDialog(open: boolean) {
   return {
     contentRef,
     dragHandleProps: { onPointerDown: startDrag },
-    style: { transform: `translate(calc(-50% + ${offset.x}px), calc(-50% + ${offset.y}px))` },
+    style: offset.x === 0 && offset.y === 0
+      ? undefined
+      : { transform: `translate(-50%, -50%) translate(${offset.x}px, ${offset.y}px)` },
   }
 }
