@@ -134,7 +134,8 @@ func TestSyncService_SyncToCloud(t *testing.T) {
 	svc := NewSyncService(db, testutil.NewTestLogger())
 
 	err := svc.SyncToCloud()
-	assert.NoError(t, err)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "not implemented")
 }
 
 func TestSyncService_SyncFromCloud(t *testing.T) {
@@ -142,7 +143,8 @@ func TestSyncService_SyncFromCloud(t *testing.T) {
 	svc := NewSyncService(db, testutil.NewTestLogger())
 
 	err := svc.SyncFromCloud()
-	assert.NoError(t, err)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "not implemented")
 }
 
 func TestSyncService_ExportClosedDB(t *testing.T) {

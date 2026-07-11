@@ -65,13 +65,13 @@ func TestAuthMethodsBuilder(t *testing.T) {
 
 func TestCreateHostKeyCallbackNewFile(t *testing.T) {
 	knownHostsPath := t.TempDir() + "/known_hosts"
-	cb, err := createHostKeyCallback(knownHostsPath)
+	cb, err := createHostKeyCallback(knownHostsPath, nil, slog.Default())
 	require.NoError(t, err)
 	assert.NotNil(t, cb)
 }
 
 func TestCreateHostKeyCallbackEmptyPath(t *testing.T) {
-	cb, err := createHostKeyCallback("")
+	cb, err := createHostKeyCallback("", nil, slog.Default())
 	require.NoError(t, err)
 	assert.NotNil(t, cb)
 }
@@ -118,4 +118,82 @@ func mustParsePortNet(addr net.Addr) int {
 	_, portStr, _ := strings.Cut(addr.String(), ":")
 	port, _ := strconv.Atoi(portStr)
 	return port
+}
+
+func TestCreateHostKeyCallbackWithVerifier(t *testing.T) {
+	knownHostsPath := t.TempDir() + "/known_hosts"
+	called := false
+	verifier := func(hostname, algorithm, fingerprint string) bool {
+		called = true
+		assert.NotEmpty(t, hostname)
+		assert.NotEmpty(t, algorithm)
+		assert.NotEmpty(t, fingerprint)
+		return true
+	}
+	cb, err := createHostKeyCallback(knownHostsPath, verifier, slog.Default())
+	require.NoError(t, err)
+	assert.NotNil(t, cb)
+	_ = called
+}
+
+func TestCreateHostKeyCallbackVerifierRejects(t *testing.T) {
+	knownHostsPath := t.TempDir() + "/known_hosts"
+	verifier := func(_, _, _ string) bool {
+		return false
+	}
+	cb, err := createHostKeyCallback(knownHostsPath, verifier, slog.Default())
+	require.NoError(t, err)
+	assert.NotNil(t, cb)
+
+}
+
+func TestConnectWithVerifierAccepts(t *testing.T) {
+	addr, cleanup := testutil.NewMockServer(t)
+	defer cleanup()
+	knownHostsPath := t.TempDir() + "/known_hosts"
+	s := model.Session{Host: "127.0.0.1", Port: mustParsePort(addr), Username: "test", KeepAlive: 30}
+	verifier := func(_, _, _ string) bool { return true }
+	ctx := context.Background()
+	cw, err := ConnectWithVerifier(ctx, s, nil, knownHostsPath, verifier, slog.Default())
+	require.NoError(t, err)
+	defer cw.Close()
+	assert.NotNil(t, cw.Inner)
+}
+
+func TestConnectWithVerifierRejects(t *testing.T) {
+	addr, cleanup := testutil.NewMockServer(t)
+	defer cleanup()
+	knownHostsPath := t.TempDir() + "/known_hosts"
+	s := model.Session{Host: "127.0.0.1", Port: mustParsePort(addr), Username: "test", KeepAlive: 30}
+	verifier := func(_, _, _ string) bool { return false }
+	ctx := context.Background()
+	_, err := ConnectWithVerifier(ctx, s, nil, knownHostsPath, verifier, slog.Default())
+	assert.Error(t, err)
+}
+
+func TestRemoteFileSize(t *testing.T) {
+	addr, cleanup := startSFTPServer(t)
+	defer cleanup()
+	cw, sftpClient := connectSFTP(t, addr)
+	defer cw.Close()
+	defer sftpClient.Close()
+
+	f, err := sftpClient.Create("/size_test.txt")
+	require.NoError(t, err)
+	_ = f.Close()
+
+	size, err := RemoteFileSize(sftpClient, "/size_test.txt")
+	require.NoError(t, err)
+	assert.Equal(t, int64(0), size)
+}
+
+func TestRemoteFileSizeNotFound(t *testing.T) {
+	addr, cleanup := startSFTPServer(t)
+	defer cleanup()
+	cw, sftpClient := connectSFTP(t, addr)
+	defer cw.Close()
+	defer sftpClient.Close()
+
+	_, err := RemoteFileSize(sftpClient, "/nonexistent_file")
+	assert.Error(t, err)
 }

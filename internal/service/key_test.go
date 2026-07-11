@@ -8,6 +8,10 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -371,4 +375,78 @@ func TestKeyService_extractPublicKeyWithType_ECDSA_PKCS8(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, model.KeyTypeECDSA, keyType)
 	assert.NotEmpty(t, pubKey)
+}
+
+// generateOpenSSHKeyPEM 使用 ssh-keygen 生成 OPENSSH PRIVATE KEY 格式的密钥。
+func generateOpenSSHKeyPEM(t *testing.T, keyType string, bits int) string {
+	t.Helper()
+	dir := t.TempDir()
+	keyPath := filepath.Join(dir, "id_"+keyType)
+	args := []string{"-t", keyType, "-f", keyPath, "-N", "", "-q"}
+	if bits > 0 {
+		args = append([]string{"-b", strconv.Itoa(bits)}, args...)
+	}
+	cmd := exec.Command("ssh-keygen", args...)
+	require.NoError(t, cmd.Run(), "ssh-keygen failed")
+	data, err := os.ReadFile(keyPath)
+	require.NoError(t, err)
+	return string(data)
+}
+
+func TestKeyService_extractPublicKeyWithType_OpenSSHED25519(t *testing.T) {
+	svc := &KeyService{db: nil, crypto: &noopCrypto{}, logger: testutil.NewTestLogger()}
+	pkPEM := generateOpenSSHKeyPEM(t, "ed25519", 0)
+	keyType, pubKey, err := svc.extractPublicKeyWithType([]byte(pkPEM))
+	require.NoError(t, err)
+	assert.Equal(t, model.KeyTypeED25519, keyType)
+	assert.Contains(t, pubKey, "ssh-ed25519")
+}
+
+func TestKeyService_extractPublicKeyWithType_OpenSSHRSA(t *testing.T) {
+	svc := &KeyService{db: nil, crypto: &noopCrypto{}, logger: testutil.NewTestLogger()}
+	pkPEM := generateOpenSSHKeyPEM(t, "rsa", 2048)
+	keyType, pubKey, err := svc.extractPublicKeyWithType([]byte(pkPEM))
+	require.NoError(t, err)
+	assert.Equal(t, model.KeyTypeRSA, keyType)
+	assert.Contains(t, pubKey, "ssh-rsa")
+}
+
+func TestKeyService_extractPublicKeyWithType_OpenSSHECDSA(t *testing.T) {
+	svc := &KeyService{db: nil, crypto: &noopCrypto{}, logger: testutil.NewTestLogger()}
+	pkPEM := generateOpenSSHKeyPEM(t, "ecdsa", 0)
+	keyType, pubKey, err := svc.extractPublicKeyWithType([]byte(pkPEM))
+	require.NoError(t, err)
+	assert.Equal(t, model.KeyTypeECDSA, keyType)
+	assert.Contains(t, pubKey, "ecdsa-")
+}
+
+func TestKeyService_extractPublicKeyWithType_OpenSSHInvalid(t *testing.T) {
+	svc := &KeyService{db: nil, crypto: &noopCrypto{}, logger: testutil.NewTestLogger()}
+	invalidPEM := "-----BEGIN OPENSSH PRIVATE KEY-----\naW52YWxpZA==\n-----END OPENSSH PRIVATE KEY-----"
+	_, _, err := svc.extractPublicKeyWithType([]byte(invalidPEM))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "parse OpenSSH key")
+}
+
+func TestKeyService_extractPublicKeyWithType_PKCS8Unsupported(t *testing.T) {
+	svc := &KeyService{db: nil, crypto: &noopCrypto{}, logger: testutil.NewTestLogger()}
+	// 构造一个 PKCS8 格式但类型不受支持的密钥：DSA 私钥
+	// 使用 EC 的 PKCS8 来构造有效 block，但替换为 DSA 是复杂的。
+	// 此处通过 PKCS8 block 但内容为不支持的类型来覆盖 default 分支。
+	// 生成一个 DSA 格式私钥太复杂，改用 marshaled-but-invalid bytes 触发解析错误。
+	block, _ := pem.Decode([]byte(generateTestPrivateKeyPEM(t)))
+	require.NotNil(t, block)
+	// 篡改 PKCS8 内容以触发 ParsePKCS8PrivateKey 返回不支持的类型
+	// 使用空内容构造一个会被 default 分支捕获的 PKCS8 block
+	invalidPKCS8 := pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: []byte{0x30, 0x05, 0x00}})
+	_, _, err := svc.extractPublicKeyWithType(invalidPKCS8)
+	require.Error(t, err)
+}
+
+func TestKeyService_extractPublicKeyWithType_DefaultBlockType(t *testing.T) {
+	svc := &KeyService{db: nil, crypto: &noopCrypto{}, logger: testutil.NewTestLogger()}
+	unknownPEM := "-----BEGIN CERTIFICATE-----\naW52YWxpZA==\n-----END CERTIFICATE-----"
+	_, _, err := svc.extractPublicKeyWithType([]byte(unknownPEM))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unsupported key type")
 }

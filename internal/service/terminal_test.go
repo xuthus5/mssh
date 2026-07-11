@@ -237,10 +237,10 @@ func TestTerminalService_Close(t *testing.T) {
 	sessionSvc := NewSessionService(db, bus, 30, "", nil, testutil.NewTestLogger())
 
 	svc := &TerminalService{logger: testutil.NewTestLogger(),
-		eventBus:  bus,
+		eventBus:   bus,
 		sessionSvc: sessionSvc,
-		ptys:      map[string]*ssh.PTYSession{"term-1": pty},
-		lastUsed:  map[string]time.Time{"term-1": time.Now()},
+		ptys:       map[string]*ssh.PTYSession{"term-1": pty},
+		lastUsed:   map[string]time.Time{"term-1": time.Now()},
 	}
 
 	sessionSvc.mu.Lock()
@@ -278,7 +278,7 @@ func TestTerminalService_EvictLRU(t *testing.T) {
 
 	svc := &TerminalService{logger: testutil.NewTestLogger(),
 		eventBus:   newMockEventBus(),
-		sessionSvc:  sessionSvc,
+		sessionSvc: sessionSvc,
 		ptys:       make(map[string]*ssh.PTYSession),
 		lastUsed:   make(map[string]time.Time),
 		maxSize:    3,

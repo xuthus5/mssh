@@ -4,10 +4,12 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
+	"fmt"
 	"net"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/pkg/sftp"
 	"github.com/stretchr/testify/assert"
@@ -290,7 +292,7 @@ func TestFileService_Upload(t *testing.T) {
 	taskID, err := svc.Upload(created.ID, tmpFile, "/tmp/uploaded.dat")
 	require.NoError(t, err)
 	assert.NotEmpty(t, taskID)
-	assert.Contains(t, taskID, "term-")
+	assert.Contains(t, taskID, "file-")
 }
 
 func TestFileService_UploadSessionNotFound(t *testing.T) {
@@ -461,4 +463,68 @@ func TestFileService_ConnectError(t *testing.T) {
 
 	err = svc.Rename(999, "/old", "/new")
 	assert.Error(t, err)
+}
+
+func TestFileService_UploadTaskIDPrefix(t *testing.T) {
+	sftpCtx := startSFTPTestServer(t)
+	defer sftpCtx.cancel()
+	svc, sess := createSFTPFileService(t, sftpCtx)
+
+	tmpFile := filepath.Join(t.TempDir(), "prefix.dat")
+	require.NoError(t, os.WriteFile(tmpFile, []byte("x"), 0o600))
+
+	taskID, err := svc.Upload(sess.ID, tmpFile, "/tmp/prefix.dat")
+	require.NoError(t, err)
+	assert.Contains(t, taskID, "file-")
+}
+
+func TestFileService_DownloadTaskIDPrefix(t *testing.T) {
+	sftpCtx := startSFTPTestServer(t)
+	defer sftpCtx.cancel()
+	svc, sess := createSFTPFileService(t, sftpCtx)
+
+	localPath := filepath.Join(t.TempDir(), "dl.dat")
+	taskID, err := svc.Download(sess.ID, "/tmp/source.dat", localPath)
+	require.NoError(t, err)
+	assert.Contains(t, taskID, "file-")
+}
+
+func TestFileService_ReportProgressWithSpeedAndETA(t *testing.T) {
+	b := newMockEventBus()
+	svc := &FileService{
+		logger:   testutil.NewTestLogger(),
+		eventBus: b,
+		tasks:    make(map[string]context.CancelFunc),
+		startsAt: make(map[string]time.Time),
+	}
+
+	svc.recordStart("task-speed")
+	svc.reportProgress("task-speed", 500, 1000)
+
+	lastEvent := b.LastEvent()
+	require.NotNil(t, lastEvent)
+	assert.Equal(t, event.TransferProgress, lastEvent.Name)
+	payload, ok := lastEvent.Payload.(event.TransferProgressPayload)
+	require.True(t, ok)
+	assert.Equal(t, 50.0, payload.Percent)
+}
+
+func TestFileService_EmitTransferError(t *testing.T) {
+	b := newMockEventBus()
+	svc := &FileService{
+		logger:   testutil.NewTestLogger(),
+		eventBus: b,
+		tasks:    make(map[string]context.CancelFunc),
+		startsAt: make(map[string]time.Time),
+	}
+
+	svc.emitTransferError("task-err", fmt.Errorf("disk full"))
+
+	lastEvent := b.LastEvent()
+	require.NotNil(t, lastEvent)
+	assert.Equal(t, event.TransferError, lastEvent.Name)
+	payload, ok := lastEvent.Payload.(event.TransferErrorPayload)
+	require.True(t, ok)
+	assert.Equal(t, "task-err", payload.TaskID)
+	assert.Contains(t, payload.Error, "disk full")
 }
