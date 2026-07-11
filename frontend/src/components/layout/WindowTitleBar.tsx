@@ -1,4 +1,4 @@
-import { Minus, Moon, Settings, Square, Sun, X } from 'lucide-react'
+import { Minus, Moon, Settings, Square, SquareTerminal, Sun, Workflow, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Window } from '@wailsio/runtime'
 import { logger } from '@/lib/logger'
@@ -40,7 +40,10 @@ export function WindowTitleBar() {
     })
   }
 
-  const navigationButton = (tab: SidebarTab, label: string) => <button type="button" role="tab" aria-selected={sidebarTab === tab} className={`px-4 text-sm font-medium transition-colors [--wails-draggable:no-drag] ${sidebarTab === tab ? 'bg-background text-foreground shadow-[inset_0_-2px_0_var(--primary)]' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`} onClick={() => setSidebarTab(tab)}>{label}</button>
+  const navigationButton = (tab: SidebarTab, label: string) => {
+    const Icon = tab === 'sessions' ? SquareTerminal : Workflow
+    return <button type="button" role="tab" aria-selected={sidebarTab === tab} className={`flex items-center gap-1.5 px-3.5 text-sm font-medium transition-colors [--wails-draggable:no-drag] ${sidebarTab === tab ? 'bg-background text-foreground shadow-[inset_0_-2px_0_var(--primary)]' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`} onClick={() => setSidebarTab(tab)}><Icon data-icon="inline-start" aria-hidden="true" className="size-4" />{label}</button>
+  }
 
   return <header className="flex h-9 shrink-0 select-none items-stretch border-b border-border bg-card">
     <nav role="tablist" aria-label="侧边栏导航" className="flex [--wails-draggable:no-drag]">{navigationButton('sessions', '会话')}{navigationButton('macros', '宏')}</nav>
