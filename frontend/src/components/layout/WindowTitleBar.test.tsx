@@ -69,9 +69,13 @@ describe('WindowTitleBar', () => {
 
   it('switches the sidebar navigation from the window title bar', async () => {
     render(<WindowTitleBar />)
-    expect(screen.getByRole('tab', { name: '会话' })).toHaveAttribute('aria-selected', 'true')
+    const sessionsTab = screen.getByRole('tab', { name: '会话' })
+    const macrosTab = screen.getByRole('tab', { name: '宏' })
+    expect(sessionsTab).toHaveAttribute('aria-selected', 'true')
+    expect(sessionsTab.querySelector('svg')).toBeInTheDocument()
+    expect(macrosTab.querySelector('svg')).toBeInTheDocument()
 
-    await userEvent.click(screen.getByRole('tab', { name: '宏' }))
+    await userEvent.click(macrosTab)
 
     expect(useAppStore.getState().sidebarTab).toBe('macros')
     expect(screen.queryByText('Secure Shell Client')).not.toBeInTheDocument()
