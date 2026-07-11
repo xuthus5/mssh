@@ -16,7 +16,7 @@ A cross-platform SSH client built with Go + Wails v3 + React + xterm.js.
 ## Development
 
 ### Prerequisites
-- Go 1.24+
+- Go 1.25+
 - Node.js 20+
 - Wails v3 CLI
 
