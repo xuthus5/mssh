@@ -12,6 +12,7 @@ import {
 import { ChevronRight, ChevronDown, Folder as FolderIcon, Server } from 'lucide-react'
 import type { Folder, Session } from '@/hooks/useSession'
 import { logger } from '@/lib/logger'
+import { Badge } from '@/components/ui/badge'
 
 interface Props {
   folders: Folder[]
@@ -86,6 +87,7 @@ export default function SessionTree({
               </span>
               <FolderIcon className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
               <span className="truncate">{folder.name}</span>
+              {folder.isDefault && <Badge className="ml-auto">默认</Badge>}
             </div>
           </ContextMenuTrigger>
           <ContextMenuContent>
@@ -97,6 +99,7 @@ export default function SessionTree({
             <ContextMenuSeparator />
             <ContextMenuItem
               variant="destructive"
+              disabled={folder.isDefault || folders.length <= 1}
               onClick={() => onDeleteFolder(folder.id)}
             >
               删除
@@ -148,11 +151,6 @@ export default function SessionTree({
             <ContextMenuSub>
               <ContextMenuSubTrigger>移动到分组</ContextMenuSubTrigger>
               <ContextMenuSubContent>
-                <ContextMenuItem
-                  onClick={() => onMoveToFolder(session.id, null)}
-                >
-                  无分组
-                </ContextMenuItem>
                 {folders.map((f) => (
                   <ContextMenuItem
                     key={f.id}
