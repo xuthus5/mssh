@@ -97,11 +97,11 @@ export default function SettingsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-3xl">
+      <DialogContent className="flex h-[min(720px,calc(100dvh-3rem))] max-h-[calc(100dvh-3rem)] flex-col overflow-hidden sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle>设置</DialogTitle>
         </DialogHeader>
-        <Tabs value={tab} onValueChange={setTab} orientation="vertical" className="min-h-[420px] flex-row gap-4">
+        <Tabs value={tab} onValueChange={setTab} orientation="vertical" className="min-h-0 flex-1 flex-row gap-4 overflow-hidden">
           <TabsList className="w-36 shrink-0 self-stretch justify-start rounded-xl border bg-muted/40 p-2">
             <TabsTrigger value="general">通用</TabsTrigger>
             <TabsTrigger value="appearance">外观</TabsTrigger>
@@ -109,7 +109,7 @@ export default function SettingsDialog({
             <TabsTrigger value="folders">分组</TabsTrigger>
             <TabsTrigger value="sync">同步</TabsTrigger>
           </TabsList>
-          <TabsContent value="general" className="min-w-0 overflow-y-auto pr-1">
+          <TabsContent value="general" className="min-h-0 min-w-0 overflow-y-auto overscroll-contain pr-2">
             <form onSubmit={handleSaveGeneral} className="flex flex-col gap-3 pt-2">
               <div className="grid grid-cols-2 gap-3">
                 <div className="flex flex-col gap-1.5">
@@ -161,10 +161,10 @@ export default function SettingsDialog({
               </div>
             </form>
           </TabsContent>
-          <TabsContent value="appearance" className="min-w-0 overflow-y-auto pr-1">
+          <TabsContent value="appearance" className="min-h-0 min-w-0 overflow-y-auto overscroll-contain pr-2">
             <ThemeEditor theme={theme} onSave={onSaveTheme} />
           </TabsContent>
-          <TabsContent value="keys" className="min-w-0 overflow-y-auto pr-1">
+          <TabsContent value="keys" className="min-h-0 min-w-0 overflow-y-auto overscroll-contain pr-2">
             <KeyManager
               keys={keys}
               onGenerate={onGenerateKey}
@@ -173,8 +173,8 @@ export default function SettingsDialog({
               onExport={onExportKey}
             />
           </TabsContent>
-          <TabsContent value="folders" className="min-w-0 overflow-y-auto pr-1"><FolderManager folders={folders} sessions={sessions} onCreate={onCreateFolder} onRename={onRenameFolder} onSetDefault={onSetDefaultFolder} onDelete={onDeleteFolder} /></TabsContent>
-          <TabsContent value="sync" className="min-w-0 overflow-y-auto pr-1">
+          <TabsContent value="folders" className="min-h-0 min-w-0 overflow-y-auto overscroll-contain pr-2"><FolderManager folders={folders} sessions={sessions} onCreate={onCreateFolder} onRename={onRenameFolder} onSetDefault={onSetDefaultFolder} onDelete={onDeleteFolder} /></TabsContent>
+          <TabsContent value="sync" className="min-h-0 min-w-0 overflow-y-auto overscroll-contain pr-2">
             <SyncPanel
               sync={sync}
               onSave={onSaveSync}
