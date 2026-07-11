@@ -46,12 +46,7 @@ func main() {
 		},
 	})
 
-	wailsApp.Window.NewWithOptions(application.WebviewWindowOptions{
-		Title:     "MSSH",
-		Width:     1280,
-		Height:    800,
-		Frameless: true,
-	})
+	wailsApp.Window.NewWithOptions(mainWindowOptions())
 
 	wailsApp.OnShutdown(func() {
 		appInstance.Shutdown()
@@ -61,6 +56,18 @@ func main() {
 	if err := wailsApp.Run(); err != nil {
 		logger.Error("MSSH run failed", "error", err)
 		os.Exit(1)
+	}
+}
+
+func mainWindowOptions() application.WebviewWindowOptions {
+	return application.WebviewWindowOptions{
+		Title:     "MSSH",
+		Width:     1280,
+		Height:    800,
+		Frameless: true,
+		Linux: application.LinuxWindow{
+			WebviewGpuPolicy: application.WebviewGpuPolicyNever,
+		},
 	}
 }
 
