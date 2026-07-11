@@ -1,31 +1,49 @@
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
+import { useEffect, useRef, type PointerEvent as ReactPointerEvent } from 'react'
 
-interface Point { x: number; y: number }
+interface DragState {
+  pointerId: number
+  startX: number
+  startY: number
+  originLeft: number
+  originTop: number
+  width: number
+  height: number
+}
 
 const VIEWPORT_MARGIN = 12
 
+function clamp(value: number, minimum: number, maximum: number) {
+  return Math.min(Math.max(value, minimum), Math.max(minimum, maximum))
+}
+
 export function useDraggableDialog(open: boolean) {
   const contentRef = useRef<HTMLDivElement>(null)
-  const dragRef = useRef<{ pointerId: number; start: Point; origin: Point; rect: DOMRect } | null>(null)
-  const [offset, setOffset] = useState<Point>({ x: 0, y: 0 })
+  const dragRef = useRef<DragState | null>(null)
 
   useEffect(() => {
-    if (!open) setOffset({ x: 0, y: 0 })
+    if (open || !contentRef.current) return
+    const element = contentRef.current
+    element.style.removeProperty('left')
+    element.style.removeProperty('top')
+    element.style.removeProperty('transform')
+    element.style.removeProperty('transition')
+    element.style.removeProperty('animation')
   }, [open])
 
   useEffect(() => {
     const handleMove = (event: PointerEvent) => {
       const drag = dragRef.current
-      if (!drag || event.pointerId !== drag.pointerId) return
-      const deltaX = event.clientX - drag.start.x
-      const deltaY = event.clientY - drag.start.y
-      setOffset({
-        x: drag.origin.x + Math.min(Math.max(deltaX, VIEWPORT_MARGIN - drag.rect.left), window.innerWidth - VIEWPORT_MARGIN - drag.rect.right),
-        y: drag.origin.y + Math.min(Math.max(deltaY, VIEWPORT_MARGIN - drag.rect.top), window.innerHeight - VIEWPORT_MARGIN - drag.rect.bottom),
-      })
+      const element = contentRef.current
+      if (!drag || !element || event.pointerId !== drag.pointerId) return
+      const left = clamp(drag.originLeft + event.clientX - drag.startX, VIEWPORT_MARGIN, window.innerWidth - VIEWPORT_MARGIN - drag.width)
+      const top = clamp(drag.originTop + event.clientY - drag.startY, VIEWPORT_MARGIN, window.innerHeight - VIEWPORT_MARGIN - drag.height)
+      element.style.left = `${left}px`
+      element.style.top = `${top}px`
     }
     const handleUp = (event: PointerEvent) => {
-      if (dragRef.current?.pointerId === event.pointerId) dragRef.current = null
+      if (dragRef.current?.pointerId !== event.pointerId) return
+      dragRef.current = null
+      contentRef.current?.style.removeProperty('cursor')
     }
     window.addEventListener('pointermove', handleMove)
     window.addEventListener('pointerup', handleUp)
@@ -38,21 +56,26 @@ export function useDraggableDialog(open: boolean) {
   }, [])
 
   const startDrag = (event: ReactPointerEvent<HTMLElement>) => {
-    if (event.button !== 0 || !contentRef.current) return
+    const element = contentRef.current
+    if (event.button !== 0 || !element) return
     event.preventDefault()
+    const rect = element.getBoundingClientRect()
+    element.style.left = `${rect.left}px`
+    element.style.top = `${rect.top}px`
+    element.style.transform = 'none'
+    element.style.transition = 'none'
+    element.style.animation = 'none'
+    element.style.cursor = 'grabbing'
     dragRef.current = {
       pointerId: event.pointerId,
-      start: { x: event.clientX, y: event.clientY },
-      origin: offset,
-      rect: contentRef.current.getBoundingClientRect(),
+      startX: event.clientX,
+      startY: event.clientY,
+      originLeft: rect.left,
+      originTop: rect.top,
+      width: rect.width,
+      height: rect.height,
     }
   }
 
-  return {
-    contentRef,
-    dragHandleProps: { onPointerDown: startDrag },
-    style: offset.x === 0 && offset.y === 0
-      ? undefined
-      : { transform: `translate(-50%, -50%) translate(${offset.x}px, ${offset.y}px)` },
-  }
+  return { contentRef, dragHandleProps: { onPointerDown: startDrag } }
 }
