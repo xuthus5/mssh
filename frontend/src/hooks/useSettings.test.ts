@@ -15,6 +15,8 @@ describe('useSettings', () => {
     _settings = {}
     _counter = 0
     writtenSettings = []
+    document.documentElement.style.removeProperty('--app-font-family')
+    document.documentElement.style.removeProperty('--app-font-size')
 
     __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.GetSetting', async (key: string) => {
       return _settings[key] ?? ''
@@ -28,6 +30,7 @@ describe('useSettings', () => {
     __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.SetMany', async (settings: any[]) => { writtenSettings.push(...settings); settings.forEach((setting) => { _settings[setting.key] = setting.value }) })
     __registerHandler('github.com/xuthus5/mssh/internal/service.KeyService.List', async () => [])
     __registerHandler('github.com/xuthus5/mssh/internal/service.TerminalService.SetMaxSize', async () => {})
+    __registerHandler('github.com/xuthus5/mssh/internal/service.FontService.List', async () => ['Arial', 'Segoe UI'])
   })
 
   it('loads default general settings', async () => {
@@ -36,17 +39,38 @@ describe('useSettings', () => {
     expect(result.current.general.maxPoolSize).toBe(10)
     expect(result.current.general.defaultKeepAlive).toBe(60)
     expect(result.current.general.defaultTermType).toBe('xterm-256color')
+    expect(result.current.general.uiFontFamily).toBe('Geist Variable')
+    expect(result.current.general.uiFontSize).toBe(14)
+    expect(result.current.systemFonts).toEqual(['Arial', 'Segoe UI'])
   })
 
   it('saves general settings and updates state', async () => {
     const { result } = renderHook(() => useSettings())
     await act(async () => {
-      await result.current.saveGeneral({ maxPoolSize: 32, defaultKeepAlive: 120, defaultTermType: 'xterm' })
+      await result.current.saveGeneral({ maxPoolSize: 32, defaultKeepAlive: 120, defaultTermType: 'xterm', uiFontFamily: 'Segoe UI', uiFontSize: 16 })
     })
     expect(result.current.general.maxPoolSize).toBe(32)
     expect(result.current.general.defaultKeepAlive).toBe(120)
     expect(result.current.general.defaultTermType).toBe('xterm')
+    expect(result.current.general.uiFontFamily).toBe('Segoe UI')
+    expect(result.current.general.uiFontSize).toBe(16)
+    expect(writtenSettings).toContainEqual(expect.objectContaining({ key: 'appearance.ui_font_family', value: '"Segoe UI"' }))
+    expect(writtenSettings).toContainEqual(expect.objectContaining({ key: 'appearance.ui_font_size', value: '16' }))
+    expect(document.documentElement.style.getPropertyValue('--app-font-family')).toBe('"Segoe UI", sans-serif')
     expect(writtenSettings).not.toContainEqual(expect.objectContaining({ updated_at: expect.anything() }))
+  })
+
+  it('loads and applies persisted interface font settings', async () => {
+    _settings['appearance.ui_font_family'] = '"Arial"'
+    _settings['appearance.ui_font_size'] = '18'
+
+    const { result } = renderHook(() => useSettings())
+    await act(async () => {})
+
+    expect(result.current.general.uiFontFamily).toBe('Arial')
+    expect(result.current.general.uiFontSize).toBe(18)
+    expect(document.documentElement.style.getPropertyValue('--app-font-family')).toBe('"Arial", sans-serif')
+    expect(document.documentElement.style.getPropertyValue('--app-font-size')).toBe('18px')
   })
 
   it('saveTheme persists to settings', async () => {
