@@ -106,4 +106,21 @@ describe('SessionDialog', () => {
     await user.click(screen.getByRole('button', { name: '创建会话' }))
     expect(defaultProps.onSave).toHaveBeenCalledWith(expect.objectContaining({ folderId: '1' }))
   })
+
+  it('shows the selected folder label instead of its ID', async () => {
+    const user = userEvent.setup()
+    render(<SessionDialog {...defaultProps} folders={[
+      { id: '1', name: '默认分组', parentId: null, isDefault: true },
+      { id: '2', name: '生产环境', parentId: null, isDefault: false },
+    ]} />)
+
+    const folderSelect = screen.getAllByRole('combobox')[1]
+    expect(within(folderSelect).getByText('默认分组（默认）')).toBeInTheDocument()
+
+    await user.click(folderSelect)
+    await user.click(screen.getByRole('option', { name: '生产环境' }))
+
+    expect(within(folderSelect).getByText('生产环境')).toBeInTheDocument()
+    expect(within(folderSelect).queryByText('2')).not.toBeInTheDocument()
+  })
 })
