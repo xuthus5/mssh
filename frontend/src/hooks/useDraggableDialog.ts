@@ -10,7 +10,7 @@ export function useDraggableDialog(open: boolean) {
   const [offset, setOffset] = useState<Point>({ x: 0, y: 0 })
 
   useEffect(() => {
-    if (open) setOffset({ x: 0, y: 0 })
+    if (!open) setOffset({ x: 0, y: 0 })
   }, [open])
 
   useEffect(() => {
