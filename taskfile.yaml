@@ -21,7 +21,7 @@ tasks:
   fmt:
     desc: 格式化代码
     cmds:
-      - goimports-reviser -rm-unused -format ./...
+      - golangci-lint run --fix ./... && goimports-reviser -rm-unused -format ./...
   test:
     desc: 运行测试 + 覆盖率
     cmds:
