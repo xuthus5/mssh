@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"mssh/internal/model"
+	"github.com/xuthus5/mssh/internal/model"
 )
 
 func CreateTheme(db *sql.DB, t model.Theme) (*model.Theme, error) {

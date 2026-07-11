@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef } from 'react'
 import { FileService } from '@/lib/wails'
 import { logger } from '@/lib/logger'
-import type { FileEntry } from '../../bindings/mssh/internal/ssh/models'
+import type { FileEntry } from '../../bindings/github.com/xuthus5/mssh/internal/ssh/models'
 import { useAppStore } from '@/store/appStore'
 export type { TransferJob } from '@/store/appStore'
 import { toast } from '@/components/ui/toast'

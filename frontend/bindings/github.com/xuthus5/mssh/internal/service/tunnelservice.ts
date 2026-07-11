@@ -10,31 +10,31 @@ import { Call as $Call, CancellablePromise as $CancellablePromise, Create as $Cr
 import * as model$0 from "../model/models.js";
 
 export function Create(tunnel: model$0.Tunnel): $CancellablePromise<model$0.Tunnel | null> {
-    return $Call.ByName("mssh/internal/service.TunnelService.Create", tunnel).then(($result: any) => {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.TunnelService.Create", tunnel).then(($result: any) => {
         return $$createType1($result);
     });
 }
 
 export function Delete(id: number): $CancellablePromise<void> {
-    return $Call.ByName("mssh/internal/service.TunnelService.Delete", id);
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.TunnelService.Delete", id);
 }
 
 export function List(): $CancellablePromise<model$0.Tunnel[]> {
-    return $Call.ByName("mssh/internal/service.TunnelService.List").then(($result: any) => {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.TunnelService.List").then(($result: any) => {
         return $$createType2($result);
     });
 }
 
 export function Start(tunnelID: number): $CancellablePromise<void> {
-    return $Call.ByName("mssh/internal/service.TunnelService.Start", tunnelID);
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.TunnelService.Start", tunnelID);
 }
 
 export function Stop(tunnelID: number): $CancellablePromise<void> {
-    return $Call.ByName("mssh/internal/service.TunnelService.Stop", tunnelID);
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.TunnelService.Stop", tunnelID);
 }
 
 export function Update(tunnel: model$0.Tunnel): $CancellablePromise<void> {
-    return $Call.ByName("mssh/internal/service.TunnelService.Update", tunnel);
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.TunnelService.Update", tunnel);
 }
 
 // Private type creation functions

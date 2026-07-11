@@ -8,7 +8,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"mssh/internal/store"
+	"github.com/xuthus5/mssh/internal/store"
 )
 
 func NewTestDB(t *testing.T) *sql.DB {

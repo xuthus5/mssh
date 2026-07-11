@@ -10,31 +10,31 @@ import { Call as $Call, CancellablePromise as $CancellablePromise, Create as $Cr
 import * as model$0 from "../model/models.js";
 
 export function Create(theme: model$0.Theme): $CancellablePromise<model$0.Theme | null> {
-    return $Call.ByName("mssh/internal/service.ThemeService.Create", theme).then(($result: any) => {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.ThemeService.Create", theme).then(($result: any) => {
         return $$createType1($result);
     });
 }
 
 export function Delete(id: number): $CancellablePromise<void> {
-    return $Call.ByName("mssh/internal/service.ThemeService.Delete", id);
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.ThemeService.Delete", id);
 }
 
 export function GetActive(): $CancellablePromise<string> {
-    return $Call.ByName("mssh/internal/service.ThemeService.GetActive");
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.ThemeService.GetActive");
 }
 
 export function List(): $CancellablePromise<model$0.Theme[]> {
-    return $Call.ByName("mssh/internal/service.ThemeService.List").then(($result: any) => {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.ThemeService.List").then(($result: any) => {
         return $$createType2($result);
     });
 }
 
 export function SetActive(themeID: string): $CancellablePromise<void> {
-    return $Call.ByName("mssh/internal/service.ThemeService.SetActive", themeID);
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.ThemeService.SetActive", themeID);
 }
 
 export function Update(theme: model$0.Theme): $CancellablePromise<void> {
-    return $Call.ByName("mssh/internal/service.ThemeService.Update", theme);
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.ThemeService.Update", theme);
 }
 
 // Private type creation functions

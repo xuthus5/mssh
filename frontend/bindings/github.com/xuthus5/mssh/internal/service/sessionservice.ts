@@ -13,87 +13,87 @@ import * as model$0 from "../model/models.js";
 import * as ssh$0 from "../ssh/models.js";
 
 export function CancelConnect(attemptID: string): $CancellablePromise<void> {
-    return $Call.ByName("mssh/internal/service.SessionService.CancelConnect", attemptID);
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.SessionService.CancelConnect", attemptID);
 }
 
 export function Connect(sessionID: number): $CancellablePromise<string> {
-    return $Call.ByName("mssh/internal/service.SessionService.Connect", sessionID);
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.SessionService.Connect", sessionID);
 }
 
 export function ConnectionCount(): $CancellablePromise<number> {
-    return $Call.ByName("mssh/internal/service.SessionService.ConnectionCount");
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.SessionService.ConnectionCount");
 }
 
 export function CreateFolder(name: string, parentID: number | null): $CancellablePromise<model$0.SessionFolder | null> {
-    return $Call.ByName("mssh/internal/service.SessionService.CreateFolder", name, parentID).then(($result: any) => {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.SessionService.CreateFolder", name, parentID).then(($result: any) => {
         return $$createType1($result);
     });
 }
 
 export function CreateSession(session: model$0.Session): $CancellablePromise<model$0.Session | null> {
-    return $Call.ByName("mssh/internal/service.SessionService.CreateSession", session).then(($result: any) => {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.SessionService.CreateSession", session).then(($result: any) => {
         return $$createType3($result);
     });
 }
 
 export function DecideHostKey(attemptID: string, accept: boolean): $CancellablePromise<void> {
-    return $Call.ByName("mssh/internal/service.SessionService.DecideHostKey", attemptID, accept);
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.SessionService.DecideHostKey", attemptID, accept);
 }
 
 export function DeleteFolder(id: number): $CancellablePromise<void> {
-    return $Call.ByName("mssh/internal/service.SessionService.DeleteFolder", id);
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.SessionService.DeleteFolder", id);
 }
 
 export function DeleteSession(id: number): $CancellablePromise<void> {
-    return $Call.ByName("mssh/internal/service.SessionService.DeleteSession", id);
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.SessionService.DeleteSession", id);
 }
 
 export function Disconnect(terminalID: string): $CancellablePromise<void> {
-    return $Call.ByName("mssh/internal/service.SessionService.Disconnect", terminalID);
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.SessionService.Disconnect", terminalID);
 }
 
 export function GetClientWrapper(connID: string): $CancellablePromise<ssh$0.ClientWrapper | null> {
-    return $Call.ByName("mssh/internal/service.SessionService.GetClientWrapper", connID).then(($result: any) => {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.SessionService.GetClientWrapper", connID).then(($result: any) => {
         return $$createType5($result);
     });
 }
 
 export function GetSession(id: number): $CancellablePromise<model$0.Session | null> {
-    return $Call.ByName("mssh/internal/service.SessionService.GetSession", id).then(($result: any) => {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.SessionService.GetSession", id).then(($result: any) => {
         return $$createType3($result);
     });
 }
 
 export function ListFolders(): $CancellablePromise<model$0.SessionFolder[]> {
-    return $Call.ByName("mssh/internal/service.SessionService.ListFolders").then(($result: any) => {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.SessionService.ListFolders").then(($result: any) => {
         return $$createType6($result);
     });
 }
 
 export function ListSessions(folderID: number | null): $CancellablePromise<model$0.Session[]> {
-    return $Call.ByName("mssh/internal/service.SessionService.ListSessions", folderID).then(($result: any) => {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.SessionService.ListSessions", folderID).then(($result: any) => {
         return $$createType7($result);
     });
 }
 
 export function MoveFolder(id: number, newParentID: number | null): $CancellablePromise<void> {
-    return $Call.ByName("mssh/internal/service.SessionService.MoveFolder", id, newParentID);
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.SessionService.MoveFolder", id, newParentID);
 }
 
 export function MoveSession(id: number, newFolderID: number | null): $CancellablePromise<void> {
-    return $Call.ByName("mssh/internal/service.SessionService.MoveSession", id, newFolderID);
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.SessionService.MoveSession", id, newFolderID);
 }
 
 export function SetDefaultFolder(id: number): $CancellablePromise<void> {
-    return $Call.ByName("mssh/internal/service.SessionService.SetDefaultFolder", id);
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.SessionService.SetDefaultFolder", id);
 }
 
 export function UpdateFolder(id: number, name: string): $CancellablePromise<void> {
-    return $Call.ByName("mssh/internal/service.SessionService.UpdateFolder", id, name);
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.SessionService.UpdateFolder", id, name);
 }
 
 export function UpdateSession(session: model$0.Session): $CancellablePromise<void> {
-    return $Call.ByName("mssh/internal/service.SessionService.UpdateSession", session);
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.SessionService.UpdateSession", session);
 }
 
 // Private type creation functions

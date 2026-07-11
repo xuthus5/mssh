@@ -4,8 +4,8 @@ import (
 	"database/sql"
 	"log/slog"
 
-	"mssh/internal/model"
-	"mssh/internal/store"
+	"github.com/xuthus5/mssh/internal/model"
+	"github.com/xuthus5/mssh/internal/store"
 )
 
 type ThemeService struct {

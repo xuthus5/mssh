@@ -14,14 +14,14 @@ describe('useSettings', () => {
     _settings = {}
     _counter = 0
 
-    __registerHandler('mssh/internal/service.SettingService.GetSetting', async (key: string) => {
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.GetSetting', async (key: string) => {
       return _settings[key] ?? ''
     })
-    __registerHandler('mssh/internal/service.SettingService.SetSetting', async (key: string, value: string) => {
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.SetSetting', async (key: string, value: string) => {
       _settings[key] = value
     })
-    __registerHandler('mssh/internal/service.KeyService.List', async () => [])
-    __registerHandler('mssh/internal/service.TerminalService.SetMaxSize', async () => {})
+    __registerHandler('github.com/xuthus5/mssh/internal/service.KeyService.List', async () => [])
+    __registerHandler('github.com/xuthus5/mssh/internal/service.TerminalService.SetMaxSize', async () => {})
   })
 
   it('loads default general settings', async () => {
@@ -54,7 +54,7 @@ describe('useSettings', () => {
   })
 
   it('generates a key and adds to state', async () => {
-    __registerHandler('mssh/internal/service.KeyService.Generate', async (name: string, keyType: string, bits: number) => ({
+    __registerHandler('github.com/xuthus5/mssh/internal/service.KeyService.Generate', async (name: string, keyType: string, bits: number) => ({
       id: nextId(), name, type: keyType, public_key: 'mock-pub', created_at: new Date().toISOString(),
     }))
 
@@ -66,10 +66,10 @@ describe('useSettings', () => {
   })
 
   it('deletes a key and removes from state', async () => {
-    __registerHandler('mssh/internal/service.KeyService.Generate', async (name: string, keyType: string, bits: number) => ({
+    __registerHandler('github.com/xuthus5/mssh/internal/service.KeyService.Generate', async (name: string, keyType: string, bits: number) => ({
       id: nextId(), name, type: keyType, public_key: 'mock-pub', created_at: new Date().toISOString(),
     }))
-    __registerHandler('mssh/internal/service.KeyService.Delete', async () => {})
+    __registerHandler('github.com/xuthus5/mssh/internal/service.KeyService.Delete', async () => {})
 
     const { result } = renderHook(() => useSettings())
     await act(async () => { await result.current.generateKey('k1', 'rsa', 2048) })
@@ -80,7 +80,7 @@ describe('useSettings', () => {
   })
 
   it('imports a key and adds to state', async () => {
-    __registerHandler('mssh/internal/service.KeyService.Import', async (name: string) => ({
+    __registerHandler('github.com/xuthus5/mssh/internal/service.KeyService.Import', async (name: string) => ({
       id: nextId(), name, type: 'rsa', public_key: 'mock-pub', created_at: new Date().toISOString(),
     }))
 
@@ -91,10 +91,10 @@ describe('useSettings', () => {
   })
 
   it('exports a key returns public key string', async () => {
-    __registerHandler('mssh/internal/service.KeyService.Generate', async (name: string, keyType: string, bits: number) => ({
+    __registerHandler('github.com/xuthus5/mssh/internal/service.KeyService.Generate', async (name: string, keyType: string, bits: number) => ({
       id: nextId(), name, type: keyType, public_key: 'mock-pub', created_at: new Date().toISOString(),
     }))
-    __registerHandler('mssh/internal/service.KeyService.ExportPublicKey', async () => 'mock-key')
+    __registerHandler('github.com/xuthus5/mssh/internal/service.KeyService.ExportPublicKey', async () => 'mock-key')
 
     const { result } = renderHook(() => useSettings())
     await act(async () => { await result.current.generateKey('ek', 'rsa', 2048) })
@@ -116,7 +116,7 @@ describe('useSettings', () => {
   })
 
   it('handles generateKey error gracefully', async () => {
-    __registerHandler('mssh/internal/service.KeyService.Generate', async () => { throw new Error('key gen failed') })
+    __registerHandler('github.com/xuthus5/mssh/internal/service.KeyService.Generate', async () => { throw new Error('key gen failed') })
 
     const { result } = renderHook(() => useSettings())
     await act(async () => { await result.current.generateKey('bad', 'rsa', 1024) })

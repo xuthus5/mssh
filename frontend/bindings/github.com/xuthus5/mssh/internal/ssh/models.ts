@@ -7,10 +7,10 @@ import { Create as $Create } from "@wailsio/runtime";
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
-import * as ssh$0 from "../../../golang.org/x/crypto/ssh/models.js";
+import * as model$0 from "../model/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
-import * as model$0 from "../model/models.js";
+import * as ssh$0 from "../../../../../golang.org/x/crypto/ssh/models.js";
 
 /**
  * ClientWrapper wraps an SSH client with keep-alive lifecycle management.

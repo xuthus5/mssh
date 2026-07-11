@@ -6,7 +6,7 @@ import TunnelDialog from '@/components/session/TunnelDialog'
 import type { Tunnel } from '@/hooks/useSession'
 import { logger } from '@/lib/logger'
 import { FileService, TunnelService } from '@/lib/wails'
-import type { Tunnel as BindingTunnel } from '../../../bindings/mssh/internal/model/models'
+import type { Tunnel as BindingTunnel } from '../../../bindings/github.com/xuthus5/mssh/internal/model/models'
 import { toast } from '@/components/ui/toast'
 
 function formatTime(date: Date): string {

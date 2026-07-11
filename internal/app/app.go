@@ -7,10 +7,10 @@ import (
 	"os"
 	"path/filepath"
 
-	"mssh/internal/crypto"
-	"mssh/internal/service"
-	"mssh/internal/store"
-	"mssh/pkg/event"
+	"github.com/xuthus5/mssh/internal/crypto"
+	"github.com/xuthus5/mssh/internal/service"
+	"github.com/xuthus5/mssh/internal/store"
+	"github.com/xuthus5/mssh/pkg/event"
 )
 
 type App struct {

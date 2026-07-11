@@ -6,33 +6,33 @@
 import { Call as $Call, CancellablePromise as $CancellablePromise, Create as $Create } from "@wailsio/runtime";
 
 export function Close(terminalID: string): $CancellablePromise<void> {
-    return $Call.ByName("mssh/internal/service.TerminalService.Close", terminalID);
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.TerminalService.Close", terminalID);
 }
 
 export function Count(): $CancellablePromise<number> {
-    return $Call.ByName("mssh/internal/service.TerminalService.Count");
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.TerminalService.Count");
 }
 
 export function Open(sessionID: number, cols: number, rows: number): $CancellablePromise<string> {
-    return $Call.ByName("mssh/internal/service.TerminalService.Open", sessionID, cols, rows);
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.TerminalService.Open", sessionID, cols, rows);
 }
 
 export function Resize(terminalID: string, cols: number, rows: number): $CancellablePromise<void> {
-    return $Call.ByName("mssh/internal/service.TerminalService.Resize", terminalID, cols, rows);
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.TerminalService.Resize", terminalID, cols, rows);
 }
 
 export function SetCloseHandler(fn: any): $CancellablePromise<void> {
-    return $Call.ByName("mssh/internal/service.TerminalService.SetCloseHandler", fn);
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.TerminalService.SetCloseHandler", fn);
 }
 
 export function SetMaxSize(maxSize: number): $CancellablePromise<void> {
-    return $Call.ByName("mssh/internal/service.TerminalService.SetMaxSize", maxSize);
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.TerminalService.SetMaxSize", maxSize);
 }
 
 export function SetOutputHandler(fn: any): $CancellablePromise<void> {
-    return $Call.ByName("mssh/internal/service.TerminalService.SetOutputHandler", fn);
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.TerminalService.SetOutputHandler", fn);
 }
 
 export function Write(terminalID: string, data: string): $CancellablePromise<number> {
-    return $Call.ByName("mssh/internal/service.TerminalService.Write", terminalID, data);
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.TerminalService.Write", terminalID, data);
 }

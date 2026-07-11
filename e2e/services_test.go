@@ -8,8 +8,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"mssh/internal/app"
-	"mssh/internal/model"
+	"github.com/xuthus5/mssh/internal/app"
+	"github.com/xuthus5/mssh/internal/model"
 )
 
 func newTestApp(t *testing.T) *app.App {
