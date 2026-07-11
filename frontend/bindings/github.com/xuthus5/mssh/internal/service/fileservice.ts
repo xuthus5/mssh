@@ -18,28 +18,28 @@ import * as ssh$0 from "../ssh/models.js";
  * CancelTransfer cancels an in-progress file transfer.
  */
 export function CancelTransfer(taskID: string): $CancellablePromise<void> {
-    return $Call.ByName("mssh/internal/service.FileService.CancelTransfer", taskID);
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.FileService.CancelTransfer", taskID);
 }
 
 /**
  * Delete removes a remote file via SFTP.
  */
 export function Delete(sessionID: number, path: string): $CancellablePromise<void> {
-    return $Call.ByName("mssh/internal/service.FileService.Delete", sessionID, path);
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.FileService.Delete", sessionID, path);
 }
 
 /**
  * Download starts an async file download and returns a task ID.
  */
 export function Download(sessionID: number, remotePath: string, localPath: string): $CancellablePromise<string> {
-    return $Call.ByName("mssh/internal/service.FileService.Download", sessionID, remotePath, localPath);
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.FileService.Download", sessionID, remotePath, localPath);
 }
 
 /**
  * ListDir lists remote directory entries via SFTP.
  */
 export function ListDir(sessionID: number, path: string): $CancellablePromise<ssh$0.FileEntry[]> {
-    return $Call.ByName("mssh/internal/service.FileService.ListDir", sessionID, path).then(($result: any) => {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.FileService.ListDir", sessionID, path).then(($result: any) => {
         return $$createType1($result);
     });
 }
@@ -48,21 +48,21 @@ export function ListDir(sessionID: number, path: string): $CancellablePromise<ss
  * Mkdir creates a remote directory via SFTP.
  */
 export function Mkdir(sessionID: number, path: string): $CancellablePromise<void> {
-    return $Call.ByName("mssh/internal/service.FileService.Mkdir", sessionID, path);
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.FileService.Mkdir", sessionID, path);
 }
 
 /**
  * Rename renames a remote file via SFTP.
  */
 export function Rename(sessionID: number, oldPath: string, newPath: string): $CancellablePromise<void> {
-    return $Call.ByName("mssh/internal/service.FileService.Rename", sessionID, oldPath, newPath);
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.FileService.Rename", sessionID, oldPath, newPath);
 }
 
 /**
  * Upload starts an async file upload and returns a task ID.
  */
 export function Upload(sessionID: number, localPath: string, remotePath: string): $CancellablePromise<string> {
-    return $Call.ByName("mssh/internal/service.FileService.Upload", sessionID, localPath, remotePath);
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.FileService.Upload", sessionID, localPath, remotePath);
 }
 
 // Private type creation functions

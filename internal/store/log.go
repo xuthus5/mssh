@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"mssh/internal/model"
+	"github.com/xuthus5/mssh/internal/model"
 )
 
 func CreateSessionLog(db *sql.DB, l model.SessionLog) (*model.SessionLog, error) {

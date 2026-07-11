@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"mssh/internal/model"
+	"github.com/xuthus5/mssh/internal/model"
 )
 
 func CreateFolder(db *sql.DB, name string, parentID *int64) (*model.SessionFolder, error) {

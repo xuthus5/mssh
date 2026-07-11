@@ -10,8 +10,8 @@ import (
 	"sync"
 	"time"
 
-	"mssh/internal/ssh"
-	"mssh/pkg/event"
+	"github.com/xuthus5/mssh/internal/ssh"
+	"github.com/xuthus5/mssh/pkg/event"
 )
 
 // FileService manages SFTP file operations with progress tracking.

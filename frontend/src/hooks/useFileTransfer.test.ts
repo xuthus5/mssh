@@ -17,7 +17,7 @@ describe('useFileTransfer', () => {
       { name: 'readme.md', path: '/readme.md', size: 100, is_dir: false, mod_time: '2024-01-01' },
       { name: 'src', path: '/src', size: 0, is_dir: true, mod_time: '2024-01-01' },
     ]
-    __registerHandler('mssh/internal/service.FileService.ListDir', async () => files)
+    __registerHandler('github.com/xuthus5/mssh/internal/service.FileService.ListDir', async () => files)
 
     const { result } = renderHook(() => useFileTransfer(SESSION_ID))
     await act(async () => { await result.current.listFiles('/') })
@@ -31,7 +31,7 @@ describe('useFileTransfer', () => {
   })
 
   it('upload creates a transfer job', async () => {
-    __registerHandler('mssh/internal/service.FileService.Upload', async () => 'task-1')
+    __registerHandler('github.com/xuthus5/mssh/internal/service.FileService.Upload', async () => 'task-1')
 
     const { result } = renderHook(() => useFileTransfer(SESSION_ID))
     await act(async () => { await result.current.upload('/local/file.txt', '/remote/file.txt') })
@@ -42,7 +42,7 @@ describe('useFileTransfer', () => {
   })
 
   it('download creates a transfer job', async () => {
-    __registerHandler('mssh/internal/service.FileService.Download', async () => 'task-2')
+    __registerHandler('github.com/xuthus5/mssh/internal/service.FileService.Download', async () => 'task-2')
 
     const { result } = renderHook(() => useFileTransfer(SESSION_ID))
     await act(async () => { await result.current.download('/remote/file.txt', '/local/file.txt') })
@@ -53,8 +53,8 @@ describe('useFileTransfer', () => {
   })
 
   it('cancelTransfer requests cancellation and keeps terminal state visible', async () => {
-    __registerHandler('mssh/internal/service.FileService.Upload', async () => 'task-1')
-    __registerHandler('mssh/internal/service.FileService.CancelTransfer', async () => {})
+    __registerHandler('github.com/xuthus5/mssh/internal/service.FileService.Upload', async () => 'task-1')
+    __registerHandler('github.com/xuthus5/mssh/internal/service.FileService.CancelTransfer', async () => {})
 
     const { result } = renderHook(() => useFileTransfer(SESSION_ID))
     await act(async () => { await result.current.upload('/a', '/b') })
@@ -71,8 +71,8 @@ describe('useFileTransfer', () => {
       { name: 'b.txt', path: '/b.txt', size: 20, is_dir: false, mod_time: '' },
     ]
     let deleted = false
-    __registerHandler('mssh/internal/service.FileService.ListDir', async () => deleted ? [files[1]] : files)
-    __registerHandler('mssh/internal/service.FileService.Delete', async () => { deleted = true })
+    __registerHandler('github.com/xuthus5/mssh/internal/service.FileService.ListDir', async () => deleted ? [files[1]] : files)
+    __registerHandler('github.com/xuthus5/mssh/internal/service.FileService.Delete', async () => { deleted = true })
 
     const { result } = renderHook(() => useFileTransfer(SESSION_ID))
     await act(async () => { await result.current.listFiles('/') })
@@ -85,7 +85,7 @@ describe('useFileTransfer', () => {
 
   it('navigateUp goes to parent directory', async () => {
     const paths: string[] = []
-    __registerHandler('mssh/internal/service.FileService.ListDir', async (_sid: number, path: string) => {
+    __registerHandler('github.com/xuthus5/mssh/internal/service.FileService.ListDir', async (_sid: number, path: string) => {
       paths.push(path)
       return []
     })
@@ -100,8 +100,8 @@ describe('useFileTransfer', () => {
 
   it('makeDir triggers listFiles on current path', async () => {
     const called: string[] = []
-    __registerHandler('mssh/internal/service.FileService.ListDir', async () => [])
-    __registerHandler('mssh/internal/service.FileService.Mkdir', async (_sid: number, p: string) => { called.push(p) })
+    __registerHandler('github.com/xuthus5/mssh/internal/service.FileService.ListDir', async () => [])
+    __registerHandler('github.com/xuthus5/mssh/internal/service.FileService.Mkdir', async (_sid: number, p: string) => { called.push(p) })
 
     const { result } = renderHook(() => useFileTransfer(SESSION_ID))
     await act(async () => { await result.current.listFiles('/home') })
@@ -111,7 +111,7 @@ describe('useFileTransfer', () => {
   })
 
   it('handles listFiles error gracefully', async () => {
-    __registerHandler('mssh/internal/service.FileService.ListDir', async () => { throw new Error('permission denied') })
+    __registerHandler('github.com/xuthus5/mssh/internal/service.FileService.ListDir', async () => { throw new Error('permission denied') })
 
     const { result } = renderHook(() => useFileTransfer(SESSION_ID))
     await act(async () => { await result.current.listFiles('/') })

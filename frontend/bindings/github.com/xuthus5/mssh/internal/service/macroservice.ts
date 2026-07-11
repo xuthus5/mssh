@@ -10,27 +10,27 @@ import { Call as $Call, CancellablePromise as $CancellablePromise, Create as $Cr
 import * as model$0 from "../model/models.js";
 
 export function Create(macro: model$0.Macro): $CancellablePromise<model$0.Macro | null> {
-    return $Call.ByName("mssh/internal/service.MacroService.Create", macro).then(($result: any) => {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.MacroService.Create", macro).then(($result: any) => {
         return $$createType1($result);
     });
 }
 
 export function Delete(id: number): $CancellablePromise<void> {
-    return $Call.ByName("mssh/internal/service.MacroService.Delete", id);
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.MacroService.Delete", id);
 }
 
 export function Execute(terminalID: string, command: string): $CancellablePromise<void> {
-    return $Call.ByName("mssh/internal/service.MacroService.Execute", terminalID, command);
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.MacroService.Execute", terminalID, command);
 }
 
 export function List(): $CancellablePromise<model$0.Macro[]> {
-    return $Call.ByName("mssh/internal/service.MacroService.List").then(($result: any) => {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.MacroService.List").then(($result: any) => {
         return $$createType2($result);
     });
 }
 
 export function Update(macro: model$0.Macro): $CancellablePromise<void> {
-    return $Call.ByName("mssh/internal/service.MacroService.Update", macro);
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.MacroService.Update", macro);
 }
 
 // Private type creation functions

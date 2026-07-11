@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"log/slog"
 
-	"mssh/internal/store"
+	"github.com/xuthus5/mssh/internal/store"
 )
 
 type SettingService struct {

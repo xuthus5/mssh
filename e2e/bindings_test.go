@@ -65,13 +65,13 @@ func TestBindingGeneration(t *testing.T) {
 }
 
 // TestBindingFQNMatchesGo verifies that each FQN in the generated bindings
-// matches the pattern: "mssh/internal/service.{Service}.{Method}"
+// matches the pattern: "github.com/xuthus5/mssh/internal/service.{Service}.{Method}"
 func TestBindingFQNMatchesGo(t *testing.T) {
 	bindingsDir := filepath.Join("..", "frontend", "bindings", "mssh", "internal", "service")
 	entries, err := os.ReadDir(bindingsDir)
 	require.NoError(t, err)
 
-	fqnPrefix := "mssh/internal/service."
+	fqnPrefix := "github.com/xuthus5/mssh/internal/service."
 
 	for _, entry := range entries {
 		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".ts") || entry.Name() == "index.ts" {
@@ -149,7 +149,7 @@ func TestRpcContract_FNVHash(t *testing.T) {
 		"SyncService":     {"Export", "Import", "SyncFromCloud", "SyncToCloud"},
 	}
 
-	pkg := "mssh/internal/service"
+	pkg := "github.com/xuthus5/mssh/internal/service"
 	allFQNs := make(map[string]bool)
 
 	for svc, methods := range serviceMethods {

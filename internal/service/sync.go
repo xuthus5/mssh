@@ -7,8 +7,8 @@ import (
 	"log/slog"
 	"os"
 
-	"mssh/internal/model"
-	"mssh/internal/store"
+	"github.com/xuthus5/mssh/internal/model"
+	"github.com/xuthus5/mssh/internal/store"
 )
 
 type SyncService struct {
