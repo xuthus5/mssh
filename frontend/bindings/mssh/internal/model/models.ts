@@ -232,6 +232,7 @@ export class SessionFolder {
     "id": number;
     "name": string;
     "parent_id": number | null;
+    "is_default": boolean;
     "sort_order": number;
     "created_at": string;
     "updated_at": string;
@@ -246,6 +247,9 @@ export class SessionFolder {
         }
         if (!("parent_id" in $$source)) {
             this["parent_id"] = null;
+        }
+        if (!("is_default" in $$source)) {
+            this["is_default"] = false;
         }
         if (!("sort_order" in $$source)) {
             this["sort_order"] = 0;

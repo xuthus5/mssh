@@ -58,7 +58,12 @@ export default function SessionDialog({ open, onOpenChange, session, folders, on
   const [keyId, setKeyId] = useState<string>(session?.keyId ?? '')
   const [keepAlive, setKeepAlive] = useState(session?.keepAlive?.toString() ?? '60')
   const [termType, setTermType] = useState(session?.termType ?? 'xterm-256color')
-  const [folderId, setFolderId] = useState(session?.folderId ?? '')
+  const defaultFolderID = folders?.find((folder) => folder.isDefault)?.id ?? ''
+  const [folderId, setFolderId] = useState(session?.folderId ?? defaultFolderID)
+
+  useEffect(() => {
+    if (open) setFolderId(session?.folderId ?? defaultFolderID)
+  }, [open, session?.folderId, defaultFolderID])
 
   const [keys, setKeys] = useState<KeyItem[]>([])
   const [pending, setPending] = useState(false)
@@ -180,9 +185,8 @@ export default function SessionDialog({ open, onOpenChange, session, folders, on
                   <SelectValue placeholder="无分组" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">无分组</SelectItem>
                   {folders.map((f) => (
-                    <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
+                    <SelectItem key={f.id} value={f.id}>{f.name}{f.isDefault ? '（默认）' : ''}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>

@@ -84,6 +84,10 @@ export function MoveSession(id: number, newFolderID: number | null): $Cancellabl
     return $Call.ByName("mssh/internal/service.SessionService.MoveSession", id, newFolderID);
 }
 
+export function SetDefaultFolder(id: number): $CancellablePromise<void> {
+    return $Call.ByName("mssh/internal/service.SessionService.SetDefaultFolder", id);
+}
+
 export function UpdateFolder(id: number, name: string): $CancellablePromise<void> {
     return $Call.ByName("mssh/internal/service.SessionService.UpdateFolder", id, name);
 }

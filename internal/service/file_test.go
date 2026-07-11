@@ -528,3 +528,15 @@ func TestFileService_EmitTransferError(t *testing.T) {
 	assert.Equal(t, "task-err", payload.TaskID)
 	assert.Contains(t, payload.Error, "disk full")
 }
+
+func TestFileService_EmitTransferCancelled(t *testing.T) {
+	b := newMockEventBus()
+	svc := &FileService{eventBus: b}
+	svc.emitTransferCancelled("task-cancelled")
+	lastEvent := b.LastEvent()
+	require.NotNil(t, lastEvent)
+	assert.Equal(t, event.TransferComplete, lastEvent.Name)
+	payload, ok := lastEvent.Payload.(event.TransferProgressPayload)
+	require.True(t, ok)
+	assert.Equal(t, "cancelled", payload.Status)
+}

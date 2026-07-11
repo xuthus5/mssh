@@ -36,6 +36,27 @@ func TestMigrate(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestMigrateLegacyFoldersCreatesDefaultAndAssignsSessions(t *testing.T) {
+	db, err := OpenDB(t.TempDir())
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, db.Close()) })
+	_, err = db.Exec(`CREATE TABLE session_folders (id INTEGER PRIMARY KEY, name TEXT NOT NULL, parent_id INTEGER, sort_order INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now')))`)
+	require.NoError(t, err)
+	_, err = db.Exec(`CREATE TABLE sessions (id INTEGER PRIMARY KEY, folder_id INTEGER, name TEXT NOT NULL, host TEXT NOT NULL, port INTEGER NOT NULL, username TEXT NOT NULL, auth_method TEXT NOT NULL, password TEXT, key_id INTEGER, keep_alive INTEGER NOT NULL, term_type TEXT NOT NULL, sort_order INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now')))`)
+	require.NoError(t, err)
+	_, err = db.Exec("INSERT INTO session_folders (id, name) VALUES (7, '历史分组')")
+	require.NoError(t, err)
+	_, err = db.Exec("INSERT INTO sessions (id, name, host, port, username, auth_method, keep_alive, term_type) VALUES (3, '旧会话', '127.0.0.1', 22, 'root', 'password', 30, 'xterm')")
+	require.NoError(t, err)
+	require.NoError(t, Migrate(db))
+
+	var defaultID, sessionFolderID int64
+	require.NoError(t, db.QueryRow("SELECT id FROM session_folders WHERE is_default = 1").Scan(&defaultID))
+	require.NoError(t, db.QueryRow("SELECT folder_id FROM sessions WHERE id = 3").Scan(&sessionFolderID))
+	assert.Equal(t, int64(7), defaultID)
+	assert.Equal(t, defaultID, sessionFolderID)
+}
+
 func TestMigrateTablesExist(t *testing.T) {
 	tmpDir := t.TempDir()
 	db, err := OpenDB(tmpDir)
@@ -78,6 +99,17 @@ func TestMigrateClosedDB(t *testing.T) {
 	db.Close()
 	err = Migrate(db)
 	assert.Error(t, err)
+}
+
+func TestDefaultFolderMigrationHelpersClosedDB(t *testing.T) {
+	db, err := OpenDB(t.TempDir())
+	require.NoError(t, err)
+	require.NoError(t, db.Close())
+	_, err = folderDefaultColumnExists(db)
+	assert.Error(t, err)
+	_, err = resolveDefaultFolderID(db)
+	assert.Error(t, err)
+	assert.Error(t, ensureDefaultFolderSchema(db))
 }
 
 func TestStoreOperationsClosedDB(t *testing.T) { //nolint:funlen
