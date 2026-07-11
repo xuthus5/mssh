@@ -17,12 +17,13 @@ vi.mock('@xterm/xterm', () => ({
     write() {}
     focus() {}
     blur() { calls.push('blur') }
+    refresh() { calls.push('refresh') }
     dispose() { calls.push('dispose') }
   },
 }))
 
 vi.mock('@xterm/addon-fit', () => ({
-  FitAddon: class { name = 'fit'; fit() {} },
+  FitAddon: class { name = 'fit'; fit() { calls.push('fit') } },
 }))
 
 vi.mock('@/lib/wails', () => ({
@@ -40,6 +41,8 @@ describe('useTerminal', () => {
       observe() {}
       disconnect() {}
     })
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => { callback(0); return 1 })
+    vi.stubGlobal('cancelAnimationFrame', vi.fn())
   })
 
   it('opens the terminal before loading renderer addons', () => {
@@ -80,6 +83,22 @@ describe('useTerminal', () => {
     rerender({ active: false })
 
     expect(calls).toContain('blur')
+    act(() => unmount())
+  })
+
+  it('refits and refreshes after an inactive terminal becomes visible', () => {
+    const containerRef = createRef<HTMLDivElement>()
+    const container = document.createElement('div')
+    Object.defineProperty(container, 'clientWidth', { value: 800 })
+    Object.defineProperty(container, 'clientHeight', { value: 500 })
+    containerRef.current = container
+    const { rerender, unmount } = renderHook(({ active }) => useTerminal('term-resume', containerRef, active), { initialProps: { active: false } })
+
+    calls.length = 0
+    rerender({ active: true })
+
+    expect(calls).toContain('fit')
+    expect(calls).toContain('refresh')
     act(() => unmount())
   })
 })
