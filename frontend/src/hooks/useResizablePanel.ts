@@ -4,6 +4,7 @@ const DEFAULT_WIDTH = 280
 const MIN_WIDTH = 220
 const MAX_WIDTH = 480
 const STORAGE_KEY = 'mssh:sidebar-width'
+const COLLAPSED_STORAGE_KEY = 'mssh:sidebar-collapsed'
 const KEYBOARD_STEP = 16
 
 function clampWidth(width: number) {
@@ -17,6 +18,7 @@ function initialWidth() {
 
 export function useResizablePanel() {
   const [width, setWidth] = useState(initialWidth)
+  const [collapsed, setCollapsed] = useState(() => localStorage.getItem(COLLAPSED_STORAGE_KEY) === 'true')
   const dragRef = useRef<{ pointerId: number; startX: number; startWidth: number } | null>(null)
 
   useEffect(() => {
@@ -48,7 +50,7 @@ export function useResizablePanel() {
   }
 
   const handlePointerDown = (event: ReactPointerEvent<HTMLElement>) => {
-    if (event.button !== 0) return
+    if (event.button !== 0 || collapsed) return
     event.preventDefault()
     dragRef.current = { pointerId: event.pointerId, startX: event.clientX, startWidth: width }
   }
@@ -61,14 +63,25 @@ export function useResizablePanel() {
     event.preventDefault()
   }
 
+  const toggleCollapsed = () => {
+    setCollapsed((current) => {
+      const next = !current
+      localStorage.setItem(COLLAPSED_STORAGE_KEY, String(next))
+      return next
+    })
+  }
+
   return {
     width,
+    collapsed,
+    displayedWidth: collapsed ? 0 : width,
+    toggleCollapsed,
     resizeHandleProps: {
       onPointerDown: handlePointerDown,
       onDoubleClick: () => resize(DEFAULT_WIDTH),
       onKeyDown: handleKeyDown,
       role: 'separator' as const,
-      tabIndex: 0,
+      tabIndex: collapsed ? -1 : 0,
       'aria-label': '调整侧边栏宽度',
       'aria-orientation': 'vertical' as const,
       'aria-valuemin': MIN_WIDTH,

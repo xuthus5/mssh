@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo, useEffect } from 'react'
-import { Plus, FolderPlus, Search } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Plus, FolderPlus, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -41,7 +41,7 @@ export default function Sidebar() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [macros, setMacros] = useState<CommandItem[]>([])
   const [deleteTarget, setDeleteTarget] = useState<{ type: 'session' | 'folder'; id: string; name: string } | null>(null)
-  const { width, resizeHandleProps } = useResizablePanel()
+  const { width, collapsed, displayedWidth, toggleCollapsed, resizeHandleProps } = useResizablePanel()
 
   const {
     folders,
@@ -197,7 +197,8 @@ export default function Sidebar() {
   }, [])
 
   return (
-    <aside style={{ width }} className="relative flex-shrink-0 flex flex-col border-r border-border bg-card">
+    <div style={{ width: displayedWidth }} className="relative shrink-0 transition-[width] duration-200 ease-out">
+      <aside style={{ width }} aria-hidden={collapsed} inert={collapsed ? true : undefined} className={`relative flex h-full flex-col border-r border-border bg-card transition-transform duration-200 ease-out ${collapsed ? '-translate-x-full pointer-events-none' : 'translate-x-0'}`}>
       <div {...resizeHandleProps} className="absolute inset-y-0 -right-1 z-20 w-2 cursor-col-resize touch-none outline-none after:absolute after:inset-y-0 after:left-1/2 after:w-px after:-translate-x-1/2 after:bg-transparent hover:after:bg-primary/60 focus-visible:after:bg-primary active:after:bg-primary" />
       <div className="flex border-b border-border">
         <button
@@ -385,6 +386,10 @@ export default function Sidebar() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </aside>
+      </aside>
+      <button type="button" aria-label={collapsed ? '展开侧边栏' : '收起侧边栏'} aria-expanded={!collapsed} onClick={toggleCollapsed} className="absolute left-full top-1/2 z-30 grid size-6 -translate-y-1/2 place-items-center rounded-r-lg border border-l-0 border-border bg-card text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+        {collapsed ? <ChevronRight className="size-3.5" /> : <ChevronLeft className="size-3.5" />}
+      </button>
+    </div>
   )
 }
