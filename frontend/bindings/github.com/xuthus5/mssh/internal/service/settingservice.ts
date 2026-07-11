@@ -6,9 +6,9 @@
 import { Call as $Call, CancellablePromise as $CancellablePromise, Create as $Create } from "@wailsio/runtime";
 
 export function GetSetting(key: string): $CancellablePromise<string> {
-    return $Call.ByName("mssh/internal/service.SettingService.GetSetting", key);
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.SettingService.GetSetting", key);
 }
 
 export function SetSetting(key: string, value: string): $CancellablePromise<void> {
-    return $Call.ByName("mssh/internal/service.SettingService.SetSetting", key, value);
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.SettingService.SetSetting", key, value);
 }

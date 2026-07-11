@@ -19,8 +19,8 @@ import (
 	"github.com/stretchr/testify/require"
 	gossh "golang.org/x/crypto/ssh"
 
-	"mssh/internal/model"
-	"mssh/internal/ssh/testutil"
+	"github.com/xuthus5/mssh/internal/model"
+	"github.com/xuthus5/mssh/internal/ssh/testutil"
 )
 
 type slowReader struct {

@@ -19,11 +19,11 @@ import (
 	"github.com/stretchr/testify/require"
 	gossh "golang.org/x/crypto/ssh"
 
-	"mssh/internal/model"
-	"mssh/internal/service/testutil"
-	sshtestutil "mssh/internal/ssh/testutil"
-	"mssh/internal/store"
-	"mssh/pkg/event"
+	"github.com/xuthus5/mssh/internal/model"
+	"github.com/xuthus5/mssh/internal/service/testutil"
+	sshtestutil "github.com/xuthus5/mssh/internal/ssh/testutil"
+	"github.com/xuthus5/mssh/internal/store"
+	"github.com/xuthus5/mssh/pkg/event"
 )
 
 type mockEventBus struct {

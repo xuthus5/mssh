@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"mssh/internal/model"
+	"github.com/xuthus5/mssh/internal/model"
 )
 
 func CreateMacro(db *sql.DB, m model.Macro) (*model.Macro, error) {

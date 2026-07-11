@@ -19,9 +19,9 @@ describe('useSession', () => {
   })
 
   it('creates a folder and adds it to state', async () => {
-    __registerHandler('mssh/internal/service.SessionService.ListFolders', async () => [])
-    __registerHandler('mssh/internal/service.SessionService.ListSessions', async () => [])
-    __registerHandler('mssh/internal/service.SessionService.CreateFolder', async (name: string, parentId: number | null) => ({
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SessionService.ListFolders', async () => [])
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SessionService.ListSessions', async () => [])
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SessionService.CreateFolder', async (name: string, parentId: number | null) => ({
       id: nextId(), name, parent_id: parentId ?? null,
     }))
 
@@ -38,12 +38,12 @@ describe('useSession', () => {
 
   it('deletes a folder and removes it from state', async () => {
     const folderId = nextId()
-    __registerHandler('mssh/internal/service.SessionService.ListFolders', async () => [{ id: folderId, name: 'test', parent_id: null }])
-    __registerHandler('mssh/internal/service.SessionService.ListSessions', async () => [])
-    __registerHandler('mssh/internal/service.SessionService.CreateFolder', async (name: string, parentId: number | null) => ({
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SessionService.ListFolders', async () => [{ id: folderId, name: 'test', parent_id: null }])
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SessionService.ListSessions', async () => [])
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SessionService.CreateFolder', async (name: string, parentId: number | null) => ({
       id: folderId, name, parent_id: parentId ?? null,
     }))
-    __registerHandler('mssh/internal/service.SessionService.DeleteFolder', async () => {})
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SessionService.DeleteFolder', async () => {})
 
     const { result } = renderHook(() => useSession())
 
@@ -55,9 +55,9 @@ describe('useSession', () => {
   })
 
   it('creates a session and adds it to state', async () => {
-    __registerHandler('mssh/internal/service.SessionService.ListFolders', async () => [])
-    __registerHandler('mssh/internal/service.SessionService.ListSessions', async () => [])
-    __registerHandler('mssh/internal/service.SessionService.CreateSession', async (s: any) => {
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SessionService.ListFolders', async () => [])
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SessionService.ListSessions', async () => [])
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SessionService.CreateSession', async (s: any) => {
       return Object.assign({}, s, { id: nextId() })
     })
 
@@ -83,12 +83,12 @@ describe('useSession', () => {
       id: sessionId, name: 'old', host: '1.1.1.1', port: 22, username: 'u',
       auth_method: 'password', keep_alive: 30, term_type: 'xterm', folder_id: null,
     }
-    __registerHandler('mssh/internal/service.SessionService.ListFolders', async () => [])
-    __registerHandler('mssh/internal/service.SessionService.ListSessions', async () => [baseSession])
-    __registerHandler('mssh/internal/service.SessionService.CreateSession', async (s: any) => {
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SessionService.ListFolders', async () => [])
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SessionService.ListSessions', async () => [baseSession])
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SessionService.CreateSession', async (s: any) => {
       return Object.assign({}, s, { id: sessionId })
     })
-    __registerHandler('mssh/internal/service.SessionService.UpdateSession', async () => {})
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SessionService.UpdateSession', async () => {})
 
     const { result } = renderHook(() => useSession())
 
@@ -105,12 +105,12 @@ describe('useSession', () => {
 
   it('deletes a session and removes it from state', async () => {
     const sessionId = nextId()
-    __registerHandler('mssh/internal/service.SessionService.ListFolders', async () => [])
-    __registerHandler('mssh/internal/service.SessionService.ListSessions', async () => [])
-    __registerHandler('mssh/internal/service.SessionService.CreateSession', async (s: any) => {
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SessionService.ListFolders', async () => [])
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SessionService.ListSessions', async () => [])
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SessionService.CreateSession', async (s: any) => {
       return Object.assign({}, s, { id: sessionId })
     })
-    __registerHandler('mssh/internal/service.SessionService.DeleteSession', async () => {})
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SessionService.DeleteSession', async () => {})
 
     const { result } = renderHook(() => useSession())
 
@@ -128,13 +128,13 @@ describe('useSession', () => {
 
   it('connect opens a tab in the store', async () => {
     const sessionId = nextId()
-    __registerHandler('mssh/internal/service.SessionService.ListFolders', async () => [])
-    __registerHandler('mssh/internal/service.SessionService.ListSessions', async () => [])
-    __registerHandler('mssh/internal/service.SessionService.CreateSession', async (s: any) => {
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SessionService.ListFolders', async () => [])
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SessionService.ListSessions', async () => [])
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SessionService.CreateSession', async (s: any) => {
       return Object.assign({}, s, { id: sessionId })
     })
-    __registerHandler('mssh/internal/service.SessionService.Connect', async () => 'term-abc')
-    __registerHandler('mssh/internal/service.TerminalService.Open', async () => 'term-abc')
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SessionService.Connect', async () => 'term-abc')
+    __registerHandler('github.com/xuthus5/mssh/internal/service.TerminalService.Open', async () => 'term-abc')
 
     const { result } = renderHook(() => useSession())
 
@@ -156,9 +156,9 @@ describe('useSession', () => {
   })
 
   it('handles createSession error gracefully', async () => {
-    __registerHandler('mssh/internal/service.SessionService.ListFolders', async () => [])
-    __registerHandler('mssh/internal/service.SessionService.ListSessions', async () => [])
-    __registerHandler('mssh/internal/service.SessionService.CreateSession', async () => { throw new Error('db error') })
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SessionService.ListFolders', async () => [])
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SessionService.ListSessions', async () => [])
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SessionService.CreateSession', async () => { throw new Error('db error') })
 
     const { result } = renderHook(() => useSession())
 
@@ -172,8 +172,8 @@ describe('useSession', () => {
   })
 
   it('handles folders list error gracefully', async () => {
-    __registerHandler('mssh/internal/service.SessionService.ListFolders', async () => { throw new Error('db error') })
-    __registerHandler('mssh/internal/service.SessionService.ListSessions', async () => [])
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SessionService.ListFolders', async () => { throw new Error('db error') })
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SessionService.ListSessions', async () => [])
 
     const { result } = renderHook(() => useSession())
 
@@ -190,9 +190,9 @@ describe('useSession - loading state', () => {
 
   it('sets loading true then false during list', async () => {
     let resolveList: (v: any[]) => void
-    __registerHandler('mssh/internal/service.SessionService.ListFolders', () =>
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SessionService.ListFolders', () =>
       new Promise<any[]>((r) => { resolveList = r }))
-    __registerHandler('mssh/internal/service.SessionService.ListSessions', () =>
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SessionService.ListSessions', () =>
       new Promise<any[]>((_r) => {}))
 
     const { result } = renderHook(() => useSession())

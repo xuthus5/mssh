@@ -17,8 +17,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"mssh/internal/model"
-	"mssh/internal/service/testutil"
+	"github.com/xuthus5/mssh/internal/model"
+	"github.com/xuthus5/mssh/internal/service/testutil"
 )
 
 type noopCrypto struct{}

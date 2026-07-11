@@ -9,9 +9,9 @@ import (
 	"sync"
 	"time"
 
-	"mssh/internal/model"
-	"mssh/internal/ssh"
-	"mssh/internal/store"
+	"github.com/xuthus5/mssh/internal/model"
+	"github.com/xuthus5/mssh/internal/ssh"
+	"github.com/xuthus5/mssh/internal/store"
 )
 
 type LogService struct {

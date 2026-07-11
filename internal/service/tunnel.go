@@ -7,10 +7,10 @@ import (
 	"log/slog"
 	"sync"
 
-	"mssh/internal/model"
-	ssh "mssh/internal/ssh"
-	"mssh/internal/store"
-	"mssh/pkg/event"
+	"github.com/xuthus5/mssh/internal/model"
+	ssh "github.com/xuthus5/mssh/internal/ssh"
+	"github.com/xuthus5/mssh/internal/store"
+	"github.com/xuthus5/mssh/pkg/event"
 )
 
 type TunnelState struct {

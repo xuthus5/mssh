@@ -71,7 +71,7 @@ describe('appStore', () => {
   })
 
   it('evicts LRU when pool exceeds max size', () => {
-    __registerHandler('mssh/internal/service.TerminalService.Close', async () => {})
+    __registerHandler('github.com/xuthus5/mssh/internal/service.TerminalService.Close', async () => {})
     const { registerTerminal } = useAppStore.getState()
     const makeTerm = () => ({ dispose: () => {} }) as unknown as import('@xterm/xterm').Terminal
     for (let i = 0; i < 35; i++) {
