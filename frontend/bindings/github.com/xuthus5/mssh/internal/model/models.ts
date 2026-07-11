@@ -9,6 +9,31 @@ import { Create as $Create } from "@wailsio/runtime";
 // @ts-ignore: Unused imports
 import * as time$0 from "../../../../../time/models.js";
 
+export class AboutInfo {
+    "current_version": string;
+    "repository_url": string;
+
+    /** Creates a new AboutInfo instance. */
+    constructor($$source: Partial<AboutInfo> = {}) {
+        if (!("current_version" in $$source)) {
+            this["current_version"] = "";
+        }
+        if (!("repository_url" in $$source)) {
+            this["repository_url"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new AboutInfo instance from a string or object.
+     */
+    static createFrom($$source: any = {}): AboutInfo {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new AboutInfo($$parsedSource as Partial<AboutInfo>);
+    }
+}
+
 export enum AuthMethod {
     /**
      * The Go zero value for the underlying type of the enum.
@@ -655,3 +680,36 @@ export enum TunnelType {
     TunnelRemote = "remote",
     TunnelDynamic = "dynamic",
 };
+
+export class UpdateInfo {
+    "current_version": string;
+    "latest_version": string;
+    "release_url": string;
+    "update_available": boolean;
+
+    /** Creates a new UpdateInfo instance. */
+    constructor($$source: Partial<UpdateInfo> = {}) {
+        if (!("current_version" in $$source)) {
+            this["current_version"] = "";
+        }
+        if (!("latest_version" in $$source)) {
+            this["latest_version"] = "";
+        }
+        if (!("release_url" in $$source)) {
+            this["release_url"] = "";
+        }
+        if (!("update_available" in $$source)) {
+            this["update_available"] = false;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new UpdateInfo instance from a string or object.
+     */
+    static createFrom($$source: any = {}): UpdateInfo {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new UpdateInfo($$parsedSource as Partial<UpdateInfo>);
+    }
+}

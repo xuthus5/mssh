@@ -11,6 +11,7 @@ import * as _MacroService from '../../../bindings/github.com/xuthus5/mssh/intern
 import * as _ThemeService from '../../../bindings/github.com/xuthus5/mssh/internal/service/themeservice'
 import * as _LogService from '../../../bindings/github.com/xuthus5/mssh/internal/service/logservice'
 import * as _SyncService from '../../../bindings/github.com/xuthus5/mssh/internal/service/syncservice'
+import * as _AboutService from '../../../bindings/github.com/xuthus5/mssh/internal/service/aboutservice'
 
 export const SessionService = _SessionService
 export const TerminalService = _TerminalService
@@ -22,3 +23,4 @@ export const MacroService = _MacroService
 export const ThemeService = _ThemeService
 export const LogService = _LogService
 export const SyncService = _SyncService
+export const AboutService = _AboutService

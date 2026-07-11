@@ -28,6 +28,7 @@ type App struct {
 	Log      *service.LogService
 	Sync     *service.SyncService
 	Setting  *service.SettingService
+	About    *service.AboutService
 }
 
 type Options struct {
@@ -145,7 +146,6 @@ func New(opts Options) (*App, error) {
 	themeSvc := service.NewThemeService(db, logger)
 	logSvc := service.NewLogService(db, opts.DataDir, logger)
 	syncSvc := service.NewSyncService(db, logger)
-	settingSvc := service.NewSettingService(db, logger)
 
 	terminalSvc.SetOutputHandler(func(terminalID string, data []byte) {
 		logSvc.HandleOutput(terminalID, data)
@@ -167,7 +167,8 @@ func New(opts Options) (*App, error) {
 		Theme:    themeSvc,
 		Log:      logSvc,
 		Sync:     syncSvc,
-		Setting:  settingSvc,
+		Setting:  service.NewSettingService(db, logger),
+		About:    service.NewAboutService(),
 	}, nil
 }
 
