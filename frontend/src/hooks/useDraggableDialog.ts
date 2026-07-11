@@ -26,6 +26,7 @@ export function useDraggableDialog(open: boolean) {
     element.style.removeProperty('left')
     element.style.removeProperty('top')
     element.style.removeProperty('transform')
+    element.style.removeProperty('translate')
     element.style.removeProperty('transition')
     element.style.removeProperty('animation')
   }, [open])
@@ -63,6 +64,7 @@ export function useDraggableDialog(open: boolean) {
     element.style.left = `${rect.left}px`
     element.style.top = `${rect.top}px`
     element.style.transform = 'none'
+    element.style.translate = 'none'
     element.style.transition = 'none'
     element.style.animation = 'none'
     element.style.cursor = 'grabbing'
