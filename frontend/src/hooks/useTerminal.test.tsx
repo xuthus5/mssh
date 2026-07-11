@@ -16,6 +16,7 @@ vi.mock('@xterm/xterm', () => ({
     onData() { return { dispose: vi.fn() } }
     write() {}
     focus() {}
+    blur() { calls.push('blur') }
     dispose() { calls.push('dispose') }
   },
 }))
@@ -45,7 +46,7 @@ describe('useTerminal', () => {
     const containerRef = createRef<HTMLDivElement>()
     containerRef.current = document.createElement('div')
 
-    const { unmount } = renderHook(() => useTerminal('term-1', containerRef))
+    const { unmount } = renderHook(() => useTerminal('term-1', containerRef, true))
 
     expect(calls).toEqual(['open', 'load:fit'])
     act(() => unmount())
@@ -62,12 +63,23 @@ describe('useTerminal', () => {
     const containerRef = createRef<HTMLDivElement>()
     containerRef.current = document.createElement('div')
 
-    const { unmount } = renderHook(() => useTerminal('term-themed', containerRef))
+    const { unmount } = renderHook(() => useTerminal('term-themed', containerRef, true))
 
     expect(terminalOptions[0]).toEqual(expect.objectContaining({
       fontSize: 18,
       theme: expect.objectContaining({ background: '#ffffff', foreground: '#111111' }),
     }))
+    act(() => unmount())
+  })
+
+  it('blurs a terminal when its tab becomes inactive', () => {
+    const containerRef = createRef<HTMLDivElement>()
+    containerRef.current = document.createElement('div')
+    const { rerender, unmount } = renderHook(({ active }) => useTerminal('term-focus', containerRef, active), { initialProps: { active: true } })
+
+    rerender({ active: false })
+
+    expect(calls).toContain('blur')
     act(() => unmount())
   })
 })
