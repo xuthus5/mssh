@@ -153,7 +153,18 @@ func (s *SessionService) Connect(ctx context.Context, sessionID int64) (string, 
 		knownHostsPath = filepath.Join(s.dataDir, "known_hosts")
 	}
 
-	wrapper, err := ssh.Connect(ctx, *sess, authMethods, knownHostsPath, s.logger)
+	onNewHostKey := func(hostname, algorithm, fingerprint string) bool {
+		terminalIDHint := ""
+		s.eventBus.Emit(event.HostKeyFingerprint, event.HostKeyPayload{
+			TerminalID:  terminalIDHint,
+			Hostname:    hostname,
+			Fingerprint: fingerprint,
+			Algorithm:   algorithm,
+		})
+		return true
+	}
+
+	wrapper, err := ssh.ConnectWithVerifier(ctx, *sess, authMethods, knownHostsPath, onNewHostKey, s.logger)
 	if err != nil {
 		s.logger.Error("connect failed", "sessionID", sessionID, "error", err)
 		return "", fmt.Errorf("connect: %w", err)
@@ -214,71 +225,86 @@ func (s *SessionService) ConnectionCount() int {
 }
 
 func (s *SessionService) buildAuthMethods(sess *model.Session) ([]gossh.AuthMethod, error) {
-	var methods []gossh.AuthMethod
-
 	switch sess.AuthMethod {
 	case model.AuthPassword:
-		s.logger.Info("using password auth", "passwordLen", len(sess.Password))
-		methods = append(methods, gossh.Password(sess.Password))
-		// Also add keyboard-interactive as fallback for PAM-based servers
-		if sess.Password != "" {
-			methods = append(methods, gossh.KeyboardInteractive(
-				func(user, instruction string, questions []string, echos []bool) ([]string, error) {
-					answers := make([]string, len(questions))
-					for i := range answers {
-						answers[i] = sess.Password
-					}
-					return answers, nil
-				},
-			))
-		}
+		return s.buildPasswordAuth(sess)
 	case model.AuthKey:
-		if sess.KeyID != nil {
-			key, err := store.GetKey(s.db, *sess.KeyID)
-			if err == nil {
-				var signer gossh.Signer
-				var signErr error
-				if s.crypto != nil {
-					decrypted, decErr := s.crypto.Decrypt([]byte(key.PrivateKey))
-					if decErr == nil {
-						signer, signErr = gossh.ParsePrivateKey(decrypted)
-					}
-				} else {
-					signer, signErr = gossh.ParsePrivateKey([]byte(key.PrivateKey))
-				}
-				if signErr == nil {
-					methods = append(methods, gossh.PublicKeys(signer))
-				}
-			}
-		}
+		return s.buildKeyAuth(sess)
 	case model.AuthKeyboardInteractive:
-		methods = append(methods, gossh.KeyboardInteractive(
-			func(user, instruction string, questions []string, echos []bool) ([]string, error) {
-				answers := make([]string, len(questions))
-				for i := range answers {
-					answers[i] = sess.Password
-				}
-				return answers, nil
-			},
-		))
+		return s.buildKeyboardInteractiveAuth(sess), nil
 	case model.AuthAgent:
-		socketPath := os.Getenv("SSH_AUTH_SOCK")
-		if socketPath == "" {
-			return nil, fmt.Errorf("SSH_AUTH_SOCK not set")
-		}
-		sock, err := net.Dial("unix", socketPath)
-		if err != nil {
-			return nil, fmt.Errorf("ssh agent: %w", err)
-		}
-		agentClient := agent.NewClient(sock)
-		signers, err := agentClient.Signers()
-		if err != nil {
-			return nil, fmt.Errorf("ssh agent signers: %w", err)
-		}
-		methods = append(methods, gossh.PublicKeys(signers...))
+		return s.buildAgentAuth()
+	default:
+		return nil, nil
 	}
+}
 
+func (s *SessionService) buildPasswordAuth(sess *model.Session) ([]gossh.AuthMethod, error) {
+	s.logger.Info("using password auth", "passwordLen", len(sess.Password))
+	methods := []gossh.AuthMethod{gossh.Password(sess.Password)}
+	if sess.Password != "" {
+		methods = append(methods, s.buildKeyboardInteractiveAuth(sess)...)
+	}
 	return methods, nil
+}
+
+func (s *SessionService) buildKeyAuth(sess *model.Session) ([]gossh.AuthMethod, error) {
+	if sess.KeyID == nil {
+		return nil, fmt.Errorf("build auth methods: key auth requires key_id")
+	}
+	key, err := store.GetKey(s.db, *sess.KeyID)
+	if err != nil {
+		return nil, fmt.Errorf("build auth methods: load key %d: %w", *sess.KeyID, err)
+	}
+	keyData, err := s.decryptPrivateKey(key.PrivateKey)
+	if err != nil {
+		return nil, err
+	}
+	signer, signErr := gossh.ParsePrivateKey(keyData)
+	if signErr != nil {
+		return nil, fmt.Errorf("build auth methods: parse private key: %w", signErr)
+	}
+	return []gossh.AuthMethod{gossh.PublicKeys(signer)}, nil
+}
+
+func (s *SessionService) decryptPrivateKey(encrypted string) ([]byte, error) {
+	if s.crypto != nil {
+		decrypted, decErr := s.crypto.Decrypt([]byte(encrypted))
+		if decErr != nil {
+			return nil, fmt.Errorf("build auth methods: decrypt private key: %w", decErr)
+		}
+		return decrypted, nil
+	}
+	return []byte(encrypted), nil
+}
+
+func (s *SessionService) buildKeyboardInteractiveAuth(sess *model.Session) []gossh.AuthMethod {
+	return []gossh.AuthMethod{gossh.KeyboardInteractive(
+		func(_, _ string, questions []string, _ []bool) ([]string, error) {
+			answers := make([]string, len(questions))
+			for i := range answers {
+				answers[i] = sess.Password
+			}
+			return answers, nil
+		},
+	)}
+}
+
+func (s *SessionService) buildAgentAuth() ([]gossh.AuthMethod, error) {
+	socketPath := os.Getenv("SSH_AUTH_SOCK")
+	if socketPath == "" {
+		return nil, fmt.Errorf("SSH_AUTH_SOCK not set")
+	}
+	sock, err := net.Dial("unix", socketPath)
+	if err != nil {
+		return nil, fmt.Errorf("ssh agent: %w", err)
+	}
+	agentClient := agent.NewClient(sock)
+	signers, err := agentClient.Signers()
+	if err != nil {
+		return nil, fmt.Errorf("ssh agent signers: %w", err)
+	}
+	return []gossh.AuthMethod{gossh.PublicKeys(signers...)}, nil
 }
 
 func generateTerminalID() string {
