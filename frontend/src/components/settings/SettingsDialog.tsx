@@ -1,4 +1,5 @@
 import { useState, useEffect, type FormEvent } from 'react'
+import { CircleHelp } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -23,6 +24,8 @@ import { FolderManager } from '@/components/settings/FolderManager'
 import { useDraggableDialog } from '@/hooks/useDraggableDialog'
 import { AboutPanel } from '@/components/settings/AboutPanel'
 import { SearchableSelect } from '@/components/ui/searchable-select'
+import { Slider } from '@/components/ui/slider'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 const TERMINAL_TYPE_OPTIONS = ['xterm-256color', 'xterm', 'vt100', 'linux'].map((value) => ({ value, label: value }))
 
@@ -37,6 +40,8 @@ interface Props {
   onSaveGeneral: (s: GeneralSettings) => Promise<void>
   onPreviewUIFont: (fontFamily: string, fallbackFamily: string, fontSize: number) => void
   onRestoreUIFont: () => void
+  onPreviewWindowOpacity: (opacity: number) => void
+  onRestoreWindowOpacity: () => void
   onSaveTheme: (t: TerminalTheme) => void
   onGenerateKey: (name: string, type: KeyInfo['type'], bits: number) => void
   onImportKey: (name: string, privateKey: string) => void
@@ -64,6 +69,8 @@ export default function SettingsDialog({
   onSaveGeneral,
   onPreviewUIFont,
   onRestoreUIFont,
+  onPreviewWindowOpacity,
+  onRestoreWindowOpacity,
   onSaveTheme,
   onGenerateKey,
   onImportKey,
@@ -85,6 +92,7 @@ export default function SettingsDialog({
   const [uiFontFamily, setUIFontFamily] = useState(general.uiFontFamily)
   const [uiFontFallbackFamily, setUIFontFallbackFamily] = useState(general.uiFontFallbackFamily)
   const [uiFontSize, setUIFontSize] = useState(general.uiFontSize.toString())
+  const [windowOpacity, setWindowOpacity] = useState(general.windowOpacity.toString())
   const [fontDirty, setFontDirty] = useState(false)
   const [saving, setSaving] = useState(false)
   const draggable = useDraggableDialog(open)
@@ -96,6 +104,7 @@ export default function SettingsDialog({
     setUIFontFamily(general.uiFontFamily)
     setUIFontFallbackFamily(general.uiFontFallbackFamily)
     setUIFontSize(general.uiFontSize.toString())
+    setWindowOpacity(general.windowOpacity.toString())
     setFontDirty(false)
   }, [general])
 
@@ -112,7 +121,10 @@ export default function SettingsDialog({
   }
 
   const handleOpenChange = (nextOpen: boolean) => {
-    if (!nextOpen && fontDirty) onRestoreUIFont()
+    if (!nextOpen && fontDirty) {
+      onRestoreUIFont()
+      onRestoreWindowOpacity()
+    }
     onOpenChange(nextOpen)
   }
 
@@ -120,7 +132,7 @@ export default function SettingsDialog({
     e.preventDefault()
     setSaving(true)
     try {
-      await onSaveGeneral({ maxPoolSize: parseInt(maxPoolSize, 10) || 10, defaultKeepAlive: parseInt(defaultKeepAlive, 10) || 60, defaultTermType, uiFontFamily, uiFontFallbackFamily, uiFontSize: parseInt(uiFontSize, 10) || 14 })
+      await onSaveGeneral({ maxPoolSize: parseInt(maxPoolSize, 10) || 10, defaultKeepAlive: parseInt(defaultKeepAlive, 10) || 60, defaultTermType, uiFontFamily, uiFontFallbackFamily, uiFontSize: parseInt(uiFontSize, 10) || 14, windowOpacity: parseInt(windowOpacity, 10) || 100 })
       setFontDirty(false)
     } finally {
       setSaving(false)
@@ -194,6 +206,25 @@ export default function SettingsDialog({
                 <div className="mt-3 rounded-lg border border-border bg-background px-3 py-2" style={{ fontFamily: `${JSON.stringify(uiFontFamily)}, ${JSON.stringify(uiFontFallbackFamily)}, sans-serif`, fontSize: `${parseInt(uiFontSize, 10) || 14}px` }}>
                   <p className="text-foreground">MSSH 安全连接 · Secure Shell 0123456789 → ✓ ★</p>
                   <p className="mt-1 text-xs text-muted-foreground">中文、English、数字与符号预览</p>
+                </div>
+              </section>
+              <section className="rounded-xl border border-border bg-card p-3 shadow-sm">
+                <div className="mb-3 flex items-center gap-1.5">
+                  <div>
+                    <h3 className="text-sm font-medium text-foreground">应用透明度</h3>
+                    <p className="mt-1 text-xs text-muted-foreground">调整整个应用窗口的显示透明度。</p>
+                  </div>
+                  <Tooltip>
+                    <TooltipTrigger render={<button type="button" aria-label="透明度兼容性说明" className="grid size-6 place-items-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground" />}><CircleHelp className="size-3.5" /></TooltipTrigger>
+                    <TooltipContent>部分桌面环境不支持窗口透明度合成显示。</TooltipContent>
+                  </Tooltip>
+                </div>
+                <div className="grid grid-cols-[minmax(0,1fr)_6rem] items-center gap-3">
+                  <Slider aria-label="应用透明度" min={50} max={100} step={1} value={[parseInt(windowOpacity, 10) || 100]} onValueChange={(value) => { const nextValue = Array.isArray(value) ? value[0] : value; setWindowOpacity(String(nextValue)); setFontDirty(true); onPreviewWindowOpacity(nextValue) }} />
+                  <div className="relative">
+                    <Input aria-label="应用透明度百分比" type="number" min={50} max={100} value={windowOpacity} className="pr-7" onChange={(event) => { const value = event.target.value; setWindowOpacity(value); setFontDirty(true); onPreviewWindowOpacity(parseInt(value, 10) || 100) }} />
+                    <span className="pointer-events-none absolute inset-y-0 right-2 flex items-center text-xs text-muted-foreground">%</span>
+                  </div>
                 </div>
               </section>
               <div className="flex justify-end">

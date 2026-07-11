@@ -75,8 +75,16 @@ func mainWindowOptions() application.WebviewWindowOptions {
 		Height:         800,
 		Frameless:      true,
 		EnableFileDrop: true,
+		BackgroundType: application.BackgroundTypeTranslucent,
+		BackgroundColour: application.RGBA{
+			Alpha: 0,
+		},
+		Mac: application.MacWindow{
+			Backdrop: application.MacBackdropTransparent,
+		},
 		Linux: application.LinuxWindow{
-			WebviewGpuPolicy: application.WebviewGpuPolicyNever,
+			WindowIsTranslucent: true,
+			WebviewGpuPolicy:    application.WebviewGpuPolicyNever,
 		},
 	}
 }
