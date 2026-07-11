@@ -162,12 +162,12 @@ describe('useSession', () => {
 
     const { result } = renderHook(() => useSession())
 
-    await act(async () => {
+    await expect(act(async () => {
       await result.current.createSession({
         name: 'x', host: 'x', port: 22, username: 'x',
         authMethod: 'password', keepAlive: 30, termType: 'xterm', folderId: null,
       })
-    })
+    })).rejects.toThrow('db error')
     expect(result.current.sessions).toHaveLength(0)
   })
 

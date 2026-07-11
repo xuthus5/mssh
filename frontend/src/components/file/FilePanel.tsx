@@ -10,6 +10,10 @@ import {
 import { Button } from '@/components/ui/button'
 import type { FileInfo } from '@/hooks/useFileTransfer'
 import { FolderOpen, File, ArrowUp } from 'lucide-react'
+import { Input } from '@/components/ui/input'
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 
 interface Props {
   open: boolean
@@ -17,6 +21,7 @@ interface Props {
   files: FileInfo[]
   currentPath: string
   loading: boolean
+  error?: string
   onNavigateTo: (path: string) => void
   onNavigateUp: () => void
   onDelete: (path: string) => void
@@ -39,9 +44,14 @@ export default function FilePanel({
   onMakeDir,
   onUpload,
   onDownload,
+  error,
 }: Props) {
   const [mkdirName, setMkdirName] = useState('')
   const [showMkdir, setShowMkdir] = useState(false)
+  const [selected, setSelected] = useState<FileInfo | null>(null)
+  const [renameOpen, setRenameOpen] = useState(false)
+  const [renameName, setRenameName] = useState('')
+  const [deleteOpen, setDeleteOpen] = useState(false)
 
   useEffect(() => {
     setMkdirName('')
@@ -114,7 +124,12 @@ export default function FilePanel({
         >
           新建文件夹
         </Button>
+        <Button size="xs" variant="outline" disabled={!selected} onClick={() => selected && onDownload(selected.path)}>下载</Button>
+        <Button size="xs" variant="outline" disabled={!selected} onClick={() => { if (selected) { setRenameName(selected.name); setRenameOpen(true) } }}>重命名</Button>
+        <Button size="xs" variant="destructive" disabled={!selected} onClick={() => setDeleteOpen(true)}>删除</Button>
+        <Button size="xs" variant="ghost" onClick={() => onNavigateTo(currentPath)}>刷新</Button>
       </div>
+      {error && <Alert variant="destructive" className="m-2"><AlertTitle>目录加载失败</AlertTitle><AlertDescription>{error}<Button size="xs" variant="outline" className="ml-2" onClick={() => onNavigateTo(currentPath)}>重试</Button></AlertDescription></Alert>}
       {showMkdir && (
         <form
           onSubmit={handleMkdirSubmit}
@@ -157,7 +172,7 @@ export default function FilePanel({
               </TableRow>
             ) : (
               files.map((f) => (
-                <TableRow key={f.path}>
+                <TableRow key={f.path} data-state={selected?.path === f.path ? 'selected' : undefined} onClick={() => setSelected(f)}>
                   <TableCell>
                     {f.isDir ? (
                       <FolderOpen className="h-4 w-4" />
@@ -195,6 +210,17 @@ export default function FilePanel({
           </TableBody>
         </Table>
       </div>
+      <Dialog open={renameOpen} onOpenChange={setRenameOpen}>
+        <DialogContent><DialogHeader><DialogTitle>重命名</DialogTitle></DialogHeader>
+          <Input value={renameName} onChange={(event) => setRenameName(event.target.value)} autoFocus />
+          <DialogFooter showCloseButton><Button onClick={() => { if (selected && renameName.trim()) onRename(selected.path, renameName.trim()); setRenameOpen(false) }}>保存</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>删除“{selected?.name}”</AlertDialogTitle><AlertDialogDescription>远程文件删除后无法恢复。</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogFooter><AlertDialogCancel>取消</AlertDialogCancel><AlertDialogAction variant="destructive" onClick={() => { if (selected) onDelete(selected.path); setSelected(null) }}>删除</AlertDialogAction></AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </aside>
   )
 }

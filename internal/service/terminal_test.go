@@ -41,6 +41,13 @@ func TestTerminalService_Count(t *testing.T) {
 	assert.Equal(t, 1, svc.Count())
 }
 
+func TestTerminalService_SetMaxSize(t *testing.T) {
+	svc := NewTerminalService(nil, newMockEventBus(), 32, testutil.NewTestLogger())
+	require.NoError(t, svc.SetMaxSize(8))
+	assert.Equal(t, 8, svc.maxSize)
+	assert.Error(t, svc.SetMaxSize(0))
+}
+
 func TestTerminalService_Open(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	bus := newMockEventBus()
@@ -70,6 +77,22 @@ func TestTerminalService_Open(t *testing.T) {
 	assert.True(t, ok)
 	_, ok = termSvc.lastUsed[terminalID]
 	assert.True(t, ok)
+	assert.NotEmpty(t, termSvc.connIDs[terminalID])
+	require.NoError(t, termSvc.Close(terminalID))
+	assert.Equal(t, 0, sessionSvc.ConnectionCount())
+}
+
+func TestTerminalService_CloseInvokesCleanupHandler(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	sessionSvc := NewSessionService(db, newMockEventBus(), 30, "", nil, testutil.NewTestLogger())
+	svc := NewTerminalService(sessionSvc, newMockEventBus(), 2, testutil.NewTestLogger())
+	svc.ptys["term-1"] = nil
+	svc.lastUsed["term-1"] = time.Now()
+
+	closed := make(chan string, 1)
+	svc.SetCloseHandler(func(terminalID string) { closed <- terminalID })
+	require.NoError(t, svc.Close("term-1"))
+	assert.Equal(t, "term-1", <-closed)
 }
 
 func TestTerminalService_OpenDefaultTermType(t *testing.T) {

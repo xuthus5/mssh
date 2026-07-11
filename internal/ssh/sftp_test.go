@@ -1,14 +1,18 @@
 package ssh
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
+	"errors"
+	"io"
 	"log/slog"
 	"net"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/pkg/sftp"
 	"github.com/stretchr/testify/assert"
@@ -18,6 +22,38 @@ import (
 	"mssh/internal/model"
 	"mssh/internal/ssh/testutil"
 )
+
+type slowReader struct {
+	remaining int
+}
+
+func (r *slowReader) Read(p []byte) (int, error) {
+	if r.remaining == 0 {
+		return 0, io.EOF
+	}
+	time.Sleep(time.Millisecond)
+	n := min(len(p), r.remaining)
+	for i := range n {
+		p[i] = 'x'
+	}
+	r.remaining -= n
+	return n, nil
+}
+
+func TestCopyWithContextCancel(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	var dst bytes.Buffer
+	reader := &slowReader{remaining: 10 * 1024 * 1024}
+	go func() {
+		time.Sleep(5 * time.Millisecond)
+		cancel()
+	}()
+
+	_, err := copyWithContext(ctx, &dst, reader, nil)
+	require.Error(t, err)
+	assert.True(t, errors.Is(err, context.Canceled))
+	assert.Less(t, dst.Len(), 10*1024*1024)
+}
 
 func startSFTPServer(t *testing.T) (string, func()) {
 	t.Helper()

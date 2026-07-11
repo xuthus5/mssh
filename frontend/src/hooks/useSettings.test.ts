@@ -21,6 +21,7 @@ describe('useSettings', () => {
       _settings[key] = value
     })
     __registerHandler('mssh/internal/service.KeyService.List', async () => [])
+    __registerHandler('mssh/internal/service.TerminalService.SetMaxSize', async () => {})
   })
 
   it('loads default general settings', async () => {

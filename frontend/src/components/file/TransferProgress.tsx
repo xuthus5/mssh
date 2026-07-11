@@ -1,17 +1,15 @@
 import { Progress } from '@/components/ui/progress'
 import { useEffect } from 'react'
 import type { TransferJob } from '@/hooks/useFileTransfer'
+import { Button } from '@/components/ui/button'
+import { X } from 'lucide-react'
 
 interface Props {
   transfers: TransferJob[]
   onCancel: (jobId: string) => void
 }
 
-export default function TransferProgress({ transfers }: Props) {
-  useEffect(() => {
-    // Wails binding stub: subscribe to progress updates
-    console.debug('[TransferProgress] active transfers:', transfers.length)
-  }, [transfers])
+export default function TransferProgress({ transfers, onCancel }: Props) {
 
   if (transfers.length === 0) return null
 
@@ -31,11 +29,28 @@ export default function TransferProgress({ transfers }: Props) {
               <span className="text-xs tabular-nums">{pct}%</span>
             </Progress>
             <span className="text-xs">{formatSpeed(t.speed)}</span>
+            {t.eta > 0 && t.status === 'running' && <span className="text-xs">剩余 {formatETA(t.eta)}</span>}
+            {t.status !== 'running' && t.status !== 'queued' && (
+              <span className="text-xs text-muted-foreground">
+                {t.status === 'completed' ? '已完成' : t.status === 'cancelled' ? '已取消' : '失败'}
+              </span>
+            )}
+            {(t.status === 'running' || t.status === 'queued') && (
+              <Button size="icon-xs" variant="ghost" aria-label={`取消 ${t.fileName}`} onClick={() => onCancel(t.id)}>
+                <X />
+              </Button>
+            )}
           </div>
         )
       })}
     </div>
   )
+}
+
+function formatETA(seconds: number): string {
+  if (seconds < 60) return `${seconds} 秒`
+  const minutes = Math.ceil(seconds / 60)
+  return `${minutes} 分钟`
 }
 
 function formatSpeed(bytesPerSec: number): string {

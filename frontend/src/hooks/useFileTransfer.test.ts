@@ -2,12 +2,14 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useFileTransfer } from '@/hooks/useFileTransfer'
 import { __registerHandler, __clearHandlers } from '@/test/__mocks__/wails-runtime'
+import { useAppStore } from '@/store/appStore'
 
 const SESSION_ID = 1
 
 describe('useFileTransfer', () => {
   beforeEach(() => {
     __clearHandlers()
+    useAppStore.setState({ transfers: [] })
   })
 
   it('listFiles sets files from service', async () => {
@@ -50,7 +52,7 @@ describe('useFileTransfer', () => {
     expect(result.current.transfers[0].fileName).toBe('file.txt')
   })
 
-  it('cancelTransfer removes transfer job', async () => {
+  it('cancelTransfer requests cancellation and keeps terminal state visible', async () => {
     __registerHandler('mssh/internal/service.FileService.Upload', async () => 'task-1')
     __registerHandler('mssh/internal/service.FileService.CancelTransfer', async () => {})
 
@@ -59,7 +61,8 @@ describe('useFileTransfer', () => {
     expect(result.current.transfers).toHaveLength(1)
 
     await act(async () => { await result.current.cancelTransfer(result.current.transfers[0].id) })
-    expect(result.current.transfers).toHaveLength(0)
+    expect(result.current.transfers).toHaveLength(1)
+    expect(result.current.transfers[0].status).toBe('queued')
   })
 
   it('deleteFile removes from list', async () => {

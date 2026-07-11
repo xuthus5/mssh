@@ -20,6 +20,12 @@ import { useAppStore } from '@/store/appStore'
 import { MacroService } from '@/lib/wails'
 import type { Macro } from '../../../bindings/mssh/internal/model/models'
 import { logger } from '@/lib/logger'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Skeleton } from '@/components/ui/skeleton'
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 
 type SidebarTab = 'sessions' | 'macros'
 
@@ -28,10 +34,12 @@ export default function Sidebar() {
   const [sessionDialogOpen, setSessionDialogOpen] = useState(false)
   const [folderDialogOpen, setFolderDialogOpen] = useState(false)
   const [folderName, setFolderName] = useState('')
+  const [editingFolder, setEditingFolder] = useState<Folder | null>(null)
   const [editingSession, setEditingSession] = useState<Session | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [macros, setMacros] = useState<CommandItem[]>([])
+  const [deleteTarget, setDeleteTarget] = useState<{ type: 'session' | 'folder'; id: string; name: string } | null>(null)
 
   const {
     folders,
@@ -44,6 +52,10 @@ export default function Sidebar() {
     deleteSession,
     moveSession,
     connect,
+    loading,
+    error,
+    listFolders,
+    listSessions,
   } = useSession()
 
   const settings = useSettings()
@@ -62,15 +74,14 @@ export default function Sidebar() {
       .catch((err: unknown) => { logger.error('Sidebar: list macros error', err) })
   }, [])
 
-  const filteredFolders = useMemo(
-    () =>
-      searchQuery.trim()
-        ? folders.filter((f) =>
-            f.name.toLowerCase().includes(searchQuery.toLowerCase()),
-          )
-        : folders,
-    [folders, searchQuery],
-  )
+  useEffect(() => {
+    const openNewSession = () => {
+      setEditingSession(null)
+      setSessionDialogOpen(true)
+    }
+    window.addEventListener('mssh:new-session', openNewSession)
+    return () => window.removeEventListener('mssh:new-session', openNewSession)
+  }, [])
 
   const filteredSessions = useMemo(
     () =>
@@ -85,14 +96,31 @@ export default function Sidebar() {
     [sessions, searchQuery],
   )
 
+  const filteredFolders = useMemo(() => {
+    if (!searchQuery.trim()) return folders
+    const included = new Set<string>()
+    for (const session of filteredSessions) {
+      let parentID = session.folderId
+      while (parentID) {
+        if (included.has(parentID)) break
+        included.add(parentID)
+        parentID = folders.find((folder) => folder.id === parentID)?.parentId ?? null
+      }
+    }
+    for (const folder of folders) {
+      if (folder.name.toLowerCase().includes(searchQuery.toLowerCase())) included.add(folder.id)
+    }
+    return folders.filter((folder) => included.has(folder.id))
+  }, [folders, filteredSessions, searchQuery])
+
   const handleSaveSession = useCallback(
-    (data: Omit<Session, 'id'>) => {
+    async (data: Omit<Session, 'id'>) => {
       if (editingSession) {
         logger.debug('Sidebar: updateSession', { id: editingSession.id, name: data.name, authMethod: data.authMethod })
-        updateSession({ ...editingSession, ...data })
+        await updateSession({ ...editingSession, ...data })
       } else {
         logger.debug('Sidebar: createSession', { name: data.name, authMethod: data.authMethod })
-        createSession(data)
+        await createSession(data)
       }
       setSessionDialogOpen(false)
       setEditingSession(null)
@@ -102,9 +130,10 @@ export default function Sidebar() {
 
   const handleCreateFolder = () => {
     if (!folderName.trim()) return
-    logger.debug('Sidebar: createFolder', folderName.trim())
-    createFolder(folderName.trim(), null)
+    if (editingFolder) void updateFolder(editingFolder.id, folderName.trim())
+    else void createFolder(folderName.trim(), null)
     setFolderName('')
+    setEditingFolder(null)
     setFolderDialogOpen(false)
   }
 
@@ -124,7 +153,7 @@ export default function Sidebar() {
     const activeTabId = useAppStore.getState().activeTabId
     if (!activeTabId) return
     const activeTab = useAppStore.getState().tabs.find((t) => t.id === activeTabId)
-    const terminalId = activeTab?.terminalId ?? activeTabId
+    const terminalId = useAppStore.getState().activePaneId ?? activeTab?.terminalId ?? activeTabId
     logger.debug('Sidebar: MacroService.Execute', terminalId, cmd)
     MacroService.Execute(terminalId, cmd).catch((err: unknown) => {
       logger.error('Sidebar: execute macro error', err)
@@ -222,7 +251,7 @@ export default function Sidebar() {
           </div>
           <div className="flex items-center justify-between px-3 py-1 border-b border-border/30">
             <span className="text-[11px] text-muted-foreground">
-              共 {sessions.length} 个会话
+              {searchQuery.trim() ? `匹配 ${filteredSessions.length} 个会话` : `共 ${sessions.length} 个会话`}
             </span>
             {searchQuery.trim() && (
               <span className="text-[10px] text-muted-foreground/60">
@@ -231,21 +260,25 @@ export default function Sidebar() {
             )}
           </div>
           <div className="flex-1 min-h-0">
-            <SessionTree
+            {loading ? <div className="flex flex-col gap-2 p-3"><Skeleton className="h-7 w-full" /><Skeleton className="h-7 w-4/5" /><Skeleton className="h-7 w-3/5" /></div> : error ? (
+              <Alert variant="destructive" className="m-2"><AlertDescription>{error}<Button size="xs" variant="outline" className="mt-2" onClick={() => { void Promise.all([listFolders(), listSessions()]) }}>重试</Button></AlertDescription></Alert>
+            ) : <SessionTree
               folders={filteredFolders}
               sessions={filteredSessions}
               onConnect={connect}
               onEditSession={handleOpenEditSession}
-              onDeleteSession={deleteSession}
-              onEditFolder={(f: Folder) => {
-                const newName = prompt('修改分组名称', f.name)
-                if (newName && newName.trim() !== '' && newName !== f.name) {
-                  updateFolder(f.id, newName.trim())
-                }
+              onDeleteSession={(id) => {
+                const session = sessions.find((item) => item.id === id)
+                if (session) setDeleteTarget({ type: 'session', id, name: session.name })
               }}
-              onDeleteFolder={deleteFolder}
+              onEditFolder={(folder: Folder) => { setEditingFolder(folder); setFolderName(folder.name); setFolderDialogOpen(true) }}
+              onDeleteFolder={(id) => {
+                const folder = folders.find((item) => item.id === id)
+                if (folder) setDeleteTarget({ type: 'folder', id, name: folder.name })
+              }}
               onMoveToFolder={moveSession}
-            />
+              revealAll={Boolean(searchQuery.trim())}
+            />}
           </div>
         </>
       )}
@@ -271,10 +304,10 @@ export default function Sidebar() {
         onSave={handleSaveSession}
       />
 
-      <Dialog open={folderDialogOpen} onOpenChange={setFolderDialogOpen}>
+      <Dialog open={folderDialogOpen} onOpenChange={(open) => { setFolderDialogOpen(open); if (!open) { setEditingFolder(null); setFolderName('') } }}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle>新建分组</DialogTitle>
+            <DialogTitle>{editingFolder ? '编辑分组' : '新建分组'}</DialogTitle>
           </DialogHeader>
           <div className="flex flex-col gap-3">
             <div className="flex flex-col gap-1.5">
@@ -296,7 +329,7 @@ export default function Sidebar() {
               取消
             </Button>
             <Button onClick={handleCreateFolder}>
-              创建
+              {editingFolder ? '保存' : '创建'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -319,6 +352,25 @@ export default function Sidebar() {
         onExportConfig={settings.exportConfig}
         onImportConfig={settings.importConfig}
       />
+      <AlertDialog open={deleteTarget !== null} onOpenChange={(open) => { if (!open) setDeleteTarget(null) }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>确认删除“{deleteTarget?.name}”</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteTarget?.type === 'folder' ? '删除分组可能影响其中会话的组织方式。此操作不可撤销。' : '该会话配置将被永久删除，此操作不可撤销。'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" onClick={() => {
+              if (!deleteTarget) return
+              if (deleteTarget.type === 'session') void deleteSession(deleteTarget.id)
+              else void deleteFolder(deleteTarget.id)
+              setDeleteTarget(null)
+            }}>删除</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </aside>
   )
 }

@@ -23,7 +23,7 @@ interface Props {
   onOpenChange: (open: boolean) => void
   session?: Session | null
   folders?: Folder[]
-  onSave: (data: Omit<Session, 'id'>) => void
+  onSave: (data: Omit<Session, 'id'>) => Promise<void>
 }
 
 interface KeyItem { id: number; name: string; type: string }
@@ -61,6 +61,8 @@ export default function SessionDialog({ open, onOpenChange, session, folders, on
   const [folderId, setFolderId] = useState(session?.folderId ?? '')
 
   const [keys, setKeys] = useState<KeyItem[]>([])
+  const [pending, setPending] = useState(false)
+  const [submitError, setSubmitError] = useState('')
 
   useEffect(() => {
     if (!open) return
@@ -69,21 +71,22 @@ export default function SessionDialog({ open, onOpenChange, session, folders, on
       .catch(() => setKeys([]))
   }, [open])
 
-  const handleSubmit = useCallback(() => {
+  const handleSubmit = useCallback(async () => {
     const needsPassword = authMethod === 'password' || authMethod === 'keyboard-interactive'
-    onSave({
-      name: name.trim(),
-      host: host.trim(),
-      port: parseInt(port, 10) || 22,
-      username: username.trim(),
-      authMethod: authMethod as Session["authMethod"],
-      password: needsPassword ? password : undefined,
-      keyId: authMethod === 'key' ? keyId : undefined,
-      keepAlive: parseInt(keepAlive, 10) || 60,
-      termType: termType.trim() || 'xterm-256color',
-      folderId: folderId || null,
-    })
-    onOpenChange(false)
+    setPending(true)
+    setSubmitError('')
+    try {
+      await onSave({
+        name: name.trim(), host: host.trim(), port: parseInt(port, 10) || 22,
+        username: username.trim(), authMethod: authMethod as Session["authMethod"],
+        password: needsPassword ? password : undefined, keyId: authMethod === 'key' ? keyId : undefined,
+        keepAlive: parseInt(keepAlive, 10) || 60, termType: termType.trim() || 'xterm-256color', folderId: folderId || null,
+      })
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setPending(false)
+    }
   }, [name, host, port, username, authMethod, password, keyId, keepAlive, termType, folderId, onSave, onOpenChange])
 
   const isEditing = !!session
@@ -99,6 +102,7 @@ export default function SessionDialog({ open, onOpenChange, session, folders, on
           onSubmit={(e) => { e.preventDefault(); handleSubmit() }}
           className="flex flex-col gap-3"
         >
+          {submitError && <div role="alert" className="rounded-lg border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">{submitError}</div>}
           <label className="flex flex-col gap-1.5">
             <span className="text-xs font-medium text-muted-foreground">名称</span>
             <Input value={name} onChange={(e) => setName(e.target.value)} required autoFocus />
@@ -206,7 +210,7 @@ export default function SessionDialog({ open, onOpenChange, session, folders, on
           </div>
 
           <DialogFooter showCloseButton>
-            <Button onClick={handleSubmit}>{isEditing ? '保存' : '创建连接'}</Button>
+            <Button type="submit" disabled={pending}>{pending ? '保存中...' : isEditing ? '保存' : '创建会话'}</Button>
           </DialogFooter>
         </form>
       </DialogContent>

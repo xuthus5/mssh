@@ -1,6 +1,7 @@
 package ssh
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -49,25 +50,38 @@ func ListDir(client *sftp.Client, path string) ([]FileEntry, error) {
 }
 
 func UploadFile(client *sftp.Client, src, dst string, onProgress ProgressFn) error {
+	return UploadFileContext(context.Background(), client, src, dst, onProgress)
+}
+
+func UploadFileContext(ctx context.Context, client *sftp.Client, src, dst string, onProgress ProgressFn) error {
 	local, err := os.Open(src)
 	if err != nil {
 		return fmt.Errorf("open local: %w", err)
 	}
-	defer local.Close()
+	defer func() { _ = local.Close() }()
+	info, err := local.Stat()
+	if err != nil {
+		return fmt.Errorf("stat local: %w", err)
+	}
 
 	remoteDir := filepath.Dir(dst)
 	if remoteDir != "." && remoteDir != "/" {
-		_ = client.MkdirAll(remoteDir)
+		if err := client.MkdirAll(remoteDir); err != nil {
+			return fmt.Errorf("create remote dir: %w", err)
+		}
 	}
 
 	remote, err := client.Create(dst)
 	if err != nil {
 		return fmt.Errorf("create remote: %w", err)
 	}
-	defer remote.Close()
+	defer func() { _ = remote.Close() }()
 
-	pw := &progressWriter{onProgress: onProgress}
-	_, err = io.Copy(remote, io.TeeReader(local, pw))
+	_, err = copyWithContext(ctx, remote, local, func(transferred int64) {
+		if onProgress != nil {
+			onProgress(transferred, info.Size())
+		}
+	})
 	if err != nil {
 		return fmt.Errorf("copy: %w", err)
 	}
@@ -75,11 +89,19 @@ func UploadFile(client *sftp.Client, src, dst string, onProgress ProgressFn) err
 }
 
 func DownloadFile(client *sftp.Client, src, dst string, onProgress ProgressFn) error {
+	return DownloadFileContext(context.Background(), client, src, dst, onProgress)
+}
+
+func DownloadFileContext(ctx context.Context, client *sftp.Client, src, dst string, onProgress ProgressFn) error {
 	remote, err := client.Open(src)
 	if err != nil {
 		return fmt.Errorf("open remote: %w", err)
 	}
-	defer remote.Close()
+	defer func() { _ = remote.Close() }()
+	info, err := remote.Stat()
+	if err != nil {
+		return fmt.Errorf("stat remote: %w", err)
+	}
 
 	localDir := filepath.Dir(dst)
 	if err := os.MkdirAll(localDir, 0o700); err != nil {
@@ -90,14 +112,59 @@ func DownloadFile(client *sftp.Client, src, dst string, onProgress ProgressFn) e
 	if err != nil {
 		return fmt.Errorf("open local: %w", err)
 	}
-	defer local.Close()
+	defer func() { _ = local.Close() }()
 
-	pw := &progressWriter{onProgress: onProgress}
-	_, err = io.Copy(local, io.TeeReader(remote, pw))
+	_, err = copyWithContext(ctx, local, remote, func(transferred int64) {
+		if onProgress != nil {
+			onProgress(transferred, info.Size())
+		}
+	})
 	if err != nil {
 		return fmt.Errorf("copy: %w", err)
 	}
 	return nil
+}
+
+func copyWithContext(ctx context.Context, dst io.Writer, src io.Reader, onProgress func(int64)) (int64, error) {
+	buffer := make([]byte, 32*1024)
+	var written int64
+	for {
+		select {
+		case <-ctx.Done():
+			return written, ctx.Err()
+		default:
+		}
+
+		readCount, readErr := src.Read(buffer)
+		if readCount > 0 {
+			var writeErr error
+			written, writeErr = writeCopyChunk(dst, buffer[:readCount], written, onProgress)
+			if writeErr != nil {
+				return written, writeErr
+			}
+		}
+		if readErr != nil {
+			if readErr == io.EOF {
+				return written, nil
+			}
+			return written, readErr
+		}
+	}
+}
+
+func writeCopyChunk(dst io.Writer, data []byte, written int64, onProgress func(int64)) (int64, error) {
+	writeCount, err := dst.Write(data)
+	written += int64(writeCount)
+	if onProgress != nil {
+		onProgress(written)
+	}
+	if err != nil {
+		return written, err
+	}
+	if writeCount != len(data) {
+		return written, io.ErrShortWrite
+	}
+	return written, nil
 }
 
 func RemoveFile(client *sftp.Client, path string) error {

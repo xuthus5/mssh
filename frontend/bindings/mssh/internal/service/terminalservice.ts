@@ -21,6 +21,14 @@ export function Resize(terminalID: string, cols: number, rows: number): $Cancell
     return $Call.ByName("mssh/internal/service.TerminalService.Resize", terminalID, cols, rows);
 }
 
+export function SetCloseHandler(fn: any): $CancellablePromise<void> {
+    return $Call.ByName("mssh/internal/service.TerminalService.SetCloseHandler", fn);
+}
+
+export function SetMaxSize(maxSize: number): $CancellablePromise<void> {
+    return $Call.ByName("mssh/internal/service.TerminalService.SetMaxSize", maxSize);
+}
+
 export function SetOutputHandler(fn: any): $CancellablePromise<void> {
     return $Call.ByName("mssh/internal/service.TerminalService.SetOutputHandler", fn);
 }
