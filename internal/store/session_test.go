@@ -21,14 +21,13 @@ func setupTestDB(t *testing.T) *sql.DB {
 
 func TestCreateAndListFolders(t *testing.T) {
 	db := setupTestDB(t)
-	var parentID int64 = 0
-	folder, err := CreateFolder(db, "生产环境", &parentID)
+	folder, err := CreateFolder(db, "生产环境", nil)
 	require.NoError(t, err)
 	assert.Equal(t, "生产环境", folder.Name)
 	folders, err := ListFolders(db)
 	require.NoError(t, err)
-	assert.Len(t, folders, 1)
-	assert.Equal(t, "生产环境", folders[0].Name)
+	assert.Len(t, folders, 2)
+	assert.Equal(t, "生产环境", folders[1].Name)
 }
 
 func TestCreateAndListSessions(t *testing.T) {
@@ -63,26 +62,27 @@ func TestUpdateAndDeleteSession(t *testing.T) {
 
 func TestUpdateAndDeleteFolder(t *testing.T) {
 	db := setupTestDB(t)
-	var parentID int64 = 0
-	folder, err := CreateFolder(db, "测试", &parentID)
+	folder, err := CreateFolder(db, "测试", nil)
 	require.NoError(t, err)
 	err = UpdateFolder(db, folder.ID, "更新后")
 	require.NoError(t, err)
 	folders, err := ListFolders(db)
 	require.NoError(t, err)
-	assert.Equal(t, "更新后", folders[0].Name)
+	assert.Equal(t, "更新后", folders[1].Name)
 	err = DeleteFolder(db, folder.ID)
 	require.NoError(t, err)
 	folders, err = ListFolders(db)
 	require.NoError(t, err)
-	assert.Len(t, folders, 0)
+	assert.Len(t, folders, 1)
+	assert.True(t, folders[0].IsDefault)
 }
 
-func TestListFoldersEmpty(t *testing.T) {
+func TestListFoldersHasDefault(t *testing.T) {
 	db := setupTestDB(t)
 	folders, err := ListFolders(db)
 	require.NoError(t, err)
-	assert.Len(t, folders, 0)
+	require.Len(t, folders, 1)
+	assert.True(t, folders[0].IsDefault)
 }
 
 func TestListSessionsByFolder(t *testing.T) {
@@ -126,8 +126,7 @@ func TestGetSessionNotFound(t *testing.T) {
 
 func TestMoveFolder(t *testing.T) {
 	db := setupTestDB(t)
-	var parent1 int64 = 1
-	folder, err := CreateFolder(db, "child", &parent1)
+	folder, err := CreateFolder(db, "child", nil)
 	require.NoError(t, err)
 	var parent2 int64 = 2
 	err = MoveFolder(db, folder.ID, &parent2)
@@ -135,7 +134,119 @@ func TestMoveFolder(t *testing.T) {
 
 	folders, err := ListFolders(db)
 	require.NoError(t, err)
-	assert.Equal(t, int64(2), *folders[0].ParentID)
+	var moved model.SessionFolder
+	for _, item := range folders {
+		if item.ID == folder.ID {
+			moved = item
+		}
+	}
+	require.NotNil(t, moved.ParentID)
+	assert.Equal(t, int64(2), *moved.ParentID)
+}
+
+func TestDefaultFolderRulesAndDeleteMigration(t *testing.T) {
+	db := setupTestDB(t)
+	folders, err := ListFolders(db)
+	require.NoError(t, err)
+	defaultFolder := folders[0]
+	require.Error(t, DeleteFolder(db, defaultFolder.ID))
+
+	target, err := CreateFolder(db, "目标", nil)
+	require.NoError(t, err)
+	child, err := CreateFolder(db, "子分组", &target.ID)
+	require.NoError(t, err)
+	session, err := CreateSession(db, model.Session{FolderID: &target.ID, Name: "server", Host: "127.0.0.1", Port: 22, Username: "root", AuthMethod: model.AuthPassword, KeepAlive: 30})
+	require.NoError(t, err)
+	require.NoError(t, DeleteFolder(db, target.ID))
+
+	migrated, err := GetSession(db, session.ID)
+	require.NoError(t, err)
+	assert.Equal(t, defaultFolder.ID, *migrated.FolderID)
+	folders, err = ListFolders(db)
+	require.NoError(t, err)
+	for _, folder := range folders {
+		if folder.ID == child.ID {
+			require.NotNil(t, folder.ParentID)
+			assert.Equal(t, defaultFolder.ID, *folder.ParentID)
+		}
+	}
+}
+
+func TestDeleteFolderRollsBackOnMigrationFailures(t *testing.T) {
+	tests := []struct{ name, trigger string }{
+		{"session migration", `CREATE TRIGGER fail_move_session BEFORE UPDATE OF folder_id ON sessions BEGIN SELECT RAISE(ABORT, 'fail'); END`},
+		{"child migration", `CREATE TRIGGER fail_move_child BEFORE UPDATE OF parent_id ON session_folders BEGIN SELECT RAISE(ABORT, 'fail'); END`},
+		{"folder deletion", `CREATE TRIGGER fail_delete_folder BEFORE DELETE ON session_folders BEGIN SELECT RAISE(ABORT, 'fail'); END`},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			db := setupTestDB(t)
+			target, err := CreateFolder(db, "目标", nil)
+			require.NoError(t, err)
+			_, err = CreateFolder(db, "子分组", &target.ID)
+			require.NoError(t, err)
+			_, err = CreateSession(db, model.Session{FolderID: &target.ID, Name: "server", Host: "127.0.0.1", Port: 22, Username: "root", AuthMethod: model.AuthPassword, KeepAlive: 30})
+			require.NoError(t, err)
+			_, err = db.Exec(test.trigger)
+			require.NoError(t, err)
+			assert.Error(t, DeleteFolder(db, target.ID))
+			var count int
+			require.NoError(t, db.QueryRow("SELECT count(*) FROM session_folders WHERE id = ?", target.ID).Scan(&count))
+			assert.Equal(t, 1, count)
+		})
+	}
+}
+
+func TestSetDefaultFolder(t *testing.T) {
+	db := setupTestDB(t)
+	folder, err := CreateFolder(db, "新默认", nil)
+	require.NoError(t, err)
+	require.NoError(t, SetDefaultFolder(db, folder.ID))
+	folders, err := ListFolders(db)
+	require.NoError(t, err)
+	for _, item := range folders {
+		assert.Equal(t, item.ID == folder.ID, item.IsDefault)
+	}
+}
+
+func TestSetDefaultFolderRollsBackOnUpdateFailure(t *testing.T) {
+	db := setupTestDB(t)
+	folder, err := CreateFolder(db, "新默认", nil)
+	require.NoError(t, err)
+	_, err = db.Exec(`CREATE TRIGGER fail_set_default BEFORE UPDATE OF is_default ON session_folders BEGIN SELECT RAISE(ABORT, 'fail'); END`)
+	require.NoError(t, err)
+	assert.Error(t, SetDefaultFolder(db, folder.ID))
+	defaultID, err := GetDefaultFolderID(db)
+	require.NoError(t, err)
+	assert.NotEqual(t, folder.ID, defaultID)
+}
+
+func TestDefaultFolderInvalidOperations(t *testing.T) {
+	db := setupTestDB(t)
+	assert.Error(t, SetDefaultFolder(db, 999))
+	assert.Error(t, DeleteFolder(db, 999))
+	defaultID, err := GetDefaultFolderID(db)
+	require.NoError(t, err)
+	assert.NotZero(t, defaultID)
+}
+
+func TestGetDefaultFolderIDClosedDB(t *testing.T) {
+	db := setupTestDB(t)
+	require.NoError(t, db.Close())
+	_, err := GetDefaultFolderID(db)
+	assert.Error(t, err)
+}
+
+func TestDefaultFolderMissingAndClosedDB(t *testing.T) {
+	db := setupTestDB(t)
+	_, err := db.Exec("UPDATE session_folders SET is_default = 0")
+	require.NoError(t, err)
+	_, err = GetDefaultFolderID(db)
+	assert.Error(t, err)
+	_, err = CreateSession(db, model.Session{Name: "orphan", Host: "127.0.0.1", Port: 22, Username: "root", AuthMethod: model.AuthPassword, KeepAlive: 30})
+	assert.Error(t, err)
+	require.NoError(t, db.Close())
+	assert.Error(t, SetDefaultFolder(db, 1))
 }
 
 func TestMoveSession(t *testing.T) {

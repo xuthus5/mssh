@@ -92,4 +92,18 @@ describe('SessionDialog', () => {
     render(<SessionDialog {...defaultProps} open={false} />)
     expect(screen.queryByText('新建会话')).not.toBeInTheDocument()
   })
+
+  it('selects the default folder for a new session', async () => {
+    const user = userEvent.setup()
+    render(<SessionDialog {...defaultProps} folders={[
+      { id: '1', name: '默认分组', parentId: null, isDefault: true },
+      { id: '2', name: '生产环境', parentId: null, isDefault: false },
+    ]} />)
+    const inputs = screen.getAllByRole('textbox')
+    await user.type(inputs[0], 'server')
+    await user.type(inputs[1], '127.0.0.1')
+    await user.type(inputs[2], 'root')
+    await user.click(screen.getByRole('button', { name: '创建会话' }))
+    expect(defaultProps.onSave).toHaveBeenCalledWith(expect.objectContaining({ folderId: '1' }))
+  })
 })

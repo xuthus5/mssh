@@ -15,6 +15,7 @@ type SessionFolder struct {
 	ID        int64     `json:"id"`
 	Name      string    `json:"name"`
 	ParentID  *int64    `json:"parent_id"`
+	IsDefault bool      `json:"is_default"`
 	SortOrder int       `json:"sort_order"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`

@@ -10,6 +10,7 @@ export interface Folder {
   id: string
   name: string
   parentId: string | null
+  isDefault: boolean
 }
 
 export interface Session {
@@ -37,8 +38,8 @@ export interface Tunnel {
   running: boolean
 }
 
-function mapFolder(f: { id: number; name: string; parent_id: number | null }): Folder {
-  return { id: String(f.id), name: f.name, parentId: f.parent_id ? String(f.parent_id) : null }
+function mapFolder(f: { id: number; name: string; parent_id: number | null; is_default: boolean }): Folder {
+  return { id: String(f.id), name: f.name, parentId: f.parent_id ? String(f.parent_id) : null, isDefault: f.is_default }
 }
 
 function mapSession(s: BindingSession): Session {
@@ -98,8 +99,10 @@ export function useSession() {
       if (result) {
         setFolders((prev) => [...prev, mapFolder(result)])
       }
+      return result ? mapFolder(result) : undefined
     } catch (err) {
       logger.error('createFolder error', err)
+      throw err
     }
   }, [])
 
@@ -109,6 +112,7 @@ export function useSession() {
       setFolders((prev) => prev.filter((f) => f.id !== id))
     } catch (err) {
       logger.error('deleteFolder error', err)
+      throw err
     }
   }, [])
 
@@ -118,7 +122,13 @@ export function useSession() {
       setFolders((prev) => prev.map((f) => (f.id === id ? { ...f, name } : f)))
     } catch (err) {
       logger.error('updateFolder error', err)
+      throw err
     }
+  }, [])
+
+  const setDefaultFolder = useCallback(async (id: string) => {
+    await SessionService.SetDefaultFolder(Number(id))
+    setFolders((prev) => prev.map((folder) => ({ ...folder, isDefault: folder.id === id })))
   }, [])
 
   const listSessions = useCallback(async () => {
@@ -253,7 +263,7 @@ export function useSession() {
 
   return {
     folders, sessions, tunnels, loading, error,
-    listFolders, createFolder, deleteFolder, updateFolder,
+    listFolders, createFolder, deleteFolder, updateFolder, setDefaultFolder,
     listSessions, createSession, updateSession, deleteSession, moveSession,
     connect, disconnect, listTunnels,
   }

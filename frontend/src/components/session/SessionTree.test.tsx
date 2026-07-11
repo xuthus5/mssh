@@ -4,8 +4,8 @@ import userEvent from '@testing-library/user-event'
 import SessionTree from '@/components/session/SessionTree'
 
 const FOLDERS = [
-  { id: 'f1', name: '生产环境', parentId: null },
-  { id: 'f2', name: '测试环境', parentId: null },
+  { id: 'f1', name: '生产环境', parentId: null, isDefault: true },
+  { id: 'f2', name: '测试环境', parentId: null, isDefault: false },
 ]
 
 const SESSIONS = [

@@ -24,6 +24,8 @@ import { ThemeEditor } from '@/components/settings/ThemeEditor'
 import { KeyManager } from '@/components/settings/KeyManager'
 import { SyncPanel } from '@/components/settings/SyncPanel'
 import type { GeneralSettings, TerminalTheme, KeyInfo, SyncConfig } from '@/hooks/useSettings'
+import type { Folder, Session } from '@/hooks/useSession'
+import { FolderManager } from '@/components/settings/FolderManager'
 
 interface Props {
   open: boolean
@@ -41,6 +43,12 @@ interface Props {
   onSaveSync: (c: SyncConfig) => void
   onExportConfig: () => void
   onImportConfig: () => void
+  folders: Folder[]
+  sessions: Session[]
+  onCreateFolder: (name: string, parentId: string | null) => Promise<Folder | undefined>
+  onRenameFolder: (id: string, name: string) => Promise<void>
+  onSetDefaultFolder: (id: string) => Promise<void>
+  onDeleteFolder: (id: string) => Promise<void>
 }
 
 export default function SettingsDialog({
@@ -59,6 +67,7 @@ export default function SettingsDialog({
   onSaveSync,
   onExportConfig,
   onImportConfig,
+  folders, sessions, onCreateFolder, onRenameFolder, onSetDefaultFolder, onDeleteFolder,
 }: Props) {
   const [tab, setTab] = useState('general')
   const [maxPoolSize, setMaxPoolSize] = useState(general.maxPoolSize.toString())
@@ -97,6 +106,7 @@ export default function SettingsDialog({
             <TabsTrigger value="general">通用</TabsTrigger>
             <TabsTrigger value="appearance">外观</TabsTrigger>
             <TabsTrigger value="keys">密钥</TabsTrigger>
+            <TabsTrigger value="folders">分组</TabsTrigger>
             <TabsTrigger value="sync">同步</TabsTrigger>
           </TabsList>
           <TabsContent value="general">
@@ -163,6 +173,7 @@ export default function SettingsDialog({
               onExport={onExportKey}
             />
           </TabsContent>
+          <TabsContent value="folders"><FolderManager folders={folders} sessions={sessions} onCreate={onCreateFolder} onRename={onRenameFolder} onSetDefault={onSetDefaultFolder} onDelete={onDeleteFolder} /></TabsContent>
           <TabsContent value="sync">
             <SyncPanel
               sync={sync}

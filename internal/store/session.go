@@ -25,7 +25,7 @@ func CreateFolder(db *sql.DB, name string, parentID *int64) (*model.SessionFolde
 
 func ListFolders(db *sql.DB) ([]model.SessionFolder, error) {
 	rows, err := db.Query(
-		"SELECT id, name, parent_id, sort_order, created_at, updated_at FROM session_folders ORDER BY sort_order",
+		"SELECT id, name, parent_id, is_default, sort_order, created_at, updated_at FROM session_folders ORDER BY sort_order, id",
 	)
 	if err != nil {
 		return nil, fmt.Errorf("list folders: %w", err)
@@ -35,7 +35,7 @@ func ListFolders(db *sql.DB) ([]model.SessionFolder, error) {
 	for rows.Next() {
 		var f model.SessionFolder
 		var createdAt, updatedAt string
-		err := rows.Scan(&f.ID, &f.Name, &f.ParentID, &f.SortOrder, &createdAt, &updatedAt)
+		err := rows.Scan(&f.ID, &f.Name, &f.ParentID, &f.IsDefault, &f.SortOrder, &createdAt, &updatedAt)
 		if err != nil {
 			return nil, fmt.Errorf("scan folder: %w", err)
 		}
@@ -67,14 +67,76 @@ func UpdateFolder(db *sql.DB, id int64, name string) error {
 }
 
 func DeleteFolder(db *sql.DB, id int64) error {
-	_, err := db.Exec("DELETE FROM session_folders WHERE id = ?", id)
+	tx, err := db.Begin()
 	if err != nil {
+		return fmt.Errorf("delete folder: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	var count int
+	var isDefault bool
+	if err := tx.QueryRow("SELECT (SELECT count(*) FROM session_folders), is_default FROM session_folders WHERE id = ?", id).Scan(&count, &isDefault); err != nil {
+		return fmt.Errorf("delete folder: %w", err)
+	}
+	if count <= 1 {
+		return fmt.Errorf("delete folder: at least one folder is required")
+	}
+	if isDefault {
+		return fmt.Errorf("delete folder: default folder cannot be deleted")
+	}
+	var defaultID int64
+	if err := tx.QueryRow("SELECT id FROM session_folders WHERE is_default = 1").Scan(&defaultID); err != nil {
+		return fmt.Errorf("delete folder: %w", err)
+	}
+	if _, err := tx.Exec("UPDATE sessions SET folder_id = ? WHERE folder_id = ?", defaultID, id); err != nil {
+		return fmt.Errorf("delete folder: %w", err)
+	}
+	if _, err := tx.Exec("UPDATE session_folders SET parent_id = ? WHERE parent_id = ?", defaultID, id); err != nil {
+		return fmt.Errorf("delete folder: %w", err)
+	}
+	if _, err := tx.Exec("DELETE FROM session_folders WHERE id = ?", id); err != nil {
+		return fmt.Errorf("delete folder: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("delete folder: %w", err)
 	}
 	return nil
 }
 
+func SetDefaultFolder(db *sql.DB, id int64) error {
+	tx, err := db.Begin()
+	if err != nil {
+		return fmt.Errorf("set default folder: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	var exists int
+	if err := tx.QueryRow("SELECT count(*) FROM session_folders WHERE id = ?", id).Scan(&exists); err != nil {
+		return fmt.Errorf("set default folder: %w", err)
+	}
+	if exists == 0 {
+		return fmt.Errorf("set default folder: folder not found")
+	}
+	if _, err := tx.Exec("UPDATE session_folders SET is_default = CASE WHEN id = ? THEN 1 ELSE 0 END, parent_id = CASE WHEN id = ? THEN NULL ELSE parent_id END, updated_at = datetime('now')", id, id); err != nil {
+		return fmt.Errorf("set default folder: %w", err)
+	}
+	return tx.Commit()
+}
+
+func GetDefaultFolderID(db *sql.DB) (int64, error) {
+	var id int64
+	if err := db.QueryRow("SELECT id FROM session_folders WHERE is_default = 1").Scan(&id); err != nil {
+		return 0, fmt.Errorf("get default folder: %w", err)
+	}
+	return id, nil
+}
+
 func CreateSession(db *sql.DB, s model.Session) (*model.Session, error) {
+	if s.FolderID == nil {
+		defaultID, err := GetDefaultFolderID(db)
+		if err != nil {
+			return nil, err
+		}
+		s.FolderID = &defaultID
+	}
 	result, err := db.Exec(
 		`INSERT INTO sessions (folder_id, name, host, port, username, auth_method, password, key_id, keep_alive, term_type, sort_order)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,

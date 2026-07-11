@@ -51,6 +51,7 @@ export default function Sidebar() {
     updateSession,
     deleteSession,
     moveSession,
+    setDefaultFolder,
     connect,
     loading,
     error,
@@ -351,6 +352,12 @@ export default function Sidebar() {
         onSaveSync={settings.saveSync}
         onExportConfig={settings.exportConfig}
         onImportConfig={settings.importConfig}
+        folders={folders}
+        sessions={sessions}
+        onCreateFolder={createFolder}
+        onRenameFolder={updateFolder}
+        onSetDefaultFolder={setDefaultFolder}
+        onDeleteFolder={deleteFolder}
       />
       <AlertDialog open={deleteTarget !== null} onOpenChange={(open) => { if (!open) setDeleteTarget(null) }}>
         <AlertDialogContent>
