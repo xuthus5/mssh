@@ -5,10 +5,50 @@
 // @ts-ignore: Unused imports
 import { Call as $Call, CancellablePromise as $CancellablePromise, Create as $Create } from "@wailsio/runtime";
 
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
+import * as model$0 from "../model/models.js";
+
+export function Delete(key: string): $CancellablePromise<void> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.SettingService.Delete", key);
+}
+
+export function Get(key: string): $CancellablePromise<model$0.Setting | null> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.SettingService.Get", key).then(($result: any) => {
+        return $$createType1($result);
+    });
+}
+
+export function GetMany(keys: string[]): $CancellablePromise<{ [_ in string]?: model$0.Setting }> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.SettingService.GetMany", keys).then(($result: any) => {
+        return $$createType2($result);
+    });
+}
+
 export function GetSetting(key: string): $CancellablePromise<string> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.SettingService.GetSetting", key);
+}
+
+export function List($namespace: string): $CancellablePromise<model$0.Setting[]> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.SettingService.List", $namespace).then(($result: any) => {
+        return $$createType3($result);
+    });
+}
+
+export function Set(setting: model$0.Setting): $CancellablePromise<void> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.SettingService.Set", setting);
+}
+
+export function SetMany(settings: model$0.Setting[]): $CancellablePromise<void> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.SettingService.SetMany", settings);
 }
 
 export function SetSetting(key: string, value: string): $CancellablePromise<void> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.SettingService.SetSetting", key, value);
 }
+
+// Private type creation functions
+const $$createType0 = model$0.Setting.createFrom;
+const $$createType1 = $Create.Nullable($$createType0);
+const $$createType2 = $Create.Map($Create.Any, $$createType0);
+const $$createType3 = $Create.Array($$createType0);

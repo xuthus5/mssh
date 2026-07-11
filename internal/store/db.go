@@ -83,10 +83,6 @@ func Migrate(db *sql.DB) error {
 			config     TEXT NOT NULL,
 			created_at TEXT NOT NULL DEFAULT (datetime('now'))
 		)`,
-		`CREATE TABLE IF NOT EXISTS settings (
-			key   TEXT PRIMARY KEY,
-			value TEXT NOT NULL
-		)`,
 		`CREATE TABLE IF NOT EXISTS session_logs (
 			id         INTEGER PRIMARY KEY AUTOINCREMENT,
 			session_id INTEGER REFERENCES sessions(id),
@@ -99,6 +95,9 @@ func Migrate(db *sql.DB) error {
 		return err
 	}
 	if err := ensureDefaultFolderSchema(db); err != nil {
+		return fmt.Errorf("migration: %w", err)
+	}
+	if err := ensureSettingsSchema(db); err != nil {
 		return fmt.Errorf("migration: %w", err)
 	}
 	return nil
