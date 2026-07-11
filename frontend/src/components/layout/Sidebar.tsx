@@ -18,6 +18,8 @@ import { useSettings } from '@/hooks/useSettings'
 import type { CommandItem } from '@/components/session/QuickCommands'
 import { useAppStore } from '@/store/appStore'
 import { MacroService } from '@/lib/wails'
+import type { Macro } from '../../../bindings/mssh/internal/model/models'
+import { logger } from '@/lib/logger'
 
 type SidebarTab = 'sessions' | 'macros'
 
@@ -48,16 +50,16 @@ export default function Sidebar() {
 
   useEffect(() => {
     MacroService.List()
-      .then((result: any) => {
-        const items = (result as { id?: number; name?: string; shortcut?: string; command?: string }[]).map((m) => ({
-          id: String(m.id ?? ''),
-          name: m.name ?? '',
-          shortcut: m.shortcut ?? '',
-          command: m.command ?? '',
+      .then((result) => {
+        const items = (result ?? []).map((m: Macro) => ({
+          id: String(m.id),
+          name: m.name,
+          shortcut: m.shortcut,
+          command: m.command,
         }))
         setMacros(items)
       })
-      .catch((err: unknown) => { console.error('[Sidebar] list macros error', err) })
+      .catch((err: unknown) => { logger.error('Sidebar: list macros error', err) })
   }, [])
 
   const filteredFolders = useMemo(
@@ -86,10 +88,10 @@ export default function Sidebar() {
   const handleSaveSession = useCallback(
     (data: Omit<Session, 'id'>) => {
       if (editingSession) {
-        console.log('[Sidebar] updateSession', { id: editingSession.id, name: data.name, authMethod: data.authMethod })
+        logger.debug('Sidebar: updateSession', { id: editingSession.id, name: data.name, authMethod: data.authMethod })
         updateSession({ ...editingSession, ...data })
       } else {
-        console.log('[Sidebar] createSession', { name: data.name, authMethod: data.authMethod })
+        logger.debug('Sidebar: createSession', { name: data.name, authMethod: data.authMethod })
         createSession(data)
       }
       setSessionDialogOpen(false)
@@ -100,20 +102,20 @@ export default function Sidebar() {
 
   const handleCreateFolder = () => {
     if (!folderName.trim()) return
-    console.log('[Sidebar] createFolder', folderName.trim())
+    logger.debug('Sidebar: createFolder', folderName.trim())
     createFolder(folderName.trim(), null)
     setFolderName('')
     setFolderDialogOpen(false)
   }
 
   const handleOpenNewSession = () => {
-    console.log('[Sidebar] openNewSession')
+    logger.debug('Sidebar: openNewSession')
     setEditingSession(null)
     setTimeout(() => setSessionDialogOpen(true), 0)
   }
 
   const handleOpenEditSession = (s: Session) => {
-    console.log('[Sidebar] openEditSession', { id: s.id, name: s.name })
+    logger.debug('Sidebar: openEditSession', { id: s.id, name: s.name })
     setEditingSession(s)
     setTimeout(() => setSessionDialogOpen(true), 0)
   }
@@ -123,35 +125,35 @@ export default function Sidebar() {
     if (!activeTabId) return
     const activeTab = useAppStore.getState().tabs.find((t) => t.id === activeTabId)
     const terminalId = activeTab?.terminalId ?? activeTabId
-    console.log('[Sidebar] MacroService.Execute', terminalId, cmd)
+    logger.debug('Sidebar: MacroService.Execute', terminalId, cmd)
     MacroService.Execute(terminalId, cmd).catch((err: unknown) => {
-      console.error('[Sidebar] execute macro error', err)
+      logger.error('Sidebar: execute macro error', err)
     })
   }, [])
 
   const handleMacroAdd = useCallback(async (item: Omit<CommandItem, 'id'>) => {
     try {
-      console.log('[Sidebar] MacroService.Create', item)
-      const result = (await MacroService.Create(item as any)) as { id?: number; name?: string; shortcut?: string; command?: string }
+      logger.debug('Sidebar: MacroService.Create', item)
+      const result = await MacroService.Create({ name: item.name, command: item.command, shortcut: item.shortcut, id: 0, delay_ms: 0, sort_order: 0, created_at: '' } as Macro)
       const newItem: CommandItem = {
-        id: String(result.id ?? ''),
-        name: result.name ?? item.name,
-        shortcut: result.shortcut ?? item.shortcut,
-        command: result.command ?? item.command,
+        id: String(result?.id ?? ''),
+        name: result?.name ?? item.name,
+        shortcut: result?.shortcut ?? item.shortcut,
+        command: result?.command ?? item.command,
       }
       setMacros((prev) => [...prev, newItem])
     } catch (err) {
-      console.error('[Sidebar] create macro error', err)
+      logger.error('Sidebar: create macro error', err)
     }
   }, [])
 
   const handleMacroDelete = useCallback(async (id: string) => {
     try {
-      console.log('[Sidebar] MacroService.Delete', id)
+      logger.debug('Sidebar: MacroService.Delete', id)
       await MacroService.Delete(Number(id))
       setMacros((prev) => prev.filter((m) => m.id !== id))
     } catch (err) {
-      console.error('[Sidebar] delete macro error', err)
+      logger.error('Sidebar: delete macro error', err)
     }
   }, [])
 
@@ -202,7 +204,7 @@ export default function Sidebar() {
                 variant="ghost"
                 size="sm"
                 className="flex-1 text-xs h-7 justify-start gap-1"
-                onClick={() => { console.log('[Sidebar] 新建会话 click'); handleOpenNewSession() }}
+                onClick={() => { logger.debug('Sidebar: 新建会话 click'); handleOpenNewSession() }}
               >
                 <Plus className="h-3 w-3" />
                 新建会话
@@ -211,7 +213,7 @@ export default function Sidebar() {
                 variant="ghost"
                 size="sm"
                 className="text-xs h-7 w-7 p-0 justify-center"
-                onClick={() => { console.log('[Sidebar] 新建分组 click'); setFolderDialogOpen(true) }}
+                onClick={() => { logger.debug('Sidebar: 新建分组 click'); setFolderDialogOpen(true) }}
                 title="新建分组"
               >
                 <FolderPlus className="h-3.5 w-3.5" />

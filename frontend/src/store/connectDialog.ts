@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { Events } from '@wailsio/runtime'
 
 export type ConnectState = 'idle' | 'connecting' | 'connected' | 'failed'
 
@@ -36,3 +37,11 @@ export const useConnectDialog = create<ConnectDialogState>((set) => ({
   setFingerprint: (fp) => set({ fingerprint: fp }),
   closeDialog: () => set({ open: false, state: 'idle' }),
 }))
+
+// Listen for host key fingerprint events from the backend.
+Events.On('session:fingerprint', (wailsEvent: { data?: { hostname?: string; fingerprint?: string; algorithm?: string } }) => {
+  const p = wailsEvent?.data
+  if (p?.fingerprint) {
+    useConnectDialog.getState().setFingerprint(p.fingerprint)
+  }
+})

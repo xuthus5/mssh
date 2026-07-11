@@ -10,6 +10,7 @@ import { ToastContainer } from '@/components/ui/toast'
 import { ConnectDialog } from '@/components/layout/ConnectDialog'
 import { useAppStore } from '@/store/appStore'
 import { useFileTransfer } from '@/hooks/useFileTransfer'
+import { logger } from '@/lib/logger'
 
 function WelcomeScreen() {
   return (
@@ -184,7 +185,7 @@ function TabContent() {
   const activeTab = tabs.find((t) => t.id === activeTabId)
   const [filePanelSessionId, setFilePanelSessionId] = useState<number | null>(null)
 
-  console.log('[App] activeTab', activeTab?.type ?? 'none', activeTabId ?? 'none')
+  logger.debug('App: activeTab', activeTab?.type ?? 'none', activeTabId ?? 'none')
 
   const handleOpenFiles = useCallback(() => {
     if (activeTab?.sessionId) {
@@ -247,7 +248,7 @@ export default function App() {
             const sel = entry.terminal.getSelection()
             if (sel) {
               navigator.clipboard.writeText(sel).catch(() => {})
-              console.log('[Shortcut] Ctrl+Shift+C: copied selection')
+              logger.debug('Shortcut: Ctrl+Shift+C: copied selection')
             }
           }
         }
@@ -261,7 +262,7 @@ export default function App() {
           if (entry) {
             navigator.clipboard.readText().then((text) => {
               entry.terminal.paste(text)
-              console.log('[Shortcut] Ctrl+Shift+V: pasted')
+              logger.debug('Shortcut: Ctrl+Shift+V: pasted')
             }).catch(() => {})
           }
         }
@@ -274,7 +275,7 @@ export default function App() {
           const entry = state.terminalPool.get(activeTab.terminalId ?? activeTab.id)
           if (entry) {
             entry.terminal.clear()
-            console.log('[Shortcut] Ctrl+Shift+L: cleared')
+            logger.debug('Shortcut: Ctrl+Shift+L: cleared')
           }
         }
       }
@@ -282,7 +283,7 @@ export default function App() {
       if (e.ctrlKey && e.key === 'w') {
         e.preventDefault()
         if (state.activeTabId) {
-          console.log('[Shortcut] Ctrl+W: close tab', state.activeTabId)
+          logger.debug('Shortcut: Ctrl+W: close tab', state.activeTabId)
           state.closeTab(state.activeTabId)
         }
       }

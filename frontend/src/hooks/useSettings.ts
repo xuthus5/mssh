@@ -1,6 +1,8 @@
 import { useState, useCallback, useEffect } from 'react'
 import { SettingService, KeyService, SyncService } from '@/lib/wails'
 import { useAppStore } from '@/store/appStore'
+import { logger } from '@/lib/logger'
+import { KeyType } from '../../bindings/mssh/internal/model/models'
 
 export interface GeneralSettings {
   maxPoolSize: number
@@ -49,7 +51,7 @@ export function useSettings() {
 
   const loadGeneral = useCallback(async () => {
     try {
-      console.log('[useSettings] loadGeneral')
+      logger.debug('loadGeneral')
       const maxPoolSize = await SettingService.GetSetting('max_pool_size')
       const keepAlive = await SettingService.GetSetting('default_keep_alive')
       const termType = await SettingService.GetSetting('default_term_type')
@@ -59,25 +61,25 @@ export function useSettings() {
         defaultTermType: termType || 'xterm-256color',
       })
     } catch (err) {
-      console.log('[useSettings] loadGeneral error', err)
+      logger.debug('loadGeneral error', err)
     }
   }, [])
 
   const saveGeneral = useCallback(async (settings: GeneralSettings) => {
     try {
-      console.log('[useSettings] saveGeneral', settings)
+      logger.debug('saveGeneral', settings)
       await SettingService.SetSetting('max_pool_size', String(settings.maxPoolSize))
       await SettingService.SetSetting('default_keep_alive', String(settings.defaultKeepAlive))
       await SettingService.SetSetting('default_term_type', settings.defaultTermType)
       setGeneral(settings)
     } catch (err) {
-      console.log('[useSettings] saveGeneral error', err)
+      logger.debug('saveGeneral error', err)
     }
   }, [])
 
   const saveTheme = useCallback(async (t: TerminalTheme) => {
     try {
-      console.log('[useSettings] saveTheme')
+      logger.debug('saveTheme')
       await SettingService.SetSetting('theme', JSON.stringify(t))
       setTheme(t)
       useAppStore.getState().setTerminalTheme({
@@ -107,13 +109,13 @@ export function useSettings() {
         ansiBrightWhite: t.ansi[15] ?? '#ffffff',
       })
     } catch (err) {
-      console.log('[useSettings] saveTheme error', err)
+      logger.debug('saveTheme error', err)
     }
   }, [])
 
   const loadTheme = useCallback(async () => {
     try {
-      console.log('[useSettings] loadTheme')
+      logger.debug('loadTheme')
       const raw = await SettingService.GetSetting('theme')
       if (raw) {
         const t: TerminalTheme = JSON.parse(raw)
@@ -146,105 +148,110 @@ export function useSettings() {
         })
       }
     } catch (err) {
-      console.log('[useSettings] loadTheme error', err)
+      logger.debug('loadTheme error', err)
     }
   }, [])
 
   const listKeys = useCallback(async () => {
     try {
-      console.log('[useSettings] listKeys')
+      logger.debug('listKeys')
       const result = await KeyService.List()
-      setKeys(result!.map((k: any) => ({ id: String(k.id), name: k.name, type: k.type, bits: 0, publicKey: k.public_key, createdAt: k.created_at })))
+      setKeys((result ?? []).map((k) => ({ id: String(k.id), name: k.name, type: k.type as KeyInfo['type'], bits: 0, publicKey: k.public_key, createdAt: k.created_at })))
     } catch (err) {
-      console.log('[useSettings] listKeys error', err)
+      logger.debug('listKeys error', err)
     }
   }, [])
 
   const generateKey = useCallback(async (name: string, type: KeyInfo['type'], bits: number) => {
     try {
-      console.log('[useSettings] generateKey', { name, type, bits })
-      const result = await KeyService.Generate(name, type as any, bits)
-      setKeys((prev) => [...prev, { id: String(result!.id), name: result!.name, type: result!.type as any, bits, publicKey: result!.public_key, createdAt: result!.created_at }])
+      logger.debug('generateKey', { name, type, bits })
+      const keyType = ({ rsa: KeyType.KeyTypeRSA, ed25519: KeyType.KeyTypeED25519, ecdsa: KeyType.KeyTypeECDSA } as const)[type]
+      const result = await KeyService.Generate(name, keyType, bits)
+      if (result) {
+        setKeys((prev) => [...prev, { id: String(result.id), name: result.name, type: ({ [KeyType.KeyTypeRSA]: 'rsa', [KeyType.KeyTypeED25519]: 'ed25519', [KeyType.KeyTypeECDSA]: 'ecdsa' } as Record<string, KeyInfo['type']>)[String(result.type)] ?? 'ed25519', bits, publicKey: result.public_key, createdAt: result.created_at }])
+      }
     } catch (err) {
-      console.log('[useSettings] generateKey error', err)
+      logger.debug('generateKey error', err)
     }
   }, [])
 
   const importKey = useCallback(async (name: string, privateKey: string) => {
     try {
-      console.log('[useSettings] importKey', { name })
+      logger.debug('importKey', { name })
       const result = await KeyService.Import(name, privateKey)
-      setKeys((prev) => [...prev, { id: String(result!.id), name: result!.name, type: result!.type as any, bits: 0, publicKey: result!.public_key, createdAt: result!.created_at }])
+      if (result) {
+        setKeys((prev) => [...prev, { id: String(result.id), name: result.name, type: ({ [KeyType.KeyTypeRSA]: 'rsa', [KeyType.KeyTypeED25519]: 'ed25519', [KeyType.KeyTypeECDSA]: 'ecdsa' } as Record<string, KeyInfo['type']>)[String(result.type)] ?? 'ed25519', bits: 0, publicKey: result.public_key, createdAt: result.created_at }])
+      }
     } catch (err) {
-      console.log('[useSettings] importKey error', err)
+      logger.debug('importKey error', err)
     }
   }, [])
 
   const deleteKey = useCallback(async (id: string) => {
     try {
-      console.log('[useSettings] deleteKey', id)
+      logger.debug('deleteKey', id)
       await KeyService.Delete(Number(id))
       setKeys((prev) => prev.filter((k) => k.id !== id))
     } catch (err) {
-      console.log('[useSettings] deleteKey error', err)
+      logger.debug('deleteKey error', err)
     }
   }, [])
 
   const exportKey = useCallback(async (id: string) => {
     try {
-      console.log('[useSettings] exportKey', id)
+      logger.debug('exportKey', id)
       const result = await KeyService.ExportPublicKey(Number(id))
       return result
     } catch (err) {
-      console.log('[useSettings] exportKey error', err)
+      logger.debug('exportKey error', err)
     }
   }, [])
 
   const saveSync = useCallback(async (config: SyncConfig) => {
     try {
-      console.log('[useSettings] saveSync', { enabled: config.enabled, url: config.url })
+      logger.debug('saveSync', { enabled: config.enabled, url: config.url })
       await SettingService.SetSetting('sync_enabled', String(config.enabled))
       await SettingService.SetSetting('sync_url', config.url)
       await SettingService.SetSetting('sync_username', config.username)
       setSync(config)
     } catch (err) {
-      console.log('[useSettings] saveSync error', err)
+      logger.debug('saveSync error', err)
     }
   }, [])
 
   const loadSync = useCallback(async () => {
     try {
-      console.log('[useSettings] loadSync')
+      logger.debug('loadSync')
       const enabled = await SettingService.GetSetting('sync_enabled')
       const url = await SettingService.GetSetting('sync_url')
       const username = await SettingService.GetSetting('sync_username')
       setSync({ enabled: enabled === 'true', url: url || '', username: username || '', password: '' })
     } catch (err) {
-      console.log('[useSettings] loadSync error', err)
+      logger.debug('loadSync error', err)
     }
   }, [])
 
   const exportConfig = useCallback(async () => {
     try {
-      console.log('[useSettings] exportConfig')
+      logger.debug('exportConfig')
       const path = await pickSaveFilePath('mssh-export.json')
       if (path) {
         await SyncService.Export(path)
       }
     } catch (err) {
-      console.log('[useSettings] exportConfig error', err)
+      logger.debug('exportConfig error', err)
     }
   }, [])
 
   const importConfig = useCallback(async () => {
     try {
-      console.log('[useSettings] importConfig')
+      logger.debug('importConfig')
       const path = await pickOpenFilePath()
       if (path) {
         await SyncService.Import(path)
       }
     } catch (err) {
-      console.log('[useSettings] importConfig error', err)
+      logger.debug('importConfig error', err)
     }
   }, [])
 
