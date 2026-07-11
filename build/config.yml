@@ -35,9 +35,9 @@ dev_mode:
     - cmd: npm run dev
       dir: frontend
       type: background
-    - cmd: CGO_ENABLED=1 /root/.govm/go/bin/go mod tidy
+    - cmd: go mod tidy
       type: blocking
-    - cmd: CGO_ENABLED=1 /root/.govm/go/bin/go run .
+    - cmd: go run .
       type: primary
 
 fileAssociations: []
