@@ -70,3 +70,24 @@ type ThemeAssignments struct {
 	DarkProfileID  int64 `json:"dark_profile_id"`
 	LightProfileID int64 `json:"light_profile_id"`
 }
+
+type ThemeImportStatus string
+
+const (
+	ThemeImportImported  ThemeImportStatus = "imported"
+	ThemeImportDuplicate ThemeImportStatus = "duplicate"
+	ThemeImportFailed    ThemeImportStatus = "failed"
+)
+
+type ThemeImportResult struct {
+	File         string            `json:"file"`
+	Name         string            `json:"name"`
+	Status       ThemeImportStatus `json:"status"`
+	DefinitionID int64             `json:"definition_id"`
+	ProfileID    int64             `json:"profile_id"`
+	Error        string            `json:"error"`
+}
+
+type ThemeImportSummary struct {
+	Results []ThemeImportResult `json:"results"`
+}
