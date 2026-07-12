@@ -73,6 +73,21 @@ describe('useThemeCatalog', () => {
     expect(deleteProfile).toHaveBeenCalledOnce()
     expect(deleteDefinition).toHaveBeenCalledOnce()
   })
+
+  it('applies the saved profile immediately for the active mode', async () => {
+    __registerHandler('github.com/xuthus5/mssh/internal/service.ThemeService.SaveConfiguration', async () => {})
+    const { result } = renderHook(() => useThemeCatalog())
+    await waitFor(() => expect(result.current.loaded).toBe(true))
+    await act(async () => {
+      await result.current.saveConfiguration({
+        dark_profile: { id: 1, name: 'dark', theme_id: 1, font_family: 'monospace', font_size: 14, cursor_style: 'bar', color_overrides: JSON.stringify({ background: '#123456' }) },
+        light_profile: { id: 1, name: 'dark', theme_id: 1, font_family: 'monospace', font_size: 14, cursor_style: 'bar', color_overrides: JSON.stringify({ background: '#123456' }) },
+        assignments: { dark_profile_id: 1, light_profile_id: 1 },
+      } as never)
+    })
+    expect(useThemeCatalogStore.getState().assignments.light_profile_id).toBe(1)
+    expect(useAppStore.getState().terminalTheme.background).toBe('#123456')
+  })
 })
 
 function registerCatalogHandlers(mode: 'dark' | 'light') {
