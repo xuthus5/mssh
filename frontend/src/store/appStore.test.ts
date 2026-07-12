@@ -35,6 +35,18 @@ describe('appStore', () => {
     expect(useAppStore.getState().activeTabId).toBeNull()
   })
 
+  it('closes playback tabs locally without closing a backend terminal', () => {
+    const closeTerminal = vi.fn(async () => {})
+    __registerHandler('github.com/xuthus5/mssh/internal/service.TerminalService.Close', closeTerminal)
+    const { openTab, closeTab } = useAppStore.getState()
+    openTab({ id: 'playback-1', title: '回放 #1', type: 'playback', terminalId: 'C:\\Users\\xuthu\\recording.msshlog' })
+
+    closeTab('playback-1')
+
+    expect(closeTerminal).not.toHaveBeenCalled()
+    expect(useAppStore.getState().tabs).toHaveLength(0)
+  })
+
   it('sets active tab', () => {
     const { openTab, setActiveTab } = useAppStore.getState()
     openTab({ id: 'tab-1', title: 'A', type: 'terminal' })
