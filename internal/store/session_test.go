@@ -87,14 +87,14 @@ func TestListFoldersHasDefault(t *testing.T) {
 
 func TestListSessionsByFolder(t *testing.T) {
 	db := setupTestDB(t)
-	var parentID int64 = 0
-	folder, _ := CreateFolder(db, "生产环境", &parentID)
+	folder, err := CreateFolder(db, "生产环境", nil)
+	require.NoError(t, err)
 	s := model.Session{
 		FolderID: &folder.ID, Name: "web-server", Host: "10.0.0.1", Port: 22,
 		Username: "root", AuthMethod: model.AuthPassword, Password: "encrypted",
 		KeepAlive: 30, TermType: "xterm-256color",
 	}
-	_, err := CreateSession(db, s)
+	_, err = CreateSession(db, s)
 	require.NoError(t, err)
 	sessions, err := ListSessions(db, &folder.ID)
 	require.NoError(t, err)
@@ -256,7 +256,9 @@ func TestMoveSession(t *testing.T) {
 	created, err := CreateSession(db, s)
 	require.NoError(t, err)
 
-	var newFolderID int64 = 2
+	folder, err := CreateFolder(db, "目标分组", nil)
+	require.NoError(t, err)
+	newFolderID := folder.ID
 	err = MoveSession(db, created.ID, &newFolderID)
 	require.NoError(t, err)
 
