@@ -179,7 +179,7 @@ export function PlaybackTab({ recordingId, title }: Props) {
       <div className="flex items-center gap-2 h-8 px-2 bg-muted/30 border-b">
         <span className="text-xs text-muted-foreground">回放: {title}</span>
         <div className="flex-1" />
-        <Button size="xs" variant="ghost" onClick={togglePlay}>
+        <Button size="xs" variant="ghost" aria-label={playing ? '暂停回放' : '开始回放'} disabled={entries.length === 0} onClick={togglePlay}>
           {playing ? (
             <Pause className="h-3.5 w-3.5" />
           ) : (

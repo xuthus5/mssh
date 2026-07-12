@@ -5,10 +5,6 @@
 // @ts-ignore: Unused imports
 import { Create as $Create } from "@wailsio/runtime";
 
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore: Unused imports
-import * as time$0 from "../../../../../time/models.js";
-
 export class AboutInfo {
     "current_version": string;
     "repository_url": string;
@@ -165,14 +161,14 @@ export enum RecordType {
 };
 
 export class RecordingEntry {
-    "timestamp": time$0.Duration;
+    "timestamp": number;
     "type": RecordType;
     "data": string;
 
     /** Creates a new RecordingEntry instance. */
     constructor($$source: Partial<RecordingEntry> = {}) {
         if (!("timestamp" in $$source)) {
-            this["timestamp"] = time$0.Duration.$zero;
+            this["timestamp"] = 0;
         }
         if (!("type" in $$source)) {
             this["type"] = RecordType.$zero;

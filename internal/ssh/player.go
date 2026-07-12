@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"time"
 
 	"github.com/xuthus5/mssh/internal/model"
 )
@@ -113,7 +112,7 @@ func (p *Player) readEntry(r io.Reader) (model.RecordingEntry, error) {
 		}
 	}
 	return model.RecordingEntry{
-		Timestamp: time.Duration(ts) * time.Millisecond,
+		Timestamp: ts,
 		Type:      model.RecordType(typ),
 		Data:      data,
 	}, nil
