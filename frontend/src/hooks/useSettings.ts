@@ -56,17 +56,9 @@ export interface SyncConfig {
   password: string
 }
 
-const DEFAULT_THEME: TerminalTheme = {
-  background: '#0d1117', foreground: '#c9d1d9', cursorColor: '#c9d1d9',
-  cursorStyle: 'bar', fontFamily: '"JetBrains Mono", "Cascadia Code", monospace', fontSize: 14,
-  ansi: ['#000000', '#cd0000', '#00cd00', '#cdcd00', '#0000ee', '#cd00cd', '#00cdcd', '#e5e5e5',
-    '#7f7f7f', '#ff0000', '#00ff00', '#ffff00', '#5c5cff', '#ff00ff', '#00ffff', '#ffffff'],
-}
-
 export function useSettings() {
   const [general, setGeneral] = useState<GeneralSettings>({ maxPoolSize: 10, defaultKeepAlive: 60, defaultTermType: 'xterm-256color', uiFontFamily: DEFAULT_UI_FONT_FAMILY, uiFontFallbackFamily: DEFAULT_UI_FONT_FALLBACK_FAMILY, uiFontSize: DEFAULT_UI_FONT_SIZE, windowOpacity: DEFAULT_WINDOW_OPACITY })
   const [systemFonts, setSystemFonts] = useState<string[]>([])
-  const [theme, setTheme] = useState<TerminalTheme>(DEFAULT_THEME)
   const [keys, setKeys] = useState<KeyInfo[]>([])
   const [sync, setSync] = useState<SyncConfig>({ enabled: false, url: '', username: '', password: '' })
   const syncRevision = useRef(0)
@@ -135,81 +127,6 @@ export function useSettings() {
   const previewWindowOpacity = useCallback((opacity: number) => applyWindowOpacity(opacity), [])
 
   const restoreWindowOpacity = useCallback(() => applyWindowOpacity(general.windowOpacity), [general.windowOpacity])
-
-  const saveTheme = useCallback(async (t: TerminalTheme) => {
-    try {
-      logger.debug('saveTheme')
-      await SettingService.Set(settingEntry('terminal.theme', t))
-      setTheme(t)
-      useAppStore.getState().setTerminalTheme({
-        background: t.background,
-        foreground: t.foreground,
-        cursor: t.cursorColor,
-        cursorAccent: t.background,
-        selectionBackground: '#264f78',
-        cursorStyle: t.cursorStyle,
-        fontFamily: t.fontFamily,
-        fontSize: t.fontSize,
-        ansiBlack: t.ansi[0] ?? '#000000',
-        ansiRed: t.ansi[1] ?? '#cd0000',
-        ansiGreen: t.ansi[2] ?? '#00cd00',
-        ansiYellow: t.ansi[3] ?? '#cdcd00',
-        ansiBlue: t.ansi[4] ?? '#0000ee',
-        ansiMagenta: t.ansi[5] ?? '#cd00cd',
-        ansiCyan: t.ansi[6] ?? '#00cdcd',
-        ansiWhite: t.ansi[7] ?? '#e5e5e5',
-        ansiBrightBlack: t.ansi[8] ?? '#7f7f7f',
-        ansiBrightRed: t.ansi[9] ?? '#ff0000',
-        ansiBrightGreen: t.ansi[10] ?? '#00ff00',
-        ansiBrightYellow: t.ansi[11] ?? '#ffff00',
-        ansiBrightBlue: t.ansi[12] ?? '#5c5cff',
-        ansiBrightMagenta: t.ansi[13] ?? '#ff00ff',
-        ansiBrightCyan: t.ansi[14] ?? '#00ffff',
-        ansiBrightWhite: t.ansi[15] ?? '#ffffff',
-      })
-    } catch (err) {
-      logger.debug('saveTheme error', err)
-    }
-  }, [])
-
-  const loadTheme = useCallback(async () => {
-    try {
-      logger.debug('loadTheme')
-      const setting = await SettingService.Get('terminal.theme')
-      if (setting) {
-        const t: TerminalTheme = JSON.parse(setting.value)
-        setTheme(t)
-        useAppStore.getState().setTerminalTheme({
-          background: t.background,
-          foreground: t.foreground,
-          cursor: t.cursorColor,
-          cursorAccent: t.background,
-          selectionBackground: '#264f78',
-          cursorStyle: t.cursorStyle,
-          fontFamily: t.fontFamily,
-          fontSize: t.fontSize,
-          ansiBlack: t.ansi[0] ?? '#000000',
-          ansiRed: t.ansi[1] ?? '#cd0000',
-          ansiGreen: t.ansi[2] ?? '#00cd00',
-          ansiYellow: t.ansi[3] ?? '#cdcd00',
-          ansiBlue: t.ansi[4] ?? '#0000ee',
-          ansiMagenta: t.ansi[5] ?? '#cd00cd',
-          ansiCyan: t.ansi[6] ?? '#00cdcd',
-          ansiWhite: t.ansi[7] ?? '#e5e5e5',
-          ansiBrightBlack: t.ansi[8] ?? '#7f7f7f',
-          ansiBrightRed: t.ansi[9] ?? '#ff0000',
-          ansiBrightGreen: t.ansi[10] ?? '#00ff00',
-          ansiBrightYellow: t.ansi[11] ?? '#ffff00',
-          ansiBrightBlue: t.ansi[12] ?? '#5c5cff',
-          ansiBrightMagenta: t.ansi[13] ?? '#ff00ff',
-          ansiBrightCyan: t.ansi[14] ?? '#00ffff',
-          ansiBrightWhite: t.ansi[15] ?? '#ffffff',
-        })
-      }
-    } catch (err) {
-      logger.debug('loadTheme error', err)
-    }
-  }, [])
 
   const listKeys = useCallback(async () => {
     try {
@@ -313,7 +230,7 @@ export function useSettings() {
     }
   }, [])
 
-  useEffect(() => { loadGeneral(); loadTheme(); listKeys(); loadSync(); loadSystemFonts() }, [loadGeneral, loadTheme, listKeys, loadSync, loadSystemFonts])
+  useEffect(() => { loadGeneral(); listKeys(); loadSync(); loadSystemFonts() }, [loadGeneral, listKeys, loadSync, loadSystemFonts])
 
-  return { general, theme, keys, sync, systemFonts, saveGeneral, previewUIFont, restoreUIFont, previewWindowOpacity, restoreWindowOpacity, saveTheme, listKeys, generateKey, importKey, deleteKey, exportKey, saveSync, exportConfig, importConfig }
+  return { general, keys, sync, systemFonts, saveGeneral, previewUIFont, restoreUIFont, previewWindowOpacity, restoreWindowOpacity, listKeys, generateKey, importKey, deleteKey, exportKey, saveSync, exportConfig, importConfig }
 }

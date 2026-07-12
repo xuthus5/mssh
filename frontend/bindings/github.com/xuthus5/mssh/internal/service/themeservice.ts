@@ -9,35 +9,71 @@ import { Call as $Call, CancellablePromise as $CancellablePromise, Create as $Cr
 // @ts-ignore: Unused imports
 import * as model$0 from "../model/models.js";
 
-export function Create(input: model$0.ThemeInput): $CancellablePromise<model$0.Theme | null> {
-    return $Call.ByName("github.com/xuthus5/mssh/internal/service.ThemeService.Create", input).then(($result: any) => {
+export function CreateCustomProfile(input: model$0.ThemeProfileInput): $CancellablePromise<model$0.ThemeProfile | null> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.ThemeService.CreateCustomProfile", input).then(($result: any) => {
         return $$createType1($result);
     });
 }
 
-export function Delete(id: number): $CancellablePromise<void> {
-    return $Call.ByName("github.com/xuthus5/mssh/internal/service.ThemeService.Delete", id);
+export function DeleteDefinition(id: number): $CancellablePromise<void> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.ThemeService.DeleteDefinition", id);
 }
 
-export function GetActive(): $CancellablePromise<string> {
-    return $Call.ByName("github.com/xuthus5/mssh/internal/service.ThemeService.GetActive");
+export function DeleteProfile(id: number): $CancellablePromise<void> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.ThemeService.DeleteProfile", id);
 }
 
-export function List(): $CancellablePromise<model$0.Theme[]> {
-    return $Call.ByName("github.com/xuthus5/mssh/internal/service.ThemeService.List").then(($result: any) => {
+export function GetAssignments(): $CancellablePromise<model$0.ThemeAssignments> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.ThemeService.GetAssignments").then(($result: any) => {
         return $$createType2($result);
     });
 }
 
-export function SetActive(themeID: string): $CancellablePromise<void> {
-    return $Call.ByName("github.com/xuthus5/mssh/internal/service.ThemeService.SetActive", themeID);
+export function GetProfile(id: number): $CancellablePromise<model$0.ThemeProfile | null> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.ThemeService.GetProfile", id).then(($result: any) => {
+        return $$createType1($result);
+    });
 }
 
-export function Update(input: model$0.ThemeInput): $CancellablePromise<void> {
-    return $Call.ByName("github.com/xuthus5/mssh/internal/service.ThemeService.Update", input);
+export function ImportFiles(paths: string[]): $CancellablePromise<model$0.ThemeImportSummary> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.ThemeService.ImportFiles", paths).then(($result: any) => {
+        return $$createType3($result);
+    });
+}
+
+export function InitializeDefaults(): $CancellablePromise<void> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.ThemeService.InitializeDefaults");
+}
+
+export function ListDefinitions(mode: string): $CancellablePromise<model$0.ThemeDefinition[]> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.ThemeService.ListDefinitions", mode).then(($result: any) => {
+        return $$createType5($result);
+    });
+}
+
+export function ListProfiles(mode: string): $CancellablePromise<model$0.ThemeProfile[]> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.ThemeService.ListProfiles", mode).then(($result: any) => {
+        return $$createType6($result);
+    });
+}
+
+export function SaveAssignments(input: model$0.ThemeAssignmentsInput): $CancellablePromise<void> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.ThemeService.SaveAssignments", input);
+}
+
+export function SaveConfiguration(input: model$0.ThemeConfigurationInput): $CancellablePromise<void> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.ThemeService.SaveConfiguration", input);
+}
+
+export function UpdateProfile(input: model$0.ThemeProfileInput): $CancellablePromise<void> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.ThemeService.UpdateProfile", input);
 }
 
 // Private type creation functions
-const $$createType0 = model$0.Theme.createFrom;
+const $$createType0 = model$0.ThemeProfile.createFrom;
 const $$createType1 = $Create.Nullable($$createType0);
-const $$createType2 = $Create.Array($$createType0);
+const $$createType2 = model$0.ThemeAssignments.createFrom;
+const $$createType3 = model$0.ThemeImportSummary.createFrom;
+const $$createType4 = model$0.ThemeDefinition.createFrom;
+const $$createType5 = $Create.Array($$createType4);
+const $$createType6 = $Create.Array($$createType0);

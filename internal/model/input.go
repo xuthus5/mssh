@@ -122,6 +122,12 @@ type ThemeAssignmentsInput struct {
 	LightProfileID int64 `json:"light_profile_id"`
 }
 
+type ThemeConfigurationInput struct {
+	DarkProfile  ThemeProfileInput     `json:"dark_profile"`
+	LightProfile ThemeProfileInput     `json:"light_profile"`
+	Assignments  ThemeAssignmentsInput `json:"assignments"`
+}
+
 func (input ThemeAssignmentsInput) ThemeAssignments() ThemeAssignments {
 	return ThemeAssignments{DarkProfileID: input.DarkProfileID, LightProfileID: input.LightProfileID}
 }
