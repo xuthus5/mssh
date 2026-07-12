@@ -30,7 +30,8 @@ export function useThemeCatalog() {
 }
 
 export async function loadThemeCatalog() {
-  if (useThemeCatalogStore.getState().loading) return
+  const current = useThemeCatalogStore.getState()
+  if (current.loading || current.loaded) return
   useThemeCatalogStore.setState({ loading: true, error: null })
   try {
     await ThemeService.InitializeDefaults()

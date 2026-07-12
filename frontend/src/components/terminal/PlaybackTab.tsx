@@ -7,7 +7,7 @@ import { Play, Pause } from 'lucide-react'
 import { LogService } from '@/lib/wails'
 import { logger } from '@/lib/logger'
 import { useAppStore } from '@/store/appStore'
-import { xtermTheme } from '@/lib/terminalTheme'
+import { applyTerminalTheme, xtermTheme } from '@/lib/terminalTheme'
 
 interface RecordingEntry {
   timestamp: number
@@ -55,6 +55,9 @@ export function PlaybackTab({ recordingId, title }: Props) {
       scrollback: 10000,
     })
     termRef.current = term
+    const unsubscribeTheme = useAppStore.subscribe((state, previous) => {
+      if (state.terminalTheme !== previous.terminalTheme) applyTerminalTheme(term.options, state.terminalTheme)
+    })
 
     const fitAddon = new FitAddon()
     term.loadAddon(fitAddon)
@@ -96,6 +99,7 @@ export function PlaybackTab({ recordingId, title }: Props) {
         clearInterval(p.timer)
       }
       resizeObs.disconnect()
+      unsubscribeTheme()
       term.dispose()
     }
   }, [recordingId, title])
