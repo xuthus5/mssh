@@ -75,13 +75,6 @@ func MacroInputFrom(macro Macro) MacroInput {
 	return MacroInput{ID: macro.ID, Name: macro.Name, Command: macro.Command, Shortcut: macro.Shortcut, DelayMs: macro.DelayMs, SortOrder: macro.SortOrder}
 }
 
-type ThemeInput struct {
-	ID        int64  `json:"id"`
-	Name      string `json:"name"`
-	IsBuiltin bool   `json:"is_builtin"`
-	Config    string `json:"config"`
-}
-
 type ThemeDefinitionInput struct {
 	ID                int64           `json:"id"`
 	Name              string          `json:"name"`
@@ -131,12 +124,4 @@ type ThemeAssignmentsInput struct {
 
 func (input ThemeAssignmentsInput) ThemeAssignments() ThemeAssignments {
 	return ThemeAssignments{DarkProfileID: input.DarkProfileID, LightProfileID: input.LightProfileID}
-}
-
-func (input ThemeInput) Theme() Theme {
-	return Theme{ID: input.ID, Name: input.Name, IsBuiltin: input.IsBuiltin, Config: input.Config}
-}
-
-func ThemeInputFrom(theme Theme) ThemeInput {
-	return ThemeInput{ID: theme.ID, Name: theme.Name, IsBuiltin: theme.IsBuiltin, Config: theme.Config}
 }

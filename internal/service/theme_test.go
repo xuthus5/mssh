@@ -10,90 +10,40 @@ import (
 	"github.com/xuthus5/mssh/internal/service/testutil"
 )
 
-func TestNewThemeService(t *testing.T) {
+func TestThemeServiceInitializesDefaultsAndAssignments(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	svc := NewThemeService(db, testutil.NewTestLogger())
-	assert.NotNil(t, svc)
+	service := NewThemeService(db, testutil.NewTestLogger())
+	require.NoError(t, service.InitializeDefaults())
+	require.NoError(t, service.InitializeDefaults())
+
+	definitions, err := service.ListDefinitions("")
+	require.NoError(t, err)
+	assert.Len(t, definitions, 2)
+	profiles, err := service.ListProfiles("")
+	require.NoError(t, err)
+	assert.Len(t, profiles, 2)
+	assignments, err := service.GetAssignments()
+	require.NoError(t, err)
+	assert.NotZero(t, assignments.DarkProfileID)
+	assert.NotZero(t, assignments.LightProfileID)
 }
 
-func TestThemeService_CRUD(t *testing.T) {
+func TestThemeServiceProfileValidationAndAssignments(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	svc := NewThemeService(db, testutil.NewTestLogger())
-
-	themes, err := svc.List()
-	require.NoError(t, err)
-	assert.Len(t, themes, 0)
-
-	theme := model.Theme{Name: "Dark", IsBuiltin: false, Config: `{"bg":"#000"}`}
-	created, err := svc.Create(model.ThemeInputFrom(theme))
-	require.NoError(t, err)
-	assert.NotZero(t, created.ID)
-	assert.Equal(t, "Dark", created.Name)
-	assert.Equal(t, `{"bg":"#000"}`, created.Config)
-
-	themes, err = svc.List()
-	require.NoError(t, err)
-	assert.Len(t, themes, 1)
-
-	created.Name = "Dracula"
-	created.Config = `{"bg":"#282a36"}`
-	err = svc.Update(model.ThemeInputFrom(*created))
+	service := NewThemeService(db, testutil.NewTestLogger())
+	require.NoError(t, service.InitializeDefaults())
+	definitions, err := service.ListDefinitions(string(model.ThemeModeDark))
 	require.NoError(t, err)
 
-	themes, err = svc.List()
+	_, err = service.CreateCustomProfile(model.ThemeProfileInput{Name: "Invalid", ThemeID: definitions[0].ID, FontFamily: "mono", FontSize: 2, CursorStyle: model.CursorStyleBar, ColorOverrides: `{}`})
+	assert.Error(t, err)
+	created, err := service.CreateCustomProfile(model.ThemeProfileInput{Name: "Custom", ThemeID: definitions[0].ID, FontFamily: "mono", FontSize: 15, CursorStyle: model.CursorStyleUnderline, ColorOverrides: `{}`})
 	require.NoError(t, err)
-	assert.Equal(t, "Dracula", themes[0].Name)
+	created.Name = "Renamed"
+	require.NoError(t, service.UpdateProfile(model.ThemeProfileInputFrom(*created)))
 
-	err = svc.Delete(created.ID)
+	assignments, err := service.GetAssignments()
 	require.NoError(t, err)
-
-	themes, err = svc.List()
-	require.NoError(t, err)
-	assert.Len(t, themes, 0)
-}
-
-func TestThemeService_GetActive(t *testing.T) {
-	db := testutil.NewTestDB(t)
-	svc := NewThemeService(db, testutil.NewTestLogger())
-
-	active, err := svc.GetActive()
-	require.NoError(t, err)
-	assert.Equal(t, "", active)
-}
-
-func TestThemeService_SetActive(t *testing.T) {
-	db := testutil.NewTestDB(t)
-	svc := NewThemeService(db, testutil.NewTestLogger())
-
-	err := svc.SetActive("dark")
-	require.NoError(t, err)
-
-	active, err := svc.GetActive()
-	require.NoError(t, err)
-	assert.Equal(t, "dark", active)
-}
-
-func TestThemeService_SetActiveOverride(t *testing.T) {
-	db := testutil.NewTestDB(t)
-	svc := NewThemeService(db, testutil.NewTestLogger())
-
-	err := svc.SetActive("light")
-	require.NoError(t, err)
-
-	err = svc.SetActive("dark")
-	require.NoError(t, err)
-
-	active, err := svc.GetActive()
-	require.NoError(t, err)
-	assert.Equal(t, "dark", active)
-}
-
-func TestThemeService_CreateBuiltin(t *testing.T) {
-	db := testutil.NewTestDB(t)
-	svc := NewThemeService(db, testutil.NewTestLogger())
-
-	theme := model.Theme{Name: "Default", IsBuiltin: true, Config: `{}`}
-	created, err := svc.Create(model.ThemeInputFrom(theme))
-	require.NoError(t, err)
-	assert.True(t, created.IsBuiltin)
+	require.NoError(t, service.SaveAssignments(model.ThemeAssignmentsInput{DarkProfileID: created.ID, LightProfileID: assignments.LightProfileID}))
+	assert.Error(t, service.DeleteProfile(created.ID))
 }

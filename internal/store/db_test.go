@@ -274,21 +274,21 @@ func TestStoreOperationsClosedDB(t *testing.T) { //nolint:funlen
 		err = DeleteMacro(db, 1)
 		assert.Error(t, err)
 	}
-	th := model.Theme{Name: "t", Config: "{}"}
+	th := model.ThemeDefinition{Name: "t", Mode: model.ThemeModeDark, SourceType: model.ThemeSourceCustom, SourceFingerprint: "closed", ColorPayload: "{}"}
 	{
-		_, err = CreateTheme(db, th)
+		_, err = CreateThemeDefinition(db, th)
 		assert.Error(t, err)
 	}
 	{
-		_, err = ListThemes(db)
+		_, err = ListThemeDefinitions(db, "")
 		assert.Error(t, err)
 	}
 	{
-		err = UpdateTheme(db, th)
+		_, err = GetThemeDefinition(db, 1)
 		assert.Error(t, err)
 	}
 	{
-		err = DeleteTheme(db, 1)
+		err = DeleteThemeDefinition(db, 1)
 		assert.Error(t, err)
 	}
 }

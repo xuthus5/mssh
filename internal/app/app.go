@@ -144,6 +144,9 @@ func New(opts Options) (*App, error) {
 	keySvc := service.NewKeyService(db, cryptoAdapter, logger)
 	macroSvc := service.NewMacroService(db, terminalSvc, logger)
 	themeSvc := service.NewThemeService(db, logger)
+	if err := themeSvc.InitializeDefaults(); err != nil {
+		return nil, fmt.Errorf("initialize terminal themes: %w", err)
+	}
 	logSvc := service.NewLogService(db, opts.DataDir, logger)
 	syncSvc := service.NewSyncService(db, logger)
 
