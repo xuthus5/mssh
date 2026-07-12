@@ -1,7 +1,8 @@
 import { useRef, useState, useEffect, useCallback } from 'react'
 import { X, Circle } from 'lucide-react'
-import { useAppStore, type ConnectionStatus } from '@/store/appStore'
+import { useAppStore } from '@/store/appStore'
 import { logger } from '@/lib/logger'
+import { connectionStatusVisual } from '@/lib/connectionStatusVisual'
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -15,18 +16,6 @@ const contextMenuItems: Array<{
   { label: '关闭', action: 'close' },
   { label: '关闭其他', action: 'closeOthers', destructive: true },
 ]
-
-function statusDot(status: ConnectionStatus | undefined): string {
-  switch (status) {
-    case 'connected':
-      return 'text-green-500 fill-green-500'
-    case 'connecting':
-      return 'text-yellow-500 fill-yellow-500'
-    case 'disconnected':
-    default:
-      return 'text-gray-500 fill-gray-500'
-  }
-}
 
 interface ContextMenuState {
   visible: boolean
@@ -134,7 +123,7 @@ export default function TabBar() {
             onContextMenu={(e) => handleContextMenu(e, tab.id)}
           >
             <Circle
-              className={`h-2 w-2 flex-shrink-0 ${statusDot(status)}`}
+              className={`size-2 shrink-0 ${connectionStatusVisual(status).dotClass}`}
             />
             <span className="truncate max-w-[160px]">{tab.title}</span>
             <button
