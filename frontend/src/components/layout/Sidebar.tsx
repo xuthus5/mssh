@@ -1,19 +1,12 @@
 import { useState, useCallback, useMemo, useEffect } from 'react'
-import { ChevronLeft, ChevronRight, Plus, FolderPlus, Search } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog'
 import SessionTree from '@/components/session/SessionTree'
-import SessionDialog from '@/components/session/SessionDialog'
 import QuickCommands from '@/components/session/QuickCommands'
-import SettingsDialog from '@/components/settings/SettingsDialog'
-import { useSession, type Session, type Folder } from '@/hooks/useSession'
+import { SidebarDialogs } from '@/components/layout/SidebarDialogs'
+import { type Session, type Folder } from '@/hooks/useSession'
+import { useSessionWorkspace } from '@/hooks/SessionWorkspaceContext'
 import { useSettings } from '@/hooks/useSettings'
 import { useThemeCatalog } from '@/hooks/useThemeCatalog'
 import type { CommandItem } from '@/components/session/QuickCommands'
@@ -23,10 +16,6 @@ import type { Macro, MacroInput } from '../../../bindings/github.com/xuthus5/mss
 import { logger } from '@/lib/logger'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Skeleton } from '@/components/ui/skeleton'
-import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
 import { useResizablePanel } from '@/hooks/useResizablePanel'
 
 export default function Sidebar() {
@@ -39,26 +28,21 @@ export default function Sidebar() {
   const [searchQuery, setSearchQuery] = useState('')
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [macros, setMacros] = useState<CommandItem[]>([])
-  const [deleteTarget, setDeleteTarget] = useState<{ type: 'session' | 'folder'; id: string; name: string } | null>(null)
   const { width, collapsed, displayedWidth, toggleCollapsed, resizeHandleProps } = useResizablePanel()
 
   const {
     folders,
     sessions,
     createFolder,
-    deleteFolder,
     updateFolder,
     createSession,
     updateSession,
-    deleteSession,
-    moveSession,
-    setDefaultFolder,
     connect,
     loading,
     error,
     listFolders,
     listSessions,
-  } = useSession()
+  } = useSessionWorkspace()
 
   const settings = useSettings()
   const themeCatalog = useThemeCatalog()
@@ -75,6 +59,20 @@ export default function Sidebar() {
         setMacros(items)
       })
       .catch((err: unknown) => { logger.error('Sidebar: list macros error', err) })
+  }, [])
+
+  useEffect(() => {
+    const openFolder = () => { setEditingFolder(null); setFolderName(''); setFolderDialogOpen(true) }
+    const editSession = (event: Event) => { setEditingSession((event as CustomEvent<Session>).detail); setSessionDialogOpen(true) }
+    const editFolder = (event: Event) => { const folder = (event as CustomEvent<Folder>).detail; setEditingFolder(folder); setFolderName(folder.name); setFolderDialogOpen(true) }
+    window.addEventListener('mssh:new-folder', openFolder)
+    window.addEventListener('mssh:edit-session', editSession)
+    window.addEventListener('mssh:edit-folder', editFolder)
+    return () => {
+      window.removeEventListener('mssh:new-folder', openFolder)
+      window.removeEventListener('mssh:edit-session', editSession)
+      window.removeEventListener('mssh:edit-folder', editFolder)
+    }
   }, [])
 
   useEffect(() => {
@@ -146,12 +144,6 @@ export default function Sidebar() {
     setFolderDialogOpen(false)
   }
 
-  const handleOpenNewSession = () => {
-    logger.debug('Sidebar: openNewSession')
-    setEditingSession(null)
-    setTimeout(() => setSessionDialogOpen(true), 0)
-  }
-
   const handleOpenEditSession = (s: Session) => {
     logger.debug('Sidebar: openEditSession', { id: s.id, name: s.name })
     setEditingSession(s)
@@ -212,26 +204,6 @@ export default function Sidebar() {
                 className="h-7 pl-7 text-xs"
               />
             </div>
-            <div className="flex gap-1 items-center">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="flex-1 text-xs h-7 justify-start gap-1"
-                onClick={() => { logger.debug('Sidebar: 新建会话 click'); handleOpenNewSession() }}
-              >
-                <Plus className="h-3 w-3" />
-                新建会话
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-xs h-7 w-7 p-0 justify-center"
-                onClick={() => { logger.debug('Sidebar: 新建分组 click'); setFolderDialogOpen(true) }}
-                title="新建分组"
-              >
-                <FolderPlus className="h-3.5 w-3.5" />
-              </Button>
-            </div>
           </div>
           <div className="flex items-center justify-between px-3 py-1 border-b border-border/30">
             <span className="text-[11px] text-muted-foreground">
@@ -251,16 +223,8 @@ export default function Sidebar() {
               sessions={filteredSessions}
               onConnect={connect}
               onEditSession={handleOpenEditSession}
-              onDeleteSession={(id) => {
-                const session = sessions.find((item) => item.id === id)
-                if (session) setDeleteTarget({ type: 'session', id, name: session.name })
-              }}
-              onEditFolder={(folder: Folder) => { setEditingFolder(folder); setFolderName(folder.name); setFolderDialogOpen(true) }}
-              onDeleteFolder={(id) => {
-                const folder = folders.find((item) => item.id === id)
-                if (folder) setDeleteTarget({ type: 'folder', id, name: folder.name })
-              }}
-              onMoveToFolder={moveSession}
+              onSelectFolder={(id) => window.dispatchEvent(new CustomEvent('mssh:select-folder', { detail: id }))}
+              navigationOnly
               revealAll={Boolean(searchQuery.trim())}
             />}
           </div>
@@ -279,99 +243,20 @@ export default function Sidebar() {
         </div>
       )}
 
-      <SessionDialog
-        key={sessionDialogOpen ? 'open' : 'closed'}
-        open={sessionDialogOpen}
-        onOpenChange={(v) => { setSessionDialogOpen(v); if (!v) setEditingSession(null) }}
-        session={editingSession}
+      <SidebarDialogs
+        sessionDialogOpen={sessionDialogOpen}
+        onSessionOpenChange={(open) => { setSessionDialogOpen(open); if (!open) setEditingSession(null) }}
+        editingSession={editingSession}
+        onSaveSession={handleSaveSession}
         folders={folders}
-        onSave={handleSaveSession}
+        folderDialogOpen={folderDialogOpen}
+        onFolderOpenChange={(open) => { setFolderDialogOpen(open); if (!open) { setEditingFolder(null); setFolderName('') } }}
+        editingFolder={editingFolder}
+        folderName={folderName}
+        setFolderName={setFolderName}
+        onCreateOrUpdateFolder={handleCreateFolder}
+        settingsProps={{ open: settingsOpen, onOpenChange: setSettingsOpen, general: settings.general, systemFonts: settings.systemFonts, themeProfiles: themeCatalog.profiles, themeAssignments: themeCatalog.assignments, keys: settings.keys, sync: settings.sync, onSaveGeneral: settings.saveGeneral, onPreviewUIFont: settings.previewUIFont, onRestoreUIFont: settings.restoreUIFont, onPreviewWindowOpacity: settings.previewWindowOpacity, onRestoreWindowOpacity: settings.restoreWindowOpacity, onSaveThemeConfiguration: themeCatalog.saveConfiguration, onImportThemes: themeCatalog.importThemes, onCreateThemeProfile: themeCatalog.createProfile, onUpdateThemeProfile: themeCatalog.saveProfile, onDeleteThemeProfile: themeCatalog.deleteProfile, onDeleteThemeDefinition: themeCatalog.deleteDefinition, onGenerateKey: settings.generateKey, onImportKey: settings.importKey, onDeleteKey: settings.deleteKey, onExportKey: settings.exportKey, onSaveSync: settings.saveSync, onExportConfig: settings.exportConfig, onImportConfig: settings.importConfig }}
       />
-
-      <Dialog open={folderDialogOpen} onOpenChange={(open) => { setFolderDialogOpen(open); if (!open) { setEditingFolder(null); setFolderName('') } }}>
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader>
-            <DialogTitle>{editingFolder ? '编辑分组' : '新建分组'}</DialogTitle>
-          </DialogHeader>
-          <div className="flex flex-col gap-3">
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-medium text-muted-foreground">
-                分组名称
-              </label>
-              <Input
-                value={folderName}
-                onChange={(e) => setFolderName(e.target.value)}
-                placeholder="例如：生产环境"
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleCreateFolder()
-                }}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setFolderDialogOpen(false)}>
-              取消
-            </Button>
-            <Button onClick={handleCreateFolder}>
-              {editingFolder ? '保存' : '创建'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <SettingsDialog
-        open={settingsOpen}
-        onOpenChange={setSettingsOpen}
-        general={settings.general}
-        systemFonts={settings.systemFonts}
-        themeProfiles={themeCatalog.profiles}
-        themeAssignments={themeCatalog.assignments}
-        keys={settings.keys}
-        sync={settings.sync}
-        onSaveGeneral={settings.saveGeneral}
-        onPreviewUIFont={settings.previewUIFont}
-        onRestoreUIFont={settings.restoreUIFont}
-        onPreviewWindowOpacity={settings.previewWindowOpacity}
-        onRestoreWindowOpacity={settings.restoreWindowOpacity}
-        onSaveThemeConfiguration={themeCatalog.saveConfiguration}
-        onImportThemes={themeCatalog.importThemes}
-        onCreateThemeProfile={themeCatalog.createProfile}
-        onUpdateThemeProfile={themeCatalog.saveProfile}
-        onDeleteThemeProfile={themeCatalog.deleteProfile}
-        onDeleteThemeDefinition={themeCatalog.deleteDefinition}
-        onGenerateKey={settings.generateKey}
-        onImportKey={settings.importKey}
-        onDeleteKey={settings.deleteKey}
-        onExportKey={settings.exportKey}
-        onSaveSync={settings.saveSync}
-        onExportConfig={settings.exportConfig}
-        onImportConfig={settings.importConfig}
-        folders={folders}
-        sessions={sessions}
-        onCreateFolder={createFolder}
-        onRenameFolder={updateFolder}
-        onSetDefaultFolder={setDefaultFolder}
-        onDeleteFolder={deleteFolder}
-      />
-      <AlertDialog open={deleteTarget !== null} onOpenChange={(open) => { if (!open) setDeleteTarget(null) }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>确认删除“{deleteTarget?.name}”</AlertDialogTitle>
-            <AlertDialogDescription>
-              {deleteTarget?.type === 'folder' ? '删除分组可能影响其中会话的组织方式。此操作不可撤销。' : '该会话配置将被永久删除，此操作不可撤销。'}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>取消</AlertDialogCancel>
-            <AlertDialogAction variant="destructive" onClick={() => {
-              if (!deleteTarget) return
-              if (deleteTarget.type === 'session') void deleteSession(deleteTarget.id)
-              else void deleteFolder(deleteTarget.id)
-              setDeleteTarget(null)
-            }}>删除</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
       </aside>
       <button type="button" aria-label={collapsed ? '展开侧边栏' : '收起侧边栏'} aria-expanded={!collapsed} onClick={toggleCollapsed} className="absolute left-full top-1/2 z-30 grid size-6 -translate-y-1/2 place-items-center rounded-r-lg border border-l-0 border-border bg-card text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
         {collapsed ? <ChevronRight className="size-3.5" /> : <ChevronLeft className="size-3.5" />}

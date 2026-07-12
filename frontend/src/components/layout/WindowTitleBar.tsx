@@ -11,8 +11,10 @@ function runWindowAction(name: string, action: () => Promise<unknown>) {
 export function WindowTitleBar() {
   const themeCatalog = useThemeCatalog()
   const colorMode = themeCatalog.colorMode
+  const hasEnteredWorkspace = useAppStore((state) => state.hasEnteredWorkspace)
   const sidebarTab = useAppStore((state) => state.sidebarTab)
   const setSidebarTab = useAppStore((state) => state.setSidebarTab)
+  const enterWorkspace = useAppStore((state) => state.enterWorkspace)
 
   const toggleColorMode = () => {
     const nextMode = colorMode === 'dark' ? 'light' : 'dark'
@@ -21,7 +23,8 @@ export function WindowTitleBar() {
 
   const navigationButton = (tab: SidebarTab, label: string) => {
     const Icon = tab === 'sessions' ? SquareTerminal : Workflow
-    return <button type="button" role="tab" aria-selected={sidebarTab === tab} className={`flex items-center gap-1.5 px-3.5 text-sm font-medium transition-colors [--wails-draggable:no-drag] ${sidebarTab === tab ? 'bg-background text-foreground shadow-[inset_0_-2px_0_var(--primary)]' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`} onClick={() => setSidebarTab(tab)}><Icon data-icon="inline-start" aria-hidden="true" className="size-4" />{label}</button>
+    const selected = hasEnteredWorkspace && sidebarTab === tab
+    return <button type="button" role="tab" aria-selected={selected} className={`flex items-center gap-1.5 px-3.5 text-sm font-medium transition-colors [--wails-draggable:no-drag] ${selected ? 'bg-background text-foreground shadow-[inset_0_-2px_0_var(--primary)]' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`} onClick={() => { enterWorkspace(); setSidebarTab(tab) }}><Icon data-icon="inline-start" aria-hidden="true" className="size-4" />{label}</button>
   }
 
   return <header className="flex h-9 shrink-0 select-none items-stretch border-b border-border bg-card">

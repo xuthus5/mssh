@@ -83,6 +83,14 @@ func TestMigrateTablesExist(t *testing.T) {
 	}
 }
 
+func TestMigrateAddsSessionRecencyColumns(t *testing.T) {
+	db, err := OpenDB(t.TempDir())
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, db.Close()) })
+	require.NoError(t, Migrate(db))
+	assertTableColumns(t, db, "sessions", []string{"last_connected_at", "connection_count"})
+}
+
 func TestThemeCatalogSchema(t *testing.T) {
 	db, err := OpenDB(t.TempDir())
 	require.NoError(t, err)

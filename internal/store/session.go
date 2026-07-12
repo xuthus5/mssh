@@ -160,12 +160,12 @@ func ListSessions(db *sql.DB, folderID *int64) ([]model.Session, error) {
 	var err error
 	if folderID != nil {
 		rows, err = db.Query(
-			`SELECT id, folder_id, name, host, port, username, auth_method, password, key_id, keep_alive, term_type, sort_order, created_at, updated_at
+			sessionSelectColumns+`
 			 FROM sessions WHERE folder_id = ? ORDER BY sort_order`, *folderID,
 		)
 	} else {
 		rows, err = db.Query(
-			`SELECT id, folder_id, name, host, port, username, auth_method, password, key_id, keep_alive, term_type, sort_order, created_at, updated_at
+			sessionSelectColumns + `
 			 FROM sessions ORDER BY sort_order`,
 		)
 	}
@@ -175,19 +175,9 @@ func ListSessions(db *sql.DB, folderID *int64) ([]model.Session, error) {
 	defer func() { _ = rows.Close() }()
 	var sessions []model.Session
 	for rows.Next() {
-		var s model.Session
-		var createdAt, updatedAt string
-		err := rows.Scan(&s.ID, &s.FolderID, &s.Name, &s.Host, &s.Port, &s.Username, &s.AuthMethod, &s.Password, &s.KeyID, &s.KeepAlive, &s.TermType, &s.SortOrder, &createdAt, &updatedAt)
+		s, err := scanSession(rows)
 		if err != nil {
 			return nil, fmt.Errorf("scan session: %w", err)
-		}
-		s.CreatedAt, err = time.Parse("2006-01-02 15:04:05", createdAt)
-		if err != nil {
-			return nil, fmt.Errorf("scan session: parse created_at: %w", err)
-		}
-		s.UpdatedAt, err = time.Parse("2006-01-02 15:04:05", updatedAt)
-		if err != nil {
-			return nil, fmt.Errorf("scan session: parse updated_at: %w", err)
 		}
 		sessions = append(sessions, s)
 	}
@@ -218,24 +208,70 @@ func DeleteSession(db *sql.DB, id int64) error {
 }
 
 func GetSession(db *sql.DB, id int64) (*model.Session, error) {
-	var s model.Session
-	var createdAt, updatedAt string
-	err := db.QueryRow(
-		`SELECT id, folder_id, name, host, port, username, auth_method, password, key_id, keep_alive, term_type, sort_order, created_at, updated_at
-		 FROM sessions WHERE id = ?`, id,
-	).Scan(&s.ID, &s.FolderID, &s.Name, &s.Host, &s.Port, &s.Username, &s.AuthMethod, &s.Password, &s.KeyID, &s.KeepAlive, &s.TermType, &s.SortOrder, &createdAt, &updatedAt)
+	s, err := scanSession(db.QueryRow(sessionSelectColumns+" FROM sessions WHERE id = ?", id))
 	if err != nil {
 		return nil, fmt.Errorf("get session: %w", err)
 	}
-	s.CreatedAt, err = time.Parse("2006-01-02 15:04:05", createdAt)
-	if err != nil {
-		return nil, fmt.Errorf("get session: parse created_at: %w", err)
-	}
-	s.UpdatedAt, err = time.Parse("2006-01-02 15:04:05", updatedAt)
-	if err != nil {
-		return nil, fmt.Errorf("get session: parse updated_at: %w", err)
-	}
 	return &s, nil
+}
+
+const sessionSelectColumns = `SELECT id, folder_id, name, host, port, username, auth_method, password, key_id, keep_alive, term_type, sort_order, last_connected_at, connection_count, created_at, updated_at`
+
+type sessionScanner interface{ Scan(...any) error }
+
+func scanSession(scanner sessionScanner) (model.Session, error) {
+	var session model.Session
+	var lastConnected sql.NullString
+	var createdAt, updatedAt string
+	err := scanner.Scan(&session.ID, &session.FolderID, &session.Name, &session.Host, &session.Port, &session.Username, &session.AuthMethod, &session.Password, &session.KeyID, &session.KeepAlive, &session.TermType, &session.SortOrder, &lastConnected, &session.ConnectionCount, &createdAt, &updatedAt)
+	if err != nil {
+		return session, err
+	}
+	if lastConnected.Valid {
+		parsed, parseErr := time.Parse("2006-01-02 15:04:05", lastConnected.String)
+		if parseErr != nil {
+			return session, fmt.Errorf("parse last_connected_at: %w", parseErr)
+		}
+		session.LastConnectedAt = &parsed
+	}
+	var parseErr error
+	session.CreatedAt, parseErr = time.Parse("2006-01-02 15:04:05", createdAt)
+	if parseErr != nil {
+		return session, fmt.Errorf("parse created_at: %w", parseErr)
+	}
+	session.UpdatedAt, parseErr = time.Parse("2006-01-02 15:04:05", updatedAt)
+	if parseErr != nil {
+		return session, fmt.Errorf("parse updated_at: %w", parseErr)
+	}
+	return session, nil
+}
+
+func MarkSessionConnected(db *sql.DB, id int64) error {
+	result, err := db.Exec("UPDATE sessions SET last_connected_at = datetime('now'), connection_count = connection_count + 1 WHERE id = ?", id)
+	if err != nil {
+		return fmt.Errorf("mark session connected: %w", err)
+	}
+	return requireAffected(result, "session")
+}
+
+func ListRecentSessions(db *sql.DB, limit int) ([]model.Session, error) {
+	if limit < 1 || limit > 10 {
+		limit = 10
+	}
+	rows, err := db.Query(sessionSelectColumns+" FROM sessions WHERE last_connected_at IS NOT NULL ORDER BY last_connected_at DESC, id DESC LIMIT ?", limit)
+	if err != nil {
+		return nil, fmt.Errorf("list recent sessions: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+	sessions := make([]model.Session, 0, limit)
+	for rows.Next() {
+		session, scanErr := scanSession(rows)
+		if scanErr != nil {
+			return nil, fmt.Errorf("scan recent session: %w", scanErr)
+		}
+		sessions = append(sessions, session)
+	}
+	return sessions, rows.Err()
 }
 
 func MoveFolder(db *sql.DB, id int64, newParentID *int64) error {

@@ -251,6 +251,8 @@ export class Session {
     "keep_alive": number;
     "term_type": string;
     "sort_order": number;
+    "last_connected_at"?: string | null;
+    "connection_count": number;
     "created_at": string;
     "updated_at": string;
 
@@ -285,6 +287,9 @@ export class Session {
         }
         if (!("sort_order" in $$source)) {
             this["sort_order"] = 0;
+        }
+        if (!("connection_count" in $$source)) {
+            this["connection_count"] = 0;
         }
         if (!("created_at" in $$source)) {
             this["created_at"] = "0001-01-01T00:00:00.000Z";

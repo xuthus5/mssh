@@ -198,6 +198,11 @@ func TestSessionService_ConnectDisconnect(t *testing.T) {
 	assert.Contains(t, terminalID, "term-")
 
 	assert.Equal(t, 1, svc.ConnectionCount())
+	recent, err := svc.ListRecentSessions(10)
+	require.NoError(t, err)
+	require.Len(t, recent, 1)
+	assert.Equal(t, created.ID, recent[0].ID)
+	assert.Equal(t, 1, recent[0].ConnectionCount)
 
 	lastEvent := bus.LastEvent()
 	require.NotNil(t, lastEvent)
