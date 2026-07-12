@@ -20,14 +20,16 @@ describe('eventBridge', () => {
   })
 
   it('maps transfer terminal states and errors', () => {
-    useAppStore.getState().addTransfer({ id: 'task-1', fileName: 'a', direction: 'upload', totalBytes: 10, transferredBytes: 0, speed: 0, eta: 0, status: 'queued', startedAt: 0 })
+    useAppStore.getState().addTransfer({ id: 'task-1', fileName: 'a', direction: 'upload', sessionId: 1, sessionName: 'one', sourcePath: '/a', targetPath: '/b', totalBytes: 10, transferredBytes: 0, speed: 0, eta: 0, status: 'queued', startedAt: 0 })
     const stop = startEventBridge()
     __emitEvent('file:progress', { data: { task_id: 'task-1', transferred: 5, total: 10, speed: 2, eta: 3 } })
     expect(useAppStore.getState().transfers[0]).toMatchObject({ status: 'running', transferredBytes: 5, eta: 3 })
     __emitEvent('file:complete', { data: { task_id: 'task-1', status: 'cancelled', transferred: 5, total: 10 } })
     expect(useAppStore.getState().transfers[0].status).toBe('cancelled')
+    expect(useAppStore.getState().transfers[0].completedAt).toEqual(expect.any(Number))
     __emitEvent('file:error', { data: { task_id: 'task-1', error: 'denied' } })
     expect(useAppStore.getState().transfers[0]).toMatchObject({ status: 'failed', error: 'denied' })
+    expect(useAppStore.getState().transfers[0].completedAt).toEqual(expect.any(Number))
     stop()
   })
 

@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react'
 import { useAppStore, type ConnectionStatus } from '@/store/appStore'
 import { Clock, Circle, Network } from 'lucide-react'
-import TransferProgress from '@/components/file/TransferProgress'
+import { TransferCenter } from '@/components/file/TransferCenter'
 import TunnelDialog from '@/components/session/TunnelDialog'
 import type { Tunnel } from '@/hooks/useSession'
 import { logger } from '@/lib/logger'
-import { FileService, TunnelService } from '@/lib/wails'
+import { TunnelService } from '@/lib/wails'
 import { TunnelType, type TunnelInput } from '../../../bindings/github.com/xuthus5/mssh/internal/model/models'
 import { toast } from '@/components/ui/toast'
 
@@ -46,7 +46,6 @@ export default function StatusBar() {
   const activeTabId = useAppStore((s) => s.activeTabId)
   const connectionStatus = useAppStore((s) => s.connectionStatus)
   const appStatus = useAppStore((s) => s.appStatus)
-  const transfers = useAppStore((s) => s.transfers)
   const tunnelState = useAppStore((s) => s.tunnelState)
   const [now, setNow] = useState(new Date())
   const [tunnelOpen, setTunnelOpen] = useState(false)
@@ -135,12 +134,7 @@ export default function StatusBar() {
         {activeTab && (
           <span className="text-foreground/80">{activeTab.title}</span>
         )}
-        {transfers.length > 0 && (
-          <TransferProgress
-            transfers={transfers}
-            onCancel={(id) => { void FileService.CancelTransfer(id).catch((err: unknown) => toast(`取消传输失败: ${err instanceof Error ? err.message : String(err)}`, 'error')) }}
-          />
-        )}
+        <TransferCenter />
       </div>
       <div className="flex items-center gap-3">
         <button
