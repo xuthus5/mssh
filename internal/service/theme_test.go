@@ -1,6 +1,10 @@
 package service
 
 import (
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -26,6 +30,39 @@ func TestThemeServiceInitializesDefaultsAndAssignments(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotZero(t, assignments.DarkProfileID)
 	assert.NotZero(t, assignments.LightProfileID)
+}
+
+func TestThemeServiceImportsFilesWithPartialResults(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	service := NewThemeService(db, testutil.NewTestLogger())
+	require.NoError(t, service.InitializeDefaults())
+	directory := t.TempDir()
+	validPath := filepath.Join(directory, "Imported.itermcolors")
+	require.NoError(t, os.WriteFile(validPath, []byte(serviceITermFixture()), 0o600))
+	unsupportedPath := filepath.Join(directory, "theme.json")
+	require.NoError(t, os.WriteFile(unsupportedPath, []byte(`{}`), 0o600))
+
+	first, err := service.ImportFiles([]string{validPath, unsupportedPath})
+	require.NoError(t, err)
+	require.Len(t, first.Results, 2)
+	assert.Equal(t, model.ThemeImportImported, first.Results[0].Status)
+	assert.Equal(t, model.ThemeImportFailed, first.Results[1].Status)
+
+	second, err := service.ImportFiles([]string{validPath})
+	require.NoError(t, err)
+	assert.Equal(t, model.ThemeImportDuplicate, second.Results[0].Status)
+}
+
+func serviceITermFixture() string {
+	entries := []string{}
+	keys := []string{"Background Color", "Foreground Color", "Cursor Color", "Selection Color"}
+	for _, key := range keys {
+		entries = append(entries, `<key>`+key+`</key><dict><key>Red Component</key><real>0.2</real><key>Green Component</key><real>0.3</real><key>Blue Component</key><real>0.4</real></dict>`)
+	}
+	for index := range 16 {
+		entries = append(entries, fmt.Sprintf(`<key>Ansi %d Color</key><dict><key>Red Component</key><real>0.2</real><key>Green Component</key><real>0.3</real><key>Blue Component</key><real>0.4</real></dict>`, index))
+	}
+	return `<plist><dict>` + strings.Join(entries, "") + `</dict></plist>`
 }
 
 func TestThemeServiceProfileValidationAndAssignments(t *testing.T) {
