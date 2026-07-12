@@ -86,17 +86,6 @@ describe('useSettings', () => {
     expect(document.documentElement.style.getPropertyValue('--app-opacity')).toBe('0.76')
   })
 
-  it('saveTheme persists to settings', async () => {
-    const { result } = renderHook(() => useSettings())
-    const custom = {
-      background: '#fff', foreground: '#000', cursorColor: '#f00',
-      cursorStyle: 'block' as const, fontFamily: 'monospace', fontSize: 16,
-      ansi: Array(16).fill('#000'),
-    }
-    await act(async () => { await result.current.saveTheme(custom) })
-    expect(result.current.theme.background).toBe('#fff')
-  })
-
   it('generates a key and adds to state', async () => {
     __registerHandler('github.com/xuthus5/mssh/internal/service.KeyService.Generate', async (name: string, keyType: string, bits: number) => ({
       id: nextId(), name, type: keyType, public_key: 'mock-pub', created_at: new Date().toISOString(),

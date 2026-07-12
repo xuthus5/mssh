@@ -15,6 +15,7 @@ import QuickCommands from '@/components/session/QuickCommands'
 import SettingsDialog from '@/components/settings/SettingsDialog'
 import { useSession, type Session, type Folder } from '@/hooks/useSession'
 import { useSettings } from '@/hooks/useSettings'
+import { useThemeCatalog } from '@/hooks/useThemeCatalog'
 import type { CommandItem } from '@/components/session/QuickCommands'
 import { useAppStore } from '@/store/appStore'
 import { MacroService } from '@/lib/wails'
@@ -60,6 +61,7 @@ export default function Sidebar() {
   } = useSession()
 
   const settings = useSettings()
+  const themeCatalog = useThemeCatalog()
 
   useEffect(() => {
     MacroService.List()
@@ -322,7 +324,8 @@ export default function Sidebar() {
         onOpenChange={setSettingsOpen}
         general={settings.general}
         systemFonts={settings.systemFonts}
-        theme={settings.theme}
+        themeProfiles={themeCatalog.profiles}
+        themeAssignments={themeCatalog.assignments}
         keys={settings.keys}
         sync={settings.sync}
         onSaveGeneral={settings.saveGeneral}
@@ -330,7 +333,12 @@ export default function Sidebar() {
         onRestoreUIFont={settings.restoreUIFont}
         onPreviewWindowOpacity={settings.previewWindowOpacity}
         onRestoreWindowOpacity={settings.restoreWindowOpacity}
-        onSaveTheme={settings.saveTheme}
+        onSaveThemeConfiguration={themeCatalog.saveConfiguration}
+        onImportThemes={themeCatalog.importThemes}
+        onCreateThemeProfile={themeCatalog.createProfile}
+        onUpdateThemeProfile={themeCatalog.saveProfile}
+        onDeleteThemeProfile={themeCatalog.deleteProfile}
+        onDeleteThemeDefinition={themeCatalog.deleteDefinition}
         onGenerateKey={settings.generateKey}
         onImportKey={settings.importKey}
         onDeleteKey={settings.deleteKey}

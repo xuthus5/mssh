@@ -46,6 +46,17 @@ export enum AuthMethod {
     AuthKeyboardInteractive = "keyboard-interactive",
 };
 
+export enum CursorStyle {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    CursorStyleBlock = "block",
+    CursorStyleUnderline = "underline",
+    CursorStyleBar = "bar",
+};
+
 export enum KeyType {
     /**
      * The Go zero value for the underlying type of the enum.
@@ -510,75 +521,376 @@ export class SettingInput {
     }
 }
 
-export class Theme {
+export class ThemeAssignments {
+    "dark_profile_id": number;
+    "light_profile_id": number;
+
+    /** Creates a new ThemeAssignments instance. */
+    constructor($$source: Partial<ThemeAssignments> = {}) {
+        if (!("dark_profile_id" in $$source)) {
+            this["dark_profile_id"] = 0;
+        }
+        if (!("light_profile_id" in $$source)) {
+            this["light_profile_id"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new ThemeAssignments instance from a string or object.
+     */
+    static createFrom($$source: any = {}): ThemeAssignments {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new ThemeAssignments($$parsedSource as Partial<ThemeAssignments>);
+    }
+}
+
+export class ThemeAssignmentsInput {
+    "dark_profile_id": number;
+    "light_profile_id": number;
+
+    /** Creates a new ThemeAssignmentsInput instance. */
+    constructor($$source: Partial<ThemeAssignmentsInput> = {}) {
+        if (!("dark_profile_id" in $$source)) {
+            this["dark_profile_id"] = 0;
+        }
+        if (!("light_profile_id" in $$source)) {
+            this["light_profile_id"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new ThemeAssignmentsInput instance from a string or object.
+     */
+    static createFrom($$source: any = {}): ThemeAssignmentsInput {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new ThemeAssignmentsInput($$parsedSource as Partial<ThemeAssignmentsInput>);
+    }
+}
+
+export class ThemeConfigurationInput {
+    "dark_profile": ThemeProfileInput;
+    "light_profile": ThemeProfileInput;
+    "assignments": ThemeAssignmentsInput;
+
+    /** Creates a new ThemeConfigurationInput instance. */
+    constructor($$source: Partial<ThemeConfigurationInput> = {}) {
+        if (!("dark_profile" in $$source)) {
+            this["dark_profile"] = (new ThemeProfileInput());
+        }
+        if (!("light_profile" in $$source)) {
+            this["light_profile"] = (new ThemeProfileInput());
+        }
+        if (!("assignments" in $$source)) {
+            this["assignments"] = (new ThemeAssignmentsInput());
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new ThemeConfigurationInput instance from a string or object.
+     */
+    static createFrom($$source: any = {}): ThemeConfigurationInput {
+        const $$createField0_0 = $$createType0;
+        const $$createField1_0 = $$createType0;
+        const $$createField2_0 = $$createType1;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("dark_profile" in $$parsedSource) {
+            $$parsedSource["dark_profile"] = $$createField0_0($$parsedSource["dark_profile"]);
+        }
+        if ("light_profile" in $$parsedSource) {
+            $$parsedSource["light_profile"] = $$createField1_0($$parsedSource["light_profile"]);
+        }
+        if ("assignments" in $$parsedSource) {
+            $$parsedSource["assignments"] = $$createField2_0($$parsedSource["assignments"]);
+        }
+        return new ThemeConfigurationInput($$parsedSource as Partial<ThemeConfigurationInput>);
+    }
+}
+
+export class ThemeDefinition {
     "id": number;
     "name": string;
+    "mode": ThemeMode;
+    "source_type": ThemeSourceType;
+    "source_name": string;
+    "source_url": string;
+    "source_author": string;
+    "source_license": string;
+    "source_version": string;
+    "source_fingerprint": string;
+    "color_payload": string;
+    "raw_payload": string;
     "is_builtin": boolean;
-    "config": string;
     "created_at": string;
+    "updated_at": string;
 
-    /** Creates a new Theme instance. */
-    constructor($$source: Partial<Theme> = {}) {
+    /** Creates a new ThemeDefinition instance. */
+    constructor($$source: Partial<ThemeDefinition> = {}) {
         if (!("id" in $$source)) {
             this["id"] = 0;
         }
         if (!("name" in $$source)) {
             this["name"] = "";
         }
+        if (!("mode" in $$source)) {
+            this["mode"] = ThemeMode.$zero;
+        }
+        if (!("source_type" in $$source)) {
+            this["source_type"] = ThemeSourceType.$zero;
+        }
+        if (!("source_name" in $$source)) {
+            this["source_name"] = "";
+        }
+        if (!("source_url" in $$source)) {
+            this["source_url"] = "";
+        }
+        if (!("source_author" in $$source)) {
+            this["source_author"] = "";
+        }
+        if (!("source_license" in $$source)) {
+            this["source_license"] = "";
+        }
+        if (!("source_version" in $$source)) {
+            this["source_version"] = "";
+        }
+        if (!("source_fingerprint" in $$source)) {
+            this["source_fingerprint"] = "";
+        }
+        if (!("color_payload" in $$source)) {
+            this["color_payload"] = "";
+        }
+        if (!("raw_payload" in $$source)) {
+            this["raw_payload"] = "";
+        }
         if (!("is_builtin" in $$source)) {
             this["is_builtin"] = false;
-        }
-        if (!("config" in $$source)) {
-            this["config"] = "";
         }
         if (!("created_at" in $$source)) {
             this["created_at"] = "0001-01-01T00:00:00.000Z";
         }
+        if (!("updated_at" in $$source)) {
+            this["updated_at"] = "0001-01-01T00:00:00.000Z";
+        }
 
         Object.assign(this, $$source);
     }
 
     /**
-     * Creates a new Theme instance from a string or object.
+     * Creates a new ThemeDefinition instance from a string or object.
      */
-    static createFrom($$source: any = {}): Theme {
+    static createFrom($$source: any = {}): ThemeDefinition {
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
-        return new Theme($$parsedSource as Partial<Theme>);
+        return new ThemeDefinition($$parsedSource as Partial<ThemeDefinition>);
     }
 }
 
-export class ThemeInput {
+export class ThemeImportResult {
+    "file": string;
+    "name": string;
+    "status": ThemeImportStatus;
+    "definition_id": number;
+    "profile_id": number;
+    "error": string;
+
+    /** Creates a new ThemeImportResult instance. */
+    constructor($$source: Partial<ThemeImportResult> = {}) {
+        if (!("file" in $$source)) {
+            this["file"] = "";
+        }
+        if (!("name" in $$source)) {
+            this["name"] = "";
+        }
+        if (!("status" in $$source)) {
+            this["status"] = ThemeImportStatus.$zero;
+        }
+        if (!("definition_id" in $$source)) {
+            this["definition_id"] = 0;
+        }
+        if (!("profile_id" in $$source)) {
+            this["profile_id"] = 0;
+        }
+        if (!("error" in $$source)) {
+            this["error"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new ThemeImportResult instance from a string or object.
+     */
+    static createFrom($$source: any = {}): ThemeImportResult {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new ThemeImportResult($$parsedSource as Partial<ThemeImportResult>);
+    }
+}
+
+export enum ThemeImportStatus {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    ThemeImportImported = "imported",
+    ThemeImportDuplicate = "duplicate",
+    ThemeImportFailed = "failed",
+};
+
+export class ThemeImportSummary {
+    "results": ThemeImportResult[];
+
+    /** Creates a new ThemeImportSummary instance. */
+    constructor($$source: Partial<ThemeImportSummary> = {}) {
+        if (!("results" in $$source)) {
+            this["results"] = [];
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new ThemeImportSummary instance from a string or object.
+     */
+    static createFrom($$source: any = {}): ThemeImportSummary {
+        const $$createField0_0 = $$createType3;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("results" in $$parsedSource) {
+            $$parsedSource["results"] = $$createField0_0($$parsedSource["results"]);
+        }
+        return new ThemeImportSummary($$parsedSource as Partial<ThemeImportSummary>);
+    }
+}
+
+export enum ThemeMode {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    ThemeModeDark = "dark",
+    ThemeModeLight = "light",
+    ThemeModeUniversal = "universal",
+};
+
+export class ThemeProfile {
     "id": number;
     "name": string;
-    "is_builtin": boolean;
-    "config": string;
+    "theme_id": number;
+    "definition"?: ThemeDefinition | null;
+    "font_family": string;
+    "font_size": number;
+    "cursor_style": CursorStyle;
+    "color_overrides": string;
+    "created_at": string;
+    "updated_at": string;
 
-    /** Creates a new ThemeInput instance. */
-    constructor($$source: Partial<ThemeInput> = {}) {
+    /** Creates a new ThemeProfile instance. */
+    constructor($$source: Partial<ThemeProfile> = {}) {
         if (!("id" in $$source)) {
             this["id"] = 0;
         }
         if (!("name" in $$source)) {
             this["name"] = "";
         }
-        if (!("is_builtin" in $$source)) {
-            this["is_builtin"] = false;
+        if (!("theme_id" in $$source)) {
+            this["theme_id"] = 0;
         }
-        if (!("config" in $$source)) {
-            this["config"] = "";
+        if (!("font_family" in $$source)) {
+            this["font_family"] = "";
+        }
+        if (!("font_size" in $$source)) {
+            this["font_size"] = 0;
+        }
+        if (!("cursor_style" in $$source)) {
+            this["cursor_style"] = CursorStyle.$zero;
+        }
+        if (!("color_overrides" in $$source)) {
+            this["color_overrides"] = "";
+        }
+        if (!("created_at" in $$source)) {
+            this["created_at"] = "0001-01-01T00:00:00.000Z";
+        }
+        if (!("updated_at" in $$source)) {
+            this["updated_at"] = "0001-01-01T00:00:00.000Z";
         }
 
         Object.assign(this, $$source);
     }
 
     /**
-     * Creates a new ThemeInput instance from a string or object.
+     * Creates a new ThemeProfile instance from a string or object.
      */
-    static createFrom($$source: any = {}): ThemeInput {
+    static createFrom($$source: any = {}): ThemeProfile {
+        const $$createField3_0 = $$createType5;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
-        return new ThemeInput($$parsedSource as Partial<ThemeInput>);
+        if ("definition" in $$parsedSource) {
+            $$parsedSource["definition"] = $$createField3_0($$parsedSource["definition"]);
+        }
+        return new ThemeProfile($$parsedSource as Partial<ThemeProfile>);
     }
 }
+
+export class ThemeProfileInput {
+    "id": number;
+    "name": string;
+    "theme_id": number;
+    "font_family": string;
+    "font_size": number;
+    "cursor_style": CursorStyle;
+    "color_overrides": string;
+
+    /** Creates a new ThemeProfileInput instance. */
+    constructor($$source: Partial<ThemeProfileInput> = {}) {
+        if (!("id" in $$source)) {
+            this["id"] = 0;
+        }
+        if (!("name" in $$source)) {
+            this["name"] = "";
+        }
+        if (!("theme_id" in $$source)) {
+            this["theme_id"] = 0;
+        }
+        if (!("font_family" in $$source)) {
+            this["font_family"] = "";
+        }
+        if (!("font_size" in $$source)) {
+            this["font_size"] = 0;
+        }
+        if (!("cursor_style" in $$source)) {
+            this["cursor_style"] = CursorStyle.$zero;
+        }
+        if (!("color_overrides" in $$source)) {
+            this["color_overrides"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new ThemeProfileInput instance from a string or object.
+     */
+    static createFrom($$source: any = {}): ThemeProfileInput {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new ThemeProfileInput($$parsedSource as Partial<ThemeProfileInput>);
+    }
+}
+
+export enum ThemeSourceType {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    ThemeSourceBuiltin = "builtin",
+    ThemeSourceITerm2 = "iterm2",
+    ThemeSourceCommunity = "community",
+    ThemeSourceCustom = "custom",
+};
 
 export class Tunnel {
     "id": number;
@@ -713,3 +1025,11 @@ export class UpdateInfo {
         return new UpdateInfo($$parsedSource as Partial<UpdateInfo>);
     }
 }
+
+// Private type creation functions
+const $$createType0 = ThemeProfileInput.createFrom;
+const $$createType1 = ThemeAssignmentsInput.createFrom;
+const $$createType2 = ThemeImportResult.createFrom;
+const $$createType3 = $Create.Array($$createType2);
+const $$createType4 = ThemeDefinition.createFrom;
+const $$createType5 = $Create.Nullable($$createType4);

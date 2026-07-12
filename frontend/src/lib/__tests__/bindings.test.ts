@@ -57,7 +57,7 @@ describe('Generated Bindings Barrel', () => {
 
   it('exports ThemeService', () => {
     expect(ThemeService).toBeDefined()
-    expect(typeof ThemeService.List).toBe('function')
+    expect(typeof ThemeService.ListProfiles).toBe('function')
   })
 
   it('exports LogService', () => {

@@ -19,7 +19,8 @@ function settingsProps() {
     onOpenChange: vi.fn(),
     general,
     systemFonts: ['Arial', 'Microsoft YaHei', 'Segoe UI'],
-    theme: { background: '#000', foreground: '#fff', cursorColor: '#fff', cursorStyle: 'bar' as const, fontFamily: 'monospace', fontSize: 14, ansi: Array(16).fill('#000') },
+    themeProfiles: [themeProfile(1, 'dark', '#000000'), themeProfile(2, 'light', '#ffffff')],
+    themeAssignments: { dark_profile_id: 1, light_profile_id: 2 },
     keys: [],
     sync: { enabled: false, url: '', username: '', password: '' },
     onSaveGeneral: vi.fn(async () => {}),
@@ -27,7 +28,12 @@ function settingsProps() {
     onRestoreUIFont: vi.fn(),
     onPreviewWindowOpacity: vi.fn(),
     onRestoreWindowOpacity: vi.fn(),
-    onSaveTheme: vi.fn(),
+    onSaveThemeConfiguration: vi.fn(async () => {}),
+    onImportThemes: vi.fn(async () => ({ results: [] })),
+    onCreateThemeProfile: vi.fn(async () => null),
+    onUpdateThemeProfile: vi.fn(async () => {}),
+    onDeleteThemeProfile: vi.fn(async () => {}),
+    onDeleteThemeDefinition: vi.fn(async () => {}),
     onGenerateKey: vi.fn(),
     onImportKey: vi.fn(),
     onDeleteKey: vi.fn(),
@@ -42,6 +48,10 @@ function settingsProps() {
     onSetDefaultFolder: vi.fn(async () => {}),
     onDeleteFolder: vi.fn(async () => {}),
   }
+}
+
+function themeProfile(id: number, mode: 'dark' | 'light', background: string): any {
+  return { id, name: mode, theme_id: id, font_family: 'monospace', font_size: 14, cursor_style: 'bar' as const, color_overrides: '{}', created_at: '', updated_at: '', definition: { id, name: mode, mode, source_type: 'builtin' as const, source_name: '', source_url: '', source_author: '', source_license: '', source_version: '', source_fingerprint: mode, color_payload: JSON.stringify({ background, foreground: mode === 'dark' ? '#ffffff' : '#000000', cursor: '#888888', selection: '#264f78', ansi: Array(16).fill('#111111') }), raw_payload: '', is_builtin: true, created_at: '', updated_at: '' } }
 }
 
 describe('SettingsDialog interface font settings', () => {
