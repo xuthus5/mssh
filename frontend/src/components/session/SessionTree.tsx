@@ -18,11 +18,13 @@ interface Props {
   folders: Folder[]
   sessions: Session[]
   onConnect: (sessionId: string) => void
-  onEditSession: (session: Session) => void
-  onDeleteSession: (sessionId: string) => void
-  onEditFolder: (folder: Folder) => void
-  onDeleteFolder: (folderId: string) => void
+  onEditSession?: (session: Session) => void
+  onDeleteSession?: (sessionId: string) => void
+  onEditFolder?: (folder: Folder) => void
+  onDeleteFolder?: (folderId: string) => void
   onMoveToFolder?: (sessionId: string, folderId: string | null) => void
+  onSelectFolder?: (folderId: string) => void
+  navigationOnly?: boolean
   revealAll?: boolean
 }
 
@@ -35,6 +37,8 @@ export default function SessionTree({
   onEditFolder,
   onDeleteFolder,
   onMoveToFolder,
+  onSelectFolder,
+  navigationOnly = false,
   revealAll = false,
 }: Props) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
@@ -62,37 +66,32 @@ export default function SessionTree({
     const folderSessions = getFolderSessions(folder.id)
     const isExpanded = revealAll || expanded.has(folder.id)
 
+    const folderRow = <div
+      role="treeitem"
+      tabIndex={0}
+      aria-expanded={isExpanded}
+      className="flex cursor-pointer items-center gap-1 rounded px-1 py-1 text-sm hover:bg-muted/50"
+      onClick={() => { toggleFolder(folder.id); onSelectFolder?.(folder.id) }}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') { toggleFolder(folder.id); onSelectFolder?.(folder.id) }
+        if (event.key === 'ArrowRight' && !isExpanded) toggleFolder(folder.id)
+        if (event.key === 'ArrowLeft' && isExpanded) toggleFolder(folder.id)
+      }}
+    >
+      <span className="shrink-0">{isExpanded ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}</span>
+      <FolderIcon className="size-3.5 shrink-0 text-muted-foreground" />
+      <span className="truncate">{folder.name}</span>
+      {folder.isDefault && <Badge className="ml-auto">默认</Badge>}
+    </div>
     return (
       <div key={folder.id}>
-        <ContextMenu>
+        {navigationOnly ? folderRow : <ContextMenu>
           <ContextMenuTrigger>
-            <div
-              role="treeitem"
-              tabIndex={0}
-              aria-expanded={isExpanded}
-              className="flex items-center gap-1 py-1 px-1 cursor-pointer hover:bg-muted/50 rounded text-sm"
-              onClick={() => toggleFolder(folder.id)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' || event.key === ' ') toggleFolder(folder.id)
-                if (event.key === 'ArrowRight' && !isExpanded) toggleFolder(folder.id)
-                if (event.key === 'ArrowLeft' && isExpanded) toggleFolder(folder.id)
-              }}
-            >
-              <span className="flex-shrink-0">
-                {isExpanded ? (
-                  <ChevronDown className="h-3.5 w-3.5" />
-                ) : (
-                  <ChevronRight className="h-3.5 w-3.5" />
-                )}
-              </span>
-              <FolderIcon className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-              <span className="truncate">{folder.name}</span>
-              {folder.isDefault && <Badge className="ml-auto">默认</Badge>}
-            </div>
+            {folderRow}
           </ContextMenuTrigger>
           <ContextMenuContent>
             <ContextMenuItem
-              onClick={() => onEditFolder(folder)}
+              onClick={() => onEditFolder?.(folder)}
             >
               编辑
             </ContextMenuItem>
@@ -100,12 +99,12 @@ export default function SessionTree({
             <ContextMenuItem
               variant="destructive"
               disabled={folder.isDefault || folders.length <= 1}
-              onClick={() => onDeleteFolder(folder.id)}
+              onClick={() => onDeleteFolder?.(folder.id)}
             >
               删除
             </ContextMenuItem>
           </ContextMenuContent>
-        </ContextMenu>
+        </ContextMenu>}
         {isExpanded && (
           <div className="ml-3">
             {children.map((child) => renderFolder(child))}
@@ -118,31 +117,24 @@ export default function SessionTree({
     )
   }
 
-  const renderSession = (session: Session) => (
-    <ContextMenu key={session.id}>
+  const renderSession = (session: Session) => {
+    const sessionRow = <div
+      role="treeitem"
+      tabIndex={0}
+      className="ml-1 flex cursor-pointer items-center gap-1 rounded px-1 py-1 text-sm hover:bg-muted/50"
+      onDoubleClick={(event: MouseEvent) => { event.stopPropagation(); logger.debug('SessionTree: onConnect', session.id); onConnect(session.id) }}
+      onKeyDown={(event) => { if (event.key === 'Enter') onConnect(session.id) }}
+    ><Server className="size-3.5 shrink-0 text-muted-foreground" /><span className="truncate">{session.name}</span></div>
+    if (navigationOnly) return <div key={session.id}>{sessionRow}</div>
+    return <ContextMenu key={session.id}>
       <ContextMenuTrigger>
-        <div
-          role="treeitem"
-          tabIndex={0}
-          className="flex items-center gap-1 py-1 px-1 cursor-pointer hover:bg-muted/50 rounded text-sm ml-1"
-          onDoubleClick={(e: MouseEvent) => {
-            e.stopPropagation()
-            logger.debug('SessionTree: onConnect', session.id)
-            onConnect(session.id)
-          }}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter') onConnect(session.id)
-          }}
-        >
-          <Server className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-          <span className="truncate">{session.name}</span>
-        </div>
+        {sessionRow}
       </ContextMenuTrigger>
       <ContextMenuContent>
         <ContextMenuItem onClick={() => { logger.debug('SessionTree: onConnect', session.id); onConnect(session.id) }}>
           连接
         </ContextMenuItem>
-        <ContextMenuItem onClick={() => { logger.debug('SessionTree: onEditSession', session.id); onEditSession(session) }}>
+        <ContextMenuItem onClick={() => { logger.debug('SessionTree: onEditSession', session.id); onEditSession?.(session) }}>
           编辑
         </ContextMenuItem>
         <ContextMenuSeparator />
@@ -166,13 +158,13 @@ export default function SessionTree({
         )}
         <ContextMenuItem
           variant="destructive"
-          onClick={() => { logger.debug('SessionTree: onDeleteSession', session.id); onDeleteSession(session.id) }}
+          onClick={() => { logger.debug('SessionTree: onDeleteSession', session.id); onDeleteSession?.(session.id) }}
         >
           删除
         </ContextMenuItem>
       </ContextMenuContent>
     </ContextMenu>
-  )
+  }
 
   return (
     <div role="tree" aria-label="会话列表" className="flex flex-col h-full p-2">

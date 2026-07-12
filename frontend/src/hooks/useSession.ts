@@ -25,6 +25,8 @@ export interface Session {
   keepAlive: number
   termType: string
   folderId: string | null
+  lastConnectedAt?: string
+  connectionCount?: number
 }
 
 export interface Tunnel {
@@ -55,6 +57,8 @@ function mapSession(s: BindingSession): Session {
     keepAlive: s.keep_alive,
     termType: s.term_type,
     folderId: s.folder_id != null ? String(s.folder_id) : null,
+    lastConnectedAt: s.last_connected_at ?? undefined,
+    connectionCount: s.connection_count,
   }
 }
 
@@ -75,6 +79,7 @@ export function useSession() {
   const openTab = useAppStore((s) => s.openTab)
   const [folders, setFolders] = useState<Folder[]>([])
   const [sessions, setSessions] = useState<Session[]>([])
+  const [recentSessions, setRecentSessions] = useState<Session[]>([])
   const [tunnels, setTunnels] = useState<Tunnel[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -109,12 +114,19 @@ export function useSession() {
   const deleteFolder = useCallback(async (id: string) => {
     try {
       await SessionService.DeleteFolder(Number(id))
-      setFolders((prev) => prev.filter((f) => f.id !== id))
+      setFolders((prev) => {
+        const defaultID = prev.find((folder) => folder.isDefault)?.id ?? null
+        return prev.filter((folder) => folder.id !== id).map((folder) => folder.parentId === id ? { ...folder, parentId: defaultID } : folder)
+      })
+      setSessions((prev) => {
+        const defaultID = folders.find((folder) => folder.isDefault)?.id ?? null
+        return prev.map((session) => session.folderId === id ? { ...session, folderId: defaultID } : session)
+      })
     } catch (err) {
       logger.error('deleteFolder error', err)
       throw err
     }
-  }, [])
+  }, [folders])
 
   const updateFolder = useCallback(async (id: string, name: string) => {
     try {
@@ -142,6 +154,16 @@ export function useSession() {
       setError(err instanceof Error ? err.message : String(err))
     } finally {
       setLoading(false)
+    }
+  }, [])
+
+  const listRecentSessions = useCallback(async () => {
+    try {
+      const result = await SessionService.ListRecentSessions(10)
+      setRecentSessions((result ?? []).map(mapSession))
+    } catch (err) {
+      logger.error('listRecentSessions error', err)
+      setError(err instanceof Error ? err.message : String(err))
     }
   }, [])
 
@@ -226,7 +248,9 @@ export function useSession() {
       const terminalId = await TerminalService.Open(Number(sessionId), 80, 24)
       const tabId = `terminal-${sessionId}`
       useAppStore.getState().setConnectionStatus(terminalId, 'connected')
+      useAppStore.getState().enterWorkspace()
       openTab({ id: tabId, title: session.name, type: 'terminal', terminalId, sessionId: Number(sessionId) })
+      await Promise.all([listRecentSessions(), listSessions()])
 
       dialog.setState('connected')
       logger.info('connected', { terminalId, host: session.host })
@@ -235,7 +259,7 @@ export function useSession() {
       const msg = err instanceof Error ? err.message : String(err)
       dialog.setError(msg)
     }
-  }, [openTab, sessions])
+  }, [listRecentSessions, listSessions, openTab, sessions])
 
   const disconnect = useCallback(async (sessionId: string) => {
     try {
@@ -259,12 +283,13 @@ export function useSession() {
   useEffect(() => {
     listFolders()
     listSessions()
-  }, [listFolders, listSessions])
+    listRecentSessions()
+  }, [listFolders, listRecentSessions, listSessions])
 
   return {
-    folders, sessions, tunnels, loading, error,
+    folders, sessions, recentSessions, tunnels, loading, error,
     listFolders, createFolder, deleteFolder, updateFolder, setDefaultFolder,
-    listSessions, createSession, updateSession, deleteSession, moveSession,
+    listSessions, listRecentSessions, createSession, updateSession, deleteSession, moveSession,
     connect, disconnect, listTunnels,
   }
 }

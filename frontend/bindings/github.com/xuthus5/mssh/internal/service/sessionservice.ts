@@ -70,6 +70,12 @@ export function ListFolders(): $CancellablePromise<model$0.SessionFolder[]> {
     });
 }
 
+export function ListRecentSessions(limit: number): $CancellablePromise<model$0.Session[]> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.SessionService.ListRecentSessions", limit).then(($result: any) => {
+        return $$createType7($result);
+    });
+}
+
 export function ListSessions(folderID: number | null): $CancellablePromise<model$0.Session[]> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.SessionService.ListSessions", folderID).then(($result: any) => {
         return $$createType7($result);

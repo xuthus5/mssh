@@ -12,7 +12,16 @@ describe('appStore', () => {
       connectionStatus: {},
       transfers: [],
       transferCenterOpen: false,
+      hasEnteredWorkspace: false,
     })
+  })
+
+  it('enters the workspace for the rest of the process lifetime', () => {
+    expect(useAppStore.getState().hasEnteredWorkspace).toBe(false)
+    useAppStore.getState().enterWorkspace()
+    expect(useAppStore.getState().hasEnteredWorkspace).toBe(true)
+    useAppStore.getState().setSidebarTab('macros')
+    expect(useAppStore.getState().hasEnteredWorkspace).toBe(true)
   })
 
   it('opens and closes tabs', () => {

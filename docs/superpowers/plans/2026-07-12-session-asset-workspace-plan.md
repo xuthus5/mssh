@@ -36,15 +36,15 @@
 - Add `store.ListRecentSessions(db *sql.DB, limit int) ([]model.Session, error)`.
 - Add `store.MarkSessionConnected(db *sql.DB, id int64) error`.
 
-- [ ] Add failing schema tests asserting `last_connected_at` and `connection_count` exist and old rows default to null/zero.
-- [ ] Add failing store tests for successful recency updates, count increments, descending ordering, limit enforcement, and exclusion of null timestamps.
-- [ ] Add a failing service test proving a successful SSH connection marks recency without changing connection failure behavior.
-- [ ] Add `ensureSessionRecencySchema` to `store.Migrate` using SQLite table inspection and `ALTER TABLE` only when columns are absent.
-- [ ] Extend all session SELECT/scan/update conversion paths with the new fields.
-- [ ] Call `MarkSessionConnected` only after `ssh.ConnectWithVerifier` returns successfully; log metadata failures without returning a connection failure.
-- [ ] Implement the limit-clamped recent query and service wrapper.
-- [ ] Run `export PATH="$HOME/.govm/go/bin:$PATH"; go test -race ./internal/store ./internal/service ./internal/app`.
-- [ ] Run `wails3 generate bindings -ts -names -d frontend/bindings .` and verify the new fields are present.
+- [x] Add failing schema tests asserting `last_connected_at` and `connection_count` exist and old rows default to null/zero.
+- [x] Add failing store tests for successful recency updates, count increments, descending ordering, limit enforcement, and exclusion of null timestamps.
+- [x] Add a failing service test proving a successful SSH connection marks recency without changing connection failure behavior.
+- [x] Add `ensureSessionRecencySchema` to `store.Migrate` using SQLite table inspection and `ALTER TABLE` only when columns are absent.
+- [x] Extend all session SELECT/scan/update conversion paths with the new fields.
+- [x] Call `MarkSessionConnected` only after `ssh.ConnectWithVerifier` returns successfully; log metadata failures without returning a connection failure.
+- [x] Implement the limit-clamped recent query and service wrapper.
+- [x] Run `export PATH="$HOME/.govm/go/bin:$PATH"; go test -race ./internal/store ./internal/service ./internal/app`.
+- [x] Run `wails3 generate bindings -ts -names -d frontend/bindings .` and verify the new fields are present.
 
 ### Task 2: Add Workspace Entry State
 
@@ -60,12 +60,12 @@
 - Keep `SidebarTab = 'sessions' | 'macros'`; selecting either calls `enterWorkspace` before changing the selected workspace.
 - `useSession.connect` calls `enterWorkspace` before opening a terminal.
 
-- [ ] Add failing store tests for initial false state and one-way transition to true.
-- [ ] Add failing title-bar tests proving Sessions and Macros navigation dismisses welcome.
-- [ ] Add failing app-shell tests proving welcome renders only while no workspace has been entered and never returns after closing tabs.
-- [ ] Implement the one-way process-local state and wire title-bar navigation.
-- [ ] Update `TabContent` and shell layout so the welcome page hides Sidebar and TabBar until workspace entry, while terminal tabs still overlay the selected workspace after entry.
-- [ ] Run the focused frontend tests.
+- [x] Add failing store tests for initial false state and one-way transition to true.
+- [x] Add failing title-bar tests proving Sessions and Macros navigation dismisses welcome.
+- [x] Add failing app-shell tests proving welcome renders only while no workspace has been entered and never returns after closing tabs.
+- [x] Implement the one-way process-local state and wire title-bar navigation.
+- [x] Update `TabContent` and shell layout so the welcome page hides Sidebar and TabBar until workspace entry, while terminal tabs still overlay the selected workspace after entry.
+- [x] Run the focused frontend tests.
 
 ### Task 3: Split Session UI and Build Asset Center
 
@@ -85,15 +85,15 @@
 - `SessionAssetCenter` owns `activeAssetTab: 'recent' | 'folders' | 'nodes'`, selected-folder filter, breadcrumb, and Create menu.
 - `useSession` exposes `listRecentSessions`, `renameFolder`, `setDefaultFolder`, `deleteFolder`, and existing session mutations with stable callbacks.
 
-- [ ] Add failing tests for the three asset tabs, create menu commands, recent ten-row rendering, folder node counts, all-node filtering, breadcrumb reset, and loading/error states.
-- [ ] Add failing tests for compact-tree folder selection, keyboard access, explicit connect action, and double-click connection.
-- [ ] Implement the compact tree by extracting navigation behavior from `SessionTree`; remove tree-level edit/delete controls.
-- [ ] Implement the asset center with shadcn `Tabs`, `Table`, `DropdownMenu`, `Breadcrumb`, `Badge`, `Empty`, `AlertDialog`, and existing `Card`/`Button` components.
-- [ ] Implement recent cards/table with `last_connected_at` and `connection_count` display.
-- [ ] Implement folder rows with rename, set-default, delete confirmation, node counts, and protected disabled states.
-- [ ] Implement all-node rows with search, folder filter, connect/edit/move/delete actions, and breadcrumb reset.
-- [ ] Ensure both Create menu commands open the existing `SessionDialog` and folder dialog.
-- [ ] Run all new session workspace tests.
+- [x] Add failing tests for the three asset tabs, create menu commands, recent ten-row rendering, folder node counts, all-node filtering, breadcrumb reset, and loading/error states.
+- [x] Add failing tests for compact-tree folder selection, keyboard access, explicit connect action, and double-click connection.
+- [x] Implement the compact tree by extracting navigation behavior from `SessionTree`; remove tree-level edit/delete controls.
+- [x] Implement the asset center with shadcn `Tabs`, `Table`, `DropdownMenu`, `Breadcrumb`, `Badge`, `Empty`, `AlertDialog`, and existing `Card`/`Button` components.
+- [x] Implement recent cards/table with `last_connected_at` and `connection_count` display.
+- [x] Implement folder rows with rename, set-default, delete confirmation, node counts, and protected disabled states.
+- [x] Implement all-node rows with search, folder filter, connect/edit/move/delete actions, and breadcrumb reset.
+- [x] Ensure both Create menu commands open the existing `SessionDialog` and folder dialog.
+- [x] Run all new session workspace tests.
 
 ### Task 4: Remove Settings Folder Management and Integrate Shell
 
@@ -110,22 +110,22 @@
 - Settings no longer accepts folder-management props and no longer renders a folders category.
 - The app shell renders `SessionWorkspace` as the selected sessions workspace and the existing macro panel as the selected macros workspace.
 
-- [ ] Add failing Settings tests proving the folder category and FolderManager are absent.
-- [ ] Move shared session/folder dialogs to `SessionWorkspace` without changing Wails method signatures.
-- [ ] Wire the title-bar workspace selection, welcome-once state, compact tree, and asset center into the app shell.
-- [ ] Preserve terminal, playback, settings, macro, SFTP, keyboard shortcut, resizing, and collapse behavior.
-- [ ] Remove dead folder-management props/imports and update README only if user-facing workflow text references Settings folders.
-- [ ] Run frontend full test suite and production build.
+- [x] Add failing Settings tests proving the folder category and FolderManager are absent.
+- [x] Move shared session/folder dialogs to `SessionWorkspace` without changing Wails method signatures.
+- [x] Wire the title-bar workspace selection, welcome-once state, compact tree, and asset center into the app shell.
+- [x] Preserve terminal, playback, settings, macro, SFTP, keyboard shortcut, resizing, and collapse behavior.
+- [x] Remove dead folder-management props/imports and update README only if user-facing workflow text references Settings folders.
+- [x] Run frontend full test suite and production build.
 
 ### Task 5: Delivery Verification
 
 **Files:**
 - Modify: `docs/superpowers/plans/2026-07-12-session-asset-workspace-plan.md`
 
-- [ ] Run `goimports-reviser -project-name github.com/xuthus5/mssh -rm-unused -set-alias -format ./...`.
-- [ ] Run `golangci-lint run` and `go test -race ./...`.
-- [ ] Run repository Go coverage and require total coverage at least 90%.
-- [ ] Run `npm test --prefix frontend` and `npm run build --prefix frontend`.
-- [ ] Run `wails3 build` with the configured `$HOME/.govm` Go toolchain.
-- [ ] Remove coverage files and build binaries.
-- [ ] Mark every plan item complete, inspect `git diff --check`, commit with `feat(session): add asset workspace`, push `main`, and verify `HEAD == origin/main` with a clean status.
+- [x] Run `goimports-reviser -project-name github.com/xuthus5/mssh -rm-unused -set-alias -format ./...`.
+- [x] Run `golangci-lint run` and `go test -race ./...`.
+- [x] Run repository Go coverage and require total coverage at least 90%.
+- [x] Run `npm test --prefix frontend` and `npm run build --prefix frontend`.
+- [x] Run `wails3 build` with the configured `$HOME/.govm` Go toolchain.
+- [x] Remove coverage files and build binaries.
+- [x] Mark every plan item complete, inspect `git diff --check`, commit with `feat(session): add asset workspace`, push `main`, and verify `HEAD == origin/main` with a clean status.
