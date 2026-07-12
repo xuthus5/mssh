@@ -12,7 +12,7 @@ import { applyTerminalTheme, xtermTheme } from '@/lib/terminalTheme'
 interface RecordingEntry {
   timestamp: number
   type: number
-  data: number[]
+  data: string
 }
 
 interface PlayerData {
@@ -124,8 +124,8 @@ export function PlaybackTab({ recordingId, title }: Props) {
 
         while (newIndex < entries.length && entries[newIndex].timestamp <= p.position) {
           const entry = entries[newIndex]
-          if (entry.data && entry.data.length > 0) {
-            term.write(new Uint8Array(entry.data))
+          if (entry.data) {
+            term.write(decodeRecordingData(entry.data))
           }
           newIndex++
         }
@@ -165,7 +165,7 @@ export function PlaybackTab({ recordingId, title }: Props) {
     let index = 0
     while (index < entries.length && entries[index].timestamp <= position) {
       const entry = entries[index]
-      if (entry.data?.length) term.write(new Uint8Array(entry.data))
+      if (entry.data) term.write(decodeRecordingData(entry.data))
       index++
     }
     p.index = index
@@ -223,4 +223,9 @@ export function PlaybackTab({ recordingId, title }: Props) {
       </div>
     </div>
   )
+}
+
+export function decodeRecordingData(encoded: string) {
+  const binary = atob(encoded)
+  return Uint8Array.from(binary, (character) => character.charCodeAt(0))
 }

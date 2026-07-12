@@ -2,6 +2,7 @@ package ssh
 
 import (
 	"encoding/binary"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -12,6 +13,10 @@ import (
 
 	"github.com/xuthus5/mssh/internal/model"
 )
+
+type failingReader struct{}
+
+func (failingReader) Read([]byte) (int, error) { return 0, assert.AnError }
 
 func TestNewPlayerFileNotFound(t *testing.T) {
 	_, err := NewPlayer("/nonexistent/file.msshlog")
@@ -54,6 +59,11 @@ func TestNewPlayerTruncatedEntryHeader(t *testing.T) {
 	_, err = NewPlayer(path)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "truncated entry header")
+}
+
+func TestPlayerEntryReportsReaderFailure(t *testing.T) {
+	_, err := (&Player{}).readEntry(failingReader{})
+	assert.ErrorContains(t, err, "read entry header")
 }
 
 func TestNewPlayerTruncatedEntryData(t *testing.T) {
@@ -166,6 +176,9 @@ func TestPlayerEntryTimestampUsesMillisecondsForJSONPlayback(t *testing.T) {
 	t.Cleanup(func() { _ = p.Close() })
 	require.Len(t, p.Entries(), 1)
 	assert.Less(t, p.Entries()[0].Timestamp, int64(1000))
+	encoded, err := json.Marshal(p)
+	require.NoError(t, err)
+	assert.Contains(t, string(encoded), `"data":"b3V0cHV0"`)
 }
 
 func TestPlayerEntriesRoundTripStdin(t *testing.T) {
