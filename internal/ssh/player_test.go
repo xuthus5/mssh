@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -150,6 +151,21 @@ func TestPlayerEntriesRoundTripStdout(t *testing.T) {
 	assert.Equal(t, model.RecordStdout, entries[0].Type)
 	assert.Equal(t, original, entries[0].Data)
 	assert.True(t, entries[0].Timestamp >= 0)
+}
+
+func TestPlayerEntryTimestampUsesMillisecondsForJSONPlayback(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "timestamp_ms.msshlog")
+	r, err := NewRecorder(path, 80, 24, "xterm")
+	require.NoError(t, err)
+	time.Sleep(2 * time.Millisecond)
+	require.NoError(t, r.Write([]byte("output"), model.RecordStdout))
+	require.NoError(t, r.Close())
+
+	p, err := NewPlayer(path)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = p.Close() })
+	require.Len(t, p.Entries(), 1)
+	assert.Less(t, p.Entries()[0].Timestamp, int64(1000))
 }
 
 func TestPlayerEntriesRoundTripStdin(t *testing.T) {
