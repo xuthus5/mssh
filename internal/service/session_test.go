@@ -162,7 +162,9 @@ func TestSessionService_SessionCRUD(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "db-server", fetched.Name)
 
-	var newFolderID int64 = 2
+	folder, err := svc.CreateFolder("目标分组", nil)
+	require.NoError(t, err)
+	newFolderID := folder.ID
 	err = svc.MoveSession(created.ID, &newFolderID)
 	require.NoError(t, err)
 

@@ -70,11 +70,3 @@ type ThemeAssignments struct {
 	DarkProfileID  int64 `json:"dark_profile_id"`
 	LightProfileID int64 `json:"light_profile_id"`
 }
-
-type Theme struct {
-	ID        int64     `json:"id"`
-	Name      string    `json:"name"`
-	IsBuiltin bool      `json:"is_builtin"`
-	Config    string    `json:"config"`
-	CreatedAt time.Time `json:"created_at"`
-}

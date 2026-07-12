@@ -13,7 +13,7 @@ func TestWriteInputsExcludeServerManagedTimestamps(t *testing.T) {
 	session := SessionInputFrom(Session{ID: 1, Name: "server", CreatedAt: now, UpdatedAt: now}).Session()
 	tunnel := TunnelInputFrom(Tunnel{ID: 2, Name: "forward", CreatedAt: now}).Tunnel()
 	macro := MacroInputFrom(Macro{ID: 3, Name: "list", CreatedAt: now}).Macro()
-	theme := ThemeInputFrom(Theme{ID: 4, Name: "dark", CreatedAt: now}).Theme()
+	theme := ThemeDefinitionInputFrom(ThemeDefinition{ID: 4, Name: "dark", CreatedAt: now, UpdatedAt: now}).ThemeDefinition()
 
 	assert.True(t, setting.UpdatedAt.IsZero())
 	assert.True(t, session.CreatedAt.IsZero())
@@ -21,4 +21,5 @@ func TestWriteInputsExcludeServerManagedTimestamps(t *testing.T) {
 	assert.True(t, tunnel.CreatedAt.IsZero())
 	assert.True(t, macro.CreatedAt.IsZero())
 	assert.True(t, theme.CreatedAt.IsZero())
+	assert.True(t, theme.UpdatedAt.IsZero())
 }

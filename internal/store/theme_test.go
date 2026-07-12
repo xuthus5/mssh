@@ -1,6 +1,7 @@
 package store
 
 import (
+	"database/sql"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -9,65 +10,54 @@ import (
 	"github.com/xuthus5/mssh/internal/model"
 )
 
-func TestCreateAndListThemes(t *testing.T) {
+func TestThemeCatalogStoreCRUDAndFilters(t *testing.T) {
 	db := setupTestDB(t)
-	th := model.Theme{
-		Name: "Dark Mode", IsBuiltin: false,
-		Config: `{"bg":"#1e1e1e","fg":"#d4d4d4"}`,
-	}
-	created, err := CreateTheme(db, th)
-	require.NoError(t, err)
-	assert.NotZero(t, created.ID)
-	assert.Equal(t, "Dark Mode", created.Name)
+	dark := createThemeDefinitionFixture(t, db, "Dark", model.ThemeModeDark, "dark-fingerprint", false)
+	_ = createThemeDefinitionFixture(t, db, "Light", model.ThemeModeLight, "light-fingerprint", false)
 
-	themes, err := ListThemes(db)
+	definitions, err := ListThemeDefinitions(db, model.ThemeModeDark)
 	require.NoError(t, err)
-	assert.Len(t, themes, 1)
-	assert.Equal(t, "Dark Mode", themes[0].Name)
-	assert.False(t, themes[0].IsBuiltin)
+	require.Len(t, definitions, 1)
+	assert.Equal(t, dark.ID, definitions[0].ID)
+
+	profile, err := CreateThemeProfile(db, model.ThemeProfile{Name: "Dark Profile", ThemeID: dark.ID, FontFamily: "monospace", FontSize: 14, CursorStyle: model.CursorStyleBar, ColorOverrides: `{}`})
+	require.NoError(t, err)
+	profile.FontSize = 16
+	require.NoError(t, UpdateThemeProfile(db, *profile))
+	loaded, err := GetThemeProfile(db, profile.ID)
+	require.NoError(t, err)
+	assert.Equal(t, 16, loaded.FontSize)
+	assert.Equal(t, dark.Name, loaded.Definition.Name)
+
+	require.NoError(t, DeleteThemeProfile(db, profile.ID))
+	require.NoError(t, DeleteThemeDefinition(db, dark.ID))
 }
 
-func TestUpdateTheme(t *testing.T) {
+func TestThemeCatalogStoreConstraints(t *testing.T) {
 	db := setupTestDB(t)
-	th := model.Theme{
-		Name: "Old Theme", IsBuiltin: false,
-		Config: `{"bg":"#fff"}`,
-	}
-	created, err := CreateTheme(db, th)
-	require.NoError(t, err)
+	builtin := createThemeDefinitionFixture(t, db, "Builtin", model.ThemeModeDark, "builtin", true)
+	_, err := CreateThemeDefinition(db, model.ThemeDefinition{Name: "Duplicate", Mode: model.ThemeModeDark, SourceType: model.ThemeSourceCustom, SourceFingerprint: "builtin", ColorPayload: `{}`})
+	assert.Error(t, err)
+	assert.Error(t, DeleteThemeDefinition(db, builtin.ID))
 
-	created.Name = "Updated Theme"
-	created.Config = `{"bg":"#000"}`
-	err = UpdateTheme(db, *created)
+	custom := createThemeDefinitionFixture(t, db, "Custom", model.ThemeModeDark, "custom", false)
+	profile, err := CreateThemeProfile(db, model.ThemeProfile{Name: "Custom", ThemeID: custom.ID, FontFamily: "monospace", FontSize: 14, CursorStyle: model.CursorStyleBlock, ColorOverrides: `{}`})
 	require.NoError(t, err)
-
-	themes, err := ListThemes(db)
-	require.NoError(t, err)
-	assert.Len(t, themes, 1)
-	assert.Equal(t, "Updated Theme", themes[0].Name)
-	assert.Equal(t, `{"bg":"#000"}`, themes[0].Config)
+	assert.Error(t, DeleteThemeDefinition(db, custom.ID))
+	require.NoError(t, DeleteThemeProfile(db, profile.ID))
 }
 
-func TestDeleteTheme(t *testing.T) {
+func TestThemeAssignmentsStore(t *testing.T) {
 	db := setupTestDB(t)
-	th := model.Theme{
-		Name: "Temp Theme", IsBuiltin: true,
-		Config: `{"bg":"#333"}`,
-	}
-	created, err := CreateTheme(db, th)
+	require.NoError(t, SaveThemeAssignments(db, model.ThemeAssignments{DarkProfileID: 4, LightProfileID: 7}))
+	assignments, err := GetThemeAssignments(db)
 	require.NoError(t, err)
-
-	err = DeleteTheme(db, created.ID)
-	require.NoError(t, err)
-
-	themes, err := ListThemes(db)
-	require.NoError(t, err)
-	assert.Len(t, themes, 0)
+	assert.Equal(t, model.ThemeAssignments{DarkProfileID: 4, LightProfileID: 7}, assignments)
 }
 
-func TestListThemesEmpty(t *testing.T) {
-	db := setupTestDB(t)
-	themes, err := ListThemes(db)
+func createThemeDefinitionFixture(t *testing.T, db *sql.DB, name string, mode model.ThemeMode, fingerprint string, builtin bool) *model.ThemeDefinition {
+	t.Helper()
+	definition, err := CreateThemeDefinition(db, model.ThemeDefinition{Name: name, Mode: mode, SourceType: model.ThemeSourceCustom, SourceFingerprint: fingerprint, ColorPayload: `{"background":"#000000"}`, IsBuiltin: builtin})
 	require.NoError(t, err)
-	assert.Len(t, themes, 0)
+	return definition
 }
