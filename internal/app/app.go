@@ -114,66 +114,68 @@ func New(opts Options) (*App, error) {
 	}
 
 	keychain := crypto.NewKeychainAdapter()
+	masterKey, err := initializeMasterKey(opts.DataDir, keychain, logger)
+	if err != nil {
+		return nil, err
+	}
 
+	eventBus := event.NewWailsEventBus(logger)
+	logger.Info("initializing services")
+	return initializeServices(db, masterKey, keychain, opts, eventBus, logger)
+}
+
+func initializeMasterKey(dataDir string, keychain crypto.KeychainAdapter, logger *slog.Logger) ([]byte, error) {
 	logger.Info("loading master key")
-	masterKey, err := loadMasterKey(opts.DataDir, keychain, logger)
+	masterKey, err := loadMasterKey(dataDir, keychain, logger)
 	if err != nil {
 		logger.Error("load master key failed", "error", err)
 		return nil, fmt.Errorf("load master key: %w", err)
 	}
-
-	if masterKey == nil {
-		logger.Info("generating new master key")
-		masterKey, err = crypto.GenerateRandomBytes(32)
-		if err != nil {
-			logger.Error("generate master key failed", "error", err)
-			return nil, fmt.Errorf("generate master key: %w", err)
-		}
-		persistMasterKey(opts.DataDir, masterKey, keychain, logger)
+	if masterKey != nil {
+		return masterKey, nil
 	}
+	logger.Info("generating new master key")
+	masterKey, err = crypto.GenerateRandomBytes(32)
+	if err != nil {
+		logger.Error("generate master key failed", "error", err)
+		return nil, fmt.Errorf("generate master key: %w", err)
+	}
+	persistMasterKey(dataDir, masterKey, keychain, logger)
+	return masterKey, nil
+}
 
-	eventBus := event.NewWailsEventBus(logger)
-
-	logger.Info("initializing services")
-	cryptoAdapter := &cryptoAdapter{key: masterKey}
-	sessionSvc := service.NewSessionService(db, eventBus, 30, opts.DataDir, cryptoAdapter, logger)
+func initializeServices(db *sql.DB, masterKey []byte, keychain crypto.KeychainAdapter, opts Options, eventBus service.EventBus, logger *slog.Logger) (*App, error) {
+	adapter := &cryptoAdapter{key: masterKey}
+	sessionSvc := service.NewSessionService(db, eventBus, 30, opts.DataDir, adapter, logger)
 	terminalSvc := service.NewTerminalService(sessionSvc, eventBus, 32, logger)
-	fileSvc := service.NewFileService(sessionSvc, eventBus, logger)
-	tunnelSvc := service.NewTunnelService(db, sessionSvc, eventBus, logger)
-
-	keySvc := service.NewKeyService(db, cryptoAdapter, logger)
-	macroSvc := service.NewMacroService(db, terminalSvc, logger)
+	logSvc := service.NewLogService(db, opts.DataDir, logger)
 	themeSvc := service.NewThemeService(db, logger)
 	if err := themeSvc.InitializeDefaults(); err != nil {
 		return nil, fmt.Errorf("initialize terminal themes: %w", err)
 	}
-	logSvc := service.NewLogService(db, opts.DataDir, logger)
-	syncSvc := service.NewSyncService(db, logger)
-
-	terminalSvc.SetOutputHandler(func(terminalID string, data []byte) {
-		logSvc.HandleOutput(terminalID, data)
-	})
-	terminalSvc.SetCloseHandler(func(terminalID string) {
-		_ = logSvc.StopTerminalRecordingIfActive(terminalID)
-	})
-
+	configureTerminalLogging(terminalSvc, logSvc)
 	return &App{
 		DB:       db,
 		Crypto:   masterKey,
 		Keychain: keychain,
 		Session:  sessionSvc,
 		Terminal: terminalSvc,
-		File:     fileSvc,
-		Tunnel:   tunnelSvc,
-		Key:      keySvc,
-		Macro:    macroSvc,
+		File:     service.NewFileService(sessionSvc, eventBus, logger),
+		Tunnel:   service.NewTunnelService(db, sessionSvc, eventBus, logger),
+		Key:      service.NewKeyService(db, adapter, logger),
+		Macro:    service.NewMacroService(db, terminalSvc, logger),
 		Theme:    themeSvc,
 		Log:      logSvc,
-		Sync:     syncSvc,
+		Sync:     service.NewSyncService(db, logger),
 		Setting:  service.NewSettingService(db, logger),
 		About:    service.NewAboutService(),
 		Font:     service.NewFontService(logger),
 	}, nil
+}
+
+func configureTerminalLogging(terminalSvc *service.TerminalService, logSvc *service.LogService) {
+	terminalSvc.SetOutputHandler(func(terminalID string, data []byte) { logSvc.HandleOutput(terminalID, data) })
+	terminalSvc.SetCloseHandler(func(terminalID string) { _ = logSvc.StopTerminalRecordingIfActive(terminalID) })
 }
 
 func (a *App) Shutdown() {

@@ -27,6 +27,7 @@ describe('ThemeManager', () => {
   })
 
   it('renames, copies, and deletes custom profiles', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
     const update = vi.fn(async () => {})
     const create = vi.fn(async () => {})
     const deleteProfile = vi.fn(async () => {})

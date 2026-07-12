@@ -46,6 +46,37 @@ func TestITermColorsFingerprintIsStable(t *testing.T) {
 	assert.Equal(t, first[0].SourceFingerprint, second[0].SourceFingerprint)
 }
 
+func TestConvertColorValidatesAndClampsComponents(t *testing.T) {
+	_, err := convertColor(map[string]map[string]string{}, "Missing")
+	assert.ErrorContains(t, err, "missing Missing")
+	_, err = convertColor(map[string]map[string]string{"Color": {"Red Component": "0"}}, "Color")
+	assert.ErrorContains(t, err, "Green Component")
+	_, err = convertColor(map[string]map[string]string{"Color": {
+		"Red Component": "invalid", "Green Component": "0", "Blue Component": "0",
+	}}, "Color")
+	assert.ErrorContains(t, err, "parse Red Component")
+
+	color, err := convertColor(map[string]map[string]string{"Color": {
+		"Red Component": "-1", "Green Component": "0.5", "Blue Component": "2",
+	}}, "Color")
+	require.NoError(t, err)
+	assert.Equal(t, "#0080ff", color)
+}
+
+func TestParseITermColorsSupportsIntegerAndStringComponents(t *testing.T) {
+	colors, err := parseITermColors([]byte(`<plist><dict><key>Color</key><dict><key>Red Component</key><integer>1</integer><key>Green Component</key><string>0.5</string></dict></dict></plist>`))
+	require.NoError(t, err)
+	assert.Equal(t, "1", colors["Color"]["Red Component"])
+	assert.Equal(t, "0.5", colors["Color"]["Green Component"])
+}
+
+func TestParseITermColorsReportsMalformedKeysAndComponents(t *testing.T) {
+	_, err := parseITermColors([]byte(`<plist><dict><key><broken></key></dict></plist>`))
+	assert.ErrorContains(t, err, "parse iTerm2 key")
+	_, err = parseITermColors([]byte(`<plist><dict><key>Color</key><dict><key>Red Component</key><real><broken></real></dict></dict></plist>`))
+	assert.ErrorContains(t, err, "parse iTerm2 component")
+}
+
 func itermFixture(background float64) string {
 	entries := []string{
 		plistColor("Background Color", background, background, background),

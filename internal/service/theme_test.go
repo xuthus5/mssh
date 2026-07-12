@@ -53,6 +53,33 @@ func TestThemeServiceImportsFilesWithPartialResults(t *testing.T) {
 	assert.Equal(t, model.ThemeImportDuplicate, second.Results[0].Status)
 }
 
+func TestThemeServiceImportReportsFileAndDatabaseFailures(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	themeService := NewThemeService(db, testutil.NewTestLogger())
+	directory := t.TempDir()
+	oversizedPath := filepath.Join(directory, "oversized.itermcolors")
+	require.NoError(t, os.WriteFile(oversizedPath, make([]byte, maxThemeImportBytes+1), 0o600))
+	malformedPath := filepath.Join(directory, "malformed.itermcolors")
+	require.NoError(t, os.WriteFile(malformedPath, []byte(`<plist><dict>`), 0o600))
+	validPath := filepath.Join(directory, "valid.itermcolors")
+	require.NoError(t, os.WriteFile(validPath, []byte(serviceITermFixture()), 0o600))
+
+	summary, err := themeService.ImportFiles([]string{filepath.Join(directory, "missing.itermcolors"), oversizedPath, malformedPath})
+	require.NoError(t, err)
+	require.Len(t, summary.Results, 3)
+	for _, result := range summary.Results {
+		assert.Equal(t, model.ThemeImportFailed, result.Status)
+		assert.NotEmpty(t, result.Error)
+	}
+
+	require.NoError(t, db.Close())
+	summary, err = themeService.ImportFiles([]string{validPath})
+	require.NoError(t, err)
+	require.Len(t, summary.Results, 1)
+	assert.Equal(t, model.ThemeImportFailed, summary.Results[0].Status)
+	assert.Contains(t, summary.Results[0].Error, "begin theme import")
+}
+
 func serviceITermFixture() string {
 	entries := []string{}
 	keys := []string{"Background Color", "Foreground Color", "Cursor Color", "Selection Color"}
@@ -83,4 +110,86 @@ func TestThemeServiceProfileValidationAndAssignments(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, service.SaveAssignments(model.ThemeAssignmentsInput{DarkProfileID: created.ID, LightProfileID: assignments.LightProfileID}))
 	assert.Error(t, service.DeleteProfile(created.ID))
+	invalidInputs := []model.ThemeProfileInput{
+		{Name: "", ThemeID: definitions[0].ID, FontFamily: "mono", FontSize: 14, CursorStyle: model.CursorStyleBar, ColorOverrides: `{}`},
+		{Name: "Invalid cursor", ThemeID: definitions[0].ID, FontFamily: "mono", FontSize: 14, CursorStyle: "beam", ColorOverrides: `{}`},
+		{Name: "Invalid JSON", ThemeID: definitions[0].ID, FontFamily: "mono", FontSize: 14, CursorStyle: model.CursorStyleBar, ColorOverrides: `{`},
+	}
+	for _, input := range invalidInputs {
+		_, err = service.CreateCustomProfile(input)
+		assert.Error(t, err)
+	}
+}
+
+func TestThemeServiceSavesCrossModeConfigurationAndManagesCustomThemes(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	themeService := NewThemeService(db, testutil.NewTestLogger())
+	require.NoError(t, themeService.InitializeDefaults())
+	profiles, err := themeService.ListProfiles("")
+	require.NoError(t, err)
+	require.Len(t, profiles, 2)
+
+	dark := profiles[0]
+	light := profiles[1]
+	dark.Name = "Dark Edited"
+	light.Name = "Light Edited"
+	require.NoError(t, themeService.SaveConfiguration(model.ThemeConfigurationInput{
+		DarkProfile:  model.ThemeProfileInputFrom(dark),
+		LightProfile: model.ThemeProfileInputFrom(light),
+		Assignments:  model.ThemeAssignmentsInput{DarkProfileID: light.ID, LightProfileID: dark.ID},
+	}))
+
+	assignments, err := themeService.GetAssignments()
+	require.NoError(t, err)
+	assert.Equal(t, light.ID, assignments.DarkProfileID)
+	assert.Equal(t, dark.ID, assignments.LightProfileID)
+	stored, err := themeService.GetProfile(dark.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "Dark Edited", stored.Name)
+
+	assert.Error(t, themeService.SaveAssignments(model.ThemeAssignmentsInput{DarkProfileID: -1, LightProfileID: light.ID}))
+	assert.Error(t, themeService.SaveAssignments(model.ThemeAssignmentsInput{DarkProfileID: dark.ID, LightProfileID: -1}))
+	assert.Error(t, themeService.SaveConfiguration(model.ThemeConfigurationInput{DarkProfile: model.ThemeProfileInput{Name: "invalid"}}))
+	assert.Error(t, themeService.SaveConfiguration(model.ThemeConfigurationInput{
+		DarkProfile: model.ThemeProfileInputFrom(dark), LightProfile: model.ThemeProfileInput{Name: "invalid"},
+	}))
+	missingDark := model.ThemeProfileInputFrom(dark)
+	missingDark.ID = -1
+	assert.Error(t, themeService.SaveConfiguration(model.ThemeConfigurationInput{
+		DarkProfile: missingDark, LightProfile: model.ThemeProfileInputFrom(light),
+	}))
+	_, err = themeService.ListDefinitions("sepia")
+	assert.Error(t, err)
+	_, err = themeService.ListProfiles("sepia")
+	assert.Error(t, err)
+	assert.Error(t, themeService.DeleteDefinition(profiles[0].ThemeID))
+}
+
+func TestThemeServiceReportsDatabaseFailures(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	themeService := NewThemeService(db, testutil.NewTestLogger())
+	require.NoError(t, db.Close())
+
+	assert.Error(t, themeService.InitializeDefaults())
+	_, err := themeService.ListDefinitions("")
+	assert.Error(t, err)
+	_, err = themeService.ListProfiles("")
+	assert.Error(t, err)
+	_, err = themeService.GetProfile(1)
+	assert.Error(t, err)
+	_, err = themeService.CreateCustomProfile(validThemeProfileInput(1))
+	assert.Error(t, err)
+	assert.Error(t, themeService.UpdateProfile(validThemeProfileInput(1)))
+	assert.Error(t, themeService.DeleteProfile(1))
+	assert.Error(t, themeService.DeleteDefinition(1))
+	_, err = themeService.GetAssignments()
+	assert.Error(t, err)
+	assert.Error(t, themeService.SaveAssignments(model.ThemeAssignmentsInput{DarkProfileID: 1, LightProfileID: 2}))
+	assert.Error(t, themeService.SaveConfiguration(model.ThemeConfigurationInput{
+		DarkProfile: validThemeProfileInput(1), LightProfile: validThemeProfileInput(2),
+	}))
+}
+
+func validThemeProfileInput(themeID int64) model.ThemeProfileInput {
+	return model.ThemeProfileInput{Name: "Valid", ThemeID: themeID, FontFamily: "mono", FontSize: 14, CursorStyle: model.CursorStyleBar, ColorOverrides: `{}`}
 }

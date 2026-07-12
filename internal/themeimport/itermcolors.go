@@ -61,9 +61,7 @@ func containsXMLExternalReference(content []byte) bool {
 
 func parseITermColors(content []byte) (map[string]map[string]string, error) {
 	decoder := xml.NewDecoder(bytes.NewReader(content))
-	colors := make(map[string]map[string]string)
-	depth := 0
-	var colorKey, componentKey string
+	state := plistParseState{colors: make(map[string]map[string]string)}
 	for {
 		token, err := decoder.Token()
 		if err == io.EOF {
@@ -72,40 +70,77 @@ func parseITermColors(content []byte) (map[string]map[string]string, error) {
 		if err != nil {
 			return nil, fmt.Errorf("parse iTerm2 plist: %w", err)
 		}
-		switch element := token.(type) {
-		case xml.StartElement:
-			if element.Name.Local == "dict" {
-				depth++
-				continue
-			}
-			if element.Name.Local == "key" {
-				var value string
-				if err = decoder.DecodeElement(&value, &element); err != nil {
-					return nil, fmt.Errorf("parse iTerm2 key: %w", err)
-				}
-				if depth == 1 {
-					colorKey = value
-					colors[colorKey] = make(map[string]string)
-				} else if depth == 2 {
-					componentKey = value
-				}
-			} else if depth == 2 && (element.Name.Local == "real" || element.Name.Local == "integer" || element.Name.Local == "string") {
-				var value string
-				if err = decoder.DecodeElement(&value, &element); err != nil {
-					return nil, fmt.Errorf("parse iTerm2 component: %w", err)
-				}
-				colors[colorKey][componentKey] = value
-			}
-		case xml.EndElement:
-			if element.Name.Local == "dict" {
-				depth--
-				if depth < 2 {
-					componentKey = ""
-				}
-			}
+		if err := state.consume(decoder, token); err != nil {
+			return nil, err
 		}
 	}
-	return colors, nil
+	return state.colors, nil
+}
+
+type plistParseState struct {
+	colors       map[string]map[string]string
+	depth        int
+	colorKey     string
+	componentKey string
+}
+
+func (state *plistParseState) consume(decoder *xml.Decoder, token xml.Token) error {
+	switch element := token.(type) {
+	case xml.StartElement:
+		return state.consumeStart(decoder, element)
+	case xml.EndElement:
+		state.consumeEnd(element)
+	}
+	return nil
+}
+
+func (state *plistParseState) consumeStart(decoder *xml.Decoder, element xml.StartElement) error {
+	switch element.Name.Local {
+	case "dict":
+		state.depth++
+	case "key":
+		return state.consumeKey(decoder, element)
+	case "real", "integer", "string":
+		return state.consumeComponent(decoder, element)
+	}
+	return nil
+}
+
+func (state *plistParseState) consumeKey(decoder *xml.Decoder, element xml.StartElement) error {
+	var value string
+	if err := decoder.DecodeElement(&value, &element); err != nil {
+		return fmt.Errorf("parse iTerm2 key: %w", err)
+	}
+	switch state.depth {
+	case 1:
+		state.colorKey = value
+		state.colors[value] = make(map[string]string)
+	case 2:
+		state.componentKey = value
+	}
+	return nil
+}
+
+func (state *plistParseState) consumeComponent(decoder *xml.Decoder, element xml.StartElement) error {
+	if state.depth != 2 {
+		return nil
+	}
+	var value string
+	if err := decoder.DecodeElement(&value, &element); err != nil {
+		return fmt.Errorf("parse iTerm2 component: %w", err)
+	}
+	state.colors[state.colorKey][state.componentKey] = value
+	return nil
+}
+
+func (state *plistParseState) consumeEnd(element xml.EndElement) {
+	if element.Name.Local != "dict" {
+		return
+	}
+	state.depth--
+	if state.depth < 2 {
+		state.componentKey = ""
+	}
 }
 
 func buildPayload(colors map[string]map[string]string) (model.TerminalColorPayload, error) {

@@ -104,16 +104,13 @@ func (service *ThemeService) GetAssignments() (model.ThemeAssignments, error) {
 
 func (service *ThemeService) SaveAssignments(input model.ThemeAssignmentsInput) error {
 	assignments := input.ThemeAssignments()
-	dark, err := store.GetThemeProfile(service.db, assignments.DarkProfileID)
+	_, err := store.GetThemeProfile(service.db, assignments.DarkProfileID)
 	if err != nil {
 		return fmt.Errorf("dark theme profile: %w", err)
 	}
-	light, err := store.GetThemeProfile(service.db, assignments.LightProfileID)
+	_, err = store.GetThemeProfile(service.db, assignments.LightProfileID)
 	if err != nil {
 		return fmt.Errorf("light theme profile: %w", err)
-	}
-	if !modeCompatible(dark.Definition.Mode, model.ThemeModeDark) || !modeCompatible(light.Definition.Mode, model.ThemeModeLight) {
-		return fmt.Errorf("theme profile is incompatible with its assigned application mode")
 	}
 	return store.SaveThemeAssignments(service.db, assignments)
 }
@@ -126,12 +123,6 @@ func (service *ThemeService) SaveConfiguration(input model.ThemeConfigurationInp
 	}
 	if err := validateThemeProfile(light); err != nil {
 		return fmt.Errorf("light profile: %w", err)
-	}
-	if err := service.validateProfileMode(dark, model.ThemeModeDark); err != nil {
-		return err
-	}
-	if err := service.validateProfileMode(light, model.ThemeModeLight); err != nil {
-		return err
 	}
 	tx, err := service.db.Begin()
 	if err != nil {
@@ -148,17 +139,6 @@ func (service *ThemeService) SaveConfiguration(input model.ThemeConfigurationInp
 		return fmt.Errorf("save theme configuration: %w", err)
 	}
 	return tx.Commit()
-}
-
-func (service *ThemeService) validateProfileMode(profile model.ThemeProfile, mode model.ThemeMode) error {
-	definition, err := store.GetThemeDefinition(service.db, profile.ThemeID)
-	if err != nil {
-		return err
-	}
-	if !modeCompatible(definition.Mode, mode) {
-		return fmt.Errorf("profile %q is incompatible with %s mode", profile.Name, mode)
-	}
-	return nil
 }
 
 func (service *ThemeService) ensureBuiltin(definition model.ThemeDefinition) (int64, error) {
@@ -222,10 +202,6 @@ func parseThemeMode(value string) (model.ThemeMode, error) {
 		return mode, nil
 	}
 	return "", fmt.Errorf("invalid theme mode %q", value)
-}
-
-func modeCompatible(actual, target model.ThemeMode) bool {
-	return actual == target || actual == model.ThemeModeUniversal
 }
 
 func defaultDarkDefinition() model.ThemeDefinition {
