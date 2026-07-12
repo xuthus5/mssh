@@ -152,10 +152,17 @@ func DeleteThemeProfile(db themeDB, id int64) error {
 }
 
 func SaveThemeAssignments(db *sql.DB, assignments model.ThemeAssignments) error {
-	return SetSettings(db, []model.Setting{
-		{Key: "terminal.theme.dark_profile_id", Namespace: "terminal", Value: strconv.FormatInt(assignments.DarkProfileID, 10), ValueType: "number", Version: 1},
-		{Key: "terminal.theme.light_profile_id", Namespace: "terminal", Value: strconv.FormatInt(assignments.LightProfileID, 10), ValueType: "number", Version: 1},
-	})
+	return SaveThemeAssignmentsDB(db, assignments)
+}
+
+func SaveThemeAssignmentsDB(db themeDB, assignments model.ThemeAssignments) error {
+	for key, id := range map[string]int64{"terminal.theme.dark_profile_id": assignments.DarkProfileID, "terminal.theme.light_profile_id": assignments.LightProfileID} {
+		_, err := db.Exec(`INSERT INTO settings (key, namespace, value, value_type, version, updated_at) VALUES (?, 'terminal', ?, 'number', 1, datetime('now')) ON CONFLICT(key) DO UPDATE SET value=excluded.value, value_type='number', version=1, updated_at=datetime('now')`, key, strconv.FormatInt(id, 10))
+		if err != nil {
+			return fmt.Errorf("save theme assignment %s: %w", key, err)
+		}
+	}
+	return nil
 }
 
 func GetThemeAssignments(db themeDB) (model.ThemeAssignments, error) {
