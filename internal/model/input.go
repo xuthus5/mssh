@@ -129,5 +129,5 @@ type ThemeConfigurationInput struct {
 }
 
 func (input ThemeAssignmentsInput) ThemeAssignments() ThemeAssignments {
-	return ThemeAssignments{DarkProfileID: input.DarkProfileID, LightProfileID: input.LightProfileID}
+	return ThemeAssignments(input)
 }
