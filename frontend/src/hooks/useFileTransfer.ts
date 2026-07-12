@@ -5,6 +5,7 @@ import type { FileEntry } from '../../bindings/github.com/xuthus5/mssh/internal/
 import { useAppStore } from '@/store/appStore'
 export type { TransferJob } from '@/store/appStore'
 import { toast } from '@/components/ui/toast'
+import { cancelTransfer as cancelTransferAction, startDownload, startUpload } from '@/lib/transferActions'
 
 export interface FileInfo {
   name: string
@@ -31,6 +32,7 @@ export function useFileTransfer(sessionId: number) {
   const [error, setError] = useState('')
   const requestID = useRef(0)
   const transfers = useAppStore((state) => state.transfers)
+  const sessionName = useAppStore((state) => state.tabs.find((tab) => tab.sessionId === sessionId)?.title ?? `会话 #${sessionId}`)
 
   const listFiles = useCallback(async (path: string) => {
     setLoading(true)
@@ -59,18 +61,12 @@ export function useFileTransfer(sessionId: number) {
     try {
       const fileName = localPath.split(/[\\/]/).pop() ?? localPath
       const targetPath = `${remotePath.replace(/\/$/, '')}/${fileName}`
-      const taskId = await FileService.Upload(sessionId, localPath, targetPath)
-      useAppStore.getState().addTransfer({
-        id: taskId,
-        fileName,
-        direction: 'upload',
-        totalBytes: 0, transferredBytes: 0, speed: 0, eta: 0, status: 'queued', startedAt: Date.now(),
-      })
+      await startUpload({ sessionId, sessionName, sourcePath: localPath, targetPath })
     } catch (err) {
       logger.error('upload error', err)
       toast(`上传失败: ${err instanceof Error ? err.message : String(err)}`, 'error')
     }
-  }, [sessionId])
+  }, [sessionId, sessionName])
 
   const uploadMany = useCallback(async (localPaths: string[], remotePath: string) => {
     await Promise.all(localPaths.map((localPath) => upload(localPath, remotePath)))
@@ -78,18 +74,12 @@ export function useFileTransfer(sessionId: number) {
 
   const download = useCallback(async (remotePath: string, localPath: string) => {
     try {
-      const taskId = await FileService.Download(sessionId, remotePath, localPath)
-      useAppStore.getState().addTransfer({
-        id: taskId,
-        fileName: remotePath.split('/').pop() ?? remotePath,
-        direction: 'download',
-        totalBytes: 0, transferredBytes: 0, speed: 0, eta: 0, status: 'queued', startedAt: Date.now(),
-      })
+      await startDownload({ sessionId, sessionName, sourcePath: remotePath, targetPath: localPath })
     } catch (err) {
       logger.error('download error', err)
       toast(`下载失败: ${err instanceof Error ? err.message : String(err)}`, 'error')
     }
-  }, [sessionId])
+  }, [sessionId, sessionName])
 
   const deleteFile = useCallback(async (path: string) => {
     try {
@@ -121,7 +111,7 @@ export function useFileTransfer(sessionId: number) {
 
   const cancelTransfer = useCallback(async (jobId: string) => {
     try {
-      await FileService.CancelTransfer(jobId)
+      await cancelTransferAction(jobId)
     } catch (err) {
       logger.error('cancelTransfer error', err)
     }

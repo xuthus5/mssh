@@ -10,6 +10,8 @@ describe('appStore', () => {
       activeTabId: null,
       terminalPool: new Map(),
       connectionStatus: {},
+      transfers: [],
+      transferCenterOpen: false,
     })
   })
 
@@ -86,12 +88,27 @@ describe('appStore', () => {
     const { addTransfer, updateTransfer, removeTransfer } = useAppStore.getState()
     addTransfer({
       id: 't1', fileName: 'test.txt', direction: 'upload',
+      sessionId: 1, sessionName: '生产服务器', sourcePath: '/tmp/test.txt', targetPath: '/remote/test.txt',
       totalBytes: 100, transferredBytes: 0, speed: 0, eta: 0, status: 'queued', startedAt: Date.now(),
     })
     expect(useAppStore.getState().transfers).toHaveLength(1)
+    expect(useAppStore.getState().transferCenterOpen).toBe(true)
     updateTransfer('t1', { transferredBytes: 50, speed: 1024 })
     expect(useAppStore.getState().transfers[0].transferredBytes).toBe(50)
     removeTransfer('t1')
     expect(useAppStore.getState().transfers).toHaveLength(0)
+  })
+
+  it('clears only finished transfer history', () => {
+    const job = { sessionId: 1, sessionName: '生产服务器', sourcePath: '/a', targetPath: '/b', totalBytes: 10, transferredBytes: 0, speed: 0, eta: 0, startedAt: 1 } as const
+    useAppStore.setState({ transfers: [
+      { ...job, id: 'running', fileName: 'running.txt', direction: 'upload', status: 'running' },
+      { ...job, id: 'failed', fileName: 'failed.txt', direction: 'download', status: 'failed', completedAt: 2 },
+      { ...job, id: 'done', fileName: 'done.txt', direction: 'upload', status: 'completed', completedAt: 3 },
+    ] })
+
+    useAppStore.getState().clearFinishedTransfers()
+
+    expect(useAppStore.getState().transfers.map((item) => item.id)).toEqual(['running'])
   })
 })
