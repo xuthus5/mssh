@@ -45,6 +45,13 @@ function settingsProps() {
 }
 
 describe('SettingsDialog interface font settings', () => {
+  it('uses the terminal category for terminal theme settings', async () => {
+    render(<SettingsDialog {...settingsProps()} />)
+
+    expect(screen.getByRole('tab', { name: '终端' })).toBeInTheDocument()
+    expect(screen.queryByRole('tab', { name: '外观' })).not.toBeInTheDocument()
+  })
+
   it('previews and saves the selected font settings', async () => {
     const props = settingsProps()
     render(<SettingsDialog {...props} />)
