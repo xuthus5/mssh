@@ -166,7 +166,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   closeTab: (id) => {
     const state = get()
     const tab = state.tabs.find((t) => t.id === id)
-    if (tab?.terminalId) {
+    if (tab?.type === 'terminal' && tab.terminalId) {
       TerminalService.Close(tab.terminalId).catch((err: unknown) => {
         logger.error('closeTab: close terminal error', err)
       })
