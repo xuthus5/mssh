@@ -14,6 +14,7 @@ interface LabeledSelectProps {
   placeholder?: string
   className?: string
   disabled?: boolean
+  ariaLabel?: string
 }
 
 export function LabeledSelect({
@@ -23,12 +24,13 @@ export function LabeledSelect({
   placeholder = '请选择',
   className,
   disabled,
+  ariaLabel,
 }: LabeledSelectProps) {
   const selectedLabel = options.find((option) => option.value === value)?.label
 
   return (
     <Select value={value} onValueChange={(nextValue) => onValueChange(nextValue ?? '')} disabled={disabled}>
-      <SelectTrigger className={cn('w-full', className)}>
+      <SelectTrigger aria-label={ariaLabel} className={cn('w-full', className)}>
         <SelectValue placeholder={placeholder}>
           <span>{selectedLabel ?? placeholder}</span>
         </SelectValue>
