@@ -20,6 +20,10 @@ export interface TransferJob {
   id: string
   fileName: string
   direction: 'upload' | 'download'
+  sessionId: number
+  sessionName: string
+  sourcePath: string
+  targetPath: string
   totalBytes: number
   transferredBytes: number
   speed: number
@@ -27,6 +31,7 @@ export interface TransferJob {
   status: 'queued' | 'running' | 'completed' | 'failed' | 'cancelled'
   error?: string
   startedAt: number
+  completedAt?: number
 }
 
 export interface TerminalTheme {
@@ -95,13 +100,16 @@ export interface AppState {
   appStatus: string
   terminalTheme: TerminalTheme
   transfers: TransferJob[]
+  transferCenterOpen: boolean
   activePaneId: string | null
   recordingState: Record<string, 'idle' | 'starting' | 'recording' | 'stopping' | 'error'>
   tunnelState: Record<string, 'running' | 'stopped'>
   sidebarTab: SidebarTab
   addTransfer: (job: TransferJob) => void
   removeTransfer: (id: string) => void
-  updateTransfer: (id: string, updates: Partial<Pick<TransferJob, 'transferredBytes' | 'speed' | 'totalBytes' | 'eta' | 'status' | 'error'>>) => void
+  updateTransfer: (id: string, updates: Partial<Pick<TransferJob, 'transferredBytes' | 'speed' | 'totalBytes' | 'eta' | 'status' | 'error' | 'completedAt'>>) => void
+  clearFinishedTransfers: () => void
+  setTransferCenterOpen: (open: boolean) => void
   openTab: (tab: Tab) => void
   closeTab: (id: string) => void
   removeTabLocal: (id: string) => void
@@ -131,16 +139,19 @@ export const useAppStore = create<AppState>((set, get) => ({
   appStatus: '就绪',
   terminalTheme: DEFAULT_THEME,
   transfers: [],
+  transferCenterOpen: false,
   activePaneId: null,
   recordingState: {},
   tunnelState: {},
   sidebarTab: 'sessions',
 
-  addTransfer: (job) => set((s) => ({ transfers: [...s.transfers, job] })),
+  addTransfer: (job) => set((s) => ({ transfers: [...s.transfers, job], transferCenterOpen: true })),
   removeTransfer: (id) => set((s) => ({ transfers: s.transfers.filter((t) => t.id !== id) })),
   updateTransfer: (id, updates) => set((s) => ({
     transfers: s.transfers.map((t) => (t.id === id ? { ...t, ...updates } : t)),
   })),
+  clearFinishedTransfers: () => set((s) => ({ transfers: s.transfers.filter((transfer) => transfer.status === 'queued' || transfer.status === 'running') })),
+  setTransferCenterOpen: (transferCenterOpen) => set({ transferCenterOpen }),
 
   openTab: (tab) => set((s) => {
     const existing = s.tabs.find((t) => t.id === tab.id)

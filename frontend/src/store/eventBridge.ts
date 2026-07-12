@@ -63,12 +63,13 @@ export function startEventBridge(): () => void {
         transferredBytes: payload.transferred ?? 0,
         totalBytes: payload.total ?? 0,
         status: payload.status === 'cancelled' ? 'cancelled' : 'completed',
+        completedAt: Date.now(),
       })
     }),
     Events.On('file:error', (event: EventEnvelope<TransferErrorPayload>) => {
       const payload = event.data
       if (!payload?.task_id) return
-      useAppStore.getState().updateTransfer(payload.task_id, { status: 'failed', error: payload.error ?? '文件传输失败' })
+      useAppStore.getState().updateTransfer(payload.task_id, { status: 'failed', error: payload.error ?? '文件传输失败', completedAt: Date.now() })
     }),
   ]
   return () => unsubscribers.forEach((unsubscribe) => unsubscribe())

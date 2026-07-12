@@ -9,7 +9,7 @@ const SESSION_ID = 1
 describe('useFileTransfer', () => {
   beforeEach(() => {
     __clearHandlers()
-    useAppStore.setState({ transfers: [] })
+    useAppStore.setState({ transfers: [], transferCenterOpen: false, tabs: [{ id: 'tab-1', title: '生产服务器', type: 'terminal', sessionId: SESSION_ID }] })
   })
 
   it('listFiles sets files from service', async () => {
@@ -39,6 +39,8 @@ describe('useFileTransfer', () => {
     expect(result.current.transfers).toHaveLength(1)
     expect(result.current.transfers[0].direction).toBe('upload')
     expect(result.current.transfers[0].fileName).toBe('file.txt')
+    expect(result.current.transfers[0]).toMatchObject({ sessionId: SESSION_ID, sessionName: '生产服务器', sourcePath: '/local/file.txt', targetPath: '/remote/file.txt/file.txt' })
+    expect(useAppStore.getState().transferCenterOpen).toBe(true)
   })
 
   it('uploads every dropped file to the current remote directory', async () => {
@@ -64,6 +66,7 @@ describe('useFileTransfer', () => {
     expect(result.current.transfers).toHaveLength(1)
     expect(result.current.transfers[0].direction).toBe('download')
     expect(result.current.transfers[0].fileName).toBe('file.txt')
+    expect(result.current.transfers[0]).toMatchObject({ sourcePath: '/remote/file.txt', targetPath: '/local/file.txt' })
   })
 
   it('cancelTransfer requests cancellation and keeps terminal state visible', async () => {
