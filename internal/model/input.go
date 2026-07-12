@@ -82,6 +82,57 @@ type ThemeInput struct {
 	Config    string `json:"config"`
 }
 
+type ThemeDefinitionInput struct {
+	ID                int64           `json:"id"`
+	Name              string          `json:"name"`
+	Mode              ThemeMode       `json:"mode"`
+	SourceType        ThemeSourceType `json:"source_type"`
+	SourceName        string          `json:"source_name"`
+	SourceURL         string          `json:"source_url"`
+	SourceAuthor      string          `json:"source_author"`
+	SourceLicense     string          `json:"source_license"`
+	SourceVersion     string          `json:"source_version"`
+	SourceFingerprint string          `json:"source_fingerprint"`
+	ColorPayload      string          `json:"color_payload"`
+	RawPayload        string          `json:"raw_payload"`
+	IsBuiltin         bool            `json:"is_builtin"`
+}
+
+func (input ThemeDefinitionInput) ThemeDefinition() ThemeDefinition {
+	return ThemeDefinition{ID: input.ID, Name: input.Name, Mode: input.Mode, SourceType: input.SourceType, SourceName: input.SourceName, SourceURL: input.SourceURL, SourceAuthor: input.SourceAuthor, SourceLicense: input.SourceLicense, SourceVersion: input.SourceVersion, SourceFingerprint: input.SourceFingerprint, ColorPayload: input.ColorPayload, RawPayload: input.RawPayload, IsBuiltin: input.IsBuiltin}
+}
+
+func ThemeDefinitionInputFrom(theme ThemeDefinition) ThemeDefinitionInput {
+	return ThemeDefinitionInput{ID: theme.ID, Name: theme.Name, Mode: theme.Mode, SourceType: theme.SourceType, SourceName: theme.SourceName, SourceURL: theme.SourceURL, SourceAuthor: theme.SourceAuthor, SourceLicense: theme.SourceLicense, SourceVersion: theme.SourceVersion, SourceFingerprint: theme.SourceFingerprint, ColorPayload: theme.ColorPayload, RawPayload: theme.RawPayload, IsBuiltin: theme.IsBuiltin}
+}
+
+type ThemeProfileInput struct {
+	ID             int64       `json:"id"`
+	Name           string      `json:"name"`
+	ThemeID        int64       `json:"theme_id"`
+	FontFamily     string      `json:"font_family"`
+	FontSize       int         `json:"font_size"`
+	CursorStyle    CursorStyle `json:"cursor_style"`
+	ColorOverrides string      `json:"color_overrides"`
+}
+
+func (input ThemeProfileInput) ThemeProfile() ThemeProfile {
+	return ThemeProfile{ID: input.ID, Name: input.Name, ThemeID: input.ThemeID, FontFamily: input.FontFamily, FontSize: input.FontSize, CursorStyle: input.CursorStyle, ColorOverrides: input.ColorOverrides}
+}
+
+func ThemeProfileInputFrom(profile ThemeProfile) ThemeProfileInput {
+	return ThemeProfileInput{ID: profile.ID, Name: profile.Name, ThemeID: profile.ThemeID, FontFamily: profile.FontFamily, FontSize: profile.FontSize, CursorStyle: profile.CursorStyle, ColorOverrides: profile.ColorOverrides}
+}
+
+type ThemeAssignmentsInput struct {
+	DarkProfileID  int64 `json:"dark_profile_id"`
+	LightProfileID int64 `json:"light_profile_id"`
+}
+
+func (input ThemeAssignmentsInput) ThemeAssignments() ThemeAssignments {
+	return ThemeAssignments{DarkProfileID: input.DarkProfileID, LightProfileID: input.LightProfileID}
+}
+
 func (input ThemeInput) Theme() Theme {
 	return Theme{ID: input.ID, Name: input.Name, IsBuiltin: input.IsBuiltin, Config: input.Config}
 }

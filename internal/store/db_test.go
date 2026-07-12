@@ -1,6 +1,7 @@
 package store
 
 import (
+	"database/sql"
 	"os"
 	"testing"
 
@@ -23,6 +24,9 @@ func TestOpenDB(t *testing.T) {
 	err = db.QueryRow("PRAGMA journal_mode").Scan(&journalMode)
 	require.NoError(t, err)
 	assert.Equal(t, "wal", journalMode)
+	var foreignKeys int
+	require.NoError(t, db.QueryRow("PRAGMA foreign_keys").Scan(&foreignKeys))
+	assert.Equal(t, 1, foreignKeys)
 }
 
 func TestMigrate(t *testing.T) {
@@ -66,7 +70,7 @@ func TestMigrateTablesExist(t *testing.T) {
 	require.NoError(t, err)
 	expected := []string{
 		"session_folders", "sessions", "ssh_keys", "tunnels",
-		"macros", "themes", "settings", "session_logs",
+		"macros", "themes", "terminal_theme_profiles", "settings", "session_logs",
 	}
 	for _, table := range expected {
 		var count int
@@ -76,6 +80,49 @@ func TestMigrateTablesExist(t *testing.T) {
 		).Scan(&count)
 		require.NoError(t, err)
 		assert.Equal(t, 1, count, "table %s should exist", table)
+	}
+}
+
+func TestThemeCatalogSchema(t *testing.T) {
+	db, err := OpenDB(t.TempDir())
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, db.Close()) })
+	require.NoError(t, Migrate(db))
+
+	assertTableColumns(t, db, "themes", []string{"id", "name", "mode", "source_type", "source_name", "source_url", "source_author", "source_license", "source_version", "source_fingerprint", "color_payload", "raw_payload", "is_builtin", "created_at", "updated_at"})
+	assertTableColumns(t, db, "terminal_theme_profiles", []string{"id", "name", "theme_id", "font_family", "font_size", "cursor_style", "color_overrides", "created_at", "updated_at"})
+
+	_, err = db.Exec("INSERT INTO themes (name, mode, source_type, source_fingerprint, color_payload) VALUES ('A', 'dark', 'custom', 'same', '{}'), ('B', 'light', 'custom', 'same', '{}')")
+	assert.Error(t, err)
+}
+
+func TestMigrateReplacesLegacyThemeSchema(t *testing.T) {
+	db, err := OpenDB(t.TempDir())
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, db.Close()) })
+	_, err = db.Exec("CREATE TABLE themes (id INTEGER PRIMARY KEY, name TEXT NOT NULL, is_builtin INTEGER NOT NULL DEFAULT 0, config TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')))")
+	require.NoError(t, err)
+	require.NoError(t, Migrate(db))
+	assertTableColumns(t, db, "themes", []string{"mode", "source_fingerprint", "color_payload", "updated_at"})
+}
+
+func assertTableColumns(t *testing.T, db interface {
+	Query(string, ...any) (*sql.Rows, error)
+}, table string, expected []string) {
+	t.Helper()
+	rows, err := db.Query("PRAGMA table_info(" + table + ")")
+	require.NoError(t, err)
+	defer func() { require.NoError(t, rows.Close()) }()
+	columns := make(map[string]bool)
+	for rows.Next() {
+		var cid, notNull, primaryKey int
+		var name, columnType string
+		var defaultValue any
+		require.NoError(t, rows.Scan(&cid, &name, &columnType, &notNull, &defaultValue, &primaryKey))
+		columns[name] = true
+	}
+	for _, name := range expected {
+		assert.True(t, columns[name], "missing %s.%s", table, name)
 	}
 }
 
