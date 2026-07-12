@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useAppStore, type ConnectionStatus } from '@/store/appStore'
+import { useAppStore } from '@/store/appStore'
 import { Clock, Circle, Network } from 'lucide-react'
 import { TransferCenter } from '@/components/file/TransferCenter'
 import TunnelDialog from '@/components/session/TunnelDialog'
@@ -8,37 +8,13 @@ import { logger } from '@/lib/logger'
 import { TunnelService } from '@/lib/wails'
 import { TunnelType, type TunnelInput } from '../../../bindings/github.com/xuthus5/mssh/internal/model/models'
 import { toast } from '@/components/ui/toast'
+import { connectionStatusVisual } from '@/lib/connectionStatusVisual'
 
 function formatTime(date: Date): string {
   const h = date.getHours().toString().padStart(2, '0')
   const m = date.getMinutes().toString().padStart(2, '0')
   const s = date.getSeconds().toString().padStart(2, '0')
   return `${h}:${m}:${s}`
-}
-
-function statusDot(status: ConnectionStatus | undefined): string {
-  switch (status) {
-    case 'connected':
-      return 'bg-green-500'
-    case 'connecting':
-      return 'bg-yellow-500'
-    case 'disconnected':
-    default:
-      return 'bg-gray-500'
-  }
-}
-
-function statusText(status: ConnectionStatus | undefined): string {
-  switch (status) {
-    case 'connected':
-      return '已连接'
-    case 'connecting':
-      return '连接中'
-    case 'disconnected':
-      return '未连接'
-    default:
-      return '就绪'
-  }
 }
 
 export default function StatusBar() {
@@ -60,7 +36,8 @@ export default function StatusBar() {
   const status = activeTab
     ? connectionStatus[activeTab.terminalId ?? activeTab.id]
     : undefined
-  const displayStatus = activeTab ? statusText(status) : appStatus
+  const statusVisual = connectionStatusVisual(status)
+  const displayStatus = activeTab ? statusVisual.label : appStatus
 
   const loadTunnels = async () => {
     try {
@@ -126,7 +103,7 @@ export default function StatusBar() {
       <div className="flex items-center gap-3">
         <span className="flex items-center gap-1.5">
           <Circle
-            className={`h-2 w-2 rounded-full inline-block ${statusDot(status)}`}
+            className={`inline-block size-2.5 rounded-full ${statusVisual.dotClass}`}
             fill="currentColor"
           />
           {displayStatus}
