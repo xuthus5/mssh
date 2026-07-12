@@ -90,6 +90,9 @@ func Migrate(db *sql.DB) error {
 	if err := ensureDefaultFolderSchema(db); err != nil {
 		return fmt.Errorf("migration: %w", err)
 	}
+	if err := ensureSessionRecencySchema(db); err != nil {
+		return fmt.Errorf("migration: %w", err)
+	}
 	if err := ensureSettingsSchema(db); err != nil {
 		return fmt.Errorf("migration: %w", err)
 	}
@@ -97,6 +100,43 @@ func Migrate(db *sql.DB) error {
 		return fmt.Errorf("migration: %w", err)
 	}
 	return nil
+}
+
+func ensureSessionRecencySchema(db *sql.DB) error {
+	columns, err := tableColumns(db, "sessions")
+	if err != nil {
+		return err
+	}
+	if !columns["last_connected_at"] {
+		if _, err := db.Exec("ALTER TABLE sessions ADD COLUMN last_connected_at TEXT"); err != nil {
+			return err
+		}
+	}
+	if !columns["connection_count"] {
+		if _, err := db.Exec("ALTER TABLE sessions ADD COLUMN connection_count INTEGER NOT NULL DEFAULT 0"); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func tableColumns(db *sql.DB, table string) (map[string]bool, error) {
+	rows, err := db.Query("PRAGMA table_info(" + table + ")")
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	columns := make(map[string]bool)
+	for rows.Next() {
+		var cid, notNull, primaryKey int
+		var name, columnType string
+		var defaultValue any
+		if err := rows.Scan(&cid, &name, &columnType, &notNull, &defaultValue, &primaryKey); err != nil {
+			return nil, err
+		}
+		columns[name] = true
+	}
+	return columns, rows.Err()
 }
 
 func executeMigrations(db *sql.DB, migrations []string) error {

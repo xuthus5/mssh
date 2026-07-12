@@ -21,8 +21,6 @@ import { KeyManager } from '@/components/settings/KeyManager'
 import { SyncPanel } from '@/components/settings/SyncPanel'
 import type { GeneralSettings, KeyInfo, SyncConfig } from '@/hooks/useSettings'
 import type { ThemeAssignments, ThemeConfigurationInput, ThemeImportSummary, ThemeProfile, ThemeProfileInput } from '../../../bindings/github.com/xuthus5/mssh/internal/model/models'
-import type { Folder, Session } from '@/hooks/useSession'
-import { FolderManager } from '@/components/settings/FolderManager'
 import { useDraggableDialog } from '@/hooks/useDraggableDialog'
 import { AboutPanel } from '@/components/settings/AboutPanel'
 import { SearchableSelect } from '@/components/ui/searchable-select'
@@ -58,12 +56,6 @@ interface Props {
   onSaveSync: (c: SyncConfig) => void
   onExportConfig: () => void
   onImportConfig: () => void
-  folders: Folder[]
-  sessions: Session[]
-  onCreateFolder: (name: string, parentId: string | null) => Promise<Folder | undefined>
-  onRenameFolder: (id: string, name: string) => Promise<void>
-  onSetDefaultFolder: (id: string) => Promise<void>
-  onDeleteFolder: (id: string) => Promise<void>
 }
 
 export default function SettingsDialog({
@@ -93,7 +85,6 @@ export default function SettingsDialog({
   onSaveSync,
   onExportConfig,
   onImportConfig,
-  folders, sessions, onCreateFolder, onRenameFolder, onSetDefaultFolder, onDeleteFolder,
 }: Props) {
   const [tab, setTab] = useState('general')
   const [maxPoolSize, setMaxPoolSize] = useState(general.maxPoolSize.toString())
@@ -164,7 +155,6 @@ export default function SettingsDialog({
             <TabsTrigger value="general">通用</TabsTrigger>
             <TabsTrigger value="terminal">终端</TabsTrigger>
             <TabsTrigger value="keys">密钥</TabsTrigger>
-            <TabsTrigger value="folders">分组</TabsTrigger>
             <TabsTrigger value="sync">同步</TabsTrigger>
             <TabsTrigger value="about">关于</TabsTrigger>
           </TabsList>
@@ -260,7 +250,6 @@ export default function SettingsDialog({
               onExport={onExportKey}
             />
           </TabsContent>
-          <TabsContent value="folders" className="min-h-0 min-w-0 overflow-y-auto overscroll-contain pr-2"><FolderManager folders={folders} sessions={sessions} onCreate={onCreateFolder} onRename={onRenameFolder} onSetDefault={onSetDefaultFolder} onDelete={onDeleteFolder} /></TabsContent>
           <TabsContent value="sync" className="min-h-0 min-w-0 overflow-y-auto overscroll-contain pr-2">
             <SyncPanel
               sync={sync}

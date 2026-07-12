@@ -2,6 +2,7 @@ package store
 
 import (
 	"database/sql"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -43,6 +44,61 @@ func TestCreateAndListSessions(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, sessions, 1)
 	assert.Equal(t, "web-server", sessions[0].Name)
+}
+
+func TestSessionRecencyTracksSuccessfulConnections(t *testing.T) {
+	db := setupTestDB(t)
+	first, err := CreateSession(db, model.Session{Name: "first", Host: "10.0.0.1", Port: 22, Username: "root", AuthMethod: model.AuthPassword, KeepAlive: 30})
+	require.NoError(t, err)
+	second, err := CreateSession(db, model.Session{Name: "second", Host: "10.0.0.2", Port: 22, Username: "root", AuthMethod: model.AuthPassword, KeepAlive: 30})
+	require.NoError(t, err)
+	require.NoError(t, MarkSessionConnected(db, first.ID))
+	require.NoError(t, MarkSessionConnected(db, first.ID))
+	require.NoError(t, MarkSessionConnected(db, second.ID))
+	recent, err := ListRecentSessions(db, 10)
+	require.NoError(t, err)
+	require.Len(t, recent, 2)
+	assert.Equal(t, second.ID, recent[0].ID)
+	assert.Equal(t, first.ID, recent[1].ID)
+	assert.Equal(t, 2, recent[1].ConnectionCount)
+	assert.NotNil(t, recent[0].LastConnectedAt)
+}
+
+func TestListRecentSessionsLimitsAndExcludesNeverConnected(t *testing.T) {
+	db := setupTestDB(t)
+	for index := range 12 {
+		created, err := CreateSession(db, model.Session{Name: fmt.Sprintf("session-%02d", index), Host: "127.0.0.1", Port: 22, Username: "root", AuthMethod: model.AuthPassword, KeepAlive: 30})
+		require.NoError(t, err)
+		if index > 0 {
+			require.NoError(t, MarkSessionConnected(db, created.ID))
+		}
+	}
+	recent, err := ListRecentSessions(db, 10)
+	require.NoError(t, err)
+	assert.Len(t, recent, 10)
+	assert.NotEqual(t, "session-00", recent[len(recent)-1].Name)
+	recent, err = ListRecentSessions(db, 0)
+	require.NoError(t, err)
+	assert.Len(t, recent, 10)
+	assert.Error(t, MarkSessionConnected(db, 9999))
+}
+
+func TestRecentSessionsReportsDatabaseErrors(t *testing.T) {
+	db := setupTestDB(t)
+	require.NoError(t, db.Close())
+	_, err := ListRecentSessions(db, 10)
+	assert.Error(t, err)
+	assert.Error(t, MarkSessionConnected(db, 1))
+}
+
+func TestRecentSessionsRejectsInvalidStoredTimestamp(t *testing.T) {
+	db := setupTestDB(t)
+	created, err := CreateSession(db, model.Session{Name: "invalid-time", Host: "127.0.0.1", Port: 22, Username: "root", AuthMethod: model.AuthPassword, KeepAlive: 30})
+	require.NoError(t, err)
+	_, err = db.Exec("UPDATE sessions SET last_connected_at = 'invalid' WHERE id = ?", created.ID)
+	require.NoError(t, err)
+	_, err = ListRecentSessions(db, 10)
+	assert.ErrorContains(t, err, "last_connected_at")
 }
 
 func TestUpdateAndDeleteSession(t *testing.T) {
