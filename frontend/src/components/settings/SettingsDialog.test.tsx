@@ -41,12 +41,6 @@ function settingsProps() {
     onSaveSync: vi.fn(),
     onExportConfig: vi.fn(),
     onImportConfig: vi.fn(),
-    folders: [],
-    sessions: [],
-    onCreateFolder: vi.fn(async () => undefined),
-    onRenameFolder: vi.fn(async () => {}),
-    onSetDefaultFolder: vi.fn(async () => {}),
-    onDeleteFolder: vi.fn(async () => {}),
   }
 }
 
@@ -60,6 +54,7 @@ describe('SettingsDialog interface font settings', () => {
 
     expect(screen.getByRole('tab', { name: '终端' })).toBeInTheDocument()
     expect(screen.queryByRole('tab', { name: '外观' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('tab', { name: '分组' })).not.toBeInTheDocument()
   })
 
   it('previews and saves the selected font settings', async () => {

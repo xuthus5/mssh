@@ -34,7 +34,7 @@ describe('WindowTitleBar', () => {
     setSetting.mockResolvedValue(undefined)
     localStorage.clear()
     document.documentElement.classList.remove('light')
-    useAppStore.setState({ sidebarTab: 'sessions' })
+    useAppStore.setState({ sidebarTab: 'sessions', hasEnteredWorkspace: false })
   })
 
   it('routes window controls to the Wails runtime', async () => {
@@ -77,13 +77,15 @@ describe('WindowTitleBar', () => {
     render(<WindowTitleBar />)
     const sessionsTab = screen.getByRole('tab', { name: '会话' })
     const macrosTab = screen.getByRole('tab', { name: '宏' })
-    expect(sessionsTab).toHaveAttribute('aria-selected', 'true')
+    expect(sessionsTab).toHaveAttribute('aria-selected', 'false')
     expect(sessionsTab.querySelector('svg')).toBeInTheDocument()
     expect(macrosTab.querySelector('svg')).toBeInTheDocument()
 
     await userEvent.click(macrosTab)
 
     expect(useAppStore.getState().sidebarTab).toBe('macros')
+    expect(useAppStore.getState().hasEnteredWorkspace).toBe(true)
+    expect(macrosTab).toHaveAttribute('aria-selected', 'true')
     expect(screen.queryByText('Secure Shell Client')).not.toBeInTheDocument()
   })
 })

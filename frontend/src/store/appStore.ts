@@ -105,6 +105,7 @@ export interface AppState {
   recordingState: Record<string, 'idle' | 'starting' | 'recording' | 'stopping' | 'error'>
   tunnelState: Record<string, 'running' | 'stopped'>
   sidebarTab: SidebarTab
+  hasEnteredWorkspace: boolean
   addTransfer: (job: TransferJob) => void
   removeTransfer: (id: string) => void
   updateTransfer: (id: string, updates: Partial<Pick<TransferJob, 'transferredBytes' | 'speed' | 'totalBytes' | 'eta' | 'status' | 'error' | 'completedAt'>>) => void
@@ -126,6 +127,7 @@ export interface AppState {
   setTerminalTheme: (theme: TerminalTheme) => void
   setMaxPoolSize: (size: number) => void
   setSidebarTab: (tab: SidebarTab) => void
+  enterWorkspace: () => void
 }
 
 const DEFAULT_MAX_POOL_SIZE = 32
@@ -144,6 +146,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   recordingState: {},
   tunnelState: {},
   sidebarTab: 'sessions',
+  hasEnteredWorkspace: false,
 
   addTransfer: (job) => set((s) => ({ transfers: [...s.transfers, job], transferCenterOpen: true })),
   removeTransfer: (id) => set((s) => ({ transfers: s.transfers.filter((t) => t.id !== id) })),
@@ -264,4 +267,5 @@ export const useAppStore = create<AppState>((set, get) => ({
   setTerminalTheme: (theme) => set({ terminalTheme: theme }),
   setMaxPoolSize: (maxPoolSize) => set({ maxPoolSize }),
   setSidebarTab: (sidebarTab) => set({ sidebarTab }),
+  enterWorkspace: () => set({ hasEnteredWorkspace: true }),
 }))
