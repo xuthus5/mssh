@@ -18,7 +18,7 @@ type SessionLog struct {
 }
 
 type RecordingEntry struct {
-	Timestamp time.Duration `json:"timestamp"`
-	Type      RecordType    `json:"type"`
-	Data      []byte        `json:"data"`
+	Timestamp int64      `json:"timestamp"`
+	Type      RecordType `json:"type"`
+	Data      []byte     `json:"data"`
 }
