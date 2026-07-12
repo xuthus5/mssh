@@ -78,6 +78,7 @@ export async function createProfile(profile: ThemeProfileInput) {
 export async function saveConfiguration(configuration: ThemeConfigurationInput) {
   await ThemeService.SaveConfiguration(configuration)
   await loadThemeCatalogFresh()
+  applySavedConfiguration(configuration)
 }
 
 export async function importThemes(paths: string[]): Promise<ThemeImportSummary> {
@@ -104,6 +105,20 @@ function applyColorMode(mode: ColorMode) {
   const profileID = mode === 'dark' ? state.assignments.dark_profile_id : state.assignments.light_profile_id
   const profile = state.profiles.find((item) => item.id === profileID) ?? state.profiles.find((item) => item.definition?.mode === mode || item.definition?.mode === 'universal')
   if (profile) useAppStore.getState().setTerminalTheme(profileToTerminalTheme(profile))
+}
+
+function applySavedConfiguration(configuration: ThemeConfigurationInput) {
+  const state = useThemeCatalogStore.getState()
+  const inputs = new Map([
+    [configuration.dark_profile.id, configuration.dark_profile],
+    [configuration.light_profile.id, configuration.light_profile],
+  ])
+  const profiles = state.profiles.map((profile) => {
+    const input = inputs.get(profile.id)
+    return input ? { ...profile, name: input.name, theme_id: input.theme_id, font_family: input.font_family, font_size: input.font_size, cursor_style: input.cursor_style, color_overrides: input.color_overrides } : profile
+  })
+  useThemeCatalogStore.setState({ profiles, assignments: configuration.assignments })
+  applyColorMode(state.colorMode)
 }
 
 async function loadThemeCatalogFresh() {
