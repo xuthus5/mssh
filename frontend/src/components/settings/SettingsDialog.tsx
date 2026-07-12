@@ -16,9 +16,11 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { LabeledSelect } from '@/components/ui/labeled-select'
 import { ThemeEditor } from '@/components/settings/ThemeEditor'
+import { ThemeManager } from '@/components/settings/ThemeManager'
 import { KeyManager } from '@/components/settings/KeyManager'
 import { SyncPanel } from '@/components/settings/SyncPanel'
-import type { GeneralSettings, TerminalTheme, KeyInfo, SyncConfig } from '@/hooks/useSettings'
+import type { GeneralSettings, KeyInfo, SyncConfig } from '@/hooks/useSettings'
+import type { ThemeAssignments, ThemeConfigurationInput, ThemeImportSummary, ThemeProfile, ThemeProfileInput } from '../../../bindings/github.com/xuthus5/mssh/internal/model/models'
 import type { Folder, Session } from '@/hooks/useSession'
 import { FolderManager } from '@/components/settings/FolderManager'
 import { useDraggableDialog } from '@/hooks/useDraggableDialog'
@@ -34,7 +36,8 @@ interface Props {
   onOpenChange: (open: boolean) => void
   general: GeneralSettings
   systemFonts: string[]
-  theme: TerminalTheme
+  themeProfiles: ThemeProfile[]
+  themeAssignments: ThemeAssignments
   keys: KeyInfo[]
   sync: SyncConfig
   onSaveGeneral: (s: GeneralSettings) => Promise<void>
@@ -42,7 +45,12 @@ interface Props {
   onRestoreUIFont: () => void
   onPreviewWindowOpacity: (opacity: number) => void
   onRestoreWindowOpacity: () => void
-  onSaveTheme: (t: TerminalTheme) => void
+  onSaveThemeConfiguration: (configuration: ThemeConfigurationInput) => Promise<void>
+  onImportThemes: (paths: string[]) => Promise<ThemeImportSummary>
+  onCreateThemeProfile: (profile: ThemeProfileInput) => Promise<ThemeProfile | null>
+  onUpdateThemeProfile: (profile: ThemeProfileInput) => Promise<void>
+  onDeleteThemeProfile: (id: number) => Promise<void>
+  onDeleteThemeDefinition: (id: number) => Promise<void>
   onGenerateKey: (name: string, type: KeyInfo['type'], bits: number) => void
   onImportKey: (name: string, privateKey: string) => void
   onDeleteKey: (id: string) => void
@@ -63,7 +71,8 @@ export default function SettingsDialog({
   onOpenChange,
   general,
   systemFonts,
-  theme,
+  themeProfiles,
+  themeAssignments,
   keys,
   sync,
   onSaveGeneral,
@@ -71,7 +80,12 @@ export default function SettingsDialog({
   onRestoreUIFont,
   onPreviewWindowOpacity,
   onRestoreWindowOpacity,
-  onSaveTheme,
+  onSaveThemeConfiguration,
+  onImportThemes,
+  onCreateThemeProfile,
+  onUpdateThemeProfile,
+  onDeleteThemeProfile,
+  onDeleteThemeDefinition,
   onGenerateKey,
   onImportKey,
   onDeleteKey,
@@ -235,7 +249,7 @@ export default function SettingsDialog({
             </form>
           </TabsContent>
           <TabsContent value="terminal" className="min-h-0 min-w-0 overflow-y-auto overscroll-contain pr-2">
-            <ThemeEditor theme={theme} onSave={onSaveTheme} />
+            <div className="flex flex-col gap-5"><ThemeEditor profiles={themeProfiles} assignments={themeAssignments} onSave={onSaveThemeConfiguration} /><ThemeManager profiles={themeProfiles} onImport={onImportThemes} onCreateProfile={onCreateThemeProfile} onUpdateProfile={onUpdateThemeProfile} onDeleteProfile={onDeleteThemeProfile} onDeleteDefinition={onDeleteThemeDefinition} /></div>
           </TabsContent>
           <TabsContent value="keys" className="min-h-0 min-w-0 overflow-y-auto overscroll-contain pr-2">
             <KeyManager

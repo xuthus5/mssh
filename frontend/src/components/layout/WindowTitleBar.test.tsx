@@ -16,6 +16,12 @@ vi.mock('@wailsio/runtime', () => ({
 
 vi.mock('@/lib/wails', () => ({
   SettingService: { Get: getSetting, Set: setSetting },
+  ThemeService: {
+    InitializeDefaults: vi.fn(async () => {}),
+    ListDefinitions: vi.fn(async () => []),
+    ListProfiles: vi.fn(async () => []),
+    GetAssignments: vi.fn(async () => ({ dark_profile_id: 0, light_profile_id: 0 })),
+  },
 }))
 
 import { WindowTitleBar } from '@/components/layout/WindowTitleBar'

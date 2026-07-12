@@ -118,6 +118,49 @@ func (service *ThemeService) SaveAssignments(input model.ThemeAssignmentsInput) 
 	return store.SaveThemeAssignments(service.db, assignments)
 }
 
+func (service *ThemeService) SaveConfiguration(input model.ThemeConfigurationInput) error {
+	dark := input.DarkProfile.ThemeProfile()
+	light := input.LightProfile.ThemeProfile()
+	if err := validateThemeProfile(dark); err != nil {
+		return fmt.Errorf("dark profile: %w", err)
+	}
+	if err := validateThemeProfile(light); err != nil {
+		return fmt.Errorf("light profile: %w", err)
+	}
+	if err := service.validateProfileMode(dark, model.ThemeModeDark); err != nil {
+		return err
+	}
+	if err := service.validateProfileMode(light, model.ThemeModeLight); err != nil {
+		return err
+	}
+	tx, err := service.db.Begin()
+	if err != nil {
+		return fmt.Errorf("begin theme configuration: %w", err)
+	}
+	if err = store.UpdateThemeProfile(tx, dark); err == nil {
+		err = store.UpdateThemeProfile(tx, light)
+	}
+	if err == nil {
+		err = store.SaveThemeAssignmentsDB(tx, input.Assignments.ThemeAssignments())
+	}
+	if err != nil {
+		_ = tx.Rollback()
+		return fmt.Errorf("save theme configuration: %w", err)
+	}
+	return tx.Commit()
+}
+
+func (service *ThemeService) validateProfileMode(profile model.ThemeProfile, mode model.ThemeMode) error {
+	definition, err := store.GetThemeDefinition(service.db, profile.ThemeID)
+	if err != nil {
+		return err
+	}
+	if !modeCompatible(definition.Mode, mode) {
+		return fmt.Errorf("profile %q is incompatible with %s mode", profile.Name, mode)
+	}
+	return nil
+}
+
 func (service *ThemeService) ensureBuiltin(definition model.ThemeDefinition) (int64, error) {
 	definitions, err := store.ListThemeDefinitions(service.db, "")
 	if err != nil {
