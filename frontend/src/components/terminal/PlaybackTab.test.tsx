@@ -26,10 +26,10 @@ describe('PlaybackTab terminal theme', () => {
   })
 
   it('writes millisecond-timestamped entries after playback starts', async () => {
-    getRecording.mockResolvedValue({ entries: [{ timestamp: 0, type: 0, data: [65] }, { timestamp: 10, type: 0, data: [66] }] })
+    getRecording.mockResolvedValue({ entries: [{ timestamp: 0, type: 0, data: 'QQ==' }, { timestamp: 10, type: 0, data: 'Qg==' }] })
     render(<PlaybackTab recordingId="1" title="demo" />)
     await waitFor(() => expect(screen.getByRole('button', { name: '开始回放' })).toBeEnabled())
     await userEvent.click(screen.getByRole('button', { name: '开始回放' }))
-    await waitFor(() => expect(terminalInstances[0].write).toHaveBeenCalled())
+    await waitFor(() => expect(terminalInstances[0].write).toHaveBeenCalledWith(new Uint8Array([65])))
   })
 })
