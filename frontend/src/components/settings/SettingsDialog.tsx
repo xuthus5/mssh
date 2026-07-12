@@ -141,14 +141,14 @@ export default function SettingsDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent ref={draggable.contentRef} className="flex h-[min(720px,calc(100dvh-3rem))] max-h-[calc(100dvh-3rem)] flex-col overflow-hidden sm:max-w-3xl">
+      <DialogContent ref={draggable.contentRef} className="flex h-[min(720px,calc(100dvh-3rem))] max-h-[calc(100dvh-3rem)] flex-col overflow-hidden sm:max-w-5xl">
         <DialogHeader data-testid="settings-drag-handle" {...draggable.dragHandleProps} className="-mx-4 -mt-4 cursor-move touch-none select-none rounded-t-xl border-b border-border px-4 py-3 active:cursor-grabbing">
           <DialogTitle>设置</DialogTitle>
         </DialogHeader>
         <Tabs value={tab} onValueChange={setTab} orientation="vertical" className="min-h-0 flex-1 flex-row gap-4 overflow-hidden">
           <TabsList className="w-36 shrink-0 self-stretch justify-start rounded-xl border bg-muted/40 p-2">
             <TabsTrigger value="general">通用</TabsTrigger>
-            <TabsTrigger value="appearance">外观</TabsTrigger>
+            <TabsTrigger value="terminal">终端</TabsTrigger>
             <TabsTrigger value="keys">密钥</TabsTrigger>
             <TabsTrigger value="folders">分组</TabsTrigger>
             <TabsTrigger value="sync">同步</TabsTrigger>
@@ -234,7 +234,7 @@ export default function SettingsDialog({
               </div>
             </form>
           </TabsContent>
-          <TabsContent value="appearance" className="min-h-0 min-w-0 overflow-y-auto overscroll-contain pr-2">
+          <TabsContent value="terminal" className="min-h-0 min-w-0 overflow-y-auto overscroll-contain pr-2">
             <ThemeEditor theme={theme} onSave={onSaveTheme} />
           </TabsContent>
           <TabsContent value="keys" className="min-h-0 min-w-0 overflow-y-auto overscroll-contain pr-2">
