@@ -14,6 +14,7 @@ import { Spinner } from '@/components/ui/spinner'
 import { WindowTitleBar } from '@/components/layout/WindowTitleBar'
 import { SessionWorkspaceProvider } from '@/hooks/SessionWorkspaceContext'
 import { SessionAssetCenter } from '@/components/session/SessionAssetCenter'
+import { closeTabsWithFeedback } from '@/lib/closeTabsWithFeedback'
 
 const TerminalTab = lazy(() => import('@/components/terminal/TerminalTab').then((module) => ({ default: module.TerminalTab })))
 const PlaybackTab = lazy(() => import('@/components/terminal/PlaybackTab').then((module) => ({ default: module.PlaybackTab })))
@@ -265,7 +266,7 @@ export default function App() {
           if (activeTab?.terminalId && (state.connectionStatus[activeTab.terminalId] === 'connected' || state.recordingState[activeTab.terminalId] === 'recording')) {
             toast('请使用标签关闭按钮确认终止活动连接', 'warning')
           } else {
-            state.closeTab(state.activeTabId)
+            closeTabsWithFeedback([state.activeTabId], state.closeTab)
           }
         }
       }
