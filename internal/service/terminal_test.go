@@ -155,17 +155,9 @@ func TestTerminalService_ReadCallback(t *testing.T) {
 	_, err = termSvc.Open(ctx, created.ID, 80, 24)
 	require.NoError(t, err)
 
-	time.Sleep(300 * time.Millisecond)
-
-	events := termBus.Events()
-	found := false
-	for _, evt := range events {
-		if evt.Name == event.TerminalOutput {
-			found = true
-			break
-		}
-	}
-	assert.True(t, found, "read callback should emit TerminalOutput event")
+	require.Eventually(t, func() bool {
+		return termBus.hasEvent(event.TerminalOutput)
+	}, 2*time.Second, 10*time.Millisecond, "read callback should emit TerminalOutput event")
 }
 
 func TestTerminalService_Write(t *testing.T) {
