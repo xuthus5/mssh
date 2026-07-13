@@ -1,13 +1,27 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useAppStore } from '@/store/appStore'
 import { logger } from '@/lib/logger'
 
 const { getRecording } = vi.hoisted(() => ({ getRecording: vi.fn(async (): Promise<any> => ({ entries: [] })) }))
 const terminalInstances: Array<{ options: Record<string, any>; writeln: ReturnType<typeof vi.fn>; write: ReturnType<typeof vi.fn>; refresh: ReturnType<typeof vi.fn>; reset: ReturnType<typeof vi.fn>; dispose: ReturnType<typeof vi.fn> }> = []
 const fitInstances: Array<{ fit: ReturnType<typeof vi.fn>; dispose: ReturnType<typeof vi.fn> }> = []
-vi.mock('@xterm/xterm', () => ({ Terminal: class { options: Record<string, any>; writeln = vi.fn(); loadAddon = vi.fn(); open = vi.fn(); dispose = vi.fn(); write = vi.fn(); reset = vi.fn(); refresh = vi.fn(); rows = 24; constructor(options: Record<string, any>) { this.options = options; terminalInstances.push(this) } } }))
+let playbackWriteError: Error | null = null
+vi.mock('@xterm/xterm', () => ({ Terminal: class {
+  options: Record<string, any>
+  writeln = vi.fn()
+  open = vi.fn()
+  reset = vi.fn()
+  refresh = vi.fn()
+  rows = 24
+  private addons: Array<{ dispose: () => void }> = []
+  private terminalDispose = vi.fn()
+  write = vi.fn(() => { if (playbackWriteError) throw playbackWriteError })
+  dispose = vi.fn(() => { this.addons.forEach((addon) => addon.dispose()); this.terminalDispose() })
+  loadAddon = vi.fn((addon: { dispose: () => void }) => { this.addons.push(addon) })
+  constructor(options: Record<string, any>) { this.options = options; terminalInstances.push(this) }
+} }))
 vi.mock('@xterm/addon-fit', () => ({ FitAddon: class { fit = vi.fn(); dispose = vi.fn(); constructor() { fitInstances.push(this) } } }))
 vi.mock('@/lib/wails', () => ({ LogService: { GetRecording: getRecording } }))
 vi.mock('@/components/ui/slider', () => ({
@@ -17,13 +31,19 @@ vi.mock('@/components/ui/slider', () => ({
 }))
 
 import { PlaybackTab } from '@/components/terminal/PlaybackTab'
+import { TerminalErrorBoundary } from '@/components/terminal/TerminalErrorBoundary'
 
 describe('PlaybackTab terminal theme', () => {
+  afterEach(() => vi.useRealTimers())
+
   beforeEach(() => {
     terminalInstances.length = 0
     fitInstances.length = 0
     getRecording.mockResolvedValue({ entries: [] })
+    playbackWriteError = null
     vi.stubGlobal('ResizeObserver', class { observe() {}; disconnect() {} })
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => { callback(0); return 1 })
+    vi.stubGlobal('cancelAnimationFrame', vi.fn())
     vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800)
     vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(500)
   })
@@ -85,15 +105,43 @@ describe('PlaybackTab terminal theme', () => {
     expect(terminalInstances[0].refresh).toHaveBeenCalledOnce()
   })
 
-  it('keeps playback running while its layer is hidden', async () => {
-    getRecording.mockResolvedValue({ entries: [{ timestamp: 0, type: 0, data: 'QQ==' }] })
-    const { rerender } = render(<PlaybackTab recordingId="1" title="demo" active />)
-    await waitFor(() => expect(screen.getByRole('button', { name: '开始回放' })).toBeEnabled())
-    await userEvent.click(screen.getByRole('button', { name: '开始回放' }))
+  it('keeps writing and advancing progress while hidden, then refits when visible', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(0)
+    let nextFrameID = 0
+    const animationFrames = new Map<number, FrameRequestCallback>()
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+      const frameID = ++nextFrameID
+      animationFrames.set(frameID, callback)
+      return frameID
+    })
+    vi.stubGlobal('cancelAnimationFrame', (frameID: number) => { animationFrames.delete(frameID) })
+    getRecording.mockResolvedValue({ entries: [
+      { timestamp: 0, type: 0, data: 'QQ==' },
+      { timestamp: 100, type: 0, data: 'Qg==' },
+      { timestamp: 1000, type: 0, data: 'Qw==' },
+    ] })
+    const view = render(<PlaybackTab recordingId="1" title="demo" active />)
+    await act(async () => { await Promise.resolve(); await Promise.resolve() })
+    fireEvent.click(screen.getByRole('button', { name: '开始回放' }))
+    view.rerender(<PlaybackTab recordingId="1" title="demo" active={false} />)
 
-    rerender(<PlaybackTab recordingId="1" title="demo" active={false} />)
-
+    act(() => vi.advanceTimersByTime(120))
+    expect(terminalInstances[0].write).toHaveBeenCalledWith(new Uint8Array([65]))
+    expect(terminalInstances[0].write).toHaveBeenCalledWith(new Uint8Array([66]))
+    expect(Number((screen.getByRole('slider', { name: '回放进度' }) as HTMLInputElement).value)).toBeGreaterThan(0)
     expect(screen.getByRole('button', { name: '暂停回放' })).toBeInTheDocument()
+
+    fitInstances[0].fit.mockClear()
+    terminalInstances[0].refresh.mockClear()
+    view.rerender(<PlaybackTab recordingId="1" title="demo" active />)
+    act(() => {
+      const callbacks = [...animationFrames.values()]
+      animationFrames.clear()
+      callbacks.forEach((callback) => callback(0))
+    })
+    expect(fitInstances[0].fit).toHaveBeenCalledOnce()
+    expect(terminalInstances[0].refresh).toHaveBeenCalledOnce()
   })
 
   it('disposes the fit addon and terminal once', () => {
@@ -104,5 +152,21 @@ describe('PlaybackTab terminal theme', () => {
 
     expect(fitInstances[0].dispose).toHaveBeenCalledOnce()
     expect(terminalInstances[0].dispose).toHaveBeenCalledOnce()
+  })
+
+  it('reports playback timer failures to its tab boundary', async () => {
+    vi.useFakeTimers()
+    getRecording.mockResolvedValue({ entries: [{ timestamp: 0, type: 0, data: 'QQ==' }, { timestamp: 1000, type: 0, data: 'Qg==' }] })
+    render(
+      <TerminalErrorBoundary onClose={vi.fn()}>
+        <PlaybackTab recordingId="1" title="demo" active />
+      </TerminalErrorBoundary>,
+    )
+    await act(async () => { await Promise.resolve(); await Promise.resolve() })
+    playbackWriteError = new Error('playback write failed')
+    fireEvent.click(screen.getByRole('button', { name: '开始回放' }))
+    act(() => vi.advanceTimersByTime(20))
+
+    expect(screen.getByText('终端渲染失败')).toBeInTheDocument()
   })
 })

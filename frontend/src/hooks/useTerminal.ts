@@ -2,6 +2,8 @@ import { useEffect, useRef, type RefObject } from 'react'
 import { FitAddon } from '@xterm/addon-fit'
 import { Terminal } from '@xterm/xterm'
 import { Events } from '@wailsio/runtime'
+import { useTerminalRuntimeErrorReporter, type TerminalRuntimeErrorReporter } from '@/components/terminal/TerminalErrorBoundary'
+import { runTerminalRuntime } from '@/components/terminal/terminalRuntime'
 import { logger } from '@/lib/logger'
 import { applyTerminalTheme, xtermTheme } from '@/lib/terminalTheme'
 import { TerminalService } from '@/lib/wails'
@@ -16,6 +18,7 @@ interface TerminalOutputEvent {
 
 export interface TerminalFocusRequest {
   sequence: number
+  targetTerminalID?: string | null
 }
 
 interface UseTerminalOptions {
@@ -72,41 +75,51 @@ function createTerminal() {
   })
 }
 
-function subscribeToData(term: Terminal, terminalID: string, storeRef: RefObject<AppState>) {
+function subscribeToData(term: Terminal, terminalID: string, storeRef: RefObject<AppState>, reportRuntimeError: TerminalRuntimeErrorReporter) {
   return term.onData((data) => {
-    storeRef.current.updateLastUsed(terminalID)
-    void TerminalService.Write(terminalID, data).catch((error: unknown) => logger.error('terminal write error', error))
+    runTerminalRuntime(reportRuntimeError, 'terminal input write', () => {
+      storeRef.current.updateLastUsed(terminalID)
+      void TerminalService.Write(terminalID, data).catch((error: unknown) => reportRuntimeError(error, 'terminal input write'))
+    })
   })
 }
 
-function subscribeToOutput(term: Terminal, terminalID: string) {
+function subscribeToOutput(term: Terminal, terminalID: string, reportRuntimeError: TerminalRuntimeErrorReporter) {
   return Events.On('terminal:output', (event: { data?: TerminalOutputEvent }) => {
     const payload = event.data
-    if (payload?.terminal_id === terminalID && payload.data) term.write(payload.data)
+    if (payload?.terminal_id === terminalID && payload.data) {
+      runTerminalRuntime(reportRuntimeError, 'terminal output write', () => term.write(payload.data!))
+    }
   })
 }
 
-function subscribeToTheme(term: Terminal) {
+function subscribeToTheme(term: Terminal, reportRuntimeError: TerminalRuntimeErrorReporter) {
   return useAppStore.subscribe((state, previous) => {
-    if (state.terminalTheme !== previous.terminalTheme) applyTerminalTheme(term.options, state.terminalTheme)
+    if (state.terminalTheme !== previous.terminalTheme) {
+      runTerminalRuntime(reportRuntimeError, 'terminal theme update', () => applyTerminalTheme(term.options, state.terminalTheme))
+    }
   })
 }
 
-function observeResize({ term, fitAddon, terminalID, containerRef, activeRef }: {
+function observeResize({ term, fitAddon, terminalID, containerRef, activeRef, reportRuntimeError }: {
   term: Terminal
   fitAddon: FitAddon
   terminalID: string
   containerRef: RefObject<HTMLDivElement | null>
   activeRef: RefObject<boolean>
+  reportRuntimeError: TerminalRuntimeErrorReporter
 }) {
   return new ResizeObserver(() => {
-    if (!activeRef.current || !fitAndRefresh(term, fitAddon, containerRef.current)) return
-    reportResize(terminalID, term, 'terminal resize error')
+    runTerminalRuntime(reportRuntimeError, 'terminal resize', () => {
+      if (!activeRef.current || !fitAndRefresh(term, fitAddon, containerRef.current)) return
+      reportResize(terminalID, term, 'terminal resize error')
+    })
   })
 }
 
-function initializeTerminal(terminalID: string, containerRef: RefObject<HTMLDivElement | null>, refs: TerminalLifecycleRefs) {
+function initializeTerminal(terminalID: string, containerRef: RefObject<HTMLDivElement | null>, refs: TerminalLifecycleRefs, reportRuntimeError: TerminalRuntimeErrorReporter) {
   let disposed = false
+  let addonOwnedByTerminal = false
   const container = containerRef.current
   const term = createTerminal()
   const fitAddon = new FitAddon()
@@ -115,15 +128,16 @@ function initializeTerminal(terminalID: string, containerRef: RefObject<HTMLDivE
   if (container) {
     term.open(container)
     term.loadAddon(fitAddon)
+    addonOwnedByTerminal = true
     refs.storeRef.current.registerTerminal(terminalID, term)
   }
-  const focusHandler = () => refs.storeRef.current.setActivePane(terminalID)
+  const focusHandler = () => runTerminalRuntime(reportRuntimeError, 'terminal pane activation', () => refs.storeRef.current.setActivePane(terminalID))
   container?.addEventListener('focusin', focusHandler)
   container?.addEventListener('pointerdown', focusHandler)
-  const dataDispose = subscribeToData(term, terminalID, refs.storeRef)
-  const unsubOutput = subscribeToOutput(term, terminalID)
-  const unsubscribeTheme = subscribeToTheme(term)
-  const resizeObserver = observeResize({ term, fitAddon, terminalID, containerRef, activeRef: refs.activeRef })
+  const dataDispose = subscribeToData(term, terminalID, refs.storeRef, reportRuntimeError)
+  const unsubOutput = subscribeToOutput(term, terminalID, reportRuntimeError)
+  const unsubscribeTheme = subscribeToTheme(term, reportRuntimeError)
+  const resizeObserver = observeResize({ term, fitAddon, terminalID, containerRef, activeRef: refs.activeRef, reportRuntimeError })
   if (container) resizeObserver.observe(container)
 
   return () => {
@@ -136,7 +150,7 @@ function initializeTerminal(terminalID: string, containerRef: RefObject<HTMLDivE
     safelyDispose('output subscription', unsubOutput)
     safelyDispose('theme subscription', unsubscribeTheme)
     safelyDispose('resize observer', () => resizeObserver.disconnect())
-    safelyDispose('fit addon', () => fitAddon.dispose())
+    if (!addonOwnedByTerminal) safelyDispose('fit addon', () => fitAddon.dispose())
     refs.storeRef.current.unregisterTerminal(terminalID)
     safelyDispose('instance', () => term.dispose())
     refs.fitAddonRef.current = null
@@ -144,16 +158,17 @@ function initializeTerminal(terminalID: string, containerRef: RefObject<HTMLDivE
   }
 }
 
-function useTerminalLifecycle(terminalID: string, containerRef: RefObject<HTMLDivElement | null>, refs: TerminalLifecycleRefs) {
-  useEffect(() => initializeTerminal(terminalID, containerRef, refs), [containerRef, terminalID])
+function useTerminalLifecycle(terminalID: string, containerRef: RefObject<HTMLDivElement | null>, refs: TerminalLifecycleRefs, reportRuntimeError: TerminalRuntimeErrorReporter) {
+  useEffect(() => initializeTerminal(terminalID, containerRef, refs, reportRuntimeError), [containerRef, reportRuntimeError, terminalID])
 }
 
-function useTerminalActivation({ terminalID, containerRef, refs, active, sequence }: {
+function useTerminalActivation({ terminalID, containerRef, refs, active, sequence, reportRuntimeError }: {
   terminalID: string
   containerRef: RefObject<HTMLDivElement | null>
   refs: TerminalLifecycleRefs
   active: boolean
   sequence: number
+  reportRuntimeError: TerminalRuntimeErrorReporter
 }) {
   const handledSequenceRef = useRef(0)
   useEffect(() => {
@@ -161,25 +176,28 @@ function useTerminalActivation({ terminalID, containerRef, refs, active, sequenc
     if (!term) return
     cancelActivationFrame(refs.activationFrameRef)
     if (!active) {
-      term.blur()
+      runTerminalRuntime(reportRuntimeError, 'terminal blur', () => term.blur())
       return
     }
     refs.activationFrameRef.current = window.requestAnimationFrame(() => {
       refs.activationFrameRef.current = null
-      const fitAddon = refs.fitAddonRef.current
-      if (!fitAddon || !fitAndRefresh(term, fitAddon, containerRef.current)) return
-      if (sequence > handledSequenceRef.current) {
-        term.focus()
-        refs.storeRef.current.setActivePane(terminalID)
-        handledSequenceRef.current = sequence
-      }
-      reportResize(terminalID, term, 'terminal activation resize error')
+      runTerminalRuntime(reportRuntimeError, 'terminal activation', () => {
+        const fitAddon = refs.fitAddonRef.current
+        if (!fitAddon || !fitAndRefresh(term, fitAddon, containerRef.current)) return
+        if (sequence > handledSequenceRef.current) {
+          term.focus()
+          refs.storeRef.current.setActivePane(terminalID)
+          handledSequenceRef.current = sequence
+        }
+        reportResize(terminalID, term, 'terminal activation resize error')
+      })
     })
     return () => cancelActivationFrame(refs.activationFrameRef)
-  }, [active, sequence])
+  }, [active, reportRuntimeError, sequence])
 }
 
 export function useTerminal(terminalID: string, containerRef: RefObject<HTMLDivElement | null>, { active, focusRequest }: UseTerminalOptions) {
+  const reportRuntimeError = useTerminalRuntimeErrorReporter()
   const refs: TerminalLifecycleRefs = {
     termRef: useRef<Terminal | null>(null),
     fitAddonRef: useRef<FitAddon | null>(null),
@@ -189,7 +207,7 @@ export function useTerminal(terminalID: string, containerRef: RefObject<HTMLDivE
   }
   refs.activeRef.current = active
   refs.storeRef.current = useAppStore.getState()
-  useTerminalLifecycle(terminalID, containerRef, refs)
-  useTerminalActivation({ terminalID, containerRef, refs, active, sequence: focusRequest.sequence })
+  useTerminalLifecycle(terminalID, containerRef, refs, reportRuntimeError)
+  useTerminalActivation({ terminalID, containerRef, refs, active, sequence: focusRequest.sequence, reportRuntimeError })
   return refs.termRef
 }
