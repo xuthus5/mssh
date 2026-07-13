@@ -1,8 +1,7 @@
 import { create } from 'zustand'
 import { Terminal } from '@xterm/xterm'
-import { TerminalService } from '@/lib/wails'
-import { logger } from '@/lib/logger'
-import { fallbackAfterClose, initialNavigationState, isTerminalNotFoundError, persistNavigationCollapsed, persistSidebarWidth, surfaceForTab, type ActiveSurface, type WorkspaceID } from '@/store/tabNavigation'
+import { initialNavigationState, type ActiveSurface, type WorkspaceID } from '@/store/tabNavigation'
+import { createNavigationActions, createPoolActions, createStatusActions, createTabActions, createTransferActions } from '@/store/appStoreActions'
 export interface Tab {
   id: string
   title: string
@@ -91,7 +90,7 @@ export interface AppState {
   workspaceTab: WorkspaceID
   navigationCollapsed: boolean
   sidebarWidth: number
-  focusRequest: { id: string; sequence: number }
+  focusRequest: { id: string; terminalId?: string | null; sequence: number }
   terminalPool: Map<string, PooledTerminal>
   maxPoolSize: number
   connectionStatus: Record<string, ConnectionStatus>
@@ -112,6 +111,7 @@ export interface AppState {
   removeTabLocal: (id: string) => void
   activateWorkspace: (id: WorkspaceID) => void
   activateTab: (id: string, focus?: boolean) => void
+  requestTerminalFocus: (tabID: string, terminalID: string) => void
   toggleNavigation: () => void
   setSidebarWidth: (width: number) => void
   registerTerminal: (id: string, terminal: Terminal) => void
@@ -129,16 +129,12 @@ export interface AppState {
 const DEFAULT_MAX_POOL_SIZE = 32
 const initialNavigation = initialNavigationState()
 
-function workspaceTabForSurface(activeSurface: ActiveSurface | null, workspaceTab: WorkspaceID): WorkspaceID {
-  return activeSurface?.type === 'workspace' ? activeSurface.id : workspaceTab
-}
-
 export const useAppStore = create<AppState>((set, get) => ({
   tabs: [],
   activeSurface: null,
   workspaceTab: 'sessions',
   ...initialNavigation,
-  focusRequest: { id: '', sequence: 0 },
+  focusRequest: { id: '', terminalId: null, sequence: 0 },
   terminalPool: new Map(),
   maxPoolSize: DEFAULT_MAX_POOL_SIZE,
   connectionStatus: {},
@@ -150,131 +146,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   recordingState: {},
   tunnelState: {},
 
-  addTransfer: (job) => set((s) => ({ transfers: [...s.transfers, job], transferCenterOpen: true })),
-  removeTransfer: (id) => set((s) => ({ transfers: s.transfers.filter((t) => t.id !== id) })),
-  updateTransfer: (id, updates) => set((s) => ({ transfers: s.transfers.map((t) => (t.id === id ? { ...t, ...updates } : t)) })),
-  clearFinishedTransfers: () => set((s) => ({ transfers: s.transfers.filter((transfer) => transfer.status === 'queued' || transfer.status === 'running') })),
-  setTransferCenterOpen: (transferCenterOpen) => set({ transferCenterOpen }),
-  openTab: (tab) => set((s) => {
-    const existing = s.tabs.find((t) => t.id === tab.id)
-    if (existing) {
-      return { activeSurface: surfaceForTab(existing) }
-    }
-    return { tabs: [...s.tabs, tab], activeSurface: surfaceForTab(tab) }
-  }),
-  closeTab: async (id) => {
-    const state = get()
-    const tab = state.tabs.find((t) => t.id === id)
-    if (tab?.type === 'terminal' && tab.terminalId) {
-      try {
-        await TerminalService.Close(tab.terminalId)
-      } catch (error: unknown) {
-        if (!isTerminalNotFoundError(error)) {
-          logger.error('closeTab: close terminal error', error)
-          throw error
-        }
-      }
-    }
-    get().removeTabLocal(id)
-  },
-  removeTabLocal: (id) => set((s) => {
-    const tab = s.tabs.find((item) => item.id === id)
-    const terminalId = tab?.terminalId
-    const activeSurface = s.activeSurface?.id === id ? fallbackAfterClose(s.tabs, id) : s.activeSurface
-    const workspaceTab = workspaceTabForSurface(activeSurface, s.workspaceTab)
-    if (terminalId) {
-      const pool = new Map(s.terminalPool)
-      pool.delete(terminalId)
-      const connectionStatus = { ...s.connectionStatus }
-      delete connectionStatus[terminalId]
-      const recordingState = { ...s.recordingState }
-      delete recordingState[terminalId]
-      const tabs = s.tabs.filter((item) => item.id !== id)
-      return {
-        tabs,
-        terminalPool: pool,
-        connectionStatus,
-        recordingState,
-        activePaneId: s.activePaneId === terminalId ? null : s.activePaneId,
-        activeSurface,
-        workspaceTab,
-      }
-    }
-    const tabs = s.tabs.filter((item) => item.id !== id)
-    return { tabs, activeSurface, workspaceTab }
-  }),
-  activateWorkspace: (id) => set({
-    activeSurface: { type: 'workspace', id },
-    workspaceTab: id,
-  }),
-  activateTab: (id, focus = false) => set((s) => {
-    const tab = s.tabs.find((item) => item.id === id)
-    if (!tab) return {}
-    return {
-      activeSurface: surfaceForTab(tab),
-      focusRequest: focus ? { id, sequence: s.focusRequest.sequence + 1 } : s.focusRequest,
-    }
-  }),
-  toggleNavigation: () => set((s) => {
-    const navigationCollapsed = !s.navigationCollapsed
-    persistNavigationCollapsed(navigationCollapsed)
-    return { navigationCollapsed }
-  }),
-  setSidebarWidth: (sidebarWidth) => {
-    set({ sidebarWidth: persistSidebarWidth(sidebarWidth) })
-  },
-  registerTerminal: (id, terminal) => set((s) => {
-    const pool = new Map(s.terminalPool)
-    if (pool.size >= s.maxPoolSize) {
-      get().evictLRU()
-      const current = new Map(get().terminalPool)
-      current.set(id, { terminal, lastUsed: Date.now() })
-      return { terminalPool: current }
-    }
-    pool.set(id, { terminal, lastUsed: Date.now() })
-    return { terminalPool: pool }
-  }),
-  unregisterTerminal: (id) => set((s) => {
-    const pool = new Map(s.terminalPool)
-    pool.delete(id)
-    return { terminalPool: pool }
-  }),
-  updateLastUsed: (id) => set((s) => {
-    const entry = s.terminalPool.get(id)
-    if (!entry) return {}
-    const pool = new Map(s.terminalPool)
-    pool.set(id, { ...entry, lastUsed: Date.now() })
-    return { terminalPool: pool }
-  }),
-  evictLRU: () => set((s) => {
-    if (s.terminalPool.size === 0) return {}
-    let oldestId = ''
-    let oldestTime = Infinity
-    for (const [id, entry] of s.terminalPool) {
-      if (entry.lastUsed < oldestTime) {
-        oldestTime = entry.lastUsed
-        oldestId = id
-      }
-    }
-    if (!oldestId) return {}
-    const pool = new Map(s.terminalPool)
-    pool.delete(oldestId)
-    TerminalService.Close(oldestId).catch((err: unknown) => {
-      logger.error('evictLRU: close terminal error', err)
-    })
-    return { terminalPool: pool }
-  }),
-  setConnectionStatus: (id, status) => set((s) => ({
-    connectionStatus: { ...s.connectionStatus, [id]: status },
-  })),
-  setActivePane: (id) => set({ activePaneId: id }),
-  setRecordingState: (id, state) => set((s) => ({
-    recordingState: { ...s.recordingState, [id]: state },
-  })),
-  setTunnelState: (id, state) => set((s) => ({
-    tunnelState: { ...s.tunnelState, [id]: state },
-  })),
-  setAppStatus: (status) => set({ appStatus: status }),
-  setTerminalTheme: (theme) => set({ terminalTheme: theme }),
-  setMaxPoolSize: (maxPoolSize) => set({ maxPoolSize }),
+  ...createTransferActions(set),
+  ...createTabActions(set, get),
+  ...createNavigationActions(set, get),
+  ...createPoolActions(set, get),
+  ...createStatusActions(set),
 }))

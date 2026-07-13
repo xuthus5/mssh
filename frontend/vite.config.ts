@@ -24,8 +24,19 @@ export default defineConfig({
     },
     coverage: {
       provider: 'v8',
-      // Wails bindings are generated and excluded from handwritten frontend coverage.
-      include: ['src/hooks/**', 'src/components/session/**', 'src/components/layout/Sidebar.tsx', 'src/store/**'],
+      include: [
+        'src/App.tsx',
+        'src/hooks/**',
+        'src/components/session/**',
+        'src/components/layout/Sidebar.tsx',
+        'src/components/layout/DynamicTabStrip.tsx',
+        'src/components/layout/WindowTitleBar.tsx',
+        'src/components/layout/WorkspaceContent.tsx',
+        'src/components/terminal/**/*.{ts,tsx}',
+        'src/store/**',
+      ],
+      // Tests and generated Wails bindings are not handwritten production code.
+      exclude: ['src/**/*.test.{ts,tsx}', 'bindings/**'],
       thresholds: { lines: 90, functions: 90 },
     },
   },

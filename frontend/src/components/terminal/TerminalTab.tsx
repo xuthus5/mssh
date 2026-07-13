@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback } from 'react'
 import { TerminalEmulator } from '@/components/terminal/TerminalEmulator'
 import { TerminalSplit } from '@/components/terminal/TerminalSplit'
 import { TerminalToolbar } from '@/components/terminal/TerminalToolbar'
@@ -68,10 +68,6 @@ export function TerminalTab({ terminalID, sessionId, onOpenFiles, active, focusR
   const tabs = useAppStore((state) => state.tabs)
   const currentTab = tabs.find((tab) => tab.terminalId === terminalID || tab.id === terminalID)
   const recording = useRecordingControl(terminalID, sessionId)
-
-  useEffect(() => {
-    if (active) useAppStore.getState().setActivePane(terminalID)
-  }, [active, terminalID])
 
   return (
     <div className="flex flex-col h-full">
