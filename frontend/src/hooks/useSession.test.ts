@@ -8,7 +8,7 @@ let _counter = 0
 function nextId() { return ++_counter }
 
 function resetAppStore() {
-  useAppStore.setState({ tabs: [], activeTabId: null, terminalPool: new Map() })
+  useAppStore.setState({ tabs: [], activeSurface: null, terminalPool: new Map() })
 }
 
 describe('useSession', () => {
@@ -152,7 +152,9 @@ describe('useSession', () => {
     expect(store.tabs).toHaveLength(1)
     expect(store.tabs[0].type).toBe('terminal')
     expect(store.tabs[0].title).toBe('srv')
-    expect(store.activeTabId).toBe(`terminal-${sid}`)
+    expect(store.activeSurface).toEqual({ type: 'terminal', id: `terminal-${sid}` })
+    expect(store).not.toHaveProperty('activeTabId')
+    expect(store).not.toHaveProperty('hasEnteredWorkspace')
   })
 
   it('handles createSession error gracefully', async () => {

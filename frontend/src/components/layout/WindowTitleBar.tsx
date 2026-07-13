@@ -1,7 +1,8 @@
 import { Menu, Minus, Moon, Settings, Square, SquareTerminal, Sun, Workflow, X } from 'lucide-react'
 import { Window } from '@wailsio/runtime'
 import { logger } from '@/lib/logger'
-import { useAppStore, type SidebarTab } from '@/store/appStore'
+import { useAppStore } from '@/store/appStore'
+import type { WorkspaceID } from '@/store/tabNavigation'
 import { useThemeCatalog } from '@/hooks/useThemeCatalog'
 import { DynamicTabStrip } from '@/components/layout/DynamicTabStrip'
 
@@ -12,11 +13,9 @@ function runWindowAction(name: string, action: () => Promise<unknown>) {
 export function WindowTitleBar() {
   const themeCatalog = useThemeCatalog()
   const colorMode = themeCatalog.colorMode
-  const hasEnteredWorkspace = useAppStore((state) => state.hasEnteredWorkspace)
+  const activeSurface = useAppStore((state) => state.activeSurface)
   const navigationCollapsed = useAppStore((state) => state.navigationCollapsed)
-  const sidebarTab = useAppStore((state) => state.sidebarTab)
   const activateWorkspace = useAppStore((state) => state.activateWorkspace)
-  const enterWorkspace = useAppStore((state) => state.enterWorkspace)
   const toggleNavigation = useAppStore((state) => state.toggleNavigation)
 
   const toggleColorMode = () => {
@@ -24,10 +23,10 @@ export function WindowTitleBar() {
     void themeCatalog.setColorMode(nextMode)
   }
 
-  const navigationButton = (tab: SidebarTab, label: string) => {
+  const navigationButton = (tab: WorkspaceID, label: string) => {
     const Icon = tab === 'sessions' ? SquareTerminal : Workflow
-    const selected = hasEnteredWorkspace && sidebarTab === tab
-    return <button type="button" role="tab" aria-selected={selected} className={`flex items-center gap-1.5 px-3.5 text-sm font-medium transition-colors [--wails-draggable:no-drag] ${selected ? 'bg-background text-foreground shadow-[inset_0_-2px_0_var(--primary)]' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`} onClick={() => { enterWorkspace(); activateWorkspace(tab) }}><Icon data-icon="inline-start" aria-hidden="true" className="size-4" />{label}</button>
+    const selected = activeSurface?.type === 'workspace' && activeSurface.id === tab
+    return <button type="button" role="tab" aria-selected={selected} className={`flex items-center gap-1.5 px-3.5 text-sm font-medium transition-colors [--wails-draggable:no-drag] ${selected ? 'bg-background text-foreground shadow-[inset_0_-2px_0_var(--primary)]' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`} onClick={() => activateWorkspace(tab)}><Icon data-icon="inline-start" aria-hidden="true" className="size-4" />{label}</button>
   }
 
   return <header className="flex h-9 shrink-0 select-none items-stretch border-b border-border bg-card">

@@ -248,7 +248,6 @@ export function useSession() {
       const terminalId = await TerminalService.Open(Number(sessionId), 80, 24)
       const tabId = `terminal-${sessionId}`
       useAppStore.getState().setConnectionStatus(terminalId, 'connected')
-      useAppStore.getState().enterWorkspace()
       openTab({ id: tabId, title: session.name, type: 'terminal', terminalId, sessionId: Number(sessionId) })
       await Promise.all([listRecentSessions(), listSessions()])
 

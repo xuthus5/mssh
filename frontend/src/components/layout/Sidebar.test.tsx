@@ -36,7 +36,7 @@ import { useAppStore } from '@/store/appStore'
 describe('Sidebar navigation collapse', () => {
   beforeEach(() => {
     localStorage.clear()
-    useAppStore.setState({ navigationCollapsed: false, sidebarTab: 'sessions', sidebarWidth: 280 })
+    useAppStore.setState({ navigationCollapsed: false, workspaceTab: 'sessions', sidebarWidth: 280 })
   })
 
   it('collapses and restores the persistent sidebar width through shared navigation state', () => {

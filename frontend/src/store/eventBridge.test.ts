@@ -34,12 +34,16 @@ describe('eventBridge', () => {
   })
 
   it('maps terminal closure and tunnel state then unsubscribes', () => {
-    useAppStore.setState({ tabs: [{ id: 'tab-1', title: 'one', type: 'terminal', terminalId: 'term-1' }] })
+    useAppStore.setState({
+      tabs: [{ id: 'tab-1', title: 'one', type: 'terminal', terminalId: 'term-1' }],
+      activeSurface: { type: 'terminal', id: 'tab-1' },
+    })
     const stop = startEventBridge()
     __emitEvent('tunnel:state', { data: { terminal_id: 'tunnel-9', state: 'running' } })
     expect(useAppStore.getState().tunnelState['9']).toBe('running')
     __emitEvent('terminal:closed', { data: { terminal_id: 'term-1' } })
     expect(useAppStore.getState().tabs).toHaveLength(0)
+    expect(useAppStore.getState().activeSurface).toEqual({ type: 'workspace', id: 'sessions' })
     stop()
     __emitEvent('tunnel:state', { data: { terminal_id: 'tunnel-9', state: 'stopped' } })
     expect(useAppStore.getState().tunnelState['9']).toBe('running')

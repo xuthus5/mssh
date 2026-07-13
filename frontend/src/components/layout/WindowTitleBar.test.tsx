@@ -36,9 +36,7 @@ describe('WindowTitleBar', () => {
     document.documentElement.classList.remove('light')
     useAppStore.setState({
       activeSurface: null,
-      hasEnteredWorkspace: false,
       navigationCollapsed: false,
-      sidebarTab: 'sessions',
       workspaceTab: 'sessions',
     })
   })
@@ -89,14 +87,14 @@ describe('WindowTitleBar', () => {
 
     await userEvent.click(macrosTab)
 
-    expect(useAppStore.getState().sidebarTab).toBe('macros')
-    expect(useAppStore.getState().hasEnteredWorkspace).toBe(true)
+    expect(useAppStore.getState().workspaceTab).toBe('macros')
+    expect(useAppStore.getState().activeSurface).toEqual({ type: 'workspace', id: 'macros' })
     expect(macrosTab).toHaveAttribute('aria-selected', 'true')
     expect(screen.queryByText('Secure Shell Client')).not.toBeInTheDocument()
   })
 
   it('collapses fixed navigation and the sidebar together', async () => {
-    useAppStore.setState({ activeSurface: { type: 'workspace', id: 'sessions' }, hasEnteredWorkspace: true })
+    useAppStore.setState({ activeSurface: { type: 'workspace', id: 'sessions' } })
     render(<WindowTitleBar />)
 
     const navigationButton = screen.getByRole('button', { name: '收起导航' })
