@@ -20,7 +20,7 @@ vi.mock('@/hooks/SessionWorkspaceContext', () => ({
   useSessionWorkspace: () => ({ connect }),
 }))
 
-import { DynamicTabStrip } from '@/components/layout/DynamicTabStrip'
+import { DynamicTabOverflowMenu, DynamicTabStrip } from '@/components/layout/DynamicTabStrip'
 import { ToastContainer, useToastStore } from '@/components/ui/toast'
 import { logger } from '@/lib/logger'
 import { useAppStore } from '@/store/appStore'
@@ -92,7 +92,7 @@ describe('DynamicTabStrip', () => {
 
   it('lists every dynamic tab in the overflow menu', async () => {
     seedTabs()
-    render(<DynamicTabStrip />)
+    render(<DynamicTabOverflowMenu />)
 
     await userEvent.click(screen.getByRole('button', { name: '打开标签列表' }))
 
@@ -116,13 +116,53 @@ describe('DynamicTabStrip', () => {
 
   it('activates a tab selected from the overflow menu', async () => {
     seedTabs()
-    render(<DynamicTabStrip />)
+    render(<DynamicTabOverflowMenu />)
 
     await userEvent.click(screen.getByRole('button', { name: '打开标签列表' }))
     await userEvent.click(screen.getByRole('menuitem', { name: '生产服务器' }))
 
     expect(useAppStore.getState().activeSurface).toEqual({ type: 'terminal', id: 'terminal-1' })
     expect(useAppStore.getState().focusRequest).toMatchObject({ id: 'terminal-1', sequence: 1 })
+  })
+
+  it('reports actual tab-list overflow without rendering the menu inline', () => {
+    let triggerResize = () => {}
+    vi.stubGlobal('ResizeObserver', class {
+      constructor(callback: ResizeObserverCallback) {
+        triggerResize = () => callback([], this as unknown as ResizeObserver)
+      }
+      observe() {}
+      disconnect() {}
+      unobserve() {}
+    })
+    const onOverflowChange = vi.fn()
+    seedTabs()
+    const view = render(<DynamicTabStrip onOverflowChange={onOverflowChange} />)
+    const tabList = screen.getByRole('tablist', { name: '动态标签' })
+    let clientWidth = 300
+    let scrollWidth = 300
+    Object.defineProperty(tabList, 'clientWidth', { configurable: true, get: () => clientWidth })
+    Object.defineProperty(tabList, 'scrollWidth', { configurable: true, get: () => scrollWidth })
+
+    act(() => triggerResize())
+    expect(onOverflowChange).toHaveBeenLastCalledWith(false)
+    expect(screen.queryByRole('button', { name: '打开标签列表' })).not.toBeInTheDocument()
+
+    clientWidth = 160
+    scrollWidth = 320
+    act(() => triggerResize())
+    expect(onOverflowChange).toHaveBeenLastCalledWith(true)
+
+    scrollWidth = 160
+    act(() => triggerResize())
+    expect(onOverflowChange).toHaveBeenLastCalledWith(false)
+    expect(tabList.parentElement).not.toHaveClass('flex-1')
+
+    scrollWidth = 320
+    act(() => triggerResize())
+    expect(onOverflowChange).toHaveBeenLastCalledWith(true)
+    view.unmount()
+    expect(onOverflowChange).toHaveBeenLastCalledWith(false)
   })
 
   it('includes terminal and playback status in each tab accessible name', () => {

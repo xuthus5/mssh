@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { Circle, Copy, List, Play, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -43,6 +43,34 @@ function useTabNavigation(tabs: Tab[], activeID: string | null, activateTab: App
   }, [])
 
   return { onKeyDown, registerTab }
+}
+
+function useTabOverflow(tabs: Tab[], onOverflowChange?: (overflow: boolean) => void) {
+  const tabListRef = useRef<HTMLDivElement>(null)
+  const lastOverflowRef = useRef<boolean | null>(null)
+  const reportOverflow = useCallback(() => {
+    const tabList = tabListRef.current
+    const overflow = tabList !== null && tabList.scrollWidth > tabList.clientWidth
+    if (lastOverflowRef.current === overflow) return
+    lastOverflowRef.current = overflow
+    onOverflowChange?.(overflow)
+  }, [onOverflowChange])
+
+  useLayoutEffect(() => { reportOverflow() }, [reportOverflow, tabs])
+  useLayoutEffect(() => {
+    const tabList = tabListRef.current
+    if (!tabList || typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(() => reportOverflow())
+    observer.observe(tabList)
+    for (const tab of tabList.children) observer.observe(tab)
+    return () => observer.disconnect()
+  }, [reportOverflow, tabs])
+  useEffect(() => () => {
+    lastOverflowRef.current = false
+    onOverflowChange?.(false)
+  }, [onOverflowChange])
+
+  return tabListRef
 }
 
 function tabStatusLabel(tab: Tab, connectionStatus: AppState['connectionStatus']): string {
@@ -109,7 +137,7 @@ function TabListMenu({ tabs, activeID, onActivate }: { tabs: Tab[]; activeID: st
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" aria-label="打开标签列表" className="h-full w-9 shrink-0 rounded-none" onClick={() => setOpen(true)} />}>
-        <List aria-hidden="true" className="size-4" />
+        <List aria-hidden="true" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
         {tabs.map((tab) => <DropdownMenuItem key={tab.id} onClick={() => { onActivate(tab.id); setOpen(false) }} className={tab.id === activeID ? 'bg-accent text-accent-foreground' : undefined}>{tab.title}</DropdownMenuItem>)}
@@ -118,13 +146,23 @@ function TabListMenu({ tabs, activeID, onActivate }: { tabs: Tab[]; activeID: st
   )
 }
 
-export function DynamicTabStrip() {
+export function DynamicTabOverflowMenu() {
+  const tabs = useAppStore((state) => state.tabs)
+  const activeSurface = useAppStore((state) => state.activeSurface)
+  const activateTab = useAppStore((state) => state.activateTab)
+  const activateWithFocus = useCallback((tabID: string) => activateTab(tabID, true), [activateTab])
+  if (tabs.length === 0) return null
+  return <TabListMenu tabs={tabs} activeID={activeSurface?.id ?? null} onActivate={activateWithFocus} />
+}
+
+export function DynamicTabStrip({ onOverflowChange }: { onOverflowChange?: (overflow: boolean) => void }) {
   const { connect } = useSessionWorkspace()
   const tabs = useAppStore((state) => state.tabs)
   const activeSurface = useAppStore((state) => state.activeSurface)
   const activateTab = useAppStore((state) => state.activateTab)
   const connectionStatus = useAppStore((state) => state.connectionStatus)
   const navigation = useTabNavigation(tabs, activeSurface?.id ?? null, activateTab)
+  const tabListRef = useTabOverflow(tabs, onOverflowChange)
   const activateWithFocus = useCallback((tabID: string) => activateTab(tabID, true), [activateTab])
   const duplicateTerminal = useCallback((sessionID: number) => { void connect(String(sessionID)) }, [connect])
   const closeCoordinator = useTabCloseCoordinator()
@@ -132,11 +170,10 @@ export function DynamicTabStrip() {
   if (tabs.length === 0) return null
 
   return (
-    <div className="flex min-w-0 flex-1 [--wails-draggable:no-drag]">
-      <div role="tablist" aria-label="动态标签" className="flex min-w-0 flex-1 overflow-x-auto">
+    <div className="flex min-w-0 shrink overflow-hidden [--wails-draggable:no-drag]">
+      <div ref={tabListRef} role="tablist" aria-label="动态标签" className="flex min-w-0 overflow-x-auto">
         {tabs.map((tab) => <DynamicTab key={tab.id} tab={tab} active={activeSurface?.id === tab.id} connectionStatus={connectionStatus} navigation={navigation} onActivate={activateWithFocus} onClose={closeCoordinator.requestClose} onDuplicate={duplicateTerminal} />)}
       </div>
-      <TabListMenu tabs={tabs} activeID={activeSurface?.id ?? null} onActivate={activateWithFocus} />
       <TabCloseConfirmation {...closeCoordinator.confirmation} />
     </div>
   )
