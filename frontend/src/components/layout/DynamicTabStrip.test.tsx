@@ -129,4 +129,35 @@ describe('DynamicTabStrip', () => {
     await waitFor(() => expect(closeTab).toHaveBeenCalledWith('playback-1'))
     expect(await screen.findByRole('alert')).toHaveTextContent('关闭标签失败: 回放清理失败')
   })
+
+  it('requests close from close-button Enter and Space without activating the tab', () => {
+    const activateTab = vi.fn()
+    seedTabs()
+    useAppStore.setState({ activateTab })
+    render(<DynamicTabStrip />)
+    const tab = screen.getByRole('tab', { name: /生产服务器/ })
+    const closeButton = screen.getByRole('button', { name: '关闭 生产服务器' })
+
+    expect(tab).not.toContainElement(closeButton)
+    closeButton.focus()
+    fireEvent.keyDown(closeButton, { key: 'Enter' })
+    fireEvent.keyDown(closeButton, { key: ' ' })
+
+    expect(closeButton).toHaveFocus()
+    expect(screen.getByRole('dialog')).toHaveTextContent('关闭活动连接？')
+    expect(activateTab).not.toHaveBeenCalled()
+  })
+
+  it('activates a tab from its Enter key without requesting close', () => {
+    const activateTab = vi.fn()
+    seedTabs()
+    useAppStore.setState({ activateTab })
+    render(<DynamicTabStrip />)
+    const tab = screen.getByRole('tab', { name: /生产服务器/ })
+
+    fireEvent.keyDown(tab, { key: 'Enter' })
+
+    expect(activateTab).toHaveBeenCalledWith('terminal-1', true)
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
 })
