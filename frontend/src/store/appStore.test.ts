@@ -5,9 +5,15 @@ import { __registerHandler, __clearHandlers } from '@/test/__mocks__/wails-runti
 describe('appStore', () => {
   beforeEach(() => {
     __clearHandlers()
+    localStorage.clear()
     useAppStore.setState({
       tabs: [],
       activeTabId: null,
+      activeSurface: null,
+      workspaceTab: 'sessions',
+      navigationCollapsed: false,
+      sidebarWidth: 280,
+      focusRequest: { id: '', sequence: 0 },
       terminalPool: new Map(),
       connectionStatus: {},
       transfers: [],
@@ -33,6 +39,85 @@ describe('appStore', () => {
     closeTab('tab-1')
     expect(useAppStore.getState().tabs).toHaveLength(0)
     expect(useAppStore.getState().activeTabId).toBeNull()
+  })
+
+  it('uses one active surface for workspaces and dynamic tabs', () => {
+    const store = useAppStore.getState()
+
+    store.activateWorkspace('sessions')
+    expect(useAppStore.getState().activeSurface).toEqual({ type: 'workspace', id: 'sessions' })
+
+    store.openTab({ id: 'terminal-1', title: 'one', type: 'terminal', terminalId: 'term-1' })
+    expect(useAppStore.getState().activeSurface).toEqual({ type: 'terminal', id: 'terminal-1' })
+  })
+
+  it('falls back right, left, then sessions when closing the active tab', async () => {
+    const store = useAppStore.getState()
+    store.openTab({ id: 'a', title: 'A', type: 'playback' })
+    store.openTab({ id: 'b', title: 'B', type: 'playback' })
+    store.openTab({ id: 'c', title: 'C', type: 'playback' })
+
+    store.activateTab('b')
+    await store.closeTab('b')
+    expect(useAppStore.getState().activeSurface).toEqual({ type: 'playback', id: 'c' })
+
+    await store.closeTab('c')
+    expect(useAppStore.getState().activeSurface).toEqual({ type: 'playback', id: 'a' })
+
+    await store.closeTab('a')
+    expect(useAppStore.getState().activeSurface).toEqual({ type: 'workspace', id: 'sessions' })
+  })
+
+  it('tracks explicit terminal focus requests', () => {
+    const store = useAppStore.getState()
+    store.openTab({ id: 'terminal-1', title: 'one', type: 'terminal', terminalId: 'term-1' })
+
+    store.activateTab('terminal-1', true)
+
+    expect(useAppStore.getState()).toMatchObject({
+      activeSurface: { type: 'terminal', id: 'terminal-1' },
+      focusRequest: { id: 'terminal-1', sequence: 1 },
+    })
+  })
+
+  it('persists shared navigation state', () => {
+    const store = useAppStore.getState()
+
+    store.toggleNavigation()
+    store.setSidebarWidth(320)
+
+    expect(useAppStore.getState()).toMatchObject({ navigationCollapsed: true, sidebarWidth: 320 })
+    expect(localStorage.getItem('mssh:sidebar-collapsed')).toBe('true')
+    expect(localStorage.getItem('mssh:sidebar-width')).toBe('320')
+  })
+
+  it('keeps a terminal tab open when closing it fails', async () => {
+    __registerHandler(
+      'github.com/xuthus5/mssh/internal/service.TerminalService.Close',
+      async () => { throw new Error('connection lost') },
+    )
+    const store = useAppStore.getState()
+    store.openTab({ id: 'terminal-1', title: 'one', type: 'terminal', terminalId: 'term-1' })
+
+    await expect(store.closeTab('terminal-1')).rejects.toThrow('connection lost')
+
+    expect(useAppStore.getState().tabs).toHaveLength(1)
+  })
+
+  it('removes a terminal tab already closed by the backend', async () => {
+    __registerHandler(
+      'github.com/xuthus5/mssh/internal/service.TerminalService.Close',
+      async () => { throw new Error('terminal term-1 not found') },
+    )
+    const store = useAppStore.getState()
+    store.openTab({ id: 'terminal-1', title: 'one', type: 'terminal', terminalId: 'term-1' })
+
+    await store.closeTab('terminal-1')
+
+    expect(useAppStore.getState()).toMatchObject({
+      tabs: [],
+      activeSurface: { type: 'workspace', id: 'sessions' },
+    })
   })
 
   it('closes playback tabs locally without closing a backend terminal', () => {
