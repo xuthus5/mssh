@@ -1,7 +1,10 @@
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
 import { Dialogs, Events } from '@wailsio/runtime'
 import { Spinner } from '@/components/ui/spinner'
+import { TerminalErrorBoundary } from '@/components/terminal/TerminalErrorBoundary'
 import { useFileTransfer } from '@/hooks/useFileTransfer'
+import type { TerminalFocusRequest } from '@/hooks/useTerminal'
+import { closeTabsWithFeedback } from '@/lib/closeTabsWithFeedback'
 import { useAppStore, type AppState, type Tab } from '@/store/appStore'
 
 const TerminalTab = lazy(() => import('@/components/terminal/TerminalTab').then((module) => ({ default: module.TerminalTab })))
@@ -9,6 +12,7 @@ const PlaybackTab = lazy(() => import('@/components/terminal/PlaybackTab').then(
 const FilePanel = lazy(() => import('@/components/file/FilePanel'))
 
 type FileTransfer = ReturnType<typeof useFileTransfer>
+const noFocusRequest: TerminalFocusRequest = { sequence: 0 }
 
 function FilePanelView({ transfer, onClose, onUpload, onDownload, dropTargetID }: {
   transfer: FileTransfer
@@ -54,64 +58,40 @@ function FilePanelContainer({ sessionID, onClose }: { sessionID: number; onClose
     onDownload={(path) => { void handleDownload(path) }} dropTargetID={dropTargetID} />
 }
 
-function DynamicLayer({ tab, active, filePanelSessionID, onToggleFiles, onCloseFiles }: {
+function DynamicLayer({ tab, active, filePanelSessionID, onToggleFiles, onCloseFiles, focusRequest, onClose }: {
   tab: Tab
   active: boolean
   filePanelSessionID: number | null
   onToggleFiles: (sessionID: number) => void
   onCloseFiles: () => void
+  focusRequest: AppState['focusRequest']
+  onClose: () => void
 }) {
   const layerClass = `absolute inset-0 flex ${active ? 'visible' : 'invisible pointer-events-none'}`
+  const terminalFocusRequest = focusRequest.id === tab.id ? focusRequest : noFocusRequest
   return (
     <div data-layer-id={tab.id} aria-hidden={!active} inert={active ? undefined : true} className={layerClass}>
-      {tab.type === 'terminal' ? <>
-        <div className="flex min-w-0 flex-1 flex-col">
-          <TerminalTab terminalID={tab.terminalId ?? tab.id} sessionId={tab.sessionId ?? 0}
-            onOpenFiles={() => onToggleFiles(tab.sessionId ?? 0)} active={active} />
-        </div>
-        {active && tab.sessionId === filePanelSessionID
-          ? <FilePanelContainer sessionID={filePanelSessionID} onClose={onCloseFiles} />
-          : null}
-      </> : <PlaybackTab recordingId={tab.terminalId ?? tab.id} title={tab.title} />}
+      <TerminalErrorBoundary onClose={onClose}>
+        {tab.type === 'terminal' ? <>
+          <div className="flex min-w-0 flex-1 flex-col">
+            <TerminalTab terminalID={tab.terminalId ?? tab.id} sessionId={tab.sessionId ?? 0}
+              onOpenFiles={() => onToggleFiles(tab.sessionId ?? 0)} active={active} focusRequest={terminalFocusRequest} />
+          </div>
+          {active && tab.sessionId === filePanelSessionID
+            ? <FilePanelContainer sessionID={filePanelSessionID} onClose={onCloseFiles} />
+            : null}
+        </> : <PlaybackTab recordingId={tab.terminalId ?? tab.id} title={tab.title} active={active} />}
+      </TerminalErrorBoundary>
     </div>
   )
-}
-
-function requestedTerminalID(
-  activeSurface: AppState['activeSurface'],
-  focusRequest: AppState['focusRequest'],
-  tabs: Tab[],
-  activePaneID: string | null,
-): string | undefined {
-  if (focusRequest.sequence === 0 || activeSurface?.type !== 'terminal' || activeSurface.id !== focusRequest.id) return undefined
-  const tab = tabs.find((item) => item.id === activeSurface.id)
-  return activePaneID ?? tab?.terminalId ?? tab?.id
-}
-
-function useRequestedTerminalFocus() {
-  const activeSurface = useAppStore((state) => state.activeSurface)
-  const focusRequest = useAppStore((state) => state.focusRequest)
-  const tabs = useAppStore((state) => state.tabs)
-  const terminalPool = useAppStore((state) => state.terminalPool)
-  const activePaneID = useAppStore((state) => state.activePaneId)
-  const handledSequences = useRef(new Map<string, number>())
-
-  useEffect(() => {
-    const terminalID = requestedTerminalID(activeSurface, focusRequest, tabs, activePaneID)
-    const handledSequence = handledSequences.current.get(focusRequest.id) ?? 0
-    if (!terminalID || focusRequest.sequence <= handledSequence) return
-    const terminal = terminalPool.get(terminalID)?.terminal
-    if (!terminal) return
-    handledSequences.current.set(focusRequest.id, focusRequest.sequence)
-    terminal.focus()
-  }, [activePaneID, activeSurface, focusRequest, tabs, terminalPool])
 }
 
 export function TerminalLayers() {
   const tabs = useAppStore((state) => state.tabs)
   const activeSurface = useAppStore((state) => state.activeSurface)
+  const focusRequest = useAppStore((state) => state.focusRequest)
+  const closeTab = useAppStore((state) => state.closeTab)
   const [filePanelSessionID, setFilePanelSessionID] = useState<number | null>(null)
-  useRequestedTerminalFocus()
 
   const toggleFiles = useCallback((sessionID: number) => {
     if (sessionID === 0) return
@@ -121,5 +101,6 @@ export function TerminalLayers() {
   return <>{tabs.map((tab) => <DynamicLayer key={tab.id} tab={tab}
     active={activeSurface?.type === tab.type && activeSurface.id === tab.id}
     filePanelSessionID={filePanelSessionID} onToggleFiles={toggleFiles}
-    onCloseFiles={() => setFilePanelSessionID(null)} />)}</>
+    focusRequest={focusRequest} onCloseFiles={() => setFilePanelSessionID(null)}
+    onClose={() => closeTabsWithFeedback([tab.id], closeTab)} />)}</>
 }
