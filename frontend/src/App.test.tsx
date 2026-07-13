@@ -1,6 +1,5 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-
 const runtime = vi.hoisted(() => ({
   openFile: vi.fn(async () => '/tmp/upload.txt' as string | string[]),
   saveFile: vi.fn(async () => '/tmp/download.txt' as string | null),
@@ -12,7 +11,11 @@ const transfer = vi.hoisted(() => ({
   download: vi.fn(async () => {}), navigateTo: vi.fn(), navigateUp: vi.fn(), deleteFile: vi.fn(),
   renameFile: vi.fn(), makeDir: vi.fn(),
 }))
-
+const layerLifecycle = vi.hoisted(() => ({
+  nextInstance: 0,
+  terminalCleanup: vi.fn(),
+  playbackCleanup: vi.fn(),
+}))
 vi.mock('@wailsio/runtime', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@wailsio/runtime')>()
   return {
@@ -27,15 +30,28 @@ vi.mock('@/components/layout/StatusBar', () => ({ default: () => null }))
 vi.mock('@/components/layout/WindowTitleBar', () => ({ WindowTitleBar: () => null }))
 vi.mock('@/components/layout/ConnectDialog', () => ({ ConnectDialog: () => null }))
 vi.mock('@/hooks/SessionWorkspaceContext', () => ({ SessionWorkspaceProvider: ({ children }: { children: React.ReactNode }) => children }))
-vi.mock('@/components/terminal/TerminalTab', () => ({
-  TerminalTab: ({ terminalID, active, onOpenFiles }: { terminalID: string; active: boolean; onOpenFiles: () => void }) => (
-    <div data-testid={`terminal-${terminalID}`} data-active={String(active)}>
-      terminal
-      <button type="button" onClick={onOpenFiles}>files</button>
-    </div>
-  ),
-}))
-vi.mock('@/components/terminal/PlaybackTab', () => ({ PlaybackTab: ({ recordingId }: { recordingId: string }) => <div data-testid={`playback-${recordingId}`}>playback</div> }))
+vi.mock('@/components/terminal/TerminalTab', async () => {
+  const { useEffect, useState } = await import('react')
+  return {
+    TerminalTab: ({ terminalID, active, onOpenFiles }: { terminalID: string; active: boolean; onOpenFiles: () => void }) => {
+      const [instance] = useState(() => `terminal-instance-${++layerLifecycle.nextInstance}`)
+      useEffect(() => () => layerLifecycle.terminalCleanup(terminalID, instance), [instance, terminalID])
+      return <div data-testid={`terminal-${terminalID}`} data-active={String(active)} data-instance={instance}>
+        terminal<button type="button" onClick={onOpenFiles}>files</button>
+      </div>
+    },
+  }
+})
+vi.mock('@/components/terminal/PlaybackTab', async () => {
+  const { useEffect, useState } = await import('react')
+  return {
+    PlaybackTab: ({ recordingId }: { recordingId: string }) => {
+      const [instance] = useState(() => `playback-instance-${++layerLifecycle.nextInstance}`)
+      useEffect(() => () => layerLifecycle.playbackCleanup(recordingId, instance), [instance, recordingId])
+      return <div data-testid={`playback-${recordingId}`} data-instance={instance}>playback</div>
+    },
+  }
+})
 vi.mock('@/components/file/FilePanel', () => ({
   default: ({ onUpload, onDownload, onClose }: { onUpload: () => void; onDownload: (path: string) => void; onClose: () => void }) => (
     <div data-testid="file-panel">
@@ -56,7 +72,6 @@ import App from '@/App'
 import { logger } from '@/lib/logger'
 import { useAppStore } from '@/store/appStore'
 import { useToastStore } from '@/components/ui/toast'
-
 afterEach(() => {
   cleanup()
   useToastStore.setState({ toasts: [] })
@@ -66,6 +81,7 @@ afterEach(() => {
 describe('persistent content layers', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    layerLifecycle.nextInstance = 0
     runtime.dropped = undefined
     runtime.openFile.mockResolvedValue('/tmp/upload.txt')
     runtime.saveFile.mockResolvedValue('/tmp/download.txt')
@@ -88,14 +104,11 @@ describe('persistent content layers', () => {
   it('shows welcome only while activeSurface is null', () => {
     render(<App />)
     expect(screen.getByText('Secure Shell Client & Session Manager')).toBeInTheDocument()
-
+    expect(screen.getByText('快捷键').parentElement).toHaveClass('rounded-xl')
     act(() => useAppStore.getState().activateWorkspace('sessions'))
-
     expect(screen.queryByText('Secure Shell Client & Session Manager')).not.toBeInTheDocument()
     expect(screen.getByText('会话资产工作区')).toBeInTheDocument()
-
     act(() => useAppStore.getState().activateWorkspace('macros'))
-
     expect(screen.queryByText('Secure Shell Client & Session Manager')).not.toBeInTheDocument()
     expect(screen.getByLabelText('宏工作区')).toBeInTheDocument()
   })
@@ -110,15 +123,12 @@ describe('persistent content layers', () => {
     fireEvent.click(screen.getByRole('button', { name: 'files' }))
     expect(await screen.findByTestId('file-panel')).toBeInTheDocument()
     expect(transfer.listFiles).toHaveBeenCalledWith('/')
-
     act(() => runtime.dropped?.({ data: { files: ['/tmp/drop.txt'], details: { id: 'sftp-drop-zone-1' } } }))
     expect(transfer.uploadMany).toHaveBeenCalledWith(['/tmp/drop.txt'], '/')
-
     fireEvent.click(screen.getByRole('button', { name: 'upload file' }))
     await waitFor(() => expect(transfer.upload).toHaveBeenCalledWith('/tmp/upload.txt', '/'))
     fireEvent.click(screen.getByRole('button', { name: 'download file' }))
     await waitFor(() => expect(transfer.download).toHaveBeenCalledWith('/remote/file.txt', '/tmp/download.txt'))
-
     fireEvent.click(screen.getByRole('button', { name: 'close files' }))
     expect(screen.queryByTestId('file-panel')).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'files' }))
@@ -126,7 +136,6 @@ describe('persistent content layers', () => {
 
     act(() => useAppStore.getState().activateWorkspace('sessions'))
     view.rerender(<App />)
-
     expect(screen.getByText('会话资产工作区')).toBeInTheDocument()
     expect(screen.getByTestId('terminal-term-1')).toHaveAttribute('data-active', 'false')
     expect(screen.getByTestId('playback-recording-1')).toBeInTheDocument()
@@ -134,16 +143,56 @@ describe('persistent content layers', () => {
     expect(screen.queryByTestId('file-panel')).not.toBeInTheDocument()
   })
 
-  it('focuses the requested active terminal layer', async () => {
-    const focus = vi.fn()
-    useAppStore.getState().openTab({ id: 'terminal-1', title: 'Terminal', type: 'terminal', terminalId: 'term-1', sessionId: 1 })
-    useAppStore.setState({ terminalPool: new Map([['term-1', { terminal: { focus } as never, lastUsed: 0 }]]) })
+  it('preserves layer instances until their tabs are removed', async () => {
+    const store = useAppStore.getState()
+    store.openTab({ id: 'terminal-1', title: 'Terminal', type: 'terminal', terminalId: 'term-1', sessionId: 1 })
+    store.openTab({ id: 'playback-1', title: 'Playback', type: 'playback', terminalId: 'recording-1' })
     render(<App />)
+    const terminal = await screen.findByTestId('terminal-term-1')
+    const playback = await screen.findByTestId('playback-recording-1')
+    const terminalInstance = terminal.getAttribute('data-instance')
+    const playbackInstance = playback.getAttribute('data-instance')
 
+    act(() => store.activateWorkspace('sessions'))
+    act(() => store.activateWorkspace('macros'))
+    act(() => store.activateTab('playback-1'))
+    act(() => store.activateTab('terminal-1'))
+    expect(screen.getByTestId('terminal-term-1')).toHaveAttribute('data-instance', terminalInstance)
+    expect(screen.getByTestId('playback-recording-1')).toHaveAttribute('data-instance', playbackInstance)
+    expect(layerLifecycle.terminalCleanup).not.toHaveBeenCalled()
+    expect(layerLifecycle.playbackCleanup).not.toHaveBeenCalled()
+    act(() => store.removeTabLocal('terminal-1'))
+    expect(layerLifecycle.terminalCleanup).toHaveBeenCalledOnce()
+    expect(layerLifecycle.playbackCleanup).not.toHaveBeenCalled()
+    expect(screen.getByTestId('playback-recording-1')).toHaveAttribute('data-instance', playbackInstance)
+    act(() => store.removeTabLocal('playback-1'))
+    expect(layerLifecycle.playbackCleanup).toHaveBeenCalledOnce()
+  })
+
+  it('consumes each terminal focus request sequence once', async () => {
+    const primaryFocus = vi.fn()
+    const splitFocus = vi.fn()
+    useAppStore.getState().openTab({ id: 'terminal-1', title: 'Terminal', type: 'terminal', terminalId: 'term-1', sessionId: 1 })
+    useAppStore.setState({ terminalPool: new Map([['term-1', { terminal: { focus: primaryFocus } as never, lastUsed: 0 }]]) })
+    render(<App />)
     await screen.findByTestId('terminal-term-1')
     act(() => useAppStore.getState().activateTab('terminal-1', true))
+    expect(primaryFocus).toHaveBeenCalledOnce()
 
-    expect(focus).toHaveBeenCalledOnce()
+    act(() => useAppStore.setState((state) => ({ terminalPool: new Map(state.terminalPool) })))
+    act(() => useAppStore.setState((state) => ({ tabs: [...state.tabs] })))
+    act(() => useAppStore.setState({
+      activePaneId: 'split-1',
+      terminalPool: new Map([
+        ['term-1', { terminal: { focus: primaryFocus } as never, lastUsed: 0 }],
+        ['split-1', { terminal: { focus: splitFocus } as never, lastUsed: 0 }],
+      ]),
+    }))
+    expect(primaryFocus).toHaveBeenCalledOnce()
+    expect(splitFocus).not.toHaveBeenCalled()
+    act(() => useAppStore.getState().activateTab('terminal-1', true))
+    expect(primaryFocus).toHaveBeenCalledOnce()
+    expect(splitFocus).toHaveBeenCalledOnce()
   })
 
   it('routes terminal shortcuts through activeSurface', async () => {
@@ -165,12 +214,10 @@ describe('persistent content layers', () => {
     const newSession = vi.fn()
     window.addEventListener('mssh:new-session', newSession)
     render(<App />)
-
     fireEvent.keyDown(document.body, { key: 'c', ctrlKey: true, shiftKey: true })
     fireEvent.keyDown(document.body, { key: 'v', ctrlKey: true, shiftKey: true })
     fireEvent.keyDown(document.body, { key: 'l', ctrlKey: true, shiftKey: true })
     fireEvent.keyDown(document.body, { key: 'n', ctrlKey: true })
-
     await waitFor(() => expect(writeText).toHaveBeenCalledWith('selected text'))
     await waitFor(() => expect(terminal.paste).toHaveBeenCalledWith('clipboard text'))
     expect(terminal.clear).toHaveBeenCalledOnce()
@@ -187,9 +234,7 @@ describe('persistent content layers', () => {
       closeTab,
     })
     render(<App />)
-
     fireEvent.keyDown(document.body, { key: 'w', ctrlKey: true })
-
     expect(closeTab).not.toHaveBeenCalled()
     expect(await screen.findByRole('status')).toHaveTextContent('请使用标签关闭按钮确认终止活动连接')
   })
@@ -209,10 +254,8 @@ describe('persistent content layers', () => {
       terminalPool: new Map([['term-1', { terminal: terminal as never, lastUsed: 0 }]]),
     })
     render(<App />)
-
     fireEvent.keyDown(document.body, { key: 'c', ctrlKey: true, shiftKey: true })
     fireEvent.keyDown(document.body, { key: 'v', ctrlKey: true, shiftKey: true })
-
     expect(await screen.findByText('复制失败: write denied')).toBeInTheDocument()
     expect(await screen.findByText('粘贴失败: read denied')).toBeInTheDocument()
   })
@@ -229,10 +272,8 @@ describe('persistent content layers', () => {
       recordingState: {},
       closeTab,
     })
-
     render(<App />)
     fireEvent.keyDown(document.body, { key: 'w', ctrlKey: true })
-
     await waitFor(() => expect(closeTab).toHaveBeenCalledWith('playback-1'))
     expect(await screen.findByRole('alert')).toHaveTextContent('关闭标签失败: connection lost')
     expect(logError).toHaveBeenCalledWith(

@@ -64,6 +64,19 @@ describe('appStore', () => {
     expect(useAppStore.getState().activeSurface).toEqual({ type: 'workspace', id: 'sessions' })
   })
 
+  it('syncs workspaceTab when the last dynamic tab falls back from macros to sessions', async () => {
+    const store = useAppStore.getState()
+    store.activateWorkspace('macros')
+    store.openTab({ id: 'playback-1', title: 'Playback', type: 'playback' })
+
+    await store.closeTab('playback-1')
+
+    expect(useAppStore.getState()).toMatchObject({
+      activeSurface: { type: 'workspace', id: 'sessions' },
+      workspaceTab: 'sessions',
+    })
+  })
+
   it('tracks explicit terminal focus requests', () => {
     const store = useAppStore.getState()
     store.openTab({ id: 'terminal-1', title: 'one', type: 'terminal', terminalId: 'term-1' })

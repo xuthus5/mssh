@@ -128,6 +128,11 @@ export interface AppState {
 }
 const DEFAULT_MAX_POOL_SIZE = 32
 const initialNavigation = initialNavigationState()
+
+function workspaceTabForSurface(activeSurface: ActiveSurface | null, workspaceTab: WorkspaceID): WorkspaceID {
+  return activeSurface?.type === 'workspace' ? activeSurface.id : workspaceTab
+}
+
 export const useAppStore = create<AppState>((set, get) => ({
   tabs: [],
   activeSurface: null,
@@ -176,6 +181,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const tab = s.tabs.find((item) => item.id === id)
     const terminalId = tab?.terminalId
     const activeSurface = s.activeSurface?.id === id ? fallbackAfterClose(s.tabs, id) : s.activeSurface
+    const workspaceTab = workspaceTabForSurface(activeSurface, s.workspaceTab)
     if (terminalId) {
       const pool = new Map(s.terminalPool)
       pool.delete(terminalId)
@@ -191,10 +197,11 @@ export const useAppStore = create<AppState>((set, get) => ({
         recordingState,
         activePaneId: s.activePaneId === terminalId ? null : s.activePaneId,
         activeSurface,
+        workspaceTab,
       }
     }
     const tabs = s.tabs.filter((item) => item.id !== id)
-    return { tabs, activeSurface }
+    return { tabs, activeSurface, workspaceTab }
   }),
   activateWorkspace: (id) => set({
     activeSurface: { type: 'workspace', id },
