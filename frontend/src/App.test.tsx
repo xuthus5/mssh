@@ -31,11 +31,24 @@ vi.mock('@/components/layout/WindowTitleBar', () => ({ WindowTitleBar: () => nul
 vi.mock('@/components/layout/ConnectDialog', () => ({ ConnectDialog: () => null }))
 vi.mock('@/hooks/SessionWorkspaceContext', () => ({ SessionWorkspaceProvider: ({ children }: { children: React.ReactNode }) => children }))
 vi.mock('@/components/terminal/TerminalTab', async () => {
-  const { useEffect, useState } = await import('react')
+  const { useEffect, useRef, useState } = await import('react')
   return {
-    TerminalTab: ({ terminalID, active, onOpenFiles }: { terminalID: string; active: boolean; onOpenFiles: () => void }) => {
+    TerminalTab: ({ terminalID, active, focusRequest, onOpenFiles }: {
+      terminalID: string
+      active: boolean
+      focusRequest: { sequence: number }
+      onOpenFiles: () => void
+    }) => {
       const [instance] = useState(() => `terminal-instance-${++layerLifecycle.nextInstance}`)
+      const handledSequence = useRef(0)
       useEffect(() => () => layerLifecycle.terminalCleanup(terminalID, instance), [instance, terminalID])
+      useEffect(() => {
+        if (!active || focusRequest.sequence <= handledSequence.current) return
+        const state = useAppStore.getState()
+        const targetID = state.activePaneId ?? terminalID
+        state.terminalPool.get(targetID)?.terminal.focus()
+        handledSequence.current = focusRequest.sequence
+      }, [active, focusRequest.sequence, terminalID])
       return <div data-testid={`terminal-${terminalID}`} data-active={String(active)} data-instance={instance}>
         terminal<button type="button" onClick={onOpenFiles}>files</button>
       </div>

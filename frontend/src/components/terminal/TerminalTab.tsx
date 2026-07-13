@@ -6,17 +6,20 @@ import { useAppStore } from '@/store/appStore'
 import { LogService } from '@/lib/wails'
 import { logger } from '@/lib/logger'
 import { toast } from '@/components/ui/toast'
+import type { TerminalFocusRequest } from '@/hooks/useTerminal'
 
 export function TerminalTab({
   terminalID,
   sessionId,
   onOpenFiles,
   active,
+  focusRequest,
 }: {
   terminalID: string
   sessionId: number
   onOpenFiles: () => void
   active: boolean
+  focusRequest: TerminalFocusRequest
 }) {
   const [split, setSplit] = useState(false)
   const tabs = useAppStore((s) => s.tabs)
@@ -75,9 +78,9 @@ export function TerminalTab({
       />
       <div className="flex-1">
         {split && currentTab?.sessionId ? (
-          <TerminalSplit primaryID={terminalID} sessionId={currentTab.sessionId} active={active} />
+          <TerminalSplit primaryID={terminalID} sessionId={currentTab.sessionId} active={active} focusRequest={focusRequest} />
         ) : (
-          <TerminalEmulator terminalID={terminalID} active={active} />
+          <TerminalEmulator terminalID={terminalID} active={active} focusRequest={focusRequest} />
         )}
       </div>
     </div>

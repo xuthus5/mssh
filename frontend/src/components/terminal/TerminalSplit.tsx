@@ -4,14 +4,16 @@ import { TerminalEmulator } from '@/components/terminal/TerminalEmulator'
 import { TerminalService } from '@/lib/wails'
 import { logger } from '@/lib/logger'
 import { useAppStore } from '@/store/appStore'
+import type { TerminalFocusRequest } from '@/hooks/useTerminal'
 
 interface Props {
   primaryID: string
   sessionId: number
   active: boolean
+  focusRequest: TerminalFocusRequest
 }
 
-export function TerminalSplit({ primaryID, sessionId, active }: Props) {
+export function TerminalSplit({ primaryID, sessionId, active, focusRequest }: Props) {
   const [splitID, setSplitID] = useState<string | null>(null)
   const [direction, setDirection] = useState<'horizontal' | 'vertical'>('horizontal')
   const splitIDRef = useRef<string | null>(null)
@@ -93,11 +95,11 @@ export function TerminalSplit({ primaryID, sessionId, active }: Props) {
         style={{ flexDirection: direction === 'horizontal' ? 'row' : 'column' }}
       >
         <div className="flex-1 min-h-0 min-w-0 border-r border-border/50">
-          <TerminalEmulator terminalID={primaryID} active={active && activePaneID !== splitID} />
+          <TerminalEmulator terminalID={primaryID} active={active && activePaneID !== splitID} focusRequest={focusRequest} />
         </div>
         {splitID && (
           <div className="flex-1 min-h-0 min-w-0">
-            <TerminalEmulator terminalID={splitID} active={active && activePaneID === splitID} />
+            <TerminalEmulator terminalID={splitID} active={active && activePaneID === splitID} focusRequest={focusRequest} />
           </div>
         )}
       </div>
