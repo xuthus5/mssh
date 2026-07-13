@@ -48,4 +48,38 @@ describe('eventBridge', () => {
     __emitEvent('tunnel:state', { data: { terminal_id: 'tunnel-9', state: 'stopped' } })
     expect(useAppStore.getState().tunnelState['9']).toBe('running')
   })
+
+  it('maps connection states and ignores incomplete events', () => {
+    const stop = startEventBridge()
+    __emitEvent('session:state', { data: {} })
+    __emitEvent('session:state', { data: { terminal_id: 'term-1', state: 'connected' } })
+    __emitEvent('session:state', { data: { terminal_id: 'term-2', state: 'disconnected' } })
+    __emitEvent('terminal:closed', { data: {} })
+    __emitEvent('tunnel:state', { data: { terminal_id: 'tunnel-3', state: 'failed' } })
+
+    expect(useAppStore.getState().connectionStatus).toEqual({
+      'term-1': 'connected',
+      'term-2': 'disconnected',
+    })
+    expect(useAppStore.getState().tunnelState).toEqual({})
+    stop()
+  })
+
+  it('uses transfer defaults and ignores events without task identifiers', () => {
+    useAppStore.getState().addTransfer({ id: 'task-2', fileName: 'b', direction: 'download', sessionId: 2, sessionName: 'two', sourcePath: '/b', targetPath: '/c', totalBytes: 10, transferredBytes: 4, speed: 3, eta: 2, status: 'queued', startedAt: 0 })
+    const stop = startEventBridge()
+
+    __emitEvent('file:progress', { data: {} })
+    __emitEvent('file:complete', { data: {} })
+    __emitEvent('file:error', { data: {} })
+    expect(useAppStore.getState().transfers[0].status).toBe('queued')
+
+    __emitEvent('file:progress', { data: { task_id: 'task-2' } })
+    expect(useAppStore.getState().transfers[0]).toMatchObject({ transferredBytes: 0, totalBytes: 0, speed: 0, eta: 0, status: 'running' })
+    __emitEvent('file:complete', { data: { task_id: 'task-2' } })
+    expect(useAppStore.getState().transfers[0]).toMatchObject({ transferredBytes: 0, totalBytes: 0, status: 'completed' })
+    __emitEvent('file:error', { data: { task_id: 'task-2' } })
+    expect(useAppStore.getState().transfers[0]).toMatchObject({ status: 'failed', error: '文件传输失败' })
+    stop()
+  })
 })
