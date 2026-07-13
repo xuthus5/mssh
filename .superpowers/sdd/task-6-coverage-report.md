@@ -2,7 +2,7 @@
 
 ## Status
 
-PASS — 手写前端生产代码全局覆盖达到 lines 92.98%、functions 92.48%，`npm run test:coverage` 退出 0。
+PASS — 仓库 `frontend/vite.config.ts` 配置的 coverage scope 达到 lines 92.98%、functions 92.48%，`npm run test:coverage` 退出 0。
 
 ## Coverage Rounds
 
@@ -25,9 +25,9 @@ PASS — 手写前端生产代码全局覆盖达到 lines 92.98%、functions 92.
 
 ## Configuration
 
-- `frontend/vite.config.ts` 的 coverage include 移除明确生成的 `bindings/**`。
-- 全局 coverage thresholds 设置为 lines 90、functions 90。
-- 未使用 v8 ignore，未排除任何手写前端模块，未降低阈值。
+- Base 已有 configured coverage scope 包含 `src/hooks/**`、`src/components/session/**`、`src/components/layout/Sidebar.tsx`、`src/store/**` 与自动生成的 `bindings/**`。
+- 本提交只从 include 中移除自动生成的 `bindings/**`，没有缩窄任何 Base 已包含的手写前端范围。
+- lines/functions thresholds 从 80 提升到 90；未使用 v8 ignore，也未降低阈值。
 
 ## Verification
 
@@ -44,3 +44,12 @@ PASS — 手写前端生产代码全局覆盖达到 lines 92.98%、functions 92.
 ## Cleanup
 
 - coverage HTML/JSON、frontend dist 与 `build/bin/mssh` 临时构建产物在提交前清理。
+
+## Review Follow-up
+
+- `Sidebar.behavior.test.tsx` 使用真实 `QuickCommands`，直接断言 `MacroService.Create` reject 后记录 `Sidebar: create macro error`，已有宏列表保持不变、添加表单按现有交互关闭并重置，且未触发 `unhandledrejection`。
+- 报告将覆盖范围明确为 Base 已存在的 `frontend/vite.config.ts` configured coverage scope；本提交仅移除自动生成的 `bindings/**`，未缩窄任何手写 include。
+- coverage 配置旁增加 generated bindings 排除说明，include 范围保持不变。
+- 定向复验：`Sidebar.behavior.test.tsx`，1 file / 4 tests passed。
+- 全量复验：`npm run test:coverage`，47 files / 216 tests passed；lines 92.98%、functions 92.48%；exit 0。
+- 提交前门禁：`golangci-lint run ./...` 0 issues；无变更 Go 文件；`wails3 build` passed。

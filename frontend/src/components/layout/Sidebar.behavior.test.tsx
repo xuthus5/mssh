@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -34,14 +34,6 @@ vi.mock('@/components/session/SessionTree', () => ({
     <span data-testid="tree-state">folders:{props.folders.map((item: any) => item.name).join(',')}|sessions:{props.sessions.map((item: any) => item.name).join(',')}|reveal:{String(props.revealAll)}</span>
     <button type="button" onClick={() => props.onEditSession?.(props.sessions[0])}>tree-edit</button>
     <button type="button" onClick={() => props.onSelectFolder?.('child')}>tree-select</button>
-  </div>,
-}))
-vi.mock('@/components/session/QuickCommands', () => ({
-  default: (props: any) => <div>
-    {props.commands.map((item: any) => <span key={item.id}>{item.name}</span>)}
-    <button type="button" onClick={() => props.onExecute('echo ok')}>macro-execute</button>
-    <button type="button" onClick={() => props.onAdd({ name: 'Deploy', shortcut: 'Ctrl+D', command: 'deploy' })}>macro-add</button>
-    <button type="button" onClick={() => props.onDelete(props.commands[0]?.id ?? '1')}>macro-delete</button>
   </div>,
 }))
 vi.mock('@/components/layout/SidebarDialogs', () => ({
@@ -157,28 +149,52 @@ describe('Sidebar behavior', () => {
     })
     render(<Sidebar />)
     expect(await screen.findByText('Initial')).toBeInTheDocument()
+    const quickCommands = screen.getByText('快捷命令').parentElement?.parentElement
+    if (!quickCommands) throw new Error('quick commands were not rendered')
 
-    await user.click(screen.getByRole('button', { name: 'macro-execute' }))
-    expect(macroService.Execute).toHaveBeenCalledWith('pane-1', 'echo ok')
+    await user.click(screen.getByText('Initial'))
+    expect(macroService.Execute).toHaveBeenCalledWith('pane-1', 'initial')
     useAppStore.setState({ activeSurface: { type: 'workspace', id: 'macros' } })
-    await user.click(screen.getByRole('button', { name: 'macro-execute' }))
+    await user.click(screen.getByText('Initial'))
     expect(macroService.Execute).toHaveBeenCalledTimes(1)
 
     macroService.Create.mockResolvedValueOnce({ id: 2, name: 'Created', shortcut: '', command: 'created' })
-    await user.click(screen.getByRole('button', { name: 'macro-add' }))
+    await user.click(within(quickCommands).getAllByRole('button')[0])
+    await user.type(screen.getByPlaceholderText('名称'), 'Created')
+    await user.type(screen.getByPlaceholderText('命令'), 'created')
+    await user.click(screen.getByRole('button', { name: '添加' }))
     expect(await screen.findByText('Created')).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'macro-delete' }))
+    const initialRow = screen.getByText('Initial').closest<HTMLElement>('[draggable="true"]')
+    if (!initialRow) throw new Error('initial macro row was not rendered')
+    await user.click(within(initialRow).getByRole('button'))
     await waitFor(() => expect(screen.queryByText('Initial')).not.toBeInTheDocument())
 
+    const unhandledRejection = vi.fn()
+    window.addEventListener('unhandledrejection', unhandledRejection)
     macroService.Create.mockRejectedValueOnce(new Error('create failed'))
-    await user.click(screen.getByRole('button', { name: 'macro-add' }))
+    await user.click(within(quickCommands).getAllByRole('button')[0])
+    await user.type(screen.getByPlaceholderText('名称'), 'Deploy')
+    await user.type(screen.getByPlaceholderText('命令'), 'deploy')
+    await user.click(screen.getByRole('button', { name: '添加' }))
+    await waitFor(() => expect(logger.error).toHaveBeenCalledWith('Sidebar: create macro error', expect.objectContaining({ message: 'create failed' })))
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(screen.getByText('Created')).toBeInTheDocument()
+    expect(screen.queryByText('Deploy')).not.toBeInTheDocument()
+    expect(screen.queryByPlaceholderText('名称')).not.toBeInTheDocument()
+    expect(within(quickCommands).getAllByRole('button')[0]).toBeEnabled()
+    expect(unhandledRejection).not.toHaveBeenCalled()
+    window.removeEventListener('unhandledrejection', unhandledRejection)
+
     macroService.Delete.mockRejectedValueOnce(new Error('delete failed'))
-    await user.click(screen.getByRole('button', { name: 'macro-delete' }))
+    const createdRow = screen.getByText('Created').closest<HTMLElement>('[draggable="true"]')
+    if (!createdRow) throw new Error('created macro row was not rendered')
+    await user.click(within(createdRow).getByRole('button'))
     await waitFor(() => expect(logger.error).toHaveBeenCalledWith('Sidebar: delete macro error', expect.any(Error)))
+    expect(screen.getByText('Created')).toBeInTheDocument()
 
     useAppStore.setState({ activeSurface: { type: 'terminal', id: 'tab-1' }, activePaneId: null })
     macroService.Execute.mockRejectedValueOnce(new Error('execute failed'))
-    await user.click(screen.getByRole('button', { name: 'macro-execute' }))
+    await user.click(screen.getByText('Created'))
     await waitFor(() => expect(logger.error).toHaveBeenCalledWith('Sidebar: execute macro error', expect.any(Error)))
   })
 
