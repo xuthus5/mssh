@@ -19,7 +19,7 @@ function closeSplitTerminal(terminalID: string, context: string) {
   void TerminalService.Close(terminalID).catch((error: unknown) => logger.error(context, error))
 }
 
-function useSplitTerminal(sessionId: number) {
+function useSplitTerminal(sessionId: number, primaryID: string) {
   const [splitID, setSplitID] = useState<string | null>(null)
   const splitIDRef = useRef<string | null>(null)
   useEffect(() => {
@@ -46,6 +46,8 @@ function useSplitTerminal(sessionId: number) {
   const close = () => {
     const terminalID = splitIDRef.current
     if (!terminalID) return
+    const state = useAppStore.getState()
+    if (state.activePaneId === terminalID) state.setActivePane(primaryID)
     splitIDRef.current = null
     setSplitID(null)
     closeSplitTerminal(terminalID, 'TerminalSplit: failed to close split')
@@ -94,7 +96,7 @@ function SplitPanes({ primaryID, splitID, active, activePaneID, direction, focus
 export function TerminalSplit({ primaryID, sessionId, active, focusRequest }: Props) {
   const [direction, setDirection] = useState<'horizontal' | 'vertical'>('horizontal')
   const activePaneID = useAppStore((state) => state.activePaneId)
-  const split = useSplitTerminal(sessionId)
+  const split = useSplitTerminal(sessionId, primaryID)
 
   return (
     <div className="flex flex-col h-full">

@@ -66,12 +66,32 @@ describe('TerminalSplit focus requests', () => {
     const request = { sequence: 0, targetTerminalID: null } as TerminalFocusRequest
     render(<TerminalSplit primaryID="primary-1" sessionId={1} active focusRequest={request} />)
     await waitFor(() => expect(terminalInstances).toHaveLength(2))
+    act(() => useAppStore.setState({ activePaneId: 'primary-1' }))
 
     fireEvent.click(screen.getByTitle('垂直分屏'))
     fireEvent.click(screen.getByTitle('关闭分屏'))
 
     await waitFor(() => expect(TerminalService.Close).toHaveBeenCalledWith('split-1'))
+    expect(useAppStore.getState().activePaneId).toBe('primary-1')
     expect(screen.queryByTitle('关闭分屏')).not.toBeInTheDocument()
+  })
+
+  it('restores primary focus after closing the active split', async () => {
+    const noRequest = { sequence: 0, targetTerminalID: null } as TerminalFocusRequest
+    const view = render(<TerminalSplit primaryID="primary-1" sessionId={1} active focusRequest={noRequest} />)
+    await waitFor(() => expect(terminalInstances).toHaveLength(2))
+    terminalInstances.forEach((terminal) => terminal.focus.mockClear())
+
+    const splitRequest = { sequence: 1, targetTerminalID: 'split-1' } as TerminalFocusRequest
+    view.rerender(<TerminalSplit primaryID="primary-1" sessionId={1} active focusRequest={splitRequest} />)
+    expect(terminalInstances[1].focus).toHaveBeenCalledOnce()
+    fireEvent.click(screen.getByTitle('关闭分屏'))
+
+    expect(useAppStore.getState().activePaneId).toBe('primary-1')
+    const primaryRequest = { sequence: 2, targetTerminalID: 'primary-1' } as TerminalFocusRequest
+    view.rerender(<TerminalSplit primaryID="primary-1" sessionId={1} active focusRequest={primaryRequest} />)
+    expect(terminalInstances[0].focus).toHaveBeenCalledOnce()
+    expect(terminalInstances[1].focus).toHaveBeenCalledOnce()
   })
 
   it('logs split open failures', async () => {
