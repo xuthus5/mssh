@@ -19,7 +19,7 @@ function formatTime(date: Date): string {
 
 export default function StatusBar() {
   const tabs = useAppStore((s) => s.tabs)
-  const activeTabId = useAppStore((s) => s.activeTabId)
+  const activeSurface = useAppStore((s) => s.activeSurface)
   const connectionStatus = useAppStore((s) => s.connectionStatus)
   const appStatus = useAppStore((s) => s.appStatus)
   const tunnelState = useAppStore((s) => s.tunnelState)
@@ -32,7 +32,9 @@ export default function StatusBar() {
     return () => clearInterval(timer)
   }, [])
 
-  const activeTab = tabs.find((t) => t.id === activeTabId)
+  const activeTab = activeSurface && activeSurface.type !== 'workspace'
+    ? tabs.find((tab) => tab.id === activeSurface.id)
+    : undefined
   const status = activeTab
     ? connectionStatus[activeTab.terminalId ?? activeTab.id]
     : undefined
@@ -94,7 +96,7 @@ export default function StatusBar() {
 
   logger.debug('[StatusBar]', {
     tabs: tabs.length,
-    activeTabId,
+    activeSurface,
     status: displayStatus,
   })
 

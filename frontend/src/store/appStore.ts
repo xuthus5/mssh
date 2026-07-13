@@ -58,7 +58,6 @@ export interface TerminalTheme {
   ansiBrightWhite: string
 }
 export type ConnectionStatus = 'connecting' | 'connected' | 'disconnected'
-export type SidebarTab = WorkspaceID
 
 const DEFAULT_THEME: TerminalTheme = {
   background: '#0d1117',
@@ -88,7 +87,6 @@ const DEFAULT_THEME: TerminalTheme = {
 }
 export interface AppState {
   tabs: Tab[]
-  activeTabId: string | null
   activeSurface: ActiveSurface | null
   workspaceTab: WorkspaceID
   navigationCollapsed: boolean
@@ -104,8 +102,6 @@ export interface AppState {
   activePaneId: string | null
   recordingState: Record<string, 'idle' | 'starting' | 'recording' | 'stopping' | 'error'>
   tunnelState: Record<string, 'running' | 'stopped'>
-  sidebarTab: SidebarTab
-  hasEnteredWorkspace: boolean
   addTransfer: (job: TransferJob) => void
   removeTransfer: (id: string) => void
   updateTransfer: (id: string, updates: Partial<Pick<TransferJob, 'transferredBytes' | 'speed' | 'totalBytes' | 'eta' | 'status' | 'error' | 'completedAt'>>) => void
@@ -114,7 +110,6 @@ export interface AppState {
   openTab: (tab: Tab) => void
   closeTab: (id: string) => Promise<void>
   removeTabLocal: (id: string) => void
-  setActiveTab: (id: string) => void
   activateWorkspace: (id: WorkspaceID) => void
   activateTab: (id: string, focus?: boolean) => void
   toggleNavigation: () => void
@@ -130,14 +125,11 @@ export interface AppState {
   setAppStatus: (status: string) => void
   setTerminalTheme: (theme: TerminalTheme) => void
   setMaxPoolSize: (size: number) => void
-  setSidebarTab: (tab: SidebarTab) => void
-  enterWorkspace: () => void
 }
 const DEFAULT_MAX_POOL_SIZE = 32
 const initialNavigation = initialNavigationState()
 export const useAppStore = create<AppState>((set, get) => ({
   tabs: [],
-  activeTabId: null,
   activeSurface: null,
   workspaceTab: 'sessions',
   ...initialNavigation,
@@ -152,8 +144,6 @@ export const useAppStore = create<AppState>((set, get) => ({
   activePaneId: null,
   recordingState: {},
   tunnelState: {},
-  sidebarTab: 'sessions',
-  hasEnteredWorkspace: false,
 
   addTransfer: (job) => set((s) => ({ transfers: [...s.transfers, job], transferCenterOpen: true })),
   removeTransfer: (id) => set((s) => ({ transfers: s.transfers.filter((t) => t.id !== id) })),
@@ -163,9 +153,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   openTab: (tab) => set((s) => {
     const existing = s.tabs.find((t) => t.id === tab.id)
     if (existing) {
-      return { activeTabId: tab.id, activeSurface: surfaceForTab(existing) }
+      return { activeSurface: surfaceForTab(existing) }
     }
-    return { tabs: [...s.tabs, tab], activeTabId: tab.id, activeSurface: surfaceForTab(tab) }
+    return { tabs: [...s.tabs, tab], activeSurface: surfaceForTab(tab) }
   }),
   closeTab: async (id) => {
     const state = get()
@@ -186,7 +176,6 @@ export const useAppStore = create<AppState>((set, get) => ({
     const tab = s.tabs.find((item) => item.id === id)
     const terminalId = tab?.terminalId
     const activeSurface = s.activeSurface?.id === id ? fallbackAfterClose(s.tabs, id) : s.activeSurface
-    const activeTabId = s.activeTabId === id ? (activeSurface?.type === 'workspace' ? null : activeSurface?.id ?? null) : s.activeTabId
     if (terminalId) {
       const pool = new Map(s.terminalPool)
       pool.delete(terminalId)
@@ -202,24 +191,19 @@ export const useAppStore = create<AppState>((set, get) => ({
         recordingState,
         activePaneId: s.activePaneId === terminalId ? null : s.activePaneId,
         activeSurface,
-        activeTabId,
       }
     }
     const tabs = s.tabs.filter((item) => item.id !== id)
-    return { tabs, activeSurface, activeTabId }
+    return { tabs, activeSurface }
   }),
-  setActiveTab: (id) => get().activateTab(id),
   activateWorkspace: (id) => set({
-    activeTabId: null,
     activeSurface: { type: 'workspace', id },
-    sidebarTab: id,
     workspaceTab: id,
   }),
   activateTab: (id, focus = false) => set((s) => {
     const tab = s.tabs.find((item) => item.id === id)
     if (!tab) return {}
     return {
-      activeTabId: id,
       activeSurface: surfaceForTab(tab),
       focusRequest: focus ? { id, sequence: s.focusRequest.sequence + 1 } : s.focusRequest,
     }
@@ -286,6 +270,4 @@ export const useAppStore = create<AppState>((set, get) => ({
   setAppStatus: (status) => set({ appStatus: status }),
   setTerminalTheme: (theme) => set({ terminalTheme: theme }),
   setMaxPoolSize: (maxPoolSize) => set({ maxPoolSize }),
-  setSidebarTab: (sidebarTab) => get().activateWorkspace(sidebarTab),
-  enterWorkspace: () => set({ hasEnteredWorkspace: true }),
 }))

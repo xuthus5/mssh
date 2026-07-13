@@ -8,7 +8,6 @@ describe('appStore', () => {
     localStorage.clear()
     useAppStore.setState({
       tabs: [],
-      activeTabId: null,
       activeSurface: null,
       workspaceTab: 'sessions',
       navigationCollapsed: false,
@@ -18,27 +17,24 @@ describe('appStore', () => {
       connectionStatus: {},
       transfers: [],
       transferCenterOpen: false,
-      hasEnteredWorkspace: false,
     })
   })
 
-  it('enters the workspace for the rest of the process lifetime', () => {
-    expect(useAppStore.getState().hasEnteredWorkspace).toBe(false)
-    useAppStore.getState().enterWorkspace()
-    expect(useAppStore.getState().hasEnteredWorkspace).toBe(true)
-    useAppStore.getState().setSidebarTab('macros')
-    expect(useAppStore.getState().hasEnteredWorkspace).toBe(true)
+  it('uses activeSurface as the only activation state', () => {
+    expect(useAppStore.getState()).not.toHaveProperty('activeTabId')
+    expect(useAppStore.getState()).not.toHaveProperty('sidebarTab')
+    expect(useAppStore.getState()).not.toHaveProperty('hasEnteredWorkspace')
   })
 
   it('opens and closes tabs', () => {
     const { openTab, closeTab } = useAppStore.getState()
     openTab({ id: 'tab-1', title: 'Test', type: 'terminal' })
     expect(useAppStore.getState().tabs).toHaveLength(1)
-    expect(useAppStore.getState().activeTabId).toBe('tab-1')
+    expect(useAppStore.getState().activeSurface).toEqual({ type: 'terminal', id: 'tab-1' })
 
     closeTab('tab-1')
     expect(useAppStore.getState().tabs).toHaveLength(0)
-    expect(useAppStore.getState().activeTabId).toBeNull()
+    expect(useAppStore.getState().activeSurface).toEqual({ type: 'workspace', id: 'sessions' })
   })
 
   it('uses one active surface for workspaces and dynamic tabs', () => {
@@ -156,11 +152,11 @@ describe('appStore', () => {
   })
 
   it('sets active tab', () => {
-    const { openTab, setActiveTab } = useAppStore.getState()
+    const { openTab, activateTab } = useAppStore.getState()
     openTab({ id: 'tab-1', title: 'A', type: 'terminal' })
     openTab({ id: 'tab-2', title: 'B', type: 'terminal' })
-    setActiveTab('tab-1')
-    expect(useAppStore.getState().activeTabId).toBe('tab-1')
+    activateTab('tab-1')
+    expect(useAppStore.getState().activeSurface).toEqual({ type: 'terminal', id: 'tab-1' })
   })
 
   it('registers and unregisters terminals', () => {

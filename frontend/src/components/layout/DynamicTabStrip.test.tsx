@@ -27,7 +27,6 @@ function seedTabs() {
       { id: 'terminal-1', title: '生产服务器', type: 'terminal', terminalId: 'term-1' },
       { id: 'playback-1', title: '回放 #1', type: 'playback' },
     ],
-    activeTabId: 'playback-1',
     activeSurface: { type: 'playback', id: 'playback-1' },
     connectionStatus: { 'term-1': 'connected' },
     recordingState: {},
@@ -41,7 +40,6 @@ describe('DynamicTabStrip', () => {
     useToastStore.setState({ toasts: [] })
     useAppStore.setState({
       tabs: [],
-      activeTabId: null,
       activeSurface: null,
       connectionStatus: {},
       recordingState: {},

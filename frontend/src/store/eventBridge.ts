@@ -36,8 +36,9 @@ export function startEventBridge(): () => void {
     Events.On('terminal:closed', (event: EventEnvelope<ConnectionPayload>) => {
       const terminalId = event.data?.terminal_id
       if (!terminalId) return
-      const tab = useAppStore.getState().tabs.find((item) => item.terminalId === terminalId)
-      if (tab) useAppStore.getState().removeTabLocal(tab.id)
+      const state = useAppStore.getState()
+      const tab = state.tabs.find((item) => item.terminalId === terminalId)
+      if (tab) state.removeTabLocal(tab.id)
     }),
     Events.On('tunnel:state', (event: EventEnvelope<ConnectionPayload>) => {
       const payload = event.data

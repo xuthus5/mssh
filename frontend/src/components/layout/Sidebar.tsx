@@ -19,7 +19,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { useResizablePanel } from '@/hooks/useResizablePanel'
 
 export default function Sidebar() {
-  const activeTab = useAppStore((state) => state.sidebarTab)
+  const activeTab = useAppStore((state) => state.workspaceTab)
   const [sessionDialogOpen, setSessionDialogOpen] = useState(false)
   const [folderDialogOpen, setFolderDialogOpen] = useState(false)
   const [folderName, setFolderName] = useState('')
@@ -151,10 +151,10 @@ export default function Sidebar() {
   }
 
   const handleMacroExecute = useCallback((cmd: string) => {
-    const activeTabId = useAppStore.getState().activeTabId
-    if (!activeTabId) return
-    const activeTab = useAppStore.getState().tabs.find((t) => t.id === activeTabId)
-    const terminalId = useAppStore.getState().activePaneId ?? activeTab?.terminalId ?? activeTabId
+    const state = useAppStore.getState()
+    if (state.activeSurface?.type !== 'terminal') return
+    const activeTab = state.tabs.find((tab) => tab.id === state.activeSurface?.id)
+    const terminalId = state.activePaneId ?? activeTab?.terminalId ?? state.activeSurface.id
     logger.debug('Sidebar: MacroService.Execute', terminalId, cmd)
     MacroService.Execute(terminalId, cmd).catch((err: unknown) => {
       logger.error('Sidebar: execute macro error', err)
