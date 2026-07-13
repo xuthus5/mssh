@@ -1,8 +1,8 @@
-import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { Dialogs, Events } from '@wailsio/runtime'
 import { Spinner } from '@/components/ui/spinner'
 import { useFileTransfer } from '@/hooks/useFileTransfer'
-import { useAppStore, type Tab } from '@/store/appStore'
+import { useAppStore, type AppState, type Tab } from '@/store/appStore'
 
 const TerminalTab = lazy(() => import('@/components/terminal/TerminalTab').then((module) => ({ default: module.TerminalTab })))
 const PlaybackTab = lazy(() => import('@/components/terminal/PlaybackTab').then((module) => ({ default: module.PlaybackTab })))
@@ -77,18 +77,33 @@ function DynamicLayer({ tab, active, filePanelSessionID, onToggleFiles, onCloseF
   )
 }
 
+function requestedTerminalID(
+  activeSurface: AppState['activeSurface'],
+  focusRequest: AppState['focusRequest'],
+  tabs: Tab[],
+  activePaneID: string | null,
+): string | undefined {
+  if (focusRequest.sequence === 0 || activeSurface?.type !== 'terminal' || activeSurface.id !== focusRequest.id) return undefined
+  const tab = tabs.find((item) => item.id === activeSurface.id)
+  return activePaneID ?? tab?.terminalId ?? tab?.id
+}
+
 function useRequestedTerminalFocus() {
   const activeSurface = useAppStore((state) => state.activeSurface)
   const focusRequest = useAppStore((state) => state.focusRequest)
   const tabs = useAppStore((state) => state.tabs)
   const terminalPool = useAppStore((state) => state.terminalPool)
   const activePaneID = useAppStore((state) => state.activePaneId)
+  const handledSequences = useRef(new Map<string, number>())
 
   useEffect(() => {
-    if (focusRequest.sequence === 0 || activeSurface?.type !== 'terminal' || activeSurface.id !== focusRequest.id) return
-    const tab = tabs.find((item) => item.id === activeSurface.id)
-    const terminalID = activePaneID ?? tab?.terminalId ?? tab?.id
-    if (terminalID) terminalPool.get(terminalID)?.terminal.focus()
+    const terminalID = requestedTerminalID(activeSurface, focusRequest, tabs, activePaneID)
+    const handledSequence = handledSequences.current.get(focusRequest.id) ?? 0
+    if (!terminalID || focusRequest.sequence <= handledSequence) return
+    const terminal = terminalPool.get(terminalID)?.terminal
+    if (!terminal) return
+    handledSequences.current.set(focusRequest.id, focusRequest.sequence)
+    terminal.focus()
   }, [activePaneID, activeSurface, focusRequest, tabs, terminalPool])
 }
 

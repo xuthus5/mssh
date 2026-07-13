@@ -20,6 +20,7 @@ vi.mock('@/hooks/useSettings', () => ({ useSettings: () => ({}) }))
 vi.mock('@/hooks/useThemeCatalog', () => ({ useThemeCatalog: () => ({}) }))
 vi.mock('@/components/session/SessionTree', () => ({ default: () => null }))
 vi.mock('@/components/session/QuickCommands', () => ({ default: () => null }))
+vi.mock('@/components/session/SessionAssetCenter', () => ({ SessionAssetCenter: () => <div>会话资产工作区</div> }))
 vi.mock('@/components/layout/SidebarDialogs', () => ({ SidebarDialogs: () => null }))
 vi.mock('@/lib/wails', () => ({
   MacroService: {
@@ -31,12 +32,14 @@ vi.mock('@/lib/wails', () => ({
 }))
 
 import Sidebar from '@/components/layout/Sidebar'
+import { WindowTitleBar } from '@/components/layout/WindowTitleBar'
+import { WorkspaceContent } from '@/components/layout/WorkspaceContent'
 import { useAppStore } from '@/store/appStore'
 
 describe('Sidebar navigation collapse', () => {
   beforeEach(() => {
     localStorage.clear()
-    useAppStore.setState({ navigationCollapsed: false, workspaceTab: 'sessions', sidebarWidth: 280 })
+    useAppStore.setState({ tabs: [], activeSurface: null, navigationCollapsed: false, workspaceTab: 'sessions', sidebarWidth: 280 })
   })
 
   it('collapses and restores the persistent sidebar width through shared navigation state', () => {
@@ -66,5 +69,19 @@ describe('Sidebar navigation collapse', () => {
     expect(sidebar).toHaveAttribute('aria-hidden', 'false')
     expect(sidebar).not.toHaveAttribute('inert')
     expect(screen.getByRole('separator', { name: '调整侧边栏宽度' })).toHaveAttribute('tabindex', '0')
+  })
+
+  it('shows sessions across title, workspace, and sidebar after closing the last tab from macros', async () => {
+    const store = useAppStore.getState()
+    store.activateWorkspace('macros')
+    store.openTab({ id: 'playback-1', title: 'Playback', type: 'playback' })
+    render(<><WindowTitleBar /><WorkspaceContent /><Sidebar /></>)
+
+    await act(async () => { await store.closeTab('playback-1') })
+
+    expect(useAppStore.getState()).toMatchObject({ activeSurface: { type: 'workspace', id: 'sessions' }, workspaceTab: 'sessions' })
+    expect(screen.getByRole('tab', { name: '会话' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByText('会话资产工作区')).toBeInTheDocument()
+    expect(screen.getByPlaceholderText('搜索会话...')).toBeInTheDocument()
   })
 })
