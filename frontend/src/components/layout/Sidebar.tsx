@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo, useEffect } from 'react'
-import { ChevronLeft, ChevronRight, Search } from 'lucide-react'
+import { Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import SessionTree from '@/components/session/SessionTree'
@@ -28,7 +28,7 @@ export default function Sidebar() {
   const [searchQuery, setSearchQuery] = useState('')
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [macros, setMacros] = useState<CommandItem[]>([])
-  const { width, collapsed, displayedWidth, toggleCollapsed, resizeHandleProps } = useResizablePanel()
+  const { width, collapsed, displayedWidth, resizeHandleProps } = useResizablePanel()
 
   const {
     folders,
@@ -190,8 +190,8 @@ export default function Sidebar() {
 
   return (
     <div style={{ width: displayedWidth }} className="relative shrink-0 transition-[width] duration-200 ease-out">
-      <aside style={{ width }} aria-hidden={collapsed} inert={collapsed ? true : undefined} className={`relative flex h-full flex-col border-r border-border bg-card transition-transform duration-200 ease-out ${collapsed ? '-translate-x-full pointer-events-none' : 'translate-x-0'}`}>
-      <div {...resizeHandleProps} className="absolute inset-y-0 -right-1 z-20 w-2 cursor-col-resize touch-none outline-none after:absolute after:inset-y-0 after:left-1/2 after:w-px after:-translate-x-1/2 after:bg-transparent hover:after:bg-primary/60 focus-visible:after:bg-primary active:after:bg-primary" />
+      <aside id="sidebar-navigation" style={{ width }} aria-hidden={collapsed} inert={collapsed ? true : undefined} className={`relative flex h-full flex-col border-r border-border bg-card transition-transform duration-200 ease-out ${collapsed ? '-translate-x-full pointer-events-none' : 'translate-x-0'}`}>
+      {!collapsed && <div {...resizeHandleProps} className="absolute inset-y-0 -right-1 z-20 w-2 cursor-col-resize touch-none outline-none after:absolute after:inset-y-0 after:left-1/2 after:w-px after:-translate-x-1/2 after:bg-transparent hover:after:bg-primary/60 focus-visible:after:bg-primary active:after:bg-primary" />}
       {activeTab === 'sessions' && (
         <>
           <div className="px-2 py-2 flex flex-col gap-1.5 border-b border-border/50">
@@ -258,9 +258,6 @@ export default function Sidebar() {
         settingsProps={{ open: settingsOpen, onOpenChange: setSettingsOpen, general: settings.general, systemFonts: settings.systemFonts, themeProfiles: themeCatalog.profiles, themeAssignments: themeCatalog.assignments, keys: settings.keys, sync: settings.sync, onSaveGeneral: settings.saveGeneral, onPreviewUIFont: settings.previewUIFont, onRestoreUIFont: settings.restoreUIFont, onPreviewWindowOpacity: settings.previewWindowOpacity, onRestoreWindowOpacity: settings.restoreWindowOpacity, onSaveThemeConfiguration: themeCatalog.saveConfiguration, onImportThemes: themeCatalog.importThemes, onCreateThemeProfile: themeCatalog.createProfile, onUpdateThemeProfile: themeCatalog.saveProfile, onDeleteThemeProfile: themeCatalog.deleteProfile, onDeleteThemeDefinition: themeCatalog.deleteDefinition, onGenerateKey: settings.generateKey, onImportKey: settings.importKey, onDeleteKey: settings.deleteKey, onExportKey: settings.exportKey, onSaveSync: settings.saveSync, onExportConfig: settings.exportConfig, onImportConfig: settings.importConfig }}
       />
       </aside>
-      <button type="button" aria-label={collapsed ? '展开侧边栏' : '收起侧边栏'} aria-expanded={!collapsed} onClick={toggleCollapsed} className="absolute left-full top-1/2 z-30 grid size-6 -translate-y-1/2 place-items-center rounded-r-lg border border-l-0 border-border bg-card text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-        {collapsed ? <ChevronRight className="size-3.5" /> : <ChevronLeft className="size-3.5" />}
-      </button>
     </div>
   )
 }
