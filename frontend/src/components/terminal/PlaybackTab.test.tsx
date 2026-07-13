@@ -54,6 +54,26 @@ describe('PlaybackTab terminal theme', () => {
     vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(500)
   })
 
+  it('stretches the playback terminal across the available layer', async () => {
+    render(<PlaybackTab recordingId="1" title="demo" active />)
+    await act(async () => { await Promise.resolve(); await Promise.resolve() })
+
+    expect(screen.getByRole('region', { name: '回放: demo' })).toHaveClass(
+      'flex-1',
+      'min-h-0',
+      'min-w-0',
+      'w-full',
+      'overflow-hidden',
+    )
+    expect(screen.getByLabelText('回放终端')).toHaveClass(
+      'flex-1',
+      'min-h-0',
+      'min-w-0',
+      'w-full',
+      'overflow-hidden',
+    )
+  })
+
   it('hot-applies terminal theme changes to an open playback terminal', async () => {
     render(<PlaybackTab recordingId="1" title="demo" active />)
     await waitFor(() => expect(terminalInstances).toHaveLength(1))
