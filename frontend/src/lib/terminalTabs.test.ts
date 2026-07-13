@@ -1,0 +1,51 @@
+import { describe, expect, it } from 'vitest'
+import { createTerminalTab } from '@/lib/terminalTabs'
+import type { Tab } from '@/store/appStore'
+
+function terminalTab(sessionId: number, terminalInstance: number): Tab {
+  return {
+    id: `terminal-term-${sessionId}-${terminalInstance}`,
+    title: terminalInstance === 1 ? 'Server' : `Server #${terminalInstance}`,
+    type: 'terminal',
+    terminalId: `term-${sessionId}-${terminalInstance}`,
+    sessionId,
+    terminalInstance,
+  }
+}
+
+describe('createTerminalTab', () => {
+  it('creates the first terminal from the backend terminal ID', () => {
+    expect(createTerminalTab({ sessionID: 7, sessionName: '生产服务器', terminalID: 'term-abc', tabs: [] })).toEqual({
+      id: 'terminal-term-abc',
+      title: '生产服务器',
+      type: 'terminal',
+      terminalId: 'term-abc',
+      sessionId: 7,
+      terminalInstance: 1,
+    })
+  })
+
+  it('uses the next available instance number for the same session', () => {
+    const tabs = [terminalTab(7, 1), terminalTab(7, 2)]
+
+    expect(createTerminalTab({ sessionID: 7, sessionName: '生产服务器', terminalID: 'term-new', tabs }).title).toBe('生产服务器 #3')
+  })
+
+  it('reuses the smallest available instance number without renaming open tabs', () => {
+    const tabs = [terminalTab(7, 1), terminalTab(7, 3)]
+
+    expect(createTerminalTab({ sessionID: 7, sessionName: '生产服务器', terminalID: 'term-new', tabs })).toMatchObject({
+      title: '生产服务器 #2',
+      terminalInstance: 2,
+    })
+  })
+
+  it('ignores other sessions and playback tabs when numbering', () => {
+    const tabs: Tab[] = [
+      terminalTab(8, 1),
+      { id: 'playback-1', title: '回放 #1', type: 'playback', sessionId: 7 },
+    ]
+
+    expect(createTerminalTab({ sessionID: 7, sessionName: '生产服务器', terminalID: 'term-new', tabs }).terminalInstance).toBe(1)
+  })
+})

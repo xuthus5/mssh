@@ -152,7 +152,13 @@ describe('useSession', () => {
     expect(store.tabs).toHaveLength(1)
     expect(store.tabs[0].type).toBe('terminal')
     expect(store.tabs[0].title).toBe('srv')
-    expect(store.activeSurface).toEqual({ type: 'terminal', id: `terminal-${sid}` })
+    expect(store.tabs[0]).toMatchObject({
+      id: 'terminal-term-abc',
+      terminalId: 'term-abc',
+      sessionId: Number(sid),
+      terminalInstance: 1,
+    })
+    expect(store.activeSurface).toEqual({ type: 'terminal', id: 'terminal-term-abc' })
     expect(store).not.toHaveProperty('activeTabId')
     expect(store).not.toHaveProperty('hasEnteredWorkspace')
   })

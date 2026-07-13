@@ -8,6 +8,7 @@ export interface Tab {
   type: 'terminal' | 'playback'
   terminalId?: string
   sessionId?: number
+  terminalInstance?: number
 }
 export interface PooledTerminal {
   terminal: Terminal

@@ -3,6 +3,8 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+const connect = vi.hoisted(() => vi.fn(async () => {}))
+
 vi.mock('@/components/ui/alert-dialog', () => ({
   AlertDialog: ({ open, children }: { open: boolean; children: ReactNode }) => open ? <div role="dialog">{children}</div> : null,
   AlertDialogAction: (props: ButtonHTMLAttributes<HTMLButtonElement>) => <button type="button" {...props} />,
@@ -12,6 +14,10 @@ vi.mock('@/components/ui/alert-dialog', () => ({
   AlertDialogFooter: ({ children }: { children: ReactNode }) => <div>{children}</div>,
   AlertDialogHeader: ({ children }: { children: ReactNode }) => <div>{children}</div>,
   AlertDialogTitle: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+}))
+
+vi.mock('@/hooks/SessionWorkspaceContext', () => ({
+  useSessionWorkspace: () => ({ connect }),
 }))
 
 import { DynamicTabStrip } from '@/components/layout/DynamicTabStrip'
@@ -24,7 +30,7 @@ const scrollIntoView = vi.fn()
 function seedTabs() {
   useAppStore.setState({
     tabs: [
-      { id: 'terminal-1', title: '生产服务器', type: 'terminal', terminalId: 'term-1' },
+      { id: 'terminal-1', title: '生产服务器', type: 'terminal', terminalId: 'term-1', sessionId: 7, terminalInstance: 1 },
       { id: 'playback-1', title: '回放 #1', type: 'playback' },
     ],
     activeSurface: { type: 'playback', id: 'playback-1' },
@@ -37,6 +43,7 @@ describe('DynamicTabStrip', () => {
   beforeEach(() => {
     Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: scrollIntoView })
     scrollIntoView.mockClear()
+    connect.mockClear()
     useToastStore.setState({ toasts: [] })
     useAppStore.setState({
       tabs: [],
@@ -62,6 +69,25 @@ describe('DynamicTabStrip', () => {
     expect(useAppStore.getState().activeSurface).toEqual({ type: 'terminal', id: 'terminal-1' })
     expect(useAppStore.getState().focusRequest).toMatchObject({ id: 'terminal-1', sequence: 1 })
     expect(useAppStore.getState().tabs).toHaveLength(2)
+  })
+
+  it('duplicates a connected terminal from its context menu', async () => {
+    seedTabs()
+    render(<DynamicTabStrip />)
+
+    fireEvent.contextMenu(screen.getByRole('tab', { name: /生产服务器/ }))
+    await userEvent.click(await screen.findByRole('menuitem', { name: '复制终端' }))
+
+    expect(connect).toHaveBeenCalledWith('7')
+  })
+
+  it('does not offer terminal duplication for playback tabs', () => {
+    seedTabs()
+    render(<DynamicTabStrip />)
+
+    fireEvent.contextMenu(screen.getByRole('tab', { name: /回放 #1/ }))
+
+    expect(screen.queryByRole('menuitem', { name: '复制终端' })).not.toBeInTheDocument()
   })
 
   it('lists every dynamic tab in the overflow menu', async () => {
