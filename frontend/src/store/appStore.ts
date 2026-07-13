@@ -230,8 +230,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     return { navigationCollapsed }
   }),
   setSidebarWidth: (sidebarWidth) => {
-    persistSidebarWidth(sidebarWidth)
-    set({ sidebarWidth })
+    set({ sidebarWidth: persistSidebarWidth(sidebarWidth) })
   },
   registerTerminal: (id, terminal) => set((s) => {
     const pool = new Map(s.terminalPool)

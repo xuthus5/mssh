@@ -3,6 +3,7 @@ import { X, Circle } from 'lucide-react'
 import { useAppStore } from '@/store/appStore'
 import { logger } from '@/lib/logger'
 import { connectionStatusVisual } from '@/lib/connectionStatusVisual'
+import { closeTabsWithFeedback } from '@/lib/closeTabsWithFeedback'
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -56,7 +57,7 @@ export default function TabBar() {
       return connectionStatus[tab.terminalId] === 'connected' || recordingState[tab.terminalId] === 'recording'
     })
     if (requiresConfirmation) setPendingClose(ids)
-    else ids.forEach(closeTab)
+    else closeTabsWithFeedback(ids, closeTab)
   }, [tabs, connectionStatus, recordingState, closeTab])
 
   const handleContextMenu = useCallback(
@@ -174,7 +175,7 @@ export default function TabBar() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>取消</AlertDialogCancel>
-            <AlertDialogAction variant="destructive" onClick={() => { pendingClose.forEach(closeTab); setPendingClose([]) }}>关闭连接</AlertDialogAction>
+            <AlertDialogAction variant="destructive" onClick={() => { closeTabsWithFeedback(pendingClose, closeTab); setPendingClose([]) }}>关闭连接</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
