@@ -1,5 +1,5 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useSession } from '@/hooks/useSession'
 import { useConnectDialog } from '@/store/connectDialog'
 import { useAppStore } from '@/store/appStore'
@@ -78,10 +78,9 @@ describe('useSession behavior', () => {
     await expect(act(async () => result.current.updateSession(result.current.sessions[0]))).rejects.toBe('update failed')
   })
 
-  it('reports connection failures and disconnects active sessions', async () => {
+  it('reports connection failures without creating terminal tabs', async () => {
     registerInitial({ sessions: [bindingSession(5, 'Connect', null)] })
     __registerHandler(service + 'TerminalService.Open', async () => { throw 'open failed' })
-    __registerHandler(service + 'SessionService.Disconnect', async () => {})
     const { result } = renderHook(() => useSession())
     await waitFor(() => expect(result.current.sessions).toHaveLength(1))
 
@@ -89,12 +88,60 @@ describe('useSession behavior', () => {
     expect(useConnectDialog.getState().open).toBe(false)
     await act(async () => result.current.connect('5'))
     expect(useConnectDialog.getState()).toMatchObject({ open: true, state: 'failed', error: 'open failed' })
+    expect(useAppStore.getState().tabs).toHaveLength(0)
+  })
 
-    await act(async () => result.current.disconnect('5'))
-    expect(useAppStore.getState().connectionStatus['terminal-5']).toBe('disconnected')
-    __registerHandler(service + 'SessionService.Disconnect', async () => { throw new Error('disconnect failed') })
-    await act(async () => result.current.disconnect('5'))
-    expect(useAppStore.getState().connectionStatus['terminal-5']).toBe('disconnected')
+  it('disconnects a specific terminal instance by backend terminal ID', async () => {
+    registerInitial({ sessions: [bindingSession(5, 'Connect', null)] })
+    const closeTerminal = vi.fn(async () => {})
+    __registerHandler(service + 'TerminalService.Close', closeTerminal)
+    const { result } = renderHook(() => useSession())
+    await waitFor(() => expect(result.current.sessions).toHaveLength(1))
+
+    await act(async () => result.current.disconnect('term-first'))
+
+    expect(closeTerminal).toHaveBeenCalledWith('term-first')
+    expect(useAppStore.getState().connectionStatus['term-first']).toBe('disconnected')
+
+    __registerHandler(service + 'TerminalService.Close', async () => { throw new Error('disconnect failed') })
+    await act(async () => result.current.disconnect('term-second'))
+    expect(useAppStore.getState().connectionStatus['term-second']).toBeUndefined()
+  })
+
+  it('opens independent terminal instances for repeated session connections', async () => {
+    registerInitial({ sessions: [bindingSession(5, '生产服务器', null)] })
+    const openTerminal = vi.fn()
+      .mockResolvedValueOnce('term-first')
+      .mockResolvedValueOnce('term-second')
+    __registerHandler(service + 'TerminalService.Open', openTerminal)
+    const { result } = renderHook(() => useSession())
+    await waitFor(() => expect(result.current.sessions).toHaveLength(1))
+
+    await act(async () => result.current.connect('5'))
+    await act(async () => result.current.connect('5'))
+
+    expect(openTerminal).toHaveBeenCalledTimes(2)
+    expect(useAppStore.getState().tabs).toEqual([
+      expect.objectContaining({
+        id: 'terminal-term-first',
+        title: '生产服务器',
+        terminalId: 'term-first',
+        sessionId: 5,
+        terminalInstance: 1,
+      }),
+      expect.objectContaining({
+        id: 'terminal-term-second',
+        title: '生产服务器 #2',
+        terminalId: 'term-second',
+        sessionId: 5,
+        terminalInstance: 2,
+      }),
+    ])
+    expect(useAppStore.getState().connectionStatus).toMatchObject({
+      'term-first': 'connected',
+      'term-second': 'connected',
+    })
+    expect(useAppStore.getState().activeSurface).toEqual({ type: 'terminal', id: 'terminal-term-second' })
   })
 })
 

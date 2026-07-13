@@ -46,15 +46,15 @@ function FilePanelView({ transfer, onClose, onUpload, onDownload, dropTargetID }
   )
 }
 
-function FilePanelContainer({ sessionID, onClose }: { sessionID: number; onClose: () => void }) {
+function FilePanelContainer({ sessionID, terminalID, onClose }: { sessionID: number; terminalID: string; onClose: () => void }) {
   const transfer = useFileTransfer(sessionID)
-  const dropTargetID = `sftp-drop-zone-${sessionID}`
+  const dropTargetID = `sftp-drop-zone-${terminalID}`
 
   useEffect(() => { void transfer.listFiles('/') }, [transfer.listFiles])
   useEffect(() => Events.On('sftp:files-dropped', (event: { data?: { files?: string[]; details?: { id?: string } } }) => {
     const files = event.data?.files ?? []
     const targetID = event.data?.details?.id
-    if (files.length === 0 || (targetID && targetID !== dropTargetID)) return
+    if (files.length === 0 || targetID !== dropTargetID) return
     void transfer.uploadMany(files, transfer.currentPath)
   }), [dropTargetID, transfer.currentPath, transfer.uploadMany])
 
@@ -73,13 +73,13 @@ function FilePanelContainer({ sessionID, onClose }: { sessionID: number; onClose
     onDownload={(path) => { void handleDownload(path) }} dropTargetID={dropTargetID} />
 }
 
-function DynamicLayer({ tab, active, activePaneID, lastActiveTerminalTabID, filePanelSessionID, onToggleFiles, onCloseFiles, focusRequest, onClose }: {
+function DynamicLayer({ tab, active, activePaneID, lastActiveTerminalTabID, filePanelOpen, onToggleFiles, onCloseFiles, focusRequest, onClose }: {
   tab: Tab
   active: boolean
   activePaneID: string | null
   lastActiveTerminalTabID: string | null
-  filePanelSessionID: number | null
-  onToggleFiles: (sessionID: number) => void
+  filePanelOpen: boolean
+  onToggleFiles: () => void
   onCloseFiles: () => void
   focusRequest: AppState['focusRequest']
   onClose: () => void
@@ -92,10 +92,10 @@ function DynamicLayer({ tab, active, activePaneID, lastActiveTerminalTabID, file
         {tab.type === 'terminal' ? <>
           <div className="flex min-w-0 flex-1 flex-col">
             <TerminalTab terminalID={tab.terminalId ?? tab.id} sessionId={tab.sessionId ?? 0}
-              onOpenFiles={() => onToggleFiles(tab.sessionId ?? 0)} active={active} focusRequest={terminalFocusRequest} />
+              onOpenFiles={onToggleFiles} active={active} focusRequest={terminalFocusRequest} />
           </div>
-          {active && tab.sessionId === filePanelSessionID
-            ? <FilePanelContainer sessionID={filePanelSessionID} onClose={onCloseFiles} />
+          {filePanelOpen && tab.sessionId !== undefined
+            ? <FilePanelContainer sessionID={tab.sessionId} terminalID={tab.terminalId ?? tab.id} onClose={onCloseFiles} />
             : null}
         </> : <PlaybackTab recordingId={tab.terminalId ?? tab.id} title={tab.title} active={active} />}
       </TerminalErrorBoundary>
@@ -108,7 +108,7 @@ export function TerminalLayers() {
   const activeSurface = useAppStore((state) => state.activeSurface)
   const focusRequest = useAppStore((state) => state.focusRequest)
   const activePaneID = useAppStore((state) => state.activePaneId)
-  const [filePanelSessionID, setFilePanelSessionID] = useState<number | null>(null)
+  const [filePanelTabIDs, setFilePanelTabIDs] = useState<Set<string>>(() => new Set())
   const lastActiveTerminalTabIDRef = useRef<string | null>(null)
   const closeCoordinator = useTabCloseCoordinator()
 
@@ -116,16 +116,37 @@ export function TerminalLayers() {
     if (activeSurface?.type === 'terminal') lastActiveTerminalTabIDRef.current = activeSurface.id
   }, [activeSurface])
 
-  const toggleFiles = useCallback((sessionID: number) => {
-    if (sessionID === 0) return
-    setFilePanelSessionID((current) => current === sessionID ? null : sessionID)
+  useEffect(() => {
+    const currentTabIDs = new Set(tabs.map((tab) => tab.id))
+    setFilePanelTabIDs((current) => {
+      const next = new Set([...current].filter((tabID) => currentTabIDs.has(tabID)))
+      return next.size === current.size ? current : next
+    })
+  }, [tabs])
+
+  const toggleFiles = useCallback((tabID: string) => {
+    setFilePanelTabIDs((current) => {
+      const next = new Set(current)
+      if (next.has(tabID)) next.delete(tabID)
+      else next.add(tabID)
+      return next
+    })
+  }, [])
+
+  const closeFiles = useCallback((tabID: string) => {
+    setFilePanelTabIDs((current) => {
+      if (!current.has(tabID)) return current
+      const next = new Set(current)
+      next.delete(tabID)
+      return next
+    })
   }, [])
 
   return <>{tabs.map((tab) => <DynamicLayer key={tab.id} tab={tab}
     active={activeSurface?.type === tab.type && activeSurface.id === tab.id}
     activePaneID={activePaneID} lastActiveTerminalTabID={lastActiveTerminalTabIDRef.current}
-    filePanelSessionID={filePanelSessionID} onToggleFiles={toggleFiles}
-    focusRequest={focusRequest} onCloseFiles={() => setFilePanelSessionID(null)}
+    filePanelOpen={filePanelTabIDs.has(tab.id)} onToggleFiles={() => toggleFiles(tab.id)}
+    focusRequest={focusRequest} onCloseFiles={() => closeFiles(tab.id)}
     onClose={() => closeCoordinator.requestClose(tab.id)} />)}
     <TabCloseConfirmation {...closeCoordinator.confirmation} />
   </>

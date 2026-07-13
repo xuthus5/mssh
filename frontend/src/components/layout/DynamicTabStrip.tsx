@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react'
-import { Circle, List, Play, X } from 'lucide-react'
+import { Circle, Copy, List, Play, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { ContextMenu, ContextMenuContent, ContextMenuGroup, ContextMenuItem, ContextMenuTrigger } from '@/components/ui/context-menu'
 import { connectionStatusVisual } from '@/lib/connectionStatusVisual'
 import { useAppStore, type AppState, type Tab } from '@/store/appStore'
 import { dynamicPanelID, dynamicTabID } from '@/store/tabNavigation'
 import { TabCloseConfirmation, useTabCloseCoordinator } from '@/hooks/useTabCloseCoordinator'
+import { useSessionWorkspace } from '@/hooks/SessionWorkspaceContext'
 
 interface TabNavigation {
   onKeyDown: (event: KeyboardEvent<HTMLButtonElement>, tabID: string) => void
@@ -61,17 +63,17 @@ function requestCloseFromKeyboard(event: KeyboardEvent<HTMLButtonElement>, tabID
   onClose(tabID)
 }
 
-function DynamicTab({ tab, active, connectionStatus, navigation, onActivate, onClose }: {
+function DynamicTab({ tab, active, connectionStatus, navigation, onActivate, onClose, onDuplicate }: {
   tab: Tab
   active: boolean
   connectionStatus: AppState['connectionStatus']
   navigation: TabNavigation
   onActivate: (tabID: string) => void
   onClose: (tabID: string) => void
+  onDuplicate: (sessionID: number) => void
 }) {
   const statusLabel = tabStatusLabel(tab, connectionStatus)
-
-  return (
+  const content = (
     <div
       className={`group flex h-full shrink-0 items-center gap-1.5 border-r border-border px-2 text-sm transition-colors ${active ? 'bg-background text-foreground shadow-[inset_0_-2px_0_var(--primary)]' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`}
     >
@@ -83,6 +85,21 @@ function DynamicTab({ tab, active, connectionStatus, navigation, onActivate, onC
         <X aria-hidden="true" className="size-3.5" />
       </button>
     </div>
+  )
+
+  if (tab.type !== 'terminal') return content
+  return (
+    <ContextMenu>
+      <ContextMenuTrigger>{content}</ContextMenuTrigger>
+      <ContextMenuContent>
+        <ContextMenuGroup>
+          <ContextMenuItem disabled={tab.sessionId === undefined} onClick={() => { if (tab.sessionId !== undefined) onDuplicate(tab.sessionId) }}>
+            <Copy aria-hidden="true" />
+            复制终端
+          </ContextMenuItem>
+        </ContextMenuGroup>
+      </ContextMenuContent>
+    </ContextMenu>
   )
 }
 
@@ -102,12 +119,14 @@ function TabListMenu({ tabs, activeID, onActivate }: { tabs: Tab[]; activeID: st
 }
 
 export function DynamicTabStrip() {
+  const { connect } = useSessionWorkspace()
   const tabs = useAppStore((state) => state.tabs)
   const activeSurface = useAppStore((state) => state.activeSurface)
   const activateTab = useAppStore((state) => state.activateTab)
   const connectionStatus = useAppStore((state) => state.connectionStatus)
   const navigation = useTabNavigation(tabs, activeSurface?.id ?? null, activateTab)
   const activateWithFocus = useCallback((tabID: string) => activateTab(tabID, true), [activateTab])
+  const duplicateTerminal = useCallback((sessionID: number) => { void connect(String(sessionID)) }, [connect])
   const closeCoordinator = useTabCloseCoordinator()
 
   if (tabs.length === 0) return null
@@ -115,7 +134,7 @@ export function DynamicTabStrip() {
   return (
     <div className="flex min-w-0 flex-1 [--wails-draggable:no-drag]">
       <div role="tablist" aria-label="动态标签" className="flex min-w-0 flex-1 overflow-x-auto">
-        {tabs.map((tab) => <DynamicTab key={tab.id} tab={tab} active={activeSurface?.id === tab.id} connectionStatus={connectionStatus} navigation={navigation} onActivate={activateWithFocus} onClose={closeCoordinator.requestClose} />)}
+        {tabs.map((tab) => <DynamicTab key={tab.id} tab={tab} active={activeSurface?.id === tab.id} connectionStatus={connectionStatus} navigation={navigation} onActivate={activateWithFocus} onClose={closeCoordinator.requestClose} onDuplicate={duplicateTerminal} />)}
       </div>
       <TabListMenu tabs={tabs} activeID={activeSurface?.id ?? null} onActivate={activateWithFocus} />
       <TabCloseConfirmation {...closeCoordinator.confirmation} />

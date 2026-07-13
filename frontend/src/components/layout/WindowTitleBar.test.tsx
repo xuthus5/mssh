@@ -24,6 +24,10 @@ vi.mock('@/lib/wails', () => ({
   },
 }))
 
+vi.mock('@/hooks/SessionWorkspaceContext', () => ({
+  useSessionWorkspace: () => ({ connect: vi.fn(async () => {}) }),
+}))
+
 import { WindowTitleBar } from '@/components/layout/WindowTitleBar'
 import { useAppStore } from '@/store/appStore'
 

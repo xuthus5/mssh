@@ -4,7 +4,7 @@ A cross-platform SSH client built with Go + Wails v3 + React + xterm.js.
 
 ## Features
 
-- Persistent top-level terminal and playback tabs with split view and per-tab recovery
+- Persistent top-level terminal and playback tabs with multi-instance connections, terminal duplication, split view, and per-tab recovery
 - Linked workspace navigation with a collapsible sidebar
 - Session management (folders, SSH password/key/agent auth)
 - Commercial folder management with one configurable default group and safe migration on deletion

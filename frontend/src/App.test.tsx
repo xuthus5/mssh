@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 const runtime = vi.hoisted(() => ({
   openFile: vi.fn(async () => '/tmp/upload.txt' as string | string[]),
@@ -66,8 +66,8 @@ vi.mock('@/components/terminal/PlaybackTab', async () => {
   }
 })
 vi.mock('@/components/file/FilePanel', () => ({
-  default: ({ onUpload, onDownload, onClose }: { onUpload: () => void; onDownload: (path: string) => void; onClose: () => void }) => (
-    <div data-testid="file-panel">
+  default: ({ onUpload, onDownload, onClose, dropTargetId }: { onUpload: () => void; onDownload: (path: string) => void; onClose: () => void; dropTargetId: string }) => (
+    <div data-testid="file-panel" data-drop-target-id={dropTargetId}>
       files panel
       <button type="button" onClick={onUpload}>upload file</button>
       <button type="button" onClick={() => onDownload('/remote/file.txt')}>download file</button>
@@ -136,7 +136,7 @@ describe('persistent content layers', () => {
     fireEvent.click(screen.getByRole('button', { name: 'files' }))
     expect(await screen.findByTestId('file-panel')).toBeInTheDocument()
     expect(transfer.listFiles).toHaveBeenCalledWith('/')
-    act(() => runtime.dropped?.({ data: { files: ['/tmp/drop.txt'], details: { id: 'sftp-drop-zone-1' } } }))
+    act(() => runtime.dropped?.({ data: { files: ['/tmp/drop.txt'], details: { id: 'sftp-drop-zone-term-1' } } }))
     expect(transfer.uploadMany).toHaveBeenCalledWith(['/tmp/drop.txt'], '/')
     fireEvent.click(screen.getByRole('button', { name: 'upload file' }))
     await waitFor(() => expect(transfer.upload).toHaveBeenCalledWith('/tmp/upload.txt', '/'))
@@ -152,8 +152,9 @@ describe('persistent content layers', () => {
     expect(screen.getByText('会话资产工作区')).toBeInTheDocument()
     expect(screen.getByTestId('terminal-term-1')).toHaveAttribute('data-active', 'false')
     expect(screen.getByTestId('playback-recording-1')).toBeInTheDocument()
-    expect(screen.getByTestId('terminal-term-1').closest('[data-layer-id="terminal-1"]')).toHaveClass('invisible', 'pointer-events-none')
-    expect(screen.queryByTestId('file-panel')).not.toBeInTheDocument()
+    const terminalLayer = screen.getByTestId('terminal-term-1').closest('[data-layer-id="terminal-1"]') as HTMLElement
+    expect(terminalLayer).toHaveClass('invisible', 'pointer-events-none')
+    expect(within(terminalLayer).getByTestId('file-panel')).toBeInTheDocument()
   })
 
   it('preserves layer instances until their tabs are removed', async () => {
