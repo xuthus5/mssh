@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -9,6 +9,8 @@ const { minimise, toggleMaximise, close, getSetting, setSetting } = vi.hoisted((
   getSetting: vi.fn(async () => ''),
   setSetting: vi.fn(async (_setting: unknown) => {}),
 }))
+
+let triggerTabResize = () => {}
 
 vi.mock('@wailsio/runtime', () => ({
   Window: { Minimise: minimise, ToggleMaximise: toggleMaximise, Close: close },
@@ -38,6 +40,15 @@ describe('WindowTitleBar', () => {
     setSetting.mockResolvedValue(undefined)
     localStorage.clear()
     document.documentElement.classList.remove('light')
+    triggerTabResize = () => {}
+    vi.stubGlobal('ResizeObserver', class {
+      constructor(callback: ResizeObserverCallback) {
+        triggerTabResize = () => callback([], this as unknown as ResizeObserver)
+      }
+      observe() {}
+      disconnect() {}
+      unobserve() {}
+    })
     useAppStore.setState({
       activeSurface: null,
       navigationCollapsed: false,
@@ -131,5 +142,36 @@ describe('WindowTitleBar', () => {
     const tab = screen.getByRole('tab', { name: /生产服务器/ })
     const dragRegion = screen.getByTestId('window-drag-region')
     expect(tab.compareDocumentPosition(dragRegion) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(dragRegion).toHaveClass('min-w-20', 'flex-1')
+  })
+
+  it('shows the overflow menu before the theme toggle only when tabs overflow', () => {
+    useAppStore.setState({
+      tabs: [{ id: 'terminal-1', title: '生产服务器', type: 'terminal', terminalId: 'term-1' }],
+      activeSurface: { type: 'terminal', id: 'terminal-1' },
+      connectionStatus: { 'term-1': 'connected' },
+    })
+    render(<WindowTitleBar />)
+    const tabList = screen.getByRole('tablist', { name: '动态标签' })
+    let clientWidth = 240
+    let scrollWidth = 240
+    Object.defineProperty(tabList, 'clientWidth', { configurable: true, get: () => clientWidth })
+    Object.defineProperty(tabList, 'scrollWidth', { configurable: true, get: () => scrollWidth })
+
+    act(() => triggerTabResize())
+    expect(screen.queryByRole('button', { name: '打开标签列表' })).not.toBeInTheDocument()
+
+    clientWidth = 120
+    scrollWidth = 260
+    act(() => triggerTabResize())
+    const menuButton = screen.getByRole('button', { name: '打开标签列表' })
+    const dragRegion = screen.getByTestId('window-drag-region')
+    const themeButton = screen.getByRole('button', { name: /切换到(浅色|深色)模式/ })
+    expect(dragRegion.compareDocumentPosition(menuButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(menuButton.compareDocumentPosition(themeButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+
+    scrollWidth = 120
+    act(() => triggerTabResize())
+    expect(screen.queryByRole('button', { name: '打开标签列表' })).not.toBeInTheDocument()
   })
 })
