@@ -286,9 +286,17 @@ export function PlaybackTab({ recordingId, title, active }: Props) {
   const controls = usePlaybackControls(entries, termRef, cursorRef, reportRuntimeError)
 
   return (
-    <div className="flex h-full flex-col">
+    <div
+      role="region"
+      aria-label={`回放: ${title}`}
+      className="flex h-full min-h-0 min-w-0 w-full flex-1 flex-col overflow-hidden"
+    >
       <PlaybackHeader title={title} playing={controls.playing} disabled={entries.length === 0} speed={controls.speed} onToggle={controls.togglePlay} />
-      <div ref={containerRef} className="flex-1" />
+      <div
+        ref={containerRef}
+        aria-label="回放终端"
+        className="min-h-0 min-w-0 w-full flex-1 overflow-hidden"
+      />
       <PlaybackTimeline progress={controls.progress} speed={controls.speed} onSeek={controls.seek} onSpeed={controls.changeSpeed} />
     </div>
   )
