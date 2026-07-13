@@ -8,12 +8,12 @@ import { connectionStatusVisual } from '@/lib/connectionStatusVisual'
 import { useAppStore, type AppState, type Tab } from '@/store/appStore'
 
 interface TabNavigation {
-  onKeyDown: (event: KeyboardEvent<HTMLDivElement>, tabID: string) => void
-  registerTab: (tabID: string, element: HTMLDivElement | null) => void
+  onKeyDown: (event: KeyboardEvent<HTMLButtonElement>, tabID: string) => void
+  registerTab: (tabID: string, element: HTMLButtonElement | null) => void
 }
 
 function useTabNavigation(tabs: Tab[], activeID: string | null, activateTab: AppState['activateTab']): TabNavigation {
-  const tabRefs = useRef(new Map<string, HTMLDivElement>())
+  const tabRefs = useRef(new Map<string, HTMLButtonElement>())
 
   useEffect(() => {
     const activeTab = activeID ? tabRefs.current.get(activeID) : undefined
@@ -25,7 +25,7 @@ function useTabNavigation(tabs: Tab[], activeID: string | null, activateTab: App
     if (focus) tabRefs.current.get(tabID)?.focus()
   }, [activateTab])
 
-  const onKeyDown = useCallback((event: KeyboardEvent<HTMLDivElement>, tabID: string) => {
+  const onKeyDown = useCallback((event: KeyboardEvent<HTMLButtonElement>, tabID: string) => {
     if (!['ArrowLeft', 'ArrowRight', 'Enter', ' '].includes(event.key)) return
     event.preventDefault()
     if (event.key === 'Enter' || event.key === ' ') return activate(tabID, true)
@@ -35,7 +35,7 @@ function useTabNavigation(tabs: Tab[], activeID: string | null, activateTab: App
     activate(nextTab.id, true)
   }, [activate, tabs])
 
-  const registerTab = useCallback((tabID: string, element: HTMLDivElement | null) => {
+  const registerTab = useCallback((tabID: string, element: HTMLButtonElement | null) => {
     if (element) tabRefs.current.set(tabID, element)
     else tabRefs.current.delete(tabID)
   }, [])
@@ -54,6 +54,13 @@ function TabStatusIcon({ tab, connectionStatus }: { tab: Tab; connectionStatus: 
   return <Circle role="img" aria-label={`${tab.title}：${visual.label}`} className={`size-2 shrink-0 ${visual.dotClass}`} />
 }
 
+function requestCloseFromKeyboard(event: KeyboardEvent<HTMLButtonElement>, tabID: string, onClose: (tabID: string) => void) {
+  if (event.key !== 'Enter' && event.key !== ' ') return
+  event.preventDefault()
+  event.stopPropagation()
+  onClose(tabID)
+}
+
 function DynamicTab({ tab, active, connectionStatus, navigation, onActivate, onClose }: {
   tab: Tab
   active: boolean
@@ -64,17 +71,13 @@ function DynamicTab({ tab, active, connectionStatus, navigation, onActivate, onC
 }) {
   return (
     <div
-      ref={(element) => navigation.registerTab(tab.id, element)}
-      role="tab"
-      tabIndex={active ? 0 : -1}
-      aria-selected={active}
-      className={`group flex h-full shrink-0 items-center gap-1.5 border-r border-border px-2 text-sm transition-colors focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${active ? 'bg-background text-foreground shadow-[inset_0_-2px_0_var(--primary)]' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`}
-      onClick={() => onActivate(tab.id)}
-      onKeyDown={(event) => navigation.onKeyDown(event, tab.id)}
+      className={`group flex h-full shrink-0 items-center gap-1.5 border-r border-border px-2 text-sm transition-colors ${active ? 'bg-background text-foreground shadow-[inset_0_-2px_0_var(--primary)]' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`}
     >
-      <TabStatusIcon tab={tab} connectionStatus={connectionStatus} />
-      <span className="max-w-40 truncate">{tab.title}</span>
-      <button type="button" aria-label={`关闭 ${tab.title}`} className={`rounded-sm p-0.5 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${active ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100'}`} onClick={(event) => { event.stopPropagation(); onClose(tab.id) }}>
+      <button ref={(element) => navigation.registerTab(tab.id, element)} type="button" role="tab" tabIndex={active ? 0 : -1} aria-selected={active} className="flex h-full min-w-0 items-center gap-1.5 focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={() => onActivate(tab.id)} onKeyDown={(event) => navigation.onKeyDown(event, tab.id)}>
+        <TabStatusIcon tab={tab} connectionStatus={connectionStatus} />
+        <span className="max-w-40 truncate">{tab.title}</span>
+      </button>
+      <button type="button" aria-label={`关闭 ${tab.title}`} className={`rounded-sm p-0.5 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${active ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100'}`} onClick={(event) => { event.stopPropagation(); onClose(tab.id) }} onKeyDown={(event) => requestCloseFromKeyboard(event, tab.id, onClose)}>
         <X aria-hidden="true" className="size-3.5" />
       </button>
     </div>
