@@ -53,7 +53,7 @@ export class TerminalErrorBoundary extends Component<Props, State> {
     }
     return (
       <div className="grid h-full w-full place-items-center bg-background p-6">
-        <Card className="w-full max-w-md">
+        <Card role="alert" className="w-full max-w-md">
           <CardHeader><CardTitle>终端渲染失败</CardTitle></CardHeader>
           <CardContent className="flex items-center justify-end gap-2">
             <Button variant="outline" onClick={this.props.onClose}>关闭标签</Button>

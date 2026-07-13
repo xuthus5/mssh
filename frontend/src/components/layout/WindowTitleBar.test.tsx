@@ -93,6 +93,15 @@ describe('WindowTitleBar', () => {
     expect(screen.queryByText('Secure Shell Client')).not.toBeInTheDocument()
   })
 
+  it('links fixed tabs to the workspace panel', () => {
+    render(<WindowTitleBar />)
+
+    expect(screen.getByRole('tab', { name: '会话' })).toHaveAttribute('id', 'workspace-tab-sessions')
+    expect(screen.getByRole('tab', { name: '会话' })).toHaveAttribute('aria-controls', 'workspace-panel')
+    expect(screen.getByRole('tab', { name: '宏' })).toHaveAttribute('id', 'workspace-tab-macros')
+    expect(screen.getByRole('tab', { name: '宏' })).toHaveAttribute('aria-controls', 'workspace-panel')
+  })
+
   it('collapses fixed navigation and the sidebar together', async () => {
     useAppStore.setState({ activeSurface: { type: 'workspace', id: 'sessions' } })
     render(<WindowTitleBar />)
