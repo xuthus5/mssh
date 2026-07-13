@@ -1,6 +1,7 @@
 import { FileText, Keyboard, Shield, Terminal } from 'lucide-react'
 import { SessionAssetCenter } from '@/components/session/SessionAssetCenter'
 import { useAppStore } from '@/store/appStore'
+import { WORKSPACE_PANEL_ID, workspaceTabID } from '@/store/tabNavigation'
 
 function WelcomeScreen() {
   return (
@@ -59,7 +60,10 @@ export function WorkspaceContent() {
 
   return (
     <div
+      id={WORKSPACE_PANEL_ID}
       data-layer-id="workspace"
+      role="tabpanel"
+      aria-labelledby={activeSurface?.type === 'workspace' ? workspaceTabID(activeSurface.id) : undefined}
       aria-hidden={!active}
       inert={active ? undefined : true}
       className={`absolute inset-0 flex flex-col ${active ? 'visible' : 'invisible pointer-events-none'}`}

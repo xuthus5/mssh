@@ -47,9 +47,10 @@ describe('TerminalTab', () => {
     })
   })
 
-  it('selects the primary pane and toggles the split viewport', () => {
+  it('preserves the selected split pane and toggles the split viewport', () => {
+    useAppStore.setState({ activePaneId: 'split-1' })
     render(<TerminalTab terminalID="term-1" sessionId={7} active focusRequest={focusRequest} onOpenFiles={vi.fn()} />)
-    expect(useAppStore.getState().activePaneId).toBe('term-1')
+    expect(useAppStore.getState().activePaneId).toBe('split-1')
     expect(screen.getByTestId('terminal-emulator')).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: '切换分屏' }))

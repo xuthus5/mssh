@@ -23,35 +23,19 @@ vi.mock('@xterm/xterm', () => ({
     options = {}
     open() { calls.push('open') }
     private addons: Array<{ dispose: () => void }> = []
-    loadAddon(addon: { name: string; dispose: () => void }) {
-      calls.push(`load:${addon.name}`)
-      this.addons.push(addon)
-    }
+    loadAddon(addon: { name: string; dispose: () => void }) { calls.push(`load:${addon.name}`); this.addons.push(addon) }
     private terminalDispose = vi.fn(() => calls.push('dispose'))
-    constructor(options: Record<string, unknown>) {
-      terminalOptions.push(options)
-      terminalDisposes.push(this.terminalDispose)
-      this.options = options
-    }
+    constructor(options: Record<string, unknown>) { terminalOptions.push(options); terminalDisposes.push(this.terminalDispose); this.options = options }
     onData() {
       const dispose = vi.fn()
       dataDisposes.push(dispose)
       return { dispose }
     }
     write() { if (runtimeFailure === 'write') throw new Error('write failed') }
-    focus() {
-      calls.push('focus')
-      if (runtimeFailure === 'focus') throw new Error('focus failed')
-    }
+    focus() { calls.push('focus'); if (runtimeFailure === 'focus') throw new Error('focus failed') }
     blur() { calls.push('blur') }
-    refresh() {
-      calls.push('refresh')
-      if (runtimeFailure === 'refresh') throw new Error('refresh failed')
-    }
-    dispose() {
-      this.addons.forEach((addon) => addon.dispose())
-      this.terminalDispose()
-    }
+    refresh() { calls.push('refresh'); if (runtimeFailure === 'refresh') throw new Error('refresh failed') }
+    dispose() { this.addons.forEach((addon) => addon.dispose()); this.terminalDispose() }
   },
 }))
 
@@ -89,6 +73,7 @@ import { TerminalErrorBoundary } from '@/components/terminal/TerminalErrorBounda
 
 describe('useTerminal', () => {
   beforeEach(() => {
+    vi.clearAllMocks()
     calls.length = 0
     terminalOptions.length = 0
     terminalDisposes.length = 0
@@ -196,6 +181,33 @@ describe('useTerminal', () => {
 
     expect(calls).toEqual(['fit', 'refresh'])
     act(() => unmount())
+  })
+
+  it('keeps a zero-size activation pending until the first visible resize', () => {
+    let width = 0
+    let height = 0
+    const containerRef = createRef<HTMLDivElement>()
+    const container = document.createElement('div')
+    Object.defineProperty(container, 'clientWidth', { get: () => width })
+    Object.defineProperty(container, 'clientHeight', { get: () => height })
+    containerRef.current = container
+    const hook = renderHook(({ active, sequence }) => useTerminal('term-recover', containerRef, {
+      active,
+      focusRequest: { sequence },
+    }), { initialProps: { active: false, sequence: 0 } })
+
+    calls.length = 0
+    hook.rerender({ active: true, sequence: 1 })
+    act(flushAnimationFrame)
+    expect(calls).toEqual([])
+
+    width = 800
+    height = 500
+    act(() => resizeHandlers[0]([], {} as ResizeObserver))
+    expect(calls).toEqual(['fit', 'refresh', 'focus'])
+
+    act(() => resizeHandlers[0]([], {} as ResizeObserver))
+    expect(calls.filter((call) => call === 'focus')).toHaveLength(1)
   })
 
   it('disposes every effect resource once under StrictMode cleanup', () => {

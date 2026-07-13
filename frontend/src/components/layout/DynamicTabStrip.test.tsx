@@ -43,6 +43,8 @@ describe('DynamicTabStrip', () => {
       activeSurface: null,
       connectionStatus: {},
       recordingState: {},
+      focusRequest: { id: '', terminalId: null, sequence: 0 },
+      activePaneId: null,
     })
   })
 
@@ -58,6 +60,7 @@ describe('DynamicTabStrip', () => {
     await userEvent.click(screen.getByRole('tab', { name: /生产服务器/ }))
 
     expect(useAppStore.getState().activeSurface).toEqual({ type: 'terminal', id: 'terminal-1' })
+    expect(useAppStore.getState().focusRequest).toMatchObject({ id: 'terminal-1', sequence: 1 })
     expect(useAppStore.getState().tabs).toHaveLength(2)
   })
 
@@ -80,6 +83,7 @@ describe('DynamicTabStrip', () => {
     fireEvent.keyDown(playbackTab, { key: 'ArrowRight' })
 
     expect(useAppStore.getState().activeSurface).toEqual({ type: 'terminal', id: 'terminal-1' })
+    expect(useAppStore.getState().focusRequest).toMatchObject({ id: 'terminal-1', sequence: 1 })
     expect(screen.getByRole('tab', { name: /生产服务器/ })).toHaveFocus()
     expect(scrollIntoView).toHaveBeenLastCalledWith({ block: 'nearest', inline: 'nearest' })
   })
@@ -92,6 +96,7 @@ describe('DynamicTabStrip', () => {
     await userEvent.click(screen.getByRole('menuitem', { name: '生产服务器' }))
 
     expect(useAppStore.getState().activeSurface).toEqual({ type: 'terminal', id: 'terminal-1' })
+    expect(useAppStore.getState().focusRequest).toMatchObject({ id: 'terminal-1', sequence: 1 })
   })
 
   it('includes terminal and playback status in each tab accessible name', () => {
@@ -105,6 +110,16 @@ describe('DynamicTabStrip', () => {
     act(() => useAppStore.setState({ connectionStatus: { 'term-1': 'disconnected' } }))
 
     expect(screen.getByRole('tab', { name: '生产服务器，状态：未连接' })).toBeInTheDocument()
+  })
+
+  it('links each dynamic tab to its persistent panel', () => {
+    seedTabs()
+    render(<DynamicTabStrip />)
+
+    expect(screen.getByRole('tab', { name: /生产服务器/ })).toHaveAttribute('id', 'dynamic-tab-terminal-1')
+    expect(screen.getByRole('tab', { name: /生产服务器/ })).toHaveAttribute('aria-controls', 'dynamic-panel-terminal-1')
+    expect(screen.getByRole('tab', { name: /回放 #1/ })).toHaveAttribute('id', 'dynamic-tab-playback-1')
+    expect(screen.getByRole('tab', { name: /回放 #1/ })).toHaveAttribute('aria-controls', 'dynamic-panel-playback-1')
   })
 
   it('requires confirmation before closing an active terminal connection', async () => {

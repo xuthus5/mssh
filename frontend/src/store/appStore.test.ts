@@ -89,6 +89,34 @@ describe('appStore', () => {
     })
   })
 
+  it('atomically activates a terminal pane and requests focus', () => {
+    const store = useAppStore.getState()
+    store.openTab({ id: 'terminal-1', title: 'one', type: 'terminal', terminalId: 'primary-1' })
+
+    store.requestTerminalFocus('terminal-1', 'split-1')
+
+    expect(useAppStore.getState()).toMatchObject({
+      activeSurface: { type: 'terminal', id: 'terminal-1' },
+      activePaneId: 'split-1',
+      focusRequest: { id: 'terminal-1', terminalId: 'split-1', sequence: 1 },
+    })
+  })
+
+  it('preserves the active split across a workspace round trip', () => {
+    const store = useAppStore.getState()
+    store.openTab({ id: 'terminal-1', title: 'one', type: 'terminal', terminalId: 'primary-1' })
+    store.requestTerminalFocus('terminal-1', 'split-1')
+
+    store.activateWorkspace('sessions')
+    store.activateTab('terminal-1', true)
+
+    expect(useAppStore.getState()).toMatchObject({
+      activeSurface: { type: 'terminal', id: 'terminal-1' },
+      activePaneId: 'split-1',
+      focusRequest: { id: 'terminal-1', terminalId: 'split-1', sequence: 2 },
+    })
+  })
+
   it('persists shared navigation state', () => {
     const store = useAppStore.getState()
 

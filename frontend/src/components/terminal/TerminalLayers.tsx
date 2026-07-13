@@ -4,8 +4,9 @@ import { Spinner } from '@/components/ui/spinner'
 import { TerminalErrorBoundary } from '@/components/terminal/TerminalErrorBoundary'
 import { useFileTransfer } from '@/hooks/useFileTransfer'
 import type { TerminalFocusRequest } from '@/hooks/useTerminal'
-import { closeTabsWithFeedback } from '@/lib/closeTabsWithFeedback'
 import { useAppStore, type AppState, type Tab } from '@/store/appStore'
+import { dynamicPanelID, dynamicTabID } from '@/store/tabNavigation'
+import { TabCloseConfirmation, useTabCloseCoordinator } from '@/hooks/useTabCloseCoordinator'
 
 const TerminalTab = lazy(() => import('@/components/terminal/TerminalTab').then((module) => ({ default: module.TerminalTab })))
 const PlaybackTab = lazy(() => import('@/components/terminal/PlaybackTab').then((module) => ({ default: module.PlaybackTab })))
@@ -22,7 +23,7 @@ function useLayerFocusRequest(tab: Tab, active: boolean, focusRequest: AppState[
     const canUseActivePane = active && (lastActiveTerminalTabID === null || lastActiveTerminalTabID === tab.id)
     resolvedRequestRef.current = {
       sequence: focusRequest.sequence,
-      targetTerminalID: canUseActivePane ? activePaneID ?? primaryTerminalID : primaryTerminalID,
+      targetTerminalID: focusRequest.terminalId ?? (canUseActivePane ? activePaneID ?? primaryTerminalID : primaryTerminalID),
     }
   }
   return resolvedRequestRef.current
@@ -86,7 +87,7 @@ function DynamicLayer({ tab, active, activePaneID, lastActiveTerminalTabID, file
   const layerClass = `absolute inset-0 flex ${active ? 'visible' : 'invisible pointer-events-none'}`
   const terminalFocusRequest = useLayerFocusRequest(tab, active, focusRequest, activePaneID, lastActiveTerminalTabID)
   return (
-    <div data-layer-id={tab.id} aria-hidden={!active} inert={active ? undefined : true} className={layerClass}>
+    <div id={dynamicPanelID(tab.id)} data-layer-id={tab.id} role="tabpanel" aria-labelledby={dynamicTabID(tab.id)} aria-hidden={!active} inert={active ? undefined : true} className={layerClass}>
       <TerminalErrorBoundary onClose={onClose}>
         {tab.type === 'terminal' ? <>
           <div className="flex min-w-0 flex-1 flex-col">
@@ -107,9 +108,9 @@ export function TerminalLayers() {
   const activeSurface = useAppStore((state) => state.activeSurface)
   const focusRequest = useAppStore((state) => state.focusRequest)
   const activePaneID = useAppStore((state) => state.activePaneId)
-  const closeTab = useAppStore((state) => state.closeTab)
   const [filePanelSessionID, setFilePanelSessionID] = useState<number | null>(null)
   const lastActiveTerminalTabIDRef = useRef<string | null>(null)
+  const closeCoordinator = useTabCloseCoordinator()
 
   useEffect(() => {
     if (activeSurface?.type === 'terminal') lastActiveTerminalTabIDRef.current = activeSurface.id
@@ -125,5 +126,7 @@ export function TerminalLayers() {
     activePaneID={activePaneID} lastActiveTerminalTabID={lastActiveTerminalTabIDRef.current}
     filePanelSessionID={filePanelSessionID} onToggleFiles={toggleFiles}
     focusRequest={focusRequest} onCloseFiles={() => setFilePanelSessionID(null)}
-    onClose={() => closeTabsWithFeedback([tab.id], closeTab)} />)}</>
+    onClose={() => closeCoordinator.requestClose(tab.id)} />)}
+    <TabCloseConfirmation {...closeCoordinator.confirmation} />
+  </>
 }

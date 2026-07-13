@@ -47,6 +47,7 @@ describe('TerminalErrorBoundary', () => {
     </>)
 
     expect(screen.getByText('终端渲染失败')).toBeInTheDocument()
+    expect(screen.getByRole('alert')).toHaveTextContent('终端渲染失败')
     expect(screen.getByText('相邻标签仍在运行')).toBeInTheDocument()
     expect(siblingUnmount).not.toHaveBeenCalled()
   })
