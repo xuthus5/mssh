@@ -108,4 +108,17 @@ describe('WindowTitleBar', () => {
     expect(screen.queryByRole('tab', { name: '会话' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: '展开导航' })).toHaveAttribute('aria-expanded', 'false')
   })
+
+  it('places dynamic tabs before the window drag region', () => {
+    useAppStore.setState({
+      tabs: [{ id: 'terminal-1', title: '生产服务器', type: 'terminal', terminalId: 'term-1' }],
+      activeSurface: { type: 'terminal', id: 'terminal-1' },
+      connectionStatus: { 'term-1': 'connected' },
+    })
+    render(<WindowTitleBar />)
+
+    const tab = screen.getByRole('tab', { name: /生产服务器/ })
+    const dragRegion = screen.getByTestId('window-drag-region')
+    expect(tab.compareDocumentPosition(dragRegion) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
 })

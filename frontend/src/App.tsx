@@ -2,7 +2,6 @@ import { useEffect, useCallback, useState, lazy, Suspense } from 'react'
 import { Dialogs, Events } from '@wailsio/runtime'
 import { Terminal, Shield, FileText, Keyboard } from 'lucide-react'
 import Sidebar from '@/components/layout/Sidebar'
-import TabBar from '@/components/layout/TabBar'
 import StatusBar from '@/components/layout/StatusBar'
 import { ToastContainer } from '@/components/ui/toast'
 import { ConnectDialog } from '@/components/layout/ConnectDialog'
@@ -282,7 +281,6 @@ export default function App() {
       <SessionWorkspaceProvider><div className="flex flex-1 min-h-0">
         <div className={hasEnteredWorkspace ? 'contents' : 'hidden'}><Sidebar /></div>
         <main className="flex-1 flex flex-col min-w-0">
-          {hasEnteredWorkspace && <TabBar />}
       <Suspense fallback={<div className="flex-1 grid place-items-center"><Spinner /></div>}><TabContent /></Suspense>
         </main>
       </div></SessionWorkspaceProvider>
