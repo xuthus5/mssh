@@ -34,7 +34,13 @@ describe('WindowTitleBar', () => {
     setSetting.mockResolvedValue(undefined)
     localStorage.clear()
     document.documentElement.classList.remove('light')
-    useAppStore.setState({ sidebarTab: 'sessions', hasEnteredWorkspace: false })
+    useAppStore.setState({
+      activeSurface: null,
+      hasEnteredWorkspace: false,
+      navigationCollapsed: false,
+      sidebarTab: 'sessions',
+      workspaceTab: 'sessions',
+    })
   })
 
   it('routes window controls to the Wails runtime', async () => {
@@ -87,5 +93,19 @@ describe('WindowTitleBar', () => {
     expect(useAppStore.getState().hasEnteredWorkspace).toBe(true)
     expect(macrosTab).toHaveAttribute('aria-selected', 'true')
     expect(screen.queryByText('Secure Shell Client')).not.toBeInTheDocument()
+  })
+
+  it('collapses fixed navigation and the sidebar together', async () => {
+    useAppStore.setState({ activeSurface: { type: 'workspace', id: 'sessions' }, hasEnteredWorkspace: true })
+    render(<WindowTitleBar />)
+
+    const navigationButton = screen.getByRole('button', { name: '收起导航' })
+    expect(navigationButton).toHaveAttribute('aria-expanded', 'true')
+
+    await userEvent.click(navigationButton)
+
+    expect(useAppStore.getState().navigationCollapsed).toBe(true)
+    expect(screen.queryByRole('tab', { name: '会话' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '展开导航' })).toHaveAttribute('aria-expanded', 'false')
   })
 })
