@@ -1,146 +1,195 @@
 import { useEffect, useRef, type RefObject } from 'react'
-import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
-import { useAppStore } from '@/store/appStore'
-import { TerminalService } from '@/lib/wails'
+import { Terminal } from '@xterm/xterm'
 import { Events } from '@wailsio/runtime'
 import { logger } from '@/lib/logger'
 import { applyTerminalTheme, xtermTheme } from '@/lib/terminalTheme'
+import { TerminalService } from '@/lib/wails'
+import { useAppStore, type AppState } from '@/store/appStore'
+
+const TERMINAL_SCROLLBACK = 10000
 
 interface TerminalOutputEvent {
   terminal_id?: string
   data?: string
 }
 
-export function useTerminal(
-  terminalID: string,
-  containerRef: RefObject<HTMLDivElement | null>,
-  active: boolean,
-) {
-  const termRef = useRef<Terminal | null>(null)
-  const fitAddonRef = useRef<FitAddon | null>(null)
-  const activationFrameRef = useRef<number | null>(null)
-  const storeRef = useRef(useAppStore.getState())
-  const activeRef = useRef(active)
-  storeRef.current = useAppStore.getState()
-  activeRef.current = active
+export interface TerminalFocusRequest {
+  sequence: number
+}
 
+interface UseTerminalOptions {
+  active: boolean
+  focusRequest: TerminalFocusRequest
+}
+
+interface TerminalLifecycleRefs {
+  termRef: RefObject<Terminal | null>
+  fitAddonRef: RefObject<FitAddon | null>
+  activationFrameRef: RefObject<number | null>
+  activeRef: RefObject<boolean>
+  storeRef: RefObject<AppState>
+}
+
+function hasVisibleSize(container: HTMLDivElement | null): container is HTMLDivElement {
+  return container !== null && container.clientWidth > 0 && container.clientHeight > 0
+}
+
+function reportResize(terminalID: string, term: Terminal, context: string) {
+  void TerminalService.Resize(terminalID, term.cols, term.rows).catch((error: unknown) => logger.error(context, error))
+}
+
+function fitAndRefresh(term: Terminal, fitAddon: FitAddon, container: HTMLDivElement | null) {
+  if (!hasVisibleSize(container)) return false
+  fitAddon.fit()
+  term.refresh(0, term.rows - 1)
+  return true
+}
+
+function safelyDispose(label: string, dispose: () => void) {
+  try {
+    dispose()
+  } catch (error: unknown) {
+    logger.error(`terminal ${label} cleanup error`, error)
+  }
+}
+
+function cancelActivationFrame(frameRef: RefObject<number | null>) {
+  if (frameRef.current === null) return
+  window.cancelAnimationFrame(frameRef.current)
+  frameRef.current = null
+}
+
+function createTerminal() {
+  const theme = useAppStore.getState().terminalTheme
+  return new Terminal({
+    cursorBlink: true,
+    cursorStyle: theme.cursorStyle,
+    fontSize: theme.fontSize,
+    fontFamily: theme.fontFamily,
+    theme: xtermTheme(theme),
+    scrollback: TERMINAL_SCROLLBACK,
+  })
+}
+
+function subscribeToData(term: Terminal, terminalID: string, storeRef: RefObject<AppState>) {
+  return term.onData((data) => {
+    storeRef.current.updateLastUsed(terminalID)
+    void TerminalService.Write(terminalID, data).catch((error: unknown) => logger.error('terminal write error', error))
+  })
+}
+
+function subscribeToOutput(term: Terminal, terminalID: string) {
+  return Events.On('terminal:output', (event: { data?: TerminalOutputEvent }) => {
+    const payload = event.data
+    if (payload?.terminal_id === terminalID && payload.data) term.write(payload.data)
+  })
+}
+
+function subscribeToTheme(term: Terminal) {
+  return useAppStore.subscribe((state, previous) => {
+    if (state.terminalTheme !== previous.terminalTheme) applyTerminalTheme(term.options, state.terminalTheme)
+  })
+}
+
+function observeResize({ term, fitAddon, terminalID, containerRef, activeRef }: {
+  term: Terminal
+  fitAddon: FitAddon
+  terminalID: string
+  containerRef: RefObject<HTMLDivElement | null>
+  activeRef: RefObject<boolean>
+}) {
+  return new ResizeObserver(() => {
+    if (!activeRef.current || !fitAndRefresh(term, fitAddon, containerRef.current)) return
+    reportResize(terminalID, term, 'terminal resize error')
+  })
+}
+
+function initializeTerminal(terminalID: string, containerRef: RefObject<HTMLDivElement | null>, refs: TerminalLifecycleRefs) {
+  let disposed = false
+  const container = containerRef.current
+  const term = createTerminal()
+  const fitAddon = new FitAddon()
+  refs.termRef.current = term
+  refs.fitAddonRef.current = fitAddon
+  if (container) {
+    term.open(container)
+    term.loadAddon(fitAddon)
+    refs.storeRef.current.registerTerminal(terminalID, term)
+  }
+  const focusHandler = () => refs.storeRef.current.setActivePane(terminalID)
+  container?.addEventListener('focusin', focusHandler)
+  container?.addEventListener('pointerdown', focusHandler)
+  const dataDispose = subscribeToData(term, terminalID, refs.storeRef)
+  const unsubOutput = subscribeToOutput(term, terminalID)
+  const unsubscribeTheme = subscribeToTheme(term)
+  const resizeObserver = observeResize({ term, fitAddon, terminalID, containerRef, activeRef: refs.activeRef })
+  if (container) resizeObserver.observe(container)
+
+  return () => {
+    if (disposed) return
+    disposed = true
+    cancelActivationFrame(refs.activationFrameRef)
+    container?.removeEventListener('focusin', focusHandler)
+    container?.removeEventListener('pointerdown', focusHandler)
+    safelyDispose('data subscription', () => dataDispose.dispose())
+    safelyDispose('output subscription', unsubOutput)
+    safelyDispose('theme subscription', unsubscribeTheme)
+    safelyDispose('resize observer', () => resizeObserver.disconnect())
+    safelyDispose('fit addon', () => fitAddon.dispose())
+    refs.storeRef.current.unregisterTerminal(terminalID)
+    safelyDispose('instance', () => term.dispose())
+    refs.fitAddonRef.current = null
+    refs.termRef.current = null
+  }
+}
+
+function useTerminalLifecycle(terminalID: string, containerRef: RefObject<HTMLDivElement | null>, refs: TerminalLifecycleRefs) {
+  useEffect(() => initializeTerminal(terminalID, containerRef, refs), [containerRef, terminalID])
+}
+
+function useTerminalActivation({ terminalID, containerRef, refs, active, sequence }: {
+  terminalID: string
+  containerRef: RefObject<HTMLDivElement | null>
+  refs: TerminalLifecycleRefs
+  active: boolean
+  sequence: number
+}) {
+  const handledSequenceRef = useRef(0)
   useEffect(() => {
-    const initialTheme = useAppStore.getState().terminalTheme
-    const term = new Terminal({
-      cursorBlink: true,
-      cursorStyle: initialTheme.cursorStyle,
-      fontSize: initialTheme.fontSize,
-      fontFamily: initialTheme.fontFamily,
-      theme: xtermTheme(initialTheme),
-      scrollback: 10000,
-    })
-
-    termRef.current = term
-
-    const fitAddon = new FitAddon()
-    fitAddonRef.current = fitAddon
-
-    let initialResizeTimer: number | undefined
-    if (containerRef.current) {
-      term.open(containerRef.current)
-      term.loadAddon(fitAddon)
-      initialResizeTimer = window.setTimeout(() => {
-        if (!activeRef.current || !containerRef.current || containerRef.current.clientWidth === 0 || containerRef.current.clientHeight === 0) return
-        fitAddon.fit()
-        term.refresh(0, term.rows - 1)
-        term.focus()
-        storeRef.current.setActivePane(terminalID)
-        void TerminalService.Resize(terminalID, term.cols, term.rows).catch((err: unknown) => logger.error('terminal initial resize error', err))
-        logger.debug('terminal opened', { cols: term.cols, rows: term.rows })
-      }, 100)
-      storeRef.current.registerTerminal(terminalID, term)
-    }
-
-    const focusHandler = () => storeRef.current.setActivePane(terminalID)
-    containerRef.current?.addEventListener('focusin', focusHandler)
-    containerRef.current?.addEventListener('pointerdown', focusHandler)
-
-    const dataDispose = term.onData((data) => {
-      storeRef.current.updateLastUsed(terminalID)
-      TerminalService.Write(terminalID, data).catch((err: unknown) => {
-        logger.error('terminal write error', err)
-      })
-    })
-
-    let eventCount = 0
-    logger.debug('subscribing to terminal:output for', terminalID)
-    const unsubOutput = Events.On('terminal:output', (wailsEvent: { data?: TerminalOutputEvent }) => {
-      eventCount++
-      const p = wailsEvent?.data
-      if (p?.terminal_id === terminalID) {
-        if (p.data !== undefined && p.data !== null && p.data.length > 0) {
-          if (eventCount <= 3) {
-            const preview = p.data.length > 60 ? p.data.slice(0, 60) + '...' : p.data
-            logger.debug(`#${eventCount} writing ${p.data.length}B`, { text: preview })
-          }
-          term.write(p.data)
-        }
-      }
-    })
-
-    const resizeObs = new ResizeObserver(() => {
-      if (activeRef.current && containerRef.current && containerRef.current.clientWidth > 0 && containerRef.current.clientHeight > 0) {
-        fitAddon.fit()
-        term.refresh(0, term.rows - 1)
-        void TerminalService.Resize(terminalID, term.cols, term.rows).catch((err: unknown) => logger.error('terminal resize error', err))
-      }
-    })
-    if (containerRef.current) {
-      resizeObs.observe(containerRef.current)
-    }
-
-    return () => {
-      if (initialResizeTimer !== undefined) window.clearTimeout(initialResizeTimer)
-      if (activationFrameRef.current !== null) window.cancelAnimationFrame(activationFrameRef.current)
-      fitAddonRef.current = null
-      dataDispose.dispose()
-      unsubOutput()
-      resizeObs.disconnect()
-      containerRef.current?.removeEventListener('focusin', focusHandler)
-      containerRef.current?.removeEventListener('pointerdown', focusHandler)
-      storeRef.current.unregisterTerminal(terminalID)
-      term.dispose()
-    }
-  }, [terminalID, containerRef])
-
-  useEffect(() => {
-    const term = termRef.current
+    const term = refs.termRef.current
     if (!term) return
+    cancelActivationFrame(refs.activationFrameRef)
     if (!active) {
-      if (activationFrameRef.current !== null) window.cancelAnimationFrame(activationFrameRef.current)
-      activationFrameRef.current = null
       term.blur()
       return
     }
-    activationFrameRef.current = window.requestAnimationFrame(() => {
-      activationFrameRef.current = null
-      const container = containerRef.current
-      const fitAddon = fitAddonRef.current
-      if (!container || !fitAddon || container.clientWidth === 0 || container.clientHeight === 0) return
-      fitAddon.fit()
-      term.refresh(0, term.rows - 1)
-      term.focus()
-      storeRef.current.setActivePane(terminalID)
-      void TerminalService.Resize(terminalID, term.cols, term.rows).catch((err: unknown) => logger.error('terminal activation resize error', err))
+    refs.activationFrameRef.current = window.requestAnimationFrame(() => {
+      refs.activationFrameRef.current = null
+      const fitAddon = refs.fitAddonRef.current
+      if (!fitAddon || !fitAndRefresh(term, fitAddon, containerRef.current)) return
+      if (sequence > handledSequenceRef.current) {
+        term.focus()
+        refs.storeRef.current.setActivePane(terminalID)
+        handledSequenceRef.current = sequence
+      }
+      reportResize(terminalID, term, 'terminal activation resize error')
     })
-  }, [active])
+    return () => cancelActivationFrame(refs.activationFrameRef)
+  }, [active, sequence])
+}
 
-  useEffect(() => {
-    const unsub = useAppStore.subscribe((state, prevState) => {
-      const t = termRef.current
-      if (!t) return
-      if (state.terminalTheme === prevState.terminalTheme) return
-      const tm = state.terminalTheme
-      applyTerminalTheme(t.options, tm)
-    })
-    return unsub
-  }, [])
-
-  return termRef
+export function useTerminal(terminalID: string, containerRef: RefObject<HTMLDivElement | null>, { active, focusRequest }: UseTerminalOptions) {
+  const refs: TerminalLifecycleRefs = {
+    termRef: useRef<Terminal | null>(null),
+    fitAddonRef: useRef<FitAddon | null>(null),
+    activationFrameRef: useRef<number | null>(null),
+    activeRef: useRef(active),
+    storeRef: useRef(useAppStore.getState()),
+  }
+  refs.activeRef.current = active
+  refs.storeRef.current = useAppStore.getState()
+  useTerminalLifecycle(terminalID, containerRef, refs)
+  useTerminalActivation({ terminalID, containerRef, refs, active, sequence: focusRequest.sequence })
+  return refs.termRef
 }

@@ -1,16 +1,17 @@
 import { useRef } from 'react'
-import { useTerminal } from '@/hooks/useTerminal'
+import { useTerminal, type TerminalFocusRequest } from '@/hooks/useTerminal'
 import '@xterm/xterm/css/xterm.css'
 
 interface Props {
   terminalID: string
   className?: string
   active: boolean
+  focusRequest: TerminalFocusRequest
 }
 
-export function TerminalEmulator({ terminalID, className, active }: Props) {
+export function TerminalEmulator({ terminalID, className, active, focusRequest }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
-  useTerminal(terminalID, containerRef, active)
+  useTerminal(terminalID, containerRef, { active, focusRequest })
 
   return (
     <div

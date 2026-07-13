@@ -1,13 +1,18 @@
-import { useRef, useEffect, useState, useCallback } from 'react'
-import { Terminal } from '@xterm/xterm'
+import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
 import { FitAddon } from '@xterm/addon-fit'
+import { Terminal } from '@xterm/xterm'
+import { Pause, Play } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Slider } from '@/components/ui/slider'
-import { Play, Pause } from 'lucide-react'
-import { LogService } from '@/lib/wails'
 import { logger } from '@/lib/logger'
-import { useAppStore } from '@/store/appStore'
 import { applyTerminalTheme, xtermTheme } from '@/lib/terminalTheme'
+import { LogService } from '@/lib/wails'
+import { useAppStore } from '@/store/appStore'
+
+const PLAYBACK_INTERVAL_MS = 16
+const PLAYBACK_SCROLLBACK = 10000
+const MAX_PROGRESS = 100
+const PLAYBACK_SPEEDS = [0.5, 1, 2, 4]
 
 interface RecordingEntry {
   timestamp: number
@@ -16,211 +21,252 @@ interface RecordingEntry {
 }
 
 interface PlayerData {
-  cols: number
-  rows: number
-  term_type: string
   entries: RecordingEntry[]
+}
+
+interface PlaybackCursor {
+  timer: ReturnType<typeof setInterval> | null
+  index: number
+  position: number
+  lastTick: number
 }
 
 interface Props {
   recordingId: string
   title: string
+  active: boolean
 }
 
-export function PlaybackTab({ recordingId, title }: Props) {
-  const containerRef = useRef<HTMLDivElement>(null)
-  const termRef = useRef<Terminal | null>(null)
-  const [playing, setPlaying] = useState(false)
-  const [speed, setSpeed] = useState(1)
-  const [progress, setProgress] = useState(0)
-  const [entries, setEntries] = useState<RecordingEntry[]>([])
-  const speedRef = useRef(1)
-  const playbackRef = useRef<{ timer: ReturnType<typeof setInterval> | null; index: number; position: number; lastTick: number }>({
-    timer: null,
-    index: 0,
-    position: 0,
-    lastTick: 0,
-  })
+function hasVisibleSize(container: HTMLDivElement | null): container is HTMLDivElement {
+  return container !== null && container.clientWidth > 0 && container.clientHeight > 0
+}
 
+function stopPlayback(cursor: PlaybackCursor) {
+  if (cursor.timer === null) return
+  const timer = cursor.timer
+  cursor.timer = null
+  clearInterval(timer)
+}
+
+function safelyDispose(label: string, dispose: () => void) {
+  try {
+    dispose()
+  } catch (error: unknown) {
+    logger.error(`playback ${label} cleanup error`, error)
+  }
+}
+
+async function loadRecording({ recordingId, title, term, setEntries, isDisposed }: {
+  recordingId: string
+  title: string
+  term: Terminal
+  setEntries: (entries: RecordingEntry[]) => void
+  isDisposed: () => boolean
+}) {
+  try {
+    const player = await LogService.GetRecording(String(recordingId)) as PlayerData | null
+    if (isDisposed()) return
+    if (!player?.entries) {
+      term.writeln('\x1b[33mNo recording data found\x1b[0m')
+      return
+    }
+    setEntries(player.entries)
+    term.writeln(`\x1b[1;36mRecording: ${title}\x1b[0m`)
+    term.writeln(`\x1b[90m${player.entries.length} entries ready for playback\x1b[0m`)
+  } catch (error: unknown) {
+    if (isDisposed()) return
+    logger.error('PlaybackTab: GetRecording error:', error)
+    term.writeln('\x1b[31mFailed to load recording\x1b[0m')
+  }
+}
+
+function createPlaybackTerminal() {
+  const terminalTheme = useAppStore.getState().terminalTheme
+  return new Terminal({
+    cursorBlink: false,
+    disableStdin: true,
+    fontSize: terminalTheme.fontSize,
+    fontFamily: terminalTheme.fontFamily,
+    theme: xtermTheme(terminalTheme),
+    scrollback: PLAYBACK_SCROLLBACK,
+  })
+}
+
+function usePlaybackLifecycle({ recordingId, title, containerRef, termRef, fitAddonRef, activeRef, cursorRef, setEntries }: {
+  recordingId: string
+  title: string
+  containerRef: RefObject<HTMLDivElement | null>
+  termRef: RefObject<Terminal | null>
+  fitAddonRef: RefObject<FitAddon | null>
+  activeRef: RefObject<boolean>
+  cursorRef: RefObject<PlaybackCursor>
+  setEntries: (entries: RecordingEntry[]) => void
+}) {
   useEffect(() => {
     let disposed = false
-    const terminalTheme = useAppStore.getState().terminalTheme
-
-    const term = new Terminal({
-      cursorBlink: false,
-      disableStdin: true,
-      fontSize: terminalTheme.fontSize,
-      fontFamily: terminalTheme.fontFamily,
-      theme: xtermTheme(terminalTheme),
-      scrollback: 10000,
-    })
+    const container = containerRef.current
+    const term = createPlaybackTerminal()
+    const fitAddon = new FitAddon()
     termRef.current = term
+    fitAddonRef.current = fitAddon
+    term.loadAddon(fitAddon)
+    if (container) term.open(container)
     const unsubscribeTheme = useAppStore.subscribe((state, previous) => {
       if (state.terminalTheme !== previous.terminalTheme) applyTerminalTheme(term.options, state.terminalTheme)
     })
-
-    const fitAddon = new FitAddon()
-    term.loadAddon(fitAddon)
-
-    if (containerRef.current) {
-      term.open(containerRef.current)
-      fitAddon.fit()
-    }
-
-    const resizeObs = new ResizeObserver(() => {
-      if (containerRef.current) {
-        fitAddon.fit()
-      }
+    const resizeObserver = new ResizeObserver(() => {
+      if (activeRef.current && hasVisibleSize(containerRef.current)) fitAddon.fit()
     })
-    if (containerRef.current) {
-      resizeObs.observe(containerRef.current)
-    }
-
-    LogService.GetRecording(String(recordingId)).then((data) => {
-      if (disposed) return
-      const player = data as PlayerData | null
-      if (player?.entries) {
-        setEntries(player.entries)
-        term.writeln(`\x1b[1;36mRecording: ${title}\x1b[0m`)
-        term.writeln(`\x1b[90m${player.entries.length} entries ready for playback\x1b[0m`)
-      } else {
-        term.writeln('\x1b[33mNo recording data found\x1b[0m')
-      }
-    }).catch((err: unknown) => {
-      if (disposed) return
-      logger.error('PlaybackTab: GetRecording error:', err)
-      term.writeln('\x1b[31mFailed to load recording\x1b[0m')
-    })
+    if (container) resizeObserver.observe(container)
+    void loadRecording({ recordingId, title, term, setEntries, isDisposed: () => disposed })
 
     return () => {
+      if (disposed) return
       disposed = true
-      const p = playbackRef.current
-      if (p.timer) {
-        clearInterval(p.timer)
-      }
-      resizeObs.disconnect()
-      unsubscribeTheme()
-      term.dispose()
+      stopPlayback(cursorRef.current)
+      safelyDispose('resize observer', () => resizeObserver.disconnect())
+      safelyDispose('theme subscription', unsubscribeTheme)
+      safelyDispose('fit addon', () => fitAddon.dispose())
+      safelyDispose('terminal', () => term.dispose())
+      fitAddonRef.current = null
+      termRef.current = null
     }
-  }, [recordingId, title])
+  }, [containerRef, cursorRef, fitAddonRef, recordingId, setEntries, termRef, title])
+}
 
+function usePlaybackActivation({ active, containerRef, termRef, fitAddonRef }: {
+  active: boolean
+  containerRef: RefObject<HTMLDivElement | null>
+  termRef: RefObject<Terminal | null>
+  fitAddonRef: RefObject<FitAddon | null>
+}) {
+  const frameRef = useRef<number | null>(null)
+  useEffect(() => {
+    if (frameRef.current !== null) cancelAnimationFrame(frameRef.current)
+    frameRef.current = null
+    if (!active) return
+    frameRef.current = requestAnimationFrame(() => {
+      frameRef.current = null
+      const term = termRef.current
+      const fitAddon = fitAddonRef.current
+      if (!term || !fitAddon || !hasVisibleSize(containerRef.current)) return
+      fitAddon.fit()
+      term.refresh(0, term.rows - 1)
+    })
+    return () => {
+      if (frameRef.current === null) return
+      cancelAnimationFrame(frameRef.current)
+      frameRef.current = null
+    }
+  }, [active, containerRef, fitAddonRef, termRef])
+}
+
+function writeUntil(term: Terminal, entries: RecordingEntry[], cursor: PlaybackCursor) {
+  let nextIndex = cursor.index
+  while (nextIndex < entries.length && entries[nextIndex].timestamp <= cursor.position) {
+    const entry = entries[nextIndex]
+    if (entry.data) term.write(decodeRecordingData(entry.data))
+    nextIndex++
+  }
+  cursor.index = nextIndex
+}
+
+function advancePlayback({ term, entries, cursor, speed, setProgress, setPlaying }: {
+  term: Terminal
+  entries: RecordingEntry[]
+  cursor: PlaybackCursor
+  speed: number
+  setProgress: (value: number) => void
+  setPlaying: (value: boolean) => void
+}) {
+  const now = Date.now()
+  cursor.position += (now - cursor.lastTick) * speed
+  cursor.lastTick = now
+  writeUntil(term, entries, cursor)
+  const duration = entries.at(-1)?.timestamp ?? 0
+  setProgress(duration > 0 ? Math.min(MAX_PROGRESS, Math.round((cursor.position / duration) * MAX_PROGRESS)) : 0)
+  if (cursor.index < entries.length) return
+  stopPlayback(cursor)
+  setPlaying(false)
+}
+
+function usePlaybackControls(entries: RecordingEntry[], termRef: RefObject<Terminal | null>, cursorRef: RefObject<PlaybackCursor>) {
+  const [playing, setPlaying] = useState(false)
+  const [speed, setSpeed] = useState(1)
+  const [progress, setProgress] = useState(0)
+  const speedRef = useRef(1)
   const togglePlay = useCallback(() => {
-    if (entries.length === 0) return
-
-    const next = !playing
-    setPlaying(next)
-
-    const p = playbackRef.current
     const term = termRef.current
-    if (!term) return
-
-    if (next) {
-      p.lastTick = Date.now()
-      p.timer = setInterval(() => {
-        const now = Date.now()
-        p.position += (now - p.lastTick) * speedRef.current
-        p.lastTick = now
-        let newIndex = p.index
-
-        while (newIndex < entries.length && entries[newIndex].timestamp <= p.position) {
-          const entry = entries[newIndex]
-          if (entry.data) {
-            term.write(decodeRecordingData(entry.data))
-          }
-          newIndex++
-        }
-
-        p.index = newIndex
-        const duration = entries.at(-1)?.timestamp ?? 0
-        const pct = duration > 0 ? Math.min(100, Math.round((p.position / duration) * 100)) : 0
-        setProgress(pct)
-
-        if (newIndex >= entries.length) {
-          clearInterval(p.timer!)
-          p.timer = null
-          setPlaying(false)
-        }
-      }, 16)
-    } else {
-      if (p.timer) {
-        clearInterval(p.timer)
-        p.timer = null
-      }
+    if (!term || entries.length === 0) return
+    const cursor = cursorRef.current
+    if (playing) {
+      stopPlayback(cursor)
+      setPlaying(false)
+      return
     }
-  }, [playing, entries])
-
-  const handleSpeedChange = useCallback((value: number | number[]) => {
-    const v = typeof value === 'number' ? value : value[0]
-    setSpeed(v)
-    speedRef.current = v
+    cursor.lastTick = Date.now()
+    cursor.timer = setInterval(() => advancePlayback({ term, entries, cursor, speed: speedRef.current, setProgress, setPlaying }), PLAYBACK_INTERVAL_MS)
+    setPlaying(true)
+  }, [cursorRef, entries, playing, termRef])
+  const changeSpeed = useCallback((value: number) => {
+    setSpeed(value)
+    speedRef.current = value
   }, [])
-
   const seek = useCallback((percentage: number) => {
     const term = termRef.current
     if (!term || entries.length === 0) return
-    const duration = entries.at(-1)?.timestamp ?? 0
-    const position = duration * Math.max(0, Math.min(100, percentage)) / 100
-    const p = playbackRef.current
+    const cursor = cursorRef.current
+    cursor.position = (entries.at(-1)?.timestamp ?? 0) * Math.max(0, Math.min(MAX_PROGRESS, percentage)) / MAX_PROGRESS
+    cursor.index = 0
     term.reset()
-    let index = 0
-    while (index < entries.length && entries[index].timestamp <= position) {
-      const entry = entries[index]
-      if (entry.data) term.write(decodeRecordingData(entry.data))
-      index++
-    }
-    p.index = index
-    p.position = position
-    p.lastTick = Date.now()
+    writeUntil(term, entries, cursor)
+    cursor.lastTick = Date.now()
     setProgress(percentage)
-  }, [entries])
+  }, [cursorRef, entries, termRef])
+  return { playing, speed, progress, togglePlay, changeSpeed, seek }
+}
+
+function PlaybackHeader({ title, playing, disabled, speed, onToggle }: { title: string; playing: boolean; disabled: boolean; speed: number; onToggle: () => void }) {
+  return (
+    <div className="flex h-8 items-center gap-2 border-b bg-muted/30 px-2">
+      <span className="text-xs text-muted-foreground">回放: {title}</span>
+      <div className="flex-1" />
+      <Button size="xs" variant="ghost" aria-label={playing ? '暂停回放' : '开始回放'} disabled={disabled} onClick={onToggle}>
+        {playing ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
+      </Button>
+      <span className="text-xs text-muted-foreground">{speed}x</span>
+    </div>
+  )
+}
+
+function PlaybackTimeline({ progress, speed, onSeek, onSpeed }: { progress: number; speed: number; onSeek: (value: number) => void; onSpeed: (value: number) => void }) {
+  return (
+    <div className="flex items-center gap-2 border-t border-border bg-muted/30 px-3 py-1.5">
+      <Slider value={[progress]} min={0} max={MAX_PROGRESS} onValueChange={(value) => onSeek(typeof value === 'number' ? value : value[0])} className="flex-1" />
+      <div className="flex flex-shrink-0 items-center gap-1">
+        {PLAYBACK_SPEEDS.map((value) => <Button key={value} size="xs" variant={speed === value ? 'default' : 'ghost'} className="text-xs" onClick={() => onSpeed(value)}>{value}x</Button>)}
+      </div>
+    </div>
+  )
+}
+
+export function PlaybackTab({ recordingId, title, active }: Props) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const termRef = useRef<Terminal | null>(null)
+  const fitAddonRef = useRef<FitAddon | null>(null)
+  const activeRef = useRef(active)
+  const cursorRef = useRef<PlaybackCursor>({ timer: null, index: 0, position: 0, lastTick: 0 })
+  const [entries, setEntries] = useState<RecordingEntry[]>([])
+  activeRef.current = active
+  usePlaybackLifecycle({ recordingId, title, containerRef, termRef, fitAddonRef, activeRef, cursorRef, setEntries })
+  usePlaybackActivation({ active, containerRef, termRef, fitAddonRef })
+  const controls = usePlaybackControls(entries, termRef, cursorRef)
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="flex items-center gap-2 h-8 px-2 bg-muted/30 border-b">
-        <span className="text-xs text-muted-foreground">回放: {title}</span>
-        <div className="flex-1" />
-        <Button size="xs" variant="ghost" aria-label={playing ? '暂停回放' : '开始回放'} disabled={entries.length === 0} onClick={togglePlay}>
-          {playing ? (
-            <Pause className="h-3.5 w-3.5" />
-          ) : (
-            <Play className="h-3.5 w-3.5" />
-          )}
-        </Button>
-        <div className="flex items-center gap-1">
-          <span className="text-xs text-muted-foreground">
-            {speed}x
-          </span>
-        </div>
-      </div>
+    <div className="flex h-full flex-col">
+      <PlaybackHeader title={title} playing={controls.playing} disabled={entries.length === 0} speed={controls.speed} onToggle={controls.togglePlay} />
       <div ref={containerRef} className="flex-1" />
-      <div className="flex items-center gap-2 px-3 py-1.5 border-t border-border bg-muted/30">
-        <Slider
-          value={[progress]}
-          min={0}
-          max={100}
-          onValueChange={(value: number | readonly number[]) => {
-            if (typeof value === 'number') {
-              seek(value)
-            } else if (value.length > 0) {
-              seek(value[0])
-            }
-          }}
-          className="flex-1"
-        />
-        <div className="flex items-center gap-1 flex-shrink-0">
-          {[0.5, 1, 2, 4].map((s) => (
-            <Button
-              key={s}
-              size="xs"
-              variant={speed === s ? 'default' : 'ghost'}
-              className="text-xs"
-              onClick={() => handleSpeedChange(s)}
-            >
-              {s}x
-            </Button>
-          ))}
-        </div>
-      </div>
+      <PlaybackTimeline progress={controls.progress} speed={controls.speed} onSeek={controls.seek} onSpeed={controls.changeSpeed} />
     </div>
   )
 }
