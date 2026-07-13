@@ -4,6 +4,7 @@ import { SessionService, TerminalService, TunnelService } from '@/lib/wails'
 import { useConnectDialog } from '@/store/connectDialog'
 import { toast } from '@/components/ui/toast'
 import { logger } from '@/lib/logger'
+import { createTerminalTab } from '@/lib/terminalTabs'
 import type { Session as BindingSession, SessionInput, Tunnel as BindingTunnel } from '../../bindings/github.com/xuthus5/mssh/internal/model/models'
 
 export interface Folder {
@@ -246,9 +247,14 @@ export function useSession() {
 
     try {
       const terminalId = await TerminalService.Open(Number(sessionId), 80, 24)
-      const tabId = `terminal-${sessionId}`
+      const tab = createTerminalTab({
+        sessionID: Number(sessionId),
+        sessionName: session.name,
+        terminalID: terminalId,
+        tabs: useAppStore.getState().tabs,
+      })
       useAppStore.getState().setConnectionStatus(terminalId, 'connected')
-      openTab({ id: tabId, title: session.name, type: 'terminal', terminalId, sessionId: Number(sessionId) })
+      openTab(tab)
       await Promise.all([listRecentSessions(), listSessions()])
 
       dialog.setState('connected')
@@ -260,10 +266,9 @@ export function useSession() {
     }
   }, [listRecentSessions, listSessions, openTab, sessions])
 
-  const disconnect = useCallback(async (sessionId: string) => {
+  const disconnect = useCallback(async (terminalId: string) => {
     try {
-      const terminalId = `terminal-${sessionId}`
-      await SessionService.Disconnect(terminalId)
+      await TerminalService.Close(terminalId)
       useAppStore.getState().setConnectionStatus(terminalId, 'disconnected')
     } catch (err) {
       logger.error('disconnect error', err)
