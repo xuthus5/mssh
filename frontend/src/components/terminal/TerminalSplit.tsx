@@ -37,11 +37,15 @@ async function openSplitTerminal({ sessionId, isCancelled, onOpen }: {
   }
 }
 
-function requestPrimaryFocus(primaryID: string, closedTerminalID: string) {
+function restorePrimaryPane(primaryID: string, closedTerminalID: string) {
   const state = useAppStore.getState()
   if (state.activePaneId !== closedTerminalID) return
   const tab = state.tabs.find((item) => item.type === 'terminal' && (item.terminalId ?? item.id) === primaryID)
-  if (tab) state.requestTerminalFocus(tab.id, primaryID)
+  const shouldRequestFocus = tab !== undefined
+    && state.activeSurface?.type === 'terminal'
+    && state.activeSurface.id === tab.id
+  state.setActivePane(primaryID)
+  if (shouldRequestFocus) state.requestTerminalFocus(tab.id, primaryID)
 }
 
 async function closeSplitTerminal({ terminalID, primaryID, mountedRef, closingRef, splitIDRef, setSplitID, setClosing }: {
@@ -71,7 +75,7 @@ async function closeSplitTerminal({ terminalID, primaryID, mountedRef, closingRe
   if (!mountedRef.current) return
   setSplitID(null)
   setClosing(false)
-  requestPrimaryFocus(primaryID, terminalID)
+  restorePrimaryPane(primaryID, terminalID)
 }
 
 function useSplitTerminal(sessionId: number, primaryID: string) {
