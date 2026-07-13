@@ -24,8 +24,8 @@ export default defineConfig({
     },
     coverage: {
       provider: 'v8',
-      include: ['src/hooks/**', 'src/components/session/**', 'src/components/layout/Sidebar.tsx', 'src/store/**', 'bindings/**'],
-      thresholds: { lines: 80, functions: 80 },
+      include: ['src/hooks/**', 'src/components/session/**', 'src/components/layout/Sidebar.tsx', 'src/store/**'],
+      thresholds: { lines: 90, functions: 90 },
     },
   },
 })
