@@ -3,7 +3,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/components/session/SessionAssetCenter', () => ({ SessionAssetCenter: () => <div>会话资产工作区</div> }))
 vi.mock('@/components/layout/Sidebar', () => ({ default: () => null }))
-vi.mock('@/components/layout/TabBar', () => ({ default: () => null }))
 vi.mock('@/components/layout/StatusBar', () => ({ default: () => null }))
 vi.mock('@/components/layout/WindowTitleBar', () => ({ WindowTitleBar: () => null }))
 vi.mock('@/components/layout/ConnectDialog', () => ({ ConnectDialog: () => null }))
