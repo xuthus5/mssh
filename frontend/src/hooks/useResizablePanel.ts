@@ -1,33 +1,22 @@
-import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react'
+import { useEffect, useRef, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react'
+import { useAppStore } from '@/store/appStore'
 
 const DEFAULT_WIDTH = 280
 const MIN_WIDTH = 220
 const MAX_WIDTH = 480
-const STORAGE_KEY = 'mssh:sidebar-width'
-const COLLAPSED_STORAGE_KEY = 'mssh:sidebar-collapsed'
 const KEYBOARD_STEP = 16
 
-function clampWidth(width: number) {
-  return Math.min(Math.max(width, MIN_WIDTH), MAX_WIDTH)
-}
-
-function initialWidth() {
-  const saved = Number(localStorage.getItem(STORAGE_KEY))
-  return Number.isFinite(saved) && saved > 0 ? clampWidth(saved) : DEFAULT_WIDTH
-}
-
 export function useResizablePanel() {
-  const [width, setWidth] = useState(initialWidth)
-  const [collapsed, setCollapsed] = useState(() => localStorage.getItem(COLLAPSED_STORAGE_KEY) === 'true')
+  const width = useAppStore((state) => state.sidebarWidth)
+  const collapsed = useAppStore((state) => state.navigationCollapsed)
+  const setSidebarWidth = useAppStore((state) => state.setSidebarWidth)
   const dragRef = useRef<{ pointerId: number; startX: number; startWidth: number } | null>(null)
 
   useEffect(() => {
     const handleMove = (event: PointerEvent) => {
       const drag = dragRef.current
       if (!drag || event.pointerId !== drag.pointerId) return
-      const nextWidth = clampWidth(drag.startWidth + event.clientX - drag.startX)
-      setWidth(nextWidth)
-      localStorage.setItem(STORAGE_KEY, String(nextWidth))
+      setSidebarWidth(drag.startWidth + event.clientX - drag.startX)
     }
     const handleUp = (event: PointerEvent) => {
       if (dragRef.current?.pointerId !== event.pointerId) return
@@ -41,12 +30,10 @@ export function useResizablePanel() {
       window.removeEventListener('pointerup', handleUp)
       window.removeEventListener('pointercancel', handleUp)
     }
-  }, [])
+  }, [setSidebarWidth])
 
   const resize = (nextWidth: number) => {
-    const value = clampWidth(nextWidth)
-    setWidth(value)
-    localStorage.setItem(STORAGE_KEY, String(value))
+    setSidebarWidth(nextWidth)
   }
 
   const handlePointerDown = (event: ReactPointerEvent<HTMLElement>) => {
@@ -63,19 +50,10 @@ export function useResizablePanel() {
     event.preventDefault()
   }
 
-  const toggleCollapsed = () => {
-    setCollapsed((current) => {
-      const next = !current
-      localStorage.setItem(COLLAPSED_STORAGE_KEY, String(next))
-      return next
-    })
-  }
-
   return {
     width,
     collapsed,
     displayedWidth: collapsed ? 0 : width,
-    toggleCollapsed,
     resizeHandleProps: {
       onPointerDown: handlePointerDown,
       onDoubleClick: () => resize(DEFAULT_WIDTH),
