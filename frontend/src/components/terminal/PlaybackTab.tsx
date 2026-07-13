@@ -4,6 +4,8 @@ import { Terminal } from '@xterm/xterm'
 import { Pause, Play } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Slider } from '@/components/ui/slider'
+import { useTerminalRuntimeErrorReporter, type TerminalRuntimeErrorReporter } from '@/components/terminal/TerminalErrorBoundary'
+import { runTerminalRuntime } from '@/components/terminal/terminalRuntime'
 import { logger } from '@/lib/logger'
 import { applyTerminalTheme, xtermTheme } from '@/lib/terminalTheme'
 import { LogService } from '@/lib/wails'
@@ -56,16 +58,25 @@ function safelyDispose(label: string, dispose: () => void) {
   }
 }
 
-async function loadRecording({ recordingId, title, term, setEntries, isDisposed }: {
+async function loadRecording({ recordingId, title, term, setEntries, isDisposed, reportRuntimeError }: {
   recordingId: string
   title: string
   term: Terminal
   setEntries: (entries: RecordingEntry[]) => void
   isDisposed: () => boolean
+  reportRuntimeError: TerminalRuntimeErrorReporter
 }) {
+  let player: PlayerData | null
   try {
-    const player = await LogService.GetRecording(String(recordingId)) as PlayerData | null
+    player = await LogService.GetRecording(String(recordingId)) as PlayerData | null
+  } catch (error: unknown) {
     if (isDisposed()) return
+    logger.error('PlaybackTab: GetRecording error:', error)
+    runTerminalRuntime(reportRuntimeError, 'playback load status', () => term.writeln('\x1b[31mFailed to load recording\x1b[0m'))
+    return
+  }
+  if (isDisposed()) return
+  runTerminalRuntime(reportRuntimeError, 'playback recording render', () => {
     if (!player?.entries) {
       term.writeln('\x1b[33mNo recording data found\x1b[0m')
       return
@@ -73,11 +84,7 @@ async function loadRecording({ recordingId, title, term, setEntries, isDisposed 
     setEntries(player.entries)
     term.writeln(`\x1b[1;36mRecording: ${title}\x1b[0m`)
     term.writeln(`\x1b[90m${player.entries.length} entries ready for playback\x1b[0m`)
-  } catch (error: unknown) {
-    if (isDisposed()) return
-    logger.error('PlaybackTab: GetRecording error:', error)
-    term.writeln('\x1b[31mFailed to load recording\x1b[0m')
-  }
+  })
 }
 
 function createPlaybackTerminal() {
@@ -92,7 +99,7 @@ function createPlaybackTerminal() {
   })
 }
 
-function usePlaybackLifecycle({ recordingId, title, containerRef, termRef, fitAddonRef, activeRef, cursorRef, setEntries }: {
+function usePlaybackLifecycle({ recordingId, title, containerRef, termRef, fitAddonRef, activeRef, cursorRef, setEntries, reportRuntimeError }: {
   recordingId: string
   title: string
   containerRef: RefObject<HTMLDivElement | null>
@@ -101,6 +108,7 @@ function usePlaybackLifecycle({ recordingId, title, containerRef, termRef, fitAd
   activeRef: RefObject<boolean>
   cursorRef: RefObject<PlaybackCursor>
   setEntries: (entries: RecordingEntry[]) => void
+  reportRuntimeError: TerminalRuntimeErrorReporter
 }) {
   useEffect(() => {
     let disposed = false
@@ -112,13 +120,17 @@ function usePlaybackLifecycle({ recordingId, title, containerRef, termRef, fitAd
     term.loadAddon(fitAddon)
     if (container) term.open(container)
     const unsubscribeTheme = useAppStore.subscribe((state, previous) => {
-      if (state.terminalTheme !== previous.terminalTheme) applyTerminalTheme(term.options, state.terminalTheme)
+      if (state.terminalTheme !== previous.terminalTheme) {
+        runTerminalRuntime(reportRuntimeError, 'playback theme update', () => applyTerminalTheme(term.options, state.terminalTheme))
+      }
     })
     const resizeObserver = new ResizeObserver(() => {
-      if (activeRef.current && hasVisibleSize(containerRef.current)) fitAddon.fit()
+      runTerminalRuntime(reportRuntimeError, 'playback resize', () => {
+        if (activeRef.current && hasVisibleSize(containerRef.current)) fitAddon.fit()
+      })
     })
     if (container) resizeObserver.observe(container)
-    void loadRecording({ recordingId, title, term, setEntries, isDisposed: () => disposed })
+    void loadRecording({ recordingId, title, term, setEntries, isDisposed: () => disposed, reportRuntimeError })
 
     return () => {
       if (disposed) return
@@ -126,19 +138,19 @@ function usePlaybackLifecycle({ recordingId, title, containerRef, termRef, fitAd
       stopPlayback(cursorRef.current)
       safelyDispose('resize observer', () => resizeObserver.disconnect())
       safelyDispose('theme subscription', unsubscribeTheme)
-      safelyDispose('fit addon', () => fitAddon.dispose())
       safelyDispose('terminal', () => term.dispose())
       fitAddonRef.current = null
       termRef.current = null
     }
-  }, [containerRef, cursorRef, fitAddonRef, recordingId, setEntries, termRef, title])
+  }, [containerRef, cursorRef, fitAddonRef, recordingId, reportRuntimeError, setEntries, termRef, title])
 }
 
-function usePlaybackActivation({ active, containerRef, termRef, fitAddonRef }: {
+function usePlaybackActivation({ active, containerRef, termRef, fitAddonRef, reportRuntimeError }: {
   active: boolean
   containerRef: RefObject<HTMLDivElement | null>
   termRef: RefObject<Terminal | null>
   fitAddonRef: RefObject<FitAddon | null>
+  reportRuntimeError: TerminalRuntimeErrorReporter
 }) {
   const frameRef = useRef<number | null>(null)
   useEffect(() => {
@@ -150,15 +162,17 @@ function usePlaybackActivation({ active, containerRef, termRef, fitAddonRef }: {
       const term = termRef.current
       const fitAddon = fitAddonRef.current
       if (!term || !fitAddon || !hasVisibleSize(containerRef.current)) return
-      fitAddon.fit()
-      term.refresh(0, term.rows - 1)
+      runTerminalRuntime(reportRuntimeError, 'playback activation', () => {
+        fitAddon.fit()
+        term.refresh(0, term.rows - 1)
+      })
     })
     return () => {
       if (frameRef.current === null) return
       cancelAnimationFrame(frameRef.current)
       frameRef.current = null
     }
-  }, [active, containerRef, fitAddonRef, termRef])
+  }, [active, containerRef, fitAddonRef, reportRuntimeError, termRef])
 }
 
 function writeUntil(term: Terminal, entries: RecordingEntry[], cursor: PlaybackCursor) {
@@ -190,7 +204,7 @@ function advancePlayback({ term, entries, cursor, speed, setProgress, setPlaying
   setPlaying(false)
 }
 
-function usePlaybackControls(entries: RecordingEntry[], termRef: RefObject<Terminal | null>, cursorRef: RefObject<PlaybackCursor>) {
+function usePlaybackControls(entries: RecordingEntry[], termRef: RefObject<Terminal | null>, cursorRef: RefObject<PlaybackCursor>, reportRuntimeError: TerminalRuntimeErrorReporter) {
   const [playing, setPlaying] = useState(false)
   const [speed, setSpeed] = useState(1)
   const [progress, setProgress] = useState(0)
@@ -205,9 +219,14 @@ function usePlaybackControls(entries: RecordingEntry[], termRef: RefObject<Termi
       return
     }
     cursor.lastTick = Date.now()
-    cursor.timer = setInterval(() => advancePlayback({ term, entries, cursor, speed: speedRef.current, setProgress, setPlaying }), PLAYBACK_INTERVAL_MS)
+    cursor.timer = setInterval(() => {
+      const succeeded = runTerminalRuntime(reportRuntimeError, 'playback timer', () => {
+        advancePlayback({ term, entries, cursor, speed: speedRef.current, setProgress, setPlaying })
+      })
+      if (!succeeded) stopPlayback(cursor)
+    }, PLAYBACK_INTERVAL_MS)
     setPlaying(true)
-  }, [cursorRef, entries, playing, termRef])
+  }, [cursorRef, entries, playing, reportRuntimeError, termRef])
   const changeSpeed = useCallback((value: number) => {
     setSpeed(value)
     speedRef.current = value
@@ -216,13 +235,15 @@ function usePlaybackControls(entries: RecordingEntry[], termRef: RefObject<Termi
     const term = termRef.current
     if (!term || entries.length === 0) return
     const cursor = cursorRef.current
-    cursor.position = (entries.at(-1)?.timestamp ?? 0) * Math.max(0, Math.min(MAX_PROGRESS, percentage)) / MAX_PROGRESS
-    cursor.index = 0
-    term.reset()
-    writeUntil(term, entries, cursor)
-    cursor.lastTick = Date.now()
-    setProgress(percentage)
-  }, [cursorRef, entries, termRef])
+    runTerminalRuntime(reportRuntimeError, 'playback seek', () => {
+      cursor.position = (entries.at(-1)?.timestamp ?? 0) * Math.max(0, Math.min(MAX_PROGRESS, percentage)) / MAX_PROGRESS
+      cursor.index = 0
+      term.reset()
+      writeUntil(term, entries, cursor)
+      cursor.lastTick = Date.now()
+      setProgress(percentage)
+    })
+  }, [cursorRef, entries, reportRuntimeError, termRef])
   return { playing, speed, progress, togglePlay, changeSpeed, seek }
 }
 
@@ -251,6 +272,7 @@ function PlaybackTimeline({ progress, speed, onSeek, onSpeed }: { progress: numb
 }
 
 export function PlaybackTab({ recordingId, title, active }: Props) {
+  const reportRuntimeError = useTerminalRuntimeErrorReporter()
   const containerRef = useRef<HTMLDivElement>(null)
   const termRef = useRef<Terminal | null>(null)
   const fitAddonRef = useRef<FitAddon | null>(null)
@@ -258,9 +280,9 @@ export function PlaybackTab({ recordingId, title, active }: Props) {
   const cursorRef = useRef<PlaybackCursor>({ timer: null, index: 0, position: 0, lastTick: 0 })
   const [entries, setEntries] = useState<RecordingEntry[]>([])
   activeRef.current = active
-  usePlaybackLifecycle({ recordingId, title, containerRef, termRef, fitAddonRef, activeRef, cursorRef, setEntries })
-  usePlaybackActivation({ active, containerRef, termRef, fitAddonRef })
-  const controls = usePlaybackControls(entries, termRef, cursorRef)
+  usePlaybackLifecycle({ recordingId, title, containerRef, termRef, fitAddonRef, activeRef, cursorRef, setEntries, reportRuntimeError })
+  usePlaybackActivation({ active, containerRef, termRef, fitAddonRef, reportRuntimeError })
+  const controls = usePlaybackControls(entries, termRef, cursorRef, reportRuntimeError)
 
   return (
     <div className="flex h-full flex-col">
