@@ -7,6 +7,20 @@ export type ActiveSurface =
   | { type: 'terminal'; id: string }
   | { type: 'playback'; id: string }
 
+export const WORKSPACE_PANEL_ID = 'workspace-panel'
+
+export function workspaceTabID(workspaceID: WorkspaceID): string {
+  return `workspace-tab-${workspaceID}`
+}
+
+export function dynamicTabID(tabID: string): string {
+  return `dynamic-tab-${tabID}`
+}
+
+export function dynamicPanelID(tabID: string): string {
+  return `dynamic-panel-${tabID}`
+}
+
 const DEFAULT_SIDEBAR_WIDTH = 280
 const MIN_SIDEBAR_WIDTH = 220
 const MAX_SIDEBAR_WIDTH = 480

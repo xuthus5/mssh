@@ -7,6 +7,7 @@ import { logger } from '@/lib/logger'
 const { getRecording } = vi.hoisted(() => ({ getRecording: vi.fn(async (): Promise<any> => ({ entries: [] })) }))
 const terminalInstances: Array<{ options: Record<string, any>; writeln: ReturnType<typeof vi.fn>; write: ReturnType<typeof vi.fn>; refresh: ReturnType<typeof vi.fn>; reset: ReturnType<typeof vi.fn>; dispose: ReturnType<typeof vi.fn> }> = []
 const fitInstances: Array<{ fit: ReturnType<typeof vi.fn>; dispose: ReturnType<typeof vi.fn> }> = []
+const resizeHandlers: ResizeObserverCallback[] = []
 let playbackWriteError: Error | null = null
 vi.mock('@xterm/xterm', () => ({ Terminal: class {
   options: Record<string, any>
@@ -39,9 +40,14 @@ describe('PlaybackTab terminal theme', () => {
   beforeEach(() => {
     terminalInstances.length = 0
     fitInstances.length = 0
+    resizeHandlers.length = 0
     getRecording.mockResolvedValue({ entries: [] })
     playbackWriteError = null
-    vi.stubGlobal('ResizeObserver', class { observe() {}; disconnect() {} })
+    vi.stubGlobal('ResizeObserver', class {
+      observe() {}
+      disconnect() {}
+      constructor(callback: ResizeObserverCallback) { resizeHandlers.push(callback) }
+    })
     vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => { callback(0); return 1 })
     vi.stubGlobal('cancelAnimationFrame', vi.fn())
     vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800)
@@ -102,6 +108,31 @@ describe('PlaybackTab terminal theme', () => {
     rerender(<PlaybackTab recordingId="1" title="demo" active />)
 
     await waitFor(() => expect(fitInstances[0].fit).toHaveBeenCalledOnce())
+    expect(terminalInstances[0].refresh).toHaveBeenCalledOnce()
+  })
+
+  it('recovers a zero-size playback on the first visible resize', async () => {
+    let width = 0
+    let height = 0
+    const animationFrames: FrameRequestCallback[] = []
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(() => width)
+    vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockImplementation(() => height)
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+      animationFrames.push(callback)
+      return animationFrames.length
+    })
+    const view = render(<PlaybackTab recordingId="1" title="demo" active={false} />)
+    await waitFor(() => expect(terminalInstances).toHaveLength(1))
+
+    view.rerender(<PlaybackTab recordingId="1" title="demo" active />)
+    act(() => animationFrames.shift()?.(0))
+    expect(fitInstances[0].fit).not.toHaveBeenCalled()
+    expect(terminalInstances[0].refresh).not.toHaveBeenCalled()
+
+    width = 800
+    height = 500
+    act(() => resizeHandlers[0]([], {} as ResizeObserver))
+    expect(fitInstances[0].fit).toHaveBeenCalledOnce()
     expect(terminalInstances[0].refresh).toHaveBeenCalledOnce()
   })
 

@@ -2,7 +2,7 @@ import { Menu, Minus, Moon, Settings, Square, SquareTerminal, Sun, Workflow, X }
 import { Window } from '@wailsio/runtime'
 import { logger } from '@/lib/logger'
 import { useAppStore } from '@/store/appStore'
-import type { WorkspaceID } from '@/store/tabNavigation'
+import { WORKSPACE_PANEL_ID, workspaceTabID, type WorkspaceID } from '@/store/tabNavigation'
 import { useThemeCatalog } from '@/hooks/useThemeCatalog'
 import { DynamicTabStrip } from '@/components/layout/DynamicTabStrip'
 
@@ -26,7 +26,7 @@ export function WindowTitleBar() {
   const navigationButton = (tab: WorkspaceID, label: string) => {
     const Icon = tab === 'sessions' ? SquareTerminal : Workflow
     const selected = activeSurface?.type === 'workspace' && activeSurface.id === tab
-    return <button type="button" role="tab" aria-selected={selected} className={`flex items-center gap-1.5 px-3.5 text-sm font-medium transition-colors [--wails-draggable:no-drag] ${selected ? 'bg-background text-foreground shadow-[inset_0_-2px_0_var(--primary)]' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`} onClick={() => activateWorkspace(tab)}><Icon data-icon="inline-start" aria-hidden="true" className="size-4" />{label}</button>
+    return <button id={workspaceTabID(tab)} type="button" role="tab" aria-controls={WORKSPACE_PANEL_ID} aria-selected={selected} className={`flex items-center gap-1.5 px-3.5 text-sm font-medium transition-colors [--wails-draggable:no-drag] ${selected ? 'bg-background text-foreground shadow-[inset_0_-2px_0_var(--primary)]' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`} onClick={() => activateWorkspace(tab)}><Icon data-icon="inline-start" aria-hidden="true" className="size-4" />{label}</button>
   }
 
   return <header className="flex h-9 shrink-0 select-none items-stretch border-b border-border bg-card">
