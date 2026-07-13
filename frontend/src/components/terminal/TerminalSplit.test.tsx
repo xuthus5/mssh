@@ -48,7 +48,8 @@ function deferred<T>() {
 
 function StoreDrivenSplit() {
   const request = useAppStore((state) => state.focusRequest)
-  return <TerminalSplit primaryID="primary-1" sessionId={1} active focusRequest={{
+  const active = useAppStore((state) => state.activeSurface?.type === 'terminal' && state.activeSurface.id === 'tab-1')
+  return <TerminalSplit primaryID="primary-1" sessionId={1} active={active} focusRequest={{
     sequence: request.sequence,
     targetTerminalID: request.terminalId ?? null,
   }} />
@@ -127,6 +128,27 @@ describe('TerminalSplit focus requests', () => {
     })
     expect(terminalInstances[0].focus).toHaveBeenCalledOnce()
     expect(terminalInstances[1].focus).toHaveBeenCalledOnce()
+  })
+
+  it('preserves a workspace selected while split close is pending', async () => {
+    const close = deferred<void>()
+    vi.mocked(TerminalService.Close).mockReturnValueOnce(close.promise as ReturnType<typeof TerminalService.Close>)
+    render(<StoreDrivenSplit />)
+    await waitFor(() => expect(screen.getByTitle('关闭分屏')).toBeInTheDocument())
+    act(() => useAppStore.getState().requestTerminalFocus('tab-1', 'split-1'))
+    const focusRequest = useAppStore.getState().focusRequest
+
+    fireEvent.click(screen.getByTitle('关闭分屏'))
+    act(() => useAppStore.getState().activateWorkspace('sessions'))
+    act(() => close.resolve())
+
+    await waitFor(() => expect(screen.queryByTitle('关闭分屏')).not.toBeInTheDocument())
+    expect(useAppStore.getState()).toMatchObject({
+      activeSurface: { type: 'workspace', id: 'sessions' },
+      activePaneId: 'primary-1',
+      focusRequest,
+    })
+    expect(terminalInstances[0].focus).not.toHaveBeenCalled()
   })
 
   it('keeps the split open and reports an explicit close failure', async () => {
