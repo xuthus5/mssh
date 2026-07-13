@@ -91,6 +91,29 @@ describe('appStore', () => {
     expect(localStorage.getItem('mssh:sidebar-width')).toBe('320')
   })
 
+  it('restores and clamps the persisted sidebar width at startup', async () => {
+    localStorage.setItem('mssh:sidebar-width', '999')
+    vi.resetModules()
+
+    const { useAppStore: freshAppStore } = await import('@/store/appStore')
+
+    expect(freshAppStore.getState().sidebarWidth).toBe(480)
+  })
+
+  it.each([
+    [Number.NaN, 280],
+    [Number.POSITIVE_INFINITY, 480],
+    [Number.NEGATIVE_INFINITY, 220],
+    [-1, 220],
+    [219, 220],
+    [481, 480],
+  ])('clamps invalid sidebar width %s to %s', (input, expected) => {
+    useAppStore.getState().setSidebarWidth(input)
+
+    expect(useAppStore.getState().sidebarWidth).toBe(expected)
+    expect(localStorage.getItem('mssh:sidebar-width')).toBe(String(expected))
+  })
+
   it('keeps a terminal tab open when closing it fails', async () => {
     __registerHandler(
       'github.com/xuthus5/mssh/internal/service.TerminalService.Close',
