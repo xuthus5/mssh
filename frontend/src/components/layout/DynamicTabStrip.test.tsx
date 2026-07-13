@@ -1,5 +1,5 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -96,12 +96,17 @@ describe('DynamicTabStrip', () => {
     expect(useAppStore.getState().activeSurface).toEqual({ type: 'terminal', id: 'terminal-1' })
   })
 
-  it('exposes terminal connection and playback state without relying on color', () => {
+  it('includes terminal and playback status in each tab accessible name', () => {
     seedTabs()
     render(<DynamicTabStrip />)
 
-    expect(screen.getByLabelText('生产服务器：已连接')).toBeInTheDocument()
-    expect(screen.getByLabelText('回放 #1：回放')).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: '生产服务器，状态：已连接' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: '回放 #1，状态：回放' })).toBeInTheDocument()
+    expect(screen.queryByRole('img')).not.toBeInTheDocument()
+
+    act(() => useAppStore.setState({ connectionStatus: { 'term-1': 'disconnected' } }))
+
+    expect(screen.getByRole('tab', { name: '生产服务器，状态：未连接' })).toBeInTheDocument()
   })
 
   it('requires confirmation before closing an active terminal connection', async () => {

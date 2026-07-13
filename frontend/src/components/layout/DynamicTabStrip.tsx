@@ -48,10 +48,15 @@ function requiresCloseConfirmation(tab: Tab, connectionStatus: AppState['connect
   return connectionStatus[tab.terminalId] === 'connected' || recordingState[tab.terminalId] === 'recording'
 }
 
+function tabStatusLabel(tab: Tab, connectionStatus: AppState['connectionStatus']): string {
+  if (tab.type === 'playback') return '回放'
+  return connectionStatusVisual(connectionStatus[tab.terminalId ?? tab.id]).label
+}
+
 function TabStatusIcon({ tab, connectionStatus }: { tab: Tab; connectionStatus: AppState['connectionStatus'] }) {
-  if (tab.type === 'playback') return <Play role="img" aria-label={`${tab.title}：回放`} className="size-3 shrink-0 fill-current text-muted-foreground" />
+  if (tab.type === 'playback') return <Play aria-hidden="true" className="size-3 shrink-0 fill-current text-muted-foreground" />
   const visual = connectionStatusVisual(connectionStatus[tab.terminalId ?? tab.id])
-  return <Circle role="img" aria-label={`${tab.title}：${visual.label}`} className={`size-2 shrink-0 ${visual.dotClass}`} />
+  return <Circle aria-hidden="true" className={`size-2 shrink-0 ${visual.dotClass}`} />
 }
 
 function requestCloseFromKeyboard(event: KeyboardEvent<HTMLButtonElement>, tabID: string, onClose: (tabID: string) => void) {
@@ -69,11 +74,13 @@ function DynamicTab({ tab, active, connectionStatus, navigation, onActivate, onC
   onActivate: (tabID: string) => void
   onClose: (tabID: string) => void
 }) {
+  const statusLabel = tabStatusLabel(tab, connectionStatus)
+
   return (
     <div
       className={`group flex h-full shrink-0 items-center gap-1.5 border-r border-border px-2 text-sm transition-colors ${active ? 'bg-background text-foreground shadow-[inset_0_-2px_0_var(--primary)]' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`}
     >
-      <button ref={(element) => navigation.registerTab(tab.id, element)} type="button" role="tab" tabIndex={active ? 0 : -1} aria-selected={active} className="flex h-full min-w-0 items-center gap-1.5 focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={() => onActivate(tab.id)} onKeyDown={(event) => navigation.onKeyDown(event, tab.id)}>
+      <button ref={(element) => navigation.registerTab(tab.id, element)} type="button" role="tab" tabIndex={active ? 0 : -1} aria-label={`${tab.title}，状态：${statusLabel}`} aria-selected={active} className="flex h-full min-w-0 items-center gap-1.5 focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={() => onActivate(tab.id)} onKeyDown={(event) => navigation.onKeyDown(event, tab.id)}>
         <TabStatusIcon tab={tab} connectionStatus={connectionStatus} />
         <span className="max-w-40 truncate">{tab.title}</span>
       </button>
