@@ -3,6 +3,7 @@ import { Window } from '@wailsio/runtime'
 import { logger } from '@/lib/logger'
 import { useAppStore, type SidebarTab } from '@/store/appStore'
 import { useThemeCatalog } from '@/hooks/useThemeCatalog'
+import { DynamicTabStrip } from '@/components/layout/DynamicTabStrip'
 
 function runWindowAction(name: string, action: () => Promise<unknown>) {
   void action().catch((error: unknown) => logger.error(`window ${name} failed`, error))
@@ -34,6 +35,7 @@ export function WindowTitleBar() {
       <button type="button" aria-label={navigationCollapsed ? '展开导航' : '收起导航'} aria-controls="sidebar-navigation" aria-expanded={!navigationCollapsed} className="grid w-10 place-items-center text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={toggleNavigation}><Menu className="size-4" /></button>
       {!navigationCollapsed && <nav role="tablist" aria-label="侧边栏导航" className="flex">{navigationButton('sessions', '会话')}{navigationButton('macros', '宏')}</nav>}
     </div>
+    <DynamicTabStrip />
     <div data-testid="window-drag-region" className="min-w-0 flex-1 [--wails-draggable:drag]" onDoubleClick={() => runWindowAction('toggle maximise', Window.ToggleMaximise)} />
     <div className="flex [--wails-draggable:no-drag]">
       <button type="button" aria-label={colorMode === 'dark' ? '切换到浅色模式' : '切换到深色模式'} className="grid w-10 place-items-center text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" onClick={toggleColorMode}>{colorMode === 'dark' ? <Sun className="size-4" /> : <Moon className="size-4" />}</button>
