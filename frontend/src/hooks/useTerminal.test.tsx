@@ -1,5 +1,5 @@
 import { StrictMode, createRef, type ReactNode } from 'react'
-import { act, renderHook } from '@testing-library/react'
+import { act, renderHook, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const calls: string[] = []
@@ -12,6 +12,9 @@ const outputUnsubscribes: Array<ReturnType<typeof vi.fn>> = []
 const themeUnsubscribes: Array<ReturnType<typeof vi.fn>> = []
 const animationFrames: FrameRequestCallback[] = []
 const cancelledAnimationFrames: number[] = []
+const outputHandlers: Array<(event: { data?: { terminal_id?: string; data?: string } }) => void> = []
+const resizeHandlers: ResizeObserverCallback[] = []
+let runtimeFailure: 'fit' | 'refresh' | 'focus' | 'write' | null = null
 
 vi.mock('@xterm/xterm', () => ({
   Terminal: class {
@@ -19,7 +22,11 @@ vi.mock('@xterm/xterm', () => ({
     rows = 24
     options = {}
     open() { calls.push('open') }
-    loadAddon(addon: { name: string }) { calls.push(`load:${addon.name}`) }
+    private addons: Array<{ dispose: () => void }> = []
+    loadAddon(addon: { name: string; dispose: () => void }) {
+      calls.push(`load:${addon.name}`)
+      this.addons.push(addon)
+    }
     private terminalDispose = vi.fn(() => calls.push('dispose'))
     constructor(options: Record<string, unknown>) {
       terminalOptions.push(options)
@@ -31,11 +38,20 @@ vi.mock('@xterm/xterm', () => ({
       dataDisposes.push(dispose)
       return { dispose }
     }
-    write() {}
-    focus() { calls.push('focus') }
+    write() { if (runtimeFailure === 'write') throw new Error('write failed') }
+    focus() {
+      calls.push('focus')
+      if (runtimeFailure === 'focus') throw new Error('focus failed')
+    }
     blur() { calls.push('blur') }
-    refresh() { calls.push('refresh') }
-    dispose() { this.terminalDispose() }
+    refresh() {
+      calls.push('refresh')
+      if (runtimeFailure === 'refresh') throw new Error('refresh failed')
+    }
+    dispose() {
+      this.addons.forEach((addon) => addon.dispose())
+      this.terminalDispose()
+    }
   },
 }))
 
@@ -44,15 +60,19 @@ vi.mock('@xterm/addon-fit', () => ({
     name = 'fit'
     private addonDispose = vi.fn()
     constructor() { addonDisposes.push(this.addonDispose) }
-    fit() { calls.push('fit') }
+    fit() {
+      calls.push('fit')
+      if (runtimeFailure === 'fit') throw new Error('fit failed')
+    }
     dispose() { this.addonDispose() }
   },
 }))
 
 vi.mock('@wailsio/runtime', () => ({
   Events: {
-    On: vi.fn(() => {
+    On: vi.fn((_name: string, handler: (event: { data?: { terminal_id?: string; data?: string } }) => void) => {
       const unsubscribe = vi.fn()
+      outputHandlers.push(handler)
       outputUnsubscribes.push(unsubscribe)
       return unsubscribe
     }),
@@ -65,6 +85,7 @@ vi.mock('@/lib/wails', () => ({
 
 import { useTerminal } from '@/hooks/useTerminal'
 import { useAppStore } from '@/store/appStore'
+import { TerminalErrorBoundary } from '@/components/terminal/TerminalErrorBoundary'
 
 describe('useTerminal', () => {
   beforeEach(() => {
@@ -78,10 +99,16 @@ describe('useTerminal', () => {
     themeUnsubscribes.length = 0
     animationFrames.length = 0
     cancelledAnimationFrames.length = 0
+    outputHandlers.length = 0
+    resizeHandlers.length = 0
+    runtimeFailure = null
     vi.stubGlobal('ResizeObserver', class {
       observe() {}
       disconnect = vi.fn()
-      constructor() { observerDisconnects.push(this.disconnect) }
+      constructor(callback: ResizeObserverCallback) {
+        observerDisconnects.push(this.disconnect)
+        resizeHandlers.push(callback)
+      }
     })
     vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
       animationFrames.push(callback)
@@ -198,5 +225,63 @@ describe('useTerminal', () => {
     expect(themeUnsubscribes.every((unsubscribe) => unsubscribe.mock.calls.length === 1)).toBe(true)
     expect(cancelledAnimationFrames.length).toBeGreaterThan(0)
     expect(new Set(cancelledAnimationFrames).size).toBe(cancelledAnimationFrames.length)
+  })
+
+  it.each(['fit', 'refresh', 'focus'] as const)('reports %s failures from the activation frame', (failure) => {
+    const containerRef = createRef<HTMLDivElement>()
+    const container = document.createElement('div')
+    Object.defineProperty(container, 'clientWidth', { value: 800 })
+    Object.defineProperty(container, 'clientHeight', { value: 500 })
+    containerRef.current = container
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <TerminalErrorBoundary onClose={vi.fn()}>{children}</TerminalErrorBoundary>
+    )
+    const hook = renderHook(({ active, sequence }) => useTerminal('term-runtime', containerRef, {
+      active,
+      focusRequest: { sequence },
+    }), { initialProps: { active: false, sequence: 0 }, wrapper })
+
+    runtimeFailure = failure
+    hook.rerender({ active: true, sequence: 1 })
+    act(flushAnimationFrame)
+
+    expect(screen.getByText('终端渲染失败')).toBeInTheDocument()
+  })
+
+  it('reports output write failures from the runtime event callback', () => {
+    const containerRef = createRef<HTMLDivElement>()
+    containerRef.current = document.createElement('div')
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <TerminalErrorBoundary onClose={vi.fn()}>{children}</TerminalErrorBoundary>
+    )
+    renderHook(() => useTerminal('term-output', containerRef, {
+      active: false,
+      focusRequest: { sequence: 0 },
+    }), { wrapper })
+
+    runtimeFailure = 'write'
+    act(() => outputHandlers[0]({ data: { terminal_id: 'term-output', data: 'hello' } }))
+
+    expect(screen.getByText('终端渲染失败')).toBeInTheDocument()
+  })
+
+  it('reports fit failures from the resize observer callback', () => {
+    const containerRef = createRef<HTMLDivElement>()
+    const container = document.createElement('div')
+    Object.defineProperty(container, 'clientWidth', { value: 800 })
+    Object.defineProperty(container, 'clientHeight', { value: 500 })
+    containerRef.current = container
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <TerminalErrorBoundary onClose={vi.fn()}>{children}</TerminalErrorBoundary>
+    )
+    renderHook(() => useTerminal('term-resize', containerRef, {
+      active: true,
+      focusRequest: { sequence: 0 },
+    }), { wrapper })
+
+    runtimeFailure = 'fit'
+    act(() => resizeHandlers[0]([], {} as ResizeObserver))
+
+    expect(screen.getByText('终端渲染失败')).toBeInTheDocument()
   })
 })

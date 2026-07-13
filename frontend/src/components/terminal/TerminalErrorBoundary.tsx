@@ -1,4 +1,4 @@
-import { Component, type ErrorInfo, type ReactNode } from 'react'
+import { Component, createContext, useContext, type ErrorInfo, type ReactNode } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { logger } from '@/lib/logger'
@@ -6,12 +6,21 @@ import { logger } from '@/lib/logger'
 interface Props {
   children: ReactNode
   onClose: () => void
-  onRetry?: () => void
 }
 
 interface State {
   failed: boolean
   retryKey: number
+}
+
+export type TerminalRuntimeErrorReporter = (error: unknown, source: string) => void
+
+const TerminalRuntimeErrorContext = createContext<TerminalRuntimeErrorReporter>((error, source) => {
+  logger.error('unscoped terminal runtime error', { source, error })
+})
+
+export function useTerminalRuntimeErrorReporter() {
+  return useContext(TerminalRuntimeErrorContext)
 }
 
 export class TerminalErrorBoundary extends Component<Props, State> {
@@ -25,13 +34,23 @@ export class TerminalErrorBoundary extends Component<Props, State> {
     logger.error('terminal layer render error', error, info.componentStack)
   }
 
+  private reportRuntimeError: TerminalRuntimeErrorReporter = (error, source) => {
+    logger.error('terminal layer runtime error', { source, error })
+    this.setState({ failed: true })
+  }
+
   private retry = () => {
-    this.props.onRetry?.()
     this.setState((state) => ({ failed: false, retryKey: state.retryKey + 1 }))
   }
 
   render() {
-    if (!this.state.failed) return <div key={this.state.retryKey} className="contents">{this.props.children}</div>
+    if (!this.state.failed) {
+      return (
+        <TerminalRuntimeErrorContext value={this.reportRuntimeError}>
+          <div key={this.state.retryKey} className="contents">{this.props.children}</div>
+        </TerminalRuntimeErrorContext>
+      )
+    }
     return (
       <div className="grid h-full w-full place-items-center bg-background p-6">
         <Card className="w-full max-w-md">

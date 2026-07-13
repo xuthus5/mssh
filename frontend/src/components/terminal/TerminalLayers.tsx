@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { Dialogs, Events } from '@wailsio/runtime'
 import { Spinner } from '@/components/ui/spinner'
 import { TerminalErrorBoundary } from '@/components/terminal/TerminalErrorBoundary'
@@ -12,7 +12,21 @@ const PlaybackTab = lazy(() => import('@/components/terminal/PlaybackTab').then(
 const FilePanel = lazy(() => import('@/components/file/FilePanel'))
 
 type FileTransfer = ReturnType<typeof useFileTransfer>
-const noFocusRequest: TerminalFocusRequest = { sequence: 0 }
+const noFocusRequest: TerminalFocusRequest = { sequence: 0, targetTerminalID: null }
+
+function useLayerFocusRequest(tab: Tab, active: boolean, focusRequest: AppState['focusRequest'], activePaneID: string | null, lastActiveTerminalTabID: string | null) {
+  const resolvedRequestRef = useRef<TerminalFocusRequest>(noFocusRequest)
+  if (tab.type !== 'terminal' || focusRequest.id !== tab.id || focusRequest.sequence === 0) return noFocusRequest
+  if (resolvedRequestRef.current.sequence !== focusRequest.sequence) {
+    const primaryTerminalID = tab.terminalId ?? tab.id
+    const canUseActivePane = active && (lastActiveTerminalTabID === null || lastActiveTerminalTabID === tab.id)
+    resolvedRequestRef.current = {
+      sequence: focusRequest.sequence,
+      targetTerminalID: canUseActivePane ? activePaneID ?? primaryTerminalID : primaryTerminalID,
+    }
+  }
+  return resolvedRequestRef.current
+}
 
 function FilePanelView({ transfer, onClose, onUpload, onDownload, dropTargetID }: {
   transfer: FileTransfer
@@ -58,9 +72,11 @@ function FilePanelContainer({ sessionID, onClose }: { sessionID: number; onClose
     onDownload={(path) => { void handleDownload(path) }} dropTargetID={dropTargetID} />
 }
 
-function DynamicLayer({ tab, active, filePanelSessionID, onToggleFiles, onCloseFiles, focusRequest, onClose }: {
+function DynamicLayer({ tab, active, activePaneID, lastActiveTerminalTabID, filePanelSessionID, onToggleFiles, onCloseFiles, focusRequest, onClose }: {
   tab: Tab
   active: boolean
+  activePaneID: string | null
+  lastActiveTerminalTabID: string | null
   filePanelSessionID: number | null
   onToggleFiles: (sessionID: number) => void
   onCloseFiles: () => void
@@ -68,7 +84,7 @@ function DynamicLayer({ tab, active, filePanelSessionID, onToggleFiles, onCloseF
   onClose: () => void
 }) {
   const layerClass = `absolute inset-0 flex ${active ? 'visible' : 'invisible pointer-events-none'}`
-  const terminalFocusRequest = focusRequest.id === tab.id ? focusRequest : noFocusRequest
+  const terminalFocusRequest = useLayerFocusRequest(tab, active, focusRequest, activePaneID, lastActiveTerminalTabID)
   return (
     <div data-layer-id={tab.id} aria-hidden={!active} inert={active ? undefined : true} className={layerClass}>
       <TerminalErrorBoundary onClose={onClose}>
@@ -90,8 +106,14 @@ export function TerminalLayers() {
   const tabs = useAppStore((state) => state.tabs)
   const activeSurface = useAppStore((state) => state.activeSurface)
   const focusRequest = useAppStore((state) => state.focusRequest)
+  const activePaneID = useAppStore((state) => state.activePaneId)
   const closeTab = useAppStore((state) => state.closeTab)
   const [filePanelSessionID, setFilePanelSessionID] = useState<number | null>(null)
+  const lastActiveTerminalTabIDRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    if (activeSurface?.type === 'terminal') lastActiveTerminalTabIDRef.current = activeSurface.id
+  }, [activeSurface])
 
   const toggleFiles = useCallback((sessionID: number) => {
     if (sessionID === 0) return
@@ -100,6 +122,7 @@ export function TerminalLayers() {
 
   return <>{tabs.map((tab) => <DynamicLayer key={tab.id} tab={tab}
     active={activeSurface?.type === tab.type && activeSurface.id === tab.id}
+    activePaneID={activePaneID} lastActiveTerminalTabID={lastActiveTerminalTabIDRef.current}
     filePanelSessionID={filePanelSessionID} onToggleFiles={toggleFiles}
     focusRequest={focusRequest} onCloseFiles={() => setFilePanelSessionID(null)}
     onClose={() => closeTabsWithFeedback([tab.id], closeTab)} />)}</>
