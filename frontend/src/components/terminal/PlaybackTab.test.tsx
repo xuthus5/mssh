@@ -3,9 +3,22 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useAppStore } from '@/store/appStore'
 import { logger } from '@/lib/logger'
+import { useTerminalBehaviorStore } from '@/store/terminalBehaviorStore'
 
 const { getRecording } = vi.hoisted(() => ({ getRecording: vi.fn(async (): Promise<any> => ({ entries: [] })) }))
-const terminalInstances: Array<{ options: Record<string, any>; writeln: ReturnType<typeof vi.fn>; write: ReturnType<typeof vi.fn>; refresh: ReturnType<typeof vi.fn>; reset: ReturnType<typeof vi.fn>; dispose: ReturnType<typeof vi.fn> }> = []
+const terminalInstances: Array<{
+  options: Record<string, any>
+  writeln: ReturnType<typeof vi.fn>
+  write: ReturnType<typeof vi.fn>
+  refresh: ReturnType<typeof vi.fn>
+  reset: ReturnType<typeof vi.fn>
+  dispose: ReturnType<typeof vi.fn>
+  focus: ReturnType<typeof vi.fn>
+  getSelection: ReturnType<typeof vi.fn>
+  onSelectionChange: ReturnType<typeof vi.fn>
+  triggerSelectionChange: () => void
+  selectionSubscription: { dispose: ReturnType<typeof vi.fn> }
+}> = []
 const fitInstances: Array<{ fit: ReturnType<typeof vi.fn>; dispose: ReturnType<typeof vi.fn> }> = []
 const resizeHandlers: ResizeObserverCallback[] = []
 let playbackWriteError: Error | null = null
@@ -18,6 +31,15 @@ vi.mock('@xterm/xterm', () => ({ Terminal: class {
   rows = 24
   private addons: Array<{ dispose: () => void }> = []
   private terminalDispose = vi.fn()
+  private selectionChange: (() => void) | undefined
+  selectionSubscription = { dispose: vi.fn() }
+  focus = vi.fn()
+  getSelection = vi.fn(() => '')
+  onSelectionChange = vi.fn((callback: () => void) => {
+    this.selectionChange = callback
+    return this.selectionSubscription
+  })
+  triggerSelectionChange = () => this.selectionChange?.()
   write = vi.fn(() => { if (playbackWriteError) throw playbackWriteError })
   dispose = vi.fn(() => { this.addons.forEach((addon) => addon.dispose()); this.terminalDispose() })
   loadAddon = vi.fn((addon: { dispose: () => void }) => { this.addons.push(addon) })
@@ -43,6 +65,7 @@ describe('PlaybackTab terminal theme', () => {
     resizeHandlers.length = 0
     getRecording.mockResolvedValue({ entries: [] })
     playbackWriteError = null
+    useTerminalBehaviorStore.setState({ rightClickAction: 'menu', copyOnSelect: false })
     vi.stubGlobal('ResizeObserver', class {
       observe() {}
       disconnect() {}
@@ -87,6 +110,46 @@ describe('PlaybackTab terminal theme', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: '开始回放' })).toBeEnabled())
     await userEvent.click(screen.getByRole('button', { name: '开始回放' }))
     await waitFor(() => expect(terminalInstances[0].write).toHaveBeenCalledWith(new Uint8Array([65])))
+  })
+
+  it('copies selected playback text when copy-on-select starts enabled', async () => {
+    vi.useFakeTimers()
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    vi.stubGlobal('navigator', { clipboard: { writeText } })
+    useTerminalBehaviorStore.getState().setSettings({ rightClickAction: 'menu', copyOnSelect: true })
+    render(<PlaybackTab recordingId="1" title="demo" active />)
+    await act(async () => { await Promise.resolve(); await Promise.resolve() })
+    terminalInstances[0].getSelection.mockReturnValue('selected playback text')
+
+    terminalInstances[0].triggerSelectionChange()
+    await act(async () => { vi.advanceTimersByTime(120) })
+
+    expect(writeText).toHaveBeenCalledWith('selected playback text')
+  })
+
+  it('hot-switches copy-on-select and clears playback selection resources', async () => {
+    vi.useFakeTimers()
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    vi.stubGlobal('navigator', { clipboard: { writeText } })
+    const view = render(<PlaybackTab recordingId="1" title="demo" active />)
+    await act(async () => { await Promise.resolve(); await Promise.resolve() })
+    const terminal = terminalInstances[0]
+    terminal.getSelection.mockReturnValue('selected playback text')
+
+    act(() => useTerminalBehaviorStore.getState().setSettings({ rightClickAction: 'menu', copyOnSelect: true }))
+    terminal.triggerSelectionChange()
+    act(() => useTerminalBehaviorStore.getState().setSettings({ rightClickAction: 'menu', copyOnSelect: false }))
+    terminal.triggerSelectionChange()
+    await act(async () => { vi.advanceTimersByTime(120) })
+    expect(writeText).not.toHaveBeenCalled()
+
+    act(() => useTerminalBehaviorStore.getState().setSettings({ rightClickAction: 'menu', copyOnSelect: true }))
+    terminal.triggerSelectionChange()
+    view.unmount()
+    await act(async () => { vi.advanceTimersByTime(120) })
+
+    expect(writeText).not.toHaveBeenCalled()
+    expect(terminal.selectionSubscription.dispose).toHaveBeenCalledOnce()
   })
 
   it('reports missing and failed recording loads in the terminal', async () => {
