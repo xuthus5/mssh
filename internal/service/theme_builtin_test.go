@@ -128,7 +128,7 @@ func TestThemeServiceResetsAssignedBuiltinStylesOnly(t *testing.T) {
 	*imported = customizeThemeProfile(*imported, "Imported User Font", 19, `{"background":"#eeeeee"}`)
 	require.NoError(t, themeService.UpdateProfile(model.ThemeProfileInputFrom(dark)))
 	require.NoError(t, themeService.UpdateProfile(model.ThemeProfileInputFrom(*imported)))
-	require.NoError(t, themeService.SaveAssignments(model.ThemeAssignmentsInput{DarkProfileID: dark.ID, LightProfileID: imported.ID}))
+	require.NoError(t, themeService.SaveAssignments(model.ThemeAssignmentsInput{DarkProfileID: dark.ID, LightProfileID: imported.ID, FollowInterfaceMode: true}))
 
 	result, err := themeService.ResetBuiltinStyles()
 	require.NoError(t, err)
@@ -169,6 +169,53 @@ func TestThemeServiceResetsBothDefaultBuiltinStyles(t *testing.T) {
 	assert.True(t, result.LightReset)
 }
 
+func TestThemeServiceRepairsInvalidFixedAssignment(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	themeService := NewThemeService(db, testutil.NewTestLogger())
+	require.NoError(t, themeService.InitializeDefaults())
+	assignments, err := themeService.GetAssignments()
+	require.NoError(t, err)
+	assignments.FollowInterfaceMode = false
+	assignments.FixedProfileID = 99999
+	require.NoError(t, store.SaveThemeAssignments(db, assignments))
+
+	require.NoError(t, themeService.InitializeDefaults())
+	repaired, err := themeService.GetAssignments()
+	require.NoError(t, err)
+	assert.False(t, repaired.FollowInterfaceMode)
+	assert.Equal(t, repaired.DarkProfileID, repaired.FixedProfileID)
+}
+
+func TestThemeServiceResetsAndDeduplicatesFixedBuiltinStyle(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	themeService := NewThemeService(db, testutil.NewTestLogger())
+	require.NoError(t, themeService.InitializeDefaults())
+	profiles := mustThemeProfiles(t, themeService)
+	dark := customizeThemeProfile(mustThemeProfileNamed(t, profiles, "Dracula"), "Dark User Font", 20, `{"background":"#111111"}`)
+	light := customizeThemeProfile(mustThemeProfileNamed(t, profiles, "GitHub Light"), "Light User Font", 18, `{"background":"#eeeeee"}`)
+	require.NoError(t, themeService.UpdateProfile(model.ThemeProfileInputFrom(dark)))
+	require.NoError(t, themeService.UpdateProfile(model.ThemeProfileInputFrom(light)))
+	require.NoError(t, themeService.SaveAssignments(model.ThemeAssignmentsInput{
+		DarkProfileID:       dark.ID,
+		LightProfileID:      light.ID,
+		FollowInterfaceMode: false,
+		FixedProfileID:      dark.ID,
+	}))
+	_, err := db.Exec(`CREATE TABLE reset_counts (profile_id INTEGER NOT NULL)`)
+	require.NoError(t, err)
+	_, err = db.Exec(`CREATE TRIGGER count_shared_theme_reset AFTER UPDATE ON terminal_theme_profiles WHEN OLD.id = ` + themeProfileID(dark.ID) + ` BEGIN INSERT INTO reset_counts(profile_id) VALUES (NEW.id); END`)
+	require.NoError(t, err)
+
+	result, err := themeService.ResetBuiltinStyles()
+	require.NoError(t, err)
+	assert.True(t, result.DarkReset)
+	assert.True(t, result.LightReset)
+	assert.True(t, result.FixedReset)
+	var updates int
+	require.NoError(t, db.QueryRow("SELECT COUNT(*) FROM reset_counts WHERE profile_id = ?", dark.ID).Scan(&updates))
+	assert.Equal(t, 1, updates)
+}
+
 func TestThemeServiceResetsAssignedLightBuiltinStyle(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	themeService := NewThemeService(db, testutil.NewTestLogger())
@@ -180,7 +227,7 @@ func TestThemeServiceResetsAssignedLightBuiltinStyle(t *testing.T) {
 	summary, err := themeService.ImportFiles([]string{path})
 	require.NoError(t, err)
 	importedID := summary.Results[0].ProfileID
-	require.NoError(t, themeService.SaveAssignments(model.ThemeAssignmentsInput{DarkProfileID: importedID, LightProfileID: light.ID}))
+	require.NoError(t, themeService.SaveAssignments(model.ThemeAssignmentsInput{DarkProfileID: importedID, LightProfileID: light.ID, FollowInterfaceMode: true}))
 
 	result, err := themeService.ResetBuiltinStyles()
 	require.NoError(t, err)
@@ -197,7 +244,7 @@ func TestThemeServiceResetBuiltinStylesRollsBack(t *testing.T) {
 	light := customizeThemeProfile(mustThemeProfileNamed(t, profiles, "GitHub Light"), "Light User Font", 18, `{"background":"#eeeeee"}`)
 	require.NoError(t, themeService.UpdateProfile(model.ThemeProfileInputFrom(dark)))
 	require.NoError(t, themeService.UpdateProfile(model.ThemeProfileInputFrom(light)))
-	require.NoError(t, themeService.SaveAssignments(model.ThemeAssignmentsInput{DarkProfileID: dark.ID, LightProfileID: light.ID}))
+	require.NoError(t, themeService.SaveAssignments(model.ThemeAssignmentsInput{DarkProfileID: dark.ID, LightProfileID: light.ID, FollowInterfaceMode: true}))
 	_, err := db.Exec(`CREATE TRIGGER fail_light_theme_reset BEFORE UPDATE ON terminal_theme_profiles WHEN OLD.id = ` + themeProfileID(light.ID) + ` BEGIN SELECT RAISE(FAIL, 'reset failed'); END`)
 	require.NoError(t, err)
 
