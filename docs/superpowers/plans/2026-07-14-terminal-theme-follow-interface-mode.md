@@ -618,7 +618,7 @@ git commit -m "feat(theme): resolve effective terminal theme"
 - Produces: a `ThemeModeSelector` fixed mode that lists all Profiles.
 - Produces: shadcn Switch interaction with current-mode initialization and persisted fixed-profile reuse.
 
-- [ ] **Step 1: Preview and add the shadcn Switch**
+- [x] **Step 1: Preview and add the shadcn Switch**
 
 Run inside `frontend`:
 
@@ -629,7 +629,7 @@ npx shadcn@latest add switch
 
 Verify the generated component uses the Base UI API configured by `components.json`, imports `cn` from `@/lib/utils`, and does not add raw color classes.
 
-- [ ] **Step 2: Add failing editor-state tests**
+- [x] **Step 2: Add failing editor-state tests**
 
 Create `frontend/src/components/settings/themeEditorState.test.ts` covering Profile-ID-keyed drafts:
 
@@ -648,7 +648,7 @@ expect(configuration.profiles.map((profile) => profile.id)).toEqual([1, 2])
 
 Add a missing draft case that throws a precise error instead of emitting a partial configuration.
 
-- [ ] **Step 3: Add failing selector tests**
+- [x] **Step 3: Add failing selector tests**
 
 Extend `ThemeModeSelector.test.tsx`:
 
@@ -662,7 +662,7 @@ expect(screen.getByText('Universal shared')).toBeInTheDocument()
 
 Assert each result contains a mode Badge, source Badge, and color preview with a background swatch derived from `definition.color_payload`.
 
-- [ ] **Step 4: Add failing ThemeEditor interaction tests**
+- [x] **Step 4: Add failing ThemeEditor interaction tests**
 
 Add tests in `ThemeEditor.test.tsx` for:
 
@@ -687,7 +687,7 @@ expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
 
 Re-render with a persisted fixed Profile, enable follow, disable it again, and assert the previous fixed ID remains selected. Add mismatch Alert and shared Profile Badge assertions. Extend reset tests to cover `fixed_reset` messages and fixed built-in eligibility only while persisted follow mode is disabled.
 
-- [ ] **Step 5: Run component tests to verify RED**
+- [x] **Step 5: Run component tests to verify RED**
 
 Run:
 
@@ -697,7 +697,7 @@ cd frontend && npm test -- src/components/settings/themeEditorState.test.ts src/
 
 Expected: FAIL because fixed selection, Switch behavior, Profile-ID-keyed drafts, and color-mode props are absent.
 
-- [ ] **Step 6: Implement Profile-ID-keyed editor state**
+- [x] **Step 6: Implement Profile-ID-keyed editor state**
 
 Create `themeEditorState.ts` with these exports:
 
@@ -716,7 +716,7 @@ export function buildThemeConfiguration(
 
 `buildThemeConfiguration` collects Dark and Light IDs and adds Fixed only while follow mode is disabled. Use a `Set<number>` so shared references produce one `ThemeProfileInput`.
 
-- [ ] **Step 7: Extend ThemeModeSelector for fixed mode**
+- [x] **Step 7: Extend ThemeModeSelector for fixed mode**
 
 Change the mode type:
 
@@ -736,7 +736,7 @@ const label = mode === 'dark'
 
 Parse `definition.color_payload` defensively and display `[background, ansi[1], ansi[2], ansi[4]]` as small bordered swatches before the name. Invalid payloads render no swatches and do not break selection.
 
-- [ ] **Step 8: Implement the strategy Card and dynamic editor context**
+- [x] **Step 8: Implement the strategy Card and dynamic editor context**
 
 Add `colorMode: ColorMode` to `ThemeEditor` props and pass it through `SettingsDialog` and `Sidebar`.
 
@@ -769,7 +769,7 @@ Set the editor slot to `fixed`. When enabling follow mode, preserve `fixed_profi
 
 Follow mode renders two mode selectors and Dark/Light Tabs. Fixed mode renders one fixed selector and no Tabs. The active draft is selected by Profile ID, so shared references edit one object.
 
-- [ ] **Step 9: Add mismatch, sharing, save, and reset feedback**
+- [x] **Step 9: Add mismatch, sharing, save, and reset feedback**
 
 Render a neutral shadcn `Alert` when the fixed Profile definition mode is neither `universal` nor the current interface mode. Render secondary Badges for `同时用于 Dark Mode` and `同时用于 Light Mode` as applicable.
 
@@ -796,7 +796,7 @@ if (!assignments.follow_interface_mode) persistedIDs.push(assignments.fixed_prof
 const canReset = persistedIDs.some((id) => findProfile(profiles, id)?.definition?.is_builtin === true)
 ```
 
-- [ ] **Step 10: Run component tests to verify GREEN**
+- [x] **Step 10: Run component tests to verify GREEN**
 
 Run:
 
@@ -806,7 +806,7 @@ cd frontend && npm test -- src/components/settings/themeEditorState.test.ts src/
 
 Expected: all targeted component tests PASS.
 
-- [ ] **Step 11: Commit the settings experience**
+- [x] **Step 11: Commit the settings experience**
 
 ```bash
 git add frontend/src/components/ui/switch.tsx frontend/src/components/settings/themeEditorState.ts frontend/src/components/settings/themeEditorState.test.ts frontend/src/components/settings/ThemeModeSelector.tsx frontend/src/components/settings/ThemeModeSelector.test.tsx frontend/src/components/settings/ThemeEditor.tsx frontend/src/components/settings/ThemeEditor.test.tsx frontend/src/components/settings/SettingsDialog.tsx frontend/src/components/settings/SettingsDialog.test.tsx frontend/src/components/layout/Sidebar.tsx
