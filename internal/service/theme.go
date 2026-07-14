@@ -17,6 +17,12 @@ type ThemeService struct {
 	logger *slog.Logger
 }
 
+type themeDatabase interface {
+	Exec(query string, args ...any) (sql.Result, error)
+	Query(query string, args ...any) (*sql.Rows, error)
+	QueryRow(query string, args ...any) *sql.Row
+}
+
 func NewThemeService(db *sql.DB, logger *slog.Logger) *ThemeService {
 	return &ThemeService{db: db, logger: logger}
 }
@@ -58,7 +64,18 @@ func (service *ThemeService) UpdateProfile(input model.ThemeProfileInput) error 
 }
 
 func (service *ThemeService) DeleteProfile(id int64) error {
-	return store.DeleteThemeProfile(service.db, id)
+	tx, err := service.db.Begin()
+	if err != nil {
+		return fmt.Errorf("begin delete theme profile: %w", err)
+	}
+	if err = store.DeleteThemeProfile(tx, id); err != nil {
+		_ = tx.Rollback()
+		return fmt.Errorf("delete theme profile: %w", err)
+	}
+	if err = tx.Commit(); err != nil {
+		return fmt.Errorf("commit delete theme profile: %w", err)
+	}
+	return nil
 }
 
 func (service *ThemeService) DeleteDefinition(id int64) error {
@@ -74,41 +91,90 @@ func (service *ThemeService) GetAssignments() (model.ThemeAssignments, error) {
 
 func (service *ThemeService) SaveAssignments(input model.ThemeAssignmentsInput) error {
 	assignments := input.ThemeAssignments()
-	_, err := store.GetThemeProfile(service.db, assignments.DarkProfileID)
+	tx, err := service.db.Begin()
 	if err != nil {
-		return fmt.Errorf("dark theme profile: %w", err)
+		return fmt.Errorf("begin save theme assignments: %w", err)
 	}
-	_, err = store.GetThemeProfile(service.db, assignments.LightProfileID)
+	if err = validateThemeAssignments(tx, assignments); err == nil {
+		err = store.SaveThemeAssignmentsDB(tx, assignments)
+	}
 	if err != nil {
-		return fmt.Errorf("light theme profile: %w", err)
+		_ = tx.Rollback()
+		return fmt.Errorf("save theme assignments: %w", err)
 	}
-	return store.SaveThemeAssignments(service.db, assignments)
+	if err = tx.Commit(); err != nil {
+		return fmt.Errorf("commit theme assignments: %w", err)
+	}
+	return nil
 }
 
 func (service *ThemeService) SaveConfiguration(input model.ThemeConfigurationInput) error {
-	dark := input.DarkProfile.ThemeProfile()
-	light := input.LightProfile.ThemeProfile()
-	if err := validateThemeProfile(dark); err != nil {
-		return fmt.Errorf("dark profile: %w", err)
-	}
-	if err := validateThemeProfile(light); err != nil {
-		return fmt.Errorf("light profile: %w", err)
+	profiles, err := validatedThemeProfiles(input.Profiles)
+	if err != nil {
+		return err
 	}
 	tx, err := service.db.Begin()
 	if err != nil {
 		return fmt.Errorf("begin theme configuration: %w", err)
 	}
-	if err = store.UpdateThemeProfile(tx, dark); err == nil {
-		err = store.UpdateThemeProfile(tx, light)
+	assignments := input.Assignments.ThemeAssignments()
+	if err = validateThemeAssignments(tx, assignments); err == nil {
+		for _, profile := range profiles {
+			if err = store.UpdateThemeProfile(tx, profile); err != nil {
+				break
+			}
+		}
 	}
 	if err == nil {
-		err = store.SaveThemeAssignmentsDB(tx, input.Assignments.ThemeAssignments())
+		err = store.SaveThemeAssignmentsDB(tx, assignments)
 	}
 	if err != nil {
 		_ = tx.Rollback()
 		return fmt.Errorf("save theme configuration: %w", err)
 	}
-	return tx.Commit()
+	if err = tx.Commit(); err != nil {
+		return fmt.Errorf("commit theme configuration: %w", err)
+	}
+	return nil
+}
+
+func validatedThemeProfiles(inputs []model.ThemeProfileInput) ([]model.ThemeProfile, error) {
+	profiles := make([]model.ThemeProfile, 0, len(inputs))
+	seen := make(map[int64]struct{}, len(inputs))
+	for _, input := range inputs {
+		profile := input.ThemeProfile()
+		if _, duplicate := seen[profile.ID]; duplicate {
+			return nil, fmt.Errorf("duplicate theme profile %d", profile.ID)
+		}
+		if err := validateThemeProfile(profile); err != nil {
+			return nil, fmt.Errorf("theme profile %d: %w", profile.ID, err)
+		}
+		seen[profile.ID] = struct{}{}
+		profiles = append(profiles, profile)
+	}
+	return profiles, nil
+}
+
+func validateThemeAssignments(db themeDatabase, assignments model.ThemeAssignments) error {
+	checks := []struct {
+		label string
+		id    int64
+	}{{label: "dark", id: assignments.DarkProfileID}, {label: "light", id: assignments.LightProfileID}}
+	if !assignments.FollowInterfaceMode {
+		if assignments.FixedProfileID < 1 {
+			return fmt.Errorf("fixed theme profile is required when follow mode is disabled")
+		}
+		checks = append(checks, struct {
+			label string
+			id    int64
+		}{label: "fixed", id: assignments.FixedProfileID})
+	}
+	for _, check := range checks {
+		if _, err := store.GetThemeProfile(db, check.id); err != nil {
+			return fmt.Errorf("%s theme profile: %w", check.label, err)
+		}
+	}
+	return nil
 }
 
 func validateThemeProfile(profile model.ThemeProfile) error {
