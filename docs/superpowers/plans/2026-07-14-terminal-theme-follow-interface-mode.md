@@ -457,7 +457,7 @@ git commit -m "feat(theme): enforce follow mode rules"
 - Produces: `resolveEffectiveTerminalProfile(assignments, colorMode, profiles) ThemeProfile`.
 - Produces: interface mode switching that skips terminal updates when follow mode is disabled.
 
-- [ ] **Step 1: Generate Wails bindings**
+- [x] **Step 1: Generate Wails bindings**
 
 Run:
 
@@ -474,7 +474,7 @@ profiles: ThemeProfileInput[]
 fixed_reset: boolean
 ```
 
-- [ ] **Step 2: Add failing resolver tests**
+- [x] **Step 2: Add failing resolver tests**
 
 Create `frontend/src/lib/effectiveTerminalTheme.test.ts`:
 
@@ -496,7 +496,7 @@ it.each([
 
 Add a missing Profile case and assert `resolveEffectiveTerminalProfile` throws `terminal theme profile <id> is unavailable`.
 
-- [ ] **Step 3: Add failing catalog hook tests**
+- [x] **Step 3: Add failing catalog hook tests**
 
 Extend `frontend/src/hooks/useThemeCatalog.test.tsx` with two tests:
 
@@ -514,7 +514,7 @@ it('does not update terminal theme when interface mode changes with follow disab
 
 Add the follow-enabled counterpart and assert the terminal background changes from the assigned Dark Profile to the assigned Light Profile.
 
-- [ ] **Step 4: Run frontend tests to verify RED**
+- [x] **Step 4: Run frontend tests to verify RED**
 
 Run:
 
@@ -524,7 +524,7 @@ cd frontend && npm test -- src/lib/effectiveTerminalTheme.test.ts src/hooks/useT
 
 Expected: FAIL because the resolver does not exist and `changeColorMode` always applies a terminal Profile.
 
-- [ ] **Step 5: Implement the pure resolver**
+- [x] **Step 5: Implement the pure resolver**
 
 Create `frontend/src/lib/effectiveTerminalTheme.ts`:
 
@@ -548,7 +548,7 @@ export function resolveEffectiveTerminalProfile(assignments: ThemeAssignments, c
 
 Remove the `ColorMode` declaration from `useThemeCatalog.ts` and import this exported type there, so the pure resolver never depends on a React hook module.
 
-- [ ] **Step 6: Separate interface mode and terminal theme application**
+- [x] **Step 6: Separate interface mode and terminal theme application**
 
 Refactor `useThemeCatalog.ts` into focused helpers:
 
@@ -581,7 +581,7 @@ assignments: {
 
 After successful configuration save, reset, deletion, or startup reload, apply the effective Profile exactly once.
 
-- [ ] **Step 7: Run frontend tests to verify GREEN**
+- [x] **Step 7: Run frontend tests to verify GREEN**
 
 Run:
 
@@ -591,7 +591,7 @@ cd frontend && npm test -- src/lib/effectiveTerminalTheme.test.ts src/hooks/useT
 
 Expected: both test files PASS.
 
-- [ ] **Step 8: Commit bindings and resolver**
+- [x] **Step 8: Commit bindings and resolver**
 
 ```bash
 git add frontend/bindings frontend/src/lib/effectiveTerminalTheme.ts frontend/src/lib/effectiveTerminalTheme.test.ts frontend/src/hooks/useThemeCatalog.ts frontend/src/hooks/useThemeCatalog.test.tsx

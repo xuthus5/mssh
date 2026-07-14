@@ -27,9 +27,11 @@ describe('ThemeEditor dual mode profiles', () => {
     await userEvent.click(screen.getByRole('button', { name: '保存主题配置' }))
 
     expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
-      dark_profile: expect.objectContaining({ id: 1, color_overrides: expect.stringContaining('#111111') }),
-      light_profile: expect.objectContaining({ id: 2, color_overrides: expect.stringContaining('#fefefe') }),
-      assignments: { dark_profile_id: 1, light_profile_id: 2 },
+      profiles: expect.arrayContaining([
+        expect.objectContaining({ id: 1, color_overrides: expect.stringContaining('#111111') }),
+        expect.objectContaining({ id: 2, color_overrides: expect.stringContaining('#fefefe') }),
+      ]),
+      assignments: { dark_profile_id: 1, light_profile_id: 2, follow_interface_mode: true, fixed_profile_id: 0 },
     }))
   })
 
@@ -42,11 +44,11 @@ describe('ThemeEditor dual mode profiles', () => {
     await userEvent.click(await screen.findByRole('option', { name: /Dracula/ }))
     expect(screen.getByLabelText('背景色 HEX')).toHaveValue('#282a36')
     await userEvent.click(screen.getByRole('button', { name: '保存主题配置' }))
-    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ assignments: { dark_profile_id: 3, light_profile_id: 2 } }))
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ assignments: { dark_profile_id: 3, light_profile_id: 2, follow_interface_mode: true, fixed_profile_id: 0 } }))
   })
 
   it('confirms and resets the assigned built-in theme styles', async () => {
-    const onResetBuiltins = vi.fn(async () => ({ dark_reset: true, light_reset: true }))
+    const onResetBuiltins = vi.fn(async () => ({ dark_reset: true, light_reset: true, fixed_reset: false }))
     renderEditor(vi.fn(async () => {}), onResetBuiltins)
 
     await userEvent.click(screen.getByRole('button', { name: '重置内置主题' }))
@@ -93,21 +95,21 @@ describe('ThemeEditor dual mode profiles', () => {
   })
 
   it('prevents duplicate reset submissions while the request is pending', async () => {
-    let resolveReset: ((result: { dark_reset: boolean; light_reset: boolean }) => void) | undefined
-    const onResetBuiltins = vi.fn(() => new Promise<{ dark_reset: boolean; light_reset: boolean }>((resolve) => { resolveReset = resolve }))
+    let resolveReset: ((result: { dark_reset: boolean; light_reset: boolean; fixed_reset: boolean }) => void) | undefined
+    const onResetBuiltins = vi.fn(() => new Promise<{ dark_reset: boolean; light_reset: boolean; fixed_reset: boolean }>((resolve) => { resolveReset = resolve }))
     renderEditor(vi.fn(async () => {}), onResetBuiltins)
     await userEvent.click(screen.getByRole('button', { name: '重置内置主题' }))
     await userEvent.click(screen.getByRole('button', { name: '确认重置' }))
 
     expect(screen.getByRole('button', { name: /重置中/ })).toBeDisabled()
     expect(onResetBuiltins).toHaveBeenCalledOnce()
-    await act(async () => { resolveReset?.({ dark_reset: true, light_reset: false }) })
+    await act(async () => { resolveReset?.({ dark_reset: true, light_reset: false, fixed_reset: false }) })
   })
 
   it.each([
-    [{ dark_reset: true, light_reset: false }, '已重置 Dark 内置主题'],
-    [{ dark_reset: false, light_reset: true }, '已重置 Light 内置主题'],
-    [{ dark_reset: false, light_reset: false }, '当前绑定没有可重置的内置主题'],
+    [{ dark_reset: true, light_reset: false, fixed_reset: false }, '已重置 Dark 内置主题'],
+    [{ dark_reset: false, light_reset: true, fixed_reset: false }, '已重置 Light 内置主题'],
+    [{ dark_reset: false, light_reset: false, fixed_reset: false }, '当前绑定没有可重置的内置主题'],
   ])('reports partial reset result %o', async (result, message) => {
     renderEditor(vi.fn(async () => {}), vi.fn(async () => result))
     await userEvent.click(screen.getByRole('button', { name: '重置内置主题' }))
@@ -116,8 +118,8 @@ describe('ThemeEditor dual mode profiles', () => {
   })
 })
 
-function renderEditor(onSave = vi.fn(async () => {}), onResetBuiltins = vi.fn(async () => ({ dark_reset: false, light_reset: false }))) {
-  return render(<ThemeEditor profiles={profiles as never} assignments={{ dark_profile_id: 1, light_profile_id: 2 } as never} onSave={onSave} onResetBuiltins={onResetBuiltins} />)
+function renderEditor(onSave = vi.fn(async () => {}), onResetBuiltins = vi.fn(async () => ({ dark_reset: false, light_reset: false, fixed_reset: false }))) {
+  return render(<ThemeEditor profiles={profiles as never} assignments={{ dark_profile_id: 1, light_profile_id: 2, follow_interface_mode: true, fixed_profile_id: 0 } as never} onSave={onSave} onResetBuiltins={onResetBuiltins} />)
 }
 
 function profile(id: number, name: string, mode: string, background: string, builtIn = true) {
