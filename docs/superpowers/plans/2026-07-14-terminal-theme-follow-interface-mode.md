@@ -40,7 +40,7 @@
 - Produces: `store.GetThemeAssignments` with missing-key defaults of `true` and `0`.
 - Produces: store-level Profile deletion rules for Dark, Light, active Fixed, and historical Fixed references.
 
-- [ ] **Step 1: Add failing model conversion tests**
+- [x] **Step 1: Add failing model conversion tests**
 
 Extend `TestThemeCatalogInputConversions` in `internal/model/theme_catalog_test.go`:
 
@@ -59,7 +59,7 @@ assert.Equal(t, ThemeAssignments{
 }, input.ThemeAssignments())
 ```
 
-- [ ] **Step 2: Add failing store assignment tests**
+- [x] **Step 2: Add failing store assignment tests**
 
 Add table-driven tests in `internal/store/theme_test.go` that cover:
 
@@ -108,7 +108,7 @@ require.NoError(t, err)
 assert.Zero(t, loaded.FixedProfileID)
 ```
 
-- [ ] **Step 3: Run focused tests to verify RED**
+- [x] **Step 3: Run focused tests to verify RED**
 
 Run:
 
@@ -118,7 +118,7 @@ PATH="$HOME/.govm/go/bin:$PATH" go test ./internal/model ./internal/store
 
 Expected: FAIL because the new fields, configuration list, boolean persistence, and fixed-reference deletion rules do not exist.
 
-- [ ] **Step 4: Extend model inputs and outputs**
+- [x] **Step 4: Extend model inputs and outputs**
 
 Change `internal/model/theme.go`:
 
@@ -162,7 +162,7 @@ Extend `BuiltinThemeResetResult` with:
 FixedReset bool `json:"fixed_reset"`
 ```
 
-- [ ] **Step 5: Implement deterministic assignment persistence**
+- [x] **Step 5: Implement deterministic assignment persistence**
 
 Add constants in `internal/store/theme.go`:
 
@@ -213,7 +213,7 @@ if assignments.FixedProfileID == id {
 }
 ```
 
-- [ ] **Step 6: Run focused tests to verify GREEN**
+- [x] **Step 6: Run focused tests to verify GREEN**
 
 Run:
 
@@ -223,7 +223,7 @@ PATH="$HOME/.govm/go/bin:$PATH" go test ./internal/model ./internal/store
 
 Expected: both packages PASS.
 
-- [ ] **Step 7: Commit the assignment aggregate**
+- [x] **Step 7: Commit the assignment aggregate**
 
 ```bash
 git add internal/model/theme.go internal/model/input.go internal/model/theme_catalog_test.go internal/store/theme.go internal/store/theme_test.go
