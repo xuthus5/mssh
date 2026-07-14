@@ -6,13 +6,14 @@ import { useAppStore } from '@/store/appStore'
 
 const darkProfile = profile(1, 'dark', '#000000')
 const lightProfile = profile(2, 'light', '#ffffff')
+const fixedProfile = profile(3, 'dark', '#123456')
 
 describe('useThemeCatalog', () => {
   beforeEach(() => {
     __clearHandlers()
     localStorage.clear()
     document.documentElement.classList.remove('light')
-    useThemeCatalogStore.setState({ definitions: [], profiles: [], assignments: { dark_profile_id: 0, light_profile_id: 0 }, colorMode: 'dark', loaded: false, loading: false, error: null })
+    useThemeCatalogStore.setState({ definitions: [], profiles: [], assignments: { dark_profile_id: 0, light_profile_id: 0, follow_interface_mode: true, fixed_profile_id: 0 }, colorMode: 'dark', loaded: false, loading: false, error: null })
     registerCatalogHandlers('light')
   })
 
@@ -37,6 +38,30 @@ describe('useThemeCatalog', () => {
     expect(useAppStore.getState().terminalTheme.background).toBe('#000000')
   })
 
+  it('does not update terminal theme when interface mode changes with follow disabled', async () => {
+    registerCatalogHandlers('dark', { dark_profile_id: 1, light_profile_id: 2, follow_interface_mode: false, fixed_profile_id: 3 })
+    renderHook(() => useThemeCatalog())
+    await waitFor(() => expect(useThemeCatalogStore.getState().loaded).toBe(true))
+    const before = useAppStore.getState().terminalTheme
+
+    await act(async () => { await changeColorMode('light') })
+
+    expect(useAppStore.getState().terminalTheme).toBe(before)
+    expect(useAppStore.getState().terminalTheme.background).toBe('#123456')
+    expect(document.documentElement).toHaveClass('light')
+  })
+
+  it('updates terminal theme when interface mode changes with follow enabled', async () => {
+    registerCatalogHandlers('dark')
+    renderHook(() => useThemeCatalog())
+    await waitFor(() => expect(useThemeCatalogStore.getState().loaded).toBe(true))
+    expect(useAppStore.getState().terminalTheme.background).toBe('#000000')
+
+    await act(async () => { await changeColorMode('light') })
+
+    expect(useAppStore.getState().terminalTheme.background).toBe('#ffffff')
+  })
+
   it('executes catalog mutation actions and reloads state', async () => {
     const saveAssignments = vi.fn(async () => {})
     const saveConfiguration = vi.fn(async () => {})
@@ -56,8 +81,8 @@ describe('useThemeCatalog', () => {
     await waitFor(() => expect(result.current.loaded).toBe(true))
 
     await act(async () => {
-      await result.current.saveAssignments({ dark_profile_id: 1, light_profile_id: 2 } as never)
-      await result.current.saveConfiguration({ dark_profile: {}, light_profile: {}, assignments: {} } as never)
+      await result.current.saveAssignments({ dark_profile_id: 1, light_profile_id: 2, follow_interface_mode: true, fixed_profile_id: 0 } as never)
+      await result.current.saveConfiguration({ profiles: [], assignments: {} } as never)
       await result.current.saveProfile({ id: 1 } as never)
       await result.current.createProfile({ id: 0 } as never)
       await result.current.importThemes(['/tmp/a.itermcolors'])
@@ -78,11 +103,13 @@ describe('useThemeCatalog', () => {
     __registerHandler('github.com/xuthus5/mssh/internal/service.ThemeService.SaveConfiguration', async () => {})
     const { result } = renderHook(() => useThemeCatalog())
     await waitFor(() => expect(result.current.loaded).toBe(true))
+    const savedProfile = { ...darkProfile, color_overrides: JSON.stringify({ background: '#123456' }) }
+    __registerHandler('github.com/xuthus5/mssh/internal/service.ThemeService.ListProfiles', async () => [savedProfile, lightProfile, fixedProfile])
+    __registerHandler('github.com/xuthus5/mssh/internal/service.ThemeService.GetAssignments', async () => ({ dark_profile_id: 1, light_profile_id: 1, follow_interface_mode: true, fixed_profile_id: 0 }))
     await act(async () => {
       await result.current.saveConfiguration({
-        dark_profile: { id: 1, name: 'dark', theme_id: 1, font_family: 'monospace', font_size: 14, cursor_style: 'bar', color_overrides: JSON.stringify({ background: '#123456' }) },
-        light_profile: { id: 1, name: 'dark', theme_id: 1, font_family: 'monospace', font_size: 14, cursor_style: 'bar', color_overrides: JSON.stringify({ background: '#123456' }) },
-        assignments: { dark_profile_id: 1, light_profile_id: 1 },
+        profiles: [{ id: 1, name: 'dark', theme_id: 1, font_family: 'monospace', font_size: 14, cursor_style: 'bar', color_overrides: JSON.stringify({ background: '#123456' }) }],
+        assignments: { dark_profile_id: 1, light_profile_id: 1, follow_interface_mode: true, fixed_profile_id: 0 },
       } as never)
     })
     expect(useThemeCatalogStore.getState().assignments.light_profile_id).toBe(1)
@@ -90,28 +117,28 @@ describe('useThemeCatalog', () => {
   })
 
   it('reloads and hot-applies the active theme after resetting built-in styles', async () => {
-    const resetBuiltinStyles = vi.fn(async () => ({ dark_reset: true, light_reset: false }))
+    const resetBuiltinStyles = vi.fn(async () => ({ dark_reset: true, light_reset: false, fixed_reset: false }))
     __registerHandler('github.com/xuthus5/mssh/internal/service.ThemeService.ResetBuiltinStyles', resetBuiltinStyles)
     const { result } = renderHook(() => useThemeCatalog())
     await waitFor(() => expect(result.current.loaded).toBe(true))
     const reloadedLight = profile(2, 'light', '#f5f5f5')
     __registerHandler('github.com/xuthus5/mssh/internal/service.ThemeService.ListProfiles', async () => [darkProfile, reloadedLight])
 
-    let resetResult: { dark_reset: boolean; light_reset: boolean } | undefined
+    let resetResult: { dark_reset: boolean; light_reset: boolean; fixed_reset: boolean } | undefined
     await act(async () => { resetResult = await result.current.resetBuiltinStyles() })
 
     expect(resetBuiltinStyles).toHaveBeenCalledOnce()
-    expect(resetResult).toEqual({ dark_reset: true, light_reset: false })
+    expect(resetResult).toEqual({ dark_reset: true, light_reset: false, fixed_reset: false })
     expect(useThemeCatalogStore.getState().profiles[1].definition?.color_payload).toContain('#f5f5f5')
     expect(useAppStore.getState().terminalTheme.background).toBe('#f5f5f5')
   })
 })
 
-function registerCatalogHandlers(mode: 'dark' | 'light') {
+function registerCatalogHandlers(mode: 'dark' | 'light', assignments = { dark_profile_id: 1, light_profile_id: 2, follow_interface_mode: true, fixed_profile_id: 0 }) {
   __registerHandler('github.com/xuthus5/mssh/internal/service.ThemeService.InitializeDefaults', async () => {})
-  __registerHandler('github.com/xuthus5/mssh/internal/service.ThemeService.ListDefinitions', async () => [darkProfile.definition, lightProfile.definition])
-  __registerHandler('github.com/xuthus5/mssh/internal/service.ThemeService.ListProfiles', async () => [darkProfile, lightProfile])
-  __registerHandler('github.com/xuthus5/mssh/internal/service.ThemeService.GetAssignments', async () => ({ dark_profile_id: 1, light_profile_id: 2 }))
+  __registerHandler('github.com/xuthus5/mssh/internal/service.ThemeService.ListDefinitions', async () => [darkProfile.definition, lightProfile.definition, fixedProfile.definition])
+  __registerHandler('github.com/xuthus5/mssh/internal/service.ThemeService.ListProfiles', async () => [darkProfile, lightProfile, fixedProfile])
+  __registerHandler('github.com/xuthus5/mssh/internal/service.ThemeService.GetAssignments', async () => assignments)
   __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.Get', async () => ({ key: 'appearance.color_mode', namespace: 'appearance', value: JSON.stringify(mode), value_type: 'string', version: 1, updated_at: '' }))
   __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.Set', async () => {})
 }

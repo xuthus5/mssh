@@ -46,7 +46,7 @@ export function ThemeEditor({ profiles, assignments, onSave, onResetBuiltins }: 
   }
   const submit = async (event: FormEvent) => {
     event.preventDefault(); setSaving(true)
-    try { await onSave({ dark_profile: themeToProfileInput(selectedProfiles.dark!, drafts.dark!), light_profile: themeToProfileInput(selectedProfiles.light!, drafts.light!), assignments: draftAssignments }); setDirty(false) } finally { setSaving(false) }
+    try { await onSave({ profiles: [themeToProfileInput(selectedProfiles.dark!, drafts.dark!), themeToProfileInput(selectedProfiles.light!, drafts.light!)], assignments: draftAssignments }); setDirty(false) } finally { setSaving(false) }
   }
   const valid = hasValidTerminalThemeColors(drafts.dark) && hasValidTerminalThemeColors(drafts.light)
   const persistedDark = findProfile(profiles, assignments.dark_profile_id)
