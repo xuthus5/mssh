@@ -6,14 +6,12 @@ const deleteRecording = vi.hoisted(() => vi.fn(async () => {}))
 
 vi.mock('@/lib/wails', () => ({ LogService: { Delete: deleteRecording } }))
 vi.mock('@/components/terminal/SessionLog', () => ({
-  default: ({ onToggleRecording, onPlayback, onDeleteRecording }: {
-    onToggleRecording: () => void
+  default: ({ onPlayback, onDeleteRecording }: {
     onPlayback: (path: string, title: string) => void
     onDeleteRecording: (id: number) => Promise<void>
   }) => <div data-testid="session-log">
-    <button type="button" onClick={onToggleRecording}>log record</button>
     <button type="button" onClick={() => onPlayback('/tmp/replay.msshlog', '回放 #9')}>log playback</button>
-    <button type="button" onClick={() => { void onDeleteRecording(9) }}>log delete</button>
+    <button type="button" onClick={() => { void onDeleteRecording(9).catch(() => {}) }}>log delete</button>
   </div>,
 }))
 
@@ -81,14 +79,20 @@ describe('TerminalToolbar', () => {
     await userEvent.click(screen.getByTitle('文件管理'))
     await userEvent.click(screen.getByTitle('分屏'))
     await userEvent.click(screen.getByTitle('停止录制'))
-    await userEvent.click(screen.getByTitle('录制记录'))
-    await userEvent.click(screen.getByRole('button', { name: 'log record' }))
+    const historyButton = screen.getByTitle('录制记录')
+    await userEvent.click(historyButton)
+    expect(screen.getByTestId('session-log')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'log record' })).not.toBeInTheDocument()
+    await userEvent.keyboard('{Escape}')
+    await waitFor(() => expect(screen.queryByTestId('session-log')).not.toBeInTheDocument())
+    expect(historyButton).toHaveFocus()
+    await userEvent.click(historyButton)
     await userEvent.click(screen.getByRole('button', { name: 'log playback' }))
     await userEvent.click(screen.getByRole('button', { name: 'log delete' }))
 
     expect(onOpenFiles).toHaveBeenCalledOnce()
     expect(onToggleSplit).toHaveBeenCalledOnce()
-    expect(onToggleRecording).toHaveBeenCalledTimes(2)
+    expect(onToggleRecording).toHaveBeenCalledOnce()
     expect(useAppStore.getState().tabs).toContainEqual(expect.objectContaining({
       id: 'playback-回放 #9',
       terminalId: '/tmp/replay.msshlog',
