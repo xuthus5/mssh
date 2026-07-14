@@ -14,11 +14,15 @@ export function profileIDForSlot(slot: ThemeEditorSlot, assignments: ThemeAssign
   return slot === 'dark' ? assignments.dark_profile_id : assignments.light_profile_id
 }
 
+export function configurationProfileIDs(assignments: ThemeAssignments): number[] {
+  const ids = new Set([assignments.dark_profile_id, assignments.light_profile_id])
+  if (assignments.fixed_profile_id > 0) ids.add(assignments.fixed_profile_id)
+  return [...ids]
+}
+
 export function buildThemeConfiguration(profiles: ThemeProfile[], drafts: ThemeDraftMap, assignments: ThemeAssignments): ThemeConfigurationInput {
   const profileByID = new Map(profiles.map((profile) => [profile.id, profile]))
-  const ids = new Set([assignments.dark_profile_id, assignments.light_profile_id])
-  if (!assignments.follow_interface_mode) ids.add(assignments.fixed_profile_id)
-  const inputs = [...ids].map((id) => {
+  const inputs = configurationProfileIDs(assignments).map((id) => {
     const profile = profileByID.get(id)
     if (!profile) throw new Error(`terminal theme Profile ${id} is unavailable`)
     const draft = drafts.get(id)
