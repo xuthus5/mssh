@@ -118,16 +118,24 @@ func ThemeProfileInputFrom(profile ThemeProfile) ThemeProfileInput {
 }
 
 type ThemeAssignmentsInput struct {
-	DarkProfileID  int64 `json:"dark_profile_id"`
-	LightProfileID int64 `json:"light_profile_id"`
+	DarkProfileID       int64 `json:"dark_profile_id"`
+	LightProfileID      int64 `json:"light_profile_id"`
+	FollowInterfaceMode bool  `json:"follow_interface_mode"`
+	FixedProfileID      int64 `json:"fixed_profile_id"`
 }
 
 type ThemeConfigurationInput struct {
 	DarkProfile  ThemeProfileInput     `json:"dark_profile"`
 	LightProfile ThemeProfileInput     `json:"light_profile"`
+	Profiles     []ThemeProfileInput   `json:"profiles"`
 	Assignments  ThemeAssignmentsInput `json:"assignments"`
 }
 
 func (input ThemeAssignmentsInput) ThemeAssignments() ThemeAssignments {
-	return ThemeAssignments(input)
+	return ThemeAssignments{
+		DarkProfileID:       input.DarkProfileID,
+		LightProfileID:      input.LightProfileID,
+		FollowInterfaceMode: input.FollowInterfaceMode,
+		FixedProfileID:      input.FixedProfileID,
+	}
 }
