@@ -77,8 +77,8 @@ describe('PlaybackTab terminal theme', () => {
   it('hot-applies terminal theme changes to an open playback terminal', async () => {
     render(<PlaybackTab recordingId="1" title="demo" active />)
     await waitFor(() => expect(terminalInstances).toHaveLength(1))
-    useAppStore.getState().setTerminalTheme({ ...useAppStore.getState().terminalTheme, background: '#ffffff', fontSize: 18 })
-    await waitFor(() => expect(terminalInstances[0].options).toMatchObject({ fontSize: 18, theme: expect.objectContaining({ background: '#ffffff' }) }))
+    useAppStore.getState().setTerminalTheme({ ...useAppStore.getState().terminalTheme, background: '#123456', fontSize: 18 })
+    await waitFor(() => expect(terminalInstances[0].options).toMatchObject({ fontSize: 18, theme: expect.objectContaining({ background: '#123456' }) }))
   })
 
   it('writes millisecond-timestamped entries after playback starts', async () => {

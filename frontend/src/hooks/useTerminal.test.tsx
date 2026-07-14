@@ -143,6 +143,20 @@ describe('useTerminal', () => {
     act(() => unmount())
   })
 
+  it('hot-applies a fixed custom background to an open terminal', () => {
+    const containerRef = createRef<HTMLDivElement>()
+    containerRef.current = document.createElement('div')
+    const { unmount } = renderHook(() => useTerminal('term-fixed-theme', containerRef, {
+      active: true,
+      focusRequest: { sequence: 0 },
+    }))
+
+    act(() => useAppStore.getState().setTerminalTheme({ ...useAppStore.getState().terminalTheme, background: '#123456' }))
+
+    expect(terminalOptions[0].theme).toEqual(expect.objectContaining({ background: '#123456' }))
+    act(() => unmount())
+  })
+
   it('blurs a terminal when its tab becomes inactive', () => {
     const containerRef = createRef<HTMLDivElement>()
     containerRef.current = document.createElement('div')
