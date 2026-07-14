@@ -11,8 +11,34 @@ describe('ThemeEditor dual mode profiles', () => {
 
   it('renders separate Dark and Light selectors', () => {
     renderEditor()
+    expect(screen.getByRole('switch', { name: '跟随界面模式' })).toBeChecked()
     expect(screen.getByRole('combobox', { name: 'Dark Mode 终端主题' })).toBeInTheDocument()
     expect(screen.getByRole('combobox', { name: 'Light Mode 终端主题' })).toBeInTheDocument()
+  })
+
+  it('uses the current Light Profile when follow mode is disabled for the first time', async () => {
+    const onSave = vi.fn(async () => {})
+    renderEditor(onSave, undefined, 'light')
+
+    await userEvent.click(screen.getByRole('switch', { name: '跟随界面模式' }))
+
+    expect(screen.getByRole('combobox', { name: '固定终端主题' })).toHaveValue('GitHub Light')
+    expect(screen.queryByRole('tab', { name: 'Dark Mode' })).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: '保存主题配置' }))
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
+      assignments: { dark_profile_id: 1, light_profile_id: 2, follow_interface_mode: false, fixed_profile_id: 2 },
+      profiles: expect.arrayContaining([expect.objectContaining({ id: 1 }), expect.objectContaining({ id: 2 })]),
+    }))
+  })
+
+  it('preserves a previously selected fixed Profile and explains mode mismatch and sharing', async () => {
+    renderEditor(undefined, undefined, 'light', { dark_profile_id: 3, light_profile_id: 2, follow_interface_mode: true, fixed_profile_id: 3 })
+
+    await userEvent.click(screen.getByRole('switch', { name: '跟随界面模式' }))
+
+    expect(screen.getByRole('combobox', { name: '固定终端主题' })).toHaveValue('Dracula')
+    expect(screen.getByRole('alert')).toHaveTextContent('当前界面为 Light Mode')
+    expect(screen.getByText('同时用于 Dark Mode')).toBeInTheDocument()
   })
 
   it('keeps Dark and Light drafts independent and saves atomically', async () => {
@@ -60,14 +86,34 @@ describe('ThemeEditor dual mode profiles', () => {
     await userEvent.click(screen.getByRole('button', { name: '确认重置' }))
 
     expect(onResetBuiltins).toHaveBeenCalledOnce()
-    expect(useToastStore.getState().toasts.at(-1)?.message).toBe('已重置 Dark 和 Light 内置主题')
+    expect(useToastStore.getState().toasts.at(-1)?.message).toBe('已重置 Dark、Light 内置主题')
   })
 
   it('disables reset when neither assigned profile is built in', () => {
     const customProfiles = [profile(1, 'Custom Dark', 'dark', '#111111', false), profile(2, 'Custom Light', 'light', '#eeeeee', false)]
-    render(<ThemeEditor profiles={customProfiles as never} assignments={{ dark_profile_id: 1, light_profile_id: 2 } as never} onSave={vi.fn()} onResetBuiltins={vi.fn()} />)
+    render(<ThemeEditor profiles={customProfiles as never} assignments={{ dark_profile_id: 1, light_profile_id: 2, follow_interface_mode: true, fixed_profile_id: 0 } as never} colorMode="dark" onSave={vi.fn()} onResetBuiltins={vi.fn()} />)
 
     expect(screen.getByRole('button', { name: '重置内置主题' })).toBeDisabled()
+  })
+
+  it('only includes the fixed built-in Profile in reset eligibility while fixed mode is active', () => {
+    const mixedProfiles = [profile(1, 'Custom Dark', 'dark', '#111111', false), profile(2, 'Custom Light', 'light', '#eeeeee', false), profile(3, 'Dracula', 'dark', '#282a36', true)]
+    const { rerender } = render(<ThemeEditor profiles={mixedProfiles as never} assignments={{ dark_profile_id: 1, light_profile_id: 2, follow_interface_mode: true, fixed_profile_id: 3 } as never} colorMode="dark" onSave={vi.fn()} onResetBuiltins={vi.fn()} />)
+    expect(screen.getByRole('button', { name: '重置内置主题' })).toBeDisabled()
+
+    rerender(<ThemeEditor profiles={mixedProfiles as never} assignments={{ dark_profile_id: 1, light_profile_id: 2, follow_interface_mode: false, fixed_profile_id: 3 } as never} colorMode="dark" onSave={vi.fn()} onResetBuiltins={vi.fn()} />)
+    expect(screen.getByRole('button', { name: '重置内置主题' })).toBeEnabled()
+  })
+
+  it('keeps edited colors when saving fails', async () => {
+    renderEditor(vi.fn(async () => { throw new Error('db failed') }))
+    await userEvent.clear(screen.getByLabelText('背景色 HEX'))
+    await userEvent.type(screen.getByLabelText('背景色 HEX'), '#123456')
+
+    await userEvent.click(screen.getByRole('button', { name: '保存主题配置' }))
+
+    expect(screen.getByLabelText('背景色 HEX')).toHaveValue('#123456')
+    expect(useToastStore.getState().toasts.at(-1)?.message).toBe('保存终端主题失败: db failed')
   })
 
   it('keeps the current draft when reset fails', async () => {
@@ -110,6 +156,7 @@ describe('ThemeEditor dual mode profiles', () => {
     [{ dark_reset: true, light_reset: false, fixed_reset: false }, '已重置 Dark 内置主题'],
     [{ dark_reset: false, light_reset: true, fixed_reset: false }, '已重置 Light 内置主题'],
     [{ dark_reset: false, light_reset: false, fixed_reset: false }, '当前绑定没有可重置的内置主题'],
+    [{ dark_reset: false, light_reset: false, fixed_reset: true }, '已重置固定内置主题'],
   ])('reports partial reset result %o', async (result, message) => {
     renderEditor(vi.fn(async () => {}), vi.fn(async () => result))
     await userEvent.click(screen.getByRole('button', { name: '重置内置主题' }))
@@ -118,8 +165,13 @@ describe('ThemeEditor dual mode profiles', () => {
   })
 })
 
-function renderEditor(onSave = vi.fn(async () => {}), onResetBuiltins = vi.fn(async () => ({ dark_reset: false, light_reset: false, fixed_reset: false }))) {
-  return render(<ThemeEditor profiles={profiles as never} assignments={{ dark_profile_id: 1, light_profile_id: 2, follow_interface_mode: true, fixed_profile_id: 0 } as never} onSave={onSave} onResetBuiltins={onResetBuiltins} />)
+function renderEditor(
+  onSave = vi.fn(async () => {}),
+  onResetBuiltins = vi.fn(async () => ({ dark_reset: false, light_reset: false, fixed_reset: false })),
+  colorMode: 'dark' | 'light' = 'dark',
+  assignments = { dark_profile_id: 1, light_profile_id: 2, follow_interface_mode: true, fixed_profile_id: 0 },
+) {
+  return render(<ThemeEditor profiles={profiles as never} assignments={assignments as never} colorMode={colorMode} onSave={onSave} onResetBuiltins={onResetBuiltins} />)
 }
 
 function profile(id: number, name: string, mode: string, background: string, builtIn = true) {
