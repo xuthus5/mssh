@@ -153,6 +153,10 @@ func (s *SessionService) GetSession(id int64) (*model.Session, error) {
 }
 
 func (s *SessionService) Disconnect(terminalID string) error {
+	return s.disconnect(terminalID, true)
+}
+
+func (s *SessionService) disconnect(terminalID string, emitState bool) error {
 	s.logger.Info("disconnecting terminal", "terminalID", terminalID)
 	s.mu.Lock()
 	wrapper, ok := s.conns[terminalID]
@@ -166,10 +170,12 @@ func (s *SessionService) Disconnect(terminalID string) error {
 
 	_ = wrapper.Close()
 
-	s.eventBus.Emit(event.ConnectionState, event.ConnectionStatePayload{
-		TerminalID: terminalID,
-		State:      "disconnected",
-	})
+	if emitState {
+		s.eventBus.Emit(event.ConnectionState, event.ConnectionStatePayload{
+			TerminalID: terminalID,
+			State:      "disconnected",
+		})
+	}
 
 	s.logger.Info("terminal disconnected", "terminalID", terminalID)
 	return nil

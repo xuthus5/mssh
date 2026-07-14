@@ -11,6 +11,10 @@ import (
 )
 
 func (s *SessionService) Connect(ctx context.Context, sessionID int64) (string, error) {
+	return s.connect(ctx, sessionID, true)
+}
+
+func (s *SessionService) connect(ctx context.Context, sessionID int64, emitState bool) (string, error) {
 	s.logger.Info("connecting to session", "sessionID", sessionID)
 	connectCtx, cancel := context.WithCancel(ctx)
 	attemptID := s.registerConnectAttempt(cancel)
@@ -42,7 +46,9 @@ func (s *SessionService) Connect(ctx context.Context, sessionID int64) (string, 
 	if err := store.MarkSessionConnected(s.db, sessionID); err != nil {
 		s.logger.Error("mark session connected failed", "sessionID", sessionID, "error", err)
 	}
-	s.eventBus.Emit(event.ConnectionState, event.ConnectionStatePayload{TerminalID: terminalID, AttemptID: attemptID, State: "connected"})
+	if emitState {
+		s.eventBus.Emit(event.ConnectionState, event.ConnectionStatePayload{TerminalID: terminalID, AttemptID: attemptID, State: "connected"})
+	}
 	return terminalID, nil
 }
 

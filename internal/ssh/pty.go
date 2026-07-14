@@ -9,15 +9,31 @@ import (
 )
 
 type PTYSession struct {
-	session   *gossh.Session
-	stdin     io.WriteCloser
-	mu        sync.RWMutex
-	readCb    func([]byte)
-	closeOnce sync.Once
-	cancel    chan struct{}
+	session      *gossh.Session
+	stdin        io.WriteCloser
+	stdout       io.Reader
+	mu           sync.RWMutex
+	readCb       func([]byte)
+	pendingRead  []byte
+	exitCb       func(error)
+	exitErr      error
+	exited       bool
+	exitNotified bool
+	closeOnce    sync.Once
+	closeErr     error
+	startOnce    sync.Once
 }
 
 func OpenPTY(c *ClientWrapper, termType string, cols, rows int) (*PTYSession, error) {
+	pty, err := PreparePTY(c, termType, cols, rows)
+	if err != nil {
+		return nil, err
+	}
+	pty.Start()
+	return pty, nil
+}
+
+func PreparePTY(c *ClientWrapper, termType string, cols, rows int) (*PTYSession, error) {
 	session, err := c.Inner.NewSession()
 	if err != nil {
 		return nil, fmt.Errorf("new session: %w", err)
@@ -45,9 +61,15 @@ func OpenPTY(c *ClientWrapper, termType string, cols, rows int) (*PTYSession, er
 		session.Close()
 		return nil, fmt.Errorf("start shell: %w", err)
 	}
-	ptys := &PTYSession{session: session, stdin: stdin, cancel: make(chan struct{}, 1)}
-	go ptys.readLoop(stdout)
-	return ptys, nil
+	return &PTYSession{session: session, stdin: stdin, stdout: stdout}, nil
+}
+
+func (p *PTYSession) Start() {
+	p.startOnce.Do(func() {
+		if p.stdout != nil {
+			go p.readLoop(p.stdout)
+		}
+	})
 }
 
 func (p *PTYSession) readLoop(r io.Reader) {
@@ -57,14 +79,10 @@ func (p *PTYSession) readLoop(r io.Reader) {
 		if n > 0 {
 			data := make([]byte, n)
 			copy(data, buf[:n])
-			p.mu.RLock()
-			cb := p.readCb
-			p.mu.RUnlock()
-			if cb != nil {
-				cb(data)
-			}
+			p.deliverRead(data)
 		}
 		if err != nil {
+			p.notifyExit(err)
 			return
 		}
 	}
@@ -73,7 +91,56 @@ func (p *PTYSession) readLoop(r io.Reader) {
 func (p *PTYSession) SetReadCallback(fn func([]byte)) {
 	p.mu.Lock()
 	p.readCb = fn
+	pending := p.pendingRead
+	p.pendingRead = nil
 	p.mu.Unlock()
+	if fn != nil && len(pending) > 0 {
+		fn(pending)
+	}
+}
+
+func (p *PTYSession) deliverRead(data []byte) {
+	p.mu.Lock()
+	callback := p.readCb
+	if callback == nil {
+		p.pendingRead = append(p.pendingRead, data...)
+	}
+	p.mu.Unlock()
+	if callback != nil {
+		callback(data)
+	}
+}
+
+func (p *PTYSession) SetExitCallback(fn func(error)) {
+	p.mu.Lock()
+	p.exitCb = fn
+	shouldNotify := p.exited && !p.exitNotified && fn != nil
+	if shouldNotify {
+		p.exitNotified = true
+	}
+	exitErr := p.exitErr
+	p.mu.Unlock()
+	if shouldNotify {
+		fn(exitErr)
+	}
+}
+
+func (p *PTYSession) notifyExit(err error) {
+	p.mu.Lock()
+	if p.exited {
+		p.mu.Unlock()
+		return
+	}
+	p.exited = true
+	p.exitErr = err
+	callback := p.exitCb
+	if callback != nil {
+		p.exitNotified = true
+	}
+	p.mu.Unlock()
+	if callback != nil {
+		callback(err)
+	}
 }
 
 func (p *PTYSession) Write(data []byte) (int, error) {
@@ -88,6 +155,10 @@ func (p *PTYSession) Resize(cols, rows int) error {
 }
 
 func (p *PTYSession) Close() error {
-	p.closeOnce.Do(func() { close(p.cancel) })
-	return p.session.Close()
+	p.closeOnce.Do(func() {
+		if p.session != nil {
+			p.closeErr = p.session.Close()
+		}
+	})
+	return p.closeErr
 }
