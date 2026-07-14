@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { buildThemeConfiguration, createThemeDrafts } from '@/components/settings/themeEditorState'
 
-const profiles = [profile(1, '#111111'), profile(2, '#eeeeee')]
+const profiles = [profile(1, '#111111'), profile(2, '#eeeeee'), profile(3, '#333333')]
 
 describe('theme editor state', () => {
   it('creates editable drafts keyed by Profile ID', () => {
@@ -31,6 +31,18 @@ describe('theme editor state', () => {
       follow_interface_mode: true,
       fixed_profile_id: 0,
     } as never)).toThrow('terminal theme draft 2 is unavailable')
+  })
+
+  it('keeps a historical fixed Profile draft when follow mode is re-enabled before saving', () => {
+    const drafts = createThemeDrafts(profiles as never)
+    const configuration = buildThemeConfiguration(profiles as never, drafts, {
+      dark_profile_id: 1,
+      light_profile_id: 2,
+      follow_interface_mode: true,
+      fixed_profile_id: 3,
+    } as never)
+
+    expect(configuration.profiles.map((profile) => profile.id)).toEqual([1, 2, 3])
   })
 })
 

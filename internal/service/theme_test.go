@@ -173,7 +173,7 @@ func TestThemeServiceSavesCrossModeConfigurationAndManagesCustomThemes(t *testin
 	assert.Error(t, themeService.DeleteDefinition(profiles[0].ThemeID))
 }
 
-func TestThemeServiceSavesFixedConfigurationAndRollsBackInvalidAssignments(t *testing.T) {
+func TestThemeServiceSavesFixedConfigurationAndRollsBackProfileUpdates(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	themeService := NewThemeService(db, testutil.NewTestLogger())
 	require.NoError(t, themeService.InitializeDefaults())
@@ -201,16 +201,18 @@ func TestThemeServiceSavesFixedConfigurationAndRollsBackInvalidAssignments(t *te
 	assert.Equal(t, fixed.ID, assignments.FixedProfileID)
 
 	dark.Name = "Must Roll Back"
+	_, err = db.Exec(`CREATE TRIGGER fail_light_profile_update BEFORE UPDATE ON terminal_theme_profiles WHEN OLD.id = ` + themeProfileID(light.ID) + ` BEGIN SELECT RAISE(FAIL, 'light profile update failed'); END`)
+	require.NoError(t, err)
 	err = themeService.SaveConfiguration(model.ThemeConfigurationInput{
-		Profiles: []model.ThemeProfileInput{model.ThemeProfileInputFrom(dark)},
+		Profiles: []model.ThemeProfileInput{model.ThemeProfileInputFrom(dark), model.ThemeProfileInputFrom(light)},
 		Assignments: model.ThemeAssignmentsInput{
 			DarkProfileID:       dark.ID,
 			LightProfileID:      light.ID,
-			FollowInterfaceMode: false,
-			FixedProfileID:      99999,
+			FollowInterfaceMode: true,
+			FixedProfileID:      fixed.ID,
 		},
 	})
-	assert.ErrorContains(t, err, "fixed theme profile")
+	assert.ErrorContains(t, err, "light profile update failed")
 	storedDark, getErr := themeService.GetProfile(dark.ID)
 	require.NoError(t, getErr)
 	assert.NotEqual(t, "Must Roll Back", storedDark.Name)
@@ -239,6 +241,41 @@ func TestThemeServiceSaveAssignmentsRollsBackPartialWrites(t *testing.T) {
 	after, getErr := store.GetThemeAssignments(db)
 	require.NoError(t, getErr)
 	assert.Equal(t, before, after)
+}
+
+func TestThemeServiceDeletesHistoricalFixedProfileTransactionally(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	themeService := NewThemeService(db, testutil.NewTestLogger())
+	require.NoError(t, themeService.InitializeDefaults())
+	profiles := mustThemeProfiles(t, themeService)
+	dark := mustThemeProfileNamed(t, profiles, "GitHub Dark")
+	light := mustThemeProfileNamed(t, profiles, "GitHub Light")
+	historical, err := themeService.CreateCustomProfile(model.ThemeProfileInput{
+		Name: "Historical Fixed", ThemeID: dark.ThemeID, FontFamily: "monospace", FontSize: 14, CursorStyle: model.CursorStyleBar, ColorOverrides: `{}`,
+	})
+	require.NoError(t, err)
+	require.NoError(t, themeService.SaveAssignments(model.ThemeAssignmentsInput{
+		DarkProfileID: dark.ID, LightProfileID: light.ID, FollowInterfaceMode: true, FixedProfileID: historical.ID,
+	}))
+
+	_, err = db.Exec(`CREATE TRIGGER fail_historical_profile_delete BEFORE DELETE ON terminal_theme_profiles WHEN OLD.id = ` + themeProfileID(historical.ID) + ` BEGIN SELECT RAISE(FAIL, 'historical profile delete failed'); END`)
+	require.NoError(t, err)
+	err = themeService.DeleteProfile(historical.ID)
+	assert.ErrorContains(t, err, "historical profile delete failed")
+	_, err = themeService.GetProfile(historical.ID)
+	require.NoError(t, err)
+	assignments, err := themeService.GetAssignments()
+	require.NoError(t, err)
+	assert.Equal(t, historical.ID, assignments.FixedProfileID)
+
+	_, err = db.Exec(`DROP TRIGGER fail_historical_profile_delete`)
+	require.NoError(t, err)
+	require.NoError(t, themeService.DeleteProfile(historical.ID))
+	_, err = themeService.GetProfile(historical.ID)
+	assert.Error(t, err)
+	assignments, err = themeService.GetAssignments()
+	require.NoError(t, err)
+	assert.Zero(t, assignments.FixedProfileID)
 }
 
 func TestThemeServiceReportsDatabaseFailures(t *testing.T) {
