@@ -98,7 +98,7 @@ func DeleteThemeDefinition(db themeDB, id int64) error {
 }
 
 func CreateThemeProfile(db themeDB, profile model.ThemeProfile) (*model.ThemeProfile, error) {
-	result, err := db.Exec(`INSERT INTO terminal_theme_profiles (name, theme_id, font_family, font_size, cursor_style, color_overrides) VALUES (?, ?, ?, ?, ?, ?)`, profile.Name, profile.ThemeID, profile.FontFamily, profile.FontSize, profile.CursorStyle, profile.ColorOverrides)
+	result, err := db.Exec(`INSERT INTO terminal_theme_profiles (name, theme_id, follow_global_style, font_family, font_size, cursor_style, color_overrides) VALUES (?, ?, ?, ?, ?, ?, ?)`, profile.Name, profile.ThemeID, profile.FollowGlobalStyle, profile.FontFamily, profile.FontSize, profile.CursorStyle, profile.ColorOverrides)
 	if err != nil {
 		return nil, fmt.Errorf("create theme profile: %w", err)
 	}
@@ -133,7 +133,7 @@ func ListThemeProfiles(db themeDB, mode model.ThemeMode) ([]model.ThemeProfile, 
 	return profiles, rows.Err()
 }
 
-const themeProfileSelect = `SELECT terminal_theme_profiles.id, terminal_theme_profiles.name, terminal_theme_profiles.theme_id, terminal_theme_profiles.font_family, terminal_theme_profiles.font_size, terminal_theme_profiles.cursor_style, terminal_theme_profiles.color_overrides, terminal_theme_profiles.created_at, terminal_theme_profiles.updated_at, themes.id, themes.name, themes.mode, themes.source_type, themes.source_name, themes.source_url, themes.source_author, themes.source_license, themes.source_version, themes.source_fingerprint, themes.color_payload, themes.raw_payload, themes.is_builtin, themes.created_at, themes.updated_at FROM terminal_theme_profiles JOIN themes ON themes.id = terminal_theme_profiles.theme_id`
+const themeProfileSelect = `SELECT terminal_theme_profiles.id, terminal_theme_profiles.name, terminal_theme_profiles.theme_id, terminal_theme_profiles.follow_global_style, terminal_theme_profiles.font_family, terminal_theme_profiles.font_size, terminal_theme_profiles.cursor_style, terminal_theme_profiles.color_overrides, terminal_theme_profiles.created_at, terminal_theme_profiles.updated_at, themes.id, themes.name, themes.mode, themes.source_type, themes.source_name, themes.source_url, themes.source_author, themes.source_license, themes.source_version, themes.source_fingerprint, themes.color_payload, themes.raw_payload, themes.is_builtin, themes.created_at, themes.updated_at FROM terminal_theme_profiles JOIN themes ON themes.id = terminal_theme_profiles.theme_id`
 
 func GetThemeProfile(db themeDB, id int64) (*model.ThemeProfile, error) {
 	row := db.QueryRow(themeProfileSelect+" WHERE terminal_theme_profiles.id = ?", id)
@@ -145,7 +145,7 @@ func GetThemeProfile(db themeDB, id int64) (*model.ThemeProfile, error) {
 }
 
 func UpdateThemeProfile(db themeDB, profile model.ThemeProfile) error {
-	result, err := db.Exec(`UPDATE terminal_theme_profiles SET name = ?, theme_id = ?, font_family = ?, font_size = ?, cursor_style = ?, color_overrides = ?, updated_at = datetime('now') WHERE id = ?`, profile.Name, profile.ThemeID, profile.FontFamily, profile.FontSize, profile.CursorStyle, profile.ColorOverrides, profile.ID)
+	result, err := db.Exec(`UPDATE terminal_theme_profiles SET name = ?, theme_id = ?, follow_global_style = ?, font_family = ?, font_size = ?, cursor_style = ?, color_overrides = ?, updated_at = datetime('now') WHERE id = ?`, profile.Name, profile.ThemeID, profile.FollowGlobalStyle, profile.FontFamily, profile.FontSize, profile.CursorStyle, profile.ColorOverrides, profile.ID)
 	if err != nil {
 		return fmt.Errorf("update theme profile: %w", err)
 	}
@@ -277,7 +277,7 @@ func scanThemeProfile(row scanner) (model.ThemeProfile, error) {
 	var profile model.ThemeProfile
 	var definition model.ThemeDefinition
 	var profileCreated, profileUpdated, definitionCreated, definitionUpdated string
-	err := row.Scan(&profile.ID, &profile.Name, &profile.ThemeID, &profile.FontFamily, &profile.FontSize, &profile.CursorStyle, &profile.ColorOverrides, &profileCreated, &profileUpdated, &definition.ID, &definition.Name, &definition.Mode, &definition.SourceType, &definition.SourceName, &definition.SourceURL, &definition.SourceAuthor, &definition.SourceLicense, &definition.SourceVersion, &definition.SourceFingerprint, &definition.ColorPayload, &definition.RawPayload, &definition.IsBuiltin, &definitionCreated, &definitionUpdated)
+	err := row.Scan(&profile.ID, &profile.Name, &profile.ThemeID, &profile.FollowGlobalStyle, &profile.FontFamily, &profile.FontSize, &profile.CursorStyle, &profile.ColorOverrides, &profileCreated, &profileUpdated, &definition.ID, &definition.Name, &definition.Mode, &definition.SourceType, &definition.SourceName, &definition.SourceURL, &definition.SourceAuthor, &definition.SourceLicense, &definition.SourceVersion, &definition.SourceFingerprint, &definition.ColorPayload, &definition.RawPayload, &definition.IsBuiltin, &definitionCreated, &definitionUpdated)
 	if err != nil {
 		return profile, err
 	}

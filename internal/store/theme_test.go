@@ -29,13 +29,15 @@ func TestThemeCatalogStoreCRUDAndFilters(t *testing.T) {
 	assert.Equal(t, "v2", updatedDefinition.SourceVersion)
 	assert.JSONEq(t, `{"background":"#111111"}`, updatedDefinition.ColorPayload)
 
-	profile, err := CreateThemeProfile(db, model.ThemeProfile{Name: "Dark Profile", ThemeID: dark.ID, FontFamily: "monospace", FontSize: 14, CursorStyle: model.CursorStyleBar, ColorOverrides: `{}`})
+	profile, err := CreateThemeProfile(db, model.ThemeProfile{Name: "Dark Profile", ThemeID: dark.ID, FollowGlobalStyle: true, FontFamily: "monospace", FontSize: 14, CursorStyle: model.CursorStyleBar, ColorOverrides: `{}`})
 	require.NoError(t, err)
 	profile.FontSize = 16
+	profile.FollowGlobalStyle = false
 	require.NoError(t, UpdateThemeProfile(db, *profile))
 	loaded, err := GetThemeProfile(db, profile.ID)
 	require.NoError(t, err)
 	assert.Equal(t, 16, loaded.FontSize)
+	assert.False(t, loaded.FollowGlobalStyle)
 	assert.Equal(t, dark.Name, loaded.Definition.Name)
 
 	require.NoError(t, DeleteThemeProfile(db, profile.ID))
