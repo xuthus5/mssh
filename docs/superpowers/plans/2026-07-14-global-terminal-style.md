@@ -13,7 +13,7 @@
 - Global style contains only terminal font family, font size, and cursor style; cursor color remains Profile-owned.
 - Global font size and Profile fallback font size must remain in the inclusive range `8–48`.
 - Cursor style accepts only `block`, `underline`, or `bar`.
-- Existing Profiles migrate to `follow_global_style = true` without losing their stored Profile-level style values.
+- Theme catalog schemas that do not match the final POC format are dropped and rebuilt; no historical Profile data migration is implemented.
 - New built-in, imported, and custom Profiles default to following global style.
 - Configuration save must atomically persist global style, Profile drafts, and theme Assignments.
 - Unsaved drafts affect only the settings preview; open terminals update only after a successful save and catalog reload.
@@ -58,13 +58,13 @@ func TestTerminalGlobalStyleInputConversions(t *testing.T) {
 }
 ```
 
-Extend database tests so a fresh database and an old Profile table both expose:
+Extend database tests so a fresh database exposes:
 
 ```text
 follow_global_style INTEGER NOT NULL DEFAULT 1
 ```
 
-The legacy-table test must insert a Profile before migration and assert that its existing font fields survive while `follow_global_style` becomes `true`.
+Add a stale-schema test that creates a Profile table without `follow_global_style`, inserts historical data, runs `Migrate`, and asserts the theme catalog was rebuilt in the final format and the historical Profile no longer exists.
 
 - [ ] **Step 2: Run model and schema tests to verify RED**
 
@@ -111,28 +111,26 @@ func TerminalGlobalStyleInputFrom(style TerminalGlobalStyle) TerminalGlobalStyle
 }
 ```
 
-- [ ] **Step 4: Add compatible Profile schema migration**
+- [ ] **Step 4: Enforce the final POC Profile schema**
 
-Add `follow_global_style INTEGER NOT NULL DEFAULT 1` to `themeProfilesSchema`. After creating tables, call a focused helper:
+Add `follow_global_style INTEGER NOT NULL DEFAULT 1` to `themeProfilesSchema`. Extend the theme catalog schema-current check to inspect both `themes` and `terminal_theme_profiles`. The final check must require the new Profile column:
 
 ```go
-func ensureThemeProfileStyleSchema(db *sql.DB) error {
+func themeProfileSchemaCurrent(db *sql.DB) (bool, error) {
 	columns, err := tableColumns(db, "terminal_theme_profiles")
 	if err != nil {
-		return fmt.Errorf("inspect terminal theme profiles: %w", err)
+		return false, fmt.Errorf("inspect terminal theme profiles: %w", err)
 	}
-	if columns["follow_global_style"] {
-		return nil
-	}
-	_, err = db.Exec("ALTER TABLE terminal_theme_profiles ADD COLUMN follow_global_style INTEGER NOT NULL DEFAULT 1")
-	if err != nil {
-		return fmt.Errorf("add terminal theme follow-global column: %w", err)
-	}
-	return nil
+	return columns["theme_id"] &&
+		columns["follow_global_style"] &&
+		columns["font_family"] &&
+		columns["font_size"] &&
+		columns["cursor_style"] &&
+		columns["color_overrides"], nil
 }
 ```
 
-Do not rebuild or drop a current theme catalog merely to add this column.
+If either theme definitions or Profile schema is not current, call the existing schema replacement path and recreate both tables. Do not add `ALTER TABLE`, data-copy, compatibility branches, or legacy value conversion.
 
 - [ ] **Step 5: Update Profile CRUD and scanning**
 
@@ -170,7 +168,7 @@ Run:
 PATH="$HOME/.govm/go/bin:$PATH" go test ./internal/model ./internal/store -count=1
 ```
 
-Expected: PASS, including fresh schema, compatible ALTER migration, Profile round trips, global style round trips, missing-key behavior, and malformed setting errors.
+Expected: PASS, including fresh schema, stale-schema replacement, Profile round trips, global style round trips, missing-key behavior, and malformed setting errors.
 
 - [ ] **Step 8: Commit persistence layer**
 
@@ -693,7 +691,7 @@ Expected: only intended source, generated bindings, tests, and concise documenta
 
 Review must specifically inspect:
 
-- Schema compatibility and preserved Profile fallback values.
+- Final-schema replacement behavior with no legacy compatibility path.
 - SaveConfiguration transaction rollback.
 - Cursor color remaining Profile-owned.
 - Global/fallback draft preservation across toggle cycles.
