@@ -3,7 +3,7 @@ import { Menu, Minus, Moon, Settings, Square, SquareTerminal, Sun, Workflow, X }
 import { Window } from '@wailsio/runtime'
 import { logger } from '@/lib/logger'
 import { useAppStore } from '@/store/appStore'
-import { WORKSPACE_PANEL_ID, workspaceTabID, type WorkspaceID } from '@/store/tabNavigation'
+import { workspaceTabID, type WorkspaceID } from '@/store/tabNavigation'
 import { useThemeCatalog } from '@/hooks/useThemeCatalog'
 import { DynamicTabOverflowMenu, DynamicTabStrip } from '@/components/layout/DynamicTabStrip'
 
@@ -16,6 +16,7 @@ export function WindowTitleBar() {
   const themeCatalog = useThemeCatalog()
   const colorMode = themeCatalog.colorMode
   const activeSurface = useAppStore((state) => state.activeSurface)
+  const workspaceTab = useAppStore((state) => state.workspaceTab)
   const navigationCollapsed = useAppStore((state) => state.navigationCollapsed)
   const activateWorkspace = useAppStore((state) => state.activateWorkspace)
   const toggleNavigation = useAppStore((state) => state.toggleNavigation)
@@ -27,14 +28,14 @@ export function WindowTitleBar() {
 
   const navigationButton = (tab: WorkspaceID, label: string) => {
     const Icon = tab === 'sessions' ? SquareTerminal : Workflow
-    const selected = activeSurface?.type === 'workspace' && activeSurface.id === tab
-    return <button id={workspaceTabID(tab)} type="button" role="tab" aria-controls={WORKSPACE_PANEL_ID} aria-selected={selected} className={`flex items-center gap-1.5 px-3.5 text-sm font-medium transition-colors [--wails-draggable:no-drag] ${selected ? 'bg-background text-foreground shadow-[inset_0_-2px_0_var(--primary)]' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`} onClick={() => activateWorkspace(tab)}><Icon data-icon="inline-start" aria-hidden="true" className="size-4" />{label}</button>
+    const selected = activeSurface !== null && workspaceTab === tab
+    return <button id={workspaceTabID(tab)} type="button" aria-controls="sidebar-navigation" aria-pressed={selected} className={`flex items-center gap-1.5 px-3.5 text-sm font-medium transition-colors [--wails-draggable:no-drag] ${selected ? 'bg-background text-foreground shadow-[inset_0_-2px_0_var(--primary)]' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`} onClick={() => activateWorkspace(tab)}><Icon data-icon="inline-start" aria-hidden="true" className="size-4" />{label}</button>
   }
 
   return <header className="flex h-9 shrink-0 select-none items-stretch border-b border-border bg-card">
     <div className="flex shrink-0 [--wails-draggable:no-drag]">
       <button type="button" aria-label={navigationCollapsed ? '展开导航' : '收起导航'} aria-controls="sidebar-navigation" aria-expanded={!navigationCollapsed} className="grid w-10 place-items-center text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={toggleNavigation}><Menu className="size-4" /></button>
-      {!navigationCollapsed && <nav role="tablist" aria-label="侧边栏导航" className="flex">{navigationButton('sessions', '会话')}{navigationButton('macros', '宏')}</nav>}
+      {!navigationCollapsed && <nav aria-label="侧边栏导航" className="flex">{navigationButton('sessions', '会话')}{navigationButton('macros', '宏')}</nav>}
     </div>
     <DynamicTabStrip onOverflowChange={setTabsOverflow} />
     <div data-testid="window-drag-region" className="min-w-20 flex-1 [--wails-draggable:drag]" onDoubleClick={() => runWindowAction('toggle maximise', Window.ToggleMaximise)} />

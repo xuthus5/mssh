@@ -80,7 +80,7 @@ describe('Sidebar navigation collapse', () => {
     await act(async () => { await store.closeTab('playback-1') })
 
     expect(useAppStore.getState()).toMatchObject({ activeSurface: { type: 'workspace', id: 'sessions' }, workspaceTab: 'sessions' })
-    expect(screen.getByRole('tab', { name: '会话' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('button', { name: '会话' })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByText('会话资产工作区')).toBeInTheDocument()
     expect(screen.getByPlaceholderText('搜索会话...')).toBeInTheDocument()
   })
