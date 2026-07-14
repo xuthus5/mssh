@@ -22,10 +22,18 @@ const (
 type CursorStyle string
 
 const (
-	CursorStyleBlock     CursorStyle = "block"
-	CursorStyleUnderline CursorStyle = "underline"
-	CursorStyleBar       CursorStyle = "bar"
+	CursorStyleBlock          CursorStyle = "block"
+	CursorStyleUnderline      CursorStyle = "underline"
+	CursorStyleBar            CursorStyle = "bar"
+	DefaultTerminalFontFamily             = `"JetBrains Mono", "Cascadia Code", monospace`
+	DefaultTerminalFontSize               = 14
 )
+
+type TerminalGlobalStyle struct {
+	FontFamily  string      `json:"font_family"`
+	FontSize    int         `json:"font_size"`
+	CursorStyle CursorStyle `json:"cursor_style"`
+}
 
 type TerminalColorPayload struct {
 	Background string   `json:"background"`
@@ -54,16 +62,17 @@ type ThemeDefinition struct {
 }
 
 type ThemeProfile struct {
-	ID             int64            `json:"id"`
-	Name           string           `json:"name"`
-	ThemeID        int64            `json:"theme_id"`
-	Definition     *ThemeDefinition `json:"definition,omitempty"`
-	FontFamily     string           `json:"font_family"`
-	FontSize       int              `json:"font_size"`
-	CursorStyle    CursorStyle      `json:"cursor_style"`
-	ColorOverrides string           `json:"color_overrides"`
-	CreatedAt      time.Time        `json:"created_at"`
-	UpdatedAt      time.Time        `json:"updated_at"`
+	ID                int64            `json:"id"`
+	Name              string           `json:"name"`
+	ThemeID           int64            `json:"theme_id"`
+	Definition        *ThemeDefinition `json:"definition,omitempty"`
+	FollowGlobalStyle bool             `json:"follow_global_style"`
+	FontFamily        string           `json:"font_family"`
+	FontSize          int              `json:"font_size"`
+	CursorStyle       CursorStyle      `json:"cursor_style"`
+	ColorOverrides    string           `json:"color_overrides"`
+	CreatedAt         time.Time        `json:"created_at"`
+	UpdatedAt         time.Time        `json:"updated_at"`
 }
 
 type ThemeAssignments struct {

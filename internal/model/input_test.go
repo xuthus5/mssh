@@ -23,3 +23,12 @@ func TestWriteInputsExcludeServerManagedTimestamps(t *testing.T) {
 	assert.True(t, theme.CreatedAt.IsZero())
 	assert.True(t, theme.UpdatedAt.IsZero())
 }
+
+func TestTerminalGlobalStyleInputConversions(t *testing.T) {
+	input := TerminalGlobalStyleInput{FontFamily: "JetBrains Mono", FontSize: 16, CursorStyle: CursorStyleBlock}
+	assert.Equal(t, TerminalGlobalStyle(input), input.TerminalGlobalStyle())
+	assert.Equal(t, input, TerminalGlobalStyleInputFrom(input.TerminalGlobalStyle()))
+
+	profile := ThemeProfile{ID: 7, FollowGlobalStyle: true, FontFamily: "mono", FontSize: 14, CursorStyle: CursorStyleBar}
+	assert.True(t, ThemeProfileInputFrom(profile).FollowGlobalStyle)
+}
