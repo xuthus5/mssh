@@ -30,9 +30,9 @@ export function useThemeCatalog() {
   return { ...state, reload: loadThemeCatalog, setColorMode: changeColorMode, saveAssignments, saveConfiguration, saveProfile, createProfile, importThemes, deleteProfile, deleteDefinition, resetBuiltinStyles }
 }
 
-export async function loadThemeCatalog() {
+export async function loadThemeCatalog(): Promise<boolean> {
   const current = useThemeCatalogStore.getState()
-  if (current.loading || current.loaded) return
+  if (current.loading || current.loaded) return current.loaded
   useThemeCatalogStore.setState({ loading: true, error: null })
   try {
     await ThemeService.InitializeDefaults()
@@ -41,10 +41,12 @@ export async function loadThemeCatalog() {
     useThemeCatalogStore.setState({ definitions, profiles, assignments, colorMode, loaded: true, loading: false })
     applyInterfaceColorMode(colorMode)
     applyEffectiveTerminalTheme()
+    return true
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     useThemeCatalogStore.setState({ loading: false, error: message })
     logger.error('load theme catalog failed', error)
+    return false
   }
 }
 
@@ -122,7 +124,8 @@ function applyEffectiveTerminalTheme() {
 
 async function loadThemeCatalogFresh() {
   useThemeCatalogStore.setState({ loaded: false, loading: false })
-  await loadThemeCatalog()
+  const loaded = await loadThemeCatalog()
+  if (!loaded) throw new Error(useThemeCatalogStore.getState().error ?? 'load theme catalog failed')
 }
 
 function parseColorMode(value?: string): ColorMode {

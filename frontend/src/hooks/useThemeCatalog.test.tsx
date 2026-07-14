@@ -116,6 +116,26 @@ describe('useThemeCatalog', () => {
     expect(useAppStore.getState().terminalTheme.background).toBe('#123456')
   })
 
+  it('propagates catalog reload failures after a successful database save', async () => {
+    __registerHandler('github.com/xuthus5/mssh/internal/service.ThemeService.SaveConfiguration', async () => {})
+    const { result } = renderHook(() => useThemeCatalog())
+    await waitFor(() => expect(result.current.loaded).toBe(true))
+    __registerHandler('github.com/xuthus5/mssh/internal/service.ThemeService.ListProfiles', async () => { throw new Error('reload failed') })
+
+    let reloadError: unknown
+    await act(async () => {
+      try {
+        await result.current.saveConfiguration({
+          profiles: [],
+          assignments: { dark_profile_id: 1, light_profile_id: 2, follow_interface_mode: true, fixed_profile_id: 0 },
+        } as never)
+      } catch (error) {
+        reloadError = error
+      }
+    })
+    expect(reloadError).toEqual(expect.objectContaining({ message: 'reload failed' }))
+  })
+
   it('reloads and hot-applies the active theme after resetting built-in styles', async () => {
     const resetBuiltinStyles = vi.fn(async () => ({ dark_reset: true, light_reset: false, fixed_reset: false }))
     __registerHandler('github.com/xuthus5/mssh/internal/service.ThemeService.ResetBuiltinStyles', resetBuiltinStyles)

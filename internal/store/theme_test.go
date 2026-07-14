@@ -113,6 +113,17 @@ func TestThemeAssignmentsStoreReportsInvalidValuesAndDatabaseErrors(t *testing.T
 	_, err = GetThemeAssignments(db)
 	assert.ErrorContains(t, err, "terminal.theme.follow_interface_mode")
 
+	_, err = db.Exec(`DELETE FROM settings`)
+	require.NoError(t, err)
+	_, err = db.Exec(`INSERT INTO settings (key, namespace, value, value_type, version) VALUES
+		('terminal.theme.dark_profile_id', 'terminal', '1', 'number', 1),
+		('terminal.theme.light_profile_id', 'terminal', '2', 'number', 1),
+		('terminal.theme.follow_interface_mode', 'terminal', 'true', 'boolean', 1),
+		('terminal.theme.fixed_profile_id', 'terminal', 'invalid', 'number', 1)`)
+	require.NoError(t, err)
+	_, err = GetThemeAssignments(db)
+	assert.ErrorContains(t, err, "terminal.theme.fixed_profile_id")
+
 	require.NoError(t, db.Close())
 	_, err = GetThemeAssignments(db)
 	assert.ErrorContains(t, err, "read theme assignment")
