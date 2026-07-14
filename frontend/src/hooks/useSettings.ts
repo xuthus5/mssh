@@ -8,6 +8,7 @@ import { toast } from '@/components/ui/toast'
 import type { Setting, SettingInput } from '../../bindings/github.com/xuthus5/mssh/internal/model/models'
 import { applyUIFont, clampUIFontSize, DEFAULT_UI_FONT_FALLBACK_FAMILY, DEFAULT_UI_FONT_FAMILY, DEFAULT_UI_FONT_SIZE, normalizeUIFontFallbackFamily, normalizeUIFontFamily } from '@/lib/uiFont'
 import { applyWindowOpacity, clampWindowOpacity, DEFAULT_WINDOW_OPACITY } from '@/lib/uiOpacity'
+import { normalizeCopyOnSelect, normalizeTerminalRightClickAction, useTerminalBehaviorStore, type TerminalRightClickAction } from '@/store/terminalBehaviorStore'
 
 function settingEntry(key: string, value: unknown): SettingInput {
   const valueType = value === null ? 'null' : Array.isArray(value) ? 'array' : typeof value === 'object' ? 'object' : typeof value
@@ -28,6 +29,8 @@ export interface GeneralSettings {
   uiFontFallbackFamily: string
   uiFontSize: number
   windowOpacity: number
+  rightClickAction: TerminalRightClickAction
+  copyOnSelect: boolean
 }
 
 export interface TerminalTheme {
@@ -57,7 +60,7 @@ export interface SyncConfig {
 }
 
 export function useSettings() {
-  const [general, setGeneral] = useState<GeneralSettings>({ maxPoolSize: 10, defaultKeepAlive: 60, defaultTermType: 'xterm-256color', uiFontFamily: DEFAULT_UI_FONT_FAMILY, uiFontFallbackFamily: DEFAULT_UI_FONT_FALLBACK_FAMILY, uiFontSize: DEFAULT_UI_FONT_SIZE, windowOpacity: DEFAULT_WINDOW_OPACITY })
+  const [general, setGeneral] = useState<GeneralSettings>({ maxPoolSize: 10, defaultKeepAlive: 60, defaultTermType: 'xterm-256color', uiFontFamily: DEFAULT_UI_FONT_FAMILY, uiFontFallbackFamily: DEFAULT_UI_FONT_FALLBACK_FAMILY, uiFontSize: DEFAULT_UI_FONT_SIZE, windowOpacity: DEFAULT_WINDOW_OPACITY, rightClickAction: 'menu', copyOnSelect: false })
   const [systemFonts, setSystemFonts] = useState<string[]>([])
   const [keys, setKeys] = useState<KeyInfo[]>([])
   const [sync, setSync] = useState<SyncConfig>({ enabled: false, url: '', username: '', password: '' })
@@ -66,8 +69,12 @@ export function useSettings() {
   const loadGeneral = useCallback(async () => {
     try {
       logger.debug('loadGeneral')
-      const settings = await SettingService.GetMany(['terminal.max_pool_size', 'terminal.default_keep_alive', 'terminal.default_term_type', 'appearance.ui_font_family', 'appearance.ui_font_fallback_family', 'appearance.ui_font_size', 'appearance.window_opacity'])
+      const settings = await SettingService.GetMany(['terminal.max_pool_size', 'terminal.default_keep_alive', 'terminal.default_term_type', 'terminal.right_click_action', 'terminal.copy_on_select', 'appearance.ui_font_family', 'appearance.ui_font_fallback_family', 'appearance.ui_font_size', 'appearance.window_opacity'])
       const uiFontFamily = normalizeUIFontFamily(settingValue(settings, 'appearance.ui_font_family', DEFAULT_UI_FONT_FAMILY))
+      const behavior = {
+        rightClickAction: normalizeTerminalRightClickAction(settingValue(settings, 'terminal.right_click_action', 'menu')),
+        copyOnSelect: normalizeCopyOnSelect(settingValue(settings, 'terminal.copy_on_select', false)),
+      }
       const loaded = {
         maxPoolSize: settingValue(settings, 'terminal.max_pool_size', 10),
         defaultKeepAlive: settingValue(settings, 'terminal.default_keep_alive', 60),
@@ -76,9 +83,11 @@ export function useSettings() {
         uiFontFallbackFamily: normalizeUIFontFallbackFamily(settingValue(settings, 'appearance.ui_font_fallback_family', DEFAULT_UI_FONT_FALLBACK_FAMILY), uiFontFamily),
         uiFontSize: clampUIFontSize(settingValue(settings, 'appearance.ui_font_size', DEFAULT_UI_FONT_SIZE)),
         windowOpacity: clampWindowOpacity(settingValue(settings, 'appearance.window_opacity', DEFAULT_WINDOW_OPACITY)),
+        ...behavior,
       }
       applyUIFont({ family: loaded.uiFontFamily, fallbackFamily: loaded.uiFontFallbackFamily, size: loaded.uiFontSize })
       applyWindowOpacity(loaded.windowOpacity)
+      useTerminalBehaviorStore.getState().setSettings(behavior)
       setGeneral(loaded)
     } catch (err) {
       logger.debug('loadGeneral error', err)
@@ -87,14 +96,19 @@ export function useSettings() {
 
   const saveGeneral = useCallback(async (settings: GeneralSettings) => {
     const uiFontFamily = normalizeUIFontFamily(settings.uiFontFamily)
-    const normalized = { ...settings, uiFontFamily, uiFontFallbackFamily: normalizeUIFontFallbackFamily(settings.uiFontFallbackFamily, uiFontFamily), uiFontSize: clampUIFontSize(settings.uiFontSize), windowOpacity: clampWindowOpacity(settings.windowOpacity) }
+    const behavior = {
+      rightClickAction: normalizeTerminalRightClickAction(settings.rightClickAction),
+      copyOnSelect: normalizeCopyOnSelect(settings.copyOnSelect),
+    }
+    const normalized = { ...settings, ...behavior, uiFontFamily, uiFontFallbackFamily: normalizeUIFontFallbackFamily(settings.uiFontFallbackFamily, uiFontFamily), uiFontSize: clampUIFontSize(settings.uiFontSize), windowOpacity: clampWindowOpacity(settings.windowOpacity) }
     try {
       logger.debug('saveGeneral', normalized)
       await Promise.all([SettingService.SetMany([
-        settingEntry('terminal.max_pool_size', normalized.maxPoolSize), settingEntry('terminal.default_keep_alive', normalized.defaultKeepAlive), settingEntry('terminal.default_term_type', normalized.defaultTermType), settingEntry('appearance.ui_font_family', normalized.uiFontFamily), settingEntry('appearance.ui_font_fallback_family', normalized.uiFontFallbackFamily), settingEntry('appearance.ui_font_size', normalized.uiFontSize), settingEntry('appearance.window_opacity', normalized.windowOpacity),
+        settingEntry('terminal.max_pool_size', normalized.maxPoolSize), settingEntry('terminal.default_keep_alive', normalized.defaultKeepAlive), settingEntry('terminal.default_term_type', normalized.defaultTermType), settingEntry('terminal.right_click_action', normalized.rightClickAction), settingEntry('terminal.copy_on_select', normalized.copyOnSelect), settingEntry('appearance.ui_font_family', normalized.uiFontFamily), settingEntry('appearance.ui_font_fallback_family', normalized.uiFontFallbackFamily), settingEntry('appearance.ui_font_size', normalized.uiFontSize), settingEntry('appearance.window_opacity', normalized.windowOpacity),
       ]), TerminalService.SetMaxSize(normalized.maxPoolSize)])
       applyUIFont({ family: normalized.uiFontFamily, fallbackFamily: normalized.uiFontFallbackFamily, size: normalized.uiFontSize })
       applyWindowOpacity(normalized.windowOpacity)
+      useTerminalBehaviorStore.getState().setSettings(behavior)
       setGeneral(normalized)
       useAppStore.getState().setMaxPoolSize(normalized.maxPoolSize)
       toast('通用设置已保存', 'success')

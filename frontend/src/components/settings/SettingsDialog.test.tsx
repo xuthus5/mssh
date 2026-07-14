@@ -11,6 +11,8 @@ const general = {
   uiFontFallbackFamily: 'Segoe UI',
   uiFontSize: 14,
   windowOpacity: 100,
+  rightClickAction: 'menu' as const,
+  copyOnSelect: false,
 }
 
 function settingsProps() {
@@ -83,7 +85,7 @@ describe('SettingsDialog interface font settings', () => {
 
     expect(props.onPreviewUIFont).toHaveBeenLastCalledWith('Microsoft YaHei', 'Segoe UI', 18)
     await userEvent.click(screen.getByRole('button', { name: '保存' }))
-    expect(props.onSaveGeneral).toHaveBeenCalledWith(expect.objectContaining({ uiFontFamily: 'Microsoft YaHei', uiFontSize: 18 }))
+    expect(props.onSaveGeneral).toHaveBeenCalledWith(expect.objectContaining({ uiFontFamily: 'Microsoft YaHei', uiFontSize: 18, rightClickAction: 'menu', copyOnSelect: false }))
   })
 
   it('previews and saves a distinct fallback font', async () => {
