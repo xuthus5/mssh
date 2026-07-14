@@ -77,6 +77,17 @@ describe('SessionLog', () => {
     expect(await screen.findByText('暂无录制记录')).toBeInTheDocument()
   })
 
+  it('shows an unknown label for legacy zero recording timestamps', async () => {
+    listRecordings.mockResolvedValue([{ ...recording, started_at: '0001-01-01T00:00:00Z' }])
+    render(<SessionLog sessionId={1} isRecording={false} onToggleRecording={vi.fn()}
+      onPlayback={vi.fn()} onDeleteRecording={vi.fn(async () => {})} />)
+
+    await userEvent.click(screen.getByRole('button', { name: '记录 (0)' }))
+
+    expect(await screen.findByText('时间未知')).toBeInTheDocument()
+    expect(screen.queryByText(/1\/1\/1/)).not.toBeInTheDocument()
+  })
+
   it('keeps the recording count when deletion fails', async () => {
     const onDeleteRecording = vi.fn(async () => { throw new Error('delete failed') })
     render(<SessionLog sessionId={1} isRecording={false} onToggleRecording={vi.fn()}

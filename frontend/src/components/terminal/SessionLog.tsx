@@ -22,6 +22,12 @@ interface Props {
   onDeleteRecording: (logId: number) => Promise<void>
 }
 
+export function formatRecordingTime(timestamp: string): string {
+  const date = new Date(timestamp)
+  if (Number.isNaN(date.getTime()) || date.getUTCFullYear() <= 1) return '时间未知'
+  return date.toLocaleString()
+}
+
 export default function SessionLog({
   sessionId,
   isRecording,
@@ -61,14 +67,6 @@ export default function SessionLog({
       setRecordings((prev) => prev.filter((r) => r.id !== logId))
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
-    }
-  }
-
-  const formatTime = (ts: string) => {
-    try {
-      return new Date(ts).toLocaleString()
-    } catch {
-      return ts
     }
   }
 
@@ -117,7 +115,7 @@ export default function SessionLog({
                     录制 #{r.id}
                   </span>
                   <span className="text-[10px] text-muted-foreground">
-                    {formatTime(r.started_at)}
+                    {formatRecordingTime(r.started_at)}
                   </span>
                 </div>
                 <div className="flex items-center gap-0.5 flex-shrink-0">

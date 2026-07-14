@@ -27,6 +27,26 @@ func TestCreateAndListSessionLogs(t *testing.T) {
 	assert.Equal(t, "/var/log/mssh/session_1.log", logs[0].DataPath)
 }
 
+func TestCreateSessionLogDefaultsStartedAtAndNormalizesUTC(t *testing.T) {
+	db := setupTestDB(t)
+	before := time.Now().UTC().Add(-time.Second)
+	created, err := CreateSessionLog(db, model.SessionLog{DataPath: "/tmp/default-time.log"})
+	require.NoError(t, err)
+	after := time.Now().UTC().Add(time.Second)
+
+	assert.False(t, created.StartedAt.IsZero())
+	assert.False(t, created.StartedAt.Before(before))
+	assert.False(t, created.StartedAt.After(after))
+
+	localTime := time.Date(2026, time.July, 14, 18, 30, 0, 0, time.FixedZone("UTC+8", 8*60*60))
+	localCreated, err := CreateSessionLog(db, model.SessionLog{StartedAt: localTime, DataPath: "/tmp/local-time.log"})
+	require.NoError(t, err)
+
+	storedLocal, err := GetSessionLog(db, localCreated.ID)
+	require.NoError(t, err)
+	assert.Equal(t, localTime.UTC(), storedLocal.StartedAt)
+}
+
 func TestUpdateSessionLog(t *testing.T) {
 	db := setupTestDB(t)
 	now := time.Now()
@@ -238,8 +258,7 @@ func TestUpdateSessionLogWithEndedAt(t *testing.T) {
 	got, err := GetSessionLog(db, created.ID)
 	require.NoError(t, err)
 	require.NotNil(t, got.EndedAt)
-	// 存储层以本地时间字符串往返，比较秒级部分即可
-	assert.Equal(t, ended.Format("2006-01-02 15:04:05"), got.EndedAt.Format("2006-01-02 15:04:05"))
+	assert.Equal(t, ended.UTC().Truncate(time.Second), *got.EndedAt)
 }
 
 func TestGetSessionLogWithEndedAt(t *testing.T) {
@@ -253,7 +272,7 @@ func TestGetSessionLogWithEndedAt(t *testing.T) {
 	got, err := GetSessionLog(db, created.ID)
 	require.NoError(t, err)
 	assert.NotNil(t, got.EndedAt)
-	assert.Equal(t, ended.Format("2006-01-02 15:04:05"), got.EndedAt.Format("2006-01-02 15:04:05"))
+	assert.Equal(t, ended.UTC().Truncate(time.Second), *got.EndedAt)
 }
 
 func TestListSessionLogsBySessionWithEndedAt(t *testing.T) {
@@ -276,5 +295,5 @@ func TestListSessionLogsBySessionWithEndedAt(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, logs, 1)
 	require.NotNil(t, logs[0].EndedAt)
-	assert.Equal(t, ended.Format("2006-01-02 15:04:05"), logs[0].EndedAt.Format("2006-01-02 15:04:05"))
+	assert.Equal(t, ended.UTC().Truncate(time.Second), *logs[0].EndedAt)
 }
