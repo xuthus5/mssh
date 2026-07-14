@@ -59,10 +59,44 @@ func TestThemeCatalogStoreConstraints(t *testing.T) {
 
 func TestThemeAssignmentsStore(t *testing.T) {
 	db := setupTestDB(t)
-	require.NoError(t, SaveThemeAssignments(db, model.ThemeAssignments{DarkProfileID: 4, LightProfileID: 7}))
+	expected := model.ThemeAssignments{DarkProfileID: 4, LightProfileID: 7, FollowInterfaceMode: false, FixedProfileID: 9}
+	require.NoError(t, SaveThemeAssignments(db, expected))
 	assignments, err := GetThemeAssignments(db)
 	require.NoError(t, err)
-	assert.Equal(t, model.ThemeAssignments{DarkProfileID: 4, LightProfileID: 7}, assignments)
+	assert.Equal(t, expected, assignments)
+
+	_, err = db.Exec(`DELETE FROM settings WHERE key IN ('terminal.theme.follow_interface_mode', 'terminal.theme.fixed_profile_id')`)
+	require.NoError(t, err)
+	assignments, err = GetThemeAssignments(db)
+	require.NoError(t, err)
+	assert.True(t, assignments.FollowInterfaceMode)
+	assert.Zero(t, assignments.FixedProfileID)
+	assert.Equal(t, expected.DarkProfileID, assignments.DarkProfileID)
+	assert.Equal(t, expected.LightProfileID, assignments.LightProfileID)
+}
+
+func TestDeleteThemeProfileProtectsActiveAssignments(t *testing.T) {
+	db := setupTestDB(t)
+	definition := createThemeDefinitionFixture(t, db, "Shared", model.ThemeModeUniversal, "shared-delete", false)
+	dark, err := CreateThemeProfile(db, model.ThemeProfile{Name: "Dark", ThemeID: definition.ID, FontFamily: "monospace", FontSize: 14, CursorStyle: model.CursorStyleBar, ColorOverrides: `{}`})
+	require.NoError(t, err)
+	light, err := CreateThemeProfile(db, model.ThemeProfile{Name: "Light", ThemeID: definition.ID, FontFamily: "monospace", FontSize: 14, CursorStyle: model.CursorStyleBar, ColorOverrides: `{}`})
+	require.NoError(t, err)
+	fixed, err := CreateThemeProfile(db, model.ThemeProfile{Name: "Fixed", ThemeID: definition.ID, FontFamily: "monospace", FontSize: 14, CursorStyle: model.CursorStyleBar, ColorOverrides: `{}`})
+	require.NoError(t, err)
+
+	assignments := model.ThemeAssignments{DarkProfileID: dark.ID, LightProfileID: light.ID, FollowInterfaceMode: false, FixedProfileID: fixed.ID}
+	require.NoError(t, SaveThemeAssignments(db, assignments))
+	assert.Error(t, DeleteThemeProfile(db, dark.ID))
+	assert.Error(t, DeleteThemeProfile(db, light.ID))
+	assert.Error(t, DeleteThemeProfile(db, fixed.ID))
+
+	assignments.FollowInterfaceMode = true
+	require.NoError(t, SaveThemeAssignments(db, assignments))
+	require.NoError(t, DeleteThemeProfile(db, fixed.ID))
+	loaded, err := GetThemeAssignments(db)
+	require.NoError(t, err)
+	assert.Zero(t, loaded.FixedProfileID)
 }
 
 func TestThemeAssignmentsStoreReportsInvalidValuesAndDatabaseErrors(t *testing.T) {
@@ -71,6 +105,13 @@ func TestThemeAssignmentsStoreReportsInvalidValuesAndDatabaseErrors(t *testing.T
 	require.NoError(t, err)
 	_, err = GetThemeAssignments(db)
 	assert.ErrorContains(t, err, "parse theme assignment")
+
+	_, err = db.Exec(`DELETE FROM settings`)
+	require.NoError(t, err)
+	_, err = db.Exec(`INSERT INTO settings (key, namespace, value, value_type, version) VALUES ('terminal.theme.follow_interface_mode', 'terminal', 'not-a-bool', 'boolean', 1)`)
+	require.NoError(t, err)
+	_, err = GetThemeAssignments(db)
+	assert.ErrorContains(t, err, "terminal.theme.follow_interface_mode")
 
 	require.NoError(t, db.Close())
 	_, err = GetThemeAssignments(db)

@@ -23,7 +23,17 @@ func TestThemeCatalogInputConversionsExcludeServerFields(t *testing.T) {
 
 	assert.Equal(t, definition, ThemeDefinitionInputFrom(definition).ThemeDefinition())
 	assert.Equal(t, profile, ThemeProfileInputFrom(profile).ThemeProfile())
-	assert.Equal(t, ThemeAssignments{DarkProfileID: 7, LightProfileID: 8}, ThemeAssignmentsInput{DarkProfileID: 7, LightProfileID: 8}.ThemeAssignments())
+	assert.Equal(t, ThemeAssignments{
+		DarkProfileID:       7,
+		LightProfileID:      8,
+		FollowInterfaceMode: false,
+		FixedProfileID:      9,
+	}, ThemeAssignmentsInput{
+		DarkProfileID:       7,
+		LightProfileID:      8,
+		FollowInterfaceMode: false,
+		FixedProfileID:      9,
+	}.ThemeAssignments())
 }
 
 func TestThemeCatalogEnums(t *testing.T) {
