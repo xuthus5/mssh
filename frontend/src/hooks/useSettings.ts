@@ -64,9 +64,11 @@ export function useSettings() {
   const [systemFonts, setSystemFonts] = useState<string[]>([])
   const [keys, setKeys] = useState<KeyInfo[]>([])
   const [sync, setSync] = useState<SyncConfig>({ enabled: false, url: '', username: '', password: '' })
+  const generalRevision = useRef(0)
   const syncRevision = useRef(0)
 
   const loadGeneral = useCallback(async () => {
+    const revision = generalRevision.current
     try {
       logger.debug('loadGeneral')
       const settings = await SettingService.GetMany(['terminal.max_pool_size', 'terminal.default_keep_alive', 'terminal.default_term_type', 'terminal.right_click_action', 'terminal.copy_on_select', 'appearance.ui_font_family', 'appearance.ui_font_fallback_family', 'appearance.ui_font_size', 'appearance.window_opacity'])
@@ -85,6 +87,7 @@ export function useSettings() {
         windowOpacity: clampWindowOpacity(settingValue(settings, 'appearance.window_opacity', DEFAULT_WINDOW_OPACITY)),
         ...behavior,
       }
+      if (revision !== generalRevision.current) return
       applyUIFont({ family: loaded.uiFontFamily, fallbackFamily: loaded.uiFontFallbackFamily, size: loaded.uiFontSize })
       applyWindowOpacity(loaded.windowOpacity)
       useTerminalBehaviorStore.getState().setSettings(behavior)
@@ -106,6 +109,7 @@ export function useSettings() {
       await Promise.all([SettingService.SetMany([
         settingEntry('terminal.max_pool_size', normalized.maxPoolSize), settingEntry('terminal.default_keep_alive', normalized.defaultKeepAlive), settingEntry('terminal.default_term_type', normalized.defaultTermType), settingEntry('terminal.right_click_action', normalized.rightClickAction), settingEntry('terminal.copy_on_select', normalized.copyOnSelect), settingEntry('appearance.ui_font_family', normalized.uiFontFamily), settingEntry('appearance.ui_font_fallback_family', normalized.uiFontFallbackFamily), settingEntry('appearance.ui_font_size', normalized.uiFontSize), settingEntry('appearance.window_opacity', normalized.windowOpacity),
       ]), TerminalService.SetMaxSize(normalized.maxPoolSize)])
+      generalRevision.current++
       applyUIFont({ family: normalized.uiFontFamily, fallbackFamily: normalized.uiFontFallbackFamily, size: normalized.uiFontSize })
       applyWindowOpacity(normalized.windowOpacity)
       useTerminalBehaviorStore.getState().setSettings(behavior)
