@@ -75,6 +75,7 @@ vi.mock('@/lib/wails', () => ({
 }))
 
 import { useTerminal } from '@/hooks/useTerminal'
+import { TerminalService } from '@/lib/wails'
 import { useAppStore } from '@/store/appStore'
 import { useTerminalBehaviorStore } from '@/store/terminalBehaviorStore'
 import { TerminalErrorBoundary } from '@/components/terminal/TerminalErrorBoundary'
@@ -151,12 +152,19 @@ describe('useTerminal', () => {
 
   it('hot-applies a fixed custom background to an open terminal', () => {
     const containerRef = createRef<HTMLDivElement>()
-    containerRef.current = document.createElement('div')
+    const container = document.createElement('div')
+    Object.defineProperty(container, 'clientWidth', { value: 800 })
+    Object.defineProperty(container, 'clientHeight', { value: 500 })
+    containerRef.current = container
     const { unmount } = renderHook(() => useTerminal('term-fixed-theme', containerRef, { active: true, focusRequest: { sequence: 0 } }))
+    calls.length = 0
 
-    act(() => useAppStore.getState().setTerminalTheme({ ...useAppStore.getState().terminalTheme, background: '#123456' }))
+    act(() => useAppStore.getState().setTerminalTheme({ ...useAppStore.getState().terminalTheme, background: '#123456', fontFamily: 'Global Font', fontSize: 18, cursorStyle: 'underline' }))
 
     expect(terminalOptions[0].theme).toEqual(expect.objectContaining({ background: '#123456' }))
+    expect(terminalOptions[0]).toEqual(expect.objectContaining({ fontFamily: 'Global Font', fontSize: 18, cursorStyle: 'underline' }))
+    expect(calls).toEqual(['fit', 'refresh'])
+    expect(TerminalService.Resize).toHaveBeenCalledWith('term-fixed-theme', 80, 24)
     act(() => unmount())
   })
 

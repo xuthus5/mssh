@@ -21,7 +21,7 @@ describe('TerminalBehaviorSettingsSection', () => {
     expect(screen.getByText('行为')).toBeInTheDocument()
     expect(screen.getByRole('combobox', { name: '鼠标右键行为' })).toHaveTextContent('显示菜单')
     await user.click(screen.getByRole('combobox', { name: '鼠标右键行为' }))
-    await user.click(screen.getByRole('option', { name: '粘贴' }))
+    await user.click(await screen.findByRole('option', { name: '粘贴' }))
     await user.click(screen.getByRole('switch', { name: '选择即复制' }))
 
     expect(onRightClickActionChange).toHaveBeenCalledWith('paste')

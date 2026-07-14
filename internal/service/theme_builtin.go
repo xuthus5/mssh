@@ -10,7 +10,6 @@ import (
 
 type builtinCatalogState struct {
 	definitionsByFingerprint map[string]model.ThemeDefinition
-	builtinDefinitionsByName map[string]model.ThemeDefinition
 	profileByThemeID         map[int64]int64
 	profileIDs               map[int64]struct{}
 }
@@ -34,17 +33,23 @@ func initializeBuiltinCatalog(tx *sql.Tx) error {
 	if err := repairTerminalGlobalStyle(tx); err != nil {
 		return err
 	}
+	definitions := builtinThemeDefinitions()
+	if err := replaceStaleBuiltinCatalog(tx, definitions); err != nil {
+		return err
+	}
 	state, err := loadBuiltinCatalogState(tx)
 	if err != nil {
 		return err
 	}
 	defaultProfiles := make(map[string]int64, 2)
-	for _, definition := range builtinThemeDefinitions() {
+	for _, definition := range definitions {
 		themeID, ensureErr := ensureBuiltinDefinition(tx, state, definition)
 		if ensureErr != nil {
 			return ensureErr
 		}
-		profileID, ensureErr := ensureBuiltinProfile(tx, state, definition.Name, themeID)
+		profileID, ensureErr := ensureBuiltinProfile(builtinProfileOptions{
+			tx: tx, state: state, name: definition.Name, themeID: themeID,
+		})
 		if ensureErr != nil {
 			return ensureErr
 		}
@@ -64,15 +69,11 @@ func loadBuiltinCatalogState(tx *sql.Tx) (*builtinCatalogState, error) {
 	}
 	state := &builtinCatalogState{
 		definitionsByFingerprint: make(map[string]model.ThemeDefinition, len(definitions)),
-		builtinDefinitionsByName: make(map[string]model.ThemeDefinition),
 		profileByThemeID:         make(map[int64]int64, len(profiles)),
 		profileIDs:               make(map[int64]struct{}, len(profiles)),
 	}
 	for _, definition := range definitions {
 		state.definitionsByFingerprint[definition.SourceFingerprint] = definition
-		if definition.IsBuiltin {
-			state.builtinDefinitionsByName[definition.Name] = definition
-		}
 	}
 	for _, profile := range profiles {
 		if _, exists := state.profileByThemeID[profile.ThemeID]; !exists {
@@ -87,32 +88,63 @@ func ensureBuiltinDefinition(tx *sql.Tx, state *builtinCatalogState, definition 
 	if existing, exists := state.definitionsByFingerprint[definition.SourceFingerprint]; exists {
 		return existing.ID, nil
 	}
-	if existing, exists := state.builtinDefinitionsByName[definition.Name]; exists {
-		definition.ID = existing.ID
-		if err := store.UpdateThemeDefinition(tx, definition); err != nil {
-			return 0, err
-		}
-		state.definitionsByFingerprint[definition.SourceFingerprint] = definition
-		return definition.ID, nil
-	}
 	created, err := store.CreateThemeDefinition(tx, definition)
 	if err != nil {
 		return 0, err
 	}
 	state.definitionsByFingerprint[created.SourceFingerprint] = *created
-	state.builtinDefinitionsByName[created.Name] = *created
 	return created.ID, nil
 }
 
-func ensureBuiltinProfile(tx *sql.Tx, state *builtinCatalogState, name string, themeID int64) (int64, error) {
-	if profileID, exists := state.profileByThemeID[themeID]; exists {
+func replaceStaleBuiltinCatalog(tx *sql.Tx, expected []model.ThemeDefinition) error {
+	expectedByFingerprint := make(map[string]model.ThemeDefinition, len(expected))
+	for _, definition := range expected {
+		expectedByFingerprint[definition.SourceFingerprint] = definition
+	}
+	existing, err := store.ListThemeDefinitions(tx, "")
+	if err != nil {
+		return err
+	}
+	for _, definition := range existing {
+		expectedDefinition, found := expectedByFingerprint[definition.SourceFingerprint]
+		if !definition.IsBuiltin || found && builtinDefinitionMatches(definition, expectedDefinition) {
+			continue
+		}
+		if _, err = tx.Exec("DELETE FROM terminal_theme_profiles WHERE theme_id = ?", definition.ID); err == nil {
+			_, err = tx.Exec("DELETE FROM themes WHERE id = ?", definition.ID)
+		}
+		if err != nil {
+			return fmt.Errorf("replace stale built-in theme %q: %w", definition.Name, err)
+		}
+	}
+	return nil
+}
+
+func builtinDefinitionMatches(actual, expected model.ThemeDefinition) bool {
+	return actual.Name == expected.Name && actual.Mode == expected.Mode && actual.SourceType == expected.SourceType &&
+		actual.SourceName == expected.SourceName && actual.SourceURL == expected.SourceURL && actual.SourceAuthor == expected.SourceAuthor &&
+		actual.SourceLicense == expected.SourceLicense && actual.SourceVersion == expected.SourceVersion &&
+		actual.SourceFingerprint == expected.SourceFingerprint && actual.ColorPayload == expected.ColorPayload &&
+		actual.RawPayload == expected.RawPayload && actual.IsBuiltin == expected.IsBuiltin
+}
+
+type builtinProfileOptions struct {
+	tx      *sql.Tx
+	state   *builtinCatalogState
+	name    string
+	themeID int64
+}
+
+func ensureBuiltinProfile(options builtinProfileOptions) (int64, error) {
+	tx, state := options.tx, options.state
+	if profileID, exists := state.profileByThemeID[options.themeID]; exists {
 		return profileID, nil
 	}
-	created, err := store.CreateThemeProfile(tx, defaultBuiltinProfile(name, themeID))
+	created, err := store.CreateThemeProfile(tx, defaultBuiltinProfile(options.name, options.themeID))
 	if err != nil {
 		return 0, err
 	}
-	state.profileByThemeID[themeID] = created.ID
+	state.profileByThemeID[options.themeID] = created.ID
 	state.profileIDs[created.ID] = struct{}{}
 	return created.ID, nil
 }

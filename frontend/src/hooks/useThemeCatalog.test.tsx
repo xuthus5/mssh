@@ -3,17 +3,19 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { __clearHandlers, __registerHandler } from '@/test/__mocks__/wails-runtime'
 import { changeColorMode, useThemeCatalog, useThemeCatalogStore } from '@/hooks/useThemeCatalog'
 import { useAppStore } from '@/store/appStore'
+import { CursorStyle } from '../../bindings/github.com/xuthus5/mssh/internal/model/models'
 
 const darkProfile = profile(1, 'dark', '#000000')
 const lightProfile = profile(2, 'light', '#ffffff')
 const fixedProfile = profile(3, 'dark', '#123456')
+const globalStyle = { font_family: 'Global Font', font_size: 15, cursor_style: CursorStyle.CursorStyleUnderline }
 
 describe('useThemeCatalog', () => {
   beforeEach(() => {
     __clearHandlers()
     localStorage.clear()
     document.documentElement.classList.remove('light')
-    useThemeCatalogStore.setState({ definitions: [], profiles: [], assignments: { dark_profile_id: 0, light_profile_id: 0, follow_interface_mode: true, fixed_profile_id: 0 }, colorMode: 'dark', loaded: false, loading: false, error: null })
+    useThemeCatalogStore.setState({ definitions: [], profiles: [], assignments: { dark_profile_id: 0, light_profile_id: 0, follow_interface_mode: true, fixed_profile_id: 0 }, globalStyle, colorMode: 'dark', loaded: false, loading: false, error: null })
     registerCatalogHandlers('light')
   })
 
@@ -23,6 +25,16 @@ describe('useThemeCatalog', () => {
     expect(useThemeCatalogStore.getState().colorMode).toBe('light')
     expect(document.documentElement).toHaveClass('light')
     expect(useAppStore.getState().terminalTheme.background).toBe('#ffffff')
+    expect(useAppStore.getState().terminalTheme).toMatchObject({ fontFamily: 'Global Font', fontSize: 15, cursorStyle: 'underline', cursor: '#888888' })
+  })
+
+  it('uses the Profile typography when global following is disabled', async () => {
+    const independentDark = { ...darkProfile, follow_global_style: false, font_family: 'Profile Font', font_size: 19, cursor_style: 'block' }
+    registerCatalogHandlers('dark', undefined, [independentDark, lightProfile, fixedProfile])
+    renderHook(() => useThemeCatalog())
+    await waitFor(() => expect(useThemeCatalogStore.getState().loaded).toBe(true))
+
+    expect(useAppStore.getState().terminalTheme).toMatchObject({ fontFamily: 'Profile Font', fontSize: 19, cursorStyle: 'block', cursor: '#888888' })
   })
 
   it('rolls back interface and terminal themes when persistence fails', async () => {
@@ -108,12 +120,49 @@ describe('useThemeCatalog', () => {
     __registerHandler('github.com/xuthus5/mssh/internal/service.ThemeService.GetAssignments', async () => ({ dark_profile_id: 1, light_profile_id: 1, follow_interface_mode: true, fixed_profile_id: 0 }))
     await act(async () => {
       await result.current.saveConfiguration({
-        profiles: [{ id: 1, name: 'dark', theme_id: 1, font_family: 'monospace', font_size: 14, cursor_style: 'bar', color_overrides: JSON.stringify({ background: '#123456' }) }],
+        global_style: globalStyle,
+        profiles: [{ id: 1, name: 'dark', theme_id: 1, follow_global_style: true, font_family: 'monospace', font_size: 14, cursor_style: 'bar', color_overrides: JSON.stringify({ background: '#123456' }) }],
         assignments: { dark_profile_id: 1, light_profile_id: 1, follow_interface_mode: true, fixed_profile_id: 0 },
       } as never)
     })
     expect(useThemeCatalogStore.getState().assignments.light_profile_id).toBe(1)
     expect(useAppStore.getState().terminalTheme.background).toBe('#123456')
+  })
+
+  it('reloads and hot-applies a saved global terminal style', async () => {
+    __registerHandler('github.com/xuthus5/mssh/internal/service.ThemeService.SaveConfiguration', async () => {})
+    const { result } = renderHook(() => useThemeCatalog())
+    await waitFor(() => expect(result.current.loaded).toBe(true))
+    const savedGlobalStyle = { font_family: 'Saved Global Font', font_size: 18, cursor_style: CursorStyle.CursorStyleBar }
+    __registerHandler('github.com/xuthus5/mssh/internal/service.ThemeService.GetGlobalStyle', async () => savedGlobalStyle)
+
+    await act(async () => {
+      await result.current.saveConfiguration({
+        global_style: savedGlobalStyle,
+        profiles: [],
+        assignments: { dark_profile_id: 1, light_profile_id: 2, follow_interface_mode: true, fixed_profile_id: 0 },
+      } as never)
+    })
+
+    expect(useThemeCatalogStore.getState().globalStyle).toEqual(savedGlobalStyle)
+    expect(useAppStore.getState().terminalTheme).toMatchObject({ fontFamily: 'Saved Global Font', fontSize: 18, cursorStyle: 'bar', cursor: '#888888' })
+  })
+
+  it('keeps the catalog and active terminal theme unchanged when configuration save fails', async () => {
+    const { result } = renderHook(() => useThemeCatalog())
+    await waitFor(() => expect(result.current.loaded).toBe(true))
+    const catalogBefore = useThemeCatalogStore.getState()
+    const terminalThemeBefore = useAppStore.getState().terminalTheme
+    __registerHandler('github.com/xuthus5/mssh/internal/service.ThemeService.SaveConfiguration', async () => { throw new Error('db failed') })
+
+    await expect(result.current.saveConfiguration({
+      global_style: { font_family: 'Rejected Font', font_size: 20, cursor_style: CursorStyle.CursorStyleBlock },
+      profiles: [],
+      assignments: catalogBefore.assignments,
+    } as never)).rejects.toThrow('db failed')
+
+    expect(useThemeCatalogStore.getState()).toEqual(catalogBefore)
+    expect(useAppStore.getState().terminalTheme).toBe(terminalThemeBefore)
   })
 
   it('propagates catalog reload failures after a successful database save', async () => {
@@ -126,6 +175,7 @@ describe('useThemeCatalog', () => {
     await act(async () => {
       try {
         await result.current.saveConfiguration({
+          global_style: globalStyle,
           profiles: [],
           assignments: { dark_profile_id: 1, light_profile_id: 2, follow_interface_mode: true, fixed_profile_id: 0 },
         } as never)
@@ -154,15 +204,20 @@ describe('useThemeCatalog', () => {
   })
 })
 
-function registerCatalogHandlers(mode: 'dark' | 'light', assignments = { dark_profile_id: 1, light_profile_id: 2, follow_interface_mode: true, fixed_profile_id: 0 }) {
+function registerCatalogHandlers(
+  mode: 'dark' | 'light',
+  assignments = { dark_profile_id: 1, light_profile_id: 2, follow_interface_mode: true, fixed_profile_id: 0 },
+  profiles = [darkProfile, lightProfile, fixedProfile],
+) {
   __registerHandler('github.com/xuthus5/mssh/internal/service.ThemeService.InitializeDefaults', async () => {})
   __registerHandler('github.com/xuthus5/mssh/internal/service.ThemeService.ListDefinitions', async () => [darkProfile.definition, lightProfile.definition, fixedProfile.definition])
-  __registerHandler('github.com/xuthus5/mssh/internal/service.ThemeService.ListProfiles', async () => [darkProfile, lightProfile, fixedProfile])
+  __registerHandler('github.com/xuthus5/mssh/internal/service.ThemeService.ListProfiles', async () => profiles)
   __registerHandler('github.com/xuthus5/mssh/internal/service.ThemeService.GetAssignments', async () => assignments)
+  __registerHandler('github.com/xuthus5/mssh/internal/service.ThemeService.GetGlobalStyle', async () => globalStyle)
   __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.Get', async () => ({ key: 'appearance.color_mode', namespace: 'appearance', value: JSON.stringify(mode), value_type: 'string', version: 1, updated_at: '' }))
   __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.Set', async () => {})
 }
 
 function profile(id: number, mode: 'dark' | 'light', background: string) {
-  return { id, name: mode, theme_id: id, font_family: 'monospace', font_size: 14, cursor_style: 'bar', color_overrides: '{}', created_at: '', updated_at: '', definition: { id, name: mode, mode, source_type: 'builtin', source_name: '', source_url: '', source_author: '', source_license: '', source_version: '', source_fingerprint: mode, color_payload: JSON.stringify({ background, foreground: mode === 'dark' ? '#ffffff' : '#000000', cursor: '#888888', selection: '#264f78', ansi: Array(16).fill('#111111') }), raw_payload: '', is_builtin: true, created_at: '', updated_at: '' } }
+  return { id, name: mode, theme_id: id, follow_global_style: true, font_family: 'monospace', font_size: 14, cursor_style: 'bar', color_overrides: '{}', created_at: '', updated_at: '', definition: { id, name: mode, mode, source_type: 'builtin', source_name: '', source_url: '', source_author: '', source_license: '', source_version: '', source_fingerprint: mode, color_payload: JSON.stringify({ background, foreground: mode === 'dark' ? '#ffffff' : '#000000', cursor: '#888888', selection: '#264f78', ansi: Array(16).fill('#111111') }), raw_payload: '', is_builtin: true, created_at: '', updated_at: '' } }
 }

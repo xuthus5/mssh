@@ -6,6 +6,7 @@ import { logger } from '@/lib/logger'
 import { useTerminalBehaviorStore } from '@/store/terminalBehaviorStore'
 
 const { getRecording } = vi.hoisted(() => ({ getRecording: vi.fn(async (): Promise<any> => ({ entries: [] })) }))
+const initialTerminalTheme = useAppStore.getState().terminalTheme
 const terminalInstances: Array<{
   options: Record<string, any>
   writeln: ReturnType<typeof vi.fn>
@@ -65,6 +66,7 @@ describe('PlaybackTab terminal theme', () => {
     resizeHandlers.length = 0
     getRecording.mockResolvedValue({ entries: [] })
     playbackWriteError = null
+    useAppStore.getState().setTerminalTheme({ ...initialTerminalTheme })
     useTerminalBehaviorStore.setState({ rightClickAction: 'menu', copyOnSelect: false })
     vi.stubGlobal('ResizeObserver', class {
       observe() {}
@@ -78,6 +80,7 @@ describe('PlaybackTab terminal theme', () => {
   })
 
   it('stretches the playback terminal across the available layer', async () => {
+    useAppStore.getState().setTerminalTheme({ ...useAppStore.getState().terminalTheme, fontFamily: 'Global Font', fontSize: 17, cursorStyle: 'bar' })
     render(<PlaybackTab recordingId="1" title="demo" active />)
     await act(async () => { await Promise.resolve(); await Promise.resolve() })
 
@@ -88,6 +91,7 @@ describe('PlaybackTab terminal theme', () => {
       'w-full',
       'overflow-hidden',
     )
+    expect(terminalInstances[0].options).toMatchObject({ fontFamily: 'Global Font', fontSize: 17, cursorStyle: 'bar' })
     expect(screen.getByLabelText('回放终端')).toHaveClass(
       'flex-1',
       'min-h-0',
@@ -96,14 +100,16 @@ describe('PlaybackTab terminal theme', () => {
       'overflow-hidden',
     )
   })
-
   it('hot-applies terminal theme changes to an open playback terminal', async () => {
     render(<PlaybackTab recordingId="1" title="demo" active />)
     await waitFor(() => expect(terminalInstances).toHaveLength(1))
-    useAppStore.getState().setTerminalTheme({ ...useAppStore.getState().terminalTheme, background: '#123456', fontSize: 18 })
-    await waitFor(() => expect(terminalInstances[0].options).toMatchObject({ fontSize: 18, theme: expect.objectContaining({ background: '#123456' }) }))
+    fitInstances[0].fit.mockClear()
+    terminalInstances[0].refresh.mockClear()
+    useAppStore.getState().setTerminalTheme({ ...useAppStore.getState().terminalTheme, background: '#123456', fontFamily: 'Global Font', fontSize: 18, cursorStyle: 'underline' })
+    await waitFor(() => expect(terminalInstances[0].options).toMatchObject({ fontFamily: 'Global Font', fontSize: 18, cursorStyle: 'underline', theme: expect.objectContaining({ background: '#123456' }) }))
+    expect(fitInstances[0].fit).toHaveBeenCalledOnce()
+    expect(terminalInstances[0].refresh).toHaveBeenCalledOnce()
   })
-
   it('writes millisecond-timestamped entries after playback starts', async () => {
     getRecording.mockResolvedValue({ entries: [{ timestamp: 0, type: 0, data: 'QQ==' }, { timestamp: 10, type: 0, data: 'Qg==' }] })
     render(<PlaybackTab recordingId="1" title="demo" active />)
@@ -111,7 +117,6 @@ describe('PlaybackTab terminal theme', () => {
     await userEvent.click(screen.getByRole('button', { name: '开始回放' }))
     await waitFor(() => expect(terminalInstances[0].write).toHaveBeenCalledWith(new Uint8Array([65])))
   })
-
   it('copies selected playback text when copy-on-select starts enabled', async () => {
     vi.useFakeTimers()
     const writeText = vi.fn().mockResolvedValue(undefined)
@@ -126,7 +131,6 @@ describe('PlaybackTab terminal theme', () => {
 
     expect(writeText).toHaveBeenCalledWith('selected playback text')
   })
-
   it('hot-switches copy-on-select after mounting', async () => {
     vi.useFakeTimers()
     const writeText = vi.fn().mockResolvedValue(undefined)
@@ -149,7 +153,6 @@ describe('PlaybackTab terminal theme', () => {
     expect(writeText).toHaveBeenCalledOnce()
     view.unmount()
   })
-
   it('disposes pending playback copy-on-select resources', async () => {
     vi.useFakeTimers()
     const writeText = vi.fn().mockResolvedValue(undefined)
@@ -167,7 +170,6 @@ describe('PlaybackTab terminal theme', () => {
     expect(writeText).not.toHaveBeenCalled()
     expect(terminal.selectionSubscription.dispose).toHaveBeenCalledOnce()
   })
-
   it('reports missing and failed recording loads in the terminal', async () => {
     getRecording.mockResolvedValueOnce(null)
     const missing = render(<PlaybackTab recordingId="missing" title="demo" active />)
@@ -182,7 +184,6 @@ describe('PlaybackTab terminal theme', () => {
     await waitFor(() => expect(terminalInstances[1].writeln).toHaveBeenCalledWith(expect.stringContaining('Failed to load recording')))
     expect(loggerError).toHaveBeenCalledWith('PlaybackTab: GetRecording error:', loadError)
   })
-
   it('pauses, changes speed, and seeks without remounting', async () => {
     getRecording.mockResolvedValue({ entries: [{ timestamp: 0, type: 0, data: 'QQ==' }, { timestamp: 1000, type: 0, data: 'Qg==' }] })
     render(<PlaybackTab recordingId="1" title="demo" active />)
@@ -198,7 +199,6 @@ describe('PlaybackTab terminal theme', () => {
     expect(terminalInstances[0].reset).toHaveBeenCalledOnce()
     expect(terminalInstances[0].write).toHaveBeenCalledWith(new Uint8Array([65]))
   })
-
   it('refits and refreshes when a hidden playback becomes visible', async () => {
     const { rerender } = render(<PlaybackTab recordingId="1" title="demo" active={false} />)
     await waitFor(() => expect(terminalInstances).toHaveLength(1))
@@ -209,7 +209,6 @@ describe('PlaybackTab terminal theme', () => {
     await waitFor(() => expect(fitInstances[0].fit).toHaveBeenCalledOnce())
     expect(terminalInstances[0].refresh).toHaveBeenCalledOnce()
   })
-
   it('recovers a zero-size playback on the first visible resize', async () => {
     let width = 0
     let height = 0
@@ -234,7 +233,6 @@ describe('PlaybackTab terminal theme', () => {
     expect(fitInstances[0].fit).toHaveBeenCalledOnce()
     expect(terminalInstances[0].refresh).toHaveBeenCalledOnce()
   })
-
   it('keeps writing and advancing progress while hidden, then refits when visible', async () => {
     vi.useFakeTimers()
     vi.setSystemTime(0)

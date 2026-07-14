@@ -113,20 +113,19 @@ func TerminalGlobalStyleInputFrom(style TerminalGlobalStyle) TerminalGlobalStyle
 
 - [x] **Step 4: Enforce the final POC Profile schema**
 
-Add `follow_global_style INTEGER NOT NULL DEFAULT 1` to `themeProfilesSchema`. Extend the theme catalog schema-current check to inspect both `themes` and `terminal_theme_profiles`. The final check must require the new Profile column:
+Add `follow_global_style INTEGER NOT NULL DEFAULT 1` to `themeProfilesSchema`. Compare the normalized `sqlite_master.sql` definitions for both `themes` and `terminal_theme_profiles` against the final `CREATE TABLE` statements. Matching column names with different types, defaults, constraints, or foreign keys must still trigger replacement:
 
 ```go
-func themeProfileSchemaCurrent(db *sql.DB) (bool, error) {
-	columns, err := tableColumns(db, "terminal_theme_profiles")
-	if err != nil {
-		return false, fmt.Errorf("inspect terminal theme profiles: %w", err)
+func tableSchemaCurrent(db *sql.DB, table, expected string) (bool, error) {
+	var actual string
+	err := db.QueryRow("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?", table).Scan(&actual)
+	if err == sql.ErrNoRows {
+		return false, nil
 	}
-	return columns["theme_id"] &&
-		columns["follow_global_style"] &&
-		columns["font_family"] &&
-		columns["font_size"] &&
-		columns["cursor_style"] &&
-		columns["color_overrides"], nil
+	if err != nil {
+		return false, err
+	}
+	return normalizeCreateTableSQL(actual) == normalizeCreateTableSQL(expected), nil
 }
 ```
 
@@ -338,7 +337,7 @@ git push origin main
 - Produces: `profileToTerminalTheme(profile, globalStyle): TerminalTheme`
 - Produces: `ThemeCatalogState.globalStyle`
 
-- [ ] **Step 1: Generate bindings**
+- [x] **Step 1: Generate bindings**
 
 Run:
 
@@ -356,7 +355,7 @@ global_style
 ThemeService.GetGlobalStyle
 ```
 
-- [ ] **Step 2: Write failing effective-style tests**
+- [x] **Step 2: Write failing effective-style tests**
 
 Extend `terminalThemeCatalog.test.ts`:
 
@@ -380,7 +379,7 @@ it('retains Profile typography while keeping Profile cursor color', () => {
 
 Add hook tests proving startup, color-mode changes, configuration saves, and reset all resolve with the loaded global style.
 
-- [ ] **Step 3: Run frontend resolver tests to verify RED**
+- [x] **Step 3: Run frontend resolver tests to verify RED**
 
 Run:
 
@@ -390,7 +389,7 @@ npm --prefix frontend test -- --run src/lib/terminalThemeCatalog.test.ts src/hoo
 
 Expected: FAIL because the resolver and store do not accept global style.
 
-- [ ] **Step 4: Implement effective style merging**
+- [x] **Step 4: Implement effective style merging**
 
 Update the mapper signature:
 
@@ -416,13 +415,13 @@ export function profileToTerminalTheme(
 
 Color resolution, including cursor color, remains unchanged.
 
-- [ ] **Step 5: Add global style to the catalog state**
+- [x] **Step 5: Add global style to the catalog state**
 
 Extend `ThemeCatalogState` and `initialState` with default global style. `loadThemeCatalog` must fetch `ThemeService.GetGlobalStyle()` in the same `Promise.all` as definitions, Profiles, Assignments, and interface color mode.
 
 `applyEffectiveTerminalTheme` passes `state.globalStyle` to the mapper. No component or terminal hook may merge the style independently.
 
-- [ ] **Step 6: Verify hot application tests**
+- [x] **Step 6: Verify hot application tests**
 
 Run:
 
@@ -432,7 +431,7 @@ npm --prefix frontend test -- --run src/lib/terminalThemeCatalog.test.ts src/hoo
 
 Expected: PASS, including already-open terminal option updates through the existing `terminalTheme` subscription.
 
-- [ ] **Step 7: Commit bindings and resolver**
+- [x] **Step 7: Commit bindings and resolver**
 
 ```bash
 git add frontend/bindings frontend/src/lib/terminalThemeCatalog.ts frontend/src/lib/terminalThemeCatalog.test.ts frontend/src/hooks/useThemeCatalog.ts frontend/src/hooks/useThemeCatalog.test.tsx frontend/src/store/appStore.ts
@@ -463,7 +462,7 @@ git push origin main
 - Produces: `buildThemeConfiguration(...).global_style`
 - Produces: commercial shadcn global and Profile-level style controls
 
-- [ ] **Step 1: Write failing draft-state tests**
+- [x] **Step 1: Write failing draft-state tests**
 
 Define the draft model in tests:
 
@@ -482,7 +481,7 @@ export function terminalGlobalStyleInput(style: TerminalGlobalStyle): TerminalGl
 
 Test that following uses global typography without mutating fallback values, toggling off restores fallback values, and `buildThemeConfiguration` emits both `global_style` and `follow_global_style`.
 
-- [ ] **Step 2: Run draft-state tests to verify RED**
+- [x] **Step 2: Run draft-state tests to verify RED**
 
 Run:
 
@@ -492,7 +491,7 @@ npm --prefix frontend test -- --run src/components/settings/themeEditorState.tes
 
 Expected: FAIL because the new draft fields and configuration output do not exist.
 
-- [ ] **Step 3: Implement pure editor state**
+- [x] **Step 3: Implement pure editor state**
 
 Update `createThemeDrafts` to copy `profile.follow_global_style`. `themeToProfileInput` must persist dormant Profile values regardless of current follow state:
 
@@ -511,7 +510,7 @@ return {
 
 `effectiveDraftTheme` replaces only `fontFamily`, `fontSize`, and `cursorStyle`; it never changes `cursorColor`.
 
-- [ ] **Step 4: Write failing component tests**
+- [x] **Step 4: Write failing component tests**
 
 `TerminalGlobalStyleEditor.test.tsx` covers:
 
@@ -528,7 +527,7 @@ return {
 - Turning follow on and off again preserves edited Profile values.
 - Cursor color is absent from this component because it remains in the color inspector.
 
-- [ ] **Step 5: Run component tests to verify RED**
+- [x] **Step 5: Run component tests to verify RED**
 
 Run:
 
@@ -538,7 +537,7 @@ npm --prefix frontend test -- --run src/components/settings/TerminalGlobalStyleE
 
 Expected: FAIL because both components are new.
 
-- [ ] **Step 6: Implement shadcn editor components**
+- [x] **Step 6: Implement shadcn editor components**
 
 `TerminalGlobalStyleEditor` uses a full `Card` composition with `Field`, `Input`, and `LabeledSelect`. It receives a controlled `TerminalGlobalStyle` draft and emits field-level changes.
 
@@ -546,7 +545,7 @@ Expected: FAIL because both components are new.
 
 Use semantic tokens only, `rounded-xl`, `border-border`, and no raw dark-mode color classes.
 
-- [ ] **Step 7: Integrate ThemeEditor**
+- [x] **Step 7: Integrate ThemeEditor**
 
 Add `globalStyle` to `ThemeEditor` props and local draft state. Render the global card after the application-strategy card. Compute:
 
@@ -558,7 +557,7 @@ Use `effectiveTheme` for `TerminalThemePreview`. Keep color controls bound to th
 
 The existing save button submits one `ThemeConfigurationInput`. Dirty, validity, reset-disable, and pending states include global and follow changes.
 
-- [ ] **Step 8: Update reset copy and SettingsDialog wiring**
+- [x] **Step 8: Update reset copy and SettingsDialog wiring**
 
 Pass `globalStyle` from the catalog through `SettingsDialog` into `ThemeEditor`. Change the built-in reset confirmation to:
 
@@ -568,7 +567,7 @@ Pass `globalStyle` from the catalog through `SettingsDialog` into `ThemeEditor`.
 
 Update the General Settings interface-font description so it no longer says terminal fonts are configured only by individual themes; it should say terminal typography is configured in the Terminal category.
 
-- [ ] **Step 9: Run UI tests to verify GREEN**
+- [x] **Step 9: Run UI tests to verify GREEN**
 
 Run:
 
@@ -583,7 +582,7 @@ npm --prefix frontend test -- --run \
 
 Expected: PASS with no React act warnings or accessibility errors.
 
-- [ ] **Step 10: Commit settings UI**
+- [x] **Step 10: Commit settings UI**
 
 ```bash
 git add frontend/src/components/settings
@@ -606,7 +605,7 @@ git push origin main
 - Verifies the complete Go → Wails → Zustand → xterm path
 - Produces no new public API beyond Tasks 1–4
 
-- [ ] **Step 1: Add full-path regression tests**
+- [x] **Step 1: Add full-path regression tests**
 
 Cover:
 
@@ -617,7 +616,7 @@ Cover:
 5. Re-enabling follow hot-applies global style without deleting fallback values.
 6. A failed SaveConfiguration leaves catalog state and open terminal options unchanged.
 
-- [ ] **Step 2: Run focused integration tests**
+- [x] **Step 2: Run focused integration tests**
 
 Run:
 
@@ -631,7 +630,7 @@ npm --prefix frontend test -- --run \
 
 Expected: PASS.
 
-- [ ] **Step 3: Run all Go tests and coverage**
+- [x] **Step 3: Run all Go tests and coverage**
 
 Run:
 
@@ -644,7 +643,7 @@ PATH="$HOME/.govm/go/bin:$PATH" go tool cover -func=coverage.out
 
 Expected: PASS with project-required coverage. Remove `coverage.out` after recording the result.
 
-- [ ] **Step 4: Run all frontend tests and coverage**
+- [x] **Step 4: Run all frontend tests and coverage**
 
 Run:
 
@@ -655,7 +654,7 @@ npm --prefix frontend run test:coverage
 
 Expected: PASS with Statements and Lines at or above `90%`.
 
-- [ ] **Step 5: Format and lint**
+- [x] **Step 5: Format and lint**
 
 Run:
 
@@ -667,7 +666,7 @@ git diff --check
 
 Expected: no issues.
 
-- [ ] **Step 6: Build the desktop application**
+- [x] **Step 6: Build the desktop application**
 
 Run:
 
@@ -677,7 +676,7 @@ PATH="$HOME/.govm/go/bin:$PATH" CGO_ENABLED=1 wails3 build
 
 Expected: exit code `0`.
 
-- [ ] **Step 7: Clean generated test and build artifacts**
+- [x] **Step 7: Clean generated test and build artifacts**
 
 ```bash
 rm -rf frontend/coverage frontend/dist
@@ -687,7 +686,7 @@ git status --short
 
 Expected: only intended source, generated bindings, tests, and concise documentation changes remain.
 
-- [ ] **Step 8: Request independent code review**
+- [x] **Step 8: Request independent code review**
 
 Review must specifically inspect:
 
@@ -700,7 +699,7 @@ Review must specifically inspect:
 
 Resolve all Critical and Important feedback before proceeding.
 
-- [ ] **Step 9: Commit final integration fixes**
+- [x] **Step 9: Commit final integration fixes**
 
 ```bash
 git add README.md docs frontend internal
@@ -708,7 +707,7 @@ git commit -m "test(theme): close global style integration"
 git push origin main
 ```
 
-- [ ] **Step 10: Verify remote state**
+- [x] **Step 10: Verify remote state**
 
 ```bash
 git status --short --branch

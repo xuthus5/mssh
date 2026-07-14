@@ -147,6 +147,23 @@ func TestRenderAndWriteGeneratedDefinitions(t *testing.T) {
 	assert.ErrorContains(t, writeGeneratedFile(directoryTarget, source), "replace generated file")
 }
 
+func TestReplaceGeneratedFileReportsMissingTemporaryFile(t *testing.T) {
+	target := filepath.Join(t.TempDir(), "generated.go")
+	err := replaceGeneratedFile(filepath.Join(t.TempDir(), "missing.tmp"), target)
+	assert.ErrorContains(t, err, "rename generated file")
+}
+
+func TestReplaceGeneratedFileReportsTargetInspectionError(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symbolic link creation requires elevated privileges on Windows")
+	}
+	directory := t.TempDir()
+	target := filepath.Join(directory, "loop")
+	require.NoError(t, os.Symlink("loop", target))
+	err := replaceGeneratedFile(filepath.Join(directory, "temporary"), target)
+	assert.ErrorContains(t, err, "inspect target")
+}
+
 func testClient(roundTrip roundTripFunc) *http.Client {
 	return &http.Client{Transport: roundTrip}
 }

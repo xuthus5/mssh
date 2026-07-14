@@ -48,7 +48,7 @@ func (service *ThemeService) GetProfile(id int64) (*model.ThemeProfile, error) {
 }
 
 func (service *ThemeService) CreateCustomProfile(input model.ThemeProfileInput) (*model.ThemeProfile, error) {
-	profile := input.ThemeProfile()
+	profile := normalizeThemeProfile(input.ThemeProfile())
 	profile.FollowGlobalStyle = true
 	if err := validateThemeProfile(profile); err != nil {
 		return nil, err
@@ -57,7 +57,7 @@ func (service *ThemeService) CreateCustomProfile(input model.ThemeProfileInput) 
 }
 
 func (service *ThemeService) UpdateProfile(input model.ThemeProfileInput) error {
-	profile := input.ThemeProfile()
+	profile := normalizeThemeProfile(input.ThemeProfile())
 	if err := validateThemeProfile(profile); err != nil {
 		return err
 	}
@@ -157,7 +157,7 @@ func validatedThemeProfiles(inputs []model.ThemeProfileInput) ([]model.ThemeProf
 	profiles := make([]model.ThemeProfile, 0, len(inputs))
 	seen := make(map[int64]struct{}, len(inputs))
 	for _, input := range inputs {
-		profile := input.ThemeProfile()
+		profile := normalizeThemeProfile(input.ThemeProfile())
 		if _, duplicate := seen[profile.ID]; duplicate {
 			return nil, fmt.Errorf("duplicate theme profile %d", profile.ID)
 		}
@@ -168,6 +168,11 @@ func validatedThemeProfiles(inputs []model.ThemeProfileInput) ([]model.ThemeProf
 		profiles = append(profiles, profile)
 	}
 	return profiles, nil
+}
+
+func normalizeThemeProfile(profile model.ThemeProfile) model.ThemeProfile {
+	profile.FontFamily = normalizeTerminalFontFamily(profile.FontFamily)
+	return profile
 }
 
 func validateThemeAssignments(db themeDatabase, assignments model.ThemeAssignments) error {

@@ -123,15 +123,34 @@ function subscribeToOutput(term: Terminal, refs: TerminalLifecycleRefs, reportRu
   })
 }
 
-function subscribeToTheme(term: Terminal, reportRuntimeError: TerminalRuntimeErrorReporter) {
+function subscribeToTheme({ term, fitAddon, containerRef, refs, reportRuntimeError }: {
+  term: Terminal
+  fitAddon: FitAddon
+  containerRef: RefObject<HTMLDivElement | null>
+  refs: TerminalLifecycleRefs
+  reportRuntimeError: TerminalRuntimeErrorReporter
+}) {
   return useAppStore.subscribe((state, previous) => {
     if (state.terminalTheme !== previous.terminalTheme) {
-      runTerminalRuntime(reportRuntimeError, 'terminal theme update', () => applyTerminalTheme(term.options, state.terminalTheme))
+      runTerminalRuntime(reportRuntimeError, 'terminal theme update', () => {
+        applyTerminalTheme(term.options, state.terminalTheme)
+        if (!refs.activeRef.current || !fitAndRefresh(term, fitAddon, containerRef.current)) {
+          refs.recoveryPendingRef.current = true
+          return
+        }
+        refs.recoveryPendingRef.current = false
+        reportResize(refs.terminalIDRef.current, term, 'terminal theme resize error')
+      })
     }
   })
 }
 
-function recoverTerminal(term: Terminal, fitAddon: FitAddon, container: HTMLDivElement | null, refs: TerminalLifecycleRefs) {
+function recoverTerminal({ term, fitAddon, container, refs }: {
+  term: Terminal
+  fitAddon: FitAddon
+  container: HTMLDivElement | null
+  refs: TerminalLifecycleRefs
+}) {
   if (!fitAndRefresh(term, fitAddon, container)) return false
   if (refs.requestedSequenceRef.current > refs.handledSequenceRef.current) {
     term.focus()
@@ -154,7 +173,7 @@ function observeResize({ term, fitAddon, containerRef, refs, reportRuntimeError 
     runTerminalRuntime(reportRuntimeError, 'terminal resize', () => {
       if (!refs.activeRef.current) return
       if (refs.recoveryPendingRef.current) {
-        recoverTerminal(term, fitAddon, containerRef.current, refs)
+        recoverTerminal({ term, fitAddon, container: containerRef.current, refs })
         return
       }
       if (!fitAndRefresh(term, fitAddon, containerRef.current)) return
@@ -185,7 +204,7 @@ function initializeTerminal(containerRef: RefObject<HTMLDivElement | null>, refs
   container?.addEventListener('pointerdown', focusHandler)
   const dataDispose = subscribeToData(term, refs)
   const unsubOutput = subscribeToOutput(term, refs, reportRuntimeError)
-  const unsubscribeTheme = subscribeToTheme(term, reportRuntimeError)
+  const unsubscribeTheme = subscribeToTheme({ term, fitAddon, containerRef, refs, reportRuntimeError })
   const resizeObserver = observeResize({ term, fitAddon, containerRef, refs, reportRuntimeError })
   if (container) resizeObserver.observe(container)
 
@@ -233,7 +252,7 @@ function useTerminalActivation({ containerRef, refs, active, sequence, reportRun
       refs.activationFrameRef.current = null
       runTerminalRuntime(reportRuntimeError, 'terminal activation', () => {
         const fitAddon = refs.fitAddonRef.current
-        if (fitAddon) recoverTerminal(term, fitAddon, containerRef.current, refs)
+        if (fitAddon) recoverTerminal({ term, fitAddon, container: containerRef.current, refs })
       })
     })
     return () => cancelActivationFrame(refs.activationFrameRef)

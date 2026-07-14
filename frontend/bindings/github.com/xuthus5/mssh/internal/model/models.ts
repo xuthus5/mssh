@@ -551,6 +551,64 @@ export class SettingInput {
     }
 }
 
+export class TerminalGlobalStyle {
+    "font_family": string;
+    "font_size": number;
+    "cursor_style": CursorStyle;
+
+    /** Creates a new TerminalGlobalStyle instance. */
+    constructor($$source: Partial<TerminalGlobalStyle> = {}) {
+        if (!("font_family" in $$source)) {
+            this["font_family"] = "";
+        }
+        if (!("font_size" in $$source)) {
+            this["font_size"] = 0;
+        }
+        if (!("cursor_style" in $$source)) {
+            this["cursor_style"] = CursorStyle.$zero;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new TerminalGlobalStyle instance from a string or object.
+     */
+    static createFrom($$source: any = {}): TerminalGlobalStyle {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new TerminalGlobalStyle($$parsedSource as Partial<TerminalGlobalStyle>);
+    }
+}
+
+export class TerminalGlobalStyleInput {
+    "font_family": string;
+    "font_size": number;
+    "cursor_style": CursorStyle;
+
+    /** Creates a new TerminalGlobalStyleInput instance. */
+    constructor($$source: Partial<TerminalGlobalStyleInput> = {}) {
+        if (!("font_family" in $$source)) {
+            this["font_family"] = "";
+        }
+        if (!("font_size" in $$source)) {
+            this["font_size"] = 0;
+        }
+        if (!("cursor_style" in $$source)) {
+            this["cursor_style"] = CursorStyle.$zero;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new TerminalGlobalStyleInput instance from a string or object.
+     */
+    static createFrom($$source: any = {}): TerminalGlobalStyleInput {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new TerminalGlobalStyleInput($$parsedSource as Partial<TerminalGlobalStyleInput>);
+    }
+}
+
 export class ThemeAssignments {
     "dark_profile_id": number;
     "light_profile_id": number;
@@ -618,11 +676,15 @@ export class ThemeAssignmentsInput {
 }
 
 export class ThemeConfigurationInput {
+    "global_style": TerminalGlobalStyleInput;
     "profiles": ThemeProfileInput[];
     "assignments": ThemeAssignmentsInput;
 
     /** Creates a new ThemeConfigurationInput instance. */
     constructor($$source: Partial<ThemeConfigurationInput> = {}) {
+        if (!("global_style" in $$source)) {
+            this["global_style"] = (new TerminalGlobalStyleInput());
+        }
         if (!("profiles" in $$source)) {
             this["profiles"] = [];
         }
@@ -637,14 +699,18 @@ export class ThemeConfigurationInput {
      * Creates a new ThemeConfigurationInput instance from a string or object.
      */
     static createFrom($$source: any = {}): ThemeConfigurationInput {
-        const $$createField0_0 = $$createType1;
+        const $$createField0_0 = $$createType0;
         const $$createField1_0 = $$createType2;
+        const $$createField2_0 = $$createType3;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("global_style" in $$parsedSource) {
+            $$parsedSource["global_style"] = $$createField0_0($$parsedSource["global_style"]);
+        }
         if ("profiles" in $$parsedSource) {
-            $$parsedSource["profiles"] = $$createField0_0($$parsedSource["profiles"]);
+            $$parsedSource["profiles"] = $$createField1_0($$parsedSource["profiles"]);
         }
         if ("assignments" in $$parsedSource) {
-            $$parsedSource["assignments"] = $$createField1_0($$parsedSource["assignments"]);
+            $$parsedSource["assignments"] = $$createField2_0($$parsedSource["assignments"]);
         }
         return new ThemeConfigurationInput($$parsedSource as Partial<ThemeConfigurationInput>);
     }
@@ -795,7 +861,7 @@ export class ThemeImportSummary {
      * Creates a new ThemeImportSummary instance from a string or object.
      */
     static createFrom($$source: any = {}): ThemeImportSummary {
-        const $$createField0_0 = $$createType4;
+        const $$createField0_0 = $$createType5;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("results" in $$parsedSource) {
             $$parsedSource["results"] = $$createField0_0($$parsedSource["results"]);
@@ -820,6 +886,7 @@ export class ThemeProfile {
     "name": string;
     "theme_id": number;
     "definition"?: ThemeDefinition | null;
+    "follow_global_style": boolean;
     "font_family": string;
     "font_size": number;
     "cursor_style": CursorStyle;
@@ -837,6 +904,9 @@ export class ThemeProfile {
         }
         if (!("theme_id" in $$source)) {
             this["theme_id"] = 0;
+        }
+        if (!("follow_global_style" in $$source)) {
+            this["follow_global_style"] = false;
         }
         if (!("font_family" in $$source)) {
             this["font_family"] = "";
@@ -864,7 +934,7 @@ export class ThemeProfile {
      * Creates a new ThemeProfile instance from a string or object.
      */
     static createFrom($$source: any = {}): ThemeProfile {
-        const $$createField3_0 = $$createType6;
+        const $$createField3_0 = $$createType7;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("definition" in $$parsedSource) {
             $$parsedSource["definition"] = $$createField3_0($$parsedSource["definition"]);
@@ -877,6 +947,7 @@ export class ThemeProfileInput {
     "id": number;
     "name": string;
     "theme_id": number;
+    "follow_global_style": boolean;
     "font_family": string;
     "font_size": number;
     "cursor_style": CursorStyle;
@@ -892,6 +963,9 @@ export class ThemeProfileInput {
         }
         if (!("theme_id" in $$source)) {
             this["theme_id"] = 0;
+        }
+        if (!("follow_global_style" in $$source)) {
+            this["follow_global_style"] = false;
         }
         if (!("font_family" in $$source)) {
             this["font_family"] = "";
@@ -1065,10 +1139,11 @@ export class UpdateInfo {
 }
 
 // Private type creation functions
-const $$createType0 = ThemeProfileInput.createFrom;
-const $$createType1 = $Create.Array($$createType0);
-const $$createType2 = ThemeAssignmentsInput.createFrom;
-const $$createType3 = ThemeImportResult.createFrom;
-const $$createType4 = $Create.Array($$createType3);
-const $$createType5 = ThemeDefinition.createFrom;
-const $$createType6 = $Create.Nullable($$createType5);
+const $$createType0 = TerminalGlobalStyleInput.createFrom;
+const $$createType1 = ThemeProfileInput.createFrom;
+const $$createType2 = $Create.Array($$createType1);
+const $$createType3 = ThemeAssignmentsInput.createFrom;
+const $$createType4 = ThemeImportResult.createFrom;
+const $$createType5 = $Create.Array($$createType4);
+const $$createType6 = ThemeDefinition.createFrom;
+const $$createType7 = $Create.Nullable($$createType6);
