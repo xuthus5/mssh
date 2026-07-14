@@ -33,6 +33,7 @@ export default defineConfig({
         'src/components/layout/WindowTitleBar.tsx',
         'src/components/layout/WorkspaceContent.tsx',
         'src/components/settings/SettingsDialog.tsx',
+        'src/components/settings/TerminalBehaviorSettings.tsx',
         'src/components/settings/ThemeEditor.tsx',
         'src/components/settings/ThemeModeSelector.tsx',
         'src/components/settings/themeEditorState.ts',
