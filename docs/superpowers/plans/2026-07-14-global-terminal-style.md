@@ -198,7 +198,7 @@ git push origin main
 - Produces: `ThemeService.GetGlobalStyle() (model.TerminalGlobalStyle, error)`
 - Produces: transactional `ThemeService.SaveConfiguration(model.ThemeConfigurationInput) error`
 
-- [ ] **Step 1: Write failing service tests**
+- [x] **Step 1: Write failing service tests**
 
 Cover these behaviors:
 
@@ -214,7 +214,7 @@ func TestImportedAndCustomProfilesFollowGlobalByDefault(t *testing.T)
 
 The rollback test creates a SQLite trigger on `terminal.style.font_size`, submits valid Profile and Assignment changes, forces the global style write to fail, then asserts every persisted value remains unchanged.
 
-- [ ] **Step 2: Run service tests to verify RED**
+- [x] **Step 2: Run service tests to verify RED**
 
 Run:
 
@@ -224,7 +224,7 @@ PATH="$HOME/.govm/go/bin:$PATH" go test ./internal/service -run 'TestThemeServic
 
 Expected: FAIL because service initialization, validation, reset, import defaults, and atomic global writes are incomplete.
 
-- [ ] **Step 3: Implement normalization and validation helpers**
+- [x] **Step 3: Implement normalization and validation helpers**
 
 Create `internal/service/terminal_style.go`:
 
@@ -244,7 +244,7 @@ func normalizeTerminalFontFamily(fontFamily string) string
 
 Normalization removes control characters, trims whitespace, and limits the persisted value to `256` runes. Validation rejects empty results, out-of-range sizes, and unknown cursor styles. `validateThemeProfile` must call the same shared validator even when `FollowGlobalStyle` is true so dormant values remain safe.
 
-- [ ] **Step 4: Initialize and expose global style**
+- [x] **Step 4: Initialize and expose global style**
 
 During `ThemeService.InitializeDefaults`, repair global style in the existing initialization transaction:
 
@@ -263,7 +263,7 @@ func repairTerminalGlobalStyle(tx *sql.Tx) error {
 
 Expose `GetGlobalStyle`, calling `InitializeDefaults` before reading.
 
-- [ ] **Step 5: Extend atomic SaveConfiguration**
+- [x] **Step 5: Extend atomic SaveConfiguration**
 
 Convert `input.GlobalStyle`, validate it before opening the transaction, then save in this order:
 
@@ -277,7 +277,7 @@ commit
 
 Return `%w`-wrapped errors with `save theme configuration` context. Do not update any global style through a separate `SettingService` frontend call.
 
-- [ ] **Step 6: Apply default follow behavior**
+- [x] **Step 6: Apply default follow behavior**
 
 Set `FollowGlobalStyle: true` in:
 
@@ -287,7 +287,7 @@ Set `FollowGlobalStyle: true` in:
 
 Because Go bool has no “omitted” distinction, custom creation must explicitly normalize new Profiles to `true`; updates preserve the supplied value.
 
-- [ ] **Step 7: Update built-in reset semantics**
+- [x] **Step 7: Update built-in reset semantics**
 
 `resetBuiltinProfile` must restore:
 
@@ -301,7 +301,7 @@ profile.ColorOverrides = `{}`
 
 Global style settings must not be written by reset.
 
-- [ ] **Step 8: Run service tests to verify GREEN**
+- [x] **Step 8: Run service tests to verify GREEN**
 
 Run:
 
@@ -312,7 +312,7 @@ PATH="$HOME/.govm/go/bin:$PATH" go test -race ./internal/service -count=1
 
 Expected: PASS with atomic rollback, default repair, reset, custom, and import behavior covered.
 
-- [ ] **Step 9: Commit service layer**
+- [x] **Step 9: Commit service layer**
 
 ```bash
 git add internal/service

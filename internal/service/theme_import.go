@@ -60,7 +60,7 @@ func (service *ThemeService) persistImportedTheme(result model.ThemeImportResult
 		_ = tx.Rollback()
 		return failedImport(result, err)
 	}
-	profile, err := store.CreateThemeProfile(tx, model.ThemeProfile{Name: definition.Name, ThemeID: createdDefinition.ID, FontFamily: defaultTerminalFont, FontSize: 14, CursorStyle: model.CursorStyleBar, ColorOverrides: `{}`})
+	profile, err := store.CreateThemeProfile(tx, model.ThemeProfile{Name: definition.Name, ThemeID: createdDefinition.ID, FollowGlobalStyle: true, FontFamily: defaultTerminalFont, FontSize: model.DefaultTerminalFontSize, CursorStyle: model.CursorStyleBar, ColorOverrides: `{}`})
 	if err != nil {
 		_ = tx.Rollback()
 		return failedImport(result, err)
