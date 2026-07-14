@@ -132,6 +132,13 @@ func repairThemeAssignments(tx *sql.Tx, state *builtinCatalogState, defaults map
 	if assignments.DarkProfileID == 0 || assignments.LightProfileID == 0 {
 		return fmt.Errorf("default GitHub theme profiles are missing")
 	}
+	if _, valid := state.profileIDs[assignments.FixedProfileID]; !valid {
+		if assignments.FollowInterfaceMode {
+			assignments.FixedProfileID = 0
+		} else {
+			assignments.FixedProfileID = assignments.DarkProfileID
+		}
+	}
 	return store.SaveThemeAssignmentsDB(tx, assignments)
 }
 
@@ -159,15 +166,35 @@ func resetAssignedBuiltinStyles(tx *sql.Tx) (model.BuiltinThemeResetResult, erro
 	if err != nil {
 		return model.BuiltinThemeResetResult{}, err
 	}
-	darkReset, err := resetBuiltinProfile(tx, assignments.DarkProfileID)
+	resetByID := make(map[int64]bool, 3)
+	darkReset, err := resetBuiltinProfileCached(tx, assignments.DarkProfileID, resetByID)
 	if err != nil {
 		return model.BuiltinThemeResetResult{}, err
 	}
-	lightReset, err := resetBuiltinProfile(tx, assignments.LightProfileID)
+	lightReset, err := resetBuiltinProfileCached(tx, assignments.LightProfileID, resetByID)
 	if err != nil {
 		return model.BuiltinThemeResetResult{}, err
 	}
-	return model.BuiltinThemeResetResult{DarkReset: darkReset, LightReset: lightReset}, nil
+	fixedReset := false
+	if !assignments.FollowInterfaceMode {
+		fixedReset, err = resetBuiltinProfileCached(tx, assignments.FixedProfileID, resetByID)
+		if err != nil {
+			return model.BuiltinThemeResetResult{}, err
+		}
+	}
+	return model.BuiltinThemeResetResult{DarkReset: darkReset, LightReset: lightReset, FixedReset: fixedReset}, nil
+}
+
+func resetBuiltinProfileCached(tx *sql.Tx, profileID int64, resetByID map[int64]bool) (bool, error) {
+	if reset, exists := resetByID[profileID]; exists {
+		return reset, nil
+	}
+	reset, err := resetBuiltinProfile(tx, profileID)
+	if err != nil {
+		return false, err
+	}
+	resetByID[profileID] = reset
+	return reset, nil
 }
 
 func resetBuiltinProfile(tx *sql.Tx, profileID int64) (bool, error) {

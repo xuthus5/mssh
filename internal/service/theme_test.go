@@ -12,6 +12,7 @@ import (
 
 	"github.com/xuthus5/mssh/internal/model"
 	"github.com/xuthus5/mssh/internal/service/testutil"
+	"github.com/xuthus5/mssh/internal/store"
 )
 
 func TestThemeServiceInitializesDefaultsAndAssignments(t *testing.T) {
@@ -30,6 +31,8 @@ func TestThemeServiceInitializesDefaultsAndAssignments(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotZero(t, assignments.DarkProfileID)
 	assert.NotZero(t, assignments.LightProfileID)
+	assert.True(t, assignments.FollowInterfaceMode)
+	assert.Zero(t, assignments.FixedProfileID)
 }
 
 func TestThemeServiceImportsFilesWithPartialResults(t *testing.T) {
@@ -108,8 +111,10 @@ func TestThemeServiceProfileValidationAndAssignments(t *testing.T) {
 
 	assignments, err := service.GetAssignments()
 	require.NoError(t, err)
-	require.NoError(t, service.SaveAssignments(model.ThemeAssignmentsInput{DarkProfileID: created.ID, LightProfileID: assignments.LightProfileID}))
+	require.NoError(t, service.SaveAssignments(model.ThemeAssignmentsInput{DarkProfileID: created.ID, LightProfileID: assignments.LightProfileID, FollowInterfaceMode: true}))
 	assert.Error(t, service.DeleteProfile(created.ID))
+	assert.Error(t, service.SaveAssignments(model.ThemeAssignmentsInput{DarkProfileID: created.ID, LightProfileID: assignments.LightProfileID, FollowInterfaceMode: false}))
+	assert.Error(t, service.SaveAssignments(model.ThemeAssignmentsInput{DarkProfileID: created.ID, LightProfileID: assignments.LightProfileID, FollowInterfaceMode: false, FixedProfileID: 99999}))
 	invalidInputs := []model.ThemeProfileInput{
 		{Name: "", ThemeID: definitions[0].ID, FontFamily: "mono", FontSize: 14, CursorStyle: model.CursorStyleBar, ColorOverrides: `{}`},
 		{Name: "Invalid cursor", ThemeID: definitions[0].ID, FontFamily: "mono", FontSize: 14, CursorStyle: "beam", ColorOverrides: `{}`},
@@ -134,9 +139,8 @@ func TestThemeServiceSavesCrossModeConfigurationAndManagesCustomThemes(t *testin
 	dark.Name = "Dark Edited"
 	light.Name = "Light Edited"
 	require.NoError(t, themeService.SaveConfiguration(model.ThemeConfigurationInput{
-		DarkProfile:  model.ThemeProfileInputFrom(dark),
-		LightProfile: model.ThemeProfileInputFrom(light),
-		Assignments:  model.ThemeAssignmentsInput{DarkProfileID: light.ID, LightProfileID: dark.ID},
+		Profiles:    []model.ThemeProfileInput{model.ThemeProfileInputFrom(dark), model.ThemeProfileInputFrom(light)},
+		Assignments: model.ThemeAssignmentsInput{DarkProfileID: light.ID, LightProfileID: dark.ID, FollowInterfaceMode: true},
 	}))
 
 	assignments, err := themeService.GetAssignments()
@@ -147,22 +151,94 @@ func TestThemeServiceSavesCrossModeConfigurationAndManagesCustomThemes(t *testin
 	require.NoError(t, err)
 	assert.Equal(t, "Dark Edited", stored.Name)
 
-	assert.Error(t, themeService.SaveAssignments(model.ThemeAssignmentsInput{DarkProfileID: -1, LightProfileID: light.ID}))
-	assert.Error(t, themeService.SaveAssignments(model.ThemeAssignmentsInput{DarkProfileID: dark.ID, LightProfileID: -1}))
-	assert.Error(t, themeService.SaveConfiguration(model.ThemeConfigurationInput{DarkProfile: model.ThemeProfileInput{Name: "invalid"}}))
+	assert.Error(t, themeService.SaveAssignments(model.ThemeAssignmentsInput{DarkProfileID: -1, LightProfileID: light.ID, FollowInterfaceMode: true}))
+	assert.Error(t, themeService.SaveAssignments(model.ThemeAssignmentsInput{DarkProfileID: dark.ID, LightProfileID: -1, FollowInterfaceMode: true}))
+	assert.Error(t, themeService.SaveConfiguration(model.ThemeConfigurationInput{Profiles: []model.ThemeProfileInput{{Name: "invalid"}}}))
 	assert.Error(t, themeService.SaveConfiguration(model.ThemeConfigurationInput{
-		DarkProfile: model.ThemeProfileInputFrom(dark), LightProfile: model.ThemeProfileInput{Name: "invalid"},
+		Profiles: []model.ThemeProfileInput{model.ThemeProfileInputFrom(dark), {Name: "invalid"}},
 	}))
 	missingDark := model.ThemeProfileInputFrom(dark)
 	missingDark.ID = -1
 	assert.Error(t, themeService.SaveConfiguration(model.ThemeConfigurationInput{
-		DarkProfile: missingDark, LightProfile: model.ThemeProfileInputFrom(light),
+		Profiles: []model.ThemeProfileInput{missingDark, model.ThemeProfileInputFrom(light)},
 	}))
+	assert.ErrorContains(t, themeService.SaveConfiguration(model.ThemeConfigurationInput{
+		Profiles:    []model.ThemeProfileInput{model.ThemeProfileInputFrom(dark), model.ThemeProfileInputFrom(dark)},
+		Assignments: model.ThemeAssignmentsInput{DarkProfileID: dark.ID, LightProfileID: light.ID, FollowInterfaceMode: true},
+	}), "duplicate theme profile")
 	_, err = themeService.ListDefinitions("sepia")
 	assert.Error(t, err)
 	_, err = themeService.ListProfiles("sepia")
 	assert.Error(t, err)
 	assert.Error(t, themeService.DeleteDefinition(profiles[0].ThemeID))
+}
+
+func TestThemeServiceSavesFixedConfigurationAndRollsBackInvalidAssignments(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	themeService := NewThemeService(db, testutil.NewTestLogger())
+	require.NoError(t, themeService.InitializeDefaults())
+	profiles := mustThemeProfiles(t, themeService)
+	dark := mustThemeProfileNamed(t, profiles, "GitHub Dark")
+	light := mustThemeProfileNamed(t, profiles, "GitHub Light")
+	fixed := mustThemeProfileNamed(t, profiles, "Dracula")
+
+	require.NoError(t, themeService.SaveConfiguration(model.ThemeConfigurationInput{
+		Profiles: []model.ThemeProfileInput{
+			model.ThemeProfileInputFrom(dark),
+			model.ThemeProfileInputFrom(light),
+			model.ThemeProfileInputFrom(fixed),
+		},
+		Assignments: model.ThemeAssignmentsInput{
+			DarkProfileID:       dark.ID,
+			LightProfileID:      light.ID,
+			FollowInterfaceMode: false,
+			FixedProfileID:      fixed.ID,
+		},
+	}))
+	assignments, err := themeService.GetAssignments()
+	require.NoError(t, err)
+	assert.False(t, assignments.FollowInterfaceMode)
+	assert.Equal(t, fixed.ID, assignments.FixedProfileID)
+
+	dark.Name = "Must Roll Back"
+	err = themeService.SaveConfiguration(model.ThemeConfigurationInput{
+		Profiles: []model.ThemeProfileInput{model.ThemeProfileInputFrom(dark)},
+		Assignments: model.ThemeAssignmentsInput{
+			DarkProfileID:       dark.ID,
+			LightProfileID:      light.ID,
+			FollowInterfaceMode: false,
+			FixedProfileID:      99999,
+		},
+	})
+	assert.ErrorContains(t, err, "fixed theme profile")
+	storedDark, getErr := themeService.GetProfile(dark.ID)
+	require.NoError(t, getErr)
+	assert.NotEqual(t, "Must Roll Back", storedDark.Name)
+}
+
+func TestThemeServiceSaveAssignmentsRollsBackPartialWrites(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	themeService := NewThemeService(db, testutil.NewTestLogger())
+	require.NoError(t, themeService.InitializeDefaults())
+	profiles := mustThemeProfiles(t, themeService)
+	dark := mustThemeProfileNamed(t, profiles, "GitHub Dark")
+	light := mustThemeProfileNamed(t, profiles, "GitHub Light")
+	fixed := mustThemeProfileNamed(t, profiles, "Dracula")
+	before, err := themeService.GetAssignments()
+	require.NoError(t, err)
+	_, err = db.Exec(`CREATE TRIGGER fail_fixed_assignment BEFORE UPDATE ON settings WHEN NEW.key = 'terminal.theme.fixed_profile_id' BEGIN SELECT RAISE(FAIL, 'fixed assignment failed'); END`)
+	require.NoError(t, err)
+
+	err = themeService.SaveAssignments(model.ThemeAssignmentsInput{
+		DarkProfileID:       fixed.ID,
+		LightProfileID:      light.ID,
+		FollowInterfaceMode: false,
+		FixedProfileID:      dark.ID,
+	})
+	assert.ErrorContains(t, err, "save theme assignments")
+	after, getErr := store.GetThemeAssignments(db)
+	require.NoError(t, getErr)
+	assert.Equal(t, before, after)
 }
 
 func TestThemeServiceReportsDatabaseFailures(t *testing.T) {
@@ -184,9 +260,10 @@ func TestThemeServiceReportsDatabaseFailures(t *testing.T) {
 	assert.Error(t, themeService.DeleteDefinition(1))
 	_, err = themeService.GetAssignments()
 	assert.Error(t, err)
-	assert.Error(t, themeService.SaveAssignments(model.ThemeAssignmentsInput{DarkProfileID: 1, LightProfileID: 2}))
+	assert.Error(t, themeService.SaveAssignments(model.ThemeAssignmentsInput{DarkProfileID: 1, LightProfileID: 2, FollowInterfaceMode: true}))
 	assert.Error(t, themeService.SaveConfiguration(model.ThemeConfigurationInput{
-		DarkProfile: validThemeProfileInput(1), LightProfile: validThemeProfileInput(2),
+		Profiles:    []model.ThemeProfileInput{validThemeProfileInput(1), validThemeProfileInput(2)},
+		Assignments: model.ThemeAssignmentsInput{DarkProfileID: 1, LightProfileID: 2, FollowInterfaceMode: true},
 	}))
 	_, err = themeService.ResetBuiltinStyles()
 	assert.ErrorContains(t, err, "prepare built-in theme reset")
