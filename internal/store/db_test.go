@@ -98,7 +98,7 @@ func TestThemeCatalogSchema(t *testing.T) {
 	require.NoError(t, Migrate(db))
 
 	assertTableColumns(t, db, "themes", []string{"id", "name", "mode", "source_type", "source_name", "source_url", "source_author", "source_license", "source_version", "source_fingerprint", "color_payload", "raw_payload", "is_builtin", "created_at", "updated_at"})
-	assertTableColumns(t, db, "terminal_theme_profiles", []string{"id", "name", "theme_id", "font_family", "font_size", "cursor_style", "color_overrides", "created_at", "updated_at"})
+	assertTableColumns(t, db, "terminal_theme_profiles", []string{"id", "name", "theme_id", "follow_global_style", "font_family", "font_size", "cursor_style", "color_overrides", "created_at", "updated_at"})
 
 	_, err = db.Exec("INSERT INTO themes (name, mode, source_type, source_fingerprint, color_payload) VALUES ('A', 'dark', 'custom', 'same', '{}'), ('B', 'light', 'custom', 'same', '{}')")
 	assert.Error(t, err)
@@ -112,6 +112,34 @@ func TestMigrateReplacesLegacyThemeSchema(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, Migrate(db))
 	assertTableColumns(t, db, "themes", []string{"mode", "source_fingerprint", "color_payload", "updated_at"})
+}
+
+func TestMigrateReplacesStaleThemeProfileSchema(t *testing.T) {
+	db, err := OpenDB(t.TempDir())
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, db.Close()) })
+	_, err = db.Exec(themeDefinitionsSchema)
+	require.NoError(t, err)
+	_, err = db.Exec(`CREATE TABLE terminal_theme_profiles (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		name TEXT NOT NULL,
+		theme_id INTEGER NOT NULL REFERENCES themes(id) ON DELETE RESTRICT,
+		font_family TEXT NOT NULL,
+		font_size INTEGER NOT NULL,
+		cursor_style TEXT NOT NULL,
+		color_overrides TEXT NOT NULL DEFAULT '{}'
+	)`)
+	require.NoError(t, err)
+	_, err = db.Exec(`INSERT INTO themes (name, mode, source_type, source_fingerprint, color_payload) VALUES ('Old', 'dark', 'custom', 'old', '{}')`)
+	require.NoError(t, err)
+	_, err = db.Exec(`INSERT INTO terminal_theme_profiles (name, theme_id, font_family, font_size, cursor_style) VALUES ('Old', 1, 'mono', 14, 'bar')`)
+	require.NoError(t, err)
+
+	require.NoError(t, Migrate(db))
+	assertTableColumns(t, db, "terminal_theme_profiles", []string{"follow_global_style"})
+	var count int
+	require.NoError(t, db.QueryRow("SELECT count(*) FROM terminal_theme_profiles").Scan(&count))
+	assert.Zero(t, count)
 }
 
 func assertTableColumns(t *testing.T, db interface {

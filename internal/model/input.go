@@ -100,21 +100,36 @@ func ThemeDefinitionInputFrom(theme ThemeDefinition) ThemeDefinitionInput {
 }
 
 type ThemeProfileInput struct {
-	ID             int64       `json:"id"`
-	Name           string      `json:"name"`
-	ThemeID        int64       `json:"theme_id"`
-	FontFamily     string      `json:"font_family"`
-	FontSize       int         `json:"font_size"`
-	CursorStyle    CursorStyle `json:"cursor_style"`
-	ColorOverrides string      `json:"color_overrides"`
+	ID                int64       `json:"id"`
+	Name              string      `json:"name"`
+	ThemeID           int64       `json:"theme_id"`
+	FollowGlobalStyle bool        `json:"follow_global_style"`
+	FontFamily        string      `json:"font_family"`
+	FontSize          int         `json:"font_size"`
+	CursorStyle       CursorStyle `json:"cursor_style"`
+	ColorOverrides    string      `json:"color_overrides"`
 }
 
 func (input ThemeProfileInput) ThemeProfile() ThemeProfile {
-	return ThemeProfile{ID: input.ID, Name: input.Name, ThemeID: input.ThemeID, FontFamily: input.FontFamily, FontSize: input.FontSize, CursorStyle: input.CursorStyle, ColorOverrides: input.ColorOverrides}
+	return ThemeProfile{ID: input.ID, Name: input.Name, ThemeID: input.ThemeID, FollowGlobalStyle: input.FollowGlobalStyle, FontFamily: input.FontFamily, FontSize: input.FontSize, CursorStyle: input.CursorStyle, ColorOverrides: input.ColorOverrides}
 }
 
 func ThemeProfileInputFrom(profile ThemeProfile) ThemeProfileInput {
-	return ThemeProfileInput{ID: profile.ID, Name: profile.Name, ThemeID: profile.ThemeID, FontFamily: profile.FontFamily, FontSize: profile.FontSize, CursorStyle: profile.CursorStyle, ColorOverrides: profile.ColorOverrides}
+	return ThemeProfileInput{ID: profile.ID, Name: profile.Name, ThemeID: profile.ThemeID, FollowGlobalStyle: profile.FollowGlobalStyle, FontFamily: profile.FontFamily, FontSize: profile.FontSize, CursorStyle: profile.CursorStyle, ColorOverrides: profile.ColorOverrides}
+}
+
+type TerminalGlobalStyleInput struct {
+	FontFamily  string      `json:"font_family"`
+	FontSize    int         `json:"font_size"`
+	CursorStyle CursorStyle `json:"cursor_style"`
+}
+
+func (input TerminalGlobalStyleInput) TerminalGlobalStyle() TerminalGlobalStyle {
+	return TerminalGlobalStyle(input)
+}
+
+func TerminalGlobalStyleInputFrom(style TerminalGlobalStyle) TerminalGlobalStyleInput {
+	return TerminalGlobalStyleInput(style)
 }
 
 type ThemeAssignmentsInput struct {
@@ -125,8 +140,9 @@ type ThemeAssignmentsInput struct {
 }
 
 type ThemeConfigurationInput struct {
-	Profiles    []ThemeProfileInput   `json:"profiles"`
-	Assignments ThemeAssignmentsInput `json:"assignments"`
+	GlobalStyle TerminalGlobalStyleInput `json:"global_style"`
+	Profiles    []ThemeProfileInput      `json:"profiles"`
+	Assignments ThemeAssignmentsInput    `json:"assignments"`
 }
 
 func (input ThemeAssignmentsInput) ThemeAssignments() ThemeAssignments {
