@@ -14,6 +14,7 @@ A cross-platform SSH client built with Go + Wails v3 + React + xterm.js.
 - Session recording and playback
 - 24 curated offline terminal themes with optional Dark/Light following or a fixed Profile, `.itermcolors` import, live preview, and built-in style reset
 - Searchable system font and size settings for the application interface
+- Terminal behavior settings support right-click menus or paste and optional copy-on-select
 - Persisted 50–100% application window opacity with desktop-compositor compatibility guidance
 - Quick command macros
 - Explicit host-key fingerprint trust and connection cancellation
