@@ -116,6 +116,40 @@ describe('ThemeEditor dual mode profiles', () => {
     expect(useToastStore.getState().toasts.at(-1)?.message).toBe('保存终端主题失败: db failed')
   })
 
+  it('disables reset while a save request is pending', async () => {
+    let resolveSave: (() => void) | undefined
+    const onSave = vi.fn(() => new Promise<void>((resolve) => { resolveSave = resolve }))
+    renderEditor(onSave)
+
+    await userEvent.click(screen.getByRole('button', { name: '保存主题配置' }))
+
+    expect(screen.getByRole('button', { name: '重置内置主题' })).toBeDisabled()
+    await act(async () => { resolveSave?.() })
+  })
+
+  it('keeps save disabled when a historical fixed Profile draft is invalid', async () => {
+    renderEditor(undefined, undefined, 'dark', { dark_profile_id: 1, light_profile_id: 2, follow_interface_mode: true, fixed_profile_id: 3 })
+    await userEvent.click(screen.getByRole('switch', { name: '跟随界面模式' }))
+    await userEvent.clear(screen.getByLabelText('背景色 HEX'))
+    await userEvent.type(screen.getByLabelText('背景色 HEX'), '#123')
+    await userEvent.click(screen.getByRole('switch', { name: '跟随界面模式' }))
+
+    const saveButton = document.querySelector('button[type="submit"]')
+    expect(saveButton).toBeDisabled()
+  })
+
+  it('disables save while a reset request is pending', async () => {
+    let resolveReset: ((result: { dark_reset: boolean; light_reset: boolean; fixed_reset: boolean }) => void) | undefined
+    const onResetBuiltins = vi.fn(() => new Promise<{ dark_reset: boolean; light_reset: boolean; fixed_reset: boolean }>((resolve) => { resolveReset = resolve }))
+    renderEditor(vi.fn(async () => {}), onResetBuiltins)
+    await userEvent.click(screen.getByRole('button', { name: '重置内置主题' }))
+    await userEvent.click(screen.getByRole('button', { name: '确认重置' }))
+
+    const saveButton = document.querySelector('button[type="submit"]')
+    expect(saveButton).toBeDisabled()
+    await act(async () => { resolveReset?.({ dark_reset: true, light_reset: true, fixed_reset: false }) })
+  })
+
   it('keeps the current draft when reset fails', async () => {
     const onResetBuiltins = vi.fn(async () => { throw new Error('db failed') })
     renderEditor(vi.fn(async () => {}), onResetBuiltins)
