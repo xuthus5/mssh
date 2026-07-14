@@ -62,7 +62,7 @@ export function WorkspaceContent() {
     <div
       id={WORKSPACE_PANEL_ID}
       data-layer-id="workspace"
-      role="tabpanel"
+      role="region"
       aria-labelledby={activeSurface?.type === 'workspace' ? workspaceTabID(activeSurface.id) : undefined}
       aria-hidden={!active}
       inert={active ? undefined : true}

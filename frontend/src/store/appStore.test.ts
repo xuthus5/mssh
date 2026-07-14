@@ -47,6 +47,24 @@ describe('appStore', () => {
     expect(useAppStore.getState().activeSurface).toEqual({ type: 'terminal', id: 'terminal-1' })
   })
 
+  it('keeps the active terminal visible when opening the macro sidebar', () => {
+    const store = useAppStore.getState()
+    store.openTab({ id: 'terminal-1', title: 'one', type: 'terminal', terminalId: 'term-1' })
+
+    store.activateWorkspace('macros')
+
+    expect(useAppStore.getState()).toMatchObject({
+      activeSurface: { type: 'terminal', id: 'terminal-1' },
+      workspaceTab: 'macros',
+    })
+
+    store.activateWorkspace('sessions')
+    expect(useAppStore.getState()).toMatchObject({
+      activeSurface: { type: 'workspace', id: 'sessions' },
+      workspaceTab: 'sessions',
+    })
+  })
+
   it('falls back right, left, then sessions when closing the active tab', async () => {
     const store = useAppStore.getState()
     store.openTab({ id: 'a', title: 'A', type: 'playback' })

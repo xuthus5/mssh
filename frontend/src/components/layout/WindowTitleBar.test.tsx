@@ -50,9 +50,11 @@ describe('WindowTitleBar', () => {
       unobserve() {}
     })
     useAppStore.setState({
+      tabs: [],
       activeSurface: null,
       navigationCollapsed: false,
       workspaceTab: 'sessions',
+      connectionStatus: {},
     })
   })
 
@@ -94,27 +96,53 @@ describe('WindowTitleBar', () => {
 
   it('switches the sidebar navigation from the window title bar', async () => {
     render(<WindowTitleBar />)
-    const sessionsTab = screen.getByRole('tab', { name: '会话' })
-    const macrosTab = screen.getByRole('tab', { name: '宏' })
-    expect(sessionsTab).toHaveAttribute('aria-selected', 'false')
-    expect(sessionsTab.querySelector('svg')).toBeInTheDocument()
-    expect(macrosTab.querySelector('svg')).toBeInTheDocument()
+    const sessionsButton = screen.getByRole('button', { name: '会话' })
+    const macrosButton = screen.getByRole('button', { name: '宏' })
+    expect(sessionsButton).toHaveAttribute('aria-pressed', 'false')
+    expect(sessionsButton.querySelector('svg')).toBeInTheDocument()
+    expect(macrosButton.querySelector('svg')).toBeInTheDocument()
 
-    await userEvent.click(macrosTab)
+    await userEvent.click(macrosButton)
 
     expect(useAppStore.getState().workspaceTab).toBe('macros')
     expect(useAppStore.getState().activeSurface).toEqual({ type: 'workspace', id: 'macros' })
-    expect(macrosTab).toHaveAttribute('aria-selected', 'true')
+    expect(macrosButton).toHaveAttribute('aria-pressed', 'true')
     expect(screen.queryByText('Secure Shell Client')).not.toBeInTheDocument()
   })
 
-  it('links fixed tabs to the workspace panel', () => {
+  it('opens the macro sidebar without covering an active terminal', async () => {
+    useAppStore.setState({
+      tabs: [{ id: 'terminal-1', title: '生产服务器', type: 'terminal', terminalId: 'term-1' }],
+      activeSurface: { type: 'terminal', id: 'terminal-1' },
+      workspaceTab: 'sessions',
+      connectionStatus: { 'term-1': 'connected' },
+    })
     render(<WindowTitleBar />)
 
-    expect(screen.getByRole('tab', { name: '会话' })).toHaveAttribute('id', 'workspace-tab-sessions')
-    expect(screen.getByRole('tab', { name: '会话' })).toHaveAttribute('aria-controls', 'workspace-panel')
-    expect(screen.getByRole('tab', { name: '宏' })).toHaveAttribute('id', 'workspace-tab-macros')
-    expect(screen.getByRole('tab', { name: '宏' })).toHaveAttribute('aria-controls', 'workspace-panel')
+    await userEvent.click(screen.getByRole('button', { name: '宏' }))
+
+    expect(useAppStore.getState()).toMatchObject({
+      activeSurface: { type: 'terminal', id: 'terminal-1' },
+      workspaceTab: 'macros',
+    })
+    expect(screen.getByRole('button', { name: '宏' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: '宏' })).toHaveAttribute('aria-controls', 'sidebar-navigation')
+    expect(screen.getByRole('tab', { name: /生产服务器/ })).toHaveAttribute('aria-selected', 'true')
+
+    await userEvent.click(screen.getByRole('button', { name: '会话' }))
+    expect(useAppStore.getState()).toMatchObject({
+      activeSurface: { type: 'workspace', id: 'sessions' },
+      workspaceTab: 'sessions',
+    })
+  })
+
+  it('links fixed navigation buttons to the sidebar', () => {
+    render(<WindowTitleBar />)
+
+    expect(screen.getByRole('button', { name: '会话' })).toHaveAttribute('id', 'workspace-tab-sessions')
+    expect(screen.getByRole('button', { name: '会话' })).toHaveAttribute('aria-controls', 'sidebar-navigation')
+    expect(screen.getByRole('button', { name: '宏' })).toHaveAttribute('id', 'workspace-tab-macros')
+    expect(screen.getByRole('button', { name: '宏' })).toHaveAttribute('aria-controls', 'sidebar-navigation')
   })
 
   it('collapses fixed navigation and the sidebar together', async () => {
@@ -127,7 +155,7 @@ describe('WindowTitleBar', () => {
     await userEvent.click(navigationButton)
 
     expect(useAppStore.getState().navigationCollapsed).toBe(true)
-    expect(screen.queryByRole('tab', { name: '会话' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '会话' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: '展开导航' })).toHaveAttribute('aria-expanded', 'false')
   })
 
