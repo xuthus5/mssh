@@ -3,6 +3,7 @@ import { FitAddon } from '@xterm/addon-fit'
 import { Terminal } from '@xterm/xterm'
 import { Events } from '@wailsio/runtime'
 import { useTerminalRuntimeErrorReporter, type TerminalRuntimeErrorReporter } from '@/components/terminal/TerminalErrorBoundary'
+import { installTerminalCopyOnSelect } from '@/components/terminal/terminalBehaviorRuntime'
 import { runTerminalRuntime } from '@/components/terminal/terminalRuntime'
 import { logger } from '@/lib/logger'
 import { toast } from '@/components/ui/toast'
@@ -160,6 +161,7 @@ function observeResize({ term, fitAddon, terminalID, containerRef, refs, reportR
 function initializeTerminal(terminalID: string, containerRef: RefObject<HTMLDivElement | null>, refs: TerminalLifecycleRefs, reportRuntimeError: TerminalRuntimeErrorReporter) {
   let disposed = false
   let addonOwnedByTerminal = false
+  let cleanupCopyOnSelect: (() => void) | undefined
   const container = containerRef.current
   const term = createTerminal()
   const fitAddon = new FitAddon()
@@ -167,6 +169,7 @@ function initializeTerminal(terminalID: string, containerRef: RefObject<HTMLDivE
   refs.fitAddonRef.current = fitAddon
   if (container) {
     term.open(container)
+    cleanupCopyOnSelect = installTerminalCopyOnSelect(term, 'terminal')
     term.loadAddon(fitAddon)
     addonOwnedByTerminal = true
     refs.storeRef.current.registerTerminal(terminalID, term)
@@ -190,6 +193,7 @@ function initializeTerminal(terminalID: string, containerRef: RefObject<HTMLDivE
     safelyDispose('output subscription', unsubOutput)
     safelyDispose('theme subscription', unsubscribeTheme)
     safelyDispose('resize observer', () => resizeObserver.disconnect())
+    if (cleanupCopyOnSelect) safelyDispose('copy-on-select subscription', cleanupCopyOnSelect)
     if (!addonOwnedByTerminal) safelyDispose('fit addon', () => fitAddon.dispose())
     refs.storeRef.current.unregisterTerminal(terminalID)
     safelyDispose('instance', () => term.dispose())
