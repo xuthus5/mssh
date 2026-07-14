@@ -120,7 +120,7 @@ describe('TerminalInteractionSurface', () => {
     expect(toast).toHaveBeenCalledWith('剪贴板操作失败: clipboard denied', 'error')
   })
 
-  it('hot-switches an already mounted surface from menu to paste mode', () => {
+  it('hot-switches an already mounted surface between menu and paste modes', () => {
     const { terminalRef } = createTerminal()
     render(<TerminalInteractionSurface terminalRef={terminalRef}><div>terminal</div></TerminalInteractionSurface>)
     expect(screen.getByRole('button', { name: '复制' })).toBeInTheDocument()
@@ -129,5 +129,10 @@ describe('TerminalInteractionSurface', () => {
 
     expect(screen.queryByRole('button', { name: '复制' })).not.toBeInTheDocument()
     expect(screen.getByText('terminal').parentElement).toHaveClass('bg-background', 'text-foreground')
+
+    act(() => useTerminalBehaviorStore.getState().setSettings({ rightClickAction: 'menu', copyOnSelect: false }))
+
+    expect(screen.getByRole('button', { name: '复制' })).toBeInTheDocument()
+    expect(screen.getByTestId('context-menu-trigger')).toHaveClass('select-text')
   })
 })
