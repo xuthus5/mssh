@@ -43,7 +43,7 @@ func (importer *ITermColorsImporter) Import(filename string, content []byte) ([]
 	sum := sha256.Sum256(encoded)
 	definition := model.ThemeDefinition{
 		Name:              strings.TrimSuffix(filepath.Base(filename), filepath.Ext(filename)),
-		Mode:              classifyMode(payload.Background),
+		Mode:              ClassifyMode(payload.Background),
 		SourceType:        model.ThemeSourceITerm2,
 		SourceName:        "iTerm2 Color Schemes",
 		SourceLicense:     "unknown",
@@ -190,7 +190,7 @@ func convertColor(colors map[string]map[string]string, name string) (string, err
 	return fmt.Sprintf("#%02x%02x%02x", values[0], values[1], values[2]), nil
 }
 
-func classifyMode(background string) model.ThemeMode {
+func ClassifyMode(background string) model.ThemeMode {
 	red, _ := strconv.ParseInt(background[1:3], 16, 64)
 	green, _ := strconv.ParseInt(background[3:5], 16, 64)
 	blue, _ := strconv.ParseInt(background[5:7], 16, 64)

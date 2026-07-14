@@ -46,6 +46,24 @@ func TestITermColorsFingerprintIsStable(t *testing.T) {
 	assert.Equal(t, first[0].SourceFingerprint, second[0].SourceFingerprint)
 }
 
+func TestClassifyModeUsesBackgroundLuminance(t *testing.T) {
+	tests := []struct {
+		name       string
+		background string
+		expected   model.ThemeMode
+	}{
+		{name: "black", background: "#000000", expected: model.ThemeModeDark},
+		{name: "white", background: "#ffffff", expected: model.ThemeModeLight},
+		{name: "dark mixed rgb", background: "#804020", expected: model.ThemeModeDark},
+		{name: "light mixed rgb", background: "#80c080", expected: model.ThemeModeLight},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			assert.Equal(t, test.expected, ClassifyMode(test.background))
+		})
+	}
+}
+
 func TestConvertColorValidatesAndClampsComponents(t *testing.T) {
 	_, err := convertColor(map[string]map[string]string{}, "Missing")
 	assert.ErrorContains(t, err, "missing Missing")

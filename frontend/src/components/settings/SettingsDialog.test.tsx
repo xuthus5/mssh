@@ -34,6 +34,7 @@ function settingsProps() {
     onUpdateThemeProfile: vi.fn(async () => {}),
     onDeleteThemeProfile: vi.fn(async () => {}),
     onDeleteThemeDefinition: vi.fn(async () => {}),
+    onResetBuiltinThemes: vi.fn(async () => ({ dark_reset: true, light_reset: true })),
     onGenerateKey: vi.fn(),
     onImportKey: vi.fn(),
     onDeleteKey: vi.fn(),
@@ -55,6 +56,17 @@ describe('SettingsDialog interface font settings', () => {
     expect(screen.getByRole('tab', { name: '终端' })).toBeInTheDocument()
     expect(screen.queryByRole('tab', { name: '外观' })).not.toBeInTheDocument()
     expect(screen.queryByRole('tab', { name: '分组' })).not.toBeInTheDocument()
+  })
+
+  it('passes the built-in theme reset action to the terminal editor', async () => {
+    const props = settingsProps()
+    render(<SettingsDialog {...props} />)
+
+    await userEvent.click(screen.getByRole('tab', { name: '终端' }))
+    await userEvent.click(screen.getByRole('button', { name: '重置内置主题' }))
+    await userEvent.click(screen.getByRole('button', { name: '确认重置' }))
+
+    expect(props.onResetBuiltinThemes).toHaveBeenCalledOnce()
   })
 
   it('previews and saves the selected font settings', async () => {
