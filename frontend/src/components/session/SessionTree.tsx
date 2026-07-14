@@ -121,8 +121,13 @@ export default function SessionTree({
     const sessionRow = <div
       role="treeitem"
       tabIndex={0}
-      className="ml-1 flex cursor-pointer items-center gap-1 rounded px-1 py-1 text-sm hover:bg-muted/50"
-      onDoubleClick={(event: MouseEvent) => { event.stopPropagation(); logger.debug('SessionTree: onConnect', session.id); onConnect(session.id) }}
+      className="ml-1 flex cursor-pointer select-none items-center gap-1 rounded px-1 py-1 text-sm hover:bg-muted/50"
+      onDoubleClick={(event: MouseEvent) => {
+        event.preventDefault()
+        event.stopPropagation()
+        logger.debug('SessionTree: onConnect', session.id)
+        onConnect(session.id)
+      }}
       onKeyDown={(event) => { if (event.key === 'Enter') onConnect(session.id) }}
     ><Server className="size-3.5 shrink-0 text-muted-foreground" /><span className="truncate">{session.name}</span></div>
     if (navigationOnly) return <div key={session.id}>{sessionRow}</div>

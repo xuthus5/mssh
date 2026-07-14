@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import SessionTree from '@/components/session/SessionTree'
 
@@ -57,7 +57,7 @@ describe('SessionTree', () => {
     expect(screen.getByText('db-master')).toBeInTheDocument()
   })
 
-  it('calls onConnect on double click', async () => {
+  it('connects once without allowing browser text selection on double click', async () => {
     const user = userEvent.setup()
     const onConnect = vi.fn()
     render(<SessionTree
@@ -70,8 +70,18 @@ describe('SessionTree', () => {
       onDeleteFolder={vi.fn()}
     />)
 
-    await user.dblClick(screen.getByText('web-01'))
+    const sessionItem = screen.getByRole('treeitem', { name: 'web-01' })
+    expect(sessionItem).toHaveClass('select-none')
+    await user.dblClick(sessionItem)
+
     expect(onConnect).toHaveBeenCalledWith('s1')
+    expect(onConnect).toHaveBeenCalledTimes(1)
+    onConnect.mockClear()
+    expect(fireEvent.doubleClick(sessionItem)).toBe(false)
+    expect(onConnect).toHaveBeenCalledTimes(1)
+
+    await user.pointer({ target: sessionItem, keys: '[MouseRight]' })
+    expect(await screen.findByRole('menuitem', { name: '连接' })).toBeInTheDocument()
   })
 
   it('shows empty message when no data', () => {
