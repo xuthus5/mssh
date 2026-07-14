@@ -40,7 +40,7 @@
 - Produces: `useTerminalBehaviorStore` with `setSettings(settings)`.
 - Extends: `GeneralSettings` with `rightClickAction` and `copyOnSelect`.
 
-- [ ] **Step 1: Add failing store normalization tests**
+- [x] **Step 1: Add failing store normalization tests**
 
 Create `frontend/src/store/terminalBehaviorStore.test.ts`:
 
@@ -76,7 +76,7 @@ describe('terminal behavior store', () => {
 })
 ```
 
-- [ ] **Step 2: Extend settings hook tests for defaults, loading, and saving**
+- [x] **Step 2: Extend settings hook tests for defaults, loading, and saving**
 
 Update `frontend/src/hooks/useSettings.test.ts` so the default test asserts:
 
@@ -129,7 +129,7 @@ it('does not publish terminal behavior when persistence fails', async () => {
 })
 ```
 
-- [ ] **Step 3: Run focused tests to verify RED**
+- [x] **Step 3: Run focused tests to verify RED**
 
 Run:
 
@@ -140,7 +140,7 @@ npm test -- src/store/terminalBehaviorStore.test.ts src/hooks/useSettings.test.t
 
 Expected: FAIL because the behavior store and General Settings fields do not exist.
 
-- [ ] **Step 4: Implement the behavior store**
+- [x] **Step 4: Implement the behavior store**
 
 Create `frontend/src/store/terminalBehaviorStore.ts`:
 
@@ -177,7 +177,7 @@ export const useTerminalBehaviorStore = create<TerminalBehaviorState>((set) => (
 }))
 ```
 
-- [ ] **Step 5: Load and save behavior through General Settings**
+- [x] **Step 5: Load and save behavior through General Settings**
 
 Extend `GeneralSettings` in `frontend/src/hooks/useSettings.ts`:
 
@@ -218,7 +218,7 @@ const normalized = { ...settings, ...behavior, uiFontFamily, uiFontFallbackFamil
 useTerminalBehaviorStore.getState().setSettings(behavior)
 ```
 
-- [ ] **Step 6: Run focused tests to verify GREEN**
+- [x] **Step 6: Run focused tests to verify GREEN**
 
 Run:
 
@@ -229,7 +229,7 @@ npm test -- src/store/terminalBehaviorStore.test.ts src/hooks/useSettings.test.t
 
 Expected: both test files PASS.
 
-- [ ] **Step 7: Commit the persistence boundary**
+- [x] **Step 7: Commit the persistence boundary**
 
 ```bash
 git add frontend/src/store/terminalBehaviorStore.ts frontend/src/store/terminalBehaviorStore.test.ts frontend/src/hooks/useSettings.ts frontend/src/hooks/useSettings.test.ts
@@ -249,7 +249,7 @@ git commit -m "feat(settings): persist terminal behavior"
 - Produces: `TerminalBehaviorSettingsSection` with controlled right-click select and copy-on-select switch.
 - Extends: General Settings form submission with both behavior values.
 
-- [ ] **Step 1: Add failing behavior section tests**
+- [x] **Step 1: Add failing behavior section tests**
 
 Create `frontend/src/components/settings/TerminalBehaviorSettings.test.tsx`:
 
@@ -277,7 +277,7 @@ it('shows labels and emits controlled behavior changes', async () => {
 
 Extend `SettingsDialog.test.tsx` test data with `rightClickAction: 'menu'` and `copyOnSelect: false`, change both controls, save, and assert `onSaveGeneral` receives `paste` and `true`.
 
-- [ ] **Step 2: Run focused tests to verify RED**
+- [x] **Step 2: Run focused tests to verify RED**
 
 ```bash
 cd frontend
@@ -286,7 +286,7 @@ npm test -- src/components/settings/TerminalBehaviorSettings.test.tsx src/compon
 
 Expected: FAIL because the behavior section is missing.
 
-- [ ] **Step 3: Implement the shadcn behavior section**
+- [x] **Step 3: Implement the shadcn behavior section**
 
 Create `frontend/src/components/settings/TerminalBehaviorSettings.tsx` with:
 
@@ -316,7 +316,7 @@ export function TerminalBehaviorSettingsSection(props: Props) {
 }
 ```
 
-- [ ] **Step 4: Wire the section into SettingsDialog**
+- [x] **Step 4: Wire the section into SettingsDialog**
 
 Add local state initialized from `general`, refresh it in the existing effect, include it in `handleSaveGeneral`, and render:
 
@@ -331,7 +331,7 @@ Add local state initialized from `general`, refresh it in the existing effect, i
 
 Place the card after the terminal defaults and before the interface font card. Keep `SettingsDialog.tsx` below 300 lines.
 
-- [ ] **Step 5: Run focused tests to verify GREEN**
+- [x] **Step 5: Run focused tests to verify GREEN**
 
 ```bash
 cd frontend
@@ -340,7 +340,7 @@ npm test -- src/components/settings/TerminalBehaviorSettings.test.tsx src/compon
 
 Expected: both test files PASS.
 
-- [ ] **Step 6: Commit the settings UI**
+- [x] **Step 6: Commit the settings UI**
 
 ```bash
 git add frontend/src/components/settings/TerminalBehaviorSettings.tsx frontend/src/components/settings/TerminalBehaviorSettings.test.tsx frontend/src/components/settings/SettingsDialog.tsx frontend/src/components/settings/SettingsDialog.test.tsx
@@ -360,7 +360,7 @@ git commit -m "feat(settings): add terminal behavior controls"
 - Produces: `createCopyOnSelectController(term, options)` returning `{setEnabled, dispose}`.
 - Produces: `installTerminalCopyOnSelect(term, label)` returning an idempotent cleanup function.
 
-- [ ] **Step 1: Add failing clipboard helper tests**
+- [x] **Step 1: Add failing clipboard helper tests**
 
 Add tests with the following assertions:
 
@@ -387,11 +387,11 @@ clipboard.readText.mockRejectedValueOnce(new Error('clipboard denied'))
 await expect(pasteClipboardIntoTerminal(terminal as never, clipboard)).rejects.toThrow('clipboard denied')
 ```
 
-- [ ] **Step 2: Add failing debounced copy controller tests**
+- [x] **Step 2: Add failing debounced copy controller tests**
 
 Use fake timers and an xterm selection callback stub. Assert that repeated changes produce one final clipboard write, disabling cancels the timer, empty selections do not write, errors call `onError`, and dispose unsubscribes exactly once.
 
-- [ ] **Step 3: Run focused tests to verify RED**
+- [x] **Step 3: Run focused tests to verify RED**
 
 ```bash
 cd frontend
@@ -400,7 +400,7 @@ npm test -- src/lib/terminalInteractions.test.ts src/components/terminal/termina
 
 Expected: FAIL because the runtime files do not exist.
 
-- [ ] **Step 4: Implement clipboard helpers and controller**
+- [x] **Step 4: Implement clipboard helpers and controller**
 
 Use this public shape in `terminalInteractions.ts`:
 
@@ -419,7 +419,7 @@ export function createCopyOnSelectController(term: Terminal, options: {
 
 The controller owns one timer, subscribes once to `term.onSelectionChange`, copies the latest non-empty selection after 120 ms by default, cancels when disabled, and makes `dispose` idempotent.
 
-- [ ] **Step 5: Bind controllers to the behavior store**
+- [x] **Step 5: Bind controllers to the behavior store**
 
 Implement `installTerminalCopyOnSelect`:
 
@@ -442,7 +442,7 @@ export function installTerminalCopyOnSelect(term: Terminal, label: string) {
 }
 ```
 
-- [ ] **Step 6: Run focused tests to verify GREEN**
+- [x] **Step 6: Run focused tests to verify GREEN**
 
 ```bash
 cd frontend
@@ -451,7 +451,7 @@ npm test -- src/lib/terminalInteractions.test.ts src/components/terminal/termina
 
 Expected: both files PASS.
 
-- [ ] **Step 7: Include the helper in coverage and commit**
+- [x] **Step 7: Include the helper in coverage and commit**
 
 Add `src/lib/terminalInteractions.ts` to `frontend/vite.config.ts`, then commit:
 
@@ -476,7 +476,7 @@ git commit -m "feat(terminal): add interaction runtime"
 - Produces: direct right-click paste mode.
 - Installs: live-terminal copy-on-select during xterm initialization.
 
-- [ ] **Step 1: Add failing interaction-surface tests**
+- [x] **Step 1: Add failing interaction-surface tests**
 
 Mock the shadcn context-menu primitives as visible wrappers. Cover:
 
@@ -493,11 +493,11 @@ Assertions:
 - Explicit clipboard rejection logs and adds an error toast.
 - Changing the store from menu to paste rerenders the already-mounted surface.
 
-- [ ] **Step 2: Add failing live lifecycle tests**
+- [x] **Step 2: Add failing live lifecycle tests**
 
 Extend the xterm mock in `useTerminal.test.tsx` with `getSelection` and `onSelectionChange`. Assert initialization installs the behavior runtime and StrictMode cleanup disposes its selection subscription once.
 
-- [ ] **Step 3: Run focused tests to verify RED**
+- [x] **Step 3: Run focused tests to verify RED**
 
 ```bash
 cd frontend
@@ -506,7 +506,7 @@ npm test -- src/components/terminal/TerminalInteractionSurface.test.tsx src/comp
 
 Expected: FAIL because the interaction surface and selection lifecycle are absent.
 
-- [ ] **Step 4: Implement the live interaction surface**
+- [x] **Step 4: Implement the live interaction surface**
 
 `TerminalInteractionSurface` reads `rightClickAction` with a Zustand selector. In menu mode it wraps children with existing `ContextMenu`, `ContextMenuTrigger`, `ContextMenuContent`, and `ContextMenuItem`. It reads `terminalRef.current` at action time, updates copy disabled state during `onContextMenuCapture`, and uses `Copy`, `ClipboardPaste`, and `TextSelect` icons.
 
@@ -519,7 +519,7 @@ onContextMenu={(event) => {
 }}
 ```
 
-- [ ] **Step 5: Wrap TerminalEmulator and install copy-on-select**
+- [x] **Step 5: Wrap TerminalEmulator and install copy-on-select**
 
 Wrap the existing xterm container:
 
@@ -530,7 +530,7 @@ return <TerminalInteractionSurface terminalRef={terminalRef}>{container}</Termin
 
 In `initializeTerminal`, call `installTerminalCopyOnSelect(term, 'terminal')` after `term.open`, and invoke its cleanup before disposing the terminal.
 
-- [ ] **Step 6: Run focused tests to verify GREEN**
+- [x] **Step 6: Run focused tests to verify GREEN**
 
 ```bash
 cd frontend
@@ -539,7 +539,7 @@ npm test -- src/components/terminal/TerminalInteractionSurface.test.tsx src/comp
 
 Expected: all focused files PASS.
 
-- [ ] **Step 7: Commit live terminal interactions**
+- [x] **Step 7: Commit live terminal interactions**
 
 ```bash
 git add frontend/src/components/terminal/TerminalInteractionSurface.tsx frontend/src/components/terminal/TerminalInteractionSurface.test.tsx frontend/src/components/terminal/TerminalEmulator.tsx frontend/src/components/terminal/TerminalEmulator.test.tsx frontend/src/hooks/useTerminal.ts frontend/src/hooks/useTerminal.test.tsx
@@ -559,13 +559,13 @@ git commit -m "feat(terminal): apply mouse behavior"
 - Produces: playback selection copying with no right-click paste or interactive context menu.
 - Extracts: existing header and timeline UI so `PlaybackTab.tsx` remains below 300 lines.
 
-- [ ] **Step 1: Add failing playback selection tests**
+- [x] **Step 1: Add failing playback selection tests**
 
 Extend the playback xterm mock with `getSelection` and `onSelectionChange`. Enable `copyOnSelect` in the store, initialize playback, invoke the selection callback, advance fake timers by 120 ms, and assert clipboard text is written. Disable the setting and assert later selections do not write.
 
 Add cleanup assertions for the selection subscription and pending timer.
 
-- [ ] **Step 2: Add characterization tests for extracted controls**
+- [x] **Step 2: Add characterization tests for extracted controls**
 
 Create `PlaybackControls.test.tsx` with this behavior:
 
@@ -593,7 +593,7 @@ await userEvent.keyboard('{ArrowRight}')
 expect(onSeek).toHaveBeenCalledWith(26)
 ```
 
-- [ ] **Step 3: Run focused tests to verify RED**
+- [x] **Step 3: Run focused tests to verify RED**
 
 ```bash
 cd frontend
@@ -602,7 +602,7 @@ npm test -- src/components/terminal/PlaybackTab.test.tsx src/components/terminal
 
 Expected: FAIL because playback does not install copy-on-select and the controls file does not exist.
 
-- [ ] **Step 4: Extract playback controls without behavior changes**
+- [x] **Step 4: Extract playback controls without behavior changes**
 
 Move `PlaybackHeader`, `PlaybackTimeline`, `PLAYBACK_SPEEDS`, and the associated markup to `PlaybackControls.tsx`. Export two focused components:
 
@@ -632,7 +632,7 @@ export function PlaybackTimeline({ progress, speed, onSeek, onSpeed }: TimelineP
 
 Keep `PlaybackHeader` above the terminal container and `PlaybackTimeline` below it. Keep both source files below 300 lines.
 
-- [ ] **Step 5: Install playback copy-on-select**
+- [x] **Step 5: Install playback copy-on-select**
 
 In `usePlaybackLifecycle`, install after opening the terminal:
 
@@ -642,7 +642,7 @@ const disposeCopyOnSelect = installTerminalCopyOnSelect(term, 'playback')
 
 Invoke `disposeCopyOnSelect()` during cleanup before `term.dispose()`. Do not add context-menu or paste behavior to playback.
 
-- [ ] **Step 6: Run focused tests to verify GREEN**
+- [x] **Step 6: Run focused tests to verify GREEN**
 
 ```bash
 cd frontend
@@ -651,7 +651,7 @@ npm test -- src/components/terminal/PlaybackTab.test.tsx src/components/terminal
 
 Expected: both files PASS and `wc -l frontend/src/components/terminal/PlaybackTab.tsx` reports at most 300 lines.
 
-- [ ] **Step 7: Commit playback behavior**
+- [x] **Step 7: Commit playback behavior**
 
 ```bash
 git add frontend/src/components/terminal/PlaybackControls.tsx frontend/src/components/terminal/PlaybackControls.test.tsx frontend/src/components/terminal/PlaybackTab.tsx frontend/src/components/terminal/PlaybackTab.test.tsx
@@ -668,7 +668,7 @@ git commit -m "feat(playback): copy selected text"
 - Consumes: Tasks 1-5.
 - Produces: fully verified and pushed `main` with no generated artifacts.
 
-- [ ] **Step 1: Update concise user documentation**
+- [x] **Step 1: Update concise user documentation**
 
 Add one short README bullet under settings or terminal capabilities:
 
@@ -676,7 +676,7 @@ Add one short README bullet under settings or terminal capabilities:
 - Terminal behavior settings support right-click menus or paste and optional copy-on-select.
 ```
 
-- [ ] **Step 2: Run frontend coverage**
+- [x] **Step 2: Run frontend coverage**
 
 ```bash
 cd frontend
@@ -685,7 +685,7 @@ npm run test:coverage
 
 Expected: all tests PASS and line coverage is at least 90%.
 
-- [ ] **Step 3: Run Go formatting and tests**
+- [x] **Step 3: Run Go formatting and tests**
 
 ```bash
 export PATH="$HOME/.govm/go/bin:$HOME/go/bin:$PATH"
@@ -697,7 +697,7 @@ go tool cover -func=coverage.out | tail -1
 
 Expected: tests PASS, race detection reports no races, and total Go coverage is at least 90%.
 
-- [ ] **Step 4: Run lint and production build**
+- [x] **Step 4: Run lint and production build**
 
 ```bash
 export PATH="$HOME/.govm/go/bin:$HOME/go/bin:$PATH"
@@ -707,7 +707,7 @@ CGO_ENABLED=1 CC='gcc -fuse-ld=bfd' wails3 build
 
 Expected: `0 issues` and successful Wails build. The existing Vite chunk-size warning remains non-blocking.
 
-- [ ] **Step 5: Request final code review**
+- [x] **Step 5: Request final code review**
 
 Use `requesting-code-review` against the complete feature diff. Reject any implementation that:
 
@@ -721,7 +721,7 @@ Use `requesting-code-review` against the complete feature diff. Reject any imple
 
 Fix every Critical and Important finding, then rerun affected focused tests and the final gates.
 
-- [ ] **Step 6: Clean outputs and close the plan**
+- [x] **Step 6: Clean outputs and close the plan**
 
 ```bash
 rm -rf frontend/coverage frontend/dist
@@ -732,7 +732,7 @@ git status --short
 
 Mark every completed checkbox in this plan with `[x]`. Confirm only intended source, tests, README, and plan files remain.
 
-- [ ] **Step 7: Commit and push the completed feature**
+- [x] **Step 7: Commit and push the completed feature**
 
 ```bash
 git add README.md docs/superpowers/plans/2026-07-14-terminal-input-behavior.md
