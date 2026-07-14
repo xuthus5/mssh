@@ -91,3 +91,8 @@ type ThemeImportResult struct {
 type ThemeImportSummary struct {
 	Results []ThemeImportResult `json:"results"`
 }
+
+type BuiltinThemeResetResult struct {
+	DarkReset  bool `json:"dark_reset"`
+	LightReset bool `json:"light_reset"`
+}

@@ -42,6 +42,31 @@ export enum AuthMethod {
     AuthKeyboardInteractive = "keyboard-interactive",
 };
 
+export class BuiltinThemeResetResult {
+    "dark_reset": boolean;
+    "light_reset": boolean;
+
+    /** Creates a new BuiltinThemeResetResult instance. */
+    constructor($$source: Partial<BuiltinThemeResetResult> = {}) {
+        if (!("dark_reset" in $$source)) {
+            this["dark_reset"] = false;
+        }
+        if (!("light_reset" in $$source)) {
+            this["light_reset"] = false;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new BuiltinThemeResetResult instance from a string or object.
+     */
+    static createFrom($$source: any = {}): BuiltinThemeResetResult {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new BuiltinThemeResetResult($$parsedSource as Partial<BuiltinThemeResetResult>);
+    }
+}
+
 export enum CursorStyle {
     /**
      * The Go zero value for the underlying type of the enum.

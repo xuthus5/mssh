@@ -26,7 +26,7 @@ export const useThemeCatalogStore = create<ThemeCatalogState>(() => initialState
 export function useThemeCatalog() {
   const state = useThemeCatalogStore()
   useEffect(() => { void loadThemeCatalog() }, [])
-  return { ...state, reload: loadThemeCatalog, setColorMode: changeColorMode, saveAssignments, saveConfiguration, saveProfile, createProfile, importThemes, deleteProfile, deleteDefinition }
+  return { ...state, reload: loadThemeCatalog, setColorMode: changeColorMode, saveAssignments, saveConfiguration, saveProfile, createProfile, importThemes, deleteProfile, deleteDefinition, resetBuiltinStyles }
 }
 
 export async function loadThemeCatalog() {
@@ -95,6 +95,12 @@ export async function deleteProfile(id: number) {
 export async function deleteDefinition(id: number) {
   await ThemeService.DeleteDefinition(id)
   await loadThemeCatalogFresh()
+}
+
+export async function resetBuiltinStyles() {
+  const result = await ThemeService.ResetBuiltinStyles()
+  await loadThemeCatalogFresh()
+  return result
 }
 
 function applyColorMode(mode: ColorMode) {
