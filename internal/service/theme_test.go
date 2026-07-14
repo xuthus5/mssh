@@ -22,10 +22,10 @@ func TestThemeServiceInitializesDefaultsAndAssignments(t *testing.T) {
 
 	definitions, err := service.ListDefinitions("")
 	require.NoError(t, err)
-	assert.Len(t, definitions, 2)
+	assert.Len(t, definitions, 24)
 	profiles, err := service.ListProfiles("")
 	require.NoError(t, err)
-	assert.Len(t, profiles, 2)
+	assert.Len(t, profiles, 24)
 	assignments, err := service.GetAssignments()
 	require.NoError(t, err)
 	assert.NotZero(t, assignments.DarkProfileID)
@@ -127,10 +127,10 @@ func TestThemeServiceSavesCrossModeConfigurationAndManagesCustomThemes(t *testin
 	require.NoError(t, themeService.InitializeDefaults())
 	profiles, err := themeService.ListProfiles("")
 	require.NoError(t, err)
-	require.Len(t, profiles, 2)
+	require.Len(t, profiles, 24)
 
-	dark := profiles[0]
-	light := profiles[1]
+	dark := mustThemeProfileNamed(t, profiles, "GitHub Dark")
+	light := mustThemeProfileNamed(t, profiles, "GitHub Light")
 	dark.Name = "Dark Edited"
 	light.Name = "Light Edited"
 	require.NoError(t, themeService.SaveConfiguration(model.ThemeConfigurationInput{
@@ -188,6 +188,8 @@ func TestThemeServiceReportsDatabaseFailures(t *testing.T) {
 	assert.Error(t, themeService.SaveConfiguration(model.ThemeConfigurationInput{
 		DarkProfile: validThemeProfileInput(1), LightProfile: validThemeProfileInput(2),
 	}))
+	_, err = themeService.ResetBuiltinStyles()
+	assert.ErrorContains(t, err, "prepare built-in theme reset")
 }
 
 func validThemeProfileInput(themeID int64) model.ThemeProfileInput {

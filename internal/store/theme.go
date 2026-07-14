@@ -2,6 +2,7 @@ package store
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"strconv"
 	"time"
@@ -58,6 +59,14 @@ func GetThemeDefinition(db themeDB, id int64) (*model.ThemeDefinition, error) {
 		return nil, fmt.Errorf("get theme definition: %w", err)
 	}
 	return &definition, nil
+}
+
+func UpdateThemeDefinition(db themeDB, definition model.ThemeDefinition) error {
+	result, err := db.Exec(`UPDATE themes SET name = ?, mode = ?, source_type = ?, source_name = ?, source_url = ?, source_author = ?, source_license = ?, source_version = ?, source_fingerprint = ?, color_payload = ?, raw_payload = ?, is_builtin = ?, updated_at = datetime('now') WHERE id = ?`, definition.Name, definition.Mode, definition.SourceType, definition.SourceName, definition.SourceURL, definition.SourceAuthor, definition.SourceLicense, definition.SourceVersion, definition.SourceFingerprint, definition.ColorPayload, definition.RawPayload, definition.IsBuiltin, definition.ID)
+	if err != nil {
+		return fmt.Errorf("update theme definition: %w", err)
+	}
+	return requireAffected(result, "theme definition")
 }
 
 func DeleteThemeDefinition(db themeDB, id int64) error {
@@ -166,16 +175,30 @@ func SaveThemeAssignmentsDB(db themeDB, assignments model.ThemeAssignments) erro
 }
 
 func GetThemeAssignments(db themeDB) (model.ThemeAssignments, error) {
-	return model.ThemeAssignments{DarkProfileID: themeAssignmentID(db, "terminal.theme.dark_profile_id"), LightProfileID: themeAssignmentID(db, "terminal.theme.light_profile_id")}, nil
+	darkProfileID, err := themeAssignmentID(db, "terminal.theme.dark_profile_id")
+	if err != nil {
+		return model.ThemeAssignments{}, err
+	}
+	lightProfileID, err := themeAssignmentID(db, "terminal.theme.light_profile_id")
+	if err != nil {
+		return model.ThemeAssignments{}, err
+	}
+	return model.ThemeAssignments{DarkProfileID: darkProfileID, LightProfileID: lightProfileID}, nil
 }
 
-func themeAssignmentID(db themeDB, key string) int64 {
+func themeAssignmentID(db themeDB, key string) (int64, error) {
 	var value string
 	if err := db.QueryRow("SELECT value FROM settings WHERE key = ?", key).Scan(&value); err != nil {
-		return 0
+		if errors.Is(err, sql.ErrNoRows) {
+			return 0, nil
+		}
+		return 0, fmt.Errorf("read theme assignment %s: %w", key, err)
 	}
-	id, _ := strconv.ParseInt(value, 10, 64)
-	return id
+	id, err := strconv.ParseInt(value, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("parse theme assignment %s: %w", key, err)
+	}
+	return id, nil
 }
 
 type scanner interface{ Scan(dest ...any) error }

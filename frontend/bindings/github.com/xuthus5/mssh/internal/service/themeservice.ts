@@ -57,6 +57,12 @@ export function ListProfiles(mode: string): $CancellablePromise<model$0.ThemePro
     });
 }
 
+export function ResetBuiltinStyles(): $CancellablePromise<model$0.BuiltinThemeResetResult> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.ThemeService.ResetBuiltinStyles").then(($result: any) => {
+        return $$createType7($result);
+    });
+}
+
 export function SaveAssignments(input: model$0.ThemeAssignmentsInput): $CancellablePromise<void> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.ThemeService.SaveAssignments", input);
 }
@@ -77,3 +83,4 @@ const $$createType3 = model$0.ThemeImportSummary.createFrom;
 const $$createType4 = model$0.ThemeDefinition.createFrom;
 const $$createType5 = $Create.Array($$createType4);
 const $$createType6 = $Create.Array($$createType0);
+const $$createType7 = model$0.BuiltinThemeResetResult.createFrom;

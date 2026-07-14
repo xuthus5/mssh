@@ -37,7 +37,7 @@
 - Produces: `func themeimport.ClassifyMode(background string) model.ThemeMode`
 - Produces: `go generate ./internal/service` regeneration entry point.
 
-- [ ] **Step 1: Add failing catalog and classifier tests**
+- [x] **Step 1: Add failing catalog and classifier tests**
 
 Add tests that assert:
 
@@ -52,7 +52,7 @@ For every definition, decode `ColorPayload`, require 16 ANSI colors, validate al
 
 Rename the private classifier test target to the exported `ClassifyMode` and cover black, white, threshold-adjacent, and mixed RGB backgrounds.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 Run:
 
@@ -62,7 +62,7 @@ PATH="$HOME/.govm/go/bin:$PATH" go test ./internal/service ./internal/themeimpor
 
 Expected: FAIL because `builtinThemeDefinitions` and `themeimport.ClassifyMode` do not exist.
 
-- [ ] **Step 3: Implement the generator and exported classifier**
+- [x] **Step 3: Implement the generator and exported classifier**
 
 Use an explicit manifest in `cmd/themegen/main.go` containing the 24 approved filenames and declared modes. Download from:
 
@@ -93,7 +93,7 @@ Add:
 
 Export the existing luminance classifier as `ClassifyMode` and update importer usage.
 
-- [ ] **Step 4: Generate and verify GREEN**
+- [x] **Step 4: Generate and verify GREEN**
 
 Run:
 
@@ -118,7 +118,7 @@ Expected: generated file contains 24 definitions and both packages PASS.
 - Produces: `func (service *ThemeService) ResetBuiltinStyles() (model.BuiltinThemeResetResult, error)`
 - Produces: transactional initialization of all definitions and profiles.
 
-- [ ] **Step 1: Add failing initialization and reset tests**
+- [x] **Step 1: Add failing initialization and reset tests**
 
 Cover these observable cases:
 
@@ -147,7 +147,7 @@ assert.Equal(t, assignmentsBefore, assignmentsAfter)
 
 Add database failure tests for begin, update, and commit/rollback paths.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 Run:
 
@@ -157,7 +157,7 @@ PATH="$HOME/.govm/go/bin:$PATH" go test ./internal/service ./internal/store
 
 Expected: FAIL because initialization still creates two themes and reset is missing.
 
-- [ ] **Step 3: Refactor initialization to one transaction**
+- [x] **Step 3: Refactor initialization to one transaction**
 
 Change helpers to consume `store.themeDB`-compatible values indirectly through existing store functions:
 
@@ -174,7 +174,7 @@ func (service *ThemeService) ensureProfile(db themeStore, name string, themeID i
 
 If a service-local interface is needed, define only `Exec`, `Query`, and `QueryRow`. Loop over `builtinThemeDefinitions`, collect GitHub Dark/Light profile IDs, repair invalid assignments, save assignments through `store.SaveThemeAssignmentsDB`, and commit once. Roll back on every failure.
 
-- [ ] **Step 4: Implement reset transaction**
+- [x] **Step 4: Implement reset transaction**
 
 Add the model:
 
@@ -196,7 +196,7 @@ profile.ColorOverrides = `{}`
 
 Commit once and return the per-mode result.
 
-- [ ] **Step 5: Verify GREEN**
+- [x] **Step 5: Verify GREEN**
 
 Run:
 
@@ -218,7 +218,7 @@ Expected: PASS with initialization, reset, idempotency, and error paths covered.
 - Consumes: `ThemeService.ResetBuiltinStyles()`
 - Produces: `resetBuiltinStyles(): Promise<BuiltinThemeResetResult>` from `useThemeCatalog`.
 
-- [ ] **Step 1: Add failing hook test**
+- [x] **Step 1: Add failing hook test**
 
 Register a Wails mock for `ThemeService.ResetBuiltinStyles`, call `result.current.resetBuiltinStyles()`, and assert the hook:
 
@@ -227,7 +227,7 @@ Register a Wails mock for `ThemeService.ResetBuiltinStyles`, call `result.curren
 3. Applies the reloaded active-mode profile to `appStore.terminalTheme`.
 4. Returns `{ dark_reset: true, light_reset: false }` unchanged.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 Run:
 
@@ -237,7 +237,7 @@ cd frontend && npm test -- useThemeCatalog.test.tsx
 
 Expected: FAIL because the hook action and generated binding are missing.
 
-- [ ] **Step 3: Generate bindings and add hook action**
+- [x] **Step 3: Generate bindings and add hook action**
 
 Run:
 
@@ -258,7 +258,7 @@ export async function resetBuiltinStyles() {
 
 Expose it from `useThemeCatalog`.
 
-- [ ] **Step 4: Verify GREEN**
+- [x] **Step 4: Verify GREEN**
 
 Run:
 
@@ -281,7 +281,7 @@ Expected: PASS.
 - Consumes: `onResetBuiltins(): Promise<BuiltinThemeResetResult>`
 - Produces: confirmed reset button with disabled, loading, success, and failure states.
 
-- [ ] **Step 1: Add failing interaction tests**
+- [x] **Step 1: Add failing interaction tests**
 
 Add tests for:
 
@@ -294,7 +294,7 @@ Add tests for:
 - Rejected reset shows `重置内置主题失败` and leaves editor inputs unchanged.
 - `SettingsDialog` and `Sidebar` pass the callback through correctly.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 Run:
 
@@ -304,7 +304,7 @@ cd frontend && npm test -- ThemeEditor.test.tsx SettingsDialog.test.tsx
 
 Expected: FAIL because reset props and UI are missing.
 
-- [ ] **Step 3: Implement shadcn reset flow**
+- [x] **Step 3: Implement shadcn reset flow**
 
 Add `onResetBuiltins` to the editor and dialog props. Derive assigned profiles from `assignments`; enable reset when either assigned definition has `is_builtin === true`.
 
@@ -319,7 +319,7 @@ Use existing shadcn components:
 
 Compose `AlertDialog`, `AlertDialogTitle`, `AlertDialogDescription`, cancel, and confirm actions. The async confirm catches errors, uses the existing toast API, closes only on success, and formats the backend result without changing drafts directly; the catalog reload updates props and recreates drafts.
 
-- [ ] **Step 4: Verify GREEN**
+- [x] **Step 4: Verify GREEN**
 
 Run:
 
@@ -340,17 +340,17 @@ Expected: PASS.
 - Consumes: pinned catalog metadata.
 - Produces: distributable attribution for the bundled collection and selected theme names.
 
-- [ ] **Step 1: Add metadata assertions**
+- [x] **Step 1: Add metadata assertions**
 
 Assert every generated definition uses the pinned commit, exact source name, exact author text, non-empty fixed-commit URL, and `MIT collection; individual rights retained`.
 
-- [ ] **Step 2: Write third-party notice**
+- [x] **Step 2: Write third-party notice**
 
 Create `THIRD_PARTY_NOTICES.md` with the upstream repository URL, fixed commit, all 24 theme names, the collection copyright, the MIT license text, and the upstream statement that individual theme rights belong to their authors.
 
 Update the README terminal theme feature bullet to mention 24 curated offline built-ins, Dark/Light assignment, `.itermcolors` import, and reset support in one concise line.
 
-- [ ] **Step 3: Verify documentation and focused tests**
+- [x] **Step 3: Verify documentation and focused tests**
 
 Run:
 
@@ -370,7 +370,7 @@ Expected: metadata appears in generated data and notices; tests PASS.
 - Consumes: completed Tasks 1-5.
 - Produces: formatted, tested, built, committed, and pushed implementation.
 
-- [ ] **Step 1: Run frontend tests and coverage**
+- [x] **Step 1: Run frontend tests and coverage**
 
 ```bash
 cd frontend
@@ -380,7 +380,7 @@ npm run test:coverage
 
 Expected: all tests pass and line/function coverage remains at least 90%.
 
-- [ ] **Step 2: Run Go formatting and quality gates**
+- [x] **Step 2: Run Go formatting and quality gates**
 
 ```bash
 PATH="$HOME/.govm/go/bin:$PATH" goimports-reviser -rm-unused -format ./...
@@ -391,7 +391,7 @@ PATH="$HOME/.govm/go/bin:$PATH" CGO_ENABLED=1 CC='gcc -fuse-ld=bfd' golangci-lin
 
 Expected: all commands exit successfully with zero lint issues.
 
-- [ ] **Step 3: Build the Wails application**
+- [x] **Step 3: Build the Wails application**
 
 ```bash
 PATH="$HOME/.govm/go/bin:$PATH" CGO_ENABLED=1 CC='gcc -fuse-ld=bfd' wails3 build
@@ -399,11 +399,11 @@ PATH="$HOME/.govm/go/bin:$PATH" CGO_ENABLED=1 CC='gcc -fuse-ld=bfd' wails3 build
 
 Expected: frontend and Go application build successfully.
 
-- [ ] **Step 4: Clean generated test/build output**
+- [x] **Step 4: Clean generated test/build output**
 
 Remove only `frontend/coverage`, `frontend/dist`, `coverage.out`, and `build/bin/mssh` when present. Confirm `git status --short` contains only intended source, generated binding, documentation, and test changes.
 
-- [ ] **Step 5: Commit and push by scope**
+- [x] **Step 5: Commit and push by scope**
 
 Use Conventional Commits:
 

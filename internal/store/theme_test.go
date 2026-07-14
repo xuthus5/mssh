@@ -19,6 +19,15 @@ func TestThemeCatalogStoreCRUDAndFilters(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, definitions, 1)
 	assert.Equal(t, dark.ID, definitions[0].ID)
+	dark.Name = "Dark Updated"
+	dark.SourceVersion = "v2"
+	dark.ColorPayload = `{"background":"#111111"}`
+	require.NoError(t, UpdateThemeDefinition(db, *dark))
+	updatedDefinition, err := GetThemeDefinition(db, dark.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "Dark Updated", updatedDefinition.Name)
+	assert.Equal(t, "v2", updatedDefinition.SourceVersion)
+	assert.JSONEq(t, `{"background":"#111111"}`, updatedDefinition.ColorPayload)
 
 	profile, err := CreateThemeProfile(db, model.ThemeProfile{Name: "Dark Profile", ThemeID: dark.ID, FontFamily: "monospace", FontSize: 14, CursorStyle: model.CursorStyleBar, ColorOverrides: `{}`})
 	require.NoError(t, err)
@@ -39,6 +48,7 @@ func TestThemeCatalogStoreConstraints(t *testing.T) {
 	_, err := CreateThemeDefinition(db, model.ThemeDefinition{Name: "Duplicate", Mode: model.ThemeModeDark, SourceType: model.ThemeSourceCustom, SourceFingerprint: "builtin", ColorPayload: `{}`})
 	assert.Error(t, err)
 	assert.Error(t, DeleteThemeDefinition(db, builtin.ID))
+	assert.Error(t, UpdateThemeDefinition(db, model.ThemeDefinition{ID: -1, Name: "Missing"}))
 
 	custom := createThemeDefinitionFixture(t, db, "Custom", model.ThemeModeDark, "custom", false)
 	profile, err := CreateThemeProfile(db, model.ThemeProfile{Name: "Custom", ThemeID: custom.ID, FontFamily: "monospace", FontSize: 14, CursorStyle: model.CursorStyleBlock, ColorOverrides: `{}`})
@@ -53,6 +63,18 @@ func TestThemeAssignmentsStore(t *testing.T) {
 	assignments, err := GetThemeAssignments(db)
 	require.NoError(t, err)
 	assert.Equal(t, model.ThemeAssignments{DarkProfileID: 4, LightProfileID: 7}, assignments)
+}
+
+func TestThemeAssignmentsStoreReportsInvalidValuesAndDatabaseErrors(t *testing.T) {
+	db := setupTestDB(t)
+	_, err := db.Exec(`INSERT INTO settings (key, namespace, value, value_type, version) VALUES ('terminal.theme.dark_profile_id', 'terminal', 'invalid', 'number', 1)`)
+	require.NoError(t, err)
+	_, err = GetThemeAssignments(db)
+	assert.ErrorContains(t, err, "parse theme assignment")
+
+	require.NoError(t, db.Close())
+	_, err = GetThemeAssignments(db)
+	assert.ErrorContains(t, err, "read theme assignment")
 }
 
 func createThemeDefinitionFixture(t *testing.T, db *sql.DB, name string, mode model.ThemeMode, fingerprint string, builtin bool) *model.ThemeDefinition {
