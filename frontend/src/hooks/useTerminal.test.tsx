@@ -10,6 +10,7 @@ const addonDisposes: Array<ReturnType<typeof vi.fn>> = []
 const observerDisconnects: Array<ReturnType<typeof vi.fn>> = []
 const outputUnsubscribes: Array<ReturnType<typeof vi.fn>> = []
 const themeUnsubscribes: Array<ReturnType<typeof vi.fn>> = []
+const selectionDisposes: Array<ReturnType<typeof vi.fn>> = []
 const animationFrames: FrameRequestCallback[] = []
 const cancelledAnimationFrames: number[] = []
 const outputHandlers: Array<(event: { data?: { terminal_id?: string; data?: string } }) => void> = []
@@ -29,6 +30,12 @@ vi.mock('@xterm/xterm', () => ({
     onData() {
       const dispose = vi.fn()
       dataDisposes.push(dispose)
+      return { dispose }
+    }
+    getSelection() { return '' }
+    onSelectionChange() {
+      const dispose = vi.fn()
+      selectionDisposes.push(dispose)
       return { dispose }
     }
     write() { if (runtimeFailure === 'write') throw new Error('write failed') }
@@ -69,6 +76,7 @@ vi.mock('@/lib/wails', () => ({
 
 import { useTerminal } from '@/hooks/useTerminal'
 import { useAppStore } from '@/store/appStore'
+import { useTerminalBehaviorStore } from '@/store/terminalBehaviorStore'
 import { TerminalErrorBoundary } from '@/components/terminal/TerminalErrorBoundary'
 
 describe('useTerminal', () => {
@@ -82,11 +90,13 @@ describe('useTerminal', () => {
     observerDisconnects.length = 0
     outputUnsubscribes.length = 0
     themeUnsubscribes.length = 0
+    selectionDisposes.length = 0
     animationFrames.length = 0
     cancelledAnimationFrames.length = 0
     outputHandlers.length = 0
     resizeHandlers.length = 0
     runtimeFailure = null
+    useTerminalBehaviorStore.setState({ rightClickAction: 'menu', copyOnSelect: false })
     vi.stubGlobal('ResizeObserver', class {
       observe() {}
       disconnect = vi.fn()
@@ -111,13 +121,12 @@ describe('useTerminal', () => {
     const containerRef = createRef<HTMLDivElement>()
     containerRef.current = document.createElement('div')
 
-    const { unmount } = renderHook(() => useTerminal('term-1', containerRef, {
-      active: true,
-      focusRequest: { sequence: 0 },
-    }))
+    const { unmount } = renderHook(() => useTerminal('term-1', containerRef, { active: true, focusRequest: { sequence: 0 } }))
 
     expect(calls).toEqual(['open', 'load:fit'])
+    expect(selectionDisposes).toHaveLength(1)
     act(() => unmount())
+    expect(selectionDisposes[0]).toHaveBeenCalledOnce()
     expect(calls.at(-1)).toBe('dispose')
   })
 
@@ -131,10 +140,7 @@ describe('useTerminal', () => {
     const containerRef = createRef<HTMLDivElement>()
     containerRef.current = document.createElement('div')
 
-    const { unmount } = renderHook(() => useTerminal('term-themed', containerRef, {
-      active: true,
-      focusRequest: { sequence: 0 },
-    }))
+    const { unmount } = renderHook(() => useTerminal('term-themed', containerRef, { active: true, focusRequest: { sequence: 0 } }))
 
     expect(terminalOptions[0]).toEqual(expect.objectContaining({
       fontSize: 18,
@@ -146,10 +152,7 @@ describe('useTerminal', () => {
   it('hot-applies a fixed custom background to an open terminal', () => {
     const containerRef = createRef<HTMLDivElement>()
     containerRef.current = document.createElement('div')
-    const { unmount } = renderHook(() => useTerminal('term-fixed-theme', containerRef, {
-      active: true,
-      focusRequest: { sequence: 0 },
-    }))
+    const { unmount } = renderHook(() => useTerminal('term-fixed-theme', containerRef, { active: true, focusRequest: { sequence: 0 } }))
 
     act(() => useAppStore.getState().setTerminalTheme({ ...useAppStore.getState().terminalTheme, background: '#123456' }))
 
@@ -160,10 +163,7 @@ describe('useTerminal', () => {
   it('blurs a terminal when its tab becomes inactive', () => {
     const containerRef = createRef<HTMLDivElement>()
     containerRef.current = document.createElement('div')
-    const { rerender, unmount } = renderHook(({ active }) => useTerminal('term-focus', containerRef, {
-      active,
-      focusRequest: { sequence: 0 },
-    }), { initialProps: { active: true } })
+    const { rerender, unmount } = renderHook(({ active }) => useTerminal('term-focus', containerRef, { active, focusRequest: { sequence: 0 } }), { initialProps: { active: true } })
 
     rerender({ active: false })
 
@@ -177,10 +177,7 @@ describe('useTerminal', () => {
     Object.defineProperty(container, 'clientWidth', { value: 800 })
     Object.defineProperty(container, 'clientHeight', { value: 500 })
     containerRef.current = container
-    const { rerender, unmount } = renderHook(({ active, sequence }) => useTerminal('term-resume', containerRef, {
-      active,
-      focusRequest: { sequence },
-    }), { initialProps: { active: false, sequence: 0 } })
+    const { rerender, unmount } = renderHook(({ active, sequence }) => useTerminal('term-resume', containerRef, { active, focusRequest: { sequence } }), { initialProps: { active: false, sequence: 0 } })
 
     calls.length = 0
     rerender({ active: true, sequence: 1 })
@@ -205,10 +202,7 @@ describe('useTerminal', () => {
     Object.defineProperty(container, 'clientWidth', { get: () => width })
     Object.defineProperty(container, 'clientHeight', { get: () => height })
     containerRef.current = container
-    const hook = renderHook(({ active, sequence }) => useTerminal('term-recover', containerRef, {
-      active,
-      focusRequest: { sequence },
-    }), { initialProps: { active: false, sequence: 0 } })
+    const hook = renderHook(({ active, sequence }) => useTerminal('term-recover', containerRef, { active, focusRequest: { sequence } }), { initialProps: { active: false, sequence: 0 } })
 
     calls.length = 0
     hook.rerender({ active: true, sequence: 1 })
@@ -234,10 +228,7 @@ describe('useTerminal', () => {
       return unsubscribe
     })
 
-    const { unmount } = renderHook(() => useTerminal('term-cleanup', containerRef, {
-      active: true,
-      focusRequest: { sequence: 1 },
-    }), { wrapper })
+    const { unmount } = renderHook(() => useTerminal('term-cleanup', containerRef, { active: true, focusRequest: { sequence: 1 } }), { wrapper })
 
     act(() => unmount())
     act(() => unmount())
@@ -249,6 +240,8 @@ describe('useTerminal', () => {
     expect(observerDisconnects.every((disconnect) => disconnect.mock.calls.length === 1)).toBe(true)
     expect(outputUnsubscribes.every((unsubscribe) => unsubscribe.mock.calls.length === 1)).toBe(true)
     expect(themeUnsubscribes.every((unsubscribe) => unsubscribe.mock.calls.length === 1)).toBe(true)
+    expect(selectionDisposes.length).toBeGreaterThan(0)
+    expect(selectionDisposes.every((dispose) => dispose.mock.calls.length === 1)).toBe(true)
     expect(cancelledAnimationFrames.length).toBeGreaterThan(0)
     expect(new Set(cancelledAnimationFrames).size).toBe(cancelledAnimationFrames.length)
   })
@@ -259,13 +252,8 @@ describe('useTerminal', () => {
     Object.defineProperty(container, 'clientWidth', { value: 800 })
     Object.defineProperty(container, 'clientHeight', { value: 500 })
     containerRef.current = container
-    const wrapper = ({ children }: { children: ReactNode }) => (
-      <TerminalErrorBoundary onClose={vi.fn()}>{children}</TerminalErrorBoundary>
-    )
-    const hook = renderHook(({ active, sequence }) => useTerminal('term-runtime', containerRef, {
-      active,
-      focusRequest: { sequence },
-    }), { initialProps: { active: false, sequence: 0 }, wrapper })
+    const wrapper = ({ children }: { children: ReactNode }) => <TerminalErrorBoundary onClose={vi.fn()}>{children}</TerminalErrorBoundary>
+    const hook = renderHook(({ active, sequence }) => useTerminal('term-runtime', containerRef, { active, focusRequest: { sequence } }), { initialProps: { active: false, sequence: 0 }, wrapper })
 
     runtimeFailure = failure
     hook.rerender({ active: true, sequence: 1 })
@@ -277,13 +265,8 @@ describe('useTerminal', () => {
   it('reports output write failures from the runtime event callback', () => {
     const containerRef = createRef<HTMLDivElement>()
     containerRef.current = document.createElement('div')
-    const wrapper = ({ children }: { children: ReactNode }) => (
-      <TerminalErrorBoundary onClose={vi.fn()}>{children}</TerminalErrorBoundary>
-    )
-    renderHook(() => useTerminal('term-output', containerRef, {
-      active: false,
-      focusRequest: { sequence: 0 },
-    }), { wrapper })
+    const wrapper = ({ children }: { children: ReactNode }) => <TerminalErrorBoundary onClose={vi.fn()}>{children}</TerminalErrorBoundary>
+    renderHook(() => useTerminal('term-output', containerRef, { active: false, focusRequest: { sequence: 0 } }), { wrapper })
 
     runtimeFailure = 'write'
     act(() => outputHandlers[0]({ data: { terminal_id: 'term-output', data: 'hello' } }))
@@ -297,13 +280,8 @@ describe('useTerminal', () => {
     Object.defineProperty(container, 'clientWidth', { value: 800 })
     Object.defineProperty(container, 'clientHeight', { value: 500 })
     containerRef.current = container
-    const wrapper = ({ children }: { children: ReactNode }) => (
-      <TerminalErrorBoundary onClose={vi.fn()}>{children}</TerminalErrorBoundary>
-    )
-    renderHook(() => useTerminal('term-resize', containerRef, {
-      active: true,
-      focusRequest: { sequence: 0 },
-    }), { wrapper })
+    const wrapper = ({ children }: { children: ReactNode }) => <TerminalErrorBoundary onClose={vi.fn()}>{children}</TerminalErrorBoundary>
+    renderHook(() => useTerminal('term-resize', containerRef, { active: true, focusRequest: { sequence: 0 } }), { wrapper })
 
     runtimeFailure = 'fit'
     act(() => resizeHandlers[0]([], {} as ResizeObserver))

@@ -1,5 +1,7 @@
+import { createRef } from 'react'
 import { render } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { useTerminalBehaviorStore } from '@/store/terminalBehaviorStore'
 
 const { useTerminal } = vi.hoisted(() => ({ useTerminal: vi.fn() }))
 vi.mock('@/hooks/useTerminal', () => ({ useTerminal }))
@@ -7,7 +9,15 @@ vi.mock('@/hooks/useTerminal', () => ({ useTerminal }))
 import { TerminalEmulator } from '@/components/terminal/TerminalEmulator'
 
 describe('TerminalEmulator', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    useTerminalBehaviorStore.setState({ rightClickAction: 'menu', copyOnSelect: false })
+  })
+
   it('passes active state and the layer focus request to useTerminal', () => {
+    const terminalRef = createRef<never>()
+    terminalRef.current = {} as never
+    useTerminal.mockReturnValue(terminalRef)
     const view = render(
       <TerminalEmulator terminalID="term-1" active focusRequest={{ sequence: 7 }} className="terminal-shell" />,
     )
@@ -16,6 +26,7 @@ describe('TerminalEmulator', () => {
       active: true,
       focusRequest: { sequence: 7 },
     })
-    expect(view.container.firstChild).toHaveClass('terminal-shell')
+    expect(view.container.querySelector('.terminal-shell')).toBeInTheDocument()
+    expect(view.container.querySelector('[data-slot="context-menu-trigger"]')).toHaveClass('select-text')
   })
 })

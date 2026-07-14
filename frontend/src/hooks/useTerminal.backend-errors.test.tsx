@@ -32,6 +32,8 @@ vi.mock('@xterm/xterm', () => ({
       dataDisposes.push(dispose)
       return { dispose }
     }
+    getSelection() { return '' }
+    onSelectionChange() { return { dispose: vi.fn() } }
     write() {}
     focus() {}
     blur() {}
