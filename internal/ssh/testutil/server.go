@@ -5,26 +5,37 @@ import (
 	"crypto/rsa"
 	"net"
 	"testing"
+	"time"
 
 	gossh "golang.org/x/crypto/ssh"
 )
 
 func NewMockServer(t *testing.T) (string, func()) {
 	t.Helper()
-	return newMockServerWithConfig(t, false, false)
+	return newMockServerWithConfig(t, false, false, false, false)
 }
 
 func NewMockServerRejectPty(t *testing.T) (string, func()) {
 	t.Helper()
-	return newMockServerWithConfig(t, true, false)
+	return newMockServerWithConfig(t, true, false, false, false)
 }
 
 func NewMockServerRejectShell(t *testing.T) (string, func()) {
 	t.Helper()
-	return newMockServerWithConfig(t, false, true)
+	return newMockServerWithConfig(t, false, true, false, false)
 }
 
-func newMockServerWithConfig(t *testing.T, rejectPty, rejectShell bool) (string, func()) {
+func NewMockServerAutoLogout(t *testing.T) (string, func()) {
+	t.Helper()
+	return newMockServerWithConfig(t, false, false, true, false)
+}
+
+func NewMockServerImmediateLogout(t *testing.T) (string, func()) {
+	t.Helper()
+	return newMockServerWithConfig(t, false, false, true, true)
+}
+
+func newMockServerWithConfig(t *testing.T, rejectPty, rejectShell, autoLogout, immediateLogout bool) (string, func()) {
 	t.Helper()
 	config := &gossh.ServerConfig{
 		NoClientAuth: true,
@@ -54,6 +65,13 @@ func newMockServerWithConfig(t *testing.T, rejectPty, rejectShell bool) (string,
 									} else {
 										_ = req.Reply(true, nil)
 										_, _ = channel.Write([]byte("mock> "))
+										if autoLogout {
+											_, _ = channel.Write([]byte("time out waiting for input: auto-logout\r\n"))
+											if !immediateLogout {
+												time.Sleep(10 * time.Millisecond)
+											}
+											_ = channel.Close()
+										}
 									}
 								case "pty-req":
 									if rejectPty {

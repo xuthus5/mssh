@@ -25,6 +25,8 @@ func TestNewTerminalService(t *testing.T) {
 	assert.Equal(t, 32, svc.maxSize)
 	assert.NotNil(t, svc.ptys)
 	assert.NotNil(t, svc.lastUsed)
+	assert.NotNil(t, svc.attached)
+	assert.NotNil(t, svc.pendingOutput)
 
 	svc2 := NewTerminalService(sessionSvc, bus, 10, testutil.NewTestLogger())
 	assert.Equal(t, 10, svc2.maxSize)
@@ -121,6 +123,93 @@ func TestTerminalService_OpenDefaultTermType(t *testing.T) {
 	assert.Equal(t, 1, termSvc.Count())
 }
 
+func TestTerminalService_RemoteExitCleansTerminalAndEmitsDisconnectedState(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	terminalBus := newMockEventBus()
+	sessionSvc := NewSessionService(db, terminalBus, 30, "", nil, testutil.NewTestLogger())
+	addr, cleanup := sshtestutil.NewMockServerAutoLogout(t)
+	defer cleanup()
+
+	created, err := sessionSvc.CreateSession(model.SessionInputFrom(model.Session{
+		Name: "auto-logout", Host: "127.0.0.1", Port: parsePort(t, addr), Username: "root",
+		AuthMethod: model.AuthPassword, KeepAlive: 30, TermType: "xterm-256color",
+	}))
+	require.NoError(t, err)
+
+	terminalSvc := NewTerminalService(sessionSvc, terminalBus, 32, testutil.NewTestLogger())
+	closed := make(chan string, 1)
+	terminalSvc.SetCloseHandler(func(terminalID string) { closed <- terminalID })
+
+	terminalID, err := terminalSvc.Open(context.Background(), created.ID, 80, 24)
+	require.NoError(t, err)
+
+	require.Eventually(t, func() bool { return terminalSvc.Count() == 0 }, 2*time.Second, 10*time.Millisecond)
+	require.Eventually(t, func() bool { return sessionSvc.ConnectionCount() == 0 }, 2*time.Second, 10*time.Millisecond)
+	assert.Equal(t, terminalID, <-closed)
+	_, err = terminalSvc.Write(terminalID, "whoami\n")
+	assert.ErrorContains(t, err, "not found")
+
+	var disconnected bool
+	var states []string
+	for _, captured := range terminalBus.Events() {
+		payload, ok := captured.Payload.(event.ConnectionStatePayload)
+		if captured.Name == event.ConnectionState && ok {
+			assert.Equal(t, terminalID, payload.TerminalID)
+			states = append(states, payload.State)
+		}
+		if captured.Name == event.ConnectionState && ok && payload.TerminalID == terminalID && payload.State == "disconnected" {
+			disconnected = true
+		}
+		assert.NotEqual(t, event.TerminalClosed, captured.Name)
+	}
+	assert.True(t, disconnected)
+	assert.Equal(t, []string{"connected", "disconnected"}, states)
+}
+
+func TestTerminalService_ImmediateRemoteExitOrdersLifecycleAndCleans(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	bus := newMockEventBus()
+	sessionSvc := NewSessionService(db, bus, 30, "", nil, testutil.NewTestLogger())
+	addr, cleanup := sshtestutil.NewMockServerImmediateLogout(t)
+	defer cleanup()
+	created, err := sessionSvc.CreateSession(model.SessionInputFrom(model.Session{
+		Name: "immediate-logout", Host: "127.0.0.1", Port: parsePort(t, addr), Username: "root",
+		AuthMethod: model.AuthPassword, KeepAlive: 30, TermType: "xterm-256color",
+	}))
+	require.NoError(t, err)
+	terminalSvc := NewTerminalService(sessionSvc, bus, 32, testutil.NewTestLogger())
+
+	terminalID, err := terminalSvc.Open(context.Background(), created.ID, 80, 24)
+	require.NoError(t, err)
+	assert.NotEmpty(t, terminalID)
+	require.Eventually(t, func() bool { return terminalSvc.Count() == 0 }, 2*time.Second, 10*time.Millisecond)
+	require.Eventually(t, func() bool { return sessionSvc.ConnectionCount() == 0 }, 2*time.Second, 10*time.Millisecond)
+	require.Eventually(t, func() bool {
+		for _, captured := range bus.Events() {
+			payload, ok := captured.Payload.(event.ConnectionStatePayload)
+			if captured.Name == event.ConnectionState && ok && payload.State == "disconnected" {
+				return true
+			}
+		}
+		return false
+	}, 2*time.Second, 10*time.Millisecond)
+	var states []string
+	for _, captured := range bus.Events() {
+		payload, ok := captured.Payload.(event.ConnectionStatePayload)
+		if captured.Name == event.ConnectionState && ok {
+			states = append(states, payload.State)
+		}
+	}
+	assert.Equal(t, []string{"connected", "disconnected"}, states)
+	require.NoError(t, terminalSvc.Attach(terminalID))
+	lastEvent := bus.LastEvent()
+	require.NotNil(t, lastEvent)
+	assert.Equal(t, event.TerminalOutput, lastEvent.Name)
+	payload, ok := lastEvent.Payload.(event.TerminalOutputPayload)
+	require.True(t, ok)
+	assert.Contains(t, payload.Data, "auto-logout")
+}
+
 func TestTerminalService_OpenSessionNotFound(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	sessionSvc := NewSessionService(db, newMockEventBus(), 30, "", nil, testutil.NewTestLogger())
@@ -150,14 +239,23 @@ func TestTerminalService_ReadCallback(t *testing.T) {
 
 	termBus := newMockEventBus()
 	termSvc := NewTerminalService(sessionSvc, termBus, 32, testutil.NewTestLogger())
+	output := make(chan string, 4)
+	termSvc.SetOutputHandler(func(_ string, data []byte) { output <- string(data) })
 	ctx := context.Background()
 
-	_, err = termSvc.Open(ctx, created.ID, 80, 24)
+	terminalID, err := termSvc.Open(ctx, created.ID, 80, 24)
 	require.NoError(t, err)
+	require.NoError(t, termSvc.Attach(terminalID))
 
 	require.Eventually(t, func() bool {
 		return termBus.hasEvent(event.TerminalOutput)
 	}, 2*time.Second, 10*time.Millisecond, "read callback should emit TerminalOutput event")
+	assert.NotEmpty(t, <-output)
+}
+
+func TestTerminalService_AttachNotFound(t *testing.T) {
+	service := NewTerminalService(nil, newMockEventBus(), 32, testutil.NewTestLogger())
+	assert.ErrorContains(t, service.Attach("missing"), "not found")
 }
 
 func TestTerminalService_Write(t *testing.T) {

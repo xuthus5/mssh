@@ -24,6 +24,7 @@ vi.mock('@/components/terminal/TerminalTab', () => ({
 vi.mock('@/components/terminal/PlaybackTab', () => ({ PlaybackTab: () => null }))
 vi.mock('@/components/file/FilePanel', () => ({ default: () => null }))
 vi.mock('@/hooks/useFileTransfer', () => ({ useFileTransfer: vi.fn() }))
+vi.mock('@/hooks/SessionWorkspaceContext', () => ({ useSessionWorkspace: () => ({ reconnect: vi.fn(async () => {}) }) }))
 
 import { TerminalLayers } from '@/components/terminal/TerminalLayers'
 import { useAppStore } from '@/store/appStore'

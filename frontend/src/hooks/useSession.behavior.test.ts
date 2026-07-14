@@ -91,6 +91,20 @@ describe('useSession behavior', () => {
     expect(useAppStore.getState().tabs).toHaveLength(0)
   })
 
+  it('does not start a second session while another connection dialog is active', async () => {
+    registerInitial({ sessions: [bindingSession(5, 'Connect', null)] })
+    const openTerminal = vi.fn(async () => 'term-new')
+    __registerHandler(service + 'TerminalService.Open', openTerminal)
+    const { result } = renderHook(() => useSession())
+    await waitFor(() => expect(result.current.sessions).toHaveLength(1))
+    useConnectDialog.getState().openDialog('other.internal', 22, 'admin', vi.fn())
+
+    await act(async () => result.current.connect('5'))
+
+    expect(openTerminal).not.toHaveBeenCalled()
+    expect(useConnectDialog.getState().host).toBe('other.internal')
+  })
+
   it('disconnects a specific terminal instance by backend terminal ID', async () => {
     registerInitial({ sessions: [bindingSession(5, 'Connect', null)] })
     const closeTerminal = vi.fn(async () => {})
@@ -142,6 +156,69 @@ describe('useSession behavior', () => {
       'term-second': 'connected',
     })
     expect(useAppStore.getState().activeSurface).toEqual({ type: 'terminal', id: 'terminal-term-second' })
+  })
+
+  it('reconnects a disconnected terminal in the existing tab', async () => {
+    registerInitial({ sessions: [bindingSession(5, '生产服务器', null)] })
+    const openTerminal = vi.fn(async () => 'term-reconnected')
+    __registerHandler(service + 'TerminalService.Open', openTerminal)
+    useAppStore.setState({
+      tabs: [{ id: 'terminal-term-old', title: '生产服务器', type: 'terminal', terminalId: 'term-old', sessionId: 5, terminalInstance: 1 }],
+      activeSurface: { type: 'terminal', id: 'terminal-term-old' },
+      activePaneId: 'term-old',
+      connectionStatus: { 'term-old': 'disconnected' },
+      terminalPool: new Map([['term-old', { terminal: { cols: 132, rows: 43 } as never, lastUsed: 0 }]]),
+    })
+    const { result } = renderHook(() => useSession())
+    await waitFor(() => expect(result.current.sessions).toHaveLength(1))
+
+    await act(async () => result.current.reconnect('terminal-term-old'))
+
+    expect(openTerminal).toHaveBeenCalledWith(5, 132, 43)
+    expect(useAppStore.getState()).toMatchObject({
+      tabs: [expect.objectContaining({ id: 'terminal-term-old', terminalId: 'term-reconnected', terminalInstance: 1 })],
+      activeSurface: { type: 'terminal', id: 'terminal-term-old' },
+      activePaneId: 'term-reconnected',
+      connectionStatus: { 'term-reconnected': 'connected' },
+    })
+    expect(useAppStore.getState().connectionStatus['term-old']).toBeUndefined()
+  })
+
+  it('preserves a disconnected state reported before reconnect replacement completes', async () => {
+    registerInitial({ sessions: [bindingSession(5, '生产服务器', null)] })
+    __registerHandler(service + 'TerminalService.Open', async () => {
+      useAppStore.getState().setConnectionStatus('term-reconnected', 'disconnected')
+      return 'term-reconnected'
+    })
+    useAppStore.setState({
+      tabs: [{ id: 'terminal-term-old', title: '生产服务器', type: 'terminal', terminalId: 'term-old', sessionId: 5 }],
+      activeSurface: { type: 'terminal', id: 'terminal-term-old' },
+      connectionStatus: { 'term-old': 'disconnected' },
+    })
+    const { result } = renderHook(() => useSession())
+    await waitFor(() => expect(result.current.sessions).toHaveLength(1))
+
+    await act(async () => result.current.reconnect('terminal-term-old'))
+
+    expect(useAppStore.getState().connectionStatus['term-reconnected']).toBe('disconnected')
+  })
+
+  it('keeps a failed reconnect retryable without replacing the old terminal', async () => {
+    registerInitial({ sessions: [bindingSession(5, '生产服务器', null)] })
+    __registerHandler(service + 'TerminalService.Open', async () => { throw new Error('network unavailable') })
+    useAppStore.setState({
+      tabs: [{ id: 'terminal-term-old', title: '生产服务器', type: 'terminal', terminalId: 'term-old', sessionId: 5, terminalInstance: 1 }],
+      activeSurface: { type: 'terminal', id: 'terminal-term-old' },
+      connectionStatus: { 'term-old': 'disconnected' },
+    })
+    const { result } = renderHook(() => useSession())
+    await waitFor(() => expect(result.current.sessions).toHaveLength(1))
+
+    await act(async () => result.current.reconnect('terminal-term-old'))
+
+    expect(useAppStore.getState().tabs[0].terminalId).toBe('term-old')
+    expect(useAppStore.getState().connectionStatus['term-old']).toBe('disconnected')
+    expect(useConnectDialog.getState()).toMatchObject({ state: 'failed', error: 'network unavailable' })
   })
 })
 

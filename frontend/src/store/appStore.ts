@@ -110,6 +110,7 @@ export interface AppState {
   openTab: (tab: Tab) => void
   closeTab: (id: string) => Promise<void>
   removeTabLocal: (id: string) => void
+  replaceTerminalConnection: (tabID: string, previousTerminalID: string, nextTerminalID: string) => boolean
   activateWorkspace: (id: WorkspaceID) => void
   activateTab: (id: string, focus?: boolean) => void
   requestTerminalFocus: (tabID: string, terminalID: string) => void

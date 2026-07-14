@@ -6,6 +6,7 @@ import { toast } from '@/components/ui/toast'
 import { logger } from '@/lib/logger'
 import { createTerminalTab } from '@/lib/terminalTabs'
 import type { Session as BindingSession, SessionInput, Tunnel as BindingTunnel } from '../../bindings/github.com/xuthus5/mssh/internal/model/models'
+import { reconnectSessionTab } from '@/hooks/sessionReconnect'
 
 export interface Folder {
   id: string
@@ -241,10 +242,9 @@ export function useSession() {
   const connect = useCallback(async (sessionId: string) => {
     const session = sessions.find((s) => s.id === sessionId)
     if (!session) return
-
     const dialog = useConnectDialog.getState()
+    if (dialog.open) return void toast('已有 SSH 连接正在处理，请先完成或关闭当前连接窗口', 'info')
     dialog.openDialog(session.host, session.port, session.username, () => { void connect(sessionId) })
-
     try {
       const terminalId = await TerminalService.Open(Number(sessionId), 80, 24)
       const tab = createTerminalTab({
@@ -253,10 +253,11 @@ export function useSession() {
         terminalID: terminalId,
         tabs: useAppStore.getState().tabs,
       })
-      useAppStore.getState().setConnectionStatus(terminalId, 'connected')
+      if (useAppStore.getState().connectionStatus[terminalId] === undefined) {
+        useAppStore.getState().setConnectionStatus(terminalId, 'connected')
+      }
       openTab(tab)
       await Promise.all([listRecentSessions(), listSessions()])
-
       dialog.setState('connected')
       logger.info('connected', { terminalId, host: session.host })
     } catch (err) {
@@ -274,7 +275,7 @@ export function useSession() {
       logger.error('disconnect error', err)
     }
   }, [])
-
+  const reconnect = useCallback((tabId: string) => reconnectSessionTab(tabId, sessions), [sessions])
   const listTunnels = useCallback(async () => {
     try {
       const result = await TunnelService.List()
@@ -294,6 +295,6 @@ export function useSession() {
     folders, sessions, recentSessions, tunnels, loading, error,
     listFolders, createFolder, deleteFolder, updateFolder, setDefaultFolder,
     listSessions, listRecentSessions, createSession, updateSession, deleteSession, moveSession,
-    connect, disconnect, listTunnels,
+    connect, reconnect, disconnect, listTunnels,
   }
 }

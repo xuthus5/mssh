@@ -1,0 +1,103 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { reconnectSessionTab } from '@/hooks/sessionReconnect'
+import { logger } from '@/lib/logger'
+import { useConnectDialog } from '@/store/connectDialog'
+import { useAppStore } from '@/store/appStore'
+import { __clearHandlers, __registerHandler } from '@/test/__mocks__/wails-runtime'
+
+const service = 'github.com/xuthus5/mssh/internal/service.TerminalService.'
+const sessions = [{ id: '5', host: 'server.internal', port: 22, username: 'root' }]
+const replaceTerminalConnection = useAppStore.getState().replaceTerminalConnection
+
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  let reject!: (error: unknown) => void
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise
+    reject = rejectPromise
+  })
+  return { promise, resolve, reject }
+}
+
+function seedDisconnectedTab() {
+  useAppStore.setState({
+    tabs: [{ id: 'tab-1', title: 'Server', type: 'terminal', terminalId: 'term-old', sessionId: 5 }],
+    activeSurface: { type: 'terminal', id: 'tab-1' },
+    connectionStatus: { 'term-old': 'disconnected' },
+    terminalPool: new Map(),
+  })
+}
+
+describe('reconnectSessionTab', () => {
+  beforeEach(() => {
+    __clearHandlers()
+    seedDisconnectedTab()
+    useAppStore.setState({ replaceTerminalConnection })
+    useConnectDialog.setState({ open: false, state: 'idle', attemptId: '', error: '', fingerprint: '', algorithm: '' })
+  })
+
+  it('ignores missing and already connecting terminal targets', async () => {
+    const open = vi.fn(async () => 'term-new')
+    __registerHandler(service + 'Open', open)
+
+    await reconnectSessionTab('missing', sessions)
+    useAppStore.getState().setConnectionStatus('term-old', 'connecting')
+    await reconnectSessionTab('tab-1', sessions)
+
+    expect(open).not.toHaveBeenCalled()
+  })
+
+  it('does not replace another active connection dialog', async () => {
+    const open = vi.fn(async () => 'term-new')
+    __registerHandler(service + 'Open', open)
+    useConnectDialog.getState().openDialog('other.internal', 22, 'admin', vi.fn())
+
+    await reconnectSessionTab('tab-1', sessions)
+
+    expect(open).not.toHaveBeenCalled()
+    expect(useConnectDialog.getState()).toMatchObject({ host: 'other.internal', state: 'connecting' })
+  })
+
+  it('closes a newly opened terminal when its tab disappears', async () => {
+    const open = deferred<string>()
+    const close = vi.fn(async () => {})
+    __registerHandler(service + 'Open', async () => open.promise)
+    __registerHandler(service + 'Close', close)
+
+    const reconnecting = reconnectSessionTab('tab-1', sessions)
+    useAppStore.getState().removeTabLocal('tab-1')
+    open.resolve('term-new')
+    await reconnecting
+
+    expect(close).toHaveBeenCalledWith('term-new')
+    expect(useAppStore.getState().tabs).toHaveLength(0)
+    expect(useConnectDialog.getState()).toMatchObject({ open: false, state: 'idle' })
+  })
+
+  it('closes the connection dialog when a pending reconnect fails after tab removal', async () => {
+    const open = deferred<string>()
+    __registerHandler(service + 'Open', async () => open.promise)
+    const reconnecting = reconnectSessionTab('tab-1', sessions)
+    useAppStore.getState().removeTabLocal('tab-1')
+
+    open.reject(new Error('network failed'))
+    await reconnecting
+
+    expect(useConnectDialog.getState()).toMatchObject({ open: false, state: 'idle' })
+    expect(useAppStore.getState().connectionStatus['term-old']).toBeUndefined()
+  })
+
+  it('logs cleanup failures when a reconnect replacement becomes stale', async () => {
+    const error = new Error('close failed')
+    const loggerError = vi.spyOn(logger, 'error').mockImplementation(() => {})
+    __registerHandler(service + 'Open', async () => 'term-new')
+    __registerHandler(service + 'Close', async () => { throw error })
+    useAppStore.getState().removeTabLocal('tab-1')
+    seedDisconnectedTab()
+    useAppStore.setState({ replaceTerminalConnection: () => false })
+
+    await reconnectSessionTab('tab-1', sessions)
+
+    expect(loggerError).toHaveBeenCalledWith('reconnect stale terminal cleanup failed', error)
+  })
+})

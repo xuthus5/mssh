@@ -16,7 +16,7 @@ import type { AppState, Tab } from '@/store/appStore'
 type StoreSet = StoreApi<AppState>['setState']
 type StoreGet = StoreApi<AppState>['getState']
 type TransferActions = Pick<AppState, 'addTransfer' | 'removeTransfer' | 'updateTransfer' | 'clearFinishedTransfers' | 'setTransferCenterOpen'>
-type TabActions = Pick<AppState, 'openTab' | 'closeTab' | 'removeTabLocal'>
+type TabActions = Pick<AppState, 'openTab' | 'closeTab' | 'removeTabLocal' | 'replaceTerminalConnection'>
 type NavigationActions = Pick<AppState, 'activateWorkspace' | 'activateTab' | 'requestTerminalFocus' | 'toggleNavigation' | 'setSidebarWidth'>
 type PoolActions = Pick<AppState, 'registerTerminal' | 'unregisterTerminal' | 'updateLastUsed' | 'evictLRU'>
 type StatusActions = Pick<AppState, 'setConnectionStatus' | 'setActivePane' | 'setRecordingState' | 'setTunnelState' | 'setAppStatus' | 'setTerminalTheme' | 'setMaxPoolSize'>
@@ -70,6 +70,31 @@ function removeTabState(state: AppState, id: string): Partial<AppState> {
   }
 }
 
+function replaceTerminalConnectionState(state: AppState, tabID: string, previousTerminalID: string, nextTerminalID: string): Partial<AppState> {
+  const tab = state.tabs.find((item) => item.id === tabID)
+  if (tab?.type !== 'terminal' || tab.terminalId !== previousTerminalID) return {}
+  const terminalPool = new Map(state.terminalPool)
+  const terminalEntry = terminalPool.get(previousTerminalID)
+  terminalPool.delete(previousTerminalID)
+  if (terminalEntry) terminalPool.set(nextTerminalID, terminalEntry)
+  const connectionStatus = { ...state.connectionStatus }
+  delete connectionStatus[previousTerminalID]
+  connectionStatus[nextTerminalID] = state.connectionStatus[nextTerminalID] ?? 'connected'
+  const recordingState = { ...state.recordingState }
+  delete recordingState[previousTerminalID]
+  const active = state.activeSurface?.type === 'terminal' && state.activeSurface.id === tabID
+  return {
+    tabs: state.tabs.map((item) => item.id === tabID ? { ...item, terminalId: nextTerminalID } : item),
+    terminalPool,
+    connectionStatus,
+    recordingState,
+    activePaneId: state.activePaneId === previousTerminalID ? nextTerminalID : state.activePaneId,
+    focusRequest: active
+      ? { id: tabID, terminalId: nextTerminalID, sequence: state.focusRequest.sequence + 1 }
+      : state.focusRequest,
+  }
+}
+
 function activateTab(set: StoreSet, get: StoreGet, id: string, focus: boolean) {
   const state = get()
   const tab = state.tabs.find((item) => item.id === id)
@@ -113,6 +138,15 @@ export function createTabActions(set: StoreSet, get: StoreGet): TabActions {
     openTab: (tab) => set((state) => openTabState(state, tab)),
     closeTab: (id) => closeTab(get, id),
     removeTabLocal: (id) => set((state) => removeTabState(state, id)),
+    replaceTerminalConnection: (tabID, previousTerminalID, nextTerminalID) => {
+      let replaced = false
+      set((state) => {
+        const updates = replaceTerminalConnectionState(state, tabID, previousTerminalID, nextTerminalID)
+        replaced = Object.keys(updates).length > 0
+        return updates
+      })
+      return replaced
+    },
   }
 }
 

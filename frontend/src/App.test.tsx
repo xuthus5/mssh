@@ -29,7 +29,10 @@ vi.mock('@/components/layout/Sidebar', () => ({ default: () => null }))
 vi.mock('@/components/layout/StatusBar', () => ({ default: () => null }))
 vi.mock('@/components/layout/WindowTitleBar', () => ({ WindowTitleBar: () => null }))
 vi.mock('@/components/layout/ConnectDialog', () => ({ ConnectDialog: () => null }))
-vi.mock('@/hooks/SessionWorkspaceContext', () => ({ SessionWorkspaceProvider: ({ children }: { children: React.ReactNode }) => children }))
+vi.mock('@/hooks/SessionWorkspaceContext', () => ({
+  SessionWorkspaceProvider: ({ children }: { children: React.ReactNode }) => children,
+  useSessionWorkspace: () => ({ reconnect: vi.fn(async () => {}) }),
+}))
 vi.mock('@/components/terminal/TerminalTab', async () => {
   const { useEffect, useRef, useState } = await import('react')
   return {

@@ -31,6 +31,7 @@ vi.mock('@/hooks/useFileTransfer', () => ({
     download: vi.fn(async () => {}),
   }),
 }))
+vi.mock('@/hooks/SessionWorkspaceContext', () => ({ useSessionWorkspace: () => ({ reconnect: vi.fn(async () => {}) }) }))
 
 import { TerminalLayers } from '@/components/terminal/TerminalLayers'
 import { useAppStore } from '@/store/appStore'
