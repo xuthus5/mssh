@@ -7,6 +7,7 @@ import type { TerminalFocusRequest } from '@/hooks/useTerminal'
 import { useAppStore, type AppState, type Tab } from '@/store/appStore'
 import { dynamicPanelID, dynamicTabID } from '@/store/tabNavigation'
 import { TabCloseConfirmation, useTabCloseCoordinator } from '@/hooks/useTabCloseCoordinator'
+import { useSessionWorkspace } from '@/hooks/SessionWorkspaceContext'
 
 const TerminalTab = lazy(() => import('@/components/terminal/TerminalTab').then((module) => ({ default: module.TerminalTab })))
 const PlaybackTab = lazy(() => import('@/components/terminal/PlaybackTab').then((module) => ({ default: module.PlaybackTab })))
@@ -73,7 +74,7 @@ function FilePanelContainer({ sessionID, terminalID, onClose }: { sessionID: num
     onDownload={(path) => { void handleDownload(path) }} dropTargetID={dropTargetID} />
 }
 
-function DynamicLayer({ tab, active, activePaneID, lastActiveTerminalTabID, filePanelOpen, onToggleFiles, onCloseFiles, focusRequest, onClose }: {
+function DynamicLayer({ tab, active, activePaneID, lastActiveTerminalTabID, filePanelOpen, onToggleFiles, onCloseFiles, focusRequest, onClose, onReconnect }: {
   tab: Tab
   active: boolean
   activePaneID: string | null
@@ -83,6 +84,7 @@ function DynamicLayer({ tab, active, activePaneID, lastActiveTerminalTabID, file
   onCloseFiles: () => void
   focusRequest: AppState['focusRequest']
   onClose: () => void
+  onReconnect: () => void
 }) {
   const layerClass = `absolute inset-0 flex ${active ? 'visible' : 'invisible pointer-events-none'}`
   const terminalFocusRequest = useLayerFocusRequest(tab, active, focusRequest, activePaneID, lastActiveTerminalTabID)
@@ -92,7 +94,7 @@ function DynamicLayer({ tab, active, activePaneID, lastActiveTerminalTabID, file
         {tab.type === 'terminal' ? <>
           <div className="flex min-w-0 flex-1 flex-col">
             <TerminalTab terminalID={tab.terminalId ?? tab.id} sessionId={tab.sessionId ?? 0}
-              onOpenFiles={onToggleFiles} active={active} focusRequest={terminalFocusRequest} />
+              onOpenFiles={onToggleFiles} active={active} focusRequest={terminalFocusRequest} onReconnect={onReconnect} />
           </div>
           {filePanelOpen && tab.sessionId !== undefined
             ? <FilePanelContainer sessionID={tab.sessionId} terminalID={tab.terminalId ?? tab.id} onClose={onCloseFiles} />
@@ -104,6 +106,7 @@ function DynamicLayer({ tab, active, activePaneID, lastActiveTerminalTabID, file
 }
 
 export function TerminalLayers() {
+  const { reconnect } = useSessionWorkspace()
   const tabs = useAppStore((state) => state.tabs)
   const activeSurface = useAppStore((state) => state.activeSurface)
   const focusRequest = useAppStore((state) => state.focusRequest)
@@ -147,6 +150,7 @@ export function TerminalLayers() {
     activePaneID={activePaneID} lastActiveTerminalTabID={lastActiveTerminalTabIDRef.current}
     filePanelOpen={filePanelTabIDs.has(tab.id)} onToggleFiles={() => toggleFiles(tab.id)}
     focusRequest={focusRequest} onCloseFiles={() => closeFiles(tab.id)}
+    onReconnect={() => { void reconnect(tab.id) }}
     onClose={() => closeCoordinator.requestClose(tab.id)} />)}
     <TabCloseConfirmation {...closeCoordinator.confirmation} />
   </>

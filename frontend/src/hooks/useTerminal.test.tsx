@@ -71,7 +71,7 @@ vi.mock('@wailsio/runtime', () => ({
 }))
 
 vi.mock('@/lib/wails', () => ({
-  TerminalService: { Resize: vi.fn(async () => {}), Write: vi.fn(async () => {}), Close: vi.fn(async () => {}) },
+  TerminalService: { Attach: vi.fn(async () => {}), Resize: vi.fn(async () => {}), Write: vi.fn(async () => {}), Close: vi.fn(async () => {}) },
 }))
 
 import { useTerminal } from '@/hooks/useTerminal'

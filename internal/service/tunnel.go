@@ -1,21 +1,21 @@
 package service
 
 import (
-	"context"
 	"database/sql"
 	"fmt"
 	"log/slog"
 	"sync"
 
 	"github.com/xuthus5/mssh/internal/model"
-	ssh "github.com/xuthus5/mssh/internal/ssh"
 	"github.com/xuthus5/mssh/internal/store"
 	"github.com/xuthus5/mssh/pkg/event"
 )
 
 type TunnelState struct {
-	ID     int64
-	closed func() error
+	ID       int64
+	connID   string
+	closed   func() error
+	starting bool
 }
 
 type TunnelService struct {
@@ -62,83 +62,13 @@ func (t *TunnelService) Delete(id int64) error {
 		if state.closed != nil {
 			_ = state.closed()
 		}
+		if state.connID != "" {
+			_ = t.sessions.disconnect(state.connID, false)
+		}
 	} else {
 		t.mu.Unlock()
 	}
 	return store.DeleteTunnel(t.db, id)
-}
-
-func (t *TunnelService) Start(tunnelID int64) error {
-	t.logger.Info("starting tunnel", "tunnelID", tunnelID)
-	t.mu.Lock()
-	if _, ok := t.tunnels[tunnelID]; ok {
-		t.mu.Unlock()
-		return fmt.Errorf("tunnel %d already running", tunnelID)
-	}
-	t.mu.Unlock()
-
-	tunnel, err := store.ListTunnels(t.db)
-	if err != nil {
-		return fmt.Errorf("tunnel start: %w", err)
-	}
-
-	var found *model.Tunnel
-	for i := range tunnel {
-		if tunnel[i].ID == tunnelID {
-			found = &tunnel[i]
-			break
-		}
-	}
-	if found == nil {
-		return fmt.Errorf("tunnel %d not found", tunnelID)
-	}
-
-	ctx := context.Background()
-	connID, err := t.sessions.Connect(ctx, found.SessionID)
-	if err != nil {
-		return fmt.Errorf("tunnel start: %w", err)
-	}
-
-	wrapper, err := t.sessions.GetClientWrapper(connID)
-	if err != nil {
-		_ = t.sessions.Disconnect(connID)
-		return fmt.Errorf("tunnel start: %w", err)
-	}
-
-	if found.LocalHost == "" {
-		found.LocalHost = "127.0.0.1"
-	}
-	if found.RemoteHost == "" {
-		found.RemoteHost = "127.0.0.1"
-	}
-
-	cfg := ssh.ForwardConfig{
-		Type:       found.Type,
-		LocalHost:  found.LocalHost,
-		LocalPort:  found.LocalPort,
-		RemoteHost: found.RemoteHost,
-		RemotePort: found.RemotePort,
-	}
-
-	_, closeFn, err := ssh.StartForward(wrapper, cfg)
-	if err != nil {
-		_ = t.sessions.Disconnect(connID)
-		return fmt.Errorf("tunnel start: %w", err)
-	}
-
-	t.mu.Lock()
-	t.tunnels[tunnelID] = &TunnelState{
-		ID:     tunnelID,
-		closed: closeFn,
-	}
-	t.mu.Unlock()
-
-	t.eventBus.Emit(event.TunnelState, event.ConnectionStatePayload{
-		TerminalID: fmt.Sprintf("tunnel-%d", tunnelID),
-		State:      "running",
-	})
-
-	return nil
 }
 
 func (t *TunnelService) Stop(tunnelID int64) error {
@@ -154,6 +84,9 @@ func (t *TunnelService) Stop(tunnelID int64) error {
 
 	if state.closed != nil {
 		_ = state.closed()
+	}
+	if state.connID != "" {
+		_ = t.sessions.disconnect(state.connID, false)
 	}
 
 	t.eventBus.Emit(event.TunnelState, event.ConnectionStatePayload{

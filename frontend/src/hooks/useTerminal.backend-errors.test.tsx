@@ -3,6 +3,7 @@ import { act, renderHook, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const backend = vi.hoisted(() => ({
+  attach: vi.fn(async () => {}),
   resize: vi.fn(async () => {}),
   write: vi.fn(async () => 0),
 }))
@@ -44,7 +45,7 @@ vi.mock('@xterm/xterm', () => ({
 vi.mock('@xterm/addon-fit', () => ({ FitAddon: class { fit() {}; dispose() {} } }))
 vi.mock('@wailsio/runtime', () => ({ Events: { On: vi.fn(() => vi.fn()) } }))
 vi.mock('@/lib/wails', () => ({
-  TerminalService: { Resize: backend.resize, Write: backend.write, Close: vi.fn(async () => {}) },
+  TerminalService: { Attach: backend.attach, Resize: backend.resize, Write: backend.write, Close: vi.fn(async () => {}) },
 }))
 
 import { useTerminal } from '@/hooks/useTerminal'
@@ -64,6 +65,12 @@ function visibleContainer() {
   return container
 }
 
+function deferred<T>() {
+  let reject!: (error: unknown) => void
+  const promise = new Promise<T>((_resolve, rejectPromise) => { reject = rejectPromise })
+  return { promise, reject }
+}
+
 describe('useTerminal backend failures', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -73,6 +80,7 @@ describe('useTerminal backend failures', () => {
     terminalOptions.length = 0
     animationFrames.length = 0
     backend.resize.mockResolvedValue(undefined)
+    backend.attach.mockResolvedValue(undefined)
     backend.write.mockResolvedValue(0)
     useToastStore.setState({ toasts: [] })
     useAppStore.setState({ terminalPool: new Map(), connectionStatus: {} })
@@ -100,6 +108,59 @@ describe('useTerminal backend failures', () => {
     expect(screen.getAllByRole('alert')).toHaveLength(1)
     expect(terminalDisposes[0]).not.toHaveBeenCalled()
     expect(loggerError).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps the xterm instance and routes input to the new backend terminal after reconnect', async () => {
+    const containerRef = createRef<HTMLDivElement>()
+    containerRef.current = document.createElement('div')
+    useAppStore.setState({
+      tabs: [{ id: 'tab-1', title: 'Server', type: 'terminal', terminalId: 'term-old', sessionId: 1 }],
+      activeSurface: { type: 'terminal', id: 'tab-1' },
+      connectionStatus: { 'term-old': 'disconnected' },
+    })
+    const hook = renderHook(({ terminalID }) => useTerminal(terminalID, containerRef, {
+      active: false,
+      focusRequest: { sequence: 0 },
+    }), { initialProps: { terminalID: 'term-old' } })
+
+    act(() => expect(useAppStore.getState().replaceTerminalConnection('tab-1', 'term-old', 'term-new')).toBe(true))
+    hook.rerender({ terminalID: 'term-new' })
+    act(() => dataHandlers[0]('whoami\n'))
+
+    await waitFor(() => expect(backend.write).toHaveBeenCalledWith('term-new', 'whoami\n'))
+    expect(terminalDisposes).toHaveLength(1)
+    expect(terminalDisposes[0]).not.toHaveBeenCalled()
+    expect(dataHandlers).toHaveLength(1)
+    expect(backend.attach).toHaveBeenNthCalledWith(1, 'term-old')
+    expect(backend.attach).toHaveBeenNthCalledWith(2, 'term-new')
+  })
+
+  it('ignores a delayed write failure from the replaced backend terminal', async () => {
+    const oldWrite = deferred<number>()
+    backend.write.mockReturnValueOnce(oldWrite.promise)
+    const loggerError = vi.spyOn(logger, 'error').mockImplementation(() => {})
+    const containerRef = createRef<HTMLDivElement>()
+    containerRef.current = document.createElement('div')
+    useAppStore.setState({
+      tabs: [{ id: 'tab-1', title: 'Server', type: 'terminal', terminalId: 'term-old', sessionId: 1 }],
+      activeSurface: { type: 'terminal', id: 'tab-1' },
+      connectionStatus: { 'term-old': 'connected' },
+    })
+    const hook = renderHook(({ terminalID }) => useTerminal(terminalID, containerRef, {
+      active: false,
+      focusRequest: { sequence: 0 },
+    }), { initialProps: { terminalID: 'term-old' }, wrapper: ({ children }) => <>{children}<ToastContainer /></> })
+    act(() => dataHandlers[0]('slow command\n'))
+    act(() => expect(useAppStore.getState().replaceTerminalConnection('tab-1', 'term-old', 'term-new')).toBe(true))
+    hook.rerender({ terminalID: 'term-new' })
+
+    oldWrite.reject(new Error('old connection closed'))
+    await act(async () => { await oldWrite.promise.catch(() => undefined) })
+
+    expect(useAppStore.getState().connectionStatus['term-old']).toBeUndefined()
+    expect(useAppStore.getState().connectionStatus['term-new']).toBe('connected')
+    expect(loggerError).not.toHaveBeenCalledWith('terminal write failed', expect.anything())
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
   it('keeps a synchronous write failure outside the boundary', async () => {
