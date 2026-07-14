@@ -127,10 +127,11 @@ describe('PlaybackTab terminal theme', () => {
     expect(writeText).toHaveBeenCalledWith('selected playback text')
   })
 
-  it('hot-switches copy-on-select and clears playback selection resources', async () => {
+  it('hot-switches copy-on-select after mounting', async () => {
     vi.useFakeTimers()
     const writeText = vi.fn().mockResolvedValue(undefined)
     vi.stubGlobal('navigator', { clipboard: { writeText } })
+    useTerminalBehaviorStore.getState().setSettings({ rightClickAction: 'menu', copyOnSelect: false })
     const view = render(<PlaybackTab recordingId="1" title="demo" active />)
     await act(async () => { await Promise.resolve(); await Promise.resolve() })
     const terminal = terminalInstances[0]
@@ -138,12 +139,27 @@ describe('PlaybackTab terminal theme', () => {
 
     act(() => useTerminalBehaviorStore.getState().setSettings({ rightClickAction: 'menu', copyOnSelect: true }))
     terminal.triggerSelectionChange()
-    act(() => useTerminalBehaviorStore.getState().setSettings({ rightClickAction: 'menu', copyOnSelect: false }))
-    terminal.triggerSelectionChange()
     await act(async () => { vi.advanceTimersByTime(120) })
-    expect(writeText).not.toHaveBeenCalled()
+    expect(writeText).toHaveBeenCalledOnce()
 
-    act(() => useTerminalBehaviorStore.getState().setSettings({ rightClickAction: 'menu', copyOnSelect: true }))
+    terminal.triggerSelectionChange()
+    act(() => useTerminalBehaviorStore.getState().setSettings({ rightClickAction: 'menu', copyOnSelect: false }))
+    await act(async () => { vi.advanceTimersByTime(120) })
+
+    expect(writeText).toHaveBeenCalledOnce()
+    view.unmount()
+  })
+
+  it('disposes pending playback copy-on-select resources', async () => {
+    vi.useFakeTimers()
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    vi.stubGlobal('navigator', { clipboard: { writeText } })
+    useTerminalBehaviorStore.getState().setSettings({ rightClickAction: 'menu', copyOnSelect: true })
+    const view = render(<PlaybackTab recordingId="1" title="demo" active />)
+    await act(async () => { await Promise.resolve(); await Promise.resolve() })
+    const terminal = terminalInstances[0]
+    terminal.getSelection.mockReturnValue('selected playback text')
+
     terminal.triggerSelectionChange()
     view.unmount()
     await act(async () => { vi.advanceTimersByTime(120) })
