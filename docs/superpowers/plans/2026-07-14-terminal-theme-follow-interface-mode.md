@@ -911,7 +911,7 @@ git commit -m "fix(theme): preserve terminal backgrounds"
 - Consumes: all implementation tasks.
 - Produces: verified, reviewed, committed, and pushed `main` branch with no generated artifacts.
 
-- [ ] **Step 1: Run frontend coverage**
+- [x] **Step 1: Run frontend coverage**
 
 ```bash
 cd frontend && npm run test:coverage
@@ -919,7 +919,7 @@ cd frontend && npm run test:coverage
 
 Expected: all tests PASS and line coverage is at least 90%.
 
-- [ ] **Step 2: Run Go formatting and tests**
+- [x] **Step 2: Run Go formatting and tests**
 
 ```bash
 export PATH="$HOME/.govm/go/bin:$HOME/go/bin:$PATH"
@@ -931,7 +931,7 @@ go tool cover -func=coverage.out | tail -1
 
 Expected: tests PASS, race detection reports no races, and total Go coverage is at least 90%.
 
-- [ ] **Step 3: Run lint and production build**
+- [x] **Step 3: Run lint and production build**
 
 ```bash
 export PATH="$HOME/.govm/go/bin:$HOME/go/bin:$PATH"
@@ -941,7 +941,7 @@ CGO_ENABLED=1 CC='gcc -fuse-ld=bfd' wails3 build
 
 Expected: `0 issues` and successful Wails build. The existing Vite chunk-size warning is non-blocking.
 
-- [ ] **Step 4: Request code review and close findings**
+- [x] **Step 4: Request code review and close findings**
 
 Use `requesting-code-review` against the complete diff. Reject any implementation that:
 
@@ -953,7 +953,7 @@ Use `requesting-code-review` against the complete diff. Reject any implementatio
 
 Fix every Critical or Important finding, then rerun the affected focused tests.
 
-- [ ] **Step 5: Clean generated outputs**
+- [x] **Step 5: Clean generated outputs**
 
 ```bash
 rm -rf frontend/coverage frontend/dist
@@ -964,7 +964,7 @@ git status --short
 
 Expected: no coverage or build artifacts remain; only intended source, test, generated binding, documentation, and plan changes are present.
 
-- [ ] **Step 6: Close the plan checklist**
+- [x] **Step 6: Close the plan checklist**
 
 Mark every completed checkbox in this file with `[x]`, then run:
 
@@ -974,7 +974,7 @@ git diff --check
 
 Expected: no whitespace errors and no unchecked implementation steps.
 
-- [ ] **Step 7: Commit plan closure and push**
+- [x] **Step 7: Commit plan closure and push**
 
 ```bash
 git add docs/superpowers/plans/2026-07-14-terminal-theme-follow-interface-mode.md
