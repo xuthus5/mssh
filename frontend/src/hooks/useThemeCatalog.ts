@@ -3,11 +3,12 @@ import { create } from 'zustand'
 import { SettingService, ThemeService } from '@/lib/wails'
 import { logger } from '@/lib/logger'
 import { toast } from '@/components/ui/toast'
+import { resolveEffectiveTerminalProfile, type ColorMode } from '@/lib/effectiveTerminalTheme'
 import { profileToTerminalTheme } from '@/lib/terminalThemeCatalog'
 import { useAppStore } from '@/store/appStore'
 import type { ThemeAssignments, ThemeConfigurationInput, ThemeDefinition, ThemeImportSummary, ThemeProfile, ThemeProfileInput } from '../../bindings/github.com/xuthus5/mssh/internal/model/models'
 
-export type ColorMode = 'dark' | 'light'
+export type { ColorMode } from '@/lib/effectiveTerminalTheme'
 
 interface ThemeCatalogState {
   definitions: ThemeDefinition[]
@@ -19,7 +20,7 @@ interface ThemeCatalogState {
   error: string | null
 }
 
-const initialState: ThemeCatalogState = { definitions: [], profiles: [], assignments: { dark_profile_id: 0, light_profile_id: 0 } as ThemeAssignments, colorMode: localStorage.getItem('mssh:color-mode') === 'light' ? 'light' : 'dark', loaded: false, loading: false, error: null }
+const initialState: ThemeCatalogState = { definitions: [], profiles: [], assignments: { dark_profile_id: 0, light_profile_id: 0, follow_interface_mode: true, fixed_profile_id: 0 } as ThemeAssignments, colorMode: localStorage.getItem('mssh:color-mode') === 'light' ? 'light' : 'dark', loaded: false, loading: false, error: null }
 
 export const useThemeCatalogStore = create<ThemeCatalogState>(() => initialState)
 
@@ -38,7 +39,8 @@ export async function loadThemeCatalog() {
     const [definitions, profiles, assignments, colorSetting] = await Promise.all([ThemeService.ListDefinitions(''), ThemeService.ListProfiles(''), ThemeService.GetAssignments(), SettingService.Get('appearance.color_mode')])
     const colorMode = parseColorMode(colorSetting?.value)
     useThemeCatalogStore.setState({ definitions, profiles, assignments, colorMode, loaded: true, loading: false })
-    applyColorMode(colorMode)
+    applyInterfaceColorMode(colorMode)
+    applyEffectiveTerminalTheme()
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     useThemeCatalogStore.setState({ loading: false, error: message })
@@ -47,12 +49,16 @@ export async function loadThemeCatalog() {
 }
 
 export async function changeColorMode(nextMode: ColorMode) {
-  const previousMode = useThemeCatalogStore.getState().colorMode
-  applyColorMode(nextMode)
+  const state = useThemeCatalogStore.getState()
+  const previousMode = state.colorMode
+  const followsInterfaceMode = state.assignments.follow_interface_mode
+  applyInterfaceColorMode(nextMode)
   try {
+    if (followsInterfaceMode) applyEffectiveTerminalTheme()
     await SettingService.Set({ key: 'appearance.color_mode', namespace: 'appearance', value: JSON.stringify(nextMode), value_type: 'string', version: 1 })
   } catch (error) {
-    applyColorMode(previousMode)
+    applyInterfaceColorMode(previousMode)
+    if (followsInterfaceMode) applyEffectiveTerminalTheme()
     toast('主题设置保存失败，已恢复原主题', 'error')
     logger.error('save colour mode failed', error)
   }
@@ -61,7 +67,7 @@ export async function changeColorMode(nextMode: ColorMode) {
 export async function saveAssignments(assignments: ThemeAssignments) {
   await ThemeService.SaveAssignments(assignments)
   useThemeCatalogStore.setState({ assignments })
-  applyColorMode(useThemeCatalogStore.getState().colorMode)
+  applyEffectiveTerminalTheme()
 }
 
 export async function saveProfile(profile: ThemeProfileInput) {
@@ -78,7 +84,6 @@ export async function createProfile(profile: ThemeProfileInput) {
 export async function saveConfiguration(configuration: ThemeConfigurationInput) {
   await ThemeService.SaveConfiguration(configuration)
   await loadThemeCatalogFresh()
-  applySavedConfiguration(configuration)
 }
 
 export async function importThemes(paths: string[]): Promise<ThemeImportSummary> {
@@ -103,28 +108,16 @@ export async function resetBuiltinStyles() {
   return result
 }
 
-function applyColorMode(mode: ColorMode) {
+function applyInterfaceColorMode(mode: ColorMode) {
   document.documentElement.classList.toggle('light', mode === 'light')
   localStorage.setItem('mssh:color-mode', mode)
   useThemeCatalogStore.setState({ colorMode: mode })
-  const state = useThemeCatalogStore.getState()
-  const profileID = mode === 'dark' ? state.assignments.dark_profile_id : state.assignments.light_profile_id
-  const profile = state.profiles.find((item) => item.id === profileID) ?? state.profiles.find((item) => item.definition?.mode === mode || item.definition?.mode === 'universal')
-  if (profile) useAppStore.getState().setTerminalTheme(profileToTerminalTheme(profile))
 }
 
-function applySavedConfiguration(configuration: ThemeConfigurationInput) {
+function applyEffectiveTerminalTheme() {
   const state = useThemeCatalogStore.getState()
-  const inputs = new Map([
-    [configuration.dark_profile.id, configuration.dark_profile],
-    [configuration.light_profile.id, configuration.light_profile],
-  ])
-  const profiles = state.profiles.map((profile) => {
-    const input = inputs.get(profile.id)
-    return input ? { ...profile, name: input.name, theme_id: input.theme_id, font_family: input.font_family, font_size: input.font_size, cursor_style: input.cursor_style, color_overrides: input.color_overrides } : profile
-  })
-  useThemeCatalogStore.setState({ profiles, assignments: configuration.assignments })
-  applyColorMode(state.colorMode)
+  const profile = resolveEffectiveTerminalProfile(state.assignments, state.colorMode, state.profiles)
+  useAppStore.getState().setTerminalTheme(profileToTerminalTheme(profile))
 }
 
 async function loadThemeCatalogFresh() {

@@ -45,6 +45,7 @@ export enum AuthMethod {
 export class BuiltinThemeResetResult {
     "dark_reset": boolean;
     "light_reset": boolean;
+    "fixed_reset": boolean;
 
     /** Creates a new BuiltinThemeResetResult instance. */
     constructor($$source: Partial<BuiltinThemeResetResult> = {}) {
@@ -53,6 +54,9 @@ export class BuiltinThemeResetResult {
         }
         if (!("light_reset" in $$source)) {
             this["light_reset"] = false;
+        }
+        if (!("fixed_reset" in $$source)) {
+            this["fixed_reset"] = false;
         }
 
         Object.assign(this, $$source);
@@ -550,6 +554,8 @@ export class SettingInput {
 export class ThemeAssignments {
     "dark_profile_id": number;
     "light_profile_id": number;
+    "follow_interface_mode": boolean;
+    "fixed_profile_id": number;
 
     /** Creates a new ThemeAssignments instance. */
     constructor($$source: Partial<ThemeAssignments> = {}) {
@@ -558,6 +564,12 @@ export class ThemeAssignments {
         }
         if (!("light_profile_id" in $$source)) {
             this["light_profile_id"] = 0;
+        }
+        if (!("follow_interface_mode" in $$source)) {
+            this["follow_interface_mode"] = false;
+        }
+        if (!("fixed_profile_id" in $$source)) {
+            this["fixed_profile_id"] = 0;
         }
 
         Object.assign(this, $$source);
@@ -575,6 +587,8 @@ export class ThemeAssignments {
 export class ThemeAssignmentsInput {
     "dark_profile_id": number;
     "light_profile_id": number;
+    "follow_interface_mode": boolean;
+    "fixed_profile_id": number;
 
     /** Creates a new ThemeAssignmentsInput instance. */
     constructor($$source: Partial<ThemeAssignmentsInput> = {}) {
@@ -583,6 +597,12 @@ export class ThemeAssignmentsInput {
         }
         if (!("light_profile_id" in $$source)) {
             this["light_profile_id"] = 0;
+        }
+        if (!("follow_interface_mode" in $$source)) {
+            this["follow_interface_mode"] = false;
+        }
+        if (!("fixed_profile_id" in $$source)) {
+            this["fixed_profile_id"] = 0;
         }
 
         Object.assign(this, $$source);
@@ -598,17 +618,13 @@ export class ThemeAssignmentsInput {
 }
 
 export class ThemeConfigurationInput {
-    "dark_profile": ThemeProfileInput;
-    "light_profile": ThemeProfileInput;
+    "profiles": ThemeProfileInput[];
     "assignments": ThemeAssignmentsInput;
 
     /** Creates a new ThemeConfigurationInput instance. */
     constructor($$source: Partial<ThemeConfigurationInput> = {}) {
-        if (!("dark_profile" in $$source)) {
-            this["dark_profile"] = (new ThemeProfileInput());
-        }
-        if (!("light_profile" in $$source)) {
-            this["light_profile"] = (new ThemeProfileInput());
+        if (!("profiles" in $$source)) {
+            this["profiles"] = [];
         }
         if (!("assignments" in $$source)) {
             this["assignments"] = (new ThemeAssignmentsInput());
@@ -621,18 +637,14 @@ export class ThemeConfigurationInput {
      * Creates a new ThemeConfigurationInput instance from a string or object.
      */
     static createFrom($$source: any = {}): ThemeConfigurationInput {
-        const $$createField0_0 = $$createType0;
-        const $$createField1_0 = $$createType0;
-        const $$createField2_0 = $$createType1;
+        const $$createField0_0 = $$createType1;
+        const $$createField1_0 = $$createType2;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
-        if ("dark_profile" in $$parsedSource) {
-            $$parsedSource["dark_profile"] = $$createField0_0($$parsedSource["dark_profile"]);
-        }
-        if ("light_profile" in $$parsedSource) {
-            $$parsedSource["light_profile"] = $$createField1_0($$parsedSource["light_profile"]);
+        if ("profiles" in $$parsedSource) {
+            $$parsedSource["profiles"] = $$createField0_0($$parsedSource["profiles"]);
         }
         if ("assignments" in $$parsedSource) {
-            $$parsedSource["assignments"] = $$createField2_0($$parsedSource["assignments"]);
+            $$parsedSource["assignments"] = $$createField1_0($$parsedSource["assignments"]);
         }
         return new ThemeConfigurationInput($$parsedSource as Partial<ThemeConfigurationInput>);
     }
@@ -783,7 +795,7 @@ export class ThemeImportSummary {
      * Creates a new ThemeImportSummary instance from a string or object.
      */
     static createFrom($$source: any = {}): ThemeImportSummary {
-        const $$createField0_0 = $$createType3;
+        const $$createField0_0 = $$createType4;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("results" in $$parsedSource) {
             $$parsedSource["results"] = $$createField0_0($$parsedSource["results"]);
@@ -852,7 +864,7 @@ export class ThemeProfile {
      * Creates a new ThemeProfile instance from a string or object.
      */
     static createFrom($$source: any = {}): ThemeProfile {
-        const $$createField3_0 = $$createType5;
+        const $$createField3_0 = $$createType6;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("definition" in $$parsedSource) {
             $$parsedSource["definition"] = $$createField3_0($$parsedSource["definition"]);
@@ -1054,8 +1066,9 @@ export class UpdateInfo {
 
 // Private type creation functions
 const $$createType0 = ThemeProfileInput.createFrom;
-const $$createType1 = ThemeAssignmentsInput.createFrom;
-const $$createType2 = ThemeImportResult.createFrom;
-const $$createType3 = $Create.Array($$createType2);
-const $$createType4 = ThemeDefinition.createFrom;
-const $$createType5 = $Create.Nullable($$createType4);
+const $$createType1 = $Create.Array($$createType0);
+const $$createType2 = ThemeAssignmentsInput.createFrom;
+const $$createType3 = ThemeImportResult.createFrom;
+const $$createType4 = $Create.Array($$createType3);
+const $$createType5 = ThemeDefinition.createFrom;
+const $$createType6 = $Create.Nullable($$createType5);
