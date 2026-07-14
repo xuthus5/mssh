@@ -110,7 +110,7 @@ Theme Catalog 加载时同时返回或并行加载全局样式、Profiles 与 As
 follow_global_style INTEGER NOT NULL DEFAULT 1
 ```
 
-启动迁移通过 `PRAGMA table_info` 检查字段；缺失时执行 `ALTER TABLE`。已有 Profile 自动获得 `1`，原有字体、字号和光标样式原样保留为备用独立配置。
+项目处于 POC 阶段，不保留旧主题目录格式。启动时检查 `themes` 与 `terminal_theme_profiles` 是否符合最终 Schema；任一结构不匹配时直接删除并重建主题目录，由 `InitializeDefaults` 重新创建内置主题和默认绑定。旧 Profile、旧主题绑定及旧主题级字体配置不做迁移。
 
 ### 事务边界
 
@@ -207,7 +207,7 @@ cursor color = profile colors
 
 - 默认全局样式设置在主题初始化事务中补齐。
 - 新建内置 Profile 的 `follow_global_style` 为 `true`。
-- 已有 Profile 迁移后默认跟随全局，但原主题级值不被覆盖。
+- Schema 重建后创建的所有内置 Profile 默认跟随全局。
 
 ### 重置内置主题
 
@@ -275,7 +275,7 @@ cursor color = profile colors
 
 ## 验收标准
 
-1. 新安装和升级后的所有主题默认跟随全局终端字体、字号和光标样式。
+1. 新安装和按最终 Schema 重建后的所有主题默认跟随全局终端字体、字号和光标样式。
 2. 修改并保存全局样式后，当前与后续 SSH、分屏和回放终端立即使用新配置。
 3. 某主题关闭跟随后，只在该主题生效其独立字体、字号和光标样式。
 4. 主题重新开启跟随后使用全局值，再次关闭时恢复此前保存的独立值。
