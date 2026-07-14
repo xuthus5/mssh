@@ -88,6 +88,19 @@ describe('SettingsDialog interface font settings', () => {
     expect(props.onSaveGeneral).toHaveBeenCalledWith(expect.objectContaining({ uiFontFamily: 'Microsoft YaHei', uiFontSize: 18, rightClickAction: 'menu', copyOnSelect: false }))
   })
 
+  it('saves changed terminal behavior settings', async () => {
+    const props = settingsProps()
+    const user = userEvent.setup()
+    render(<SettingsDialog {...props} />)
+
+    await user.click(screen.getByRole('combobox', { name: '鼠标右键行为' }))
+    await user.click(screen.getByRole('option', { name: '粘贴' }))
+    await user.click(screen.getByRole('switch', { name: '选择即复制' }))
+    await user.click(screen.getByRole('button', { name: '保存' }))
+
+    expect(props.onSaveGeneral).toHaveBeenCalledWith(expect.objectContaining({ rightClickAction: 'paste', copyOnSelect: true }))
+  })
+
   it('previews and saves a distinct fallback font', async () => {
     const props = settingsProps()
     render(<SettingsDialog {...props} />)

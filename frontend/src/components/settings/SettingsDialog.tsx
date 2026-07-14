@@ -15,6 +15,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { LabeledSelect } from '@/components/ui/labeled-select'
+import { TerminalBehaviorSettingsSection } from '@/components/settings/TerminalBehaviorSettings'
 import { ThemeEditor } from '@/components/settings/ThemeEditor'
 import { ThemeManager } from '@/components/settings/ThemeManager'
 import { KeyManager } from '@/components/settings/KeyManager'
@@ -103,6 +104,8 @@ export default function SettingsDialog({
   const [uiFontFallbackFamily, setUIFontFallbackFamily] = useState(general.uiFontFallbackFamily)
   const [uiFontSize, setUIFontSize] = useState(general.uiFontSize.toString())
   const [windowOpacity, setWindowOpacity] = useState(general.windowOpacity.toString())
+  const [rightClickAction, setRightClickAction] = useState(general.rightClickAction)
+  const [copyOnSelect, setCopyOnSelect] = useState(general.copyOnSelect)
   const [fontDirty, setFontDirty] = useState(false)
   const [saving, setSaving] = useState(false)
   const draggable = useDraggableDialog(open)
@@ -115,6 +118,8 @@ export default function SettingsDialog({
     setUIFontFallbackFamily(general.uiFontFallbackFamily)
     setUIFontSize(general.uiFontSize.toString())
     setWindowOpacity(general.windowOpacity.toString())
+    setRightClickAction(general.rightClickAction)
+    setCopyOnSelect(general.copyOnSelect)
     setFontDirty(false)
   }, [general])
 
@@ -142,7 +147,7 @@ export default function SettingsDialog({
     e.preventDefault()
     setSaving(true)
     try {
-      await onSaveGeneral({ maxPoolSize: parseInt(maxPoolSize, 10) || 10, defaultKeepAlive: parseInt(defaultKeepAlive, 10) || 60, defaultTermType, uiFontFamily, uiFontFallbackFamily, uiFontSize: parseInt(uiFontSize, 10) || 14, windowOpacity: parseInt(windowOpacity, 10) || 100, rightClickAction: general.rightClickAction, copyOnSelect: general.copyOnSelect })
+      await onSaveGeneral({ maxPoolSize: parseInt(maxPoolSize, 10) || 10, defaultKeepAlive: parseInt(defaultKeepAlive, 10) || 60, defaultTermType, uiFontFamily, uiFontFallbackFamily, uiFontSize: parseInt(uiFontSize, 10) || 14, windowOpacity: parseInt(windowOpacity, 10) || 100, rightClickAction, copyOnSelect })
       setFontDirty(false)
     } finally {
       setSaving(false)
@@ -193,6 +198,12 @@ export default function SettingsDialog({
                 </label>
                 <LabeledSelect value={defaultTermType} options={TERMINAL_TYPE_OPTIONS} onValueChange={setDefaultTermType} />
               </div>
+              <TerminalBehaviorSettingsSection
+                rightClickAction={rightClickAction}
+                copyOnSelect={copyOnSelect}
+                onRightClickActionChange={setRightClickAction}
+                onCopyOnSelectChange={setCopyOnSelect}
+              />
               <section className="rounded-xl border border-border bg-card p-3 shadow-sm">
                 <div className="mb-3">
                   <h3 className="text-sm font-medium text-foreground">界面字体</h3>
