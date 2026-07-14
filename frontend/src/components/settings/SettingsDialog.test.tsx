@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import SettingsDialog from '@/components/settings/SettingsDialog'
+import { CursorStyle } from '../../../bindings/github.com/xuthus5/mssh/internal/model/models'
 
 const general = {
   maxPoolSize: 10,
@@ -23,6 +24,7 @@ function settingsProps() {
     systemFonts: ['Arial', 'Microsoft YaHei', 'Segoe UI'],
     themeProfiles: [themeProfile(1, 'dark', '#000000'), themeProfile(2, 'light', '#ffffff')],
     themeAssignments: { dark_profile_id: 1, light_profile_id: 2, follow_interface_mode: true, fixed_profile_id: 0 },
+    terminalGlobalStyle: { font_family: 'Global Font', font_size: 16, cursor_style: CursorStyle.CursorStyleUnderline },
     colorMode: 'dark' as const,
     keys: [],
     sync: { enabled: false, url: '', username: '', password: '' },
@@ -49,7 +51,7 @@ function settingsProps() {
 }
 
 function themeProfile(id: number, mode: 'dark' | 'light', background: string): any {
-  return { id, name: mode, theme_id: id, font_family: 'monospace', font_size: 14, cursor_style: 'bar' as const, color_overrides: '{}', created_at: '', updated_at: '', definition: { id, name: mode, mode, source_type: 'builtin' as const, source_name: '', source_url: '', source_author: '', source_license: '', source_version: '', source_fingerprint: mode, color_payload: JSON.stringify({ background, foreground: mode === 'dark' ? '#ffffff' : '#000000', cursor: '#888888', selection: '#264f78', ansi: Array(16).fill('#111111') }), raw_payload: '', is_builtin: true, created_at: '', updated_at: '' } }
+  return { id, name: mode, theme_id: id, follow_global_style: true, font_family: 'monospace', font_size: 14, cursor_style: 'bar' as const, color_overrides: '{}', created_at: '', updated_at: '', definition: { id, name: mode, mode, source_type: 'builtin' as const, source_name: '', source_url: '', source_author: '', source_license: '', source_version: '', source_fingerprint: mode, color_payload: JSON.stringify({ background, foreground: mode === 'dark' ? '#ffffff' : '#000000', cursor: '#888888', selection: '#264f78', ansi: Array(16).fill('#111111') }), raw_payload: '', is_builtin: true, created_at: '', updated_at: '' } }
 }
 
 describe('SettingsDialog interface font settings', () => {
@@ -66,7 +68,9 @@ describe('SettingsDialog interface font settings', () => {
     render(<SettingsDialog {...props} />)
 
     await userEvent.click(screen.getByRole('tab', { name: '终端' }))
+    expect(screen.getByLabelText('全局终端字体')).toHaveValue('Global Font')
     await userEvent.click(screen.getByRole('button', { name: '重置内置主题' }))
+    expect(screen.getByRole('alertdialog')).toHaveTextContent('全局字体与光标配置不会被修改')
     await userEvent.click(screen.getByRole('button', { name: '确认重置' }))
 
     expect(props.onResetBuiltinThemes).toHaveBeenCalledOnce()
@@ -75,6 +79,8 @@ describe('SettingsDialog interface font settings', () => {
   it('previews and saves the selected font settings', async () => {
     const props = settingsProps()
     render(<SettingsDialog {...props} />)
+
+    expect(screen.getByText(/终端排版请在“终端”分类中配置/)).toBeInTheDocument()
 
     const fontInput = screen.getByRole('combobox', { name: '界面字体' })
     await userEvent.clear(fontInput)
@@ -94,7 +100,7 @@ describe('SettingsDialog interface font settings', () => {
     render(<SettingsDialog {...props} />)
 
     await user.click(screen.getByRole('combobox', { name: '鼠标右键行为' }))
-    await user.click(screen.getByRole('option', { name: '粘贴' }))
+    await user.click(await screen.findByRole('option', { name: '粘贴' }))
     await user.click(screen.getByRole('switch', { name: '选择即复制' }))
     await user.click(screen.getByRole('button', { name: '保存' }))
 

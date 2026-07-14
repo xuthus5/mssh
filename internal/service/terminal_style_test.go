@@ -3,6 +3,7 @@ package service
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -100,6 +101,40 @@ func TestThemeServiceSavesTerminalConfigurationAtomically(t *testing.T) {
 	assert.Equal(t, beforeAssignments, afterAssignments)
 }
 
+func TestThemeServiceRollsBackWhenConfigurationAssignmentWriteFails(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	themeService := NewThemeService(db, testutil.NewTestLogger())
+	require.NoError(t, themeService.InitializeDefaults())
+	profiles := mustThemeProfiles(t, themeService)
+	dark := mustThemeProfileNamed(t, profiles, "GitHub Dark")
+	light := mustThemeProfileNamed(t, profiles, "GitHub Light")
+	fixed := mustThemeProfileNamed(t, profiles, "Dracula")
+	beforeStyle, err := themeService.GetGlobalStyle()
+	require.NoError(t, err)
+	beforeAssignments, err := themeService.GetAssignments()
+	require.NoError(t, err)
+	dark.Name = "Must Roll Back"
+	_, err = db.Exec(`CREATE TRIGGER fail_configuration_assignment BEFORE UPDATE ON settings WHEN NEW.key = 'terminal.theme.fixed_profile_id' BEGIN SELECT RAISE(FAIL, 'assignment failed'); END`)
+	require.NoError(t, err)
+	err = themeService.SaveConfiguration(model.ThemeConfigurationInput{
+		GlobalStyle: model.TerminalGlobalStyleInput{FontFamily: "Changed Font", FontSize: 18, CursorStyle: model.CursorStyleBlock},
+		Profiles:    []model.ThemeProfileInput{model.ThemeProfileInputFrom(dark), model.ThemeProfileInputFrom(light), model.ThemeProfileInputFrom(fixed)},
+		Assignments: model.ThemeAssignmentsInput{DarkProfileID: dark.ID, LightProfileID: light.ID, FollowInterfaceMode: false, FixedProfileID: fixed.ID},
+	})
+	assert.ErrorContains(t, err, "assignment failed")
+	_, err = db.Exec("DROP TRIGGER fail_configuration_assignment")
+	require.NoError(t, err)
+	storedDark, err := themeService.GetProfile(dark.ID)
+	require.NoError(t, err)
+	assert.NotEqual(t, "Must Roll Back", storedDark.Name)
+	storedStyle, err := themeService.GetGlobalStyle()
+	require.NoError(t, err)
+	assert.Equal(t, beforeStyle, storedStyle)
+	storedAssignments, err := themeService.GetAssignments()
+	require.NoError(t, err)
+	assert.Equal(t, beforeAssignments, storedAssignments)
+}
+
 func TestThemeServiceNormalizesAndResetsTerminalStyles(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	themeService := NewThemeService(db, testutil.NewTestLogger())
@@ -132,6 +167,50 @@ func TestThemeServiceNormalizesAndResetsTerminalStyles(t *testing.T) {
 	afterReset, err := themeService.GetGlobalStyle()
 	require.NoError(t, err)
 	assert.Equal(t, storedGlobal, afterReset)
+}
+
+func TestThemeServiceLimitsGlobalFontFamilyAndReportsClosedDatabase(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	themeService := NewThemeService(db, testutil.NewTestLogger())
+	require.NoError(t, themeService.InitializeDefaults())
+	profiles := mustThemeProfiles(t, themeService)
+	dark := mustThemeProfileNamed(t, profiles, "GitHub Dark")
+	light := mustThemeProfileNamed(t, profiles, "GitHub Light")
+	longFontFamily := strings.Repeat("字", maxTerminalFontFamilyRunes+10)
+	require.NoError(t, themeService.SaveConfiguration(model.ThemeConfigurationInput{
+		GlobalStyle: model.TerminalGlobalStyleInput{FontFamily: longFontFamily, FontSize: 14, CursorStyle: model.CursorStyleBar},
+		Profiles:    []model.ThemeProfileInput{model.ThemeProfileInputFrom(dark), model.ThemeProfileInputFrom(light)},
+		Assignments: model.ThemeAssignmentsInput{DarkProfileID: dark.ID, LightProfileID: light.ID, FollowInterfaceMode: true},
+	}))
+	style, err := themeService.GetGlobalStyle()
+	require.NoError(t, err)
+	assert.Len(t, []rune(style.FontFamily), maxTerminalFontFamilyRunes)
+
+	require.NoError(t, db.Close())
+	_, err = themeService.GetGlobalStyle()
+	assert.Error(t, err)
+}
+
+func TestThemeServiceNormalizesProfileFallbackFontFamily(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	themeService := NewThemeService(db, testutil.NewTestLogger())
+	require.NoError(t, themeService.InitializeDefaults())
+	profiles := mustThemeProfiles(t, themeService)
+	dark := mustThemeProfileNamed(t, profiles, "GitHub Dark")
+	light := mustThemeProfileNamed(t, profiles, "GitHub Light")
+	dark.FollowGlobalStyle = false
+	dark.FontFamily = "\x00 " + strings.Repeat("字", maxTerminalFontFamilyRunes+10) + "\n"
+	require.NoError(t, themeService.SaveConfiguration(model.ThemeConfigurationInput{
+		GlobalStyle: model.TerminalGlobalStyleInputFrom(terminalStyleDefaults()),
+		Profiles:    []model.ThemeProfileInput{model.ThemeProfileInputFrom(dark), model.ThemeProfileInputFrom(light)},
+		Assignments: model.ThemeAssignmentsInput{DarkProfileID: dark.ID, LightProfileID: light.ID, FollowInterfaceMode: true},
+	}))
+
+	stored, err := themeService.GetProfile(dark.ID)
+	require.NoError(t, err)
+	assert.Len(t, []rune(stored.FontFamily), maxTerminalFontFamilyRunes)
+	assert.NotContains(t, stored.FontFamily, "\x00")
+	assert.NotContains(t, stored.FontFamily, "\n")
 }
 
 func TestNewCustomAndImportedProfilesFollowGlobalStyle(t *testing.T) {

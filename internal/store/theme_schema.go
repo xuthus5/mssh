@@ -3,6 +3,7 @@ package store
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 )
 
 const themeDefinitionsSchema = `CREATE TABLE IF NOT EXISTS themes (
@@ -42,7 +43,7 @@ func ensureThemeCatalogSchema(db *sql.DB) error {
 		return err
 	}
 	if !current {
-		if err = replaceLegacyThemeSchema(db); err != nil {
+		if err = replaceThemeCatalogSchema(db); err != nil {
 			return err
 		}
 	}
@@ -56,22 +57,38 @@ func ensureThemeCatalogSchema(db *sql.DB) error {
 }
 
 func themeCatalogSchemaCurrent(db *sql.DB) (bool, error) {
-	definitionColumns, err := tableColumns(db, "themes")
+	definitionsCurrent, err := tableSchemaCurrent(db, "themes", themeDefinitionsSchema)
 	if err != nil {
 		return false, fmt.Errorf("inspect themes schema: %w", err)
 	}
-	definitionsCurrent := definitionColumns["mode"] && definitionColumns["source_fingerprint"] && definitionColumns["color_payload"]
 	if !definitionsCurrent {
 		return false, nil
 	}
-	profileColumns, err := tableColumns(db, "terminal_theme_profiles")
+	profilesCurrent, err := tableSchemaCurrent(db, "terminal_theme_profiles", themeProfilesSchema)
 	if err != nil {
 		return false, fmt.Errorf("inspect terminal theme profiles: %w", err)
 	}
-	return profileColumns["theme_id"] && profileColumns["follow_global_style"] && profileColumns["font_family"] && profileColumns["font_size"] && profileColumns["cursor_style"] && profileColumns["color_overrides"], nil
+	return profilesCurrent, nil
 }
 
-func replaceLegacyThemeSchema(db *sql.DB) error {
+func tableSchemaCurrent(db *sql.DB, table, expected string) (bool, error) {
+	var actual string
+	err := db.QueryRow("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?", table).Scan(&actual)
+	if err == sql.ErrNoRows {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return normalizeCreateTableSQL(actual) == normalizeCreateTableSQL(expected), nil
+}
+
+func normalizeCreateTableSQL(value string) string {
+	value = strings.Replace(value, "CREATE TABLE IF NOT EXISTS", "CREATE TABLE", 1)
+	return strings.Join(strings.Fields(value), " ")
+}
+
+func replaceThemeCatalogSchema(db *sql.DB) error {
 	tx, err := db.Begin()
 	if err != nil {
 		return fmt.Errorf("begin theme schema replacement: %w", err)

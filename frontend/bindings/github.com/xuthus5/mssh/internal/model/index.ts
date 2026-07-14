@@ -18,6 +18,8 @@ export {
     SessionLog,
     Setting,
     SettingInput,
+    TerminalGlobalStyle,
+    TerminalGlobalStyleInput,
     ThemeAssignments,
     ThemeAssignmentsInput,
     ThemeConfigurationInput,

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -19,4 +20,10 @@ func TestMainWindowOptionsUseStableLinuxRendering(t *testing.T) {
 	assert.True(t, options.Linux.WindowIsTranslucent)
 	assert.Equal(t, application.MacBackdropTransparent, options.Mac.Backdrop)
 	assert.Equal(t, application.WebviewGpuPolicyNever, options.Linux.WebviewGpuPolicy)
+}
+
+func TestDefaultDataDirUsesUserHome(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	assert.Equal(t, filepath.Join(home, ".mssh"), defaultDataDir())
 }
