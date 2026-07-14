@@ -88,6 +88,23 @@ describe('useThemeCatalog', () => {
     expect(useThemeCatalogStore.getState().assignments.light_profile_id).toBe(1)
     expect(useAppStore.getState().terminalTheme.background).toBe('#123456')
   })
+
+  it('reloads and hot-applies the active theme after resetting built-in styles', async () => {
+    const resetBuiltinStyles = vi.fn(async () => ({ dark_reset: true, light_reset: false }))
+    __registerHandler('github.com/xuthus5/mssh/internal/service.ThemeService.ResetBuiltinStyles', resetBuiltinStyles)
+    const { result } = renderHook(() => useThemeCatalog())
+    await waitFor(() => expect(result.current.loaded).toBe(true))
+    const reloadedLight = profile(2, 'light', '#f5f5f5')
+    __registerHandler('github.com/xuthus5/mssh/internal/service.ThemeService.ListProfiles', async () => [darkProfile, reloadedLight])
+
+    let resetResult: { dark_reset: boolean; light_reset: boolean } | undefined
+    await act(async () => { resetResult = await result.current.resetBuiltinStyles() })
+
+    expect(resetBuiltinStyles).toHaveBeenCalledOnce()
+    expect(resetResult).toEqual({ dark_reset: true, light_reset: false })
+    expect(useThemeCatalogStore.getState().profiles[1].definition?.color_payload).toContain('#f5f5f5')
+    expect(useAppStore.getState().terminalTheme.background).toBe('#f5f5f5')
+  })
 })
 
 function registerCatalogHandlers(mode: 'dark' | 'light') {

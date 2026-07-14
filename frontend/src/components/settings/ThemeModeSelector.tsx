@@ -11,10 +11,11 @@ interface Props {
 }
 
 export function ThemeModeSelector({ mode, profiles, value, onValueChange }: Props) {
-  const labels = useMemo(() => profileLabels(profiles), [profiles])
+  const compatibleProfiles = useMemo(() => profiles.filter((profile) => profile.definition?.mode === mode || profile.definition?.mode === 'universal'), [mode, profiles])
+  const labels = useMemo(() => profileLabels(compatibleProfiles), [compatibleProfiles])
   const profileByName = useMemo(() => new Map(labels.map(({ label, profile }) => [label, profile])), [labels])
   const names = useMemo(() => labels.map(({ label }) => label), [labels])
-  const selected = profiles.find((profile) => profile.id === value)
+  const selected = compatibleProfiles.find((profile) => profile.id === value)
   const selectedLabel = labels.find((item) => item.profile.id === selected?.id)?.label
   const label = mode === 'dark' ? 'Dark Mode 终端主题' : 'Light Mode 终端主题'
   return <div className="flex min-w-0 flex-col gap-2">
@@ -22,8 +23,6 @@ export function ThemeModeSelector({ mode, profiles, value, onValueChange }: Prop
     <Combobox items={names} value={selectedLabel ?? ''} onValueChange={(name) => {
       const profile = profileByName.get(name ?? '')
       if (!profile) return
-      const compatible = profile.definition?.mode === mode || profile.definition?.mode === 'universal'
-      if (!compatible && !window.confirm(`${profile.name} 与 ${label} 不兼容，仍要使用吗？`)) return
       onValueChange(profile.id)
     }}>
       <ComboboxInput aria-label={label} placeholder="搜索终端主题" className="w-full" />

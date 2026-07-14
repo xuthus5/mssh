@@ -4,6 +4,7 @@
 export {
     AboutInfo,
     AuthMethod,
+    BuiltinThemeResetResult,
     CursorStyle,
     KeyType,
     Macro,
