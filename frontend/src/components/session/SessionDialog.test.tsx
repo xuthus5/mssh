@@ -38,7 +38,7 @@ describe('SessionDialog', () => {
 
     const comboboxes = screen.getAllByRole('combobox')
     await user.click(comboboxes[0])
-    await user.click(screen.getByRole('option', { name: '密钥' }))
+    await user.click(await screen.findByRole('option', { name: '密钥' }))
 
     expect(screen.getByText('SSH 密钥')).toBeInTheDocument()
   })

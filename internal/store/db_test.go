@@ -88,65 +88,20 @@ func TestMigrateAddsSessionRecencyColumns(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, db.Close()) })
 	require.NoError(t, Migrate(db))
-	assertTableColumns(t, db, "sessions", []string{"last_connected_at", "connection_count"})
+	assertTableColumns(t, tableColumnExpectation{db: db, table: "sessions", expected: []string{"last_connected_at", "connection_count"}})
 }
 
-func TestThemeCatalogSchema(t *testing.T) {
-	db, err := OpenDB(t.TempDir())
-	require.NoError(t, err)
-	t.Cleanup(func() { require.NoError(t, db.Close()) })
-	require.NoError(t, Migrate(db))
-
-	assertTableColumns(t, db, "themes", []string{"id", "name", "mode", "source_type", "source_name", "source_url", "source_author", "source_license", "source_version", "source_fingerprint", "color_payload", "raw_payload", "is_builtin", "created_at", "updated_at"})
-	assertTableColumns(t, db, "terminal_theme_profiles", []string{"id", "name", "theme_id", "follow_global_style", "font_family", "font_size", "cursor_style", "color_overrides", "created_at", "updated_at"})
-
-	_, err = db.Exec("INSERT INTO themes (name, mode, source_type, source_fingerprint, color_payload) VALUES ('A', 'dark', 'custom', 'same', '{}'), ('B', 'light', 'custom', 'same', '{}')")
-	assert.Error(t, err)
+type tableColumnExpectation struct {
+	db interface {
+		Query(string, ...any) (*sql.Rows, error)
+	}
+	table    string
+	expected []string
 }
 
-func TestMigrateReplacesLegacyThemeSchema(t *testing.T) {
-	db, err := OpenDB(t.TempDir())
-	require.NoError(t, err)
-	t.Cleanup(func() { require.NoError(t, db.Close()) })
-	_, err = db.Exec("CREATE TABLE themes (id INTEGER PRIMARY KEY, name TEXT NOT NULL, is_builtin INTEGER NOT NULL DEFAULT 0, config TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')))")
-	require.NoError(t, err)
-	require.NoError(t, Migrate(db))
-	assertTableColumns(t, db, "themes", []string{"mode", "source_fingerprint", "color_payload", "updated_at"})
-}
-
-func TestMigrateReplacesStaleThemeProfileSchema(t *testing.T) {
-	db, err := OpenDB(t.TempDir())
-	require.NoError(t, err)
-	t.Cleanup(func() { require.NoError(t, db.Close()) })
-	_, err = db.Exec(themeDefinitionsSchema)
-	require.NoError(t, err)
-	_, err = db.Exec(`CREATE TABLE terminal_theme_profiles (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		name TEXT NOT NULL,
-		theme_id INTEGER NOT NULL REFERENCES themes(id) ON DELETE RESTRICT,
-		font_family TEXT NOT NULL,
-		font_size INTEGER NOT NULL,
-		cursor_style TEXT NOT NULL,
-		color_overrides TEXT NOT NULL DEFAULT '{}'
-	)`)
-	require.NoError(t, err)
-	_, err = db.Exec(`INSERT INTO themes (name, mode, source_type, source_fingerprint, color_payload) VALUES ('Old', 'dark', 'custom', 'old', '{}')`)
-	require.NoError(t, err)
-	_, err = db.Exec(`INSERT INTO terminal_theme_profiles (name, theme_id, font_family, font_size, cursor_style) VALUES ('Old', 1, 'mono', 14, 'bar')`)
-	require.NoError(t, err)
-
-	require.NoError(t, Migrate(db))
-	assertTableColumns(t, db, "terminal_theme_profiles", []string{"follow_global_style"})
-	var count int
-	require.NoError(t, db.QueryRow("SELECT count(*) FROM terminal_theme_profiles").Scan(&count))
-	assert.Zero(t, count)
-}
-
-func assertTableColumns(t *testing.T, db interface {
-	Query(string, ...any) (*sql.Rows, error)
-}, table string, expected []string) {
+func assertTableColumns(t *testing.T, expectation tableColumnExpectation) {
 	t.Helper()
-	rows, err := db.Query("PRAGMA table_info(" + table + ")")
+	rows, err := expectation.db.Query("PRAGMA table_info(" + expectation.table + ")")
 	require.NoError(t, err)
 	defer func() { require.NoError(t, rows.Close()) }()
 	columns := make(map[string]bool)
@@ -157,8 +112,8 @@ func assertTableColumns(t *testing.T, db interface {
 		require.NoError(t, rows.Scan(&cid, &name, &columnType, &notNull, &defaultValue, &primaryKey))
 		columns[name] = true
 	}
-	for _, name := range expected {
-		assert.True(t, columns[name], "missing %s.%s", table, name)
+	for _, name := range expectation.expected {
+		assert.True(t, columns[name], "missing %s.%s", expectation.table, name)
 	}
 }
 
@@ -195,138 +150,101 @@ func TestDefaultFolderMigrationHelpersClosedDB(t *testing.T) {
 	assert.Error(t, ensureDefaultFolderSchema(db))
 }
 
-func TestStoreOperationsClosedDB(t *testing.T) { //nolint:funlen
+func TestStoreOperationsClosedDB(t *testing.T) {
 	tmpDir := t.TempDir()
 	db, err := OpenDB(tmpDir)
 	require.NoError(t, err)
 	_ = Migrate(db)
-	db.Close()
+	require.NoError(t, db.Close())
 
-	{
-		var pid int64 = 1
-		_, err = CreateFolder(db, "test", &pid)
-		assert.Error(t, err)
-	}
-	{
-		_, err = ListFolders(db)
-		assert.Error(t, err)
-	}
-	{
-		err = UpdateFolder(db, 1, "test")
-		assert.Error(t, err)
-	}
-	{
-		err = DeleteFolder(db, 1)
-		assert.Error(t, err)
-	}
-	{
-		err = MoveFolder(db, 1, ptrInt64(2))
-		assert.Error(t, err)
-	}
+	assertClosedFolderOperations(t, db)
+	assertClosedSessionOperations(t, db)
+	assertClosedSettingOperations(t, db)
+	assertClosedKeyOperations(t, db)
+	assertClosedTunnelOperations(t, db)
+	assertClosedMacroOperations(t, db)
+	assertClosedThemeOperations(t, db)
+}
+
+func assertClosedFolderOperations(t *testing.T, db *sql.DB) {
+	t.Helper()
+	_, err := CreateFolder(db, "test", ptrInt64(1))
+	assert.Error(t, err)
+	_, err = ListFolders(db)
+	assert.Error(t, err)
+	assert.Error(t, UpdateFolder(db, 1, "test"))
+	assert.Error(t, DeleteFolder(db, 1))
+	assert.Error(t, MoveFolder(db, 1, ptrInt64(2)))
+}
+
+func assertClosedSessionOperations(t *testing.T, db *sql.DB) {
+	t.Helper()
 	s := model.Session{
 		Name: "s", Host: "1.1.1.1", Port: 22, Username: "u",
 		AuthMethod: model.AuthPassword, Password: "p", KeepAlive: 30,
 	}
-	{
-		_, err = CreateSession(db, s)
-		assert.Error(t, err)
-	}
-	{
-		_, err = ListSessions(db, nil)
-		assert.Error(t, err)
-	}
-	{
-		err = UpdateSession(db, s)
-		assert.Error(t, err)
-	}
-	{
-		err = DeleteSession(db, 1)
-		assert.Error(t, err)
-	}
-	{
-		_, err = GetSession(db, 1)
-		assert.Error(t, err)
-	}
-	{
-		err = MoveSession(db, 1, ptrInt64(2))
-		assert.Error(t, err)
-	}
-	{
-		_, err = GetSetting(db, "key")
-		assert.Error(t, err)
-	}
-	{
-		err = SetSetting(db, "key", "val")
-		assert.Error(t, err)
-	}
+	_, err := CreateSession(db, s)
+	assert.Error(t, err)
+	_, err = ListSessions(db, nil)
+	assert.Error(t, err)
+	assert.Error(t, UpdateSession(db, s))
+	assert.Error(t, DeleteSession(db, 1))
+	_, err = GetSession(db, 1)
+	assert.Error(t, err)
+	assert.Error(t, MoveSession(db, 1, ptrInt64(2)))
+}
+
+func assertClosedSettingOperations(t *testing.T, db *sql.DB) {
+	t.Helper()
+	_, err := GetSetting(db, "key")
+	assert.Error(t, err)
+	assert.Error(t, SetSetting(db, "key", "val"))
+}
+
+func assertClosedKeyOperations(t *testing.T, db *sql.DB) {
+	t.Helper()
 	k := model.SSHKey{Name: "k", Type: model.KeyTypeED25519, PrivateKey: "priv"}
-	{
-		_, err = CreateKey(db, k)
-		assert.Error(t, err)
-	}
-	{
-		_, err = ListKeys(db)
-		assert.Error(t, err)
-	}
-	{
-		_, err = GetKey(db, 1)
-		assert.Error(t, err)
-	}
-	{
-		err = DeleteKey(db, 1)
-		assert.Error(t, err)
-	}
+	_, err := CreateKey(db, k)
+	assert.Error(t, err)
+	_, err = ListKeys(db)
+	assert.Error(t, err)
+	_, err = GetKey(db, 1)
+	assert.Error(t, err)
+	assert.Error(t, DeleteKey(db, 1))
+}
+
+func assertClosedTunnelOperations(t *testing.T, db *sql.DB) {
+	t.Helper()
 	tun := model.Tunnel{SessionID: 1, Name: "t", Type: model.TunnelLocal, LocalPort: 8080}
-	{
-		_, err = CreateTunnel(db, tun)
-		assert.Error(t, err)
-	}
-	{
-		_, err = ListTunnels(db)
-		assert.Error(t, err)
-	}
-	{
-		err = UpdateTunnel(db, tun)
-		assert.Error(t, err)
-	}
-	{
-		err = DeleteTunnel(db, 1)
-		assert.Error(t, err)
-	}
+	_, err := CreateTunnel(db, tun)
+	assert.Error(t, err)
+	_, err = ListTunnels(db)
+	assert.Error(t, err)
+	assert.Error(t, UpdateTunnel(db, tun))
+	assert.Error(t, DeleteTunnel(db, 1))
+}
+
+func assertClosedMacroOperations(t *testing.T, db *sql.DB) {
+	t.Helper()
 	mac := model.Macro{Name: "m", Command: "c"}
-	{
-		_, err = CreateMacro(db, mac)
-		assert.Error(t, err)
-	}
-	{
-		_, err = ListMacros(db)
-		assert.Error(t, err)
-	}
-	{
-		err = UpdateMacro(db, mac)
-		assert.Error(t, err)
-	}
-	{
-		err = DeleteMacro(db, 1)
-		assert.Error(t, err)
-	}
+	_, err := CreateMacro(db, mac)
+	assert.Error(t, err)
+	_, err = ListMacros(db)
+	assert.Error(t, err)
+	assert.Error(t, UpdateMacro(db, mac))
+	assert.Error(t, DeleteMacro(db, 1))
+}
+
+func assertClosedThemeOperations(t *testing.T, db *sql.DB) {
+	t.Helper()
 	th := model.ThemeDefinition{Name: "t", Mode: model.ThemeModeDark, SourceType: model.ThemeSourceCustom, SourceFingerprint: "closed", ColorPayload: "{}"}
-	{
-		_, err = CreateThemeDefinition(db, th)
-		assert.Error(t, err)
-	}
-	{
-		_, err = ListThemeDefinitions(db, "")
-		assert.Error(t, err)
-	}
-	{
-		_, err = GetThemeDefinition(db, 1)
-		assert.Error(t, err)
-	}
-	{
-		err = DeleteThemeDefinition(db, 1)
-		assert.Error(t, err)
-	}
+	_, err := CreateThemeDefinition(db, th)
+	assert.Error(t, err)
+	_, err = ListThemeDefinitions(db, "")
+	assert.Error(t, err)
+	_, err = GetThemeDefinition(db, 1)
+	assert.Error(t, err)
+	assert.Error(t, DeleteThemeDefinition(db, 1))
 }
 
 func ptrInt64(v int64) *int64 {

@@ -35,6 +35,25 @@ interface PlaybackCursor {
   lastTick: number
 }
 
+interface PlaybackLifecycleOptions {
+  recordingId: string
+  title: string
+  containerRef: RefObject<HTMLDivElement | null>
+  termRef: RefObject<Terminal | null>
+  fitAddonRef: RefObject<FitAddon | null>
+  activeRef: RefObject<boolean>
+  recoveryPendingRef: RefObject<boolean>
+  cursorRef: RefObject<PlaybackCursor>
+  setEntries: (entries: RecordingEntry[]) => void
+  reportRuntimeError: TerminalRuntimeErrorReporter
+}
+
+interface PlaybackControlOptions {
+  entries: RecordingEntry[]
+  termRef: RefObject<Terminal | null>
+  cursorRef: RefObject<PlaybackCursor>
+  reportRuntimeError: TerminalRuntimeErrorReporter
+}
 interface Props {
   recordingId: string
   title: string
@@ -89,6 +108,7 @@ function createPlaybackTerminal() {
   const terminalTheme = useAppStore.getState().terminalTheme
   return new Terminal({
     cursorBlink: false,
+    cursorStyle: terminalTheme.cursorStyle,
     disableStdin: true,
     fontSize: terminalTheme.fontSize,
     fontFamily: terminalTheme.fontFamily,
@@ -97,18 +117,7 @@ function createPlaybackTerminal() {
   })
 }
 
-function usePlaybackLifecycle({ recordingId, title, containerRef, termRef, fitAddonRef, activeRef, recoveryPendingRef, cursorRef, setEntries, reportRuntimeError }: {
-  recordingId: string
-  title: string
-  containerRef: RefObject<HTMLDivElement | null>
-  termRef: RefObject<Terminal | null>
-  fitAddonRef: RefObject<FitAddon | null>
-  activeRef: RefObject<boolean>
-  recoveryPendingRef: RefObject<boolean>
-  cursorRef: RefObject<PlaybackCursor>
-  setEntries: (entries: RecordingEntry[]) => void
-  reportRuntimeError: TerminalRuntimeErrorReporter
-}) {
+function usePlaybackLifecycle({ recordingId, title, containerRef, termRef, fitAddonRef, activeRef, recoveryPendingRef, cursorRef, setEntries, reportRuntimeError }: PlaybackLifecycleOptions) {
   useEffect(() => {
     let disposed = false
     const container = containerRef.current
@@ -121,7 +130,14 @@ function usePlaybackLifecycle({ recordingId, title, containerRef, termRef, fitAd
     const disposeCopyOnSelect = installTerminalCopyOnSelect(term, 'playback')
     const unsubscribeTheme = useAppStore.subscribe((state, previous) => {
       if (state.terminalTheme !== previous.terminalTheme) {
-        runTerminalRuntime(reportRuntimeError, 'playback theme update', () => applyTerminalTheme(term.options, state.terminalTheme))
+        runTerminalRuntime(reportRuntimeError, 'playback theme update', () => {
+          applyTerminalTheme(term.options, state.terminalTheme)
+          if (!activeRef.current || !recoverPlaybackView(term, fitAddon, containerRef.current)) {
+            recoveryPendingRef.current = true
+            return
+          }
+          recoveryPendingRef.current = false
+        })
       }
     })
     const resizeObserver = createPlaybackResizeObserver({
@@ -204,7 +220,7 @@ function advancePlayback({ term, entries, cursor, speed, setProgress, setPlaying
   setPlaying(false)
 }
 
-function usePlaybackControls(entries: RecordingEntry[], termRef: RefObject<Terminal | null>, cursorRef: RefObject<PlaybackCursor>, reportRuntimeError: TerminalRuntimeErrorReporter) {
+function usePlaybackControls({ entries, termRef, cursorRef, reportRuntimeError }: PlaybackControlOptions) {
   const [playing, setPlaying] = useState(false)
   const [speed, setSpeed] = useState(1)
   const [progress, setProgress] = useState(0)
@@ -259,7 +275,7 @@ export function PlaybackTab({ recordingId, title, active }: Props) {
   activeRef.current = active
   usePlaybackLifecycle({ recordingId, title, containerRef, termRef, fitAddonRef, activeRef, recoveryPendingRef, cursorRef, setEntries, reportRuntimeError })
   usePlaybackActivation({ active, containerRef, termRef, fitAddonRef, recoveryPendingRef, reportRuntimeError })
-  const controls = usePlaybackControls(entries, termRef, cursorRef, reportRuntimeError)
+  const controls = usePlaybackControls({ entries, termRef, cursorRef, reportRuntimeError })
 
   return (
     <div
