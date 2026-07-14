@@ -8,11 +8,23 @@ import (
 	"github.com/xuthus5/mssh/internal/model"
 )
 
+const sessionLogTimeLayout = "2006-01-02 15:04:05"
+
+func normalizeSessionLogTime(value time.Time) time.Time {
+	if value.IsZero() {
+		value = time.Now()
+	}
+	return value.UTC().Truncate(time.Second)
+}
+
 func CreateSessionLog(db *sql.DB, l model.SessionLog) (*model.SessionLog, error) {
-	startedAt := l.StartedAt.Format("2006-01-02 15:04:05")
+	l.StartedAt = normalizeSessionLogTime(l.StartedAt)
+	startedAt := l.StartedAt.Format(sessionLogTimeLayout)
 	var endedAt *string
 	if l.EndedAt != nil {
-		s := l.EndedAt.Format("2006-01-02 15:04:05")
+		normalized := normalizeSessionLogTime(*l.EndedAt)
+		l.EndedAt = &normalized
+		s := normalized.Format(sessionLogTimeLayout)
 		endedAt = &s
 	}
 	result, err := db.Exec(
@@ -45,12 +57,12 @@ func ListSessionLogs(db *sql.DB) ([]model.SessionLog, error) {
 		if err != nil {
 			return nil, fmt.Errorf("scan session log: %w", err)
 		}
-		l.StartedAt, err = time.Parse("2006-01-02 15:04:05", startedAt)
+		l.StartedAt, err = time.Parse(sessionLogTimeLayout, startedAt)
 		if err != nil {
 			return nil, fmt.Errorf("scan session log: parse started_at: %w", err)
 		}
 		if endedAt != nil {
-			t, err := time.Parse("2006-01-02 15:04:05", *endedAt)
+			t, err := time.Parse(sessionLogTimeLayout, *endedAt)
 			if err != nil {
 				return nil, fmt.Errorf("scan session log: parse ended_at: %w", err)
 			}
@@ -65,10 +77,10 @@ func ListSessionLogs(db *sql.DB) ([]model.SessionLog, error) {
 }
 
 func UpdateSessionLog(db *sql.DB, l model.SessionLog) error {
-	startedAt := l.StartedAt.Format("2006-01-02 15:04:05")
+	startedAt := normalizeSessionLogTime(l.StartedAt).Format(sessionLogTimeLayout)
 	var endedAt *string
 	if l.EndedAt != nil {
-		s := l.EndedAt.Format("2006-01-02 15:04:05")
+		s := normalizeSessionLogTime(*l.EndedAt).Format(sessionLogTimeLayout)
 		endedAt = &s
 	}
 	_, err := db.Exec(
@@ -100,12 +112,12 @@ func GetSessionLog(db *sql.DB, id int64) (*model.SessionLog, error) {
 	if err != nil {
 		return nil, fmt.Errorf("get session log: %w", err)
 	}
-	l.StartedAt, err = time.Parse("2006-01-02 15:04:05", startedAt)
+	l.StartedAt, err = time.Parse(sessionLogTimeLayout, startedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get session log: parse started_at: %w", err)
 	}
 	if endedAt != nil {
-		t, err := time.Parse("2006-01-02 15:04:05", *endedAt)
+		t, err := time.Parse(sessionLogTimeLayout, *endedAt)
 		if err != nil {
 			return nil, fmt.Errorf("get session log: parse ended_at: %w", err)
 		}
@@ -133,12 +145,12 @@ func ListSessionLogsBySession(db *sql.DB, sessionID int64) ([]model.SessionLog, 
 		if err != nil {
 			return nil, fmt.Errorf("scan session log: %w", err)
 		}
-		l.StartedAt, err = time.Parse("2006-01-02 15:04:05", startedAt)
+		l.StartedAt, err = time.Parse(sessionLogTimeLayout, startedAt)
 		if err != nil {
 			return nil, fmt.Errorf("scan session log: parse started_at: %w", err)
 		}
 		if endedAt != nil {
-			t, err := time.Parse("2006-01-02 15:04:05", *endedAt)
+			t, err := time.Parse(sessionLogTimeLayout, *endedAt)
 			if err != nil {
 				return nil, fmt.Errorf("scan session log: parse ended_at: %w", err)
 			}
