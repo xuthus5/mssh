@@ -1,5 +1,5 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react'
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -28,48 +28,49 @@ const recording = {
   data_path: '/tmp/recording-7.msshlog',
 }
 
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  let reject!: (error: unknown) => void
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise
+    reject = rejectPromise
+  })
+  return { promise, resolve, reject }
+}
+
 describe('SessionLog', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     listRecordings.mockResolvedValue([recording])
   })
 
-  it('loads, plays, toggles recording, and removes a recording', async () => {
-    const onToggleRecording = vi.fn()
+  it('loads, plays, and removes a recording without duplicate toolbar actions', async () => {
     const onPlayback = vi.fn()
+    const onClose = vi.fn()
     const onDeleteRecording = vi.fn(async () => {})
-    render(<SessionLog sessionId={1} isRecording={false} onToggleRecording={onToggleRecording}
-      onPlayback={onPlayback} onDeleteRecording={onDeleteRecording} />)
+    render(<SessionLog sessionId={1} onPlayback={onPlayback} onDeleteRecording={onDeleteRecording} onClose={onClose} />)
 
-    await userEvent.click(screen.getByTitle('开始录制'))
-    expect(onToggleRecording).toHaveBeenCalledOnce()
-    await userEvent.click(screen.getByRole('button', { name: '记录 (0)' }))
-    const row = (await screen.findByText('录制 #7')).closest('.flex.items-center.justify-between')
-    expect(row).not.toBeNull()
-    const [playButton] = within(row as HTMLElement).getAllByRole('button')
-    await userEvent.click(playButton)
+    expect(await screen.findByText('录制 #7')).toBeInTheDocument()
+    expect(screen.queryByText('录制中')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /记录 \(/ })).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: '播放录制 #7' }))
     expect(onPlayback).toHaveBeenCalledWith('/tmp/recording-7.msshlog', '回放 #7')
-    expect(screen.queryByText('录制 #7')).not.toBeInTheDocument()
+    expect(onClose).toHaveBeenCalledOnce()
 
-    await userEvent.click(screen.getByRole('button', { name: '记录 (1)' }))
-    const deleteRow = (await screen.findByText('录制 #7')).closest('.flex.items-center.justify-between')
-    const deleteButton = within(deleteRow as HTMLElement).getAllByRole('button')[1]
-    await userEvent.click(deleteButton)
+    await userEvent.click(screen.getByRole('button', { name: '删除录制 #7' }))
     await userEvent.click(screen.getByRole('button', { name: '删除' }))
 
     await waitFor(() => expect(onDeleteRecording).toHaveBeenCalledWith(7))
     expect(screen.queryByText('录制 #7')).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '记录 (0)' })).toBeInTheDocument()
+    expect(screen.getByText('0 条')).toBeInTheDocument()
   })
 
   it('shows load errors and retries to the empty state', async () => {
     const loadError = new Error('list failed')
     const loggerError = vi.spyOn(logger, 'error').mockImplementation(() => {})
     listRecordings.mockRejectedValueOnce(loadError).mockResolvedValueOnce([])
-    render(<SessionLog sessionId={1} isRecording onToggleRecording={vi.fn()}
-      onPlayback={vi.fn()} onDeleteRecording={vi.fn(async () => {})} />)
+    render(<SessionLog sessionId={1} onPlayback={vi.fn()} onDeleteRecording={vi.fn(async () => {})} onClose={vi.fn()} />)
 
-    await userEvent.click(screen.getByRole('button', { name: '记录 (0)' }))
     expect(await screen.findByText('list failed')).toBeInTheDocument()
     expect(loggerError).toHaveBeenCalledWith('SessionLog: load recordings error:', loadError)
     await userEvent.click(screen.getByRole('button', { name: '重试' }))
@@ -79,26 +80,28 @@ describe('SessionLog', () => {
 
   it('shows an unknown label for legacy zero recording timestamps', async () => {
     listRecordings.mockResolvedValue([{ ...recording, started_at: '0001-01-01T00:00:00Z' }])
-    render(<SessionLog sessionId={1} isRecording={false} onToggleRecording={vi.fn()}
-      onPlayback={vi.fn()} onDeleteRecording={vi.fn(async () => {})} />)
-
-    await userEvent.click(screen.getByRole('button', { name: '记录 (0)' }))
+    render(<SessionLog sessionId={1} onPlayback={vi.fn()} onDeleteRecording={vi.fn(async () => {})} onClose={vi.fn()} />)
 
     expect(await screen.findByText('时间未知')).toBeInTheDocument()
     expect(screen.queryByText(/1\/1\/1/)).not.toBeInTheDocument()
   })
 
   it('keeps the recording count when deletion fails', async () => {
-    const onDeleteRecording = vi.fn(async () => { throw new Error('delete failed') })
-    render(<SessionLog sessionId={1} isRecording={false} onToggleRecording={vi.fn()}
-      onPlayback={vi.fn()} onDeleteRecording={onDeleteRecording} />)
-    await userEvent.click(screen.getByRole('button', { name: '记录 (0)' }))
-    const row = (await screen.findByText('录制 #7')).closest('.flex.items-center.justify-between')
+    const deletion = deferred<void>()
+    const onDeleteRecording = vi.fn(() => deletion.promise)
+    render(<SessionLog sessionId={1} onPlayback={vi.fn()} onDeleteRecording={onDeleteRecording} onClose={vi.fn()} />)
+    expect(await screen.findByText('录制 #7')).toBeInTheDocument()
 
-    await userEvent.click(within(row as HTMLElement).getAllByRole('button')[1])
+    await userEvent.click(screen.getByRole('button', { name: '删除录制 #7' }))
     await userEvent.click(screen.getByRole('button', { name: '删除' }))
+    expect(screen.getByRole('button', { name: '删除中...' })).toBeDisabled()
+    expect(screen.getByText('录制 #7')).toBeInTheDocument()
+
+    deletion.reject(new Error('delete failed'))
 
     expect(await screen.findByText('delete failed')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '记录 (1)' })).toBeInTheDocument()
+    expect(screen.getByText('1 条')).toBeInTheDocument()
+    expect(screen.getByText('录制 #7')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '删除' })).toBeEnabled()
   })
 })

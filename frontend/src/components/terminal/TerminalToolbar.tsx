@@ -4,6 +4,12 @@ import { useAppStore } from '@/store/appStore'
 import { LogService } from '@/lib/wails'
 import SessionLog from '@/components/terminal/SessionLog'
 import { logger } from '@/lib/logger'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTitle,
+  PopoverTrigger,
+} from '@/components/ui/popover'
 
 interface TerminalToolbarProps {
   terminalID: string
@@ -28,6 +34,7 @@ export function TerminalToolbar({
   split,
 }: TerminalToolbarProps) {
   const [showSessionLog, setShowSessionLog] = useState(false)
+  const [sessionLogBlocked, setSessionLogBlocked] = useState(false)
 
   const getTerminal = useCallback(() => {
     const state = useAppStore.getState()
@@ -68,8 +75,13 @@ export function TerminalToolbar({
     restoreFocus()
   }, [getTerminal, restoreFocus])
 
+  const handleSessionLogOpenChange = useCallback((open: boolean) => {
+    if (!open && sessionLogBlocked) return
+    setShowSessionLog(open)
+  }, [sessionLogBlocked])
+
   return (
-    <div className="flex items-center gap-1 h-8 px-2 bg-muted/30 border-b flex-shrink-0">
+    <div className="relative flex items-center gap-1 h-8 px-2 bg-muted/30 border-b flex-shrink-0">
       <span className="text-xs text-muted-foreground truncate mr-2">
         {hostname ?? 'Terminal'}
       </span>
@@ -155,36 +167,44 @@ export function TerminalToolbar({
           </span>
         </button>
 
-        <button
-          type="button"
-          className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors"
-          onClick={() => setShowSessionLog(!showSessionLog)}
-          title="录制记录"
-        >
-          记录
-        </button>
+        <Popover open={showSessionLog} onOpenChange={handleSessionLogOpenChange}>
+          <PopoverTrigger
+            render={
+              <button
+                type="button"
+                className="flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
+                title="录制记录"
+              />
+            }
+          >
+            记录
+          </PopoverTrigger>
+          <PopoverContent
+            align="end"
+            sideOffset={4}
+            className="w-auto bg-transparent p-0 shadow-none ring-0"
+          >
+            <PopoverTitle className="sr-only">录制记录</PopoverTitle>
+            <SessionLog
+              sessionId={sessionId}
+              onClose={() => setShowSessionLog(false)}
+              onDeleteDialogOpenChange={setSessionLogBlocked}
+              onPlayback={(recordingPath: string, title: string) => {
+                const { openTab } = useAppStore.getState()
+                openTab({ id: `playback-${title}`, title, type: 'playback', terminalId: recordingPath })
+              }}
+              onDeleteRecording={async (logId: number) => {
+                try {
+                  await LogService.Delete(logId)
+                } catch (err) {
+                  logger.error('TerminalToolbar: delete recording error:', err)
+                  throw err
+                }
+              }}
+            />
+          </PopoverContent>
+        </Popover>
       </div>
-
-      {showSessionLog && (
-        <div className="absolute top-8 right-2 z-50">
-          <SessionLog
-            sessionId={sessionId}
-            isRecording={isRecording}
-            onToggleRecording={onToggleRecording}
-            onPlayback={(recordingPath: string, title: string) => {
-              const { openTab } = useAppStore.getState()
-              openTab({ id: `playback-${title}`, title, type: 'playback', terminalId: recordingPath })
-            }}
-            onDeleteRecording={async (logId: number) => {
-              try {
-                await LogService.Delete(logId)
-              } catch (err) {
-                logger.error('TerminalToolbar: delete recording error:', err)
-              }
-            }}
-          />
-        </div>
-      )}
     </div>
   )
 }
