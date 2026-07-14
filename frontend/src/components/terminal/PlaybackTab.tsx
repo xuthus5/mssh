@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
 import { FitAddon } from '@xterm/addon-fit'
 import { Terminal } from '@xterm/xterm'
-import { Pause, Play } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Slider } from '@/components/ui/slider'
 import { useTerminalRuntimeErrorReporter, type TerminalRuntimeErrorReporter } from '@/components/terminal/TerminalErrorBoundary'
+import { PlaybackHeader, PlaybackTimeline } from '@/components/terminal/PlaybackControls'
+import { installTerminalCopyOnSelect } from '@/components/terminal/terminalBehaviorRuntime'
 import { runTerminalRuntime } from '@/components/terminal/terminalRuntime'
 import { logger } from '@/lib/logger'
 import { applyTerminalTheme, xtermTheme } from '@/lib/terminalTheme'
@@ -18,7 +17,6 @@ import {
 const PLAYBACK_INTERVAL_MS = 16
 const PLAYBACK_SCROLLBACK = 10000
 const MAX_PROGRESS = 100
-const PLAYBACK_SPEEDS = [0.5, 1, 2, 4]
 
 interface RecordingEntry {
   timestamp: number
@@ -120,6 +118,7 @@ function usePlaybackLifecycle({ recordingId, title, containerRef, termRef, fitAd
     fitAddonRef.current = fitAddon
     term.loadAddon(fitAddon)
     if (container) term.open(container)
+    const disposeCopyOnSelect = installTerminalCopyOnSelect(term, 'playback')
     const unsubscribeTheme = useAppStore.subscribe((state, previous) => {
       if (state.terminalTheme !== previous.terminalTheme) {
         runTerminalRuntime(reportRuntimeError, 'playback theme update', () => applyTerminalTheme(term.options, state.terminalTheme))
@@ -137,6 +136,7 @@ function usePlaybackLifecycle({ recordingId, title, containerRef, termRef, fitAd
       stopPlayback(cursorRef.current)
       safelyDispose('resize observer', () => resizeObserver.disconnect())
       safelyDispose('theme subscription', unsubscribeTheme)
+      safelyDispose('copy-on-select', disposeCopyOnSelect)
       safelyDispose('terminal', () => term.dispose())
       fitAddonRef.current = null
       termRef.current = null
@@ -245,30 +245,6 @@ function usePlaybackControls(entries: RecordingEntry[], termRef: RefObject<Termi
     })
   }, [cursorRef, entries, reportRuntimeError, termRef])
   return { playing, speed, progress, togglePlay, changeSpeed, seek }
-}
-
-function PlaybackHeader({ title, playing, disabled, speed, onToggle }: { title: string; playing: boolean; disabled: boolean; speed: number; onToggle: () => void }) {
-  return (
-    <div className="flex h-8 items-center gap-2 border-b bg-muted/30 px-2">
-      <span className="text-xs text-muted-foreground">回放: {title}</span>
-      <div className="flex-1" />
-      <Button size="xs" variant="ghost" aria-label={playing ? '暂停回放' : '开始回放'} disabled={disabled} onClick={onToggle}>
-        {playing ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
-      </Button>
-      <span className="text-xs text-muted-foreground">{speed}x</span>
-    </div>
-  )
-}
-
-function PlaybackTimeline({ progress, speed, onSeek, onSpeed }: { progress: number; speed: number; onSeek: (value: number) => void; onSpeed: (value: number) => void }) {
-  return (
-    <div className="flex items-center gap-2 border-t border-border bg-muted/30 px-3 py-1.5">
-      <Slider value={[progress]} min={0} max={MAX_PROGRESS} onValueChange={(value) => onSeek(typeof value === 'number' ? value : value[0])} className="flex-1" />
-      <div className="flex flex-shrink-0 items-center gap-1">
-        {PLAYBACK_SPEEDS.map((value) => <Button key={value} size="xs" variant={speed === value ? 'default' : 'ghost'} className="text-xs" onClick={() => onSpeed(value)}>{value}x</Button>)}
-      </div>
-    </div>
-  )
 }
 
 export function PlaybackTab({ recordingId, title, active }: Props) {
