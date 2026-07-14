@@ -67,8 +67,10 @@ type ThemeProfile struct {
 }
 
 type ThemeAssignments struct {
-	DarkProfileID  int64 `json:"dark_profile_id"`
-	LightProfileID int64 `json:"light_profile_id"`
+	DarkProfileID       int64 `json:"dark_profile_id"`
+	LightProfileID      int64 `json:"light_profile_id"`
+	FollowInterfaceMode bool  `json:"follow_interface_mode"`
+	FixedProfileID      int64 `json:"fixed_profile_id"`
 }
 
 type ThemeImportStatus string
@@ -95,4 +97,5 @@ type ThemeImportSummary struct {
 type BuiltinThemeResetResult struct {
 	DarkReset  bool `json:"dark_reset"`
 	LightReset bool `json:"light_reset"`
+	FixedReset bool `json:"fixed_reset"`
 }
