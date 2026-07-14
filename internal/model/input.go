@@ -125,10 +125,8 @@ type ThemeAssignmentsInput struct {
 }
 
 type ThemeConfigurationInput struct {
-	DarkProfile  ThemeProfileInput     `json:"dark_profile"`
-	LightProfile ThemeProfileInput     `json:"light_profile"`
-	Profiles     []ThemeProfileInput   `json:"profiles"`
-	Assignments  ThemeAssignmentsInput `json:"assignments"`
+	Profiles    []ThemeProfileInput   `json:"profiles"`
+	Assignments ThemeAssignmentsInput `json:"assignments"`
 }
 
 func (input ThemeAssignmentsInput) ThemeAssignments() ThemeAssignments {

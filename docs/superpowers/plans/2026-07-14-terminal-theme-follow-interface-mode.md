@@ -245,7 +245,7 @@ git commit -m "feat(theme): extend theme assignments"
 - Produces: transactional `ThemeService.DeleteProfile` that safely clears historical Fixed references.
 - Produces: initialization repair and deduplicated Dark/Light/Fixed built-in reset.
 
-- [ ] **Step 1: Add failing service validation tests**
+- [x] **Step 1: Add failing service validation tests**
 
 Add cases in `internal/service/theme_test.go`:
 
@@ -267,7 +267,7 @@ assert.Error(t, service.SaveAssignments(model.ThemeAssignmentsInput{
 
 Add a successful fixed assignment and assert `GetAssignments` returns all four fields.
 
-- [ ] **Step 2: Add failing configuration transaction tests**
+- [x] **Step 2: Add failing configuration transaction tests**
 
 Create a configuration with three unique Profiles:
 
@@ -290,7 +290,7 @@ require.NoError(t, service.SaveConfiguration(input))
 
 Add duplicate Profile IDs to `Profiles` and require an error containing `duplicate theme profile`. Add an invalid Fixed ID after changing a Profile draft and assert neither Profile nor assignments were committed.
 
-- [ ] **Step 3: Add failing initialization and reset tests**
+- [x] **Step 3: Add failing initialization and reset tests**
 
 In `internal/service/theme_builtin_test.go`, cover:
 
@@ -313,7 +313,7 @@ assert.Equal(t, repaired.DarkProfileID, repaired.FixedProfileID)
 
 Assign a third built-in Profile as Fixed while follow is disabled, customize all three assigned Profiles, reset, and assert `DarkReset`, `LightReset`, and `FixedReset` are true. Assign the same Profile to Dark and Fixed and assert its update occurs once while both result fields remain true.
 
-- [ ] **Step 4: Run service tests to verify RED**
+- [x] **Step 4: Run service tests to verify RED**
 
 Run:
 
@@ -323,7 +323,7 @@ PATH="$HOME/.govm/go/bin:$PATH" go test ./internal/service ./internal/store
 
 Expected: FAIL because configuration still accepts two fixed fields, fixed assignment validation is absent, and reset does not include Fixed.
 
-- [ ] **Step 5: Implement assignment validation**
+- [x] **Step 5: Implement assignment validation**
 
 Add a helper in `internal/service/theme.go`:
 
@@ -360,7 +360,7 @@ func validateThemeAssignments(db interface {
 
 Call it from `SaveAssignments` before persistence.
 
-- [ ] **Step 6: Refactor SaveConfiguration to a unique Profile list**
+- [x] **Step 6: Refactor SaveConfiguration to a unique Profile list**
 
 Validate input before opening the transaction:
 
@@ -382,11 +382,11 @@ for _, profileInput := range input.Profiles {
 
 Inside one transaction, validate assignment references, update each Profile once, save assignments, and commit. Roll back and wrap every failure with `save theme configuration`.
 
-- [ ] **Step 7: Make Profile deletion transactional**
+- [x] **Step 7: Make Profile deletion transactional**
 
 Change `ThemeService.DeleteProfile` to begin a transaction, call `store.DeleteThemeProfile(tx, id)`, roll back on error, and commit on success. This makes historical Fixed clearing and Profile deletion atomic.
 
-- [ ] **Step 8: Repair follow and fixed assignments during initialization**
+- [x] **Step 8: Repair follow and fixed assignments during initialization**
 
 Extend `repairThemeAssignments`:
 
@@ -402,7 +402,7 @@ if _, valid := state.profileIDs[assignments.FixedProfileID]; !valid {
 
 Because missing follow settings load as `true`, saving the repaired assignments writes the explicit default for future reads.
 
-- [ ] **Step 9: Deduplicate built-in reset work**
+- [x] **Step 9: Deduplicate built-in reset work**
 
 Use a cache keyed by Profile ID:
 
@@ -423,7 +423,7 @@ reset := func(id int64) (bool, error) {
 
 Reset Dark and Light unconditionally. Reset Fixed only when follow mode is disabled. Populate all three result fields from the cached results.
 
-- [ ] **Step 10: Run service tests to verify GREEN**
+- [x] **Step 10: Run service tests to verify GREEN**
 
 Run:
 
@@ -433,7 +433,7 @@ PATH="$HOME/.govm/go/bin:$PATH" go test ./internal/service ./internal/store
 
 Expected: both packages PASS.
 
-- [ ] **Step 11: Commit transactional behavior**
+- [x] **Step 11: Commit transactional behavior**
 
 ```bash
 git add internal/service/theme.go internal/service/theme_test.go internal/service/theme_builtin.go internal/service/theme_builtin_test.go internal/store/theme_test.go
