@@ -142,7 +142,7 @@ export default function SettingsDialog({
     e.preventDefault()
     setSaving(true)
     try {
-      await onSaveGeneral({ maxPoolSize: parseInt(maxPoolSize, 10) || 10, defaultKeepAlive: parseInt(defaultKeepAlive, 10) || 60, defaultTermType, uiFontFamily, uiFontFallbackFamily, uiFontSize: parseInt(uiFontSize, 10) || 14, windowOpacity: parseInt(windowOpacity, 10) || 100 })
+      await onSaveGeneral({ maxPoolSize: parseInt(maxPoolSize, 10) || 10, defaultKeepAlive: parseInt(defaultKeepAlive, 10) || 60, defaultTermType, uiFontFamily, uiFontFallbackFamily, uiFontSize: parseInt(uiFontSize, 10) || 14, windowOpacity: parseInt(windowOpacity, 10) || 100, rightClickAction: general.rightClickAction, copyOnSelect: general.copyOnSelect })
       setFontDirty(false)
     } finally {
       setSaving(false)
