@@ -828,7 +828,7 @@ git commit -m "feat(theme): add follow mode controls"
 - Produces: no global CSS override for `.xterm-viewport` background.
 - Produces: regression coverage for SSH and playback hot updates with a fixed custom background.
 
-- [ ] **Step 1: Add the failing CSS ownership test**
+- [x] **Step 1: Add the failing CSS ownership test**
 
 Create `frontend/src/styles/globals.test.ts`:
 
@@ -851,7 +851,7 @@ cd frontend && npm test -- src/styles/globals.test.ts
 
 Expected: FAIL because the forbidden rule still exists.
 
-- [ ] **Step 2: Add SSH and playback integration assertions**
+- [x] **Step 2: Add SSH and playback integration assertions**
 
 Extend `useTerminal.test.tsx` so a global theme update to `background: '#123456'` updates the existing terminal options exactly once.
 
@@ -865,7 +865,7 @@ expect(terminalInstances[0].options.theme).toEqual(expect.objectContaining({
 
 These tests protect both live terminal types from diverging after the new resolver is introduced.
 
-- [ ] **Step 3: Remove the CSS override**
+- [x] **Step 3: Remove the CSS override**
 
 Delete only:
 
@@ -877,15 +877,15 @@ Delete only:
 
 Keep the global scrollbar token rules unchanged.
 
-- [ ] **Step 4: Include new files in frontend coverage**
+- [x] **Step 4: Include new files in frontend coverage**
 
 Update `frontend/vite.config.ts` coverage includes so `effectiveTerminalTheme.ts`, `themeEditorState.ts`, and the modified settings components participate in the 90% gate.
 
-- [ ] **Step 5: Update README behavior summary**
+- [x] **Step 5: Update README behavior summary**
 
 Change the terminal theme feature line to state that users can either bind separate Dark/Light Profiles or choose one fixed terminal Profile independent of the application mode.
 
-- [ ] **Step 6: Run focused integration tests**
+- [x] **Step 6: Run focused integration tests**
 
 Run:
 
@@ -895,7 +895,7 @@ cd frontend && npm test -- src/styles/globals.test.ts src/hooks/useTerminal.test
 
 Expected: all targeted tests PASS.
 
-- [ ] **Step 7: Commit the xterm ownership fix**
+- [x] **Step 7: Commit the xterm ownership fix**
 
 ```bash
 git add frontend/src/styles/globals.css frontend/src/styles/globals.test.ts frontend/src/hooks/useTerminal.test.tsx frontend/src/components/terminal/PlaybackTab.test.tsx frontend/vite.config.ts README.md

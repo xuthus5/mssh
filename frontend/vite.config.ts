@@ -35,7 +35,9 @@ export default defineConfig({
         'src/components/settings/SettingsDialog.tsx',
         'src/components/settings/ThemeEditor.tsx',
         'src/components/settings/ThemeModeSelector.tsx',
+        'src/components/settings/themeEditorState.ts',
         'src/components/terminal/**/*.{ts,tsx}',
+        'src/lib/effectiveTerminalTheme.ts',
         'src/store/**',
       ],
       // Tests and generated Wails bindings are not handwritten production code.
