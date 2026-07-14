@@ -43,7 +43,7 @@
 - Produces: `store.GetTerminalGlobalStyle(themeDB) (model.TerminalGlobalStyle, error)`
 - Produces: `store.SaveTerminalGlobalStyleDB(themeDB, model.TerminalGlobalStyle) error`
 
-- [ ] **Step 1: Write failing model and schema tests**
+- [x] **Step 1: Write failing model and schema tests**
 
 Add assertions that input conversion preserves global style and Profile follow state:
 
@@ -66,7 +66,7 @@ follow_global_style INTEGER NOT NULL DEFAULT 1
 
 Add a stale-schema test that creates a Profile table without `follow_global_style`, inserts historical data, runs `Migrate`, and asserts the theme catalog was rebuilt in the final format and the historical Profile no longer exists.
 
-- [ ] **Step 2: Run model and schema tests to verify RED**
+- [x] **Step 2: Run model and schema tests to verify RED**
 
 Run:
 
@@ -76,7 +76,7 @@ PATH="$HOME/.govm/go/bin:$PATH" go test ./internal/model ./internal/store -run '
 
 Expected: FAIL because the global model, input fields, schema column, and store functions do not exist.
 
-- [ ] **Step 3: Add model and input types**
+- [x] **Step 3: Add model and input types**
 
 Add to `internal/model/theme.go`:
 
@@ -111,7 +111,7 @@ func TerminalGlobalStyleInputFrom(style TerminalGlobalStyle) TerminalGlobalStyle
 }
 ```
 
-- [ ] **Step 4: Enforce the final POC Profile schema**
+- [x] **Step 4: Enforce the final POC Profile schema**
 
 Add `follow_global_style INTEGER NOT NULL DEFAULT 1` to `themeProfilesSchema`. Extend the theme catalog schema-current check to inspect both `themes` and `terminal_theme_profiles`. The final check must require the new Profile column:
 
@@ -132,7 +132,7 @@ func themeProfileSchemaCurrent(db *sql.DB) (bool, error) {
 
 If either theme definitions or Profile schema is not current, call the existing schema replacement path and recreate both tables. Do not add `ALTER TABLE`, data-copy, compatibility branches, or legacy value conversion.
 
-- [ ] **Step 5: Update Profile CRUD and scanning**
+- [x] **Step 5: Update Profile CRUD and scanning**
 
 Include `follow_global_style` in Profile INSERT, SELECT, UPDATE, and scan order. SQLite bool values scan directly into `bool`:
 
@@ -144,7 +144,7 @@ VALUES (?, ?, ?, ?, ?, ?, ?)
 
 Ensure `themeProfileSelect` and `scanThemeProfile` use the exact same field order.
 
-- [ ] **Step 6: Implement typed global style storage**
+- [x] **Step 6: Implement typed global style storage**
 
 Create `internal/store/terminal_style.go` with keys:
 
@@ -160,7 +160,7 @@ Implement reads where missing keys use the documented field defaults while malfo
 
 `GetTerminalGlobalStyle` returns a contextual error for malformed persisted data; default repair belongs to the service initialization task rather than silently masking corruption in the store.
 
-- [ ] **Step 7: Run store tests to verify GREEN**
+- [x] **Step 7: Run store tests to verify GREEN**
 
 Run:
 
@@ -170,7 +170,7 @@ PATH="$HOME/.govm/go/bin:$PATH" go test ./internal/model ./internal/store -count
 
 Expected: PASS, including fresh schema, stale-schema replacement, Profile round trips, global style round trips, missing-key behavior, and malformed setting errors.
 
-- [ ] **Step 8: Commit persistence layer**
+- [x] **Step 8: Commit persistence layer**
 
 ```bash
 git add internal/model internal/store

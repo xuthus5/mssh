@@ -27,6 +27,7 @@ const themeProfilesSchema = `CREATE TABLE IF NOT EXISTS terminal_theme_profiles 
 	id INTEGER PRIMARY KEY AUTOINCREMENT,
 	name TEXT NOT NULL,
 	theme_id INTEGER NOT NULL REFERENCES themes(id) ON DELETE RESTRICT,
+	follow_global_style INTEGER NOT NULL DEFAULT 1,
 	font_family TEXT NOT NULL,
 	font_size INTEGER NOT NULL,
 	cursor_style TEXT NOT NULL CHECK(cursor_style IN ('block', 'underline', 'bar')),
@@ -55,25 +56,19 @@ func ensureThemeCatalogSchema(db *sql.DB) error {
 }
 
 func themeCatalogSchemaCurrent(db *sql.DB) (bool, error) {
-	rows, err := db.Query("PRAGMA table_info(themes)")
+	definitionColumns, err := tableColumns(db, "themes")
 	if err != nil {
 		return false, fmt.Errorf("inspect themes schema: %w", err)
 	}
-	columns := make(map[string]bool)
-	for rows.Next() {
-		var cid, notNull, primaryKey int
-		var name, columnType string
-		var defaultValue any
-		if err = rows.Scan(&cid, &name, &columnType, &notNull, &defaultValue, &primaryKey); err != nil {
-			_ = rows.Close()
-			return false, fmt.Errorf("scan themes schema: %w", err)
-		}
-		columns[name] = true
+	definitionsCurrent := definitionColumns["mode"] && definitionColumns["source_fingerprint"] && definitionColumns["color_payload"]
+	if !definitionsCurrent {
+		return false, nil
 	}
-	if err = rows.Close(); err != nil {
-		return false, fmt.Errorf("close themes schema rows: %w", err)
+	profileColumns, err := tableColumns(db, "terminal_theme_profiles")
+	if err != nil {
+		return false, fmt.Errorf("inspect terminal theme profiles: %w", err)
 	}
-	return columns["mode"] && columns["source_fingerprint"] && columns["color_payload"], nil
+	return profileColumns["theme_id"] && profileColumns["follow_global_style"] && profileColumns["font_family"] && profileColumns["font_size"] && profileColumns["cursor_style"] && profileColumns["color_overrides"], nil
 }
 
 func replaceLegacyThemeSchema(db *sql.DB) error {
