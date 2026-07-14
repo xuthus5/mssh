@@ -12,8 +12,8 @@ import (
 
 func TestThemeCatalogStoreCRUDAndFilters(t *testing.T) {
 	db := setupTestDB(t)
-	dark := createThemeDefinitionFixture(t, db, "Dark", model.ThemeModeDark, "dark-fingerprint", false)
-	_ = createThemeDefinitionFixture(t, db, "Light", model.ThemeModeLight, "light-fingerprint", false)
+	dark := createThemeDefinitionFixture(t, db, themeDefinitionFixture{name: "Dark", mode: model.ThemeModeDark, fingerprint: "dark-fingerprint"})
+	_ = createThemeDefinitionFixture(t, db, themeDefinitionFixture{name: "Light", mode: model.ThemeModeLight, fingerprint: "light-fingerprint"})
 
 	definitions, err := ListThemeDefinitions(db, model.ThemeModeDark)
 	require.NoError(t, err)
@@ -39,6 +39,13 @@ func TestThemeCatalogStoreCRUDAndFilters(t *testing.T) {
 	assert.Equal(t, 16, loaded.FontSize)
 	assert.False(t, loaded.FollowGlobalStyle)
 	assert.Equal(t, dark.Name, loaded.Definition.Name)
+	profiles, err := ListThemeProfiles(db, model.ThemeModeDark)
+	require.NoError(t, err)
+	require.Len(t, profiles, 1)
+	assert.Equal(t, profile.ID, profiles[0].ID)
+	profiles, err = ListThemeProfiles(db, "")
+	require.NoError(t, err)
+	assert.Len(t, profiles, 1)
 
 	require.NoError(t, DeleteThemeProfile(db, profile.ID))
 	require.NoError(t, DeleteThemeDefinition(db, dark.ID))
@@ -46,17 +53,39 @@ func TestThemeCatalogStoreCRUDAndFilters(t *testing.T) {
 
 func TestThemeCatalogStoreConstraints(t *testing.T) {
 	db := setupTestDB(t)
-	builtin := createThemeDefinitionFixture(t, db, "Builtin", model.ThemeModeDark, "builtin", true)
+	builtin := createThemeDefinitionFixture(t, db, themeDefinitionFixture{name: "Builtin", mode: model.ThemeModeDark, fingerprint: "builtin", builtin: true})
 	_, err := CreateThemeDefinition(db, model.ThemeDefinition{Name: "Duplicate", Mode: model.ThemeModeDark, SourceType: model.ThemeSourceCustom, SourceFingerprint: "builtin", ColorPayload: `{}`})
 	assert.Error(t, err)
 	assert.Error(t, DeleteThemeDefinition(db, builtin.ID))
 	assert.Error(t, UpdateThemeDefinition(db, model.ThemeDefinition{ID: -1, Name: "Missing"}))
 
-	custom := createThemeDefinitionFixture(t, db, "Custom", model.ThemeModeDark, "custom", false)
+	custom := createThemeDefinitionFixture(t, db, themeDefinitionFixture{name: "Custom", mode: model.ThemeModeDark, fingerprint: "custom"})
 	profile, err := CreateThemeProfile(db, model.ThemeProfile{Name: "Custom", ThemeID: custom.ID, FontFamily: "monospace", FontSize: 14, CursorStyle: model.CursorStyleBlock, ColorOverrides: `{}`})
 	require.NoError(t, err)
 	assert.Error(t, DeleteThemeDefinition(db, custom.ID))
 	require.NoError(t, DeleteThemeProfile(db, profile.ID))
+	_, err = CreateThemeProfile(db, model.ThemeProfile{Name: "Missing", ThemeID: -1})
+	assert.ErrorContains(t, err, "create theme profile")
+	_, err = GetThemeProfile(db, -1)
+	assert.ErrorContains(t, err, "get theme profile")
+	assert.ErrorContains(t, UpdateThemeProfile(db, model.ThemeProfile{ID: -1}), "theme profile not found")
+	assert.ErrorContains(t, DeleteThemeProfile(db, -1), "theme profile not found")
+}
+
+func TestListThemeProfilesReportsQueryErrors(t *testing.T) {
+	db := setupTestDB(t)
+	require.NoError(t, db.Close())
+	_, err := ListThemeProfiles(db, model.ThemeModeDark)
+	assert.ErrorContains(t, err, "list theme profiles")
+}
+
+func TestListThemeProfilesReportsInvalidStoredValues(t *testing.T) {
+	db := setupTestDB(t)
+	definition := createThemeDefinitionFixture(t, db, themeDefinitionFixture{name: "Invalid Profile", mode: model.ThemeModeDark, fingerprint: "invalid-profile"})
+	_, err := db.Exec(`INSERT INTO terminal_theme_profiles (name, theme_id, follow_global_style, font_family, font_size, cursor_style, color_overrides) VALUES ('Invalid', ?, 1, 'mono', 'large', 'bar', '{}')`, definition.ID)
+	require.NoError(t, err)
+	_, err = ListThemeProfiles(db, model.ThemeModeDark)
+	assert.ErrorContains(t, err, "font_size")
 }
 
 func TestThemeAssignmentsStore(t *testing.T) {
@@ -79,7 +108,7 @@ func TestThemeAssignmentsStore(t *testing.T) {
 
 func TestDeleteThemeProfileProtectsActiveAssignments(t *testing.T) {
 	db := setupTestDB(t)
-	definition := createThemeDefinitionFixture(t, db, "Shared", model.ThemeModeUniversal, "shared-delete", false)
+	definition := createThemeDefinitionFixture(t, db, themeDefinitionFixture{name: "Shared", mode: model.ThemeModeUniversal, fingerprint: "shared-delete"})
 	dark, err := CreateThemeProfile(db, model.ThemeProfile{Name: "Dark", ThemeID: definition.ID, FontFamily: "monospace", FontSize: 14, CursorStyle: model.CursorStyleBar, ColorOverrides: `{}`})
 	require.NoError(t, err)
 	light, err := CreateThemeProfile(db, model.ThemeProfile{Name: "Light", ThemeID: definition.ID, FontFamily: "monospace", FontSize: 14, CursorStyle: model.CursorStyleBar, ColorOverrides: `{}`})
@@ -131,9 +160,16 @@ func TestThemeAssignmentsStoreReportsInvalidValuesAndDatabaseErrors(t *testing.T
 	assert.ErrorContains(t, err, "read theme assignment")
 }
 
-func createThemeDefinitionFixture(t *testing.T, db *sql.DB, name string, mode model.ThemeMode, fingerprint string, builtin bool) *model.ThemeDefinition {
+type themeDefinitionFixture struct {
+	name        string
+	mode        model.ThemeMode
+	fingerprint string
+	builtin     bool
+}
+
+func createThemeDefinitionFixture(t *testing.T, db *sql.DB, fixture themeDefinitionFixture) *model.ThemeDefinition {
 	t.Helper()
-	definition, err := CreateThemeDefinition(db, model.ThemeDefinition{Name: name, Mode: mode, SourceType: model.ThemeSourceCustom, SourceFingerprint: fingerprint, ColorPayload: `{"background":"#000000"}`, IsBuiltin: builtin})
+	definition, err := CreateThemeDefinition(db, model.ThemeDefinition{Name: fixture.name, Mode: fixture.mode, SourceType: model.ThemeSourceCustom, SourceFingerprint: fixture.fingerprint, ColorPayload: `{"background":"#000000"}`, IsBuiltin: fixture.builtin})
 	require.NoError(t, err)
 	return definition
 }

@@ -1,10 +1,17 @@
+import type { ComponentProps } from 'react'
 import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ThemeEditor } from '@/components/settings/ThemeEditor'
 import { useToastStore } from '@/components/ui/toast'
 
-const profiles = [profile(1, 'GitHub Dark', 'dark', '#0d1117'), profile(2, 'GitHub Light', 'light', '#ffffff'), profile(3, 'Dracula', 'dark', '#282a36')]
+const profiles = [
+  profile({ id: 1, name: 'GitHub Dark', mode: 'dark', background: '#0d1117' }),
+  profile({ id: 2, name: 'GitHub Light', mode: 'light', background: '#ffffff' }),
+  profile({ id: 3, name: 'Dracula', mode: 'dark', background: '#282a36' }),
+]
+const globalStyle = { font_family: 'Global Font', font_size: 16, cursor_style: 'underline' as const }
+type ThemeEditorProps = ComponentProps<typeof ThemeEditor>
 
 describe('ThemeEditor dual mode profiles', () => {
   beforeEach(() => useToastStore.setState({ toasts: [] }))
@@ -16,9 +23,54 @@ describe('ThemeEditor dual mode profiles', () => {
     expect(screen.getByRole('combobox', { name: 'Light Mode 终端主题' })).toBeInTheDocument()
   })
 
+  it('previews and saves global terminal typography atomically', async () => {
+    const onSave = vi.fn(async () => {})
+    renderEditor({ onSave })
+
+    expect(screen.getByTestId('terminal-theme-preview')).toHaveStyle({ fontFamily: 'Global Font', fontSize: '16px' })
+    await userEvent.clear(screen.getByLabelText('全局终端字体'))
+    await userEvent.type(screen.getByLabelText('全局终端字体'), 'Cascadia Code')
+    expect(screen.getByTestId('terminal-theme-preview')).toHaveStyle({ fontFamily: 'Cascadia Code' })
+    await userEvent.click(screen.getByRole('button', { name: '保存主题配置' }))
+
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
+      global_style: { font_family: 'Cascadia Code', font_size: 16, cursor_style: 'underline' },
+      profiles: expect.arrayContaining([expect.objectContaining({ id: 1, follow_global_style: true, font_family: 'monospace' })]),
+    }))
+  })
+
+  it('keeps an independent Profile style after global following is disabled', async () => {
+    const onSave = vi.fn(async () => {})
+    renderEditor({ onSave })
+
+    await userEvent.click(screen.getByRole('switch', { name: '跟随全局字体与光标' }))
+    await userEvent.clear(screen.getByLabelText('主题字体'))
+    await userEvent.type(screen.getByLabelText('主题字体'), 'Profile Font')
+    expect(screen.getByTestId('terminal-theme-preview')).toHaveStyle({ fontFamily: 'Profile Font' })
+    await userEvent.click(screen.getByRole('button', { name: '保存主题配置' }))
+
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
+      profiles: expect.arrayContaining([expect.objectContaining({ id: 1, follow_global_style: false, font_family: 'Profile Font' })]),
+    }))
+  })
+
+  it('prevents saving invalid global and Profile style drafts', async () => {
+    renderEditor()
+    const saveButton = screen.getByRole('button', { name: '保存主题配置' })
+
+    await userEvent.clear(screen.getByLabelText('全局终端字号'))
+    expect(saveButton).toBeDisabled()
+    await userEvent.type(screen.getByLabelText('全局终端字号'), '16')
+    expect(saveButton).toBeEnabled()
+
+    await userEvent.click(screen.getByRole('switch', { name: '跟随全局字体与光标' }))
+    await userEvent.clear(screen.getByLabelText('主题字号'))
+    expect(saveButton).toBeDisabled()
+  })
+
   it('uses the current Light Profile when follow mode is disabled for the first time', async () => {
     const onSave = vi.fn(async () => {})
-    renderEditor(onSave, undefined, 'light')
+    renderEditor({ onSave, colorMode: 'light' })
 
     await userEvent.click(screen.getByRole('switch', { name: '跟随界面模式' }))
 
@@ -32,7 +84,7 @@ describe('ThemeEditor dual mode profiles', () => {
   })
 
   it('preserves a previously selected fixed Profile and explains mode mismatch and sharing', async () => {
-    renderEditor(undefined, undefined, 'light', { dark_profile_id: 3, light_profile_id: 2, follow_interface_mode: true, fixed_profile_id: 3 })
+    renderEditor({ colorMode: 'light', assignments: { dark_profile_id: 3, light_profile_id: 2, follow_interface_mode: true, fixed_profile_id: 3 } })
 
     await userEvent.click(screen.getByRole('switch', { name: '跟随界面模式' }))
 
@@ -43,7 +95,7 @@ describe('ThemeEditor dual mode profiles', () => {
 
   it('keeps Dark and Light drafts independent and saves atomically', async () => {
     const onSave = vi.fn(async () => {})
-    renderEditor(onSave)
+    renderEditor({ onSave })
     await userEvent.clear(screen.getByLabelText('背景色 HEX'))
     await userEvent.type(screen.getByLabelText('背景色 HEX'), '#111111')
     await userEvent.click(screen.getByRole('tab', { name: 'Light Mode' }))
@@ -63,7 +115,7 @@ describe('ThemeEditor dual mode profiles', () => {
 
   it('changes the Dark assignment without replacing the Light draft', async () => {
     const onSave = vi.fn(async () => {})
-    renderEditor(onSave)
+    renderEditor({ onSave })
     const input = screen.getByRole('combobox', { name: 'Dark Mode 终端主题' })
     await userEvent.clear(input)
     await userEvent.type(input, 'Dracula')
@@ -75,7 +127,7 @@ describe('ThemeEditor dual mode profiles', () => {
 
   it('confirms and resets the assigned built-in theme styles', async () => {
     const onResetBuiltins = vi.fn(async () => ({ dark_reset: true, light_reset: true, fixed_reset: false }))
-    renderEditor(vi.fn(async () => {}), onResetBuiltins)
+    renderEditor({ onResetBuiltins })
 
     await userEvent.click(screen.getByRole('button', { name: '重置内置主题' }))
     expect(screen.getByRole('alertdialog')).toHaveTextContent('恢复当前 Dark/Light 内置主题')
@@ -90,23 +142,23 @@ describe('ThemeEditor dual mode profiles', () => {
   })
 
   it('disables reset when neither assigned profile is built in', () => {
-    const customProfiles = [profile(1, 'Custom Dark', 'dark', '#111111', false), profile(2, 'Custom Light', 'light', '#eeeeee', false)]
-    render(<ThemeEditor profiles={customProfiles as never} assignments={{ dark_profile_id: 1, light_profile_id: 2, follow_interface_mode: true, fixed_profile_id: 0 } as never} colorMode="dark" onSave={vi.fn()} onResetBuiltins={vi.fn()} />)
+    const customProfiles = [profile({ id: 1, name: 'Custom Dark', mode: 'dark', background: '#111111', builtIn: false }), profile({ id: 2, name: 'Custom Light', mode: 'light', background: '#eeeeee', builtIn: false })]
+    render(<ThemeEditor profiles={customProfiles as never} assignments={{ dark_profile_id: 1, light_profile_id: 2, follow_interface_mode: true, fixed_profile_id: 0 } as never} globalStyle={globalStyle as never} colorMode="dark" onSave={vi.fn()} onResetBuiltins={vi.fn()} />)
 
     expect(screen.getByRole('button', { name: '重置内置主题' })).toBeDisabled()
   })
 
   it('only includes the fixed built-in Profile in reset eligibility while fixed mode is active', () => {
-    const mixedProfiles = [profile(1, 'Custom Dark', 'dark', '#111111', false), profile(2, 'Custom Light', 'light', '#eeeeee', false), profile(3, 'Dracula', 'dark', '#282a36', true)]
-    const { rerender } = render(<ThemeEditor profiles={mixedProfiles as never} assignments={{ dark_profile_id: 1, light_profile_id: 2, follow_interface_mode: true, fixed_profile_id: 3 } as never} colorMode="dark" onSave={vi.fn()} onResetBuiltins={vi.fn()} />)
+    const mixedProfiles = [profile({ id: 1, name: 'Custom Dark', mode: 'dark', background: '#111111', builtIn: false }), profile({ id: 2, name: 'Custom Light', mode: 'light', background: '#eeeeee', builtIn: false }), profile({ id: 3, name: 'Dracula', mode: 'dark', background: '#282a36' })]
+    const { rerender } = render(<ThemeEditor profiles={mixedProfiles as never} assignments={{ dark_profile_id: 1, light_profile_id: 2, follow_interface_mode: true, fixed_profile_id: 3 } as never} globalStyle={globalStyle as never} colorMode="dark" onSave={vi.fn()} onResetBuiltins={vi.fn()} />)
     expect(screen.getByRole('button', { name: '重置内置主题' })).toBeDisabled()
 
-    rerender(<ThemeEditor profiles={mixedProfiles as never} assignments={{ dark_profile_id: 1, light_profile_id: 2, follow_interface_mode: false, fixed_profile_id: 3 } as never} colorMode="dark" onSave={vi.fn()} onResetBuiltins={vi.fn()} />)
+    rerender(<ThemeEditor profiles={mixedProfiles as never} assignments={{ dark_profile_id: 1, light_profile_id: 2, follow_interface_mode: false, fixed_profile_id: 3 } as never} globalStyle={globalStyle as never} colorMode="dark" onSave={vi.fn()} onResetBuiltins={vi.fn()} />)
     expect(screen.getByRole('button', { name: '重置内置主题' })).toBeEnabled()
   })
 
   it('keeps edited colors when saving fails', async () => {
-    renderEditor(vi.fn(async () => { throw new Error('db failed') }))
+    renderEditor({ onSave: vi.fn(async () => { throw new Error('db failed') }) })
     await userEvent.clear(screen.getByLabelText('背景色 HEX'))
     await userEvent.type(screen.getByLabelText('背景色 HEX'), '#123456')
 
@@ -119,7 +171,7 @@ describe('ThemeEditor dual mode profiles', () => {
   it('disables reset while a save request is pending', async () => {
     let resolveSave: (() => void) | undefined
     const onSave = vi.fn(() => new Promise<void>((resolve) => { resolveSave = resolve }))
-    renderEditor(onSave)
+    renderEditor({ onSave })
 
     await userEvent.click(screen.getByRole('button', { name: '保存主题配置' }))
 
@@ -128,7 +180,7 @@ describe('ThemeEditor dual mode profiles', () => {
   })
 
   it('keeps save disabled when a historical fixed Profile draft is invalid', async () => {
-    renderEditor(undefined, undefined, 'dark', { dark_profile_id: 1, light_profile_id: 2, follow_interface_mode: true, fixed_profile_id: 3 })
+    renderEditor({ assignments: { dark_profile_id: 1, light_profile_id: 2, follow_interface_mode: true, fixed_profile_id: 3 } })
     await userEvent.click(screen.getByRole('switch', { name: '跟随界面模式' }))
     await userEvent.clear(screen.getByLabelText('背景色 HEX'))
     await userEvent.type(screen.getByLabelText('背景色 HEX'), '#123')
@@ -141,7 +193,7 @@ describe('ThemeEditor dual mode profiles', () => {
   it('disables save while a reset request is pending', async () => {
     let resolveReset: ((result: { dark_reset: boolean; light_reset: boolean; fixed_reset: boolean }) => void) | undefined
     const onResetBuiltins = vi.fn(() => new Promise<{ dark_reset: boolean; light_reset: boolean; fixed_reset: boolean }>((resolve) => { resolveReset = resolve }))
-    renderEditor(vi.fn(async () => {}), onResetBuiltins)
+    renderEditor({ onResetBuiltins })
     await userEvent.click(screen.getByRole('button', { name: '重置内置主题' }))
     await userEvent.click(screen.getByRole('button', { name: '确认重置' }))
 
@@ -152,7 +204,7 @@ describe('ThemeEditor dual mode profiles', () => {
 
   it('keeps the current draft when reset fails', async () => {
     const onResetBuiltins = vi.fn(async () => { throw new Error('db failed') })
-    renderEditor(vi.fn(async () => {}), onResetBuiltins)
+    renderEditor({ onResetBuiltins })
 
     await userEvent.click(screen.getByRole('button', { name: '重置内置主题' }))
     await userEvent.click(screen.getByRole('button', { name: '确认重置' }))
@@ -177,7 +229,7 @@ describe('ThemeEditor dual mode profiles', () => {
   it('prevents duplicate reset submissions while the request is pending', async () => {
     let resolveReset: ((result: { dark_reset: boolean; light_reset: boolean; fixed_reset: boolean }) => void) | undefined
     const onResetBuiltins = vi.fn(() => new Promise<{ dark_reset: boolean; light_reset: boolean; fixed_reset: boolean }>((resolve) => { resolveReset = resolve }))
-    renderEditor(vi.fn(async () => {}), onResetBuiltins)
+    renderEditor({ onResetBuiltins })
     await userEvent.click(screen.getByRole('button', { name: '重置内置主题' }))
     await userEvent.click(screen.getByRole('button', { name: '确认重置' }))
 
@@ -192,22 +244,27 @@ describe('ThemeEditor dual mode profiles', () => {
     [{ dark_reset: false, light_reset: false, fixed_reset: false }, '当前绑定没有可重置的内置主题'],
     [{ dark_reset: false, light_reset: false, fixed_reset: true }, '已重置固定内置主题'],
   ])('reports partial reset result %o', async (result, message) => {
-    renderEditor(vi.fn(async () => {}), vi.fn(async () => result))
+    renderEditor({ onResetBuiltins: vi.fn(async () => result) })
     await userEvent.click(screen.getByRole('button', { name: '重置内置主题' }))
     await userEvent.click(screen.getByRole('button', { name: '确认重置' }))
     expect(useToastStore.getState().toasts.at(-1)?.message).toBe(message)
   })
 })
 
-function renderEditor(
+function renderEditor({
   onSave = vi.fn(async () => {}),
   onResetBuiltins = vi.fn(async () => ({ dark_reset: false, light_reset: false, fixed_reset: false })),
-  colorMode: 'dark' | 'light' = 'dark',
+  colorMode = 'dark',
   assignments = { dark_profile_id: 1, light_profile_id: 2, follow_interface_mode: true, fixed_profile_id: 0 },
-) {
-  return render(<ThemeEditor profiles={profiles as never} assignments={assignments as never} colorMode={colorMode} onSave={onSave} onResetBuiltins={onResetBuiltins} />)
+}: {
+  onSave?: ThemeEditorProps['onSave']
+  onResetBuiltins?: ThemeEditorProps['onResetBuiltins']
+  colorMode?: 'dark' | 'light'
+  assignments?: { dark_profile_id: number; light_profile_id: number; follow_interface_mode: boolean; fixed_profile_id: number }
+} = {}) {
+  return render(<ThemeEditor profiles={profiles as never} assignments={assignments as never} globalStyle={globalStyle as never} colorMode={colorMode} onSave={onSave} onResetBuiltins={onResetBuiltins} />)
 }
 
-function profile(id: number, name: string, mode: string, background: string, builtIn = true) {
-  return { id, name, theme_id: id, font_family: 'monospace', font_size: 14, cursor_style: 'bar', color_overrides: '{}', created_at: '', updated_at: '', definition: { id, name, mode, source_type: builtIn ? 'builtin' : 'custom', source_name: 'MSSH', source_url: '', source_author: '', source_license: 'MIT', source_version: '1', source_fingerprint: name, color_payload: JSON.stringify({ background, foreground: mode === 'dark' ? '#ffffff' : '#000000', cursor: '#888888', selection: '#264f78', ansi: Array(16).fill('#111111') }), raw_payload: '', is_builtin: builtIn, created_at: '', updated_at: '' } }
+function profile({ id, name, mode, background, builtIn = true }: { id: number; name: string; mode: string; background: string; builtIn?: boolean }) {
+  return { id, name, theme_id: id, follow_global_style: true, font_family: 'monospace', font_size: 14, cursor_style: 'bar', color_overrides: '{}', created_at: '', updated_at: '', definition: { id, name, mode, source_type: builtIn ? 'builtin' : 'custom', source_name: 'MSSH', source_url: '', source_author: '', source_license: 'MIT', source_version: '1', source_fingerprint: name, color_payload: JSON.stringify({ background, foreground: mode === 'dark' ? '#ffffff' : '#000000', cursor: '#888888', selection: '#264f78', ansi: Array(16).fill('#111111') }), raw_payload: '', is_builtin: builtIn, created_at: '', updated_at: '' } }
 }

@@ -29,6 +29,12 @@ export function GetAssignments(): $CancellablePromise<model$0.ThemeAssignments> 
     });
 }
 
+export function GetGlobalStyle(): $CancellablePromise<model$0.TerminalGlobalStyle> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.ThemeService.GetGlobalStyle").then(($result: any) => {
+        return $$createType3($result);
+    });
+}
+
 export function GetProfile(id: number): $CancellablePromise<model$0.ThemeProfile | null> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.ThemeService.GetProfile", id).then(($result: any) => {
         return $$createType1($result);
@@ -37,7 +43,7 @@ export function GetProfile(id: number): $CancellablePromise<model$0.ThemeProfile
 
 export function ImportFiles(paths: string[]): $CancellablePromise<model$0.ThemeImportSummary> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.ThemeService.ImportFiles", paths).then(($result: any) => {
-        return $$createType3($result);
+        return $$createType4($result);
     });
 }
 
@@ -47,19 +53,19 @@ export function InitializeDefaults(): $CancellablePromise<void> {
 
 export function ListDefinitions(mode: string): $CancellablePromise<model$0.ThemeDefinition[]> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.ThemeService.ListDefinitions", mode).then(($result: any) => {
-        return $$createType5($result);
+        return $$createType6($result);
     });
 }
 
 export function ListProfiles(mode: string): $CancellablePromise<model$0.ThemeProfile[]> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.ThemeService.ListProfiles", mode).then(($result: any) => {
-        return $$createType6($result);
+        return $$createType7($result);
     });
 }
 
 export function ResetBuiltinStyles(): $CancellablePromise<model$0.BuiltinThemeResetResult> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.ThemeService.ResetBuiltinStyles").then(($result: any) => {
-        return $$createType7($result);
+        return $$createType8($result);
     });
 }
 
@@ -79,8 +85,9 @@ export function UpdateProfile(input: model$0.ThemeProfileInput): $CancellablePro
 const $$createType0 = model$0.ThemeProfile.createFrom;
 const $$createType1 = $Create.Nullable($$createType0);
 const $$createType2 = model$0.ThemeAssignments.createFrom;
-const $$createType3 = model$0.ThemeImportSummary.createFrom;
-const $$createType4 = model$0.ThemeDefinition.createFrom;
-const $$createType5 = $Create.Array($$createType4);
-const $$createType6 = $Create.Array($$createType0);
-const $$createType7 = model$0.BuiltinThemeResetResult.createFrom;
+const $$createType3 = model$0.TerminalGlobalStyle.createFrom;
+const $$createType4 = model$0.ThemeImportSummary.createFrom;
+const $$createType5 = model$0.ThemeDefinition.createFrom;
+const $$createType6 = $Create.Array($$createType5);
+const $$createType7 = $Create.Array($$createType0);
+const $$createType8 = model$0.BuiltinThemeResetResult.createFrom;

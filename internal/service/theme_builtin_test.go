@@ -1,7 +1,6 @@
 package service
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -15,7 +14,7 @@ import (
 	"github.com/xuthus5/mssh/internal/store"
 )
 
-func TestThemeServiceUpgradesLegacyBuiltinsWithoutDuplicatingProfiles(t *testing.T) {
+func TestThemeServiceReplacesStaleBuiltinsWithoutCompatibility(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	legacyDefinition, err := store.CreateThemeDefinition(db, model.ThemeDefinition{
 		Name: "GitHub Dark", Mode: model.ThemeModeDark, SourceType: model.ThemeSourceBuiltin,
@@ -31,13 +30,15 @@ func TestThemeServiceUpgradesLegacyBuiltinsWithoutDuplicatingProfiles(t *testing
 	definitions, err := themeService.ListDefinitions("")
 	require.NoError(t, err)
 	require.Len(t, definitions, 24)
-	upgradedProfile, err := themeService.GetProfile(legacyProfile.ID)
-	require.NoError(t, err)
-	assert.Equal(t, legacyProfile.ID, upgradedProfile.ID)
-	assert.Equal(t, "Renamed Dark", upgradedProfile.Name)
-	assert.Equal(t, "User Font", upgradedProfile.FontFamily)
-	assert.Equal(t, 20, upgradedProfile.FontSize)
-	assert.Equal(t, expectedBuiltinThemeVersion, upgradedProfile.Definition.SourceVersion)
+	_, err = themeService.GetProfile(legacyProfile.ID)
+	assert.Error(t, err)
+	profiles := mustThemeProfiles(t, themeService)
+	require.Len(t, profiles, 24)
+	replacement := mustThemeProfileNamed(t, profiles, "GitHub Dark")
+	assert.NotEqual(t, legacyProfile.ID, replacement.ID)
+	assert.True(t, replacement.FollowGlobalStyle)
+	assert.Equal(t, model.DefaultTerminalFontFamily, replacement.FontFamily)
+	assert.Equal(t, expectedBuiltinThemeVersion, replacement.Definition.SourceVersion)
 }
 
 func TestThemeServiceDoesNotReuseImportedDefinitionWithBuiltinColors(t *testing.T) {
@@ -69,16 +70,15 @@ func TestThemeServiceDoesNotReuseImportedDefinitionWithBuiltinColors(t *testing.
 		}
 	}
 	assert.Equal(t, 24, builtinCount)
-	upgraded, err := themeService.GetProfile(legacyProfile.ID)
-	require.NoError(t, err)
-	assert.True(t, upgraded.Definition.IsBuiltin)
-	assert.Equal(t, expectedBuiltinThemeVersion, upgraded.Definition.SourceVersion)
+	_, err = themeService.GetProfile(legacyProfile.ID)
+	assert.Error(t, err)
 	storedImported, err := themeService.GetProfile(importedProfile.ID)
 	require.NoError(t, err)
 	assert.Equal(t, model.ThemeSourceITerm2, storedImported.Definition.SourceType)
 	assignments, err := themeService.GetAssignments()
 	require.NoError(t, err)
-	assert.Equal(t, legacyProfile.ID, assignments.DarkProfileID)
+	assert.NotEqual(t, legacyProfile.ID, assignments.DarkProfileID)
+	assert.Equal(t, mustThemeProfileNamed(t, mustThemeProfiles(t, themeService), "GitHub Dark").ID, assignments.DarkProfileID)
 }
 
 func TestThemeServiceRestoresMissingBuiltinsWithoutOverwritingProfiles(t *testing.T) {
@@ -124,8 +124,8 @@ func TestThemeServiceResetsAssignedBuiltinStylesOnly(t *testing.T) {
 	imported, err := themeService.GetProfile(summary.Results[0].ProfileID)
 	require.NoError(t, err)
 
-	dark = customizeThemeProfile(dark, "Dark User Font", 22, `{"background":"#111111"}`)
-	*imported = customizeThemeProfile(*imported, "Imported User Font", 19, `{"background":"#eeeeee"}`)
+	dark = customizeThemeProfile(dark, themeProfileStyle{font: "Dark User Font", size: 22, overrides: `{"background":"#111111"}`})
+	*imported = customizeThemeProfile(*imported, themeProfileStyle{font: "Imported User Font", size: 19, overrides: `{"background":"#eeeeee"}`})
 	require.NoError(t, themeService.UpdateProfile(model.ThemeProfileInputFrom(dark)))
 	require.NoError(t, themeService.UpdateProfile(model.ThemeProfileInputFrom(*imported)))
 	require.NoError(t, themeService.SaveAssignments(model.ThemeAssignmentsInput{DarkProfileID: dark.ID, LightProfileID: imported.ID, FollowInterfaceMode: true}))
@@ -191,8 +191,8 @@ func TestThemeServiceResetsAndDeduplicatesFixedBuiltinStyle(t *testing.T) {
 	themeService := NewThemeService(db, testutil.NewTestLogger())
 	require.NoError(t, themeService.InitializeDefaults())
 	profiles := mustThemeProfiles(t, themeService)
-	dark := customizeThemeProfile(mustThemeProfileNamed(t, profiles, "Dracula"), "Dark User Font", 20, `{"background":"#111111"}`)
-	light := customizeThemeProfile(mustThemeProfileNamed(t, profiles, "GitHub Light"), "Light User Font", 18, `{"background":"#eeeeee"}`)
+	dark := customizeThemeProfile(mustThemeProfileNamed(t, profiles, "Dracula"), themeProfileStyle{font: "Dark User Font", size: 20, overrides: `{"background":"#111111"}`})
+	light := customizeThemeProfile(mustThemeProfileNamed(t, profiles, "GitHub Light"), themeProfileStyle{font: "Light User Font", size: 18, overrides: `{"background":"#eeeeee"}`})
 	require.NoError(t, themeService.UpdateProfile(model.ThemeProfileInputFrom(dark)))
 	require.NoError(t, themeService.UpdateProfile(model.ThemeProfileInputFrom(light)))
 	require.NoError(t, themeService.SaveAssignments(model.ThemeAssignmentsInput{
@@ -240,8 +240,8 @@ func TestThemeServiceResetBuiltinStylesRollsBack(t *testing.T) {
 	themeService := NewThemeService(db, testutil.NewTestLogger())
 	require.NoError(t, themeService.InitializeDefaults())
 	profiles := mustThemeProfiles(t, themeService)
-	dark := customizeThemeProfile(mustThemeProfileNamed(t, profiles, "GitHub Dark"), "Dark User Font", 21, `{"background":"#111111"}`)
-	light := customizeThemeProfile(mustThemeProfileNamed(t, profiles, "GitHub Light"), "Light User Font", 18, `{"background":"#eeeeee"}`)
+	dark := customizeThemeProfile(mustThemeProfileNamed(t, profiles, "GitHub Dark"), themeProfileStyle{font: "Dark User Font", size: 21, overrides: `{"background":"#111111"}`})
+	light := customizeThemeProfile(mustThemeProfileNamed(t, profiles, "GitHub Light"), themeProfileStyle{font: "Light User Font", size: 18, overrides: `{"background":"#eeeeee"}`})
 	require.NoError(t, themeService.UpdateProfile(model.ThemeProfileInputFrom(dark)))
 	require.NoError(t, themeService.UpdateProfile(model.ThemeProfileInputFrom(light)))
 	require.NoError(t, themeService.SaveAssignments(model.ThemeAssignmentsInput{DarkProfileID: dark.ID, LightProfileID: light.ID, FollowInterfaceMode: true}))
@@ -283,45 +283,4 @@ func TestThemeServiceInitializationRollsBackProfileFailure(t *testing.T) {
 	require.NoError(t, db.QueryRow("SELECT COUNT(*) FROM terminal_theme_profiles").Scan(&profiles))
 	assert.Zero(t, definitions)
 	assert.Zero(t, profiles)
-}
-
-func mustThemeProfiles(t *testing.T, themeService *ThemeService) []model.ThemeProfile {
-	t.Helper()
-	profiles, err := themeService.ListProfiles("")
-	require.NoError(t, err)
-	return profiles
-}
-
-func mustThemeProfileNamed(t *testing.T, profiles []model.ThemeProfile, name string) model.ThemeProfile {
-	t.Helper()
-	for _, profile := range profiles {
-		if profile.Name == name {
-			return profile
-		}
-	}
-	t.Fatalf("theme profile %q not found", name)
-	return model.ThemeProfile{}
-}
-
-func customizeThemeProfile(profile model.ThemeProfile, font string, size int, overrides string) model.ThemeProfile {
-	profile.FontFamily = font
-	profile.FontSize = size
-	profile.CursorStyle = model.CursorStyleUnderline
-	profile.ColorOverrides = overrides
-	return profile
-}
-
-func themeProfileID(id int64) string {
-	return fmt.Sprintf("%d", id)
-}
-
-func mustBuiltinDefinitionNamed(t *testing.T, name string) model.ThemeDefinition {
-	t.Helper()
-	for _, definition := range builtinThemeDefinitions() {
-		if definition.Name == name {
-			return definition
-		}
-	}
-	t.Fatalf("built-in theme definition %q not found", name)
-	return model.ThemeDefinition{}
 }

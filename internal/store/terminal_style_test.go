@@ -34,13 +34,27 @@ func TestTerminalGlobalStyleStoreDefaultsAndRoundTrip(t *testing.T) {
 }
 
 func TestTerminalGlobalStyleStoreReportsMalformedValuesAndDatabaseErrors(t *testing.T) {
-	db := setupTestDB(t)
-	_, err := db.Exec(`INSERT INTO settings (key, namespace, value, value_type, version) VALUES (?, 'terminal', '"large"', 'number', 1)`, terminalFontSizeKey)
-	require.NoError(t, err)
-	_, err = GetTerminalGlobalStyle(db)
-	assert.ErrorContains(t, err, terminalFontSizeKey)
+	for _, testCase := range []struct {
+		name  string
+		key   string
+		value string
+	}{
+		{name: "font family", key: terminalFontFamilyKey, value: `{`},
+		{name: "font size", key: terminalFontSizeKey, value: `"large"`},
+		{name: "cursor style", key: terminalCursorStyleKey, value: `{`},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			db := setupTestDB(t)
+			_, err := db.Exec(`INSERT INTO settings (key, namespace, value, value_type, version) VALUES (?, 'terminal', ?, 'string', 1)`, testCase.key, testCase.value)
+			require.NoError(t, err)
+			_, err = GetTerminalGlobalStyle(db)
+			assert.ErrorContains(t, err, testCase.key)
+		})
+	}
 
+	db := setupTestDB(t)
 	require.NoError(t, db.Close())
-	_, err = GetTerminalGlobalStyle(db)
+	_, err := GetTerminalGlobalStyle(db)
 	assert.ErrorContains(t, err, "read terminal global style")
+	assert.ErrorContains(t, SaveTerminalGlobalStyleDB(db, model.TerminalGlobalStyle{}), "save terminal global style")
 }

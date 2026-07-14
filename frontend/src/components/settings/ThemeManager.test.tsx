@@ -43,12 +43,12 @@ describe('ThemeManager', () => {
     await userEvent.click(screen.getByRole('button', { name: '删除 Custom Profile' }))
     await userEvent.click(screen.getByRole('button', { name: '删除 Custom 主题定义' }))
 
-    expect(update).toHaveBeenCalledWith(expect.objectContaining({ name: 'Renamed' }))
-    expect(create).toHaveBeenCalledWith(expect.objectContaining({ id: 0 }))
+    expect(update).toHaveBeenCalledWith(expect.objectContaining({ name: 'Renamed', follow_global_style: true }))
+    expect(create).toHaveBeenCalledWith(expect.objectContaining({ id: 0, follow_global_style: true }))
     expect(deleteProfile).toHaveBeenCalledWith(3)
     expect(deleteDefinition).toHaveBeenCalledWith(3)
   })
 })
 
 const profiles = [profile(1, 'GitHub Dark', 'dark'), profile(2, 'GitHub Light', 'light')]
-function profile(id: number, name: string, mode: string) { return { id, name, theme_id: id, font_family: 'monospace', font_size: 14, cursor_style: 'bar', color_overrides: '{}', definition: { id, name, mode, source_type: 'builtin', source_license: 'MIT', is_builtin: true } } }
+function profile(id: number, name: string, mode: string) { return { id, name, theme_id: id, follow_global_style: true, font_family: 'monospace', font_size: 14, cursor_style: 'bar', color_overrides: '{}', definition: { id, name, mode, source_type: 'builtin', source_license: 'MIT', is_builtin: true } } }

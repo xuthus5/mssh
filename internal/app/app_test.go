@@ -10,6 +10,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/xuthus5/mssh/internal/crypto"
+	"github.com/xuthus5/mssh/internal/store"
+	"github.com/xuthus5/mssh/pkg/event"
 )
 
 func TestNew(t *testing.T) {
@@ -225,10 +227,25 @@ func TestPersistMasterKeyKeychainAvailable(t *testing.T) {
 	assert.Equal(t, key, saved)
 }
 
+func TestPersistMasterKeyHandlesUnavailableDestinations(t *testing.T) {
+	missingDataDir := filepath.Join(t.TempDir(), "missing")
+	kc := &stubKeychain{available: true, setErr: assert.AnError}
+	persistMasterKey(missingDataDir, make([]byte, 32), kc, slog.Default())
+}
+
+func TestInitializeServicesReportsThemeInitializationFailure(t *testing.T) {
+	db, err := store.OpenDB(t.TempDir())
+	require.NoError(t, err)
+	require.NoError(t, db.Close())
+	_, err = initializeServices(db, make([]byte, 32), &stubKeychain{}, Options{DataDir: t.TempDir()}, event.NewWailsEventBus(slog.Default()), slog.Default())
+	assert.ErrorContains(t, err, "initialize terminal themes")
+}
+
 type stubKeychain struct {
 	available bool
 	data      []byte
 	err       error
+	setErr    error
 }
 
 func (s *stubKeychain) Get(_, _ string) ([]byte, error) {
@@ -239,7 +256,7 @@ func (s *stubKeychain) Get(_, _ string) ([]byte, error) {
 }
 
 func (s *stubKeychain) Set(_, _ string, _ []byte) error {
-	return nil
+	return s.setErr
 }
 
 func (s *stubKeychain) Delete(_, _ string) error {

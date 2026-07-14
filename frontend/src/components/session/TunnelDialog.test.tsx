@@ -43,7 +43,7 @@ describe('TunnelDialog', () => {
 
     await user.click(screen.getByRole('button', { name: '新建隧道' }))
     await user.click(screen.getByRole('combobox'))
-    await user.click(screen.getByRole('option', { name: '动态转发' }))
+    await user.click(await screen.findByRole('option', { name: '动态转发' }))
     expect(screen.queryByPlaceholderText('80')).not.toBeInTheDocument()
     await user.type(screen.getByPlaceholderText('127.0.0.1'), '0.0.0.0')
     await user.type(screen.getByPlaceholderText('1080'), '1080')

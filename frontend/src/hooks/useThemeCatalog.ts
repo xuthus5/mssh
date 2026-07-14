@@ -6,7 +6,7 @@ import { toast } from '@/components/ui/toast'
 import { resolveEffectiveTerminalProfile, type ColorMode } from '@/lib/effectiveTerminalTheme'
 import { profileToTerminalTheme } from '@/lib/terminalThemeCatalog'
 import { useAppStore } from '@/store/appStore'
-import type { ThemeAssignments, ThemeConfigurationInput, ThemeDefinition, ThemeImportSummary, ThemeProfile, ThemeProfileInput } from '../../bindings/github.com/xuthus5/mssh/internal/model/models'
+import type { TerminalGlobalStyle, ThemeAssignments, ThemeConfigurationInput, ThemeDefinition, ThemeImportSummary, ThemeProfile, ThemeProfileInput } from '../../bindings/github.com/xuthus5/mssh/internal/model/models'
 
 export type { ColorMode } from '@/lib/effectiveTerminalTheme'
 
@@ -14,13 +14,23 @@ interface ThemeCatalogState {
   definitions: ThemeDefinition[]
   profiles: ThemeProfile[]
   assignments: ThemeAssignments
+  globalStyle: TerminalGlobalStyle
   colorMode: ColorMode
   loaded: boolean
   loading: boolean
   error: string | null
 }
 
-const initialState: ThemeCatalogState = { definitions: [], profiles: [], assignments: { dark_profile_id: 0, light_profile_id: 0, follow_interface_mode: true, fixed_profile_id: 0 } as ThemeAssignments, colorMode: localStorage.getItem('mssh:color-mode') === 'light' ? 'light' : 'dark', loaded: false, loading: false, error: null }
+const initialState: ThemeCatalogState = {
+  definitions: [],
+  profiles: [],
+  assignments: { dark_profile_id: 0, light_profile_id: 0, follow_interface_mode: true, fixed_profile_id: 0 } as ThemeAssignments,
+  globalStyle: { font_family: '"JetBrains Mono", "Cascadia Code", monospace', font_size: 14, cursor_style: 'bar' } as TerminalGlobalStyle,
+  colorMode: localStorage.getItem('mssh:color-mode') === 'light' ? 'light' : 'dark',
+  loaded: false,
+  loading: false,
+  error: null,
+}
 
 export const useThemeCatalogStore = create<ThemeCatalogState>(() => initialState)
 
@@ -36,9 +46,9 @@ export async function loadThemeCatalog(): Promise<boolean> {
   useThemeCatalogStore.setState({ loading: true, error: null })
   try {
     await ThemeService.InitializeDefaults()
-    const [definitions, profiles, assignments, colorSetting] = await Promise.all([ThemeService.ListDefinitions(''), ThemeService.ListProfiles(''), ThemeService.GetAssignments(), SettingService.Get('appearance.color_mode')])
+    const [definitions, profiles, assignments, globalStyle, colorSetting] = await Promise.all([ThemeService.ListDefinitions(''), ThemeService.ListProfiles(''), ThemeService.GetAssignments(), ThemeService.GetGlobalStyle(), SettingService.Get('appearance.color_mode')])
     const colorMode = parseColorMode(colorSetting?.value)
-    useThemeCatalogStore.setState({ definitions, profiles, assignments, colorMode, loaded: true, loading: false })
+    useThemeCatalogStore.setState({ definitions, profiles, assignments, globalStyle, colorMode, loaded: true, loading: false })
     applyInterfaceColorMode(colorMode)
     applyEffectiveTerminalTheme()
     return true
@@ -119,7 +129,7 @@ function applyInterfaceColorMode(mode: ColorMode) {
 function applyEffectiveTerminalTheme() {
   const state = useThemeCatalogStore.getState()
   const profile = resolveEffectiveTerminalProfile(state.assignments, state.colorMode, state.profiles)
-  useAppStore.getState().setTerminalTheme(profileToTerminalTheme(profile))
+  useAppStore.getState().setTerminalTheme(profileToTerminalTheme(profile, state.globalStyle))
 }
 
 async function loadThemeCatalogFresh() {

@@ -22,7 +22,7 @@ describe('LabeledSelect', () => {
     expect(within(trigger).queryByText('folder-1')).not.toBeInTheDocument()
 
     await user.click(trigger)
-    await user.click(screen.getByRole('option', { name: '生产环境' }))
+    await user.click(await screen.findByRole('option', { name: '生产环境' }))
     expect(onValueChange).toHaveBeenCalledWith('folder-2')
 
     rerender(
