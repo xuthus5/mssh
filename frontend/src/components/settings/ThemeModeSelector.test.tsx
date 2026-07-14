@@ -39,8 +39,19 @@ describe('ThemeModeSelector', () => {
     expect(await screen.findAllByRole('option')).toHaveLength(12)
     expect(screen.queryByText('Light 1')).not.toBeInTheDocument()
   })
+
+  it('lists every Profile with metadata and color swatches for fixed mode', async () => {
+    render(<ThemeModeSelector mode="fixed" profiles={profiles as never} value={1} onValueChange={vi.fn()} />)
+    const input = screen.getByRole('combobox', { name: '固定终端主题' })
+    await userEvent.click(input)
+
+    expect(await screen.findByRole('option', { name: /GitHub Dark/ })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: /GitHub Light/ })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: /Universal/ })).toBeInTheDocument()
+    expect(screen.getAllByTestId('theme-color-swatch').length).toBeGreaterThanOrEqual(12)
+  })
 })
 
 function profile(id: number, name: string, mode: string) {
-  return { id, name, definition: { id, name, mode, color_payload: '{}', source_type: 'builtin' } }
+  return { id, name, definition: { id, name, mode, color_payload: JSON.stringify({ background: '#111111', ansi: Array(16).fill('#222222') }), source_type: 'builtin' } }
 }

@@ -21,6 +21,7 @@ function settingsProps() {
     systemFonts: ['Arial', 'Microsoft YaHei', 'Segoe UI'],
     themeProfiles: [themeProfile(1, 'dark', '#000000'), themeProfile(2, 'light', '#ffffff')],
     themeAssignments: { dark_profile_id: 1, light_profile_id: 2, follow_interface_mode: true, fixed_profile_id: 0 },
+    colorMode: 'dark' as const,
     keys: [],
     sync: { enabled: false, url: '', username: '', password: '' },
     onSaveGeneral: vi.fn(async () => {}),
