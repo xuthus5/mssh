@@ -239,20 +239,20 @@ func (f *FileService) Rename(sessionID int64, oldPath, newPath string) error {
 // connect establishes a temporary SSH connection for a file operation.
 func (f *FileService) connect(sessionID int64) (*ssh.ClientWrapper, string, error) {
 	ctx := context.Background()
-	connID, err := f.sessions.Connect(ctx, sessionID)
+	connID, err := f.sessions.connect(ctx, sessionID, false)
 	if err != nil {
 		return nil, "", err
 	}
 	wrapper, err := f.sessions.GetClientWrapper(connID)
 	if err != nil {
-		_ = f.sessions.Disconnect(connID)
+		_ = f.sessions.disconnect(connID, false)
 		return nil, "", err
 	}
 	return wrapper, connID, nil
 }
 
 func (f *FileService) disconnect(connID string) {
-	_ = f.sessions.Disconnect(connID)
+	_ = f.sessions.disconnect(connID, false)
 }
 
 func (f *FileService) removeTask(taskID string) {

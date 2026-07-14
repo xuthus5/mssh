@@ -1,7 +1,9 @@
 package ssh
 
 import (
+	"bytes"
 	"context"
+	"io"
 	"log/slog"
 	"sync"
 	"testing"
@@ -26,6 +28,26 @@ func TestOpenPTY(t *testing.T) {
 	require.NoError(t, err)
 	defer ptys.Close()
 	assert.NotNil(t, ptys)
+}
+
+func TestPreparePTYStartsReadingOnlyAfterStart(t *testing.T) {
+	addr, cleanup := testutil.NewMockServer(t)
+	defer cleanup()
+	session := model.Session{Host: "127.0.0.1", Port: mustParsePort(addr), Username: "test", TermType: "xterm-256color"}
+	client, err := Connect(context.Background(), session, nil, "", slog.Default())
+	require.NoError(t, err)
+	defer client.Close()
+	pty, err := PreparePTY(client, session.TermType, 80, 24)
+	require.NoError(t, err)
+	defer pty.Close()
+	received := make(chan string, 1)
+	pty.SetReadCallback(func(data []byte) { received <- string(data) })
+
+	assert.Never(t, func() bool { return len(received) > 0 }, 50*time.Millisecond, 10*time.Millisecond)
+	pty.Start()
+	pty.Start()
+
+	require.Eventually(t, func() bool { return len(received) > 0 }, 2*time.Second, 10*time.Millisecond)
 }
 
 func TestOpenPTY_ClosedWrapper(t *testing.T) {
@@ -97,10 +119,43 @@ func TestPTYReadCallback(t *testing.T) {
 		received = append(received, data)
 		mu.Unlock()
 	})
-	time.Sleep(200 * time.Millisecond)
-	mu.Lock()
-	assert.NotEmpty(t, received)
-	mu.Unlock()
+	require.Eventually(t, func() bool {
+		mu.Lock()
+		defer mu.Unlock()
+		return len(received) > 0
+	}, 2*time.Second, 10*time.Millisecond)
+}
+
+func TestPTYExitCallbackObservesEOFWhenRegisteredAfterReadLoop(t *testing.T) {
+	pty := &PTYSession{}
+	pty.readLoop(bytes.NewReader(nil))
+
+	exited := make(chan error, 1)
+	pty.SetExitCallback(func(err error) { exited <- err })
+
+	assert.ErrorIs(t, <-exited, io.EOF)
+}
+
+func TestPTYExitCallbackRunsOnceWhenReadLoopCompletes(t *testing.T) {
+	pty := &PTYSession{}
+	exited := make(chan error, 2)
+	pty.SetExitCallback(func(err error) { exited <- err })
+
+	pty.readLoop(bytes.NewReader(nil))
+	pty.notifyExit(io.ErrClosedPipe)
+
+	assert.ErrorIs(t, <-exited, io.EOF)
+	assert.Empty(t, exited)
+}
+
+func TestPTYReadCallbackReceivesOutputBufferedBeforeRegistration(t *testing.T) {
+	pty := &PTYSession{}
+	pty.readLoop(bytes.NewBufferString("early output"))
+
+	received := make(chan string, 1)
+	pty.SetReadCallback(func(data []byte) { received <- string(data) })
+
+	assert.Equal(t, "early output", <-received)
 }
 
 func TestPTYResize(t *testing.T) {

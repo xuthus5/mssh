@@ -24,6 +24,7 @@ vi.mock('@xterm/addon-fit', () => ({ FitAddon: class { fit() {}; dispose() {} } 
 vi.mock('@wailsio/runtime', () => ({ Events: { On: vi.fn(() => vi.fn()) } }))
 vi.mock('@/lib/wails', () => ({
   TerminalService: {
+    Attach: vi.fn(async () => {}),
     Open: vi.fn(async () => 'split-1'),
     Close: vi.fn(async () => {}),
     Resize: vi.fn(async () => {}),

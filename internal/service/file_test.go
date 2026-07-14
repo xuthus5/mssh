@@ -156,6 +156,10 @@ func TestFileService_IntegratedSFTP(t *testing.T) {
 
 	err = svc.Delete(created.ID, "/renameddir")
 	require.NoError(t, err)
+	assert.Equal(t, 0, sessionSvc.ConnectionCount())
+	for _, captured := range bus.Events() {
+		assert.NotEqual(t, event.ConnectionState, captured.Name)
+	}
 }
 
 func TestNewFileService(t *testing.T) {

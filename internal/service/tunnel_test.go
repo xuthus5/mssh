@@ -93,13 +93,14 @@ func TestTunnelService_StartStop(t *testing.T) {
 
 	tunnel := model.Tunnel{
 		SessionID: createdSess.ID, Name: "socks", Type: model.TunnelDynamic,
-		LocalHost: "127.0.0.1", LocalPort: 15000,
+		LocalHost: "127.0.0.1", LocalPort: 0,
 	}
 	created, err := svc.Create(model.TunnelInputFrom(tunnel))
 	require.NoError(t, err)
 
 	err = svc.Start(created.ID)
 	require.NoError(t, err)
+	assert.Equal(t, 1, sessionSvc.ConnectionCount())
 
 	events := bus.Events()
 	assert.GreaterOrEqual(t, len(events), 2)
@@ -116,6 +117,7 @@ func TestTunnelService_StartStop(t *testing.T) {
 
 	err = svc.Stop(created.ID)
 	require.NoError(t, err)
+	assert.Equal(t, 0, sessionSvc.ConnectionCount())
 
 	events = bus.Events()
 	foundStopped := false
@@ -128,6 +130,9 @@ func TestTunnelService_StartStop(t *testing.T) {
 		}
 	}
 	assert.True(t, foundStopped)
+	for _, captured := range events {
+		assert.NotEqual(t, event.ConnectionState, captured.Name)
+	}
 }
 
 func TestTunnelService_StartNotFound(t *testing.T) {
@@ -159,17 +164,50 @@ func TestTunnelService_StartAlreadyRunning(t *testing.T) {
 
 	tunnel := model.Tunnel{
 		SessionID: createdSess.ID, Name: "dyn", Type: model.TunnelDynamic,
-		LocalHost: "127.0.0.1", LocalPort: 15001,
+		LocalHost: "127.0.0.1", LocalPort: 0,
 	}
 	created, err := svc.Create(model.TunnelInputFrom(tunnel))
 	require.NoError(t, err)
 
 	err = svc.Start(created.ID)
 	require.NoError(t, err)
+	t.Cleanup(func() { _ = svc.Stop(created.ID) })
 
 	err = svc.Start(created.ID)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "already running")
+}
+
+func TestTunnelService_ConcurrentStartReservesSingleRuntime(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	bus := newMockEventBus()
+	sessionSvc := NewSessionService(db, bus, 30, "", nil, testutil.NewTestLogger())
+	addr, cleanup := sshtestutil.NewMockServer(t)
+	defer cleanup()
+	createdSession, err := sessionSvc.CreateSession(model.SessionInputFrom(model.Session{
+		Name: "test-concurrent", Host: "127.0.0.1", Port: parsePort(t, addr), Username: "root",
+		AuthMethod: model.AuthPassword, KeepAlive: 30, TermType: "xterm-256color",
+	}))
+	require.NoError(t, err)
+	service := NewTunnelService(db, sessionSvc, bus, testutil.NewTestLogger())
+	created, err := service.Create(model.TunnelInputFrom(model.Tunnel{
+		SessionID: createdSession.ID, Name: "concurrent", Type: model.TunnelDynamic,
+		LocalHost: "127.0.0.1", LocalPort: 0,
+	}))
+	require.NoError(t, err)
+
+	start := make(chan struct{})
+	results := make(chan error, 2)
+	for range 2 {
+		go func() { <-start; results <- service.Start(created.ID) }()
+	}
+	close(start)
+	first, second := <-results, <-results
+
+	assert.Equal(t, 1, boolToInt(first == nil)+boolToInt(second == nil))
+	assert.Equal(t, 1, sessionSvc.ConnectionCount())
+	require.NoError(t, service.Stop(created.ID))
+	assert.Equal(t, 0, sessionSvc.ConnectionCount())
 }
 
 func TestTunnelService_StopNotRunning(t *testing.T) {
@@ -202,7 +240,7 @@ func TestTunnelService_DeleteRunning(t *testing.T) {
 
 	tunnel := model.Tunnel{
 		SessionID: createdSess.ID, Name: "del", Type: model.TunnelDynamic,
-		LocalHost: "127.0.0.1", LocalPort: 15002,
+		LocalHost: "127.0.0.1", LocalPort: 0,
 	}
 	created, err := svc.Create(model.TunnelInputFrom(tunnel))
 	require.NoError(t, err)
@@ -212,10 +250,18 @@ func TestTunnelService_DeleteRunning(t *testing.T) {
 
 	err = svc.Delete(created.ID)
 	require.NoError(t, err)
+	assert.Equal(t, 0, sessionSvc.ConnectionCount())
 
 	list, err := svc.List()
 	require.NoError(t, err)
 	assert.Len(t, list, 0)
+}
+
+func boolToInt(value bool) int {
+	if value {
+		return 1
+	}
+	return 0
 }
 
 func TestTunnelService_Remote(t *testing.T) {

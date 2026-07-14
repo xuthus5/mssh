@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react'
+import { RefreshCw, WifiOff } from 'lucide-react'
 import { TerminalEmulator } from '@/components/terminal/TerminalEmulator'
 import { TerminalSplit } from '@/components/terminal/TerminalSplit'
 import { TerminalToolbar } from '@/components/terminal/TerminalToolbar'
@@ -7,6 +8,7 @@ import { LogService } from '@/lib/wails'
 import { logger } from '@/lib/logger'
 import { toast } from '@/components/ui/toast'
 import type { TerminalFocusRequest } from '@/hooks/useTerminal'
+import { Button } from '@/components/ui/button'
 
 const noFocusRequest: TerminalFocusRequest = { sequence: 0, targetTerminalID: null }
 
@@ -16,6 +18,7 @@ interface Props {
   onOpenFiles: () => void
   active: boolean
   focusRequest: TerminalFocusRequest
+  onReconnect?: () => void
 }
 
 function useRecordingControl(terminalID: string, sessionId: number) {
@@ -63,11 +66,35 @@ function TerminalViewport({ split, sessionId, terminalID, active, focusRequest }
   return <TerminalEmulator terminalID={terminalID} active={active} focusRequest={primaryFocusRequest} />
 }
 
-export function TerminalTab({ terminalID, sessionId, onOpenFiles, active, focusRequest }: Props) {
+function ConnectionOverlay({ status, onReconnect }: {
+  status: 'connecting' | 'connected' | 'disconnected' | undefined
+  onReconnect?: () => void
+}) {
+  if (status === 'connected' || status === undefined) return null
+  const connecting = status === 'connecting'
+  return <div className="absolute inset-0 z-10 grid place-items-center bg-background/70 p-6 backdrop-blur-[1px]">
+    <div className="flex max-w-sm flex-col items-center rounded-xl border border-border bg-card/95 p-5 text-center shadow-lg">
+      {connecting
+        ? <RefreshCw aria-hidden="true" className="mb-3 size-8 animate-spin text-primary" />
+        : <WifiOff aria-hidden="true" className="mb-3 size-8 text-destructive" />}
+      <h3 className="text-sm font-semibold text-foreground">{connecting ? '正在重新连接' : '连接已断开'}</h3>
+      <p className="mt-1 text-xs leading-5 text-muted-foreground">
+        {connecting ? '正在为当前标签创建新的 SSH 通道。' : '远端会话可能因空闲超时或网络中断而结束，可在当前标签中重新连接。'}
+      </p>
+      <Button type="button" size="sm" className="mt-4" disabled={connecting} onClick={onReconnect}>
+        <RefreshCw aria-hidden="true" />
+        {connecting ? '正在重连' : '重新连接'}
+      </Button>
+    </div>
+  </div>
+}
+
+export function TerminalTab({ terminalID, sessionId, onOpenFiles, active, focusRequest, onReconnect }: Props) {
   const [split, setSplit] = useState(false)
   const tabs = useAppStore((state) => state.tabs)
   const currentTab = tabs.find((tab) => tab.terminalId === terminalID || tab.id === terminalID)
   const recording = useRecordingControl(terminalID, sessionId)
+  const connectionStatus = useAppStore((state) => state.connectionStatus[terminalID])
 
   return (
     <div className="flex flex-col h-full">
@@ -82,8 +109,9 @@ export function TerminalTab({ terminalID, sessionId, onOpenFiles, active, focusR
         onToggleSplit={() => setSplit((current) => !current)}
         split={split}
       />
-      <div className="flex-1">
+      <div className="relative min-h-0 flex-1">
         <TerminalViewport split={split} sessionId={currentTab?.sessionId} terminalID={terminalID} active={active} focusRequest={focusRequest} />
+        <ConnectionOverlay status={connectionStatus} onReconnect={onReconnect} />
       </div>
     </div>
   )

@@ -44,6 +44,7 @@ describe('TerminalTab', () => {
       terminalPool: new Map([['term-1', { terminal: { cols: 120, rows: 40 } as never, lastUsed: 0 }]]),
       recordingState: {},
       activePaneId: null,
+      connectionStatus: { 'term-1': 'connected' },
     })
   })
 
@@ -88,5 +89,28 @@ describe('TerminalTab', () => {
     fireEvent.click(screen.getByRole('button', { name: '停止录制' }))
     await waitFor(() => expect(useAppStore.getState().recordingState['term-1']).toBe('recording'))
     expect(loggerError).toHaveBeenCalledTimes(2)
+  })
+
+  it('keeps terminal output visible and offers reconnect after disconnection', () => {
+    const onReconnect = vi.fn()
+    useAppStore.setState({ connectionStatus: { 'term-1': 'disconnected' } })
+
+    render(<TerminalTab terminalID="term-1" sessionId={7} active focusRequest={focusRequest} onOpenFiles={vi.fn()} onReconnect={onReconnect} />)
+
+    expect(screen.getByTestId('terminal-emulator')).toBeInTheDocument()
+    expect(screen.getByText('连接已断开')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '重新连接' }))
+    expect(onReconnect).toHaveBeenCalledOnce()
+  })
+
+  it('prevents duplicate reconnect requests while connecting', () => {
+    const onReconnect = vi.fn()
+    useAppStore.setState({ connectionStatus: { 'term-1': 'connecting' } })
+
+    render(<TerminalTab terminalID="term-1" sessionId={7} active focusRequest={focusRequest} onOpenFiles={vi.fn()} onReconnect={onReconnect} />)
+
+    expect(screen.getByRole('button', { name: '正在重连' })).toBeDisabled()
+    fireEvent.click(screen.getByRole('button', { name: '正在重连' }))
+    expect(onReconnect).not.toHaveBeenCalled()
   })
 })
