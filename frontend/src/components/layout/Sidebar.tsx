@@ -11,6 +11,7 @@ import { useSettings } from '@/hooks/useSettings'
 import { useThemeCatalog } from '@/hooks/useThemeCatalog'
 import type { CommandItem } from '@/components/session/QuickCommands'
 import { useAppStore } from '@/store/appStore'
+import { workspaceTabID } from '@/store/tabNavigation'
 import { MacroService } from '@/lib/wails'
 import type { Macro, MacroInput } from '../../../bindings/github.com/xuthus5/mssh/internal/model/models'
 import { logger } from '@/lib/logger'
@@ -190,7 +191,7 @@ export default function Sidebar() {
 
   return (
     <div style={{ width: displayedWidth }} className="relative shrink-0 transition-[width] duration-200 ease-out">
-      <aside id="sidebar-navigation" style={{ width }} aria-hidden={collapsed} inert={collapsed ? true : undefined} className={`relative flex h-full flex-col border-r border-border bg-card transition-transform duration-200 ease-out ${collapsed ? '-translate-x-full pointer-events-none' : 'translate-x-0'}`}>
+      <aside id="sidebar-navigation" style={{ width }} aria-labelledby={workspaceTabID(activeTab)} aria-hidden={collapsed} inert={collapsed ? true : undefined} className={`relative flex h-full flex-col border-r border-border bg-card transition-transform duration-200 ease-out ${collapsed ? '-translate-x-full pointer-events-none' : 'translate-x-0'}`}>
       {!collapsed && <div {...resizeHandleProps} className="absolute inset-y-0 -right-1 z-20 w-2 cursor-col-resize touch-none outline-none after:absolute after:inset-y-0 after:left-1/2 after:w-px after:-translate-x-1/2 after:bg-transparent hover:after:bg-primary/60 focus-visible:after:bg-primary active:after:bg-primary" />}
       {activeTab === 'sessions' && (
         <>

@@ -118,7 +118,11 @@ export function createTabActions(set: StoreSet, get: StoreGet): TabActions {
 
 export function createNavigationActions(set: StoreSet, get: StoreGet): NavigationActions {
   return {
-    activateWorkspace: (id) => set({ activeSurface: { type: 'workspace', id }, workspaceTab: id }),
+    activateWorkspace: (id) => set((state) => (
+      id === 'macros' && state.activeSurface?.type === 'terminal'
+        ? { workspaceTab: id }
+        : { activeSurface: { type: 'workspace', id }, workspaceTab: id }
+    )),
     activateTab: (id, focus = false) => activateTab(set, get, id, focus),
     requestTerminalFocus: (tabID, terminalID) => set((state) => requestTerminalFocusState(state, tabID, terminalID)),
     toggleNavigation: () => set((state) => {

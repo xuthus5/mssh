@@ -16,7 +16,7 @@ describe('WorkspaceContent accessibility', () => {
   it('labels the workspace panel from the selected fixed tab', () => {
     render(<WorkspaceContent />)
 
-    const panel = screen.getByRole('tabpanel')
+    const panel = screen.getByRole('region')
     expect(panel).toHaveAttribute('id', 'workspace-panel')
     expect(panel).toHaveAttribute('aria-labelledby', 'workspace-tab-sessions')
   })
