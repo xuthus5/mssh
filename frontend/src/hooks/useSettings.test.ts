@@ -100,6 +100,34 @@ describe('useSettings', () => {
     expect(document.documentElement.style.getPropertyValue('--app-opacity')).toBe('0.76')
   })
 
+  it('preserves saved general settings when an earlier load completes', async () => {
+    let resolveInitialLoad: ((settings: Record<string, any>) => void) | undefined
+    const staleSettings = {
+      'terminal.max_pool_size': { key: 'terminal.max_pool_size', namespace: 'terminal', value: '5', value_type: 'number', version: 1, updated_at: '' },
+      'terminal.right_click_action': { key: 'terminal.right_click_action', namespace: 'terminal', value: '"menu"', value_type: 'string', version: 1, updated_at: '' },
+      'terminal.copy_on_select': { key: 'terminal.copy_on_select', namespace: 'terminal', value: 'false', value_type: 'boolean', version: 1, updated_at: '' },
+    }
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.GetMany', async (keys: string[]) => {
+      if (keys.includes('terminal.right_click_action')) {
+        return new Promise((resolve) => { resolveInitialLoad = resolve })
+      }
+      return {}
+    })
+
+    const { result } = renderHook(() => useSettings())
+    await act(async () => {})
+    const completeInitialLoad = resolveInitialLoad
+    if (!completeInitialLoad) throw new Error('initial general load did not start')
+
+    await act(async () => {
+      await result.current.saveGeneral({ ...result.current.general, maxPoolSize: 32, rightClickAction: 'paste', copyOnSelect: true })
+    })
+    await act(async () => { completeInitialLoad(staleSettings) })
+
+    expect(result.current.general).toMatchObject({ maxPoolSize: 32, rightClickAction: 'paste', copyOnSelect: true })
+    expect(useTerminalBehaviorStore.getState()).toMatchObject({ rightClickAction: 'paste', copyOnSelect: true })
+  })
+
   it('does not publish terminal behavior when persistence fails', async () => {
     useTerminalBehaviorStore.getState().setSettings({ rightClickAction: 'menu', copyOnSelect: false })
     __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.SetMany', async () => { throw new Error('db failed') })
