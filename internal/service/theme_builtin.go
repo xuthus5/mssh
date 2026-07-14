@@ -31,6 +31,9 @@ func (service *ThemeService) InitializeDefaults() error {
 }
 
 func initializeBuiltinCatalog(tx *sql.Tx) error {
+	if err := repairTerminalGlobalStyle(tx); err != nil {
+		return err
+	}
 	state, err := loadBuiltinCatalogState(tx)
 	if err != nil {
 		return err
@@ -115,7 +118,7 @@ func ensureBuiltinProfile(tx *sql.Tx, state *builtinCatalogState, name string, t
 }
 
 func defaultBuiltinProfile(name string, themeID int64) model.ThemeProfile {
-	return model.ThemeProfile{Name: name, ThemeID: themeID, FontFamily: defaultTerminalFont, FontSize: 14, CursorStyle: model.CursorStyleBar, ColorOverrides: `{}`}
+	return model.ThemeProfile{Name: name, ThemeID: themeID, FollowGlobalStyle: true, FontFamily: defaultTerminalFont, FontSize: model.DefaultTerminalFontSize, CursorStyle: model.CursorStyleBar, ColorOverrides: `{}`}
 }
 
 func repairThemeAssignments(tx *sql.Tx, state *builtinCatalogState, defaults map[string]int64) error {
@@ -205,8 +208,9 @@ func resetBuiltinProfile(tx *sql.Tx, profileID int64) (bool, error) {
 	if profile.Definition == nil || !profile.Definition.IsBuiltin {
 		return false, nil
 	}
+	profile.FollowGlobalStyle = true
 	profile.FontFamily = defaultTerminalFont
-	profile.FontSize = 14
+	profile.FontSize = model.DefaultTerminalFontSize
 	profile.CursorStyle = model.CursorStyleBar
 	profile.ColorOverrides = `{}`
 	if err = store.UpdateThemeProfile(tx, *profile); err != nil {

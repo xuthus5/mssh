@@ -10,7 +10,7 @@ import (
 	"github.com/xuthus5/mssh/internal/store"
 )
 
-const defaultTerminalFont = `"JetBrains Mono", "Cascadia Code", monospace`
+const defaultTerminalFont = model.DefaultTerminalFontFamily
 
 type ThemeService struct {
 	db     *sql.DB
@@ -49,6 +49,7 @@ func (service *ThemeService) GetProfile(id int64) (*model.ThemeProfile, error) {
 
 func (service *ThemeService) CreateCustomProfile(input model.ThemeProfileInput) (*model.ThemeProfile, error) {
 	profile := input.ThemeProfile()
+	profile.FollowGlobalStyle = true
 	if err := validateThemeProfile(profile); err != nil {
 		return nil, err
 	}
@@ -89,6 +90,13 @@ func (service *ThemeService) GetAssignments() (model.ThemeAssignments, error) {
 	return store.GetThemeAssignments(service.db)
 }
 
+func (service *ThemeService) GetGlobalStyle() (model.TerminalGlobalStyle, error) {
+	if err := service.InitializeDefaults(); err != nil {
+		return model.TerminalGlobalStyle{}, err
+	}
+	return store.GetTerminalGlobalStyle(service.db)
+}
+
 func (service *ThemeService) SaveAssignments(input model.ThemeAssignmentsInput) error {
 	assignments := input.ThemeAssignments()
 	tx, err := service.db.Begin()
@@ -109,6 +117,10 @@ func (service *ThemeService) SaveAssignments(input model.ThemeAssignmentsInput) 
 }
 
 func (service *ThemeService) SaveConfiguration(input model.ThemeConfigurationInput) error {
+	globalStyle := normalizeTerminalGlobalStyle(input.GlobalStyle.TerminalGlobalStyle())
+	if err := validateTerminalGlobalStyle(globalStyle); err != nil {
+		return fmt.Errorf("terminal global style: %w", err)
+	}
 	profiles, err := validatedThemeProfiles(input.Profiles)
 	if err != nil {
 		return err
@@ -124,6 +136,9 @@ func (service *ThemeService) SaveConfiguration(input model.ThemeConfigurationInp
 				break
 			}
 		}
+	}
+	if err == nil {
+		err = store.SaveTerminalGlobalStyleDB(tx, globalStyle)
 	}
 	if err == nil {
 		err = store.SaveThemeAssignmentsDB(tx, assignments)
@@ -178,14 +193,11 @@ func validateThemeAssignments(db themeDatabase, assignments model.ThemeAssignmen
 }
 
 func validateThemeProfile(profile model.ThemeProfile) error {
-	if profile.Name == "" || profile.ThemeID < 1 || profile.FontFamily == "" {
+	if profile.Name == "" || profile.ThemeID < 1 {
 		return fmt.Errorf("theme profile name, definition, and font are required")
 	}
-	if profile.FontSize < 8 || profile.FontSize > 48 {
-		return fmt.Errorf("theme profile font size must be between 8 and 48")
-	}
-	if profile.CursorStyle != model.CursorStyleBar && profile.CursorStyle != model.CursorStyleBlock && profile.CursorStyle != model.CursorStyleUnderline {
-		return fmt.Errorf("invalid theme profile cursor style")
+	if err := validateTerminalStyle(profile.FontFamily, profile.FontSize, profile.CursorStyle); err != nil {
+		return fmt.Errorf("theme profile %w", err)
 	}
 	if !json.Valid([]byte(profile.ColorOverrides)) {
 		return fmt.Errorf("invalid theme profile color overrides")

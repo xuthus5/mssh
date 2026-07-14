@@ -139,6 +139,7 @@ func TestThemeServiceSavesCrossModeConfigurationAndManagesCustomThemes(t *testin
 	dark.Name = "Dark Edited"
 	light.Name = "Light Edited"
 	require.NoError(t, themeService.SaveConfiguration(model.ThemeConfigurationInput{
+		GlobalStyle: validTerminalGlobalStyleInput(),
 		Profiles:    []model.ThemeProfileInput{model.ThemeProfileInputFrom(dark), model.ThemeProfileInputFrom(light)},
 		Assignments: model.ThemeAssignmentsInput{DarkProfileID: light.ID, LightProfileID: dark.ID, FollowInterfaceMode: true},
 	}))
@@ -163,6 +164,7 @@ func TestThemeServiceSavesCrossModeConfigurationAndManagesCustomThemes(t *testin
 		Profiles: []model.ThemeProfileInput{missingDark, model.ThemeProfileInputFrom(light)},
 	}))
 	assert.ErrorContains(t, themeService.SaveConfiguration(model.ThemeConfigurationInput{
+		GlobalStyle: validTerminalGlobalStyleInput(),
 		Profiles:    []model.ThemeProfileInput{model.ThemeProfileInputFrom(dark), model.ThemeProfileInputFrom(dark)},
 		Assignments: model.ThemeAssignmentsInput{DarkProfileID: dark.ID, LightProfileID: light.ID, FollowInterfaceMode: true},
 	}), "duplicate theme profile")
@@ -183,6 +185,7 @@ func TestThemeServiceSavesFixedConfigurationAndRollsBackProfileUpdates(t *testin
 	fixed := mustThemeProfileNamed(t, profiles, "Dracula")
 
 	require.NoError(t, themeService.SaveConfiguration(model.ThemeConfigurationInput{
+		GlobalStyle: validTerminalGlobalStyleInput(),
 		Profiles: []model.ThemeProfileInput{
 			model.ThemeProfileInputFrom(dark),
 			model.ThemeProfileInputFrom(light),
@@ -204,7 +207,8 @@ func TestThemeServiceSavesFixedConfigurationAndRollsBackProfileUpdates(t *testin
 	_, err = db.Exec(`CREATE TRIGGER fail_light_profile_update BEFORE UPDATE ON terminal_theme_profiles WHEN OLD.id = ` + themeProfileID(light.ID) + ` BEGIN SELECT RAISE(FAIL, 'light profile update failed'); END`)
 	require.NoError(t, err)
 	err = themeService.SaveConfiguration(model.ThemeConfigurationInput{
-		Profiles: []model.ThemeProfileInput{model.ThemeProfileInputFrom(dark), model.ThemeProfileInputFrom(light)},
+		GlobalStyle: validTerminalGlobalStyleInput(),
+		Profiles:    []model.ThemeProfileInput{model.ThemeProfileInputFrom(dark), model.ThemeProfileInputFrom(light)},
 		Assignments: model.ThemeAssignmentsInput{
 			DarkProfileID:       dark.ID,
 			LightProfileID:      light.ID,
@@ -299,6 +303,7 @@ func TestThemeServiceReportsDatabaseFailures(t *testing.T) {
 	assert.Error(t, err)
 	assert.Error(t, themeService.SaveAssignments(model.ThemeAssignmentsInput{DarkProfileID: 1, LightProfileID: 2, FollowInterfaceMode: true}))
 	assert.Error(t, themeService.SaveConfiguration(model.ThemeConfigurationInput{
+		GlobalStyle: validTerminalGlobalStyleInput(),
 		Profiles:    []model.ThemeProfileInput{validThemeProfileInput(1), validThemeProfileInput(2)},
 		Assignments: model.ThemeAssignmentsInput{DarkProfileID: 1, LightProfileID: 2, FollowInterfaceMode: true},
 	}))
@@ -308,4 +313,8 @@ func TestThemeServiceReportsDatabaseFailures(t *testing.T) {
 
 func validThemeProfileInput(themeID int64) model.ThemeProfileInput {
 	return model.ThemeProfileInput{Name: "Valid", ThemeID: themeID, FontFamily: "mono", FontSize: 14, CursorStyle: model.CursorStyleBar, ColorOverrides: `{}`}
+}
+
+func validTerminalGlobalStyleInput() model.TerminalGlobalStyleInput {
+	return model.TerminalGlobalStyleInputFrom(defaultTerminalGlobalStyle())
 }
