@@ -146,6 +146,35 @@ describe('useSettings', () => {
     expect(useTerminalBehaviorStore.getState()).toMatchObject({ rightClickAction: 'menu', copyOnSelect: false })
   })
 
+  it('applies an earlier general load after a failed save', async () => {
+    const persistedSettings = {
+      'terminal.max_pool_size': { key: 'terminal.max_pool_size', namespace: 'terminal', value: '17', value_type: 'number', version: 1, updated_at: '' },
+      'terminal.right_click_action': { key: 'terminal.right_click_action', namespace: 'terminal', value: '"paste"', value_type: 'string', version: 1, updated_at: '' },
+      'terminal.copy_on_select': { key: 'terminal.copy_on_select', namespace: 'terminal', value: 'true', value_type: 'boolean', version: 1, updated_at: '' },
+    }
+    let resolveInitialLoad: ((settings: typeof persistedSettings) => void) | undefined
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.GetMany', async (keys: string[]) => {
+      if (keys.includes('terminal.right_click_action')) {
+        return new Promise<typeof persistedSettings>((resolve) => { resolveInitialLoad = resolve })
+      }
+      return {}
+    })
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.SetMany', async () => { throw new Error('db failed') })
+
+    const { result } = renderHook(() => useSettings())
+    await act(async () => {})
+    const completeInitialLoad = resolveInitialLoad
+    if (!completeInitialLoad) throw new Error('initial general load did not start')
+
+    await act(async () => {
+      await expect(result.current.saveGeneral({ ...result.current.general, maxPoolSize: 44 })).rejects.toThrow('db failed')
+    })
+    await act(async () => { completeInitialLoad(persistedSettings) })
+
+    expect(result.current.general).toMatchObject({ maxPoolSize: 17, rightClickAction: 'paste', copyOnSelect: true })
+    expect(useTerminalBehaviorStore.getState()).toMatchObject({ rightClickAction: 'paste', copyOnSelect: true })
+  })
+
   it('generates a key and adds to state', async () => {
     __registerHandler('github.com/xuthus5/mssh/internal/service.KeyService.Generate', async (name: string, keyType: string, bits: number) => ({
       id: nextId(), name, type: keyType, public_key: 'mock-pub', created_at: new Date().toISOString(),

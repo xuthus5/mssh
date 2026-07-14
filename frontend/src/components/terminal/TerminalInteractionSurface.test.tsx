@@ -15,7 +15,9 @@ vi.mock('@/lib/terminalInteractions', () => interactions)
 vi.mock('@/lib/logger', () => ({ logger: { error: loggerError } }))
 vi.mock('@/components/ui/toast', () => ({ toast }))
 vi.mock('@/components/ui/context-menu', () => ({
-  ContextMenu: ({ children }: { children: ReactNode }) => <div data-testid="context-menu">{children}</div>,
+  ContextMenu: ({ children, disabled }: { children: ReactNode; disabled?: boolean }) => (
+    <div data-testid="context-menu" data-disabled={disabled}>{children}</div>
+  ),
   ContextMenuTrigger: ({ children, className, onContextMenuCapture }: {
     children: ReactNode
     className?: string
@@ -102,6 +104,7 @@ describe('TerminalInteractionSurface', () => {
     fireEvent(surface, event)
 
     expect(event.defaultPrevented).toBe(true)
+    expect(screen.getByTestId('context-menu')).toHaveAttribute('data-disabled', 'true')
     expect(screen.queryByRole('button', { name: '复制' })).not.toBeInTheDocument()
     await waitFor(() => expect(interactions.pasteClipboardIntoTerminal).toHaveBeenCalledWith(terminal, navigator.clipboard))
     expect(terminal.focus).toHaveBeenCalledOnce()
@@ -134,5 +137,21 @@ describe('TerminalInteractionSurface', () => {
 
     expect(screen.getByRole('button', { name: '复制' })).toBeInTheDocument()
     expect(screen.getByTestId('context-menu-trigger')).toHaveClass('select-text')
+  })
+
+  it('preserves the mounted terminal container across mode switches', () => {
+    const { terminalRef } = createTerminal()
+    render(
+      <TerminalInteractionSurface terminalRef={terminalRef}>
+        <div data-testid="terminal-container">terminal</div>
+      </TerminalInteractionSurface>,
+    )
+    const terminalContainer = screen.getByTestId('terminal-container')
+
+    act(() => useTerminalBehaviorStore.getState().setSettings({ rightClickAction: 'paste', copyOnSelect: false }))
+    expect(screen.getByTestId('terminal-container')).toBe(terminalContainer)
+
+    act(() => useTerminalBehaviorStore.getState().setSettings({ rightClickAction: 'menu', copyOnSelect: false }))
+    expect(screen.getByTestId('terminal-container')).toBe(terminalContainer)
   })
 })
