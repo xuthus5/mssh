@@ -17,25 +17,47 @@ export function ExportPublicKey(id: number): $CancellablePromise<string> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.KeyService.ExportPublicKey", id);
 }
 
-export function Generate(name: string, keyType: model$0.KeyType, bits: number): $CancellablePromise<model$0.SSHKey | null> {
+export function Generate(name: string, keyType: model$0.KeyType, bits: number): $CancellablePromise<model$0.SSHKeyMaterial | null> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.KeyService.Generate", name, keyType, bits).then(($result: any) => {
+        return $$createType1($result);
+    });
+}
+
+export function GetMaterial(id: number): $CancellablePromise<model$0.SSHKeyMaterial | null> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.KeyService.GetMaterial", id).then(($result: any) => {
         return $$createType1($result);
     });
 }
 
 export function Import(name: string, privateKeyPEM: string): $CancellablePromise<model$0.SSHKey | null> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.KeyService.Import", name, privateKeyPEM).then(($result: any) => {
-        return $$createType1($result);
+        return $$createType3($result);
     });
 }
 
 export function List(): $CancellablePromise<model$0.SSHKey[]> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.KeyService.List").then(($result: any) => {
-        return $$createType2($result);
+        return $$createType4($result);
+    });
+}
+
+export function SelectImportFile(): $CancellablePromise<model$0.SSHKeyImportFile | null> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.KeyService.SelectImportFile").then(($result: any) => {
+        return $$createType6($result);
+    });
+}
+
+export function Update(input: model$0.SSHKeyUpdateInput): $CancellablePromise<model$0.SSHKeyMaterial | null> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.KeyService.Update", input).then(($result: any) => {
+        return $$createType1($result);
     });
 }
 
 // Private type creation functions
-const $$createType0 = model$0.SSHKey.createFrom;
+const $$createType0 = model$0.SSHKeyMaterial.createFrom;
 const $$createType1 = $Create.Nullable($$createType0);
-const $$createType2 = $Create.Array($$createType0);
+const $$createType2 = model$0.SSHKey.createFrom;
+const $$createType3 = $Create.Nullable($$createType2);
+const $$createType4 = $Create.Array($$createType2);
+const $$createType5 = model$0.SSHKeyImportFile.createFrom;
+const $$createType6 = $Create.Nullable($$createType5);
