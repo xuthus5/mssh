@@ -1,6 +1,7 @@
 package main
 
 import (
+	_ "embed"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -11,6 +12,9 @@ import (
 	"github.com/xuthus5/mssh/internal/app"
 	"github.com/xuthus5/mssh/internal/windowing"
 )
+
+//go:embed build/appicon.png
+var appIcon []byte
 
 func main() {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo}))
@@ -26,7 +30,7 @@ func main() {
 	}
 
 	wailsApp := newWailsApplication(appInstance)
-	configureWindows(wailsApp)
+	configureWindows(wailsApp, windowConfiguration{Settings: appInstance.Setting, Logger: logger})
 	wailsApp.OnShutdown(func() { appInstance.Shutdown() })
 
 	logger.Info("MSSH started")
@@ -40,6 +44,7 @@ func newWailsApplication(appInstance *app.App) *application.App {
 	return application.New(application.Options{
 		Name:        "mssh",
 		Description: "A cross-platform SSH client",
+		Icon:        appIcon,
 		Services: []application.Service{
 			application.NewService(appInstance.Session),
 			application.NewService(appInstance.Terminal),
@@ -58,19 +63,30 @@ func newWailsApplication(appInstance *app.App) *application.App {
 			Handler: application.AssetFileServerFS(os.DirFS("./frontend/dist")),
 		},
 		Mac: application.MacOptions{
-			ApplicationShouldTerminateAfterLastWindowClosed: true,
+			ApplicationShouldTerminateAfterLastWindowClosed: false,
 		},
 	})
 }
 
-func configureWindows(wailsApp *application.App) {
+type windowConfiguration struct {
+	Settings windowing.CloseActionReader
+	Logger   *slog.Logger
+}
+
+func configureWindows(wailsApp *application.App, configuration windowConfiguration) {
 	mainWindow := wailsApp.Window.NewWithOptions(mainWindowOptions())
 	settingsController := windowing.NewSettingsWindowController(wailsApp.Window, mainWindow, wailsApp.Event.Emit)
+	lifecycleController := windowing.NewApplicationLifecycleController(windowing.ApplicationLifecycleOptions{
+		Settings: configuration.Settings, Logger: configuration.Logger,
+		ShowMain: func() { mainWindow.Show() }, HideMain: func() { mainWindow.Hide() },
+		FocusMain: func() { mainWindow.Focus() }, CloseSettings: settingsController.Close,
+		Quit: wailsApp.Quit,
+	})
 	_ = wailsApp.Event.On(windowing.OpenSettingsWindowEvent, func(*application.CustomEvent) {
 		settingsController.Open()
 	})
-	_ = mainWindow.RegisterHook(events.Common.WindowClosing, func(*application.WindowEvent) {
-		settingsController.Close()
+	_ = mainWindow.RegisterHook(events.Common.WindowClosing, func(event *application.WindowEvent) {
+		lifecycleController.HandleWindowClosing(event)
 	})
 	_ = mainWindow.OnWindowEvent(events.Common.WindowFilesDropped, func(event *application.WindowEvent) {
 		_ = wailsApp.Event.Emit("sftp:files-dropped", map[string]any{
@@ -78,6 +94,19 @@ func configureWindows(wailsApp *application.App) {
 			"details": event.Context().DropTargetDetails(),
 		})
 	})
+	configureSystemTray(wailsApp, lifecycleController)
+}
+
+func configureSystemTray(wailsApp *application.App, controller *windowing.ApplicationLifecycleController) (*application.SystemTray, *application.Menu) {
+	menu := wailsApp.NewMenu()
+	menu.Add("显示主窗口").OnClick(func(*application.Context) { controller.ShowMainWindow() })
+	menu.Add("隐藏到托盘").OnClick(func(*application.Context) { controller.HideMainWindow() })
+	menu.AddSeparator()
+	menu.Add("退出").OnClick(func(*application.Context) { controller.QuitApplication() })
+	tray := wailsApp.SystemTray.New()
+	tray.SetIcon(appIcon).SetMenu(menu).OnClick(controller.ShowMainWindow)
+	tray.SetTooltip("MSSH")
+	return tray, menu
 }
 
 func mainWindowOptions() application.WebviewWindowOptions {

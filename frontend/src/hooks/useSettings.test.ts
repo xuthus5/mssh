@@ -43,13 +43,14 @@ describe('useSettings', () => {
     expect(result.current.general.windowOpacity).toBe(100)
     expect(result.current.general.rightClickAction).toBe('menu')
     expect(result.current.general.copyOnSelect).toBe(false)
+    expect(result.current.general.closeButtonAction).toBe('tray')
     expect(result.current.systemFonts).toEqual(['Arial', 'Segoe UI'])
   })
 
   it('saves general settings and updates state', async () => {
     const { result } = renderHook(() => useSettings())
     await act(async () => {
-      await result.current.saveGeneral({ maxPoolSize: 32, defaultKeepAlive: 120, defaultTermType: 'xterm', uiFontFamily: 'Segoe UI', uiFontFallbackFamily: 'Microsoft YaHei', uiFontSize: 16, windowOpacity: 82, rightClickAction: 'paste', copyOnSelect: true })
+      await result.current.saveGeneral({ maxPoolSize: 32, defaultKeepAlive: 120, defaultTermType: 'xterm', uiFontFamily: 'Segoe UI', uiFontFallbackFamily: 'Microsoft YaHei', uiFontSize: 16, windowOpacity: 82, rightClickAction: 'paste', copyOnSelect: true, closeButtonAction: 'exit' })
     })
     expect(result.current.general.maxPoolSize).toBe(32)
     expect(result.current.general.defaultKeepAlive).toBe(120)
@@ -60,12 +61,14 @@ describe('useSettings', () => {
     expect(result.current.general.windowOpacity).toBe(82)
     expect(result.current.general.rightClickAction).toBe('paste')
     expect(result.current.general.copyOnSelect).toBe(true)
+    expect(result.current.general.closeButtonAction).toBe('exit')
     expect(writtenSettings).toContainEqual(expect.objectContaining({ key: 'appearance.ui_font_family', value: '"Segoe UI"' }))
     expect(writtenSettings).toContainEqual(expect.objectContaining({ key: 'appearance.ui_font_fallback_family', value: '"Microsoft YaHei"' }))
     expect(writtenSettings).toContainEqual(expect.objectContaining({ key: 'appearance.ui_font_size', value: '16' }))
     expect(writtenSettings).toContainEqual(expect.objectContaining({ key: 'appearance.window_opacity', value: '82' }))
     expect(writtenSettings).toContainEqual(expect.objectContaining({ key: 'terminal.right_click_action', value: '"paste"' }))
     expect(writtenSettings).toContainEqual(expect.objectContaining({ key: 'terminal.copy_on_select', value: 'true' }))
+    expect(writtenSettings).toContainEqual(expect.objectContaining({ key: 'application.close_button_action', value: '"exit"' }))
     expect(useTerminalBehaviorStore.getState()).toMatchObject({ rightClickAction: 'paste', copyOnSelect: true })
     expect(document.documentElement.style.getPropertyValue('--app-font-family')).toBe('"Segoe UI", "Microsoft YaHei", sans-serif')
     expect(document.documentElement.style.getPropertyValue('--app-opacity')).toBe('0.82')
@@ -79,6 +82,7 @@ describe('useSettings', () => {
     _settings['appearance.window_opacity'] = '76'
     _settings['terminal.right_click_action'] = '"paste"'
     _settings['terminal.copy_on_select'] = 'true'
+    _settings['application.close_button_action'] = '"exit"'
 
     const { result } = renderHook(() => useSettings())
     await act(async () => {})
@@ -89,6 +93,7 @@ describe('useSettings', () => {
     expect(result.current.general.windowOpacity).toBe(76)
     expect(result.current.general.rightClickAction).toBe('paste')
     expect(result.current.general.copyOnSelect).toBe(true)
+    expect(result.current.general.closeButtonAction).toBe('exit')
     expect(useTerminalBehaviorStore.getState()).toMatchObject({ rightClickAction: 'paste', copyOnSelect: true })
     expect(document.documentElement.style.getPropertyValue('--app-font-family')).toBe('"Arial", "Segoe UI", sans-serif')
     expect(document.documentElement.style.getPropertyValue('--app-font-size')).toBe('18px')

@@ -34,7 +34,7 @@ func TestDefaultDataDirUsesUserHome(t *testing.T) {
 
 func TestConfigureWindowsCreatesAndReusesSettingsWindow(t *testing.T) {
 	wailsApp := application.New(application.Options{Name: "mssh-window-test"})
-	configureWindows(wailsApp)
+	configureWindows(wailsApp, windowConfiguration{})
 
 	assert.False(t, wailsApp.Event.Emit(windowing.OpenSettingsWindowEvent))
 	assert.Eventually(t, func() bool {
@@ -45,4 +45,19 @@ func TestConfigureWindowsCreatesAndReusesSettingsWindow(t *testing.T) {
 
 	assert.False(t, wailsApp.Event.Emit(windowing.OpenSettingsWindowEvent))
 	assert.Eventually(t, func() bool { return len(wailsApp.Window.GetAll()) == 2 }, time.Second, 10*time.Millisecond)
+}
+
+func TestEmbeddedApplicationIconIsPNG(t *testing.T) {
+	assert.Greater(t, len(appIcon), 8)
+	assert.Equal(t, []byte{0x89, 'P', 'N', 'G', 0x0d, 0x0a, 0x1a, 0x0a}, appIcon[:8])
+}
+
+func TestSystemTrayMenuContainsRequiredActions(t *testing.T) {
+	wailsApp := application.New(application.Options{Name: "mssh-tray-test"})
+	controller := windowing.NewApplicationLifecycleController(windowing.ApplicationLifecycleOptions{})
+	_, menu := configureSystemTray(wailsApp, controller)
+
+	assert.NotNil(t, menu.FindByLabel("显示主窗口"))
+	assert.NotNil(t, menu.FindByLabel("隐藏到托盘"))
+	assert.NotNil(t, menu.FindByLabel("退出"))
 }
