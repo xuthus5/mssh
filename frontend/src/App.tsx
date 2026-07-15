@@ -10,6 +10,8 @@ import { SessionWorkspaceProvider } from '@/hooks/SessionWorkspaceContext'
 import { closeTabsWithFeedback } from '@/lib/closeTabsWithFeedback'
 import { WorkspaceContent } from '@/components/layout/WorkspaceContent'
 import { TerminalLayers } from '@/components/terminal/TerminalLayers'
+import { SessionQuickSearchHost } from '@/components/session/SessionQuickSearchHost'
+import { SESSION_QUICK_SEARCH_EVENT } from '@/lib/sessionQuickSearch'
 
 function activeTab(state: AppState): Tab | undefined {
   const surface = state.activeSurface
@@ -57,12 +59,24 @@ function closeActiveTab(state: AppState) {
   closeTabsWithFeedback([tab.id], state.closeTab)
 }
 
+function isOrdinaryEditable(target: HTMLElement | null) {
+  if (!target?.matches('input, textarea, select, [contenteditable="true"]')) return false
+  if (target.classList.contains('xterm-helper-textarea')) return false
+  return !target.hasAttribute('data-session-search-input')
+}
+
 function handleShortcut(event: KeyboardEvent) {
   const target = event.target as HTMLElement | null
-  if (target?.matches('input, textarea, select, [contenteditable="true"]')) return
   const commandKey = event.ctrlKey || event.metaKey
   if (!commandKey) return
   const key = event.key.toLowerCase()
+  if (!event.shiftKey && key === 'f') {
+    if (isOrdinaryEditable(target)) return
+    window.dispatchEvent(new CustomEvent(SESSION_QUICK_SEARCH_EVENT))
+    event.preventDefault()
+    return
+  }
+  if (isOrdinaryEditable(target)) return
   const state = useAppStore.getState()
 
   if (!event.shiftKey && key === 'n') window.dispatchEvent(new CustomEvent('mssh:new-session'))
@@ -96,6 +110,7 @@ export default function App() {
         <StatusBar />
         <ToastContainer />
         <ConnectDialog />
+        <SessionQuickSearchHost />
       </SessionWorkspaceProvider>
     </div>
   )
