@@ -16,7 +16,19 @@ describe('TerminalProfileStyleEditor', () => {
     expect(screen.getByLabelText('主题字号')).toHaveValue(16)
     expect(screen.getByRole('combobox', { name: '主题光标样式' })).toHaveTextContent('下划线')
     expect(screen.getByLabelText('主题字体')).toBeDisabled()
+    expect(screen.getByLabelText('选区背景色 HEX')).toHaveValue('#264f78')
+    expect(screen.getByLabelText('选区背景色 HEX')).toBeEnabled()
     expect(screen.queryByLabelText('光标颜色 HEX')).not.toBeInTheDocument()
+  })
+
+  it('edits the Profile selection background while global typography is followed', async () => {
+    render(<ProfileStyleHarness />)
+
+    await userEvent.clear(screen.getByLabelText('选区背景色 HEX'))
+    await userEvent.type(screen.getByLabelText('选区背景色 HEX'), '#4f46e5')
+
+    expect(screen.getByLabelText('选区背景色 HEX')).toHaveValue('#4f46e5')
+    expect(screen.getByRole('switch', { name: '跟随全局字体与光标' })).toBeChecked()
   })
 
   it('restores and edits Profile fallback values when following is disabled', async () => {
@@ -72,6 +84,7 @@ function draft(): ThemeDraft {
     fontFamily: 'Profile Font',
     fontSize: 19,
     ansi: Array(16).fill('#111111'),
+    selectionBackground: '#264f78',
     followGlobalStyle: true,
   }
 }

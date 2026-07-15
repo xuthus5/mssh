@@ -76,15 +76,15 @@ export function terminalGlobalStyleInput(style: TerminalGlobalStyle): TerminalGl
 }
 
 function profileToEditableTheme(profile: ThemeProfile): ThemeDraft {
-  const colors = JSON.parse(profile.definition?.color_payload ?? '{}') as TerminalTheme & { cursor?: string; selection?: string }
-  const overrides = JSON.parse(profile.color_overrides || '{}') as Partial<TerminalTheme> & { cursor?: string }
+  const colors = JSON.parse(profile.definition?.color_payload ?? '{}') as TerminalTheme & { cursor?: string; selection: string }
+  const overrides = JSON.parse(profile.color_overrides || '{}') as Partial<TerminalTheme> & { cursor?: string; selection?: string }
   return {
-    ...normalizeTerminalThemeColors({ background: overrides.background ?? colors.background, foreground: overrides.foreground ?? colors.foreground, cursorColor: overrides.cursorColor ?? overrides.cursor ?? colors.cursor ?? colors.foreground, cursorStyle: profile.cursor_style as TerminalTheme['cursorStyle'], fontFamily: profile.font_family, fontSize: profile.font_size, ansi: completeAnsiPalette(overrides.ansi ?? colors.ansi ?? []) }),
+    ...normalizeTerminalThemeColors({ background: overrides.background ?? colors.background, foreground: overrides.foreground ?? colors.foreground, cursorColor: overrides.cursorColor ?? overrides.cursor ?? colors.cursor ?? colors.foreground, selectionBackground: overrides.selection ?? colors.selection, cursorStyle: profile.cursor_style as TerminalTheme['cursorStyle'], fontFamily: profile.font_family, fontSize: profile.font_size, ansi: completeAnsiPalette(overrides.ansi ?? colors.ansi ?? []) }),
     followGlobalStyle: profile.follow_global_style,
   }
 }
 
 function themeToProfileInput(profile: ThemeProfile, theme: ThemeDraft): ThemeProfileInput {
   const normalized = normalizeTerminalThemeColors(theme)
-  return { id: profile.id, name: profile.name, theme_id: profile.theme_id, follow_global_style: theme.followGlobalStyle, font_family: normalized.fontFamily, font_size: normalized.fontSize, cursor_style: normalized.cursorStyle, color_overrides: JSON.stringify({ background: normalized.background, foreground: normalized.foreground, cursor: normalized.cursorColor, ansi: normalized.ansi }) } as ThemeProfileInput
+  return { id: profile.id, name: profile.name, theme_id: profile.theme_id, follow_global_style: theme.followGlobalStyle, font_family: normalized.fontFamily, font_size: normalized.fontSize, cursor_style: normalized.cursorStyle, color_overrides: JSON.stringify({ background: normalized.background, foreground: normalized.foreground, cursor: normalized.cursorColor, selection: normalized.selectionBackground, ansi: normalized.ansi }) } as ThemeProfileInput
 }

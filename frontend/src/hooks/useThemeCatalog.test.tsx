@@ -138,7 +138,7 @@ describe('useThemeCatalog', () => {
     __registerHandler('github.com/xuthus5/mssh/internal/service.ThemeService.SaveConfiguration', async () => {})
     const { result } = renderHook(() => useThemeCatalog())
     await waitFor(() => expect(result.current.loaded).toBe(true))
-    const savedProfile = { ...darkProfile, color_overrides: JSON.stringify({ background: '#123456' }) }
+    const savedProfile = { ...darkProfile, color_overrides: JSON.stringify({ background: '#123456', selection: '#4f46e5' }) }
     __registerHandler('github.com/xuthus5/mssh/internal/service.ThemeService.ListProfiles', async () => [savedProfile, lightProfile, fixedProfile])
     __registerHandler('github.com/xuthus5/mssh/internal/service.ThemeService.GetAssignments', async () => ({ dark_profile_id: 1, light_profile_id: 1, follow_interface_mode: true, fixed_profile_id: 0 }))
     await act(async () => {
@@ -150,6 +150,7 @@ describe('useThemeCatalog', () => {
     })
     expect(useThemeCatalogStore.getState().assignments.light_profile_id).toBe(1)
     expect(useAppStore.getState().terminalTheme.background).toBe('#123456')
+    expect(useAppStore.getState().terminalTheme.selectionBackground).toBe('#4f46e5')
   })
 
   it('reloads and hot-applies a saved global terminal style', async () => {

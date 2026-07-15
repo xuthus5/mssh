@@ -16,6 +16,7 @@ describe('theme editor state', () => {
     const drafts = createThemeDrafts(profiles as never)
     expect(drafts.get(1)?.background).toBe('#111111')
     expect(drafts.get(2)?.background).toBe('#eeeeee')
+    expect(drafts.get(1)?.selectionBackground).toBe('#264f78')
   })
 
   it('deduplicates Profiles shared by Dark and Fixed assignments', () => {
@@ -77,6 +78,8 @@ describe('theme editor state', () => {
     expect(configuration.global_style).toEqual(terminalGlobalStyleInput(globalStyle as never))
     expect(configuration.profiles).toContainEqual(expect.objectContaining({ id: 1, follow_global_style: true, font_family: 'Profile Font 1' }))
     expect(configuration.profiles).toContainEqual(expect.objectContaining({ id: 2, follow_global_style: false, font_family: 'Independent Font', font_size: 18, cursor_style: 'block' }))
+    const independentProfile = configuration.profiles.find((profile) => profile.id === 2)
+    expect(JSON.parse(independentProfile?.color_overrides ?? '{}')).toMatchObject({ selection: '#264f78' })
   })
 
   it('validates terminal typography boundaries', () => {
