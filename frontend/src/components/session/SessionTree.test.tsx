@@ -84,6 +84,20 @@ describe('SessionTree', () => {
     expect(await screen.findByRole('menuitem', { name: '连接' })).toBeInTheDocument()
   })
 
+  it('prevents browser text selection when a folder is double clicked', () => {
+    render(<SessionTree
+      folders={FOLDERS}
+      sessions={SESSIONS}
+      onConnect={vi.fn()}
+      onSelectFolder={vi.fn()}
+      navigationOnly
+    />)
+
+    const folderItem = screen.getByRole('treeitem', { name: /生产环境/ })
+    expect(folderItem).toHaveClass('select-none')
+    expect(fireEvent.doubleClick(folderItem)).toBe(false)
+  })
+
   it('shows empty message when no data', () => {
     render(<SessionTree
       folders={[]}

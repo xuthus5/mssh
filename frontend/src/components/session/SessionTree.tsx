@@ -70,8 +70,12 @@ export default function SessionTree({
       role="treeitem"
       tabIndex={0}
       aria-expanded={isExpanded}
-      className="flex cursor-pointer items-center gap-1 rounded px-1 py-1 text-sm hover:bg-muted/50"
+      className="flex cursor-pointer select-none items-center gap-1 rounded px-1 py-1 text-sm hover:bg-muted/50"
       onClick={() => { toggleFolder(folder.id); onSelectFolder?.(folder.id) }}
+      onDoubleClick={(event: MouseEvent) => {
+        event.preventDefault()
+        event.stopPropagation()
+      }}
       onKeyDown={(event) => {
         if (event.key === 'Enter' || event.key === ' ') { toggleFolder(folder.id); onSelectFolder?.(folder.id) }
         if (event.key === 'ArrowRight' && !isExpanded) toggleFolder(folder.id)
