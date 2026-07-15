@@ -33,7 +33,7 @@ function openTabState(state: AppState, tab: Tab): Partial<AppState> {
 
 async function closeTab(get: StoreGet, id: string) {
   const tab = get().tabs.find((item) => item.id === id)
-  if (tab?.type === 'terminal' && tab.terminalId) {
+  if (tab?.type === 'terminal') {
     try {
       await TerminalService.Close(tab.terminalId)
     } catch (error: unknown) {
@@ -48,7 +48,7 @@ async function closeTab(get: StoreGet, id: string) {
 
 function removeTabState(state: AppState, id: string): Partial<AppState> {
   const tab = state.tabs.find((item) => item.id === id)
-  const terminalID = tab?.terminalId
+  const terminalID = tab?.type === 'terminal' ? tab.terminalId : undefined
   const activeSurface = state.activeSurface?.id === id ? fallbackAfterClose(state.tabs, id) : state.activeSurface
   const workspaceTab = workspaceTabForSurface(activeSurface, state.workspaceTab)
   const tabs = state.tabs.filter((item) => item.id !== id)
@@ -84,7 +84,7 @@ function replaceTerminalConnectionState(state: AppState, tabID: string, previous
   delete recordingState[previousTerminalID]
   const active = state.activeSurface?.type === 'terminal' && state.activeSurface.id === tabID
   return {
-    tabs: state.tabs.map((item) => item.id === tabID ? { ...item, terminalId: nextTerminalID } : item),
+    tabs: state.tabs.map((item) => item.id === tabID && item.type === 'terminal' ? { ...item, terminalId: nextTerminalID } : item),
     terminalPool,
     connectionStatus,
     recordingState,
@@ -100,7 +100,7 @@ function activateTab(set: StoreSet, get: StoreGet, id: string, focus: boolean) {
   const tab = state.tabs.find((item) => item.id === id)
   if (!tab) return
   if (focus && tab.type === 'terminal') {
-    const primaryID = tab.terminalId ?? tab.id
+    const primaryID = tab.terminalId
     const returningToSameTab = state.activeSurface?.id === id || state.focusRequest.id === id
     state.requestTerminalFocus(id, returningToSameTab ? state.activePaneId ?? primaryID : primaryID)
     return

@@ -16,10 +16,6 @@ export function CancelConnect(attemptID: string): $CancellablePromise<void> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.SessionService.CancelConnect", attemptID);
 }
 
-export function Connect(sessionID: number): $CancellablePromise<string> {
-    return $Call.ByName("github.com/xuthus5/mssh/internal/service.SessionService.Connect", sessionID);
-}
-
 export function ConnectionCount(): $CancellablePromise<number> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.SessionService.ConnectionCount");
 }
@@ -46,10 +42,6 @@ export function DeleteFolder(id: number): $CancellablePromise<void> {
 
 export function DeleteSession(id: number): $CancellablePromise<void> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.SessionService.DeleteSession", id);
-}
-
-export function Disconnect(terminalID: string): $CancellablePromise<void> {
-    return $Call.ByName("github.com/xuthus5/mssh/internal/service.SessionService.Disconnect", terminalID);
 }
 
 export function GetClientWrapper(connID: string): $CancellablePromise<ssh$0.ClientWrapper | null> {

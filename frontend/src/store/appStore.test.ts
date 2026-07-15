@@ -26,13 +26,14 @@ describe('appStore', () => {
     expect(useAppStore.getState()).not.toHaveProperty('hasEnteredWorkspace')
   })
 
-  it('opens and closes tabs', () => {
+  it('opens and closes tabs', async () => {
+    __registerHandler('github.com/xuthus5/mssh/internal/service.TerminalService.Close', async () => {})
     const { openTab, closeTab } = useAppStore.getState()
-    openTab({ id: 'tab-1', title: 'Test', type: 'terminal' })
+    openTab({ id: 'tab-1', title: 'Test', type: 'terminal', terminalId: 'term-1', sessionId: 1 })
     expect(useAppStore.getState().tabs).toHaveLength(1)
     expect(useAppStore.getState().activeSurface).toEqual({ type: 'terminal', id: 'tab-1' })
 
-    closeTab('tab-1')
+    await closeTab('tab-1')
     expect(useAppStore.getState().tabs).toHaveLength(0)
     expect(useAppStore.getState().activeSurface).toEqual({ type: 'workspace', id: 'sessions' })
   })
@@ -43,13 +44,13 @@ describe('appStore', () => {
     store.activateWorkspace('sessions')
     expect(useAppStore.getState().activeSurface).toEqual({ type: 'workspace', id: 'sessions' })
 
-    store.openTab({ id: 'terminal-1', title: 'one', type: 'terminal', terminalId: 'term-1' })
+    store.openTab({ id: 'terminal-1', title: 'one', type: 'terminal', terminalId: 'term-1', sessionId: 1 })
     expect(useAppStore.getState().activeSurface).toEqual({ type: 'terminal', id: 'terminal-1' })
   })
 
   it('keeps the active terminal visible when opening the macro sidebar', () => {
     const store = useAppStore.getState()
-    store.openTab({ id: 'terminal-1', title: 'one', type: 'terminal', terminalId: 'term-1' })
+    store.openTab({ id: 'terminal-1', title: 'one', type: 'terminal', terminalId: 'term-1', sessionId: 1 })
 
     store.activateWorkspace('macros')
 
@@ -67,9 +68,9 @@ describe('appStore', () => {
 
   it('falls back right, left, then sessions when closing the active tab', async () => {
     const store = useAppStore.getState()
-    store.openTab({ id: 'a', title: 'A', type: 'playback' })
-    store.openTab({ id: 'b', title: 'B', type: 'playback' })
-    store.openTab({ id: 'c', title: 'C', type: 'playback' })
+    store.openTab({ id: 'a', title: 'A', type: 'playback', recordingPath: '/tmp/a.msshlog' })
+    store.openTab({ id: 'b', title: 'B', type: 'playback', recordingPath: '/tmp/b.msshlog' })
+    store.openTab({ id: 'c', title: 'C', type: 'playback', recordingPath: '/tmp/c.msshlog' })
 
     store.activateTab('b')
     await store.closeTab('b')
@@ -85,7 +86,7 @@ describe('appStore', () => {
   it('syncs workspaceTab when the last dynamic tab falls back from macros to sessions', async () => {
     const store = useAppStore.getState()
     store.activateWorkspace('macros')
-    store.openTab({ id: 'playback-1', title: 'Playback', type: 'playback' })
+    store.openTab({ id: 'playback-1', title: 'Playback', type: 'playback', recordingPath: '/tmp/playback-1.msshlog' })
 
     await store.closeTab('playback-1')
 
@@ -97,7 +98,7 @@ describe('appStore', () => {
 
   it('tracks explicit terminal focus requests', () => {
     const store = useAppStore.getState()
-    store.openTab({ id: 'terminal-1', title: 'one', type: 'terminal', terminalId: 'term-1' })
+    store.openTab({ id: 'terminal-1', title: 'one', type: 'terminal', terminalId: 'term-1', sessionId: 1 })
 
     store.activateTab('terminal-1', true)
 
@@ -109,7 +110,7 @@ describe('appStore', () => {
 
   it('atomically activates a terminal pane and requests focus', () => {
     const store = useAppStore.getState()
-    store.openTab({ id: 'terminal-1', title: 'one', type: 'terminal', terminalId: 'primary-1' })
+    store.openTab({ id: 'terminal-1', title: 'one', type: 'terminal', terminalId: 'primary-1', sessionId: 1 })
 
     store.requestTerminalFocus('terminal-1', 'split-1')
 
@@ -122,7 +123,7 @@ describe('appStore', () => {
 
   it('preserves the active split across a workspace round trip', () => {
     const store = useAppStore.getState()
-    store.openTab({ id: 'terminal-1', title: 'one', type: 'terminal', terminalId: 'primary-1' })
+    store.openTab({ id: 'terminal-1', title: 'one', type: 'terminal', terminalId: 'primary-1', sessionId: 1 })
     store.requestTerminalFocus('terminal-1', 'split-1')
 
     store.activateWorkspace('sessions')
@@ -175,7 +176,7 @@ describe('appStore', () => {
       async () => { throw new Error('connection lost') },
     )
     const store = useAppStore.getState()
-    store.openTab({ id: 'terminal-1', title: 'one', type: 'terminal', terminalId: 'term-1' })
+    store.openTab({ id: 'terminal-1', title: 'one', type: 'terminal', terminalId: 'term-1', sessionId: 1 })
 
     await expect(store.closeTab('terminal-1')).rejects.toThrow('connection lost')
 
@@ -188,7 +189,7 @@ describe('appStore', () => {
       async () => { throw new Error('terminal term-1 not found') },
     )
     const store = useAppStore.getState()
-    store.openTab({ id: 'terminal-1', title: 'one', type: 'terminal', terminalId: 'term-1' })
+    store.openTab({ id: 'terminal-1', title: 'one', type: 'terminal', terminalId: 'term-1', sessionId: 1 })
 
     await store.closeTab('terminal-1')
 
@@ -202,7 +203,7 @@ describe('appStore', () => {
     const closeTerminal = vi.fn(async () => {})
     __registerHandler('github.com/xuthus5/mssh/internal/service.TerminalService.Close', closeTerminal)
     const { openTab, closeTab } = useAppStore.getState()
-    openTab({ id: 'playback-1', title: '回放 #1', type: 'playback', terminalId: 'C:\\Users\\xuthu\\recording.msshlog' })
+    openTab({ id: 'playback-1', title: '回放 #1', type: 'playback', recordingPath: 'C:\\Users\\xuthu\\recording.msshlog' })
 
     closeTab('playback-1')
 
@@ -212,8 +213,8 @@ describe('appStore', () => {
 
   it('sets active tab', () => {
     const { openTab, activateTab } = useAppStore.getState()
-    openTab({ id: 'tab-1', title: 'A', type: 'terminal' })
-    openTab({ id: 'tab-2', title: 'B', type: 'terminal' })
+    openTab({ id: 'tab-1', title: 'A', type: 'terminal', terminalId: 'term-1', sessionId: 1 })
+    openTab({ id: 'tab-2', title: 'B', type: 'terminal', terminalId: 'term-2', sessionId: 2 })
     activateTab('tab-1')
     expect(useAppStore.getState().activeSurface).toEqual({ type: 'terminal', id: 'tab-1' })
   })
@@ -232,7 +233,7 @@ describe('appStore', () => {
     const dispose = vi.fn()
     const terminal = { dispose } as unknown as import('@xterm/xterm').Terminal
     const store = useAppStore.getState()
-    store.openTab({ id: 'tab-1', title: 'Test', type: 'terminal', terminalId: 'term-1' })
+    store.openTab({ id: 'tab-1', title: 'Test', type: 'terminal', terminalId: 'term-1', sessionId: 1 })
     store.registerTerminal('term-1', terminal)
 
     store.removeTabLocal('tab-1')

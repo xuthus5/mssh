@@ -20,8 +20,8 @@ function activeTab(state: AppState): Tab | undefined {
 function activeTerminalEntry(state: AppState) {
   if (state.activeSurface?.type !== 'terminal') return undefined
   const tab = activeTab(state)
-  if (!tab) return undefined
-  return state.terminalPool.get(state.activePaneId ?? tab.terminalId ?? tab.id)
+  if (!tab || tab.type !== 'terminal') return undefined
+  return state.terminalPool.get(state.activePaneId ?? tab.terminalId)
 }
 
 function copySelection(state: AppState) {
@@ -50,8 +50,7 @@ function clearTerminal(state: AppState) {
 function closeActiveTab(state: AppState) {
   const tab = activeTab(state)
   if (!tab) return
-  const terminalID = tab.terminalId
-  if (terminalID && (state.connectionStatus[terminalID] === 'connected' || state.recordingState[terminalID] === 'recording')) {
+  if (tab.type === 'terminal' && (state.connectionStatus[tab.terminalId] === 'connected' || state.recordingState[tab.terminalId] === 'recording')) {
     toast('请使用标签关闭按钮确认终止活动连接', 'warning')
     return
   }

@@ -115,7 +115,7 @@ describe('WindowTitleBar', () => {
 
   it('opens the macro sidebar without covering an active terminal', async () => {
     useAppStore.setState({
-      tabs: [{ id: 'terminal-1', title: '生产服务器', type: 'terminal', terminalId: 'term-1' }],
+      tabs: [{ id: 'terminal-1', title: '生产服务器', type: 'terminal', terminalId: 'term-1', sessionId: 1 }],
       activeSurface: { type: 'terminal', id: 'terminal-1' },
       workspaceTab: 'sessions',
       connectionStatus: { 'term-1': 'connected' },
@@ -164,7 +164,7 @@ describe('WindowTitleBar', () => {
 
   it('places dynamic tabs before the window drag region', () => {
     useAppStore.setState({
-      tabs: [{ id: 'terminal-1', title: '生产服务器', type: 'terminal', terminalId: 'term-1' }],
+      tabs: [{ id: 'terminal-1', title: '生产服务器', type: 'terminal', terminalId: 'term-1', sessionId: 1 }],
       activeSurface: { type: 'terminal', id: 'terminal-1' },
       connectionStatus: { 'term-1': 'connected' },
     })
@@ -178,7 +178,7 @@ describe('WindowTitleBar', () => {
 
   it('shows the overflow menu before the theme toggle only when tabs overflow', () => {
     useAppStore.setState({
-      tabs: [{ id: 'terminal-1', title: '生产服务器', type: 'terminal', terminalId: 'term-1' }],
+      tabs: [{ id: 'terminal-1', title: '生产服务器', type: 'terminal', terminalId: 'term-1', sessionId: 1 }],
       activeSurface: { type: 'terminal', id: 'terminal-1' },
       connectionStatus: { 'term-1': 'connected' },
     })

@@ -16,7 +16,7 @@ import (
 func TestPasswordSSH(t *testing.T) {
 	a := newTestApp(t)
 
-	s, err := a.Session.CreateSession(model.Session{
+	s, err := a.Session.CreateSession(model.SessionInput{
 		Name: "pwd-ssh-test", Host: "127.0.0.1", Port: 30022,
 		Username: "root", AuthMethod: model.AuthPassword, Password: "testpass123",
 		KeepAlive: 30,

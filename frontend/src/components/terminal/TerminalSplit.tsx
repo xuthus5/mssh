@@ -40,7 +40,7 @@ async function openSplitTerminal({ sessionId, isCancelled, onOpen }: {
 function restorePrimaryPane(primaryID: string, closedTerminalID: string) {
   const state = useAppStore.getState()
   if (state.activePaneId !== closedTerminalID) return
-  const tab = state.tabs.find((item) => item.type === 'terminal' && (item.terminalId ?? item.id) === primaryID)
+  const tab = state.tabs.find((item) => item.type === 'terminal' && item.terminalId === primaryID)
   const shouldRequestFocus = tab !== undefined
     && state.activeSurface?.type === 'terminal'
     && state.activeSurface.id === tab.id

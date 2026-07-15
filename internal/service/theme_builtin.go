@@ -11,7 +11,6 @@ import (
 type builtinCatalogState struct {
 	definitionsByFingerprint map[string]model.ThemeDefinition
 	profileByThemeID         map[int64]int64
-	profileIDs               map[int64]struct{}
 }
 
 func (service *ThemeService) InitializeDefaults() error {
@@ -30,13 +29,11 @@ func (service *ThemeService) InitializeDefaults() error {
 }
 
 func initializeBuiltinCatalog(tx *sql.Tx) error {
-	if err := repairTerminalGlobalStyle(tx); err != nil {
+	if err := initializeTerminalGlobalStyle(tx); err != nil {
 		return err
 	}
+	// 内置 catalog 不兼容变更必须提升 databaseFormatVersion 并触发破坏性重建。
 	definitions := builtinThemeDefinitions()
-	if err := replaceStaleBuiltinCatalog(tx, definitions); err != nil {
-		return err
-	}
 	state, err := loadBuiltinCatalogState(tx)
 	if err != nil {
 		return err
@@ -55,7 +52,7 @@ func initializeBuiltinCatalog(tx *sql.Tx) error {
 		}
 		defaultProfiles[definition.Name] = profileID
 	}
-	return repairThemeAssignments(tx, state, defaultProfiles)
+	return initializeThemeAssignments(tx, defaultProfiles)
 }
 
 func loadBuiltinCatalogState(tx *sql.Tx) (*builtinCatalogState, error) {
@@ -70,7 +67,6 @@ func loadBuiltinCatalogState(tx *sql.Tx) (*builtinCatalogState, error) {
 	state := &builtinCatalogState{
 		definitionsByFingerprint: make(map[string]model.ThemeDefinition, len(definitions)),
 		profileByThemeID:         make(map[int64]int64, len(profiles)),
-		profileIDs:               make(map[int64]struct{}, len(profiles)),
 	}
 	for _, definition := range definitions {
 		state.definitionsByFingerprint[definition.SourceFingerprint] = definition
@@ -79,7 +75,6 @@ func loadBuiltinCatalogState(tx *sql.Tx) (*builtinCatalogState, error) {
 		if _, exists := state.profileByThemeID[profile.ThemeID]; !exists {
 			state.profileByThemeID[profile.ThemeID] = profile.ID
 		}
-		state.profileIDs[profile.ID] = struct{}{}
 	}
 	return state, nil
 }
@@ -94,38 +89,6 @@ func ensureBuiltinDefinition(tx *sql.Tx, state *builtinCatalogState, definition 
 	}
 	state.definitionsByFingerprint[created.SourceFingerprint] = *created
 	return created.ID, nil
-}
-
-func replaceStaleBuiltinCatalog(tx *sql.Tx, expected []model.ThemeDefinition) error {
-	expectedByFingerprint := make(map[string]model.ThemeDefinition, len(expected))
-	for _, definition := range expected {
-		expectedByFingerprint[definition.SourceFingerprint] = definition
-	}
-	existing, err := store.ListThemeDefinitions(tx, "")
-	if err != nil {
-		return err
-	}
-	for _, definition := range existing {
-		expectedDefinition, found := expectedByFingerprint[definition.SourceFingerprint]
-		if !definition.IsBuiltin || found && builtinDefinitionMatches(definition, expectedDefinition) {
-			continue
-		}
-		if _, err = tx.Exec("DELETE FROM terminal_theme_profiles WHERE theme_id = ?", definition.ID); err == nil {
-			_, err = tx.Exec("DELETE FROM themes WHERE id = ?", definition.ID)
-		}
-		if err != nil {
-			return fmt.Errorf("replace stale built-in theme %q: %w", definition.Name, err)
-		}
-	}
-	return nil
-}
-
-func builtinDefinitionMatches(actual, expected model.ThemeDefinition) bool {
-	return actual.Name == expected.Name && actual.Mode == expected.Mode && actual.SourceType == expected.SourceType &&
-		actual.SourceName == expected.SourceName && actual.SourceURL == expected.SourceURL && actual.SourceAuthor == expected.SourceAuthor &&
-		actual.SourceLicense == expected.SourceLicense && actual.SourceVersion == expected.SourceVersion &&
-		actual.SourceFingerprint == expected.SourceFingerprint && actual.ColorPayload == expected.ColorPayload &&
-		actual.RawPayload == expected.RawPayload && actual.IsBuiltin == expected.IsBuiltin
 }
 
 type builtinProfileOptions struct {
@@ -145,7 +108,6 @@ func ensureBuiltinProfile(options builtinProfileOptions) (int64, error) {
 		return 0, err
 	}
 	state.profileByThemeID[options.themeID] = created.ID
-	state.profileIDs[created.ID] = struct{}{}
 	return created.ID, nil
 }
 
@@ -153,27 +115,20 @@ func defaultBuiltinProfile(name string, themeID int64) model.ThemeProfile {
 	return model.ThemeProfile{Name: name, ThemeID: themeID, FollowGlobalStyle: true, FontFamily: defaultTerminalFont, FontSize: model.DefaultTerminalFontSize, CursorStyle: model.CursorStyleBar, ColorOverrides: `{}`}
 }
 
-func repairThemeAssignments(tx *sql.Tx, state *builtinCatalogState, defaults map[string]int64) error {
-	assignments, err := store.GetThemeAssignments(tx)
+func initializeThemeAssignments(tx *sql.Tx, defaults map[string]int64) error {
+	assignments, exists, err := store.LoadThemeAssignments(tx)
 	if err != nil {
 		return err
 	}
-	if _, valid := state.profileIDs[assignments.DarkProfileID]; !valid {
-		assignments.DarkProfileID = defaults["GitHub Dark"]
+	if exists {
+		return validateThemeAssignments(tx, assignments)
 	}
-	if _, valid := state.profileIDs[assignments.LightProfileID]; !valid {
-		assignments.LightProfileID = defaults["GitHub Light"]
-	}
-	if assignments.DarkProfileID == 0 || assignments.LightProfileID == 0 {
+	darkProfileID, darkFound := defaults["GitHub Dark"]
+	lightProfileID, lightFound := defaults["GitHub Light"]
+	if !darkFound || !lightFound || darkProfileID < 1 || lightProfileID < 1 {
 		return fmt.Errorf("default GitHub theme profiles are missing")
 	}
-	if _, valid := state.profileIDs[assignments.FixedProfileID]; !valid {
-		if assignments.FollowInterfaceMode {
-			assignments.FixedProfileID = 0
-		} else {
-			assignments.FixedProfileID = assignments.DarkProfileID
-		}
-	}
+	assignments = model.ThemeAssignments{DarkProfileID: darkProfileID, LightProfileID: lightProfileID, FollowInterfaceMode: true}
 	return store.SaveThemeAssignmentsDB(tx, assignments)
 }
 

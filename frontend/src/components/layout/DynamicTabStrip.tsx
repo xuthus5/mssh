@@ -75,12 +75,12 @@ function useTabOverflow(tabs: Tab[], onOverflowChange?: (overflow: boolean) => v
 
 function tabStatusLabel(tab: Tab, connectionStatus: AppState['connectionStatus']): string {
   if (tab.type === 'playback') return '回放'
-  return connectionStatusVisual(connectionStatus[tab.terminalId ?? tab.id]).label
+  return connectionStatusVisual(connectionStatus[tab.terminalId]).label
 }
 
 function TabStatusIcon({ tab, connectionStatus }: { tab: Tab; connectionStatus: AppState['connectionStatus'] }) {
   if (tab.type === 'playback') return <Play aria-hidden="true" className="size-3 shrink-0 fill-current text-muted-foreground" />
-  const visual = connectionStatusVisual(connectionStatus[tab.terminalId ?? tab.id])
+  const visual = connectionStatusVisual(connectionStatus[tab.terminalId])
   return <Circle aria-hidden="true" className={`size-2 shrink-0 ${visual.dotClass}`} />
 }
 
@@ -121,7 +121,7 @@ function DynamicTab({ tab, active, connectionStatus, navigation, onActivate, onC
       <ContextMenuTrigger>{content}</ContextMenuTrigger>
       <ContextMenuContent>
         <ContextMenuGroup>
-          <ContextMenuItem disabled={tab.sessionId === undefined} onClick={() => { if (tab.sessionId !== undefined) onDuplicate(tab.sessionId) }}>
+          <ContextMenuItem onClick={() => onDuplicate(tab.sessionId)}>
             <Copy aria-hidden="true" />
             复制终端
           </ContextMenuItem>

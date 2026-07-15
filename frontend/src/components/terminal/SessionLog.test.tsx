@@ -48,7 +48,9 @@ describe('SessionLog', () => {
     const onPlayback = vi.fn()
     const onClose = vi.fn()
     const onDeleteRecording = vi.fn(async () => {})
-    render(<SessionLog sessionId={1} onPlayback={onPlayback} onDeleteRecording={onDeleteRecording} onClose={onClose} />)
+    const onDeleteDialogOpenChange = vi.fn()
+    render(<SessionLog sessionId={1} onPlayback={onPlayback} onDeleteRecording={onDeleteRecording}
+      onClose={onClose} onDeleteDialogOpenChange={onDeleteDialogOpenChange} />)
 
     expect(await screen.findByText('录制 #7')).toBeInTheDocument()
     expect(screen.queryByText('录制中')).not.toBeInTheDocument()
@@ -58,9 +60,11 @@ describe('SessionLog', () => {
     expect(onClose).toHaveBeenCalledOnce()
 
     await userEvent.click(screen.getByRole('button', { name: '删除录制 #7' }))
+    expect(onDeleteDialogOpenChange).toHaveBeenLastCalledWith(true)
     await userEvent.click(screen.getByRole('button', { name: '删除' }))
 
     await waitFor(() => expect(onDeleteRecording).toHaveBeenCalledWith(7))
+    expect(onDeleteDialogOpenChange).toHaveBeenLastCalledWith(false)
     expect(screen.queryByText('录制 #7')).not.toBeInTheDocument()
     expect(screen.getByText('0 条')).toBeInTheDocument()
   })
@@ -78,12 +82,11 @@ describe('SessionLog', () => {
     expect(await screen.findByText('暂无录制记录')).toBeInTheDocument()
   })
 
-  it('shows an unknown label for legacy zero recording timestamps', async () => {
-    listRecordings.mockResolvedValue([{ ...recording, started_at: '0001-01-01T00:00:00Z' }])
+  it('shows an unknown label for invalid recording timestamps', async () => {
+    listRecordings.mockResolvedValue([{ ...recording, started_at: 'not-a-date' }])
     render(<SessionLog sessionId={1} onPlayback={vi.fn()} onDeleteRecording={vi.fn(async () => {})} onClose={vi.fn()} />)
 
     expect(await screen.findByText('时间未知')).toBeInTheDocument()
-    expect(screen.queryByText(/1\/1\/1/)).not.toBeInTheDocument()
   })
 
   it('keeps the recording count when deletion fails', async () => {

@@ -117,7 +117,8 @@ export function useSidebarMacros() {
     const state = useAppStore.getState()
     if (state.activeSurface?.type !== 'terminal') return
     const activeTab = state.tabs.find((tab) => tab.id === state.activeSurface?.id)
-    const terminalID = state.activePaneId ?? activeTab?.terminalId ?? state.activeSurface.id
+    if (!activeTab || activeTab.type !== 'terminal') return
+    const terminalID = state.activePaneId ?? activeTab.terminalId
     MacroService.Execute(terminalID, command).catch((error: unknown) => logger.error('Sidebar: execute macro error', error))
   }, [])
   const add = useCallback((item: Omit<CommandItem, 'id'>) => addMacro(item, setMacros), [])

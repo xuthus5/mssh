@@ -17,7 +17,7 @@ function requiresCloseConfirmation(
   connectionStatus: AppState['connectionStatus'],
   recordingState: AppState['recordingState'],
 ): boolean {
-  if (!tab.terminalId) return false
+  if (tab.type !== 'terminal') return false
   return connectionStatus[tab.terminalId] === 'connected'
     || recordingState[tab.terminalId] === 'recording'
 }

@@ -10,10 +10,6 @@ import (
 	"github.com/xuthus5/mssh/pkg/event"
 )
 
-func (s *SessionService) Connect(ctx context.Context, sessionID int64) (string, error) {
-	return s.connect(ctx, sessionID, true)
-}
-
 func (s *SessionService) connect(ctx context.Context, sessionID int64, emitState bool) (string, error) {
 	s.logger.Info("connecting to session", "sessionID", sessionID)
 	connectCtx, cancel := context.WithCancel(ctx)

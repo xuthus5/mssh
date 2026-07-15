@@ -74,7 +74,7 @@ describe('Sidebar navigation collapse', () => {
   it('shows sessions across title, workspace, and sidebar after closing the last tab from macros', async () => {
     const store = useAppStore.getState()
     store.activateWorkspace('macros')
-    store.openTab({ id: 'playback-1', title: 'Playback', type: 'playback' })
+    store.openTab({ id: 'playback-1', title: 'Playback', type: 'playback', recordingPath: '/tmp/playback-1.msshlog' })
     render(<><WindowTitleBar /><WorkspaceContent /><Sidebar /></>)
 
     await act(async () => { await store.closeTab('playback-1') })
