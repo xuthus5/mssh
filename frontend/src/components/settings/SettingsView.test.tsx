@@ -14,6 +14,7 @@ const general = {
   windowOpacity: 100,
   rightClickAction: 'menu' as const,
   copyOnSelect: false,
+  closeButtonAction: 'tray' as const,
 }
 
 function settingsProps() {
@@ -101,6 +102,18 @@ describe('SettingsView', () => {
     await user.click(screen.getByRole('button', { name: '保存' }))
 
     expect(props.onSaveGeneral).toHaveBeenCalledWith(expect.objectContaining({ rightClickAction: 'paste', copyOnSelect: true }))
+  })
+
+  it('saves the selected close button behavior', async () => {
+    const props = settingsProps()
+    const user = userEvent.setup()
+    render(<SettingsView {...props} />)
+
+    await user.click(screen.getByRole('combobox', { name: '关闭按钮行为' }))
+    await user.click(await screen.findByRole('option', { name: '关闭应用' }))
+    await user.click(screen.getByRole('button', { name: '保存' }))
+
+    expect(props.onSaveGeneral).toHaveBeenCalledWith(expect.objectContaining({ closeButtonAction: 'exit' }))
   })
 
   it('previews and saves a distinct fallback font', async () => {
