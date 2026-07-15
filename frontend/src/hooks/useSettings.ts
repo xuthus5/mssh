@@ -16,9 +16,9 @@ function settingEntry(key: string, value: unknown): SettingInput {
 }
 
 function settingValue<T>(settings: { [_ in string]?: Setting }, key: string, fallback: T): T {
-  const raw = settings[key]?.value
-  if (!raw) return fallback
-  try { return JSON.parse(raw) as T } catch { return fallback }
+  const setting = settings[key]
+  if (setting === undefined) return fallback
+  return JSON.parse(setting.value) as T
 }
 
 export interface GeneralSettings {

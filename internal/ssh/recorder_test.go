@@ -3,6 +3,7 @@ package ssh
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -185,6 +186,9 @@ func TestRecorderEmpty(t *testing.T) {
 }
 
 func TestRecorderFilePermissions(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows does not expose POSIX file modes")
+	}
 	path := filepath.Join(t.TempDir(), "perms.msshlog")
 	r, err := NewRecorder(path, 80, 24, "xterm")
 	require.NoError(t, err)

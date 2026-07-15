@@ -131,7 +131,7 @@ describe('persistent content layers', () => {
 
   it('keeps terminal and playback layers mounted behind the workspace', async () => {
     useAppStore.getState().openTab({ id: 'terminal-1', title: 'Terminal', type: 'terminal', terminalId: 'term-1', sessionId: 1 })
-    useAppStore.getState().openTab({ id: 'playback-1', title: 'Playback', type: 'playback', terminalId: 'recording-1' })
+    useAppStore.getState().openTab({ id: 'playback-1', title: 'Playback', type: 'playback', recordingPath: 'recording-1' })
     const view = render(<App />)
 
     act(() => useAppStore.getState().activateTab('terminal-1'))
@@ -163,7 +163,7 @@ describe('persistent content layers', () => {
   it('preserves layer instances until their tabs are removed', async () => {
     const store = useAppStore.getState()
     store.openTab({ id: 'terminal-1', title: 'Terminal', type: 'terminal', terminalId: 'term-1', sessionId: 1 })
-    store.openTab({ id: 'playback-1', title: 'Playback', type: 'playback', terminalId: 'recording-1' })
+    store.openTab({ id: 'playback-1', title: 'Playback', type: 'playback', recordingPath: 'recording-1' })
     render(<App />)
     const terminal = await screen.findByTestId('terminal-term-1')
     const playback = await screen.findByTestId('playback-recording-1')
@@ -241,11 +241,10 @@ describe('persistent content layers', () => {
     expect(newSession).toHaveBeenCalledOnce()
     window.removeEventListener('mssh:new-session', newSession)
   })
-
   it('blocks Ctrl+W for a connected active terminal', async () => {
     const closeTab = vi.fn(async () => {})
     useAppStore.setState({
-      tabs: [{ id: 'terminal-1', title: 'Terminal', type: 'terminal', terminalId: 'term-1' }],
+      tabs: [{ id: 'terminal-1', title: 'Terminal', type: 'terminal', terminalId: 'term-1', sessionId: 1 }],
       activeSurface: { type: 'terminal', id: 'terminal-1' },
       connectionStatus: { 'term-1': 'connected' },
       closeTab,
@@ -255,7 +254,6 @@ describe('persistent content layers', () => {
     expect(closeTab).not.toHaveBeenCalled()
     expect(await screen.findByRole('status')).toHaveTextContent('请使用标签关闭按钮确认终止活动连接')
   })
-
   it('reports clipboard shortcut failures', async () => {
     const terminal = { getSelection: vi.fn(() => 'selected text'), paste: vi.fn(), clear: vi.fn(), focus: vi.fn() }
     Object.defineProperty(navigator, 'clipboard', {
@@ -266,7 +264,7 @@ describe('persistent content layers', () => {
       },
     })
     useAppStore.setState({
-      tabs: [{ id: 'terminal-1', title: 'Terminal', type: 'terminal', terminalId: 'term-1' }],
+      tabs: [{ id: 'terminal-1', title: 'Terminal', type: 'terminal', terminalId: 'term-1', sessionId: 1 }],
       activeSurface: { type: 'terminal', id: 'terminal-1' },
       terminalPool: new Map([['term-1', { terminal: terminal as never, lastUsed: 0 }]]),
     })
@@ -276,14 +274,13 @@ describe('persistent content layers', () => {
     expect(await screen.findByText('复制失败: write denied')).toBeInTheDocument()
     expect(await screen.findByText('粘贴失败: read denied')).toBeInTheDocument()
   })
-
   it('consumes a rejected Ctrl+W close and shows an error toast', async () => {
     const closeTab = vi.fn(async () => { throw new Error('connection lost') })
     const logError = vi.spyOn(logger, 'error').mockImplementation(() => {})
     const unhandledRejection = vi.fn((event: PromiseRejectionEvent) => event.preventDefault())
     window.addEventListener('unhandledrejection', unhandledRejection)
     useAppStore.setState({
-      tabs: [{ id: 'playback-1', title: 'Playback', type: 'playback' }],
+      tabs: [{ id: 'playback-1', title: 'Playback', type: 'playback', recordingPath: '/tmp/playback-1.msshlog' }],
       activeSurface: { type: 'playback', id: 'playback-1' },
       connectionStatus: {},
       recordingState: {},

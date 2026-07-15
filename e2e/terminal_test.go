@@ -32,7 +32,7 @@ func TestTerminalOutputFlow(t *testing.T) {
 	a := newTestApp(t)
 
 	// Create a session pointing to the mock server
-	s, err := a.Session.CreateSession(model.Session{
+	s, err := a.Session.CreateSession(model.SessionInput{
 		Name:       "test-term",
 		Host:       "127.0.0.1",
 		Port:       mustParsePort(addr),
@@ -82,7 +82,7 @@ func TestEventBusReceivesTerminalOutput(t *testing.T) {
 
 	a := newTestApp(t)
 
-	s, err := a.Session.CreateSession(model.Session{
+	s, err := a.Session.CreateSession(model.SessionInput{
 		Name: "event-test", Host: "127.0.0.1", Port: mustParsePort(addr),
 		Username: "test", AuthMethod: model.AuthPassword, KeepAlive: 30,
 	})

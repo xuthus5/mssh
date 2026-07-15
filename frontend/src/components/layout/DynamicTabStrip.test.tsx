@@ -31,7 +31,7 @@ function seedTabs() {
   useAppStore.setState({
     tabs: [
       { id: 'terminal-1', title: '生产服务器', type: 'terminal', terminalId: 'term-1', sessionId: 7, terminalInstance: 1 },
-      { id: 'playback-1', title: '回放 #1', type: 'playback' },
+      { id: 'playback-1', title: '回放 #1', type: 'playback', recordingPath: '/tmp/recording-1.msshlog' },
     ],
     activeSurface: { type: 'playback', id: 'playback-1' },
     connectionStatus: { 'term-1': 'connected' },

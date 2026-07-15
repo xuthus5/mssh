@@ -43,7 +43,7 @@ describe('createTerminalTab', () => {
   it('ignores other sessions and playback tabs when numbering', () => {
     const tabs: Tab[] = [
       terminalTab(8, 1),
-      { id: 'playback-1', title: '回放 #1', type: 'playback', sessionId: 7 },
+      { id: 'playback-1', title: '回放 #1', type: 'playback', recordingPath: '/tmp/recording-1.msshlog' },
     ]
 
     expect(createTerminalTab({ sessionID: 7, sessionName: '生产服务器', terminalID: 'term-new', tabs }).terminalInstance).toBe(1)

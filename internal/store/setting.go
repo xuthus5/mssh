@@ -3,6 +3,7 @@ package store
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -10,7 +11,7 @@ import (
 	"github.com/xuthus5/mssh/internal/model"
 )
 
-const settingsTableSQL = `CREATE TABLE settings (
+const settingsTableSQL = `CREATE TABLE IF NOT EXISTS settings (
 	key TEXT PRIMARY KEY,
 	namespace TEXT NOT NULL,
 	value TEXT NOT NULL,
@@ -19,42 +20,13 @@ const settingsTableSQL = `CREATE TABLE settings (
 	updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 )`
 
-func ensureSettingsSchema(db *sql.DB) error {
-	var tableSQL string
-	err := db.QueryRow("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'settings'").Scan(&tableSQL)
-	if err != nil && err != sql.ErrNoRows {
-		return err
-	}
-	if err == nil && strings.Contains(tableSQL, "namespace") && strings.Contains(tableSQL, "value_type") {
-		return nil
-	}
-	tx, err := db.Begin()
-	if err != nil {
-		return err
-	}
-	defer func() { _ = tx.Rollback() }()
-	if _, err := tx.Exec("DROP TABLE IF EXISTS settings"); err != nil {
-		return err
-	}
-	if _, err := tx.Exec(settingsTableSQL); err != nil {
-		return err
-	}
-	return tx.Commit()
-}
-
 func GetSettingEntry(db *sql.DB, key string) (*model.Setting, error) {
-	var setting model.Setting
-	var updatedAt string
-	err := db.QueryRow("SELECT key, namespace, value, value_type, version, updated_at FROM settings WHERE key = ?", key).Scan(&setting.Key, &setting.Namespace, &setting.Value, &setting.ValueType, &setting.Version, &updatedAt)
-	if err == sql.ErrNoRows {
+	setting, err := scanSetting(db.QueryRow("SELECT key, namespace, value, value_type, version, updated_at FROM settings WHERE key = ?", key))
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, fmt.Errorf("get setting: %w", err)
-	}
-	setting.UpdatedAt, err = time.Parse("2006-01-02 15:04:05", updatedAt)
-	if err != nil {
-		return nil, fmt.Errorf("get setting: parse updated_at: %w", err)
 	}
 	return &setting, nil
 }
@@ -81,14 +53,9 @@ func ListSettings(db *sql.DB, namespace string) ([]model.Setting, error) {
 	defer func() { _ = rows.Close() }()
 	settings := make([]model.Setting, 0)
 	for rows.Next() {
-		var setting model.Setting
-		var updatedAt string
-		if err := rows.Scan(&setting.Key, &setting.Namespace, &setting.Value, &setting.ValueType, &setting.Version, &updatedAt); err != nil {
-			return nil, fmt.Errorf("list settings: %w", err)
-		}
-		setting.UpdatedAt, err = time.Parse("2006-01-02 15:04:05", updatedAt)
+		setting, err := scanSetting(rows)
 		if err != nil {
-			return nil, fmt.Errorf("list settings: parse updated_at: %w", err)
+			return nil, fmt.Errorf("list settings: %w", err)
 		}
 		settings = append(settings, setting)
 	}
@@ -123,42 +90,67 @@ func DeleteSetting(db *sql.DB, key string) error {
 }
 
 func validateSetting(setting model.Setting) error {
-	if setting.Key == "" || setting.Namespace == "" || (setting.Namespace != "legacy" && !strings.HasPrefix(setting.Key, setting.Namespace+".")) {
+	if setting.Key == "" || setting.Namespace == "" || setting.Namespace == "legacy" || !strings.HasPrefix(setting.Key, setting.Namespace+".") {
 		return fmt.Errorf("invalid setting key or namespace")
 	}
-	if setting.Version < 1 {
+	if setting.Version != 1 {
 		return fmt.Errorf("invalid setting version")
 	}
-	if !json.Valid([]byte(setting.Value)) {
-		return fmt.Errorf("invalid setting JSON")
+	valueType, err := settingJSONType(setting.Value)
+	if err != nil {
+		return err
 	}
-	validTypes := map[string]bool{"string": true, "number": true, "boolean": true, "array": true, "object": true, "null": true}
-	if !validTypes[setting.ValueType] {
-		return fmt.Errorf("invalid setting value type")
+	if setting.ValueType != valueType {
+		return fmt.Errorf("invalid setting value type: got %s, want %s", setting.ValueType, valueType)
 	}
 	return nil
 }
 
-func GetSetting(db *sql.DB, key string) (string, error) {
-	setting, err := GetSettingEntry(db, key)
-	if err != nil || setting == nil {
-		return "", err
-	}
-	var value string
-	if err := json.Unmarshal([]byte(setting.Value), &value); err == nil {
-		return value, nil
-	}
-	return setting.Value, nil
+type settingScanner interface {
+	Scan(dest ...any) error
 }
 
-func SetSetting(db *sql.DB, key, value string) error {
-	namespace := "legacy"
-	if strings.Contains(key, ".") {
-		namespace = strings.SplitN(key, ".", 2)[0]
+func scanSetting(scanner settingScanner) (model.Setting, error) {
+	var setting model.Setting
+	var updatedAt string
+	if err := scanner.Scan(&setting.Key, &setting.Namespace, &setting.Value, &setting.ValueType, &setting.Version, &updatedAt); err != nil {
+		return model.Setting{}, err
 	}
-	encoded, err := json.Marshal(value)
+	parsedUpdatedAt, err := time.Parse("2006-01-02 15:04:05", updatedAt)
 	if err != nil {
-		return err
+		return model.Setting{}, fmt.Errorf("parse updated_at: %w", err)
 	}
-	return SetSettings(db, []model.Setting{{Key: key, Namespace: namespace, Value: string(encoded), ValueType: "string", Version: 1}})
+	setting.UpdatedAt = parsedUpdatedAt
+	if err := validateSetting(setting); err != nil {
+		return model.Setting{}, err
+	}
+	return setting, nil
+}
+
+func settingJSONType(raw string) (string, error) {
+	if !json.Valid([]byte(raw)) {
+		return "", fmt.Errorf("invalid setting JSON")
+	}
+	decoder := json.NewDecoder(strings.NewReader(raw))
+	decoder.UseNumber()
+	var value any
+	if err := decoder.Decode(&value); err != nil {
+		return "", fmt.Errorf("decode setting JSON: %w", err)
+	}
+	switch value.(type) {
+	case nil:
+		return "null", nil
+	case string:
+		return "string", nil
+	case json.Number:
+		return "number", nil
+	case bool:
+		return "boolean", nil
+	case []any:
+		return "array", nil
+	case map[string]any:
+		return "object", nil
+	default:
+		return "", fmt.Errorf("invalid setting JSON type")
+	}
 }

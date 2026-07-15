@@ -25,10 +25,6 @@ export function GetMany(keys: string[]): $CancellablePromise<{ [_ in string]?: m
     });
 }
 
-export function GetSetting(key: string): $CancellablePromise<string> {
-    return $Call.ByName("github.com/xuthus5/mssh/internal/service.SettingService.GetSetting", key);
-}
-
 export function List($namespace: string): $CancellablePromise<model$0.Setting[]> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.SettingService.List", $namespace).then(($result: any) => {
         return $$createType3($result);
@@ -41,10 +37,6 @@ export function Set(setting: model$0.SettingInput): $CancellablePromise<void> {
 
 export function SetMany(settings: model$0.SettingInput[]): $CancellablePromise<void> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.SettingService.SetMany", settings);
-}
-
-export function SetSetting(key: string, value: string): $CancellablePromise<void> {
-    return $Call.ByName("github.com/xuthus5/mssh/internal/service.SettingService.SetSetting", key, value);
 }
 
 // Private type creation functions

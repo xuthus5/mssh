@@ -15,7 +15,7 @@ func TestOpenDB(t *testing.T) {
 	tmpDir := t.TempDir()
 	db, err := OpenDB(tmpDir)
 	require.NoError(t, err)
-	defer db.Close()
+	t.Cleanup(func() { require.NoError(t, db.Close()) })
 	assert.NotNil(t, db)
 	err = db.Ping()
 	assert.NoError(t, err)
@@ -29,66 +29,84 @@ func TestOpenDB(t *testing.T) {
 	assert.Equal(t, 1, foreignKeys)
 }
 
-func TestMigrate(t *testing.T) {
-	tmpDir := t.TempDir()
-	db, err := OpenDB(tmpDir)
-	require.NoError(t, err)
-	defer db.Close()
-	err = Migrate(db)
-	require.NoError(t, err)
-	err = Migrate(db)
-	require.NoError(t, err)
+func TestDatabaseFormatVersion(t *testing.T) {
+	assert.Equal(t, 1, databaseFormatVersion)
 }
 
-func TestMigrateLegacyFoldersCreatesDefaultAndAssignsSessions(t *testing.T) {
+func TestInitializeSchemaResetsMismatchedDatabaseFormat(t *testing.T) {
 	db, err := OpenDB(t.TempDir())
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, db.Close()) })
-	_, err = db.Exec(`CREATE TABLE session_folders (id INTEGER PRIMARY KEY, name TEXT NOT NULL, parent_id INTEGER, sort_order INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now')))`)
-	require.NoError(t, err)
-	_, err = db.Exec(`CREATE TABLE sessions (id INTEGER PRIMARY KEY, folder_id INTEGER, name TEXT NOT NULL, host TEXT NOT NULL, port INTEGER NOT NULL, username TEXT NOT NULL, auth_method TEXT NOT NULL, password TEXT, key_id INTEGER, keep_alive INTEGER NOT NULL, term_type TEXT NOT NULL, sort_order INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now')))`)
-	require.NoError(t, err)
-	_, err = db.Exec("INSERT INTO session_folders (id, name) VALUES (7, '历史分组')")
-	require.NoError(t, err)
-	_, err = db.Exec("INSERT INTO sessions (id, name, host, port, username, auth_method, keep_alive, term_type) VALUES (3, '旧会话', '127.0.0.1', 22, 'root', 'password', 30, 'xterm')")
-	require.NoError(t, err)
-	require.NoError(t, Migrate(db))
+	createLegacySentinels(t, db)
 
-	var defaultID, sessionFolderID int64
-	require.NoError(t, db.QueryRow("SELECT id FROM session_folders WHERE is_default = 1").Scan(&defaultID))
-	require.NoError(t, db.QueryRow("SELECT folder_id FROM sessions WHERE id = 3").Scan(&sessionFolderID))
-	assert.Equal(t, int64(7), defaultID)
-	assert.Equal(t, defaultID, sessionFolderID)
+	require.NoError(t, InitializeSchema(db))
+
+	assertFinalSchema(t, db)
+	for table := range expectedFinalSchemaSQL {
+		expectedRows := 0
+		if table == "session_folders" {
+			expectedRows = 1
+		}
+		assertTableRowCount(t, rowCountExpectation{db: db, table: table, expected: expectedRows})
+	}
+	assertTableRowCount(t, rowCountExpectation{db: db, table: "session_folders", condition: "is_default = 1", expected: 1})
+	assertDatabaseFormatVersion(t, db, databaseFormatVersion)
 }
 
-func TestMigrateTablesExist(t *testing.T) {
-	tmpDir := t.TempDir()
-	db, err := OpenDB(tmpDir)
-	require.NoError(t, err)
-	defer db.Close()
-	err = Migrate(db)
-	require.NoError(t, err)
-	expected := []string{
-		"session_folders", "sessions", "ssh_keys", "tunnels",
-		"macros", "themes", "terminal_theme_profiles", "settings", "session_logs",
-	}
-	for _, table := range expected {
-		var count int
-		err := db.QueryRow(
-			"SELECT count(*) FROM sqlite_master WHERE type='table' AND name=?",
-			table,
-		).Scan(&count)
-		require.NoError(t, err)
-		assert.Equal(t, 1, count, "table %s should exist", table)
-	}
-}
-
-func TestMigrateAddsSessionRecencyColumns(t *testing.T) {
+func TestInitializeSchemaPreservesCurrentDatabaseFormat(t *testing.T) {
 	db, err := OpenDB(t.TempDir())
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, db.Close()) })
-	require.NoError(t, Migrate(db))
-	assertTableColumns(t, tableColumnExpectation{db: db, table: "sessions", expected: []string{"last_connected_at", "connection_count"}})
+	require.NoError(t, InitializeSchema(db))
+	_, err = db.Exec(`INSERT INTO sessions (folder_id, name, host, username, auth_method) SELECT id, 'sentinel', '127.0.0.1', 'root', 'agent' FROM session_folders WHERE is_default = 1`)
+	require.NoError(t, err)
+
+	require.NoError(t, InitializeSchema(db))
+
+	assertTableRowCount(t, rowCountExpectation{db: db, table: "sessions", condition: "name = 'sentinel'", expected: 1})
+	assertTableRowCount(t, rowCountExpectation{db: db, table: "session_folders", condition: "is_default = 1", expected: 1})
+}
+
+func TestDatabaseFormatResetRollsBackOnFailure(t *testing.T) {
+	db, err := OpenDB(t.TempDir())
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, db.Close()) })
+	_, err = db.Exec("CREATE TABLE themes (name TEXT NOT NULL)")
+	require.NoError(t, err)
+	_, err = db.Exec("INSERT INTO themes (name) VALUES ('sentinel')")
+	require.NoError(t, err)
+	_, err = db.Exec("CREATE VIEW session_folders AS SELECT 1 AS id")
+	require.NoError(t, err)
+
+	require.Error(t, InitializeSchema(db))
+
+	assertTableRowCount(t, rowCountExpectation{db: db, table: "themes", condition: "name = 'sentinel'", expected: 1})
+	assertDatabaseFormatVersion(t, db, 0)
+}
+
+func assertDatabaseFormatVersion(t *testing.T, db *sql.DB, expected int) {
+	t.Helper()
+	var actual int
+	require.NoError(t, db.QueryRow("PRAGMA user_version").Scan(&actual))
+	assert.Equal(t, expected, actual)
+}
+
+type rowCountExpectation struct {
+	db        *sql.DB
+	table     string
+	condition string
+	expected  int
+}
+
+func assertTableRowCount(t *testing.T, expectation rowCountExpectation) {
+	t.Helper()
+	condition := expectation.condition
+	if condition == "" {
+		condition = "1 = 1"
+	}
+	var actual int
+	require.NoError(t, expectation.db.QueryRow("SELECT count(*) FROM "+expectation.table+" WHERE "+condition).Scan(&actual))
+	assert.Equal(t, expectation.expected, actual)
 }
 
 type tableColumnExpectation struct {
@@ -112,6 +130,7 @@ func assertTableColumns(t *testing.T, expectation tableColumnExpectation) {
 		require.NoError(t, rows.Scan(&cid, &name, &columnType, &notNull, &defaultValue, &primaryKey))
 		columns[name] = true
 	}
+	require.NoError(t, rows.Err())
 	for _, name := range expectation.expected {
 		assert.True(t, columns[name], "missing %s.%s", expectation.table, name)
 	}
@@ -124,37 +143,23 @@ func TestOpenDBInvalidPath(t *testing.T) {
 	require.NoError(t, err)
 
 	db, err := OpenDB(filePath)
-	require.NoError(t, err)
-	defer db.Close()
-	err = db.Ping()
+	assert.Nil(t, db)
 	assert.Error(t, err)
 }
 
-func TestMigrateClosedDB(t *testing.T) {
+func TestInitializeSchemaClosedDB(t *testing.T) {
 	tmpDir := t.TempDir()
 	db, err := OpenDB(tmpDir)
 	require.NoError(t, err)
-	db.Close()
-	err = Migrate(db)
-	assert.Error(t, err)
-}
-
-func TestDefaultFolderMigrationHelpersClosedDB(t *testing.T) {
-	db, err := OpenDB(t.TempDir())
-	require.NoError(t, err)
 	require.NoError(t, db.Close())
-	_, err = folderDefaultColumnExists(db)
-	assert.Error(t, err)
-	_, err = resolveDefaultFolderID(db)
-	assert.Error(t, err)
-	assert.Error(t, ensureDefaultFolderSchema(db))
+	assert.Error(t, InitializeSchema(db))
 }
 
 func TestStoreOperationsClosedDB(t *testing.T) {
 	tmpDir := t.TempDir()
 	db, err := OpenDB(tmpDir)
 	require.NoError(t, err)
-	_ = Migrate(db)
+	require.NoError(t, InitializeSchema(db))
 	require.NoError(t, db.Close())
 
 	assertClosedFolderOperations(t, db)
@@ -196,9 +201,15 @@ func assertClosedSessionOperations(t *testing.T, db *sql.DB) {
 
 func assertClosedSettingOperations(t *testing.T, db *sql.DB) {
 	t.Helper()
-	_, err := GetSetting(db, "key")
+	_, err := GetSettingEntry(db, "terminal.key")
 	assert.Error(t, err)
-	assert.Error(t, SetSetting(db, "key", "val"))
+	assert.Error(t, SetSettings(db, []model.Setting{{
+		Key:       "terminal.key",
+		Namespace: "terminal",
+		Value:     `"val"`,
+		ValueType: "string",
+		Version:   1,
+	}}))
 }
 
 func assertClosedKeyOperations(t *testing.T, db *sql.DB) {

@@ -19,7 +19,8 @@ describe('Generated Bindings Barrel', () => {
     expect(SessionService).toBeDefined()
     expect(typeof SessionService.ListFolders).toBe('function')
     expect(typeof SessionService.CreateSession).toBe('function')
-    expect(typeof SessionService.Connect).toBe('function')
+    expect('Connect' in SessionService).toBe(false)
+    expect('Disconnect' in SessionService).toBe(false)
   })
 
   it('exports TerminalService', () => {
@@ -42,7 +43,10 @@ describe('Generated Bindings Barrel', () => {
 
   it('exports SettingService', () => {
     expect(SettingService).toBeDefined()
-    expect(typeof SettingService.GetSetting).toBe('function')
+    expect(typeof SettingService.Get).toBe('function')
+    expect(typeof SettingService.Set).toBe('function')
+    expect('GetSetting' in SettingService).toBe(false)
+    expect('SetSetting' in SettingService).toBe(false)
   })
 
   it('exports TunnelService', () => {
@@ -63,6 +67,10 @@ describe('Generated Bindings Barrel', () => {
   it('exports LogService', () => {
     expect(LogService).toBeDefined()
     expect(typeof LogService.List).toBe('function')
+    expect(typeof LogService.StartTerminalRecording).toBe('function')
+    expect('StartRecording' in LogService).toBe(false)
+    expect('StopRecording' in LogService).toBe(false)
+    expect('CloseAllActiveRecordings' in LogService).toBe(false)
   })
 
   it('exports SyncService', () => {
