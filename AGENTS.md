@@ -21,16 +21,17 @@
 
 # Agent 规则
 
-本文件用于约束自动化代理在本机工作区中的默认工作方式，并将 Superpowers 作为主工作流体系按需激活。
+本文件用于约束自动化代理在本机工作区中的默认工作方式，并将 `grill-me` 作为需求澄清与方案校验工作流。
 
 ## 指令优先级
 
 1. 当前会话中用户的明确要求
 2. 仓库自身规则、文档与约定
 3. 本 `AGENTS.md`
-4. 相关 Superpowers / skill 流程定义
+4. 相关 `grill-me` / skill 流程定义
 
-- 默认以 **Superpowers** 作为主工作流体系，但不默认启用 full Superpowers。
+- **项目禁止使用 Superpowers 工作流及其相关技能。**
+- 需要需求澄清、方案评审或复杂设计时，使用 **`grill-me` 工作流替代 Superpowers**。
 - 本文件保留个人硬门禁、环境约束、交付偏好与沟通方式。
 - 只读分析任务可不进入完整实现流程，但结论必须清晰、可追溯。
 - 若用户明确要求 `continue nonstop`，默认持续推进，直到满足验收标准或出现真实阻塞。
@@ -43,18 +44,18 @@
 - 默认先判断任务是否适合并行；适合则优先并行，不适合再串行。
 - 能直接完成并验证的，不升级为更重流程。
 - 能用轻量 planning 解决的小任务，不升级为重文档流程。
-- 能用单一专项 skill 解决的问题，不扩展为 full Superpowers。
+- 能用单一专项 skill 解决的问题，不额外扩展工作流。
 
-### 轻量任务默认策略（Claude / Superpowers）
+### 轻量任务默认策略（Claude / `grill-me`）
 
 - 轻量任务：单文件或小范围修改、明确 bug 修复、配置 / 文案调整、小测试补充、局部文档修改。
-- 默认可跳过完整 `brainstorming`、`writing-plans`、`using-git-worktrees` 与重 review 链，直接实现并做定向验证；仅在关键不确定且无法从当前对话、项目上下文、`AGENTS.md`、现有代码回答时才提问。
+- 轻量任务可跳过完整方案访谈与重 review 链，直接实现并做定向验证；中大型任务必须先使用 `grill-me`；仅在关键不确定且无法从当前对话、项目上下文、`AGENTS.md`、现有代码回答时才提问。
 - 提问：轻量任务首次最多问 1 个关键问题；中任务优先一次性给出 2 到 3 个方案与推荐；已有上下文可回答的信息不重复提问；若未获回复且风险可控，应说明假设后继续推进。
 - 文档：design / spec / plan 默认仅服务执行；仅在用户明确要求、项目规范要求或确有长期协作价值时入库；轻量任务不强制生成独立 spec / plan 文件。
 - 默认授权边界：当前分支内可默认修改与任务直接相关的应用代码、测试、局部文档，并新增少量配套文件。
 - 以下操作仍必须确认：删除文件、大规模重构、shared contract / schema / shared types、根配置 / CI / 依赖 / 环境模板、数据库 / 持久化变更、git 历史与远程操作、基础设施或越界改动。
-- 平台偏好：在 Claude 中，复杂但不需真实并行的任务默认优先 `executing-plans`；仅在任务明确适合并行且平台对子代理支持稳定时才用 `subagent-driven-development`；非必要不默认创建 `worktree`。
-- 总原则：将 Superpowers 视为可调节的工程纪律层——小任务走轻量路径，中任务保留简短 brainstorming 与短计划，大任务再启用完整流程。
+- 平台偏好：复杂任务优先在当前分支使用 `grill-me`；仅独立任务才并行处理，并避免非必要的工作树隔离。
+- 总原则：小任务走轻量路径；中大型任务先使用 `grill-me` 澄清和校验，再进入实现与验证。
 
 ### 流程升级 / 降级
 
@@ -66,13 +67,13 @@
 ### 只读任务
 
 - 分析、解释、架构说明、代码阅读、纯信息型问答及其他不改文件的只读审查，可直接处理。
-- 真实问题排查但尚未进入修改时，优先使用 `systematic-debugging`。
+- 真实问题排查但尚未进入修改时，优先使用结构化调试方法。
 
 ### 实现任务与质量门禁
 
 - 适用：新功能、bug 修复、行为变更、重构，以及页面 / 组件 / API / 脚本 / 数据处理逻辑改动。
-- 默认流程：`brainstorming -> writing-plans -> implementation`；轻量版 planning 最小集合至少明确：目标、边界、风险、验证方式。
-- Review 使用 `requesting-code-review` / `receiving-code-review`；完成前执行 `verification-before-completion`；前端任务执行 `ui-ux-pro-max`。
+- 默认流程：`grill-me -> implementation`；轻量任务至少明确：目标、边界、风险、验证方式。
+- 完成前进行常规代码审查与最终验证；前端任务使用 `frontend-design`。
 
 ## 推进与验证
 
@@ -148,7 +149,7 @@
 
 ### Bug / Test / Code / Refactor
 
-- Bug 报告应写清现象、触发条件、预期、实际、影响范围、严重程度及日志 / 堆栈 / 环境信息；真实 bug 默认优先 `systematic-debugging`，先确认根因再修复。
+- Bug 报告应写清现象、触发条件、预期、实际、影响范围、严重程度及日志 / 堆栈 / 环境信息；真实 bug 默认优先结构化调试，先确认根因再修复。
 - 测试优先覆盖关键路径、边界情况和错误路径；断言优先 expected 在前、actual 在后。
 - 编码遵循 SOLID、DRY、关注点分离、YAGNI；命名清晰，边界条件显式处理。
 - 代码硬性上限：函数 ≤ 50 行、文件 ≤ 300 行、嵌套 ≤ 3、位置参数 ≤ 3、圈复杂度 ≤ 10、禁止魔法数字。
@@ -241,17 +242,16 @@
 - 技能存放位置：`~/.claude/skills/`（个人）与 `.claude/skills/`（项目共享，可选）。
 - 开始任务前，应优先判断是否命中对应 skill；命中时阅读 `SKILL.md` 并按流程执行。
 - 本文件默认采用以下主干整合方式：
-    - 实现前：`brainstorming -> writing-plans`
-    - debug：`systematic-debugging`
-    - review：`requesting-code-review` / `receiving-code-review`
-    - 完成前：`verification-before-completion`
-    - 高风险行为变更：`test-driven-development`
-    - 前端设计：`ui-ux-pro-max`
+    - 实现前：复杂任务使用 `grill-me`
+    - debug：结构化调试
+    - review：常规代码审查
+    - 完成前：最终验证
+    - 高风险行为变更：先编写回归测试
+    - 前端设计：`frontend-design`
 - 本地个人工作流 skill 可保留私人默认路径、私人笔记目录与本机脚本入口；若对外发布，必须基于单独副本做脱敏，不直接公开 `~/.claude/skills/` 源文件。
 - 调研总结 / 输出笔记：`research-note-wrap`
 - 会话收尾：`session-wrap`
 - 提交总结 / 日报：`commit-daily-summary`
 - 项目级日报：`project-daily-summary`
-- worktree / branch / parallel 收口：`worktree-closeout`
-- 并行开发规划 / 多 worktree 协作：`codex-parallel-collab`
+- 分支 / 并行任务收口：完成最终差异检查与验证
 - 在回复中声明本次使用了哪些技能。
