@@ -125,13 +125,3 @@ export function useSidebarMacros() {
   const remove = useCallback((id: string) => deleteMacro(id, setMacros), [])
   return { macros, execute, add, remove }
 }
-
-export function useSidebarSettingsDialog() {
-  const [settingsOpen, setSettingsOpen] = useState(false)
-  useEffect(() => {
-    const openSettings = () => setSettingsOpen(true)
-    window.addEventListener('mssh:open-settings', openSettings)
-    return () => window.removeEventListener('mssh:open-settings', openSettings)
-  }, [])
-  return { settingsOpen, setSettingsOpen }
-}

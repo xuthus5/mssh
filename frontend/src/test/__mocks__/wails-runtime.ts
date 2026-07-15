@@ -36,8 +36,15 @@ export const Events = {
       eventCallbacks.set(event, list.filter(c => c !== callback))
     }
   },
-  Emit: () => {},
+  Emit: async (name: string, data?: any) => {
+    __emitEvent(name, { name, data: data ?? null })
+  },
   Off: () => {},
+}
+
+export const Dialogs = {
+  SaveFile: async () => null as string | null,
+  OpenFile: async () => '' as string | string[],
 }
 
 export function __registerHandler(name: string, fn: (...args: any[]) => Promise<any>) {

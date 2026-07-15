@@ -1,9 +1,10 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { __clearHandlers, __registerHandler } from '@/test/__mocks__/wails-runtime'
+import { __clearHandlers, __emitEvent, __registerHandler } from '@/test/__mocks__/wails-runtime'
 import { changeColorMode, useThemeCatalog, useThemeCatalogStore } from '@/hooks/useThemeCatalog'
 import { useAppStore } from '@/store/appStore'
 import { CursorStyle } from '../../bindings/github.com/xuthus5/mssh/internal/model/models'
+import { COLOR_MODE_CHANGED_EVENT, THEME_CATALOG_CHANGED_EVENT } from '@/lib/settingsWindowEvents'
 
 const darkProfile = profile(1, 'dark', '#000000')
 const lightProfile = profile(2, 'light', '#ffffff')
@@ -72,6 +73,28 @@ describe('useThemeCatalog', () => {
     await act(async () => { await changeColorMode('light') })
 
     expect(useAppStore.getState().terminalTheme.background).toBe('#ffffff')
+  })
+
+  it('applies theme catalog snapshots emitted by the settings window', async () => {
+    renderHook(() => useThemeCatalog())
+    await waitFor(() => expect(useThemeCatalogStore.getState().loaded).toBe(true))
+    const synchronizedDark = profile(4, 'dark', '#224466')
+    act(() => __emitEvent(THEME_CATALOG_CHANGED_EVENT, { data: {
+      definitions: [synchronizedDark.definition], profiles: [synchronizedDark],
+      assignments: { dark_profile_id: 4, light_profile_id: 4, follow_interface_mode: true, fixed_profile_id: 0 },
+      globalStyle,
+    } }))
+    expect(useThemeCatalogStore.getState().profiles[0].id).toBe(4)
+    expect(useAppStore.getState().terminalTheme.background).toBe('#224466')
+  })
+
+  it('synchronizes colour mode and effective terminal theme across windows', async () => {
+    renderHook(() => useThemeCatalog())
+    await waitFor(() => expect(useThemeCatalogStore.getState().loaded).toBe(true))
+    act(() => __emitEvent(COLOR_MODE_CHANGED_EVENT, { data: 'dark' }))
+    expect(useThemeCatalogStore.getState().colorMode).toBe('dark')
+    expect(document.documentElement).not.toHaveClass('light')
+    expect(useAppStore.getState().terminalTheme.background).toBe('#000000')
   })
 
   it('executes catalog mutation actions and reloads state', async () => {
