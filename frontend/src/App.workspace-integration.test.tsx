@@ -2,7 +2,11 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const workspace = vi.hoisted(() => ({ connect: vi.fn(async () => {}) }))
+const workspace = vi.hoisted(() => ({
+  connect: vi.fn(async () => {}),
+  folders: [],
+  sessions: [],
+}))
 
 vi.mock('@/hooks/useSession', () => ({ useSession: () => workspace }))
 vi.mock('@/hooks/useThemeCatalog', () => ({

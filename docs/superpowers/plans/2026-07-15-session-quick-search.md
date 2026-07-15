@@ -30,7 +30,7 @@
 - Produces: `SessionQuickSearchDialog({ open, onOpenChange, sessions, folders, onConnect })`.
 - Produces: a controlled dialog that calls `onConnect(session.id)` exactly once after closing.
 
-- [ ] **Step 1: Write failing filtering and presentation tests**
+- [x] **Step 1: Write failing filtering and presentation tests**
 
 Create fixtures containing grouped and ungrouped sessions. Assert that the dialog filters case-insensitively by `name`, `host`, `username`, and folder name, and renders `username@host:port` plus “未分组” where appropriate.
 
@@ -41,13 +41,13 @@ expect(screen.getByRole('option', { name: /Production API/ })).toBeInTheDocument
 expect(screen.queryByRole('option', { name: /Development/ })).not.toBeInTheDocument()
 ```
 
-- [ ] **Step 2: Run tests and verify RED**
+- [x] **Step 2: Run tests and verify RED**
 
 Run: `npm --prefix frontend test -- --run src/components/session/SessionQuickSearchDialog.test.tsx`
 
 Expected: FAIL because `SessionQuickSearchDialog.tsx` does not exist.
 
-- [ ] **Step 3: Implement filtering and commercial dialog layout**
+- [x] **Step 3: Implement filtering and commercial dialog layout**
 
 Implement normalized search text from session name, host, username, and folder name. Compose existing `Dialog`, `Input`, and `ScrollArea`; use `Search`, `Server`, `Folder`, and `CornerDownLeft` icons; render loading-independent empty messages from the supplied data.
 
@@ -64,7 +64,7 @@ function filterSessions(sessions: Session[], folders: Folder[], query: string) {
 }
 ```
 
-- [ ] **Step 4: Write failing keyboard and activation tests**
+- [x] **Step 4: Write failing keyboard and activation tests**
 
 Assert first-item selection, cyclic `ArrowUp` / `ArrowDown`, selection reset after filtering, `Enter` activation, double-click activation, and no activation when results are empty.
 
@@ -75,7 +75,7 @@ expect(onOpenChange).toHaveBeenCalledWith(false)
 expect(onConnect).toHaveBeenCalledWith('session-2')
 ```
 
-- [ ] **Step 5: Implement keyboard selection and activation**
+- [x] **Step 5: Implement keyboard selection and activation**
 
 Keep `selectedIndex` local, reset it to zero when `open` or the normalized query changes, cycle within result bounds, and route both keyboard and double-click through one `activateSession` callback.
 
@@ -87,7 +87,7 @@ const activateSession = (session: Session | undefined) => {
 }
 ```
 
-- [ ] **Step 6: Run component tests and verify GREEN**
+- [x] **Step 6: Run component tests and verify GREEN**
 
 Run: `npm --prefix frontend test -- --run src/components/session/SessionQuickSearchDialog.test.tsx`
 
@@ -100,6 +100,7 @@ Expected: all dialog tests pass.
 **Files:**
 - Create: `frontend/src/components/session/SessionQuickSearchHost.tsx`
 - Create: `frontend/src/components/session/SessionQuickSearchHost.test.tsx`
+- Create: `frontend/src/lib/sessionQuickSearch.ts`
 - Modify: `frontend/src/App.tsx`
 - Modify: `frontend/src/App.test.tsx`
 
@@ -108,7 +109,7 @@ Expected: all dialog tests pass.
 - Consumes: `mssh:open-session-search` window event dispatched by `App.tsx`.
 - Produces: `SessionQuickSearchHost` mounted inside `SessionWorkspaceProvider`.
 
-- [ ] **Step 1: Write failing shortcut routing tests**
+- [x] **Step 1: Write failing shortcut routing tests**
 
 Add tests proving `Ctrl+F` and `Command+F` prevent default and dispatch `mssh:open-session-search` from `document.body` and an `.xterm-helper-textarea`, while an ordinary input does not dispatch and does not prevent default.
 
@@ -122,13 +123,13 @@ expect(fireEvent.keyDown(terminalInput, { key: 'f', ctrlKey: true })).toBe(false
 expect(openSearch).toHaveBeenCalledOnce()
 ```
 
-- [ ] **Step 2: Run shortcut tests and verify RED**
+- [x] **Step 2: Run shortcut tests and verify RED**
 
 Run: `npm --prefix frontend test -- --run src/App.test.tsx`
 
 Expected: FAIL because `Ctrl+F` is not routed and the search host is not mounted.
 
-- [ ] **Step 3: Implement target classification and shortcut event**
+- [x] **Step 3: Implement target classification and shortcut event**
 
 Extract a small predicate that identifies ordinary editable targets but excludes xterm's helper textarea. Handle unshifted `f` before returning for ordinary shortcuts, dispatch the application event, and call `preventDefault()`.
 
@@ -139,7 +140,7 @@ function isOrdinaryEditable(target: HTMLElement | null) {
 }
 ```
 
-- [ ] **Step 4: Write failing host integration tests**
+- [x] **Step 4: Write failing host integration tests**
 
 Mock `useSessionWorkspace`, dispatch `mssh:open-session-search`, verify the dialog opens, and activate a result with `Enter` to prove the existing `connect` callback receives the selected session ID.
 
@@ -151,11 +152,11 @@ fireEvent.keyDown(screen.getByRole('searchbox', { name: '搜索会话' }), { key
 expect(connect).toHaveBeenCalledWith('session-1')
 ```
 
-- [ ] **Step 5: Implement and mount the host**
+- [x] **Step 5: Implement and mount the host**
 
 Subscribe to `mssh:open-session-search` in `useEffect`, store only the controlled `open` state, render `SessionQuickSearchDialog`, and mount the host beside `ConnectDialog` within `SessionWorkspaceProvider`.
 
-- [ ] **Step 6: Run focused integration tests and verify GREEN**
+- [x] **Step 6: Run focused integration tests and verify GREEN**
 
 Run: `npm --prefix frontend test -- --run src/App.test.tsx src/components/session/SessionQuickSearchHost.test.tsx src/components/session/SessionQuickSearchDialog.test.tsx`
 
@@ -173,17 +174,17 @@ Expected: all focused tests pass.
 - Consumes: completed frontend behavior from Tasks 1 and 2.
 - Produces: verified, formatted, committed, and pushed feature delivery.
 
-- [ ] **Step 1: Run frontend formatting and lint checks**
+- [x] **Step 1: Run frontend formatting and lint checks**
 
 Run the repository-configured frontend checks. If no dedicated frontend lint script exists, run `npm --prefix frontend run build` and `git diff --check` without adding a new toolchain.
 
-- [ ] **Step 2: Run full frontend tests with coverage**
+- [x] **Step 2: Run full frontend tests with coverage**
 
 Run: `npm --prefix frontend run test:coverage`
 
 Expected: all tests pass and line coverage remains at least 90%.
 
-- [ ] **Step 3: Run Go quality gates**
+- [x] **Step 3: Run Go quality gates**
 
 Run: `PATH="$HOME/.govm/go/bin:$PATH" goimports-reviser -rm-unused -set-alias -format ./...`
 
@@ -191,17 +192,17 @@ Run: `PATH="$HOME/.govm/go/bin:$PATH" golangci-lint run`
 
 Expected: both commands exit successfully; no unrelated files are modified.
 
-- [ ] **Step 4: Build the desktop application**
+- [x] **Step 4: Build the desktop application**
 
 Run: `PATH="$HOME/.govm/go/bin:$PATH" CGO_ENABLED=1 wails3 build`
 
 Expected: build exits successfully.
 
-- [ ] **Step 5: Clean temporary artifacts and verify the diff**
+- [x] **Step 5: Clean temporary artifacts and verify the diff**
 
 Remove `frontend/coverage`, `frontend/dist`, and generated build binaries created by validation. Run `git status --short`, `git diff --check`, and inspect the complete diff.
 
-- [ ] **Step 6: Commit and push**
+- [x] **Step 6: Commit and push**
 
 ```bash
 git add frontend/src/App.tsx frontend/src/App.test.tsx \

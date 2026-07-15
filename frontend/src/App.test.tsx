@@ -29,6 +29,7 @@ vi.mock('@/components/layout/Sidebar', () => ({ default: () => null }))
 vi.mock('@/components/layout/StatusBar', () => ({ default: () => null }))
 vi.mock('@/components/layout/WindowTitleBar', () => ({ WindowTitleBar: () => null }))
 vi.mock('@/components/layout/ConnectDialog', () => ({ ConnectDialog: () => null }))
+vi.mock('@/components/session/SessionQuickSearchHost', () => ({ SessionQuickSearchHost: () => null }))
 vi.mock('@/hooks/SessionWorkspaceContext', () => ({
   SessionWorkspaceProvider: ({ children }: { children: React.ReactNode }) => children,
   useSessionWorkspace: () => ({ reconnect: vi.fn(async () => {}) }),
@@ -240,6 +241,24 @@ describe('persistent content layers', () => {
     expect(terminal.clear).toHaveBeenCalledOnce()
     expect(newSession).toHaveBeenCalledOnce()
     window.removeEventListener('mssh:new-session', newSession)
+  })
+  it('opens session search globally while preserving ordinary form input', () => {
+    const openSearch = vi.fn()
+    window.addEventListener('mssh:open-session-search', openSearch)
+    render(<App />)
+    expect(fireEvent.keyDown(document.body, { key: 'f', ctrlKey: true })).toBe(false)
+    const terminalInput = document.createElement('textarea')
+    terminalInput.className = 'xterm-helper-textarea'
+    document.body.append(terminalInput)
+    expect(fireEvent.keyDown(terminalInput, { key: 'f', ctrlKey: true })).toBe(false)
+    const ordinaryInput = document.createElement('input')
+    document.body.append(ordinaryInput)
+    expect(fireEvent.keyDown(ordinaryInput, { key: 'f', ctrlKey: true })).toBe(true)
+    expect(fireEvent.keyDown(document.body, { key: 'f', metaKey: true })).toBe(false)
+    expect(openSearch).toHaveBeenCalledTimes(3)
+    terminalInput.remove()
+    ordinaryInput.remove()
+    window.removeEventListener('mssh:open-session-search', openSearch)
   })
   it('blocks Ctrl+W for a connected active terminal', async () => {
     const closeTab = vi.fn(async () => {})
