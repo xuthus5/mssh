@@ -29,7 +29,6 @@ interface Props {
   onSave: (settings: GeneralSettings) => Promise<void>
   onPreviewUIFont: (fontFamily: string, fallbackFamily: string, fontSize: number) => void
   onPreviewWindowOpacity: (opacity: number) => void
-  onDirtyChange: (dirty: boolean) => void
 }
 
 function createDraft(general: GeneralSettings): GeneralDraft {
@@ -104,25 +103,22 @@ function WindowOpacitySettings({ value, onChange }: { value: string; onChange: (
   </section>
 }
 
-export function GeneralSettingsPanel({ general, systemFonts, onSave, onPreviewUIFont, onPreviewWindowOpacity, onDirtyChange }: Props) {
+export function GeneralSettingsPanel({ general, systemFonts, onSave, onPreviewUIFont, onPreviewWindowOpacity }: Props) {
   const [draft, setDraft] = useState(() => createDraft(general))
   const [saving, setSaving] = useState(false)
-  useEffect(() => { setDraft(createDraft(general)); onDirtyChange(false) }, [general, onDirtyChange])
+  useEffect(() => { setDraft(createDraft(general)) }, [general])
   const previewDraft = (next: GeneralDraft) => {
     setDraft(next)
-    onDirtyChange(true)
     onPreviewUIFont(next.uiFontFamily, next.uiFontFallbackFamily, parseInt(next.uiFontSize, 10) || 14)
   }
   const previewOpacity = (value: string) => {
     setDraft({ ...draft, windowOpacity: value })
-    onDirtyChange(true)
     onPreviewWindowOpacity(parseInt(value, 10) || 100)
   }
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault(); setSaving(true)
     try {
       await onSave({ maxPoolSize: parseInt(draft.maxPoolSize, 10) || 10, defaultKeepAlive: parseInt(draft.defaultKeepAlive, 10) || 60, defaultTermType: draft.defaultTermType, uiFontFamily: draft.uiFontFamily, uiFontFallbackFamily: draft.uiFontFallbackFamily, uiFontSize: parseInt(draft.uiFontSize, 10) || 14, windowOpacity: parseInt(draft.windowOpacity, 10) || 100, rightClickAction: draft.rightClickAction, copyOnSelect: draft.copyOnSelect })
-      onDirtyChange(false)
     } finally { setSaving(false) }
   }
   return <form onSubmit={handleSubmit} className="flex flex-col gap-3 pt-2">

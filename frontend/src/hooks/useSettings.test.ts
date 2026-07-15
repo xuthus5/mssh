@@ -1,5 +1,6 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
+import { Dialogs } from '@wailsio/runtime'
 import { useSettings } from '@/hooks/useSettings'
 import { DEFAULT_TERMINAL_BEHAVIOR, useTerminalBehaviorStore } from '@/store/terminalBehaviorStore'
 import { __registerHandler, __clearHandlers } from '@/test/__mocks__/wails-runtime'
@@ -253,5 +254,49 @@ describe('useSettings', () => {
     const { result } = renderHook(() => useSettings())
     await act(async () => { await result.current.generateKey('bad', 'rsa', 1024) })
     expect(result.current.keys).toHaveLength(0)
+  })
+
+  it('exports and imports configuration through native dialogs', async () => {
+    const saveFile = vi.spyOn(Dialogs, 'SaveFile').mockResolvedValue('/tmp/mssh-export.json')
+    const openFile = vi.spyOn(Dialogs, 'OpenFile').mockResolvedValue(['/tmp/mssh-import.json'])
+    const exportConfig = vi.fn(async () => {})
+    const importConfig = vi.fn(async () => {})
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SyncService.Export', exportConfig)
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SyncService.Import', importConfig)
+    const { result } = renderHook(() => useSettings())
+
+    await act(async () => { await result.current.exportConfig(); await result.current.importConfig() })
+
+    expect(saveFile).toHaveBeenCalledOnce()
+    expect(openFile).toHaveBeenCalledOnce()
+    expect(exportConfig).toHaveBeenCalledWith('/tmp/mssh-export.json')
+    expect(importConfig).toHaveBeenCalledWith('/tmp/mssh-import.json')
+  })
+
+  it('handles auxiliary service failures without leaking rejections', async () => {
+    __registerHandler('github.com/xuthus5/mssh/internal/service.KeyService.List', async () => { throw new Error('list failed') })
+    __registerHandler('github.com/xuthus5/mssh/internal/service.FontService.List', async () => { throw new Error('font failed') })
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.GetMany', async () => { throw new Error('load failed') })
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.SetMany', async () => { throw new Error('save failed') })
+    __registerHandler('github.com/xuthus5/mssh/internal/service.KeyService.Import', async () => { throw new Error('import failed') })
+    __registerHandler('github.com/xuthus5/mssh/internal/service.KeyService.Delete', async () => { throw new Error('delete failed') })
+    __registerHandler('github.com/xuthus5/mssh/internal/service.KeyService.ExportPublicKey', async () => { throw new Error('export failed') })
+    vi.spyOn(Dialogs, 'SaveFile').mockRejectedValue(new Error('dialog failed'))
+    vi.spyOn(Dialogs, 'OpenFile').mockRejectedValue(new Error('dialog failed'))
+    const { result } = renderHook(() => useSettings())
+    await act(async () => {})
+
+    await act(async () => {
+      await result.current.importKey('bad', 'bad')
+      await result.current.deleteKey('1')
+      await result.current.exportKey('1')
+      await result.current.saveSync({ enabled: true, url: '', username: '', password: '' })
+      await result.current.exportConfig()
+      await result.current.importConfig()
+    })
+
+    expect(result.current.keys).toEqual([])
+    expect(result.current.systemFonts).toEqual(['sans-serif'])
+    expect(result.current.sync.enabled).toBe(false)
   })
 })

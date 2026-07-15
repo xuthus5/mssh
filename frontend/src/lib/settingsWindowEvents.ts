@@ -1,0 +1,6 @@
+export const WINDOW_OPEN_SETTINGS_EVENT = 'window:open-settings'
+export const SETTINGS_GENERAL_PREVIEW_EVENT = 'settings:general-preview'
+export const SETTINGS_GENERAL_CHANGED_EVENT = 'settings:general-changed'
+export const SETTINGS_PREVIEW_CANCELLED_EVENT = 'settings:preview-cancelled'
+export const THEME_CATALOG_CHANGED_EVENT = 'theme:catalog-changed'
+export const COLOR_MODE_CHANGED_EVENT = 'appearance:color-mode-changed'

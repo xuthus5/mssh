@@ -24,8 +24,6 @@ const macroService = vi.hoisted(() => ({
 const logger = vi.hoisted(() => ({ debug: vi.fn(), error: vi.fn() }))
 
 vi.mock('@/hooks/SessionWorkspaceContext', () => ({ useSessionWorkspace: () => workspace }))
-vi.mock('@/hooks/useSettings', () => ({ useSettings: () => ({ general: {}, systemFonts: [], keys: [], sync: {} }) }))
-vi.mock('@/hooks/useThemeCatalog', () => ({ useThemeCatalog: () => ({ profiles: [], assignments: {} }) }))
 vi.mock('@/hooks/useResizablePanel', () => ({ useResizablePanel: () => ({ width: 280, collapsed: false, displayedWidth: 280, resizeHandleProps: {} }) }))
 vi.mock('@/lib/logger', () => ({ logger }))
 vi.mock('@/lib/wails', () => ({ MacroService: macroService }))
@@ -45,8 +43,6 @@ vi.mock('@/components/layout/SidebarDialogs', () => ({
     <input aria-label="mock-folder-name" value={props.folderName} onChange={(event) => props.setFolderName(event.target.value)} />
     <button type="button" onClick={props.onCreateOrUpdateFolder}>folder-submit</button>
     <button type="button" onClick={() => props.onFolderOpenChange(false)}>folder-close</button>
-    <span data-testid="settings-dialog">settings:{String(props.settingsProps.open)}</span>
-    <button type="button" onClick={() => props.settingsProps.onOpenChange(false)}>settings-close</button>
   </div>,
 }))
 
@@ -101,7 +97,7 @@ describe('Sidebar behavior', () => {
     expect(workspace.listSessions).toHaveBeenCalled()
   })
 
-  it('coordinates folder, session, and settings dialogs', async () => {
+  it('coordinates folder and session dialogs', async () => {
     const user = userEvent.setup()
     render(<Sidebar />)
 
@@ -132,10 +128,6 @@ describe('Sidebar behavior', () => {
     await user.click(screen.getByRole('button', { name: 'session-close' }))
     expect(screen.getByTestId('session-dialog')).toHaveTextContent('session:false:new')
 
-    act(() => window.dispatchEvent(new CustomEvent('mssh:open-settings')))
-    expect(screen.getByTestId('settings-dialog')).toHaveTextContent('settings:true')
-    await user.click(screen.getByRole('button', { name: 'settings-close' }))
-    expect(screen.getByTestId('settings-dialog')).toHaveTextContent('settings:false')
   })
 
   it('loads, executes, creates, and deletes macros with failure handling', async () => {

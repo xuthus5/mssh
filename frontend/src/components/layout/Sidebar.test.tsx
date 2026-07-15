@@ -16,8 +16,6 @@ const workspace = vi.hoisted(() => ({
 }))
 
 vi.mock('@/hooks/SessionWorkspaceContext', () => ({ useSessionWorkspace: () => workspace }))
-vi.mock('@/hooks/useSettings', () => ({ useSettings: () => ({}) }))
-vi.mock('@/hooks/useThemeCatalog', () => ({ useThemeCatalog: () => ({}) }))
 vi.mock('@/components/session/SessionTree', () => ({ default: () => null }))
 vi.mock('@/components/session/QuickCommands', () => ({ default: () => null }))
 vi.mock('@/components/session/SessionAssetCenter', () => ({ SessionAssetCenter: () => <div>会话资产工作区</div> }))

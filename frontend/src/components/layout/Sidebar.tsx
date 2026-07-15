@@ -7,10 +7,8 @@ import SessionTree from '@/components/session/SessionTree'
 import QuickCommands from '@/components/session/QuickCommands'
 import { SidebarDialogs } from '@/components/layout/SidebarDialogs'
 import { useSessionWorkspace } from '@/hooks/SessionWorkspaceContext'
-import { useSettings } from '@/hooks/useSettings'
-import { useThemeCatalog } from '@/hooks/useThemeCatalog'
 import { useResizablePanel } from '@/hooks/useResizablePanel'
-import { useSidebarDialogs, useSidebarFilter, useSidebarMacros, useSidebarSettingsDialog } from '@/hooks/useSidebarState'
+import { useSidebarDialogs, useSidebarFilter, useSidebarMacros } from '@/hooks/useSidebarState'
 import { useAppStore } from '@/store/appStore'
 import { workspaceTabID } from '@/store/tabNavigation'
 
@@ -29,26 +27,6 @@ function SessionPanel({ workspace, filter, editSession }: {
   </>
 }
 
-function settingsProps(options: {
-  open: boolean
-  setOpen: (open: boolean) => void
-  settings: ReturnType<typeof useSettings>
-  catalog: ReturnType<typeof useThemeCatalog>
-}) {
-  const { settings, catalog } = options
-  return {
-    open: options.open, onOpenChange: options.setOpen, general: settings.general, systemFonts: settings.systemFonts,
-    themeProfiles: catalog.profiles, themeAssignments: catalog.assignments, terminalGlobalStyle: catalog.globalStyle,
-    colorMode: catalog.colorMode, keys: settings.keys, sync: settings.sync, onSaveGeneral: settings.saveGeneral,
-    onPreviewUIFont: settings.previewUIFont, onRestoreUIFont: settings.restoreUIFont, onPreviewWindowOpacity: settings.previewWindowOpacity,
-    onRestoreWindowOpacity: settings.restoreWindowOpacity, onSaveThemeConfiguration: catalog.saveConfiguration,
-    onImportThemes: catalog.importThemes, onCreateThemeProfile: catalog.createProfile, onUpdateThemeProfile: catalog.saveProfile,
-    onDeleteThemeProfile: catalog.deleteProfile, onDeleteThemeDefinition: catalog.deleteDefinition, onResetBuiltinThemes: catalog.resetBuiltinStyles,
-    onGenerateKey: settings.generateKey, onImportKey: settings.importKey, onDeleteKey: settings.deleteKey, onExportKey: settings.exportKey,
-    onSaveSync: settings.saveSync, onExportConfig: settings.exportConfig, onImportConfig: settings.importConfig,
-  }
-}
-
 export default function Sidebar() {
   const activeTab = useAppStore((state) => state.workspaceTab)
   const panel = useResizablePanel()
@@ -56,15 +34,12 @@ export default function Sidebar() {
   const dialogs = useSidebarDialogs(workspace)
   const filter = useSidebarFilter(workspace.folders, workspace.sessions)
   const macro = useSidebarMacros()
-  const settingsDialog = useSidebarSettingsDialog()
-  const settings = useSettings()
-  const catalog = useThemeCatalog()
   return <div style={{ width: panel.displayedWidth }} className="relative shrink-0 transition-[width] duration-200 ease-out">
     <aside id="sidebar-navigation" style={{ width: panel.width }} aria-labelledby={workspaceTabID(activeTab)} aria-hidden={panel.collapsed} inert={panel.collapsed ? true : undefined} className={`relative flex h-full flex-col border-r border-border bg-card transition-transform duration-200 ease-out ${panel.collapsed ? '-translate-x-full pointer-events-none' : 'translate-x-0'}`}>
       {!panel.collapsed && <div {...panel.resizeHandleProps} className="absolute inset-y-0 -right-1 z-20 w-2 cursor-col-resize touch-none outline-none after:absolute after:inset-y-0 after:left-1/2 after:w-px after:-translate-x-1/2 after:bg-transparent hover:after:bg-primary/60 focus-visible:after:bg-primary active:after:bg-primary" />}
       {activeTab === 'sessions' && <SessionPanel workspace={workspace} filter={filter} editSession={dialogs.editSession} />}
       {activeTab === 'macros' && <div className="min-h-0 flex-1"><QuickCommands commands={macro.macros} onExecute={macro.execute} onAdd={macro.add} onDelete={macro.remove} showAddForm /></div>}
-      <SidebarDialogs sessionDialogOpen={dialogs.sessionDialogOpen} onSessionOpenChange={(open) => { dialogs.setSessionDialogOpen(open); if (!open) dialogs.setEditingSession(null) }} editingSession={dialogs.editingSession} onSaveSession={dialogs.saveSession} folders={workspace.folders} folderDialogOpen={dialogs.folderDialogOpen} onFolderOpenChange={(open) => { dialogs.setFolderDialogOpen(open); if (!open) { dialogs.setEditingFolder(null); dialogs.setFolderName('') } }} editingFolder={dialogs.editingFolder} folderName={dialogs.folderName} setFolderName={dialogs.setFolderName} onCreateOrUpdateFolder={dialogs.saveFolder} settingsProps={settingsProps({ open: settingsDialog.settingsOpen, setOpen: settingsDialog.setSettingsOpen, settings, catalog })} />
+      <SidebarDialogs sessionDialogOpen={dialogs.sessionDialogOpen} onSessionOpenChange={(open) => { dialogs.setSessionDialogOpen(open); if (!open) dialogs.setEditingSession(null) }} editingSession={dialogs.editingSession} onSaveSession={dialogs.saveSession} folders={workspace.folders} folderDialogOpen={dialogs.folderDialogOpen} onFolderOpenChange={(open) => { dialogs.setFolderDialogOpen(open); if (!open) { dialogs.setEditingFolder(null); dialogs.setFolderName('') } }} editingFolder={dialogs.editingFolder} folderName={dialogs.folderName} setFolderName={dialogs.setFolderName} onCreateOrUpdateFolder={dialogs.saveFolder} />
     </aside>
   </div>
 }
