@@ -10,7 +10,7 @@ const profile = {
   font_family: 'Profile Font',
   font_size: 16,
   cursor_style: 'underline',
-  color_overrides: JSON.stringify({ cursor: '#abcdef' }),
+  color_overrides: JSON.stringify({ cursor: '#abcdef', selection: '#fedcba' }),
   created_at: '',
   updated_at: '',
   definition: {
@@ -36,7 +36,7 @@ describe('profileToTerminalTheme', () => {
   it('merges definition colors and profile overrides with profile typography', () => {
     const result = profileToTerminalTheme(profile as never, globalStyle as never)
 
-    expect(result).toMatchObject({ background: '#000000', foreground: '#ffffff', cursor: '#abcdef', selectionBackground: '#123456', fontFamily: 'Profile Font', fontSize: 16, cursorStyle: 'underline', ansiBlack: '#111111', ansiBrightWhite: '#111111' })
+    expect(result).toMatchObject({ background: '#000000', foreground: '#ffffff', cursor: '#abcdef', selectionBackground: '#fedcba', fontFamily: 'Profile Font', fontSize: 16, cursorStyle: 'underline', ansiBlack: '#111111', ansiBrightWhite: '#111111' })
   })
 
   it('uses global typography without replacing the profile cursor color', () => {

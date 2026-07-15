@@ -54,6 +54,22 @@ describe('ThemeEditor dual mode profiles', () => {
     }))
   })
 
+  it('previews and saves the Profile selection background independently', async () => {
+    const onSave = vi.fn<ThemeEditorProps['onSave']>(async () => {})
+    renderEditor({ onSave })
+
+    await userEvent.clear(screen.getByLabelText('选区背景色 HEX'))
+    await userEvent.type(screen.getByLabelText('选区背景色 HEX'), '#4f46e5')
+    expect(screen.getByTestId('terminal-selection-preview')).toHaveStyle({ backgroundColor: '#4f46e5' })
+    await userEvent.click(screen.getByRole('button', { name: '保存主题配置' }))
+
+    const configuration = onSave.mock.calls[0]?.[0]
+    if (!configuration) throw new Error('theme configuration was not saved')
+    const dark = configuration.profiles.find((profile: { id: number }) => profile.id === 1)
+    if (!dark) throw new Error('dark theme Profile was not saved')
+    expect(JSON.parse(dark.color_overrides)).toMatchObject({ selection: '#4f46e5' })
+  })
+
   it('prevents saving invalid global and Profile style drafts', async () => {
     renderEditor()
     const saveButton = screen.getByRole('button', { name: '保存主题配置' })
