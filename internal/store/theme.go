@@ -2,25 +2,10 @@ package store
 
 import (
 	"database/sql"
-	"errors"
 	"fmt"
-	"strconv"
 	"time"
 
 	"github.com/xuthus5/mssh/internal/model"
-)
-
-type themeDB interface {
-	Exec(query string, args ...any) (sql.Result, error)
-	Query(query string, args ...any) (*sql.Rows, error)
-	QueryRow(query string, args ...any) *sql.Row
-}
-
-const (
-	darkThemeProfileKey  = "terminal.theme.dark_profile_id"
-	lightThemeProfileKey = "terminal.theme.light_profile_id"
-	followThemeModeKey   = "terminal.theme.follow_interface_mode"
-	fixedThemeProfileKey = "terminal.theme.fixed_profile_id"
 )
 
 func CreateThemeDefinition(db themeDB, definition model.ThemeDefinition) (*model.ThemeDefinition, error) {
@@ -166,7 +151,7 @@ func DeleteThemeProfile(db themeDB, id int64) error {
 		}
 		assignments.FixedProfileID = 0
 		if err = SaveThemeAssignmentsDB(db, assignments); err != nil {
-			return fmt.Errorf("clear historical fixed theme profile: %w", err)
+			return fmt.Errorf("clear inactive fixed theme profile: %w", err)
 		}
 	}
 	result, err := db.Exec("DELETE FROM terminal_theme_profiles WHERE id = ?", id)
@@ -174,87 +159,6 @@ func DeleteThemeProfile(db themeDB, id int64) error {
 		return fmt.Errorf("delete theme profile: %w", err)
 	}
 	return requireAffected(result, "theme profile")
-}
-
-func SaveThemeAssignments(db *sql.DB, assignments model.ThemeAssignments) error {
-	return SaveThemeAssignmentsDB(db, assignments)
-}
-
-func SaveThemeAssignmentsDB(db themeDB, assignments model.ThemeAssignments) error {
-	settings := []struct {
-		key       string
-		value     string
-		valueType string
-	}{
-		{key: darkThemeProfileKey, value: strconv.FormatInt(assignments.DarkProfileID, 10), valueType: "number"},
-		{key: lightThemeProfileKey, value: strconv.FormatInt(assignments.LightProfileID, 10), valueType: "number"},
-		{key: followThemeModeKey, value: strconv.FormatBool(assignments.FollowInterfaceMode), valueType: "boolean"},
-		{key: fixedThemeProfileKey, value: strconv.FormatInt(assignments.FixedProfileID, 10), valueType: "number"},
-	}
-	for _, setting := range settings {
-		if err := saveThemeAssignment(db, setting.key, setting.value, setting.valueType); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func saveThemeAssignment(db themeDB, key, value, valueType string) error {
-	_, err := db.Exec(`INSERT INTO settings (key, namespace, value, value_type, version, updated_at) VALUES (?, 'terminal', ?, ?, 1, datetime('now')) ON CONFLICT(key) DO UPDATE SET value=excluded.value, value_type=excluded.value_type, version=1, updated_at=datetime('now')`, key, value, valueType)
-	if err != nil {
-		return fmt.Errorf("save theme assignment %s: %w", key, err)
-	}
-	return nil
-}
-
-func GetThemeAssignments(db themeDB) (model.ThemeAssignments, error) {
-	darkProfileID, err := themeAssignmentID(db, darkThemeProfileKey)
-	if err != nil {
-		return model.ThemeAssignments{}, err
-	}
-	lightProfileID, err := themeAssignmentID(db, lightThemeProfileKey)
-	if err != nil {
-		return model.ThemeAssignments{}, err
-	}
-	followInterfaceMode, err := themeAssignmentBool(db, followThemeModeKey, true)
-	if err != nil {
-		return model.ThemeAssignments{}, err
-	}
-	fixedProfileID, err := themeAssignmentID(db, fixedThemeProfileKey)
-	if err != nil {
-		return model.ThemeAssignments{}, err
-	}
-	return model.ThemeAssignments{DarkProfileID: darkProfileID, LightProfileID: lightProfileID, FollowInterfaceMode: followInterfaceMode, FixedProfileID: fixedProfileID}, nil
-}
-
-func themeAssignmentID(db themeDB, key string) (int64, error) {
-	var value string
-	if err := db.QueryRow("SELECT value FROM settings WHERE key = ?", key).Scan(&value); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return 0, nil
-		}
-		return 0, fmt.Errorf("read theme assignment %s: %w", key, err)
-	}
-	id, err := strconv.ParseInt(value, 10, 64)
-	if err != nil {
-		return 0, fmt.Errorf("parse theme assignment %s: %w", key, err)
-	}
-	return id, nil
-}
-
-func themeAssignmentBool(db themeDB, key string, defaultValue bool) (bool, error) {
-	var value string
-	if err := db.QueryRow("SELECT value FROM settings WHERE key = ?", key).Scan(&value); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return defaultValue, nil
-		}
-		return false, fmt.Errorf("read theme assignment %s: %w", key, err)
-	}
-	parsed, err := strconv.ParseBool(value)
-	if err != nil {
-		return false, fmt.Errorf("parse theme assignment %s: %w", key, err)
-	}
-	return parsed, nil
 }
 
 type scanner interface{ Scan(dest ...any) error }

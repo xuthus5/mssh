@@ -3,13 +3,17 @@ package service
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 
 	"github.com/xuthus5/mssh/internal/model"
 	"github.com/xuthus5/mssh/internal/store"
 )
+
+const syncFormatVersion = 1
 
 type SyncService struct {
 	db     *sql.DB
@@ -21,9 +25,17 @@ func NewSyncService(db *sql.DB, logger *slog.Logger) *SyncService {
 }
 
 type ExportData struct {
-	Sessions []model.Session `json:"sessions"`
-	Keys     []model.SSHKey  `json:"keys"`
-	Macros   []model.Macro   `json:"macros"`
+	FormatVersion int             `json:"format_version"`
+	Sessions      []model.Session `json:"sessions"`
+	Keys          []model.SSHKey  `json:"keys"`
+	Macros        []model.Macro   `json:"macros"`
+}
+
+type syncImportDocument struct {
+	FormatVersion json.RawMessage `json:"format_version"`
+	Sessions      []model.Session `json:"sessions"`
+	Keys          []model.SSHKey  `json:"keys"`
+	Macros        []model.Macro   `json:"macros"`
 }
 
 func (s *SyncService) Export(path string) error {
@@ -49,9 +61,10 @@ func (s *SyncService) Export(path string) error {
 	}
 
 	data := ExportData{
-		Sessions: safeSessions,
-		Keys:     keys,
-		Macros:   macros,
+		FormatVersion: syncFormatVersion,
+		Sessions:      safeSessions,
+		Keys:          keys,
+		Macros:        macros,
 	}
 
 	file, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
@@ -74,8 +87,8 @@ func (s *SyncService) Import(path string) error {
 	}
 	defer func() { _ = file.Close() }()
 
-	var data ExportData
-	if err := json.NewDecoder(file).Decode(&data); err != nil {
+	data, err := decodeSyncData(file)
+	if err != nil {
 		return fmt.Errorf("import: %w", err)
 	}
 
@@ -102,6 +115,64 @@ func (s *SyncService) Import(path string) error {
 	}
 
 	return nil
+}
+
+func decodeSyncData(reader io.Reader) (ExportData, error) {
+	decoder := json.NewDecoder(reader)
+	decoder.DisallowUnknownFields()
+
+	var document syncImportDocument
+	if err := decoder.Decode(&document); err != nil {
+		return ExportData{}, fmt.Errorf("decode sync document: %w", err)
+	}
+	formatVersion, err := decodeSyncFormatVersion(document.FormatVersion)
+	if err != nil {
+		return ExportData{}, fmt.Errorf("decode sync document: %w", err)
+	}
+
+	var trailing json.RawMessage
+	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
+		if err == nil {
+			return ExportData{}, fmt.Errorf("decode sync document trailer: trailing JSON value")
+		}
+		return ExportData{}, fmt.Errorf("decode sync document trailer: %w", err)
+	}
+	data := ExportData{
+		FormatVersion: formatVersion,
+		Sessions:      document.Sessions,
+		Keys:          document.Keys,
+		Macros:        document.Macros,
+	}
+
+	if data.FormatVersion != syncFormatVersion {
+		return ExportData{}, fmt.Errorf("validate sync document: format_version must be %d, got %d", syncFormatVersion, data.FormatVersion)
+	}
+	if data.Sessions == nil {
+		return ExportData{}, fmt.Errorf("validate sync document: sessions array is required")
+	}
+	if data.Keys == nil {
+		return ExportData{}, fmt.Errorf("validate sync document: keys array is required")
+	}
+	if data.Macros == nil {
+		return ExportData{}, fmt.Errorf("validate sync document: macros array is required")
+	}
+
+	return data, nil
+}
+
+func decodeSyncFormatVersion(raw json.RawMessage) (int, error) {
+	if len(raw) == 0 {
+		return 0, nil
+	}
+	if string(raw) == "null" {
+		return 0, errors.New("format_version must be an integer")
+	}
+
+	var version int
+	if err := json.Unmarshal(raw, &version); err != nil {
+		return 0, errors.New("format_version must be an integer")
+	}
+	return version, nil
 }
 
 func (s *SyncService) SyncToCloud() error {

@@ -9,8 +9,7 @@ import (
 )
 
 type SettingService struct {
-	db     *sql.DB
-	logger *slog.Logger
+	db *sql.DB
 }
 
 func (s *SettingService) Get(key string) (*model.Setting, error) {
@@ -39,16 +38,6 @@ func (s *SettingService) SetMany(settings []model.SettingInput) error {
 
 func (s *SettingService) Delete(key string) error { return store.DeleteSetting(s.db, key) }
 
-func NewSettingService(db *sql.DB, logger *slog.Logger) *SettingService {
-	return &SettingService{db: db, logger: logger}
-}
-
-func (s *SettingService) GetSetting(key string) (string, error) {
-	s.logger.Info("getting setting", "key", key)
-	return store.GetSetting(s.db, key)
-}
-
-func (s *SettingService) SetSetting(key, value string) error {
-	s.logger.Info("setting setting", "key", key, "value", value)
-	return store.SetSetting(s.db, key, value)
+func NewSettingService(db *sql.DB, _ *slog.Logger) *SettingService {
+	return &SettingService{db: db}
 }

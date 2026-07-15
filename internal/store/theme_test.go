@@ -47,6 +47,7 @@ func TestThemeCatalogStoreCRUDAndFilters(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, profiles, 1)
 
+	require.NoError(t, SaveThemeAssignments(db, model.ThemeAssignments{}))
 	require.NoError(t, DeleteThemeProfile(db, profile.ID))
 	require.NoError(t, DeleteThemeDefinition(db, dark.ID))
 }
@@ -63,6 +64,7 @@ func TestThemeCatalogStoreConstraints(t *testing.T) {
 	profile, err := CreateThemeProfile(db, model.ThemeProfile{Name: "Custom", ThemeID: custom.ID, FontFamily: "monospace", FontSize: 14, CursorStyle: model.CursorStyleBlock, ColorOverrides: `{}`})
 	require.NoError(t, err)
 	assert.Error(t, DeleteThemeDefinition(db, custom.ID))
+	require.NoError(t, SaveThemeAssignments(db, model.ThemeAssignments{}))
 	require.NoError(t, DeleteThemeProfile(db, profile.ID))
 	_, err = CreateThemeProfile(db, model.ThemeProfile{Name: "Missing", ThemeID: -1})
 	assert.ErrorContains(t, err, "create theme profile")
@@ -88,22 +90,74 @@ func TestListThemeProfilesReportsInvalidStoredValues(t *testing.T) {
 	assert.ErrorContains(t, err, "font_size")
 }
 
-func TestThemeAssignmentsStore(t *testing.T) {
+func TestLoadThemeAssignmentsReportsAbsentState(t *testing.T) {
+	db := setupTestDB(t)
+	assignments, exists, err := LoadThemeAssignments(db)
+	require.NoError(t, err)
+	assert.False(t, exists)
+	assert.Equal(t, model.ThemeAssignments{}, assignments)
+	_, err = GetThemeAssignments(db)
+	assert.ErrorContains(t, err, "not initialized")
+}
+
+func TestLoadThemeAssignmentsRejectsIncompleteState(t *testing.T) {
 	db := setupTestDB(t)
 	expected := model.ThemeAssignments{DarkProfileID: 4, LightProfileID: 7, FollowInterfaceMode: false, FixedProfileID: 9}
 	require.NoError(t, SaveThemeAssignments(db, expected))
-	assignments, err := GetThemeAssignments(db)
+	_, err := db.Exec(`DELETE FROM settings WHERE key = ?`, fixedThemeProfileKey)
 	require.NoError(t, err)
-	assert.Equal(t, expected, assignments)
+	_, _, err = LoadThemeAssignments(db)
+	assert.ErrorContains(t, err, "incomplete")
+}
 
-	_, err = db.Exec(`DELETE FROM settings WHERE key IN ('terminal.theme.follow_interface_mode', 'terminal.theme.fixed_profile_id')`)
+func TestLoadThemeAssignmentsAcceptsCompleteStates(t *testing.T) {
+	for _, expected := range []model.ThemeAssignments{
+		{},
+		{DarkProfileID: 4, LightProfileID: 7, FollowInterfaceMode: false, FixedProfileID: 9},
+	} {
+		db := setupTestDB(t)
+		require.NoError(t, SaveThemeAssignments(db, expected))
+		assignments, exists, err := LoadThemeAssignments(db)
+		require.NoError(t, err)
+		assert.True(t, exists)
+		assert.Equal(t, expected, assignments)
+	}
+}
+
+func TestLoadThemeAssignmentsRejectsCorruptState(t *testing.T) {
+	db := setupTestDB(t)
+	require.NoError(t, SaveThemeAssignments(db, model.ThemeAssignments{}))
+	_, err := db.Exec(`UPDATE settings SET value = 'invalid' WHERE key = ?`, darkThemeProfileKey)
 	require.NoError(t, err)
-	assignments, err = GetThemeAssignments(db)
-	require.NoError(t, err)
-	assert.True(t, assignments.FollowInterfaceMode)
-	assert.Zero(t, assignments.FixedProfileID)
-	assert.Equal(t, expected.DarkProfileID, assignments.DarkProfileID)
-	assert.Equal(t, expected.LightProfileID, assignments.LightProfileID)
+	_, _, err = LoadThemeAssignments(db)
+	assert.ErrorContains(t, err, "parse theme assignment")
+}
+
+func TestLoadThemeAssignmentsRejectsInvalidSettingContract(t *testing.T) {
+	tests := []struct {
+		name, query string
+		args        []any
+	}{
+		{name: "namespace mismatch", query: `UPDATE settings SET namespace = 'appearance' WHERE key = ?`, args: []any{darkThemeProfileKey}},
+		{name: "namespace must be terminal", query: `UPDATE settings SET namespace = 'terminal.theme' WHERE key = ?`, args: []any{darkThemeProfileKey}},
+		{name: "legacy namespace", query: `UPDATE settings SET namespace = 'legacy' WHERE key = ?`, args: []any{darkThemeProfileKey}},
+		{name: "unsupported version", query: `UPDATE settings SET version = 2 WHERE key = ?`, args: []any{darkThemeProfileKey}},
+		{name: "invalid timestamp", query: `UPDATE settings SET updated_at = 'invalid' WHERE key = ?`, args: []any{darkThemeProfileKey}},
+		{name: "invalid json", query: `UPDATE settings SET value = '{' WHERE key = ?`, args: []any{darkThemeProfileKey}},
+		{name: "mismatched json type", query: `UPDATE settings SET value = 'true' WHERE key = ?`, args: []any{darkThemeProfileKey}},
+		{name: "wrong number assignment type", query: `UPDATE settings SET value = '"1"', value_type = 'string' WHERE key = ?`, args: []any{darkThemeProfileKey}},
+		{name: "wrong boolean assignment type", query: `UPDATE settings SET value = '1', value_type = 'number' WHERE key = ?`, args: []any{followThemeModeKey}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			db := setupTestDB(t)
+			require.NoError(t, SaveThemeAssignments(db, model.ThemeAssignments{}))
+			_, err := db.Exec(test.query, test.args...)
+			require.NoError(t, err)
+			_, _, err = LoadThemeAssignments(db)
+			require.Error(t, err)
+		})
+	}
 }
 
 func TestDeleteThemeProfileProtectsActiveAssignments(t *testing.T) {
@@ -132,31 +186,9 @@ func TestDeleteThemeProfileProtectsActiveAssignments(t *testing.T) {
 
 func TestThemeAssignmentsStoreReportsInvalidValuesAndDatabaseErrors(t *testing.T) {
 	db := setupTestDB(t)
-	_, err := db.Exec(`INSERT INTO settings (key, namespace, value, value_type, version) VALUES ('terminal.theme.dark_profile_id', 'terminal', 'invalid', 'number', 1)`)
-	require.NoError(t, err)
-	_, err = GetThemeAssignments(db)
-	assert.ErrorContains(t, err, "parse theme assignment")
-
-	_, err = db.Exec(`DELETE FROM settings`)
-	require.NoError(t, err)
-	_, err = db.Exec(`INSERT INTO settings (key, namespace, value, value_type, version) VALUES ('terminal.theme.follow_interface_mode', 'terminal', 'not-a-bool', 'boolean', 1)`)
-	require.NoError(t, err)
-	_, err = GetThemeAssignments(db)
-	assert.ErrorContains(t, err, "terminal.theme.follow_interface_mode")
-
-	_, err = db.Exec(`DELETE FROM settings`)
-	require.NoError(t, err)
-	_, err = db.Exec(`INSERT INTO settings (key, namespace, value, value_type, version) VALUES
-		('terminal.theme.dark_profile_id', 'terminal', '1', 'number', 1),
-		('terminal.theme.light_profile_id', 'terminal', '2', 'number', 1),
-		('terminal.theme.follow_interface_mode', 'terminal', 'true', 'boolean', 1),
-		('terminal.theme.fixed_profile_id', 'terminal', 'invalid', 'number', 1)`)
-	require.NoError(t, err)
-	_, err = GetThemeAssignments(db)
-	assert.ErrorContains(t, err, "terminal.theme.fixed_profile_id")
-
+	require.NoError(t, SaveThemeAssignments(db, model.ThemeAssignments{}))
 	require.NoError(t, db.Close())
-	_, err = GetThemeAssignments(db)
+	_, _, err := LoadThemeAssignments(db)
 	assert.ErrorContains(t, err, "read theme assignment")
 }
 

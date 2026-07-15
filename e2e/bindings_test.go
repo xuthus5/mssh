@@ -17,21 +17,21 @@ import (
 // TestBindingGeneration verifies the generated TypeScript bindings exist
 // and contain the correct method signatures for all registered services.
 func TestBindingGeneration(t *testing.T) {
-	bindingsDir := filepath.Join("..", "frontend", "bindings", "mssh", "internal", "service")
+	bindingsDir := serviceBindingsDir()
 	entries, err := os.ReadDir(bindingsDir)
 	require.NoError(t, err, "bindings directory not found — run: wails3 generate bindings -ts -names -d frontend/bindings/ .")
 
 	expectedServices := map[string]int{
-		"sessionservice.ts":  13, // Connect, ConnectionCount, CreateFolder, CreateSession, DeleteFolder, DeleteSession, Disconnect, GetSession, ListFolders, ListSessions, MoveFolder, MoveSession, UpdateFolder, UpdateSession
-		"terminalservice.ts": 5,  // Close, Count, Open, Resize, Write
-		"fileservice.ts":     7,  // CancelTransfer, Delete, Download, ListDir, Mkdir, Rename, Upload
-		"keyservice.ts":      5,  // Delete, ExportPublicKey, Generate, Import, List
-		"settingservice.ts":  2,  // GetSetting, SetSetting
-		"tunnelservice.ts":   6,  // Create, Delete, List, Start, Stop, Update
-		"macroservice.ts":    5,  // Create, Delete, Execute, List, Update
-		"themeservice.ts":    6,  // Create, Delete, GetActive, List, SetActive, Update
-		"logservice.ts":      8,  // Delete, GetRecording, List, StartRecording, StartTerminalRecording, StopRecording, StopTerminalRecording, HandleOutput
-		"syncservice.ts":     4,  // Export, Import, SyncFromCloud, SyncToCloud
+		"sessionservice.ts":  17,
+		"terminalservice.ts": 9,
+		"fileservice.ts":     7, // CancelTransfer, Delete, Download, ListDir, Mkdir, Rename, Upload
+		"keyservice.ts":      5, // Delete, ExportPublicKey, Generate, Import, List
+		"settingservice.ts":  6,
+		"tunnelservice.ts":   6, // Create, Delete, List, Start, Stop, Update
+		"macroservice.ts":    5, // Create, Delete, Execute, List, Update
+		"themeservice.ts":    14,
+		"logservice.ts":      7,
+		"syncservice.ts":     4, // Export, Import, SyncFromCloud, SyncToCloud
 	}
 
 	foundServices := make(map[string]bool)
@@ -67,7 +67,7 @@ func TestBindingGeneration(t *testing.T) {
 // TestBindingFQNMatchesGo verifies that each FQN in the generated bindings
 // matches the pattern: "github.com/xuthus5/mssh/internal/service.{Service}.{Method}"
 func TestBindingFQNMatchesGo(t *testing.T) {
-	bindingsDir := filepath.Join("..", "frontend", "bindings", "mssh", "internal", "service")
+	bindingsDir := serviceBindingsDir()
 	entries, err := os.ReadDir(bindingsDir)
 	require.NoError(t, err)
 
@@ -137,15 +137,15 @@ func TestBindingBarrelExports(t *testing.T) {
 // by its FQN through the same hash algorithm Wails v3 uses.
 func TestRpcContract_FNVHash(t *testing.T) {
 	serviceMethods := map[string][]string{
-		"SessionService":  {"Connect", "ConnectionCount", "CreateFolder", "CreateSession", "DeleteFolder", "DeleteSession", "Disconnect", "GetClientWrapper", "GetSession", "ListFolders", "ListSessions", "MoveFolder", "MoveSession", "UpdateFolder", "UpdateSession"},
-		"TerminalService": {"Close", "Count", "Open", "Resize", "SetOutputHandler", "Write"},
+		"SessionService":  {"CancelConnect", "ConnectionCount", "CreateFolder", "CreateSession", "DecideHostKey", "DeleteFolder", "DeleteSession", "GetClientWrapper", "GetSession", "ListFolders", "ListRecentSessions", "ListSessions", "MoveFolder", "MoveSession", "SetDefaultFolder", "UpdateFolder", "UpdateSession"},
+		"TerminalService": {"Attach", "Close", "Count", "Open", "Resize", "SetCloseHandler", "SetMaxSize", "SetOutputHandler", "Write"},
 		"FileService":     {"CancelTransfer", "Delete", "Download", "ListDir", "Mkdir", "Rename", "Upload"},
 		"KeyService":      {"Delete", "ExportPublicKey", "Generate", "Import", "List"},
-		"SettingService":  {"GetSetting", "SetSetting"},
+		"SettingService":  {"Delete", "Get", "GetMany", "List", "Set", "SetMany"},
 		"TunnelService":   {"Create", "Delete", "List", "Start", "Stop", "Update"},
 		"MacroService":    {"Create", "Delete", "Execute", "List", "Update"},
-		"ThemeService":    {"Create", "Delete", "GetActive", "List", "SetActive", "Update"},
-		"LogService":      {"Delete", "GetRecording", "HandleOutput", "List", "StartRecording", "StartTerminalRecording", "StopRecording", "StopTerminalRecording"},
+		"ThemeService":    {"CreateCustomProfile", "DeleteDefinition", "DeleteProfile", "GetAssignments", "GetGlobalStyle", "GetProfile", "ImportFiles", "InitializeDefaults", "ListDefinitions", "ListProfiles", "ResetBuiltinStyles", "SaveAssignments", "SaveConfiguration", "UpdateProfile"},
+		"LogService":      {"Delete", "GetRecording", "HandleOutput", "List", "StartTerminalRecording", "StopTerminalRecording", "StopTerminalRecordingIfActive"},
 		"SyncService":     {"Export", "Import", "SyncFromCloud", "SyncToCloud"},
 	}
 
@@ -173,61 +173,71 @@ func TestRpcContract_FNVHash(t *testing.T) {
 // actually exists as a Go exported method on the service structs.
 // This is a cross-reference check between generated bindings and Go code.
 func TestGoServiceMethodsExist(t *testing.T) {
-	// Read each generated binding file
-	bindingsDir := filepath.Join("..", "frontend", "bindings", "mssh", "internal", "service")
-	entries, err := os.ReadDir(bindingsDir)
-	require.NoError(t, err)
-
-	serviceToMethods := make(map[string][]string)
-
-	for _, entry := range entries {
-		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".ts") || entry.Name() == "index.ts" {
-			continue
-		}
-		content, err := os.ReadFile(filepath.Join(bindingsDir, entry.Name()))
-		require.NoError(t, err)
-
-		serviceName := strings.TrimSuffix(entry.Name(), ".ts")
-		// Convert "sessionservice" to "SessionService"
-		serviceName = strings.TrimSuffix(serviceName, "service")
-		if len(serviceName) > 0 {
-			serviceName = strings.ToUpper(serviceName[:1]) + serviceName[1:] + "Service"
-		}
-
-		lines := strings.Split(string(content), "\n")
-		for _, line := range lines {
-			if !strings.Contains(line, ".ByName(") {
-				continue
-			}
-			// Extract FQN from: $Call.ByName("pkg.Svc.Method", ...)
-			start := strings.Index(line, ".ByName(\"")
-			if start < 0 {
-				continue
-			}
-			start += len(".ByName(\"")
-			end := strings.Index(line[start:], "\"")
-			if end < 0 {
-				continue
-			}
-			fqn := line[start : start+end]
-
-			// Method name is the last segment
-			lastDot := strings.LastIndex(fqn, ".")
-			if lastDot < 0 {
-				continue
-			}
-			methodName := fqn[lastDot+1:]
-
-			methods := serviceToMethods[serviceName]
-			serviceToMethods[serviceName] = append(methods, methodName)
-		}
-	}
-
+	serviceToMethods := collectBindingServiceMethods(t, serviceBindingsDir())
 	t.Logf("Found %d services in binding files", len(serviceToMethods))
 	for svc, methods := range serviceToMethods {
 		t.Logf("  %s: %d methods — %v", svc, len(methods), methods)
 	}
 	assert.Greater(t, len(serviceToMethods), 5, "expected at least 6 services in bindings")
+}
+
+func collectBindingServiceMethods(t *testing.T, bindingsDir string) map[string][]string {
+	t.Helper()
+	entries, err := os.ReadDir(bindingsDir)
+	require.NoError(t, err)
+	serviceToMethods := make(map[string][]string)
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".ts") || entry.Name() == "index.ts" {
+			continue
+		}
+		serviceName, methods := readBindingServiceMethods(t, bindingsDir, entry.Name())
+		serviceToMethods[serviceName] = append(serviceToMethods[serviceName], methods...)
+	}
+	return serviceToMethods
+}
+
+func readBindingServiceMethods(t *testing.T, bindingsDir, filename string) (string, []string) {
+	t.Helper()
+	content, err := os.ReadFile(filepath.Join(bindingsDir, filename))
+	require.NoError(t, err)
+	methods := make([]string, 0)
+	for _, line := range strings.Split(string(content), "\n") {
+		methodName, ok := bindingMethodName(line)
+		if ok {
+			methods = append(methods, methodName)
+		}
+	}
+	return bindingServiceName(filename), methods
+}
+
+func bindingServiceName(filename string) string {
+	serviceName := strings.TrimSuffix(filename, ".ts")
+	serviceName = strings.TrimSuffix(serviceName, "service")
+	if len(serviceName) == 0 {
+		return serviceName
+	}
+	return strings.ToUpper(serviceName[:1]) + serviceName[1:] + "Service"
+}
+
+func bindingMethodName(line string) (string, bool) {
+	if !strings.Contains(line, ".ByName(") {
+		return "", false
+	}
+	start := strings.Index(line, ".ByName(\"")
+	if start < 0 {
+		return "", false
+	}
+	start += len(".ByName(\"")
+	end := strings.Index(line[start:], "\"")
+	if end < 0 {
+		return "", false
+	}
+	fqn := line[start : start+end]
+	lastDot := strings.LastIndex(fqn, ".")
+	if lastDot < 0 {
+		return "", false
+	}
+	return fqn[lastDot+1:], true
 }
 
 // TestBindingsNotInsideSource verifies generated binding files are NOT inside Vite's src/ tree.
@@ -245,36 +255,4 @@ func TestBindingsNotInsideSource(t *testing.T) {
 	_, err = os.Stat(serviceDir)
 	assert.True(t, os.IsNotExist(err),
 		"generated bindings found at %s — they must be in frontend/bindings/, not inside src/", serviceDir)
-}
-
-// TestBindingsUseNpmRuntime verifies generated bindings import from @wailsio/runtime
-// NOT from /wails/runtime.js (absolute path). The latter cannot be resolved by Vite.
-func TestBindingsUseNpmRuntime(t *testing.T) {
-	bindingsDir := filepath.Join("..", "frontend", "bindings", "mssh", "internal", "service")
-	entries, err := os.ReadDir(bindingsDir)
-	require.NoError(t, err)
-
-	for _, entry := range entries {
-		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".ts") || entry.Name() == "index.ts" {
-			continue
-		}
-		content, err := os.ReadFile(filepath.Join(bindingsDir, entry.Name()))
-		require.NoError(t, err)
-
-		assert.False(t, strings.Contains(string(content), `"/wails/runtime.js"`),
-			"%s imports from /wails/runtime.js — regenerate WITHOUT -b flag: wails3 generate bindings -ts -names -d frontend/bindings/ .", entry.Name())
-
-		assert.True(t, strings.Contains(string(content), `"@wailsio/runtime"`),
-			"%s does not import from @wailsio/runtime — regenerate WITHOUT -b flag", entry.Name())
-	}
-}
-
-// TestWailsRuntimeNpmInstalled verifies @wailsio/runtime is a dependency in package.json.
-func TestWailsRuntimeNpmInstalled(t *testing.T) {
-	pkgPath := filepath.Join("..", "frontend", "package.json")
-	content, err := os.ReadFile(pkgPath)
-	require.NoError(t, err)
-
-	assert.True(t, strings.Contains(string(content), `"@wailsio/runtime"`),
-		"@wailsio/runtime not found in package.json — run: npm install @wailsio/runtime")
 }

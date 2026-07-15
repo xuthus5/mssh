@@ -1,15 +1,19 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useFileTransfer } from '@/hooks/useFileTransfer'
 import { __registerHandler, __clearHandlers } from '@/test/__mocks__/wails-runtime'
 import { useAppStore } from '@/store/appStore'
+import { useToastStore } from '@/components/ui/toast'
+import { logger } from '@/lib/logger'
 
 const SESSION_ID = 1
 
 describe('useFileTransfer', () => {
   beforeEach(() => {
+    vi.clearAllMocks()
     __clearHandlers()
-    useAppStore.setState({ transfers: [], transferCenterOpen: false, tabs: [{ id: 'tab-1', title: '生产服务器', type: 'terminal', sessionId: SESSION_ID }] })
+    useToastStore.setState({ toasts: [] })
+    useAppStore.setState({ transfers: [], transferCenterOpen: false, tabs: [{ id: 'tab-1', title: '生产服务器', type: 'terminal', terminalId: 'term-1', sessionId: SESSION_ID }] })
   })
 
   it('listFiles sets files from service', async () => {
@@ -115,6 +119,23 @@ describe('useFileTransfer', () => {
     expect(paths).toContain('/home')
   })
 
+  it('navigates directly and ignores stale directory responses', async () => {
+    let resolveSlow!: (files: never[]) => void
+    __registerHandler('github.com/xuthus5/mssh/internal/service.FileService.ListDir', async (_sid: number, path: string) => {
+      if (path === '/slow') return new Promise<never[]>((resolve) => { resolveSlow = resolve })
+      return [{ name: 'fast', path: '/fast/file', size: 1, is_dir: false, mod_time: '' }]
+    })
+    const { result } = renderHook(() => useFileTransfer(SESSION_ID))
+
+    act(() => { result.current.navigateTo('/slow') })
+    await act(async () => { await result.current.listFiles('/fast') })
+    await act(async () => { resolveSlow([]) })
+
+    expect(result.current.currentPath).toBe('/fast')
+    expect(result.current.files[0].name).toBe('fast')
+    expect(result.current.loading).toBe(false)
+  })
+
   it('makeDir triggers listFiles on current path', async () => {
     const called: string[] = []
     __registerHandler('github.com/xuthus5/mssh/internal/service.FileService.ListDir', async () => [])
@@ -125,6 +146,45 @@ describe('useFileTransfer', () => {
     await act(async () => { await result.current.makeDir('newdir') })
 
     expect(called).toContain('/home/newdir')
+  })
+
+  it('renames files and refreshes the current directory', async () => {
+    const renames: unknown[][] = []
+    const listed: string[] = []
+    __registerHandler('github.com/xuthus5/mssh/internal/service.FileService.ListDir', async (_sid: number, path: string) => {
+      listed.push(path)
+      return []
+    })
+    __registerHandler('github.com/xuthus5/mssh/internal/service.FileService.Rename', async (...args: unknown[]) => {
+      renames.push(args)
+    })
+    const { result } = renderHook(() => useFileTransfer(SESSION_ID))
+
+    await act(async () => { await result.current.listFiles('/home') })
+    await act(async () => { await result.current.renameFile('/home/old.txt', 'new.txt') })
+
+    expect(renames).toEqual([[SESSION_ID, '/home/old.txt', 'new.txt']])
+    expect(listed).toEqual(['/home', '/home'])
+  })
+
+  it('reports upload and download failures without creating transfers', async () => {
+    const loggerError = vi.spyOn(logger, 'error').mockImplementation(() => {})
+    __registerHandler('github.com/xuthus5/mssh/internal/service.FileService.Upload', async () => { throw new Error('upload denied') })
+    __registerHandler('github.com/xuthus5/mssh/internal/service.FileService.Download', async () => { throw new Error('download denied') })
+    const { result } = renderHook(() => useFileTransfer(SESSION_ID))
+
+    await act(async () => {
+      await result.current.upload('/local/a.txt', '/remote')
+      await result.current.download('/remote/b.txt', '/local/b.txt')
+    })
+
+    expect(result.current.transfers).toHaveLength(0)
+    expect(useToastStore.getState().toasts.map((item) => item.message)).toEqual([
+      '上传失败: upload denied',
+      '下载失败: download denied',
+    ])
+    expect(loggerError).toHaveBeenCalledWith('upload error', expect.any(Error))
+    expect(loggerError).toHaveBeenCalledWith('download error', expect.any(Error))
   })
 
   it('handles listFiles error gracefully', async () => {

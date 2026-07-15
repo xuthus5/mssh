@@ -2,14 +2,23 @@ import { create } from 'zustand'
 import { Terminal } from '@xterm/xterm'
 import { initialNavigationState, type ActiveSurface, type WorkspaceID } from '@/store/tabNavigation'
 import { createNavigationActions, createPoolActions, createStatusActions, createTabActions, createTransferActions } from '@/store/appStoreActions'
-export interface Tab {
+export interface TerminalTab {
   id: string
   title: string
-  type: 'terminal' | 'playback'
-  terminalId?: string
-  sessionId?: number
+  type: 'terminal'
+  terminalId: string
+  sessionId: number
   terminalInstance?: number
 }
+
+export interface PlaybackTab {
+  id: string
+  title: string
+  type: 'playback'
+  recordingPath: string
+}
+
+export type Tab = TerminalTab | PlaybackTab
 export interface PooledTerminal {
   terminal: Terminal
   lastUsed: number

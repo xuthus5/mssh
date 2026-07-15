@@ -21,12 +21,6 @@ describe('useSettings', () => {
     document.documentElement.style.removeProperty('--app-font-size')
     document.documentElement.style.removeProperty('--app-opacity')
 
-    __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.GetSetting', async (key: string) => {
-      return _settings[key] ?? ''
-    })
-    __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.SetSetting', async (key: string, value: string) => {
-      _settings[key] = value
-    })
     __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.Get', async (key: string) => _settings[key] === undefined ? null : ({ key, namespace: key.split('.')[0], value: _settings[key], value_type: 'string', version: 1, updated_at: '' }))
     __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.GetMany', async (keys: string[]) => Object.fromEntries(keys.filter((key) => _settings[key] !== undefined).map((key) => [key, { key, namespace: key.split('.')[0], value: _settings[key], value_type: 'string', version: 1, updated_at: '' }])))
     __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.Set', async (setting: any) => { writtenSettings.push(setting); _settings[setting.key] = setting.value })
@@ -98,6 +92,22 @@ describe('useSettings', () => {
     expect(document.documentElement.style.getPropertyValue('--app-font-family')).toBe('"Arial", "Segoe UI", sans-serif')
     expect(document.documentElement.style.getPropertyValue('--app-font-size')).toBe('18px')
     expect(document.documentElement.style.getPropertyValue('--app-opacity')).toBe('0.76')
+  })
+
+  it('does not publish a partial load when an existing value has invalid JSON', async () => {
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.GetMany', async (keys: string[]) => {
+      if (!keys.includes('terminal.max_pool_size')) return {}
+      return {
+        'terminal.max_pool_size': { key: 'terminal.max_pool_size', namespace: 'terminal', value: '42', value_type: 'number', version: 1, updated_at: '' },
+        'terminal.default_term_type': { key: 'terminal.default_term_type', namespace: 'terminal', value: '{', value_type: 'string', version: 1, updated_at: '' },
+      }
+    })
+
+    const { result } = renderHook(() => useSettings())
+    await act(async () => {})
+
+    expect(result.current.general.maxPoolSize).toBe(10)
+    expect(result.current.general.defaultTermType).toBe('xterm-256color')
   })
 
   it('preserves saved general settings when an earlier load completes', async () => {

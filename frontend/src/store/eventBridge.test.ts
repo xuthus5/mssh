@@ -13,6 +13,8 @@ describe('eventBridge', () => {
 
   it('maps host-key attempt and fingerprint events', () => {
     const stop = startEventBridge()
+    __emitEvent('session:attempt', { data: {} })
+    __emitEvent('session:fingerprint', { data: { attempt_id: 'attempt-ignored' } })
     __emitEvent('session:attempt', { data: { attempt_id: 'attempt-1' } })
     __emitEvent('session:fingerprint', { data: { attempt_id: 'attempt-1', fingerprint: 'SHA256:key', algorithm: 'ssh-ed25519' } })
     expect(useConnectDialog.getState()).toMatchObject({ attemptId: 'attempt-1', fingerprint: 'SHA256:key', algorithm: 'ssh-ed25519' })
@@ -35,7 +37,7 @@ describe('eventBridge', () => {
 
   it('maps terminal closure and tunnel state then unsubscribes', () => {
     useAppStore.setState({
-      tabs: [{ id: 'tab-1', title: 'one', type: 'terminal', terminalId: 'term-1' }],
+      tabs: [{ id: 'tab-1', title: 'one', type: 'terminal', terminalId: 'term-1', sessionId: 1 }],
       activeSurface: { type: 'terminal', id: 'tab-1' },
     })
     const stop = startEventBridge()
@@ -52,9 +54,12 @@ describe('eventBridge', () => {
   it('maps connection states and ignores incomplete events', () => {
     const stop = startEventBridge()
     __emitEvent('session:state', { data: {} })
+    __emitEvent('session:state', { data: { terminal_id: 'term-ignored', state: 'connecting' } })
     __emitEvent('session:state', { data: { terminal_id: 'term-1', state: 'connected' } })
     __emitEvent('session:state', { data: { terminal_id: 'term-2', state: 'disconnected' } })
     __emitEvent('terminal:closed', { data: {} })
+    __emitEvent('terminal:closed', { data: { terminal_id: 'missing' } })
+    __emitEvent('tunnel:state', { data: {} })
     __emitEvent('tunnel:state', { data: { terminal_id: 'tunnel-3', state: 'failed' } })
 
     expect(useAppStore.getState().connectionStatus).toEqual({

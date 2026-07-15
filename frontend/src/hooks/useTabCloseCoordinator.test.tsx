@@ -16,7 +16,7 @@ describe('useTabCloseCoordinator', () => {
   it('cancels a pending active connection close', () => {
     const closeTab = vi.fn(async () => {})
     useAppStore.setState({
-      tabs: [{ id: 'terminal-1', title: 'Terminal', type: 'terminal', terminalId: 'term-1' }],
+      tabs: [{ id: 'terminal-1', title: 'Terminal', type: 'terminal', terminalId: 'term-1', sessionId: 1 }],
       connectionStatus: { 'term-1': 'connected' },
       closeTab,
     })
@@ -33,7 +33,7 @@ describe('useTabCloseCoordinator', () => {
   it('confirms an active recording close', async () => {
     const closeTab = vi.fn(async () => {})
     useAppStore.setState({
-      tabs: [{ id: 'terminal-1', title: 'Terminal', type: 'terminal', terminalId: 'term-1' }],
+      tabs: [{ id: 'terminal-1', title: 'Terminal', type: 'terminal', terminalId: 'term-1', sessionId: 1 }],
       recordingState: { 'term-1': 'recording' },
       closeTab,
     })

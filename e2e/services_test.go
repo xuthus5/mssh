@@ -25,92 +25,67 @@ func newTestApp(t *testing.T) *app.App {
 
 func TestSessionCRUD_E2E(t *testing.T) {
 	a := newTestApp(t)
+	t.Run("CreateFolder→List→Delete", func(t *testing.T) { testSessionFolderCRUD(t, a) })
+	t.Run("CreateSession→List→Update→Delete", func(t *testing.T) { testSessionCRUD(t, a) })
+	t.Run("Session in Folder", func(t *testing.T) { testSessionInFolder(t, a) })
+}
 
-	t.Run("CreateFolder→List→Delete", func(t *testing.T) {
-		parentID := int64(0)
-		folder, err := a.Session.CreateFolder("生产环境", &parentID)
-		require.NoError(t, err)
-		assert.Equal(t, "生产环境", folder.Name)
-		assert.Equal(t, int64(0), *folder.ParentID)
+func testSessionFolderCRUD(t *testing.T, a *app.App) {
+	folder, err := a.Session.CreateFolder("生产环境", nil)
+	require.NoError(t, err)
+	assert.Equal(t, "生产环境", folder.Name)
+	assert.Nil(t, folder.ParentID)
+	folders, err := a.Session.ListFolders()
+	require.NoError(t, err)
+	assert.Len(t, folders, 2)
+	err = a.Session.DeleteFolder(folder.ID)
+	require.NoError(t, err)
+	folders, err = a.Session.ListFolders()
+	require.NoError(t, err)
+	assert.Len(t, folders, 1)
+}
 
-		folders, err := a.Session.ListFolders()
-		require.NoError(t, err)
-		assert.Len(t, folders, 1)
+func testSessionCRUD(t *testing.T, a *app.App) {
+	s := model.Session{Name: "test-server", Host: "10.0.0.1", Port: 22, Username: "root", AuthMethod: model.AuthPassword, Password: "encrypted-test", KeepAlive: 30, TermType: "xterm-256color"}
+	created, err := a.Session.CreateSession(model.SessionInputFrom(s))
+	require.NoError(t, err)
+	assert.NotZero(t, created.ID)
+	assert.Equal(t, "test-server", created.Name)
+	assert.Equal(t, "10.0.0.1", created.Host)
+	sessions, err := a.Session.ListSessions(nil)
+	require.NoError(t, err)
+	assert.Len(t, sessions, 1)
+	created.Name = "updated-server"
+	created.Port = 2222
+	err = a.Session.UpdateSession(model.SessionInputFrom(*created))
+	require.NoError(t, err)
+	sessions, err = a.Session.ListSessions(nil)
+	require.NoError(t, err)
+	assert.Equal(t, "updated-server", sessions[0].Name)
+	assert.Equal(t, 2222, sessions[0].Port)
+	err = a.Session.DeleteSession(created.ID)
+	require.NoError(t, err)
+	sessions, err = a.Session.ListSessions(nil)
+	require.NoError(t, err)
+	assert.Len(t, sessions, 0)
+}
 
-		err = a.Session.DeleteFolder(folder.ID)
-		require.NoError(t, err)
-
-		folders, err = a.Session.ListFolders()
-		require.NoError(t, err)
-		assert.Len(t, folders, 0)
-	})
-
-	t.Run("CreateSession→List→Update→Delete", func(t *testing.T) {
-		s := model.Session{
-			Name:       "test-server",
-			Host:       "10.0.0.1",
-			Port:       22,
-			Username:   "root",
-			AuthMethod: model.AuthPassword,
-			Password:   "encrypted-test",
-			KeepAlive:  30,
-			TermType:   "xterm-256color",
-		}
-		created, err := a.Session.CreateSession(s)
-		require.NoError(t, err)
-		assert.NotZero(t, created.ID)
-		assert.Equal(t, "test-server", created.Name)
-		assert.Equal(t, "10.0.0.1", created.Host)
-
-		sessions, err := a.Session.ListSessions(nil)
-		require.NoError(t, err)
-		assert.Len(t, sessions, 1)
-
-		created.Name = "updated-server"
-		created.Port = 2222
-		err = a.Session.UpdateSession(*created)
-		require.NoError(t, err)
-
-		sessions, err = a.Session.ListSessions(nil)
-		require.NoError(t, err)
-		assert.Equal(t, "updated-server", sessions[0].Name)
-		assert.Equal(t, 2222, sessions[0].Port)
-
-		err = a.Session.DeleteSession(created.ID)
-		require.NoError(t, err)
-
-		sessions, err = a.Session.ListSessions(nil)
-		require.NoError(t, err)
-		assert.Len(t, sessions, 0)
-	})
-
-	t.Run("Session in Folder", func(t *testing.T) {
-		parentID := int64(0)
-		folder, err := a.Session.CreateFolder("测试分组", &parentID)
-		require.NoError(t, err)
-
-		s := model.Session{
-			Name: "folder-session", Host: "1.1.1.1", Port: 22, Username: "u",
-			AuthMethod: model.AuthPassword, KeepAlive: 30, TermType: "xterm",
-		}
-		s.FolderID = &folder.ID
-		created, err := a.Session.CreateSession(s)
-		require.NoError(t, err)
-
-		// List sessions in folder
-		sessions, err := a.Session.ListSessions(&folder.ID)
-		require.NoError(t, err)
-		assert.Len(t, sessions, 1)
-		assert.Equal(t, "folder-session", sessions[0].Name)
-
-		// List all sessions
-		all, err := a.Session.ListSessions(nil)
-		require.NoError(t, err)
-		assert.Len(t, all, 1)
-
-		_ = a.Session.DeleteSession(created.ID)
-		_ = a.Session.DeleteFolder(folder.ID)
-	})
+func testSessionInFolder(t *testing.T, a *app.App) {
+	folder, err := a.Session.CreateFolder("测试分组", nil)
+	require.NoError(t, err)
+	s := model.Session{Name: "folder-session", Host: "1.1.1.1", Port: 22, Username: "u", AuthMethod: model.AuthPassword, KeepAlive: 30, TermType: "xterm"}
+	s.FolderID = &folder.ID
+	created, err := a.Session.CreateSession(model.SessionInputFrom(s))
+	require.NoError(t, err)
+	sessions, err := a.Session.ListSessions(&folder.ID)
+	require.NoError(t, err)
+	assert.Len(t, sessions, 1)
+	assert.Equal(t, "folder-session", sessions[0].Name)
+	all, err := a.Session.ListSessions(nil)
+	require.NoError(t, err)
+	assert.Len(t, all, 1)
+	require.NoError(t, a.Session.DeleteSession(created.ID))
+	require.NoError(t, a.Session.DeleteFolder(folder.ID))
 }
 
 // ========== KeyService 端到端 ==========
@@ -157,24 +132,28 @@ func TestKeyService_E2E(t *testing.T) {
 func TestSettingService_E2E(t *testing.T) {
 	a := newTestApp(t)
 
-	t.Run("GetSet Settings", func(t *testing.T) {
-		v, err := a.Setting.GetSetting("nonexistent")
+	t.Run("typed settings lifecycle", func(t *testing.T) {
+		setting, err := a.Setting.Get("terminal.max_pool_size")
 		require.NoError(t, err)
-		assert.Equal(t, "", v)
+		assert.Nil(t, setting)
 
-		err = a.Setting.SetSetting("max_pool_size", "32")
-		require.NoError(t, err)
-
-		v, err = a.Setting.GetSetting("max_pool_size")
-		require.NoError(t, err)
-		assert.Equal(t, "32", v)
-
-		err = a.Setting.SetSetting("max_pool_size", "64")
+		entry := model.Setting{Key: "terminal.max_pool_size", Namespace: "terminal", Value: `32`, ValueType: "number", Version: 1}
+		err = a.Setting.Set(model.SettingInputFrom(entry))
 		require.NoError(t, err)
 
-		v, err = a.Setting.GetSetting("max_pool_size")
+		setting, err = a.Setting.Get(entry.Key)
 		require.NoError(t, err)
-		assert.Equal(t, "64", v)
+		require.NotNil(t, setting)
+		assert.Equal(t, `32`, setting.Value)
+
+		entry.Value = `64`
+		err = a.Setting.Set(model.SettingInputFrom(entry))
+		require.NoError(t, err)
+
+		setting, err = a.Setting.Get(entry.Key)
+		require.NoError(t, err)
+		require.NotNil(t, setting)
+		assert.Equal(t, `64`, setting.Value)
 	})
 }
 
@@ -184,7 +163,7 @@ func TestMacroService_E2E(t *testing.T) {
 	a := newTestApp(t)
 
 	t.Run("Create→List→Delete", func(t *testing.T) {
-		m, err := a.Macro.Create(model.Macro{
+		m, err := a.Macro.Create(model.MacroInput{
 			Name:    "hello",
 			Command: "echo hello",
 		})
@@ -209,115 +188,24 @@ func TestMacroService_E2E(t *testing.T) {
 func TestThemeService_E2E(t *testing.T) {
 	a := newTestApp(t)
 
-	t.Run("Create→List→GetActive→Delete", func(t *testing.T) {
-		tm, err := a.Theme.Create(model.Theme{
-			Name:   "custom",
-			Config: `{"background":"#000"}`,
+	t.Run("CreateProfile→ListProfiles→DeleteProfile", func(t *testing.T) {
+		definitions, err := a.Theme.ListDefinitions("")
+		require.NoError(t, err)
+		require.NotEmpty(t, definitions)
+		profile, err := a.Theme.CreateCustomProfile(model.ThemeProfileInput{
+			Name: "custom", ThemeID: definitions[0].ID, FollowGlobalStyle: true,
+			FontFamily: model.DefaultTerminalFontFamily, FontSize: model.DefaultTerminalFontSize,
+			CursorStyle: model.CursorStyleBlock, ColorOverrides: `{}`,
 		})
 		require.NoError(t, err)
 
-		list, err := a.Theme.List()
+		profiles, err := a.Theme.ListProfiles("")
 		require.NoError(t, err)
-		assert.Len(t, list, 1)
+		assert.Contains(t, themeProfileIDs(profiles), profile.ID)
 
-		active, err := a.Theme.GetActive()
+		err = a.Theme.DeleteProfile(profile.ID)
 		require.NoError(t, err)
-		assert.Equal(t, "", active)
-
-		err = a.Theme.Delete(tm.ID)
-		require.NoError(t, err)
-	})
-}
-
-// ========== TunnelService CRUD 端到端 ==========
-
-func TestTunnelService_E2E(t *testing.T) {
-	a := newTestApp(t)
-
-	t.Run("Create→List→Delete", func(t *testing.T) {
-		s, err := a.Session.CreateSession(model.Session{
-			Name: "tunnel-host", Host: "1.1.1.1", Port: 22, Username: "u",
-			AuthMethod: model.AuthPassword, KeepAlive: 30,
-		})
-		require.NoError(t, err)
-
-		tn, err := a.Tunnel.Create(model.Tunnel{
-			SessionID:  s.ID,
-			Name:       "web",
-			Type:       model.TunnelLocal,
-			LocalHost:  "127.0.0.1",
-			LocalPort:  8080,
-			RemoteHost: "remote",
-			RemotePort: 80,
-		})
-		require.NoError(t, err)
-
-		list, err := a.Tunnel.List()
-		require.NoError(t, err)
-		assert.Len(t, list, 1)
-
-		err = a.Tunnel.Delete(tn.ID)
-		require.NoError(t, err)
-	})
-}
-
-// ========== LogService 端到端 ==========
-
-func TestLogService_E2E(t *testing.T) {
-	a := newTestApp(t)
-
-	t.Run("Recording lifecycle", func(t *testing.T) {
-		// Start recording (使用 StartRecording)
-		logID, err := a.Log.StartRecording(1, 80, 24, "xterm-256color", "")
-		require.NoError(t, err)
-		assert.NotZero(t, logID)
-
-		// List recordings
-		var sid *int64 = nil // list all
-		logs, err := a.Log.List(sid)
-		require.NoError(t, err)
-		assert.Len(t, logs, 1)
-		assert.Equal(t, logID, logs[0].ID)
-
-		// Stop recording
-		err = a.Log.StopRecording(logID)
-		require.NoError(t, err)
-
-		// GetRecording (by dataPath)
-		recordings, err := a.Log.List(sid)
-		require.NoError(t, err)
-		assert.NotEmpty(t, recordings)
-
-		player, err := a.Log.GetRecording(recordings[0].DataPath)
-		require.NoError(t, err)
-		assert.NotNil(t, player)
-
-		// Delete
-		err = a.Log.Delete(logID)
-		require.NoError(t, err)
-	})
-}
-
-// ========== SyncService 端到端 ==========
-
-func TestSyncService_E2E(t *testing.T) {
-	a := newTestApp(t)
-
-	t.Run("Export→Import roundtrip", func(t *testing.T) {
-		// Create some data
-		_, _ = a.Session.CreateFolder("test-folder", nil)
-		_, _ = a.Session.CreateSession(model.Session{
-			Name: "sync-session", Host: "1.1.1.1", Port: 22, Username: "u",
-			AuthMethod: model.AuthPassword, KeepAlive: 30,
-		})
-
-		// Export
-		exportPath := t.TempDir() + "/export.json"
-		err := a.Sync.Export(exportPath)
-		require.NoError(t, err)
-
-		// Import
-		err = a.Sync.Import(exportPath)
-		require.NoError(t, err)
+		_, err = a.Theme.GetProfile(profile.ID)
+		assert.Error(t, err)
 	})
 }

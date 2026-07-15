@@ -6,12 +6,15 @@ const deleteRecording = vi.hoisted(() => vi.fn(async () => {}))
 
 vi.mock('@/lib/wails', () => ({ LogService: { Delete: deleteRecording } }))
 vi.mock('@/components/terminal/SessionLog', () => ({
-  default: ({ onPlayback, onDeleteRecording }: {
+  default: ({ onPlayback, onDeleteRecording, onDeleteDialogOpenChange }: {
     onPlayback: (path: string, title: string) => void
     onDeleteRecording: (id: number) => Promise<void>
+    onDeleteDialogOpenChange: (open: boolean) => void
   }) => <div data-testid="session-log">
     <button type="button" onClick={() => onPlayback('/tmp/replay.msshlog', '回放 #9')}>log playback</button>
     <button type="button" onClick={() => { void onDeleteRecording(9).catch(() => {}) }}>log delete</button>
+    <button type="button" onClick={() => onDeleteDialogOpenChange(true)}>block close</button>
+    <button type="button" onClick={() => onDeleteDialogOpenChange(false)}>allow close</button>
   </div>,
 }))
 
@@ -95,7 +98,7 @@ describe('TerminalToolbar', () => {
     expect(onToggleRecording).toHaveBeenCalledOnce()
     expect(useAppStore.getState().tabs).toContainEqual(expect.objectContaining({
       id: 'playback-回放 #9',
-      terminalId: '/tmp/replay.msshlog',
+      recordingPath: '/tmp/replay.msshlog',
     }))
     expect(deleteRecording).toHaveBeenCalledWith(9)
 
@@ -126,5 +129,19 @@ describe('TerminalToolbar', () => {
     await userEvent.click(screen.getByTitle('粘贴 (Ctrl+Shift+V)'))
     await userEvent.click(screen.getByTitle('清屏 (Ctrl+Shift+L)'))
     expect(readText).not.toHaveBeenCalled()
+  })
+
+  it('keeps the recording popover open while its delete dialog is active', async () => {
+    render(<TerminalToolbar terminalID="primary-1" sessionId={1} isRecording={false} recordingLogId={null}
+      onToggleRecording={vi.fn()} onOpenFiles={vi.fn()} onToggleSplit={vi.fn()} split={false} />)
+
+    await userEvent.click(screen.getByTitle('录制记录'))
+    await userEvent.click(screen.getByRole('button', { name: 'block close' }))
+    await userEvent.keyboard('{Escape}')
+    expect(screen.getByTestId('session-log')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'allow close' }))
+    await userEvent.keyboard('{Escape}')
+    await waitFor(() => expect(screen.queryByTestId('session-log')).not.toBeInTheDocument())
   })
 })

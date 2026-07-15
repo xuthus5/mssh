@@ -2,221 +2,281 @@ package store
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 
 	_ "modernc.org/sqlite"
 )
 
+const databaseFormatVersion = 1
+
+const foldersTableSQL = `CREATE TABLE IF NOT EXISTS session_folders (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	name TEXT NOT NULL,
+	parent_id INTEGER REFERENCES session_folders(id),
+	is_default INTEGER NOT NULL DEFAULT 0,
+	sort_order INTEGER NOT NULL DEFAULT 0,
+	created_at TEXT NOT NULL DEFAULT (datetime('now')),
+	updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+)`
+
+const keysTableSQL = `CREATE TABLE IF NOT EXISTS ssh_keys (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	name TEXT NOT NULL,
+	type TEXT NOT NULL CHECK(type IN ('rsa','ed25519','ecdsa')),
+	private_key TEXT NOT NULL,
+	public_key TEXT,
+	has_passphrase INTEGER NOT NULL DEFAULT 0,
+	created_at TEXT NOT NULL DEFAULT (datetime('now'))
+)`
+
+const sessionsTableSQL = `CREATE TABLE IF NOT EXISTS sessions (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	folder_id INTEGER REFERENCES session_folders(id),
+	name TEXT NOT NULL,
+	host TEXT NOT NULL,
+	port INTEGER NOT NULL DEFAULT 22,
+	username TEXT NOT NULL,
+	auth_method TEXT NOT NULL CHECK(auth_method IN ('password','key','agent','keyboard-interactive')),
+	password TEXT,
+	key_id INTEGER REFERENCES ssh_keys(id),
+	keep_alive INTEGER NOT NULL DEFAULT 30,
+	term_type TEXT NOT NULL DEFAULT 'xterm-256color',
+	sort_order INTEGER NOT NULL DEFAULT 0,
+	last_connected_at TEXT,
+	connection_count INTEGER NOT NULL DEFAULT 0,
+	created_at TEXT NOT NULL DEFAULT (datetime('now')),
+	updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+)`
+
+const tunnelsTableSQL = `CREATE TABLE IF NOT EXISTS tunnels (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	session_id INTEGER NOT NULL REFERENCES sessions(id),
+	name TEXT NOT NULL,
+	type TEXT NOT NULL CHECK(type IN ('local','remote','dynamic')),
+	local_host TEXT,
+	local_port INTEGER,
+	remote_host TEXT,
+	remote_port INTEGER,
+	created_at TEXT NOT NULL DEFAULT (datetime('now'))
+)`
+
+const macrosTableSQL = `CREATE TABLE IF NOT EXISTS macros (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	name TEXT NOT NULL,
+	command TEXT NOT NULL,
+	shortcut TEXT,
+	delay_ms INTEGER NOT NULL DEFAULT 0,
+	sort_order INTEGER NOT NULL DEFAULT 0,
+	created_at TEXT NOT NULL DEFAULT (datetime('now'))
+)`
+
+const logsTableSQL = `CREATE TABLE IF NOT EXISTS session_logs (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	session_id INTEGER REFERENCES sessions(id),
+	started_at TEXT NOT NULL,
+	ended_at TEXT,
+	data_path TEXT NOT NULL
+)`
+
+type schemaStatement struct {
+	name string
+	sql  string
+}
+
+var finalSchemaStatements = []schemaStatement{
+	{name: "session_folders", sql: foldersTableSQL},
+	{name: "ssh_keys", sql: keysTableSQL},
+	{name: "sessions", sql: sessionsTableSQL},
+	{name: "tunnels", sql: tunnelsTableSQL},
+	{name: "macros", sql: macrosTableSQL},
+	{name: "session_logs", sql: logsTableSQL},
+	{name: "settings", sql: settingsTableSQL},
+	{name: "themes", sql: themeDefinitionsSchema},
+	{name: "terminal_theme_profiles", sql: themeProfilesSchema},
+}
+
+var applicationTablesInDropOrder = []string{
+	"terminal_theme_profiles",
+	"themes",
+	"session_logs",
+	"tunnels",
+	"sessions",
+	"ssh_keys",
+	"session_folders",
+	"settings",
+	"macros",
+}
+
+type dbFile interface {
+	Chmod(mode fs.FileMode) error
+	Close() error
+}
+
+type dbOpenDependencies struct {
+	mkdirAll func(string, fs.FileMode) error
+	chmod    func(string, fs.FileMode) error
+	openFile func(string, int, fs.FileMode) (dbFile, error)
+	sqlOpen  func(string, string) (*sql.DB, error)
+	ping     func(*sql.DB) error
+	closeDB  func(*sql.DB) error
+}
+
 func OpenDB(dataDir string) (*sql.DB, error) {
-	_ = os.MkdirAll(dataDir, 0o700)
-	dbPath := filepath.Join(dataDir, "mssh.db")
-	db, err := sql.Open("sqlite", dbPath+"?_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)&_pragma=foreign_keys(1)")
-	if err != nil {
-		return nil, fmt.Errorf("open database: %w", err)
+	return openDBWithDependencies(dataDir, defaultDBOpenDependencies())
+}
+
+func defaultDBOpenDependencies() dbOpenDependencies {
+	return dbOpenDependencies{
+		mkdirAll: os.MkdirAll,
+		chmod:    os.Chmod,
+		openFile: func(path string, flag int, mode fs.FileMode) (dbFile, error) {
+			return os.OpenFile(path, flag, mode)
+		},
+		sqlOpen: sql.Open,
+		ping:    func(db *sql.DB) error { return db.Ping() },
+		closeDB: func(db *sql.DB) error { return db.Close() },
 	}
-	_ = os.Chmod(dbPath, 0o600)
+}
+
+func openDBWithDependencies(dataDir string, dependencies dbOpenDependencies) (*sql.DB, error) {
+	if err := dependencies.mkdirAll(dataDir, 0o700); err != nil {
+		return nil, fmt.Errorf("create data directory: %w", err)
+	}
+	if err := dependencies.chmod(dataDir, 0o700); err != nil {
+		return nil, fmt.Errorf("secure data directory: %w", err)
+	}
+	dbPath := filepath.Join(dataDir, "mssh.db")
+	file, err := dependencies.openFile(dbPath, os.O_RDWR|os.O_CREATE, 0o600)
+	if err != nil {
+		return nil, fmt.Errorf("open database file: %w", err)
+	}
+	if err = file.Chmod(0o600); err != nil {
+		return nil, errors.Join(fmt.Errorf("secure database file: %w", err), closeDBFile(file))
+	}
+	if err = file.Close(); err != nil {
+		return nil, fmt.Errorf("close database file: %w", err)
+	}
+	dsn := dbPath + "?_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)&_pragma=foreign_keys(1)&_txlock=immediate"
+	db, err := dependencies.sqlOpen("sqlite", dsn)
+	if err != nil {
+		return nil, errors.Join(fmt.Errorf("open database: %w", err), closeOpenedDB(db, dependencies.closeDB))
+	}
 	db.SetMaxOpenConns(1)
+	if err = dependencies.ping(db); err != nil {
+		return nil, errors.Join(fmt.Errorf("ping database: %w", err), closeOpenedDB(db, dependencies.closeDB))
+	}
 	return db, nil
 }
 
-func Migrate(db *sql.DB) error {
-	migrations := []string{
-		`CREATE TABLE IF NOT EXISTS session_folders (
-			id         INTEGER PRIMARY KEY AUTOINCREMENT,
-			name       TEXT NOT NULL,
-			parent_id  INTEGER REFERENCES session_folders(id),
-			sort_order INTEGER NOT NULL DEFAULT 0,
-			created_at TEXT NOT NULL DEFAULT (datetime('now')),
-			updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-		)`,
-		`CREATE TABLE IF NOT EXISTS sessions (
-			id         INTEGER PRIMARY KEY AUTOINCREMENT,
-			folder_id  INTEGER REFERENCES session_folders(id),
-			name       TEXT NOT NULL,
-			host       TEXT NOT NULL,
-			port       INTEGER NOT NULL DEFAULT 22,
-			username   TEXT NOT NULL,
-			auth_method TEXT NOT NULL CHECK(auth_method IN ('password','key','agent','keyboard-interactive')),
-			password   TEXT,
-			key_id     INTEGER REFERENCES ssh_keys(id),
-			keep_alive INTEGER NOT NULL DEFAULT 30,
-			term_type  TEXT NOT NULL DEFAULT 'xterm-256color',
-			sort_order INTEGER NOT NULL DEFAULT 0,
-			created_at TEXT NOT NULL DEFAULT (datetime('now')),
-			updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-		)`,
-		`CREATE TABLE IF NOT EXISTS ssh_keys (
-			id             INTEGER PRIMARY KEY AUTOINCREMENT,
-			name           TEXT NOT NULL,
-			type           TEXT NOT NULL CHECK(type IN ('rsa','ed25519','ecdsa')),
-			private_key    TEXT NOT NULL,
-			public_key     TEXT,
-			has_passphrase INTEGER NOT NULL DEFAULT 0,
-			created_at     TEXT NOT NULL DEFAULT (datetime('now'))
-		)`,
-		`CREATE TABLE IF NOT EXISTS tunnels (
-			id          INTEGER PRIMARY KEY AUTOINCREMENT,
-			session_id  INTEGER NOT NULL REFERENCES sessions(id),
-			name        TEXT NOT NULL,
-			type        TEXT NOT NULL CHECK(type IN ('local','remote','dynamic')),
-			local_host  TEXT,
-			local_port  INTEGER,
-			remote_host TEXT,
-			remote_port INTEGER,
-			created_at  TEXT NOT NULL DEFAULT (datetime('now'))
-		)`,
-		`CREATE TABLE IF NOT EXISTS macros (
-			id         INTEGER PRIMARY KEY AUTOINCREMENT,
-			name       TEXT NOT NULL,
-			command    TEXT NOT NULL,
-			shortcut   TEXT,
-			delay_ms   INTEGER NOT NULL DEFAULT 0,
-			sort_order INTEGER NOT NULL DEFAULT 0,
-			created_at TEXT NOT NULL DEFAULT (datetime('now'))
-		)`,
-		`CREATE TABLE IF NOT EXISTS session_logs (
-			id         INTEGER PRIMARY KEY AUTOINCREMENT,
-			session_id INTEGER REFERENCES sessions(id),
-			started_at TEXT NOT NULL,
-			ended_at   TEXT,
-			data_path  TEXT NOT NULL
-		)`,
-	}
-	if err := executeMigrations(db, migrations); err != nil {
-		return err
-	}
-	if err := ensureDefaultFolderSchema(db); err != nil {
-		return fmt.Errorf("migration: %w", err)
-	}
-	if err := ensureSessionRecencySchema(db); err != nil {
-		return fmt.Errorf("migration: %w", err)
-	}
-	if err := ensureSettingsSchema(db); err != nil {
-		return fmt.Errorf("migration: %w", err)
-	}
-	if err := ensureThemeCatalogSchema(db); err != nil {
-		return fmt.Errorf("migration: %w", err)
+func closeDBFile(file dbFile) error {
+	if err := file.Close(); err != nil {
+		return fmt.Errorf("close database file: %w", err)
 	}
 	return nil
 }
 
-func ensureSessionRecencySchema(db *sql.DB) error {
-	columns, err := tableColumns(db, "sessions")
-	if err != nil {
-		return err
+func closeOpenedDB(db *sql.DB, closeDB func(*sql.DB) error) error {
+	if db == nil {
+		return nil
 	}
-	if !columns["last_connected_at"] {
-		if _, err := db.Exec("ALTER TABLE sessions ADD COLUMN last_connected_at TEXT"); err != nil {
+	if err := closeDB(db); err != nil {
+		return fmt.Errorf("close database: %w", err)
+	}
+	return nil
+}
+
+func InitializeSchema(db *sql.DB) error {
+	return initializeSchema(db, databaseFormatVersion, setDatabaseVersion)
+}
+
+func initializeSchema(db *sql.DB, targetVersion int, setVersion func(*sql.Tx, int) error) error {
+	tx, err := db.Begin()
+	if err != nil {
+		return fmt.Errorf("initialize schema: begin transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	currentVersion, err := databaseVersion(tx)
+	if err != nil {
+		return fmt.Errorf("initialize schema: read format version: %w", err)
+	}
+	if currentVersion != targetVersion {
+		if err = dropApplicationTables(tx); err != nil {
 			return err
 		}
 	}
-	if !columns["connection_count"] {
-		if _, err := db.Exec("ALTER TABLE sessions ADD COLUMN connection_count INTEGER NOT NULL DEFAULT 0"); err != nil {
-			return err
+	if err = createFinalSchema(tx); err != nil {
+		return err
+	}
+	if err = initializeDefaultFolder(tx); err != nil {
+		return err
+	}
+	if currentVersion != targetVersion {
+		if err = setVersion(tx, targetVersion); err != nil {
+			return fmt.Errorf("initialize schema: set format version: %w", err)
+		}
+	}
+	if err = tx.Commit(); err != nil {
+		return fmt.Errorf("initialize schema: commit transaction: %w", err)
+	}
+	return nil
+}
+
+func databaseVersion(tx *sql.Tx) (int, error) {
+	var version int
+	if err := tx.QueryRow("PRAGMA user_version").Scan(&version); err != nil {
+		return 0, err
+	}
+	return version, nil
+}
+
+func dropApplicationTables(tx *sql.Tx) error {
+	for _, table := range applicationTablesInDropOrder {
+		if _, err := tx.Exec("DROP TABLE IF EXISTS " + table); err != nil {
+			return fmt.Errorf("initialize schema: drop %s: %w", table, err)
 		}
 	}
 	return nil
 }
 
-func tableColumns(db *sql.DB, table string) (map[string]bool, error) {
-	rows, err := db.Query("PRAGMA table_info(" + table + ")")
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = rows.Close() }()
-	columns := make(map[string]bool)
-	for rows.Next() {
-		var cid, notNull, primaryKey int
-		var name, columnType string
-		var defaultValue any
-		if err := rows.Scan(&cid, &name, &columnType, &notNull, &defaultValue, &primaryKey); err != nil {
-			return nil, err
-		}
-		columns[name] = true
-	}
-	return columns, rows.Err()
-}
-
-func executeMigrations(db *sql.DB, migrations []string) error {
-	for _, migration := range migrations {
-		if _, err := db.Exec(migration); err != nil {
-			return fmt.Errorf("migration: %w", err)
+func createFinalSchema(tx *sql.Tx) error {
+	for _, statement := range finalSchemaStatements {
+		if _, err := tx.Exec(statement.sql); err != nil {
+			return fmt.Errorf("initialize schema: create %s schema: %w", statement.name, err)
 		}
 	}
 	return nil
 }
 
-func ensureDefaultFolderSchema(db *sql.DB) error {
-	hasColumn, err := folderDefaultColumnExists(db)
-	if err != nil {
-		return err
-	}
-	if !hasColumn {
-		if _, err := db.Exec("ALTER TABLE session_folders ADD COLUMN is_default INTEGER NOT NULL DEFAULT 0"); err != nil {
-			return err
-		}
-	}
-	defaultID, err := resolveDefaultFolderID(db)
-	if err != nil {
-		return err
-	}
-	if _, err = db.Exec("UPDATE session_folders SET is_default = CASE WHEN id = ? THEN 1 ELSE 0 END", defaultID); err != nil {
-		return err
-	}
-	_, err = db.Exec("UPDATE sessions SET folder_id = ? WHERE folder_id IS NULL", defaultID)
+func setDatabaseVersion(tx *sql.Tx, version int) error {
+	_, err := tx.Exec(fmt.Sprintf("PRAGMA user_version = %d", version))
 	return err
 }
 
-func folderDefaultColumnExists(db *sql.DB) (bool, error) {
-	rows, err := db.Query("PRAGMA table_info(session_folders)")
-	if err != nil {
-		return false, err
+func initializeDefaultFolder(tx *sql.Tx) error {
+	var defaultID int64
+	err := tx.QueryRow("SELECT id FROM session_folders ORDER BY is_default DESC, id LIMIT 1").Scan(&defaultID)
+	if err != nil && err != sql.ErrNoRows {
+		return fmt.Errorf("initialize schema: find default folder: %w", err)
 	}
-	hasColumn := false
-	for rows.Next() {
-		var cid int
-		var name, columnType string
-		var notNull, primaryKey int
-		var defaultValue any
-		if err := rows.Scan(&cid, &name, &columnType, &notNull, &defaultValue, &primaryKey); err != nil {
-			_ = rows.Close()
-			return false, err
+	if err == sql.ErrNoRows {
+		result, insertErr := tx.Exec("INSERT INTO session_folders (name, is_default) VALUES ('默认分组', 1)")
+		if insertErr != nil {
+			return fmt.Errorf("initialize schema: create default folder: %w", insertErr)
 		}
-		if name == "is_default" {
-			hasColumn = true
+		defaultID, insertErr = result.LastInsertId()
+		if insertErr != nil {
+			return fmt.Errorf("initialize schema: read default folder id: %w", insertErr)
 		}
 	}
-	if err := rows.Close(); err != nil {
-		return false, err
+	if _, err = tx.Exec("UPDATE session_folders SET is_default = CASE WHEN id = ? THEN 1 ELSE 0 END", defaultID); err != nil {
+		return fmt.Errorf("initialize schema: select default folder: %w", err)
 	}
-	return hasColumn, nil
-}
-
-func resolveDefaultFolderID(db *sql.DB) (int64, error) {
-	var defaultID sql.NullInt64
-	if err := db.QueryRow("SELECT id FROM session_folders WHERE is_default = 1 ORDER BY id LIMIT 1").Scan(&defaultID); err != nil && err != sql.ErrNoRows {
-		return 0, err
+	if _, err = tx.Exec("UPDATE sessions SET folder_id = ? WHERE folder_id IS NULL", defaultID); err != nil {
+		return fmt.Errorf("initialize schema: assign default folder: %w", err)
 	}
-	if !defaultID.Valid {
-		var firstID sql.NullInt64
-		if err := db.QueryRow("SELECT id FROM session_folders ORDER BY id LIMIT 1").Scan(&firstID); err != nil && err != sql.ErrNoRows {
-			return 0, err
-		}
-		if firstID.Valid {
-			defaultID = firstID
-		} else {
-			result, err := db.Exec("INSERT INTO session_folders (name, is_default) VALUES ('默认分组', 1)")
-			if err != nil {
-				return 0, err
-			}
-			id, err := result.LastInsertId()
-			if err != nil {
-				return 0, err
-			}
-			defaultID = sql.NullInt64{Int64: id, Valid: true}
-		}
-	}
-	return defaultID.Int64, nil
+	return nil
 }

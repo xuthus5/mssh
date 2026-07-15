@@ -152,10 +152,6 @@ func (s *SessionService) GetSession(id int64) (*model.Session, error) {
 	return store.GetSession(s.db, id)
 }
 
-func (s *SessionService) Disconnect(terminalID string) error {
-	return s.disconnect(terminalID, true)
-}
-
 func (s *SessionService) disconnect(terminalID string, emitState bool) error {
 	s.logger.Info("disconnecting terminal", "terminalID", terminalID)
 	s.mu.Lock()

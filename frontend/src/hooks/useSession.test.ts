@@ -133,7 +133,6 @@ describe('useSession', () => {
     __registerHandler('github.com/xuthus5/mssh/internal/service.SessionService.CreateSession', async (s: any) => {
       return Object.assign({}, s, { id: sessionId })
     })
-    __registerHandler('github.com/xuthus5/mssh/internal/service.SessionService.Connect', async () => 'term-abc')
     __registerHandler('github.com/xuthus5/mssh/internal/service.TerminalService.Open', async () => 'term-abc')
 
     const { result } = renderHook(() => useSession())

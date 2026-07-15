@@ -32,16 +32,8 @@ export function List(sessionID: number | null): $CancellablePromise<model$0.Sess
     });
 }
 
-export function StartRecording(sessionID: number, cols: number, rows: number, termType: string, dataPath: string): $CancellablePromise<number> {
-    return $Call.ByName("github.com/xuthus5/mssh/internal/service.LogService.StartRecording", sessionID, cols, rows, termType, dataPath);
-}
-
 export function StartTerminalRecording(terminalID: string, sessionID: number, cols: number, rows: number, termType: string): $CancellablePromise<number> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.LogService.StartTerminalRecording", terminalID, sessionID, cols, rows, termType);
-}
-
-export function StopRecording(logID: number): $CancellablePromise<void> {
-    return $Call.ByName("github.com/xuthus5/mssh/internal/service.LogService.StopRecording", logID);
 }
 
 export function StopTerminalRecording(terminalID: string): $CancellablePromise<void> {

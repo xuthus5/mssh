@@ -28,7 +28,7 @@ func TestAppRealSSH(t *testing.T) {
 	t.Logf("Key imported id=%d type=%s", key.ID, key.Type)
 
 	// Create session with key auth
-	s, err := a.Session.CreateSession(model.Session{
+	s, err := a.Session.CreateSession(model.SessionInput{
 		Name: "real-ssh-test", Host: "127.0.0.1", Port: 30022,
 		Username: "root", AuthMethod: model.AuthKey, KeyID: &key.ID, KeepAlive: 30,
 	})

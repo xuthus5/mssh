@@ -1,7 +1,6 @@
 package service
 
 import (
-	"database/sql"
 	"fmt"
 	"strings"
 	"unicode"
@@ -57,13 +56,19 @@ func validateTerminalGlobalStyle(style model.TerminalGlobalStyle) error {
 	return validateTerminalStyle(style.FontFamily, style.FontSize, style.CursorStyle)
 }
 
-func repairTerminalGlobalStyle(tx *sql.Tx) error {
-	style, err := store.GetTerminalGlobalStyle(tx)
-	if err != nil || validateTerminalGlobalStyle(style) != nil {
-		style = defaultTerminalGlobalStyle()
+func initializeTerminalGlobalStyle(db themeDatabase) error {
+	style, exists, err := store.LoadTerminalGlobalStyle(db)
+	if err != nil {
+		return err
 	}
-	if err = store.SaveTerminalGlobalStyleDB(tx, style); err != nil {
-		return fmt.Errorf("repair terminal global style: %w", err)
+	if exists {
+		if err = validateTerminalGlobalStyle(style); err != nil {
+			return fmt.Errorf("terminal global style: %w", err)
+		}
+		return nil
+	}
+	if err = store.SaveTerminalGlobalStyleDB(db, defaultTerminalGlobalStyle()); err != nil {
+		return fmt.Errorf("initialize terminal global style: %w", err)
 	}
 	return nil
 }

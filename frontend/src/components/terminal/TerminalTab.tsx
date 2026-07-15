@@ -33,7 +33,7 @@ function useRecordingControl(terminalID: string, sessionId: number) {
         setRecordingState(terminalID, 'idle')
       } catch (error: unknown) {
         logger.error('TerminalTab: stop recording failed:', error)
-        setRecordingState(terminalID, 'recording')
+        setRecordingState(terminalID, 'error')
         toast(`停止录制失败: ${error instanceof Error ? error.message : String(error)}`, 'error')
       }
       return
@@ -92,7 +92,7 @@ function ConnectionOverlay({ status, onReconnect }: {
 export function TerminalTab({ terminalID, sessionId, onOpenFiles, active, focusRequest, onReconnect }: Props) {
   const [split, setSplit] = useState(false)
   const tabs = useAppStore((state) => state.tabs)
-  const currentTab = tabs.find((tab) => tab.terminalId === terminalID || tab.id === terminalID)
+  const currentTab = tabs.find((tab) => tab.type === 'terminal' && tab.terminalId === terminalID)
   const recording = useRecordingControl(terminalID, sessionId)
   const connectionStatus = useAppStore((state) => state.connectionStatus[terminalID])
 
@@ -110,7 +110,7 @@ export function TerminalTab({ terminalID, sessionId, onOpenFiles, active, focusR
         split={split}
       />
       <div className="relative min-h-0 flex-1">
-        <TerminalViewport split={split} sessionId={currentTab?.sessionId} terminalID={terminalID} active={active} focusRequest={focusRequest} />
+        <TerminalViewport split={split} sessionId={sessionId} terminalID={terminalID} active={active} focusRequest={focusRequest} />
         <ConnectionOverlay status={connectionStatus} onReconnect={onReconnect} />
       </div>
     </div>

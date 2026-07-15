@@ -7,7 +7,7 @@ A cross-platform SSH client built with Go + Wails v3 + React + xterm.js.
 - Persistent top-level terminal and playback tabs with multi-instance connections, terminal duplication, split view, and per-tab recovery
 - Linked workspace navigation with a collapsible sidebar
 - Session management (folders, SSH password/key/agent auth)
-- Commercial folder management with one configurable default group and safe migration on deletion
+- Commercial folder management with one configurable default group and safe reassignment on deletion
 - SFTP file transfer with native dialogs and a global progress, retry, history, ETA, and cancellation center
 - Port forwarding (local/remote/dynamic)
 - SSH key generation and management
@@ -33,6 +33,9 @@ A cross-platform SSH client built with Go + Wails v3 + React + xterm.js.
 go mod tidy
 cd frontend && npm install
 ```
+
+### Data format
+Database format-version mismatches trigger a destructive reset. Sync imports and exports require `format_version: 1`.
 
 ### Run
 ```bash
