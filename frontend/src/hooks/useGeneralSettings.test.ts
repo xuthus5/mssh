@@ -10,6 +10,7 @@ const savedGeneral = {
   maxPoolSize: 24, defaultKeepAlive: 90, defaultTermType: 'xterm',
   uiFontFamily: 'Arial', uiFontFallbackFamily: 'Segoe UI', uiFontSize: 18,
   windowOpacity: 78, rightClickAction: 'paste' as const, copyOnSelect: true,
+  closeButtonAction: 'exit' as const,
 }
 
 describe('useGeneralSettings cross-window sync', () => {
@@ -75,6 +76,27 @@ describe('useGeneralSettings cross-window sync', () => {
     await act(async () => { await result.current.saveGeneral({ ...savedGeneral, windowOpacity: 200 }) })
     expect(received).toContainEqual({ ...savedGeneral, windowOpacity: 100 })
     stop()
+  })
+
+  it('defaults the close button action to the system tray', async () => {
+    const { result } = renderHook(() => useGeneralSettings())
+    await waitFor(() => expect(result.current.general.closeButtonAction).toBe('tray'))
+  })
+
+  it('loads and persists the close button action using the final setting contract', async () => {
+    let savedEntries: Array<{ key: string; value: string }> = []
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.GetMany', async () => ({
+      'application.close_button_action': setting('application.close_button_action', 'exit'),
+    }))
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.SetMany', async (entries) => { savedEntries = entries })
+    const { result } = renderHook(() => useGeneralSettings())
+    await waitFor(() => expect(result.current.general.closeButtonAction).toBe('exit'))
+
+    await act(async () => { await result.current.saveGeneral({ ...savedGeneral, closeButtonAction: 'tray' }) })
+
+    expect(savedEntries).toContainEqual(expect.objectContaining({
+      key: 'application.close_button_action', value: '"tray"',
+    }))
   })
 })
 
