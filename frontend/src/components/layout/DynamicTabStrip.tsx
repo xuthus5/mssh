@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react'
-import { Circle, Copy, List, Play, X } from 'lucide-react'
+import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react'
+import { Circle, Copy, List, Play, Plus, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { ContextMenu, ContextMenuContent, ContextMenuGroup, ContextMenuItem, ContextMenuTrigger } from '@/components/ui/context-menu'
@@ -8,6 +8,7 @@ import { useAppStore, type AppState, type Tab } from '@/store/appStore'
 import { dynamicPanelID, dynamicTabID } from '@/store/tabNavigation'
 import { TabCloseConfirmation, useTabCloseCoordinator } from '@/hooks/useTabCloseCoordinator'
 import { useSessionWorkspace } from '@/hooks/SessionWorkspaceContext'
+import { SESSION_QUICK_SEARCH_EVENT } from '@/lib/sessionQuickSearch'
 
 interface TabNavigation {
   onKeyDown: (event: KeyboardEvent<HTMLButtonElement>, tabID: string) => void
@@ -146,6 +147,20 @@ function TabListMenu({ tabs, activeID, onActivate }: { tabs: Tab[]; activeID: st
   )
 }
 
+function lastTerminalTabIndex(tabs: Tab[]) {
+  let result = -1
+  tabs.forEach((tab, index) => { if (tab.type === 'terminal') result = index })
+  return result
+}
+
+function QuickConnectButton() {
+  const openSearch = () => window.dispatchEvent(new CustomEvent(SESSION_QUICK_SEARCH_EVENT))
+  return <Button type="button" variant="ghost" size="icon-sm" aria-label="快速连接会话" title="快速连接会话"
+    className="h-full w-9 shrink-0 rounded-none border-r border-border" onClick={openSearch}>
+    <Plus aria-hidden="true" />
+  </Button>
+}
+
 export function DynamicTabOverflowMenu() {
   const tabs = useAppStore((state) => state.tabs)
   const activeSurface = useAppStore((state) => state.activeSurface)
@@ -166,13 +181,17 @@ export function DynamicTabStrip({ onOverflowChange }: { onOverflowChange?: (over
   const activateWithFocus = useCallback((tabID: string) => activateTab(tabID, true), [activateTab])
   const duplicateTerminal = useCallback((sessionID: number) => { void connect(String(sessionID)) }, [connect])
   const closeCoordinator = useTabCloseCoordinator()
+  const quickConnectAfter = lastTerminalTabIndex(tabs)
 
   if (tabs.length === 0) return null
 
   return (
     <div className="flex min-w-0 shrink overflow-hidden [--wails-draggable:no-drag]">
       <div ref={tabListRef} role="tablist" aria-label="动态标签" className="flex min-w-0 overflow-x-auto">
-        {tabs.map((tab) => <DynamicTab key={tab.id} tab={tab} active={activeSurface?.id === tab.id} connectionStatus={connectionStatus} navigation={navigation} onActivate={activateWithFocus} onClose={closeCoordinator.requestClose} onDuplicate={duplicateTerminal} />)}
+        {tabs.map((tab, index) => <Fragment key={tab.id}>
+          <DynamicTab tab={tab} active={activeSurface?.id === tab.id} connectionStatus={connectionStatus} navigation={navigation} onActivate={activateWithFocus} onClose={closeCoordinator.requestClose} onDuplicate={duplicateTerminal} />
+          {index === quickConnectAfter && <QuickConnectButton />}
+        </Fragment>)}
       </div>
       <TabCloseConfirmation {...closeCoordinator.confirmation} />
     </div>
