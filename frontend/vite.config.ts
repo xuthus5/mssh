@@ -34,6 +34,7 @@ export default defineConfig({
         'src/components/layout/WorkspaceContent.tsx',
         'src/components/settings/SettingsDialog.tsx',
         'src/components/settings/TerminalBehaviorSettings.tsx',
+        'src/components/settings/ApplicationBehaviorSettings.tsx',
         'src/components/settings/TerminalGlobalStyleEditor.tsx',
         'src/components/settings/TerminalProfileStyleEditor.tsx',
         'src/components/settings/TerminalThemeInspector.tsx',

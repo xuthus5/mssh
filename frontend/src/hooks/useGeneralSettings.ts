@@ -14,7 +14,10 @@ const generalSettingKeys = [
   'terminal.max_pool_size', 'terminal.default_keep_alive', 'terminal.default_term_type',
   'terminal.right_click_action', 'terminal.copy_on_select', 'appearance.ui_font_family',
   'appearance.ui_font_fallback_family', 'appearance.ui_font_size', 'appearance.window_opacity',
+  'application.close_button_action',
 ]
+
+export type CloseButtonAction = 'tray' | 'exit'
 
 export interface GeneralSettings {
   maxPoolSize: number
@@ -26,6 +29,7 @@ export interface GeneralSettings {
   windowOpacity: number
   rightClickAction: TerminalRightClickAction
   copyOnSelect: boolean
+  closeButtonAction: CloseButtonAction
 }
 
 interface GeneralPreview {
@@ -42,6 +46,11 @@ const defaultGeneralSettings: GeneralSettings = {
   uiFontFamily: DEFAULT_UI_FONT_FAMILY, uiFontFallbackFamily: DEFAULT_UI_FONT_FALLBACK_FAMILY,
   uiFontSize: DEFAULT_UI_FONT_SIZE, windowOpacity: DEFAULT_WINDOW_OPACITY,
   rightClickAction: 'menu', copyOnSelect: false,
+  closeButtonAction: 'tray',
+}
+
+export function normalizeCloseButtonAction(value: unknown): CloseButtonAction {
+  return value === 'exit' ? 'exit' : 'tray'
 }
 
 export function settingEntry(key: string, value: unknown): SettingInput {
@@ -65,6 +74,7 @@ function normalizeGeneral(settings: GeneralSettings): GeneralSettings {
     windowOpacity: clampWindowOpacity(settings.windowOpacity),
     rightClickAction: normalizeTerminalRightClickAction(settings.rightClickAction),
     copyOnSelect: normalizeCopyOnSelect(settings.copyOnSelect),
+    closeButtonAction: normalizeCloseButtonAction(settings.closeButtonAction),
   }
 }
 
@@ -79,6 +89,7 @@ function parseGeneral(settings: { [_ in string]?: Setting }): GeneralSettings {
     uiFontFamily, uiFontFallbackFamily: settingValue(settings, 'appearance.ui_font_fallback_family', DEFAULT_UI_FONT_FALLBACK_FAMILY),
     uiFontSize: settingValue(settings, 'appearance.ui_font_size', DEFAULT_UI_FONT_SIZE),
     windowOpacity: settingValue(settings, 'appearance.window_opacity', DEFAULT_WINDOW_OPACITY),
+    closeButtonAction: settingValue(settings, 'application.close_button_action', 'tray'),
   })
 }
 
@@ -111,6 +122,7 @@ async function persistGeneral(settings: GeneralSettings) {
     settingEntry('terminal.copy_on_select', settings.copyOnSelect), settingEntry('appearance.ui_font_family', settings.uiFontFamily),
     settingEntry('appearance.ui_font_fallback_family', settings.uiFontFallbackFamily), settingEntry('appearance.ui_font_size', settings.uiFontSize),
     settingEntry('appearance.window_opacity', settings.windowOpacity),
+    settingEntry('application.close_button_action', settings.closeButtonAction),
   ]), TerminalService.SetMaxSize(settings.maxPoolSize)])
 }
 

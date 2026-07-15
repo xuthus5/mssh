@@ -7,6 +7,7 @@ import { SearchableSelect } from '@/components/ui/searchable-select'
 import { Slider } from '@/components/ui/slider'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { TerminalBehaviorSettingsSection } from '@/components/settings/TerminalBehaviorSettings'
+import { ApplicationBehaviorSettingsSection } from '@/components/settings/ApplicationBehaviorSettings'
 import type { GeneralSettings } from '@/hooks/useSettings'
 
 const TERMINAL_TYPE_OPTIONS = ['xterm-256color', 'xterm', 'vt100', 'linux'].map((value) => ({ value, label: value }))
@@ -21,6 +22,7 @@ interface GeneralDraft {
   windowOpacity: string
   rightClickAction: GeneralSettings['rightClickAction']
   copyOnSelect: boolean
+  closeButtonAction: GeneralSettings['closeButtonAction']
 }
 
 interface Props {
@@ -38,6 +40,7 @@ function createDraft(general: GeneralSettings): GeneralDraft {
     uiFontFallbackFamily: general.uiFontFallbackFamily, uiFontSize: String(general.uiFontSize),
     windowOpacity: String(general.windowOpacity), rightClickAction: general.rightClickAction,
     copyOnSelect: general.copyOnSelect,
+    closeButtonAction: general.closeButtonAction,
   }
 }
 
@@ -118,11 +121,12 @@ export function GeneralSettingsPanel({ general, systemFonts, onSave, onPreviewUI
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault(); setSaving(true)
     try {
-      await onSave({ maxPoolSize: parseInt(draft.maxPoolSize, 10) || 10, defaultKeepAlive: parseInt(draft.defaultKeepAlive, 10) || 60, defaultTermType: draft.defaultTermType, uiFontFamily: draft.uiFontFamily, uiFontFallbackFamily: draft.uiFontFallbackFamily, uiFontSize: parseInt(draft.uiFontSize, 10) || 14, windowOpacity: parseInt(draft.windowOpacity, 10) || 100, rightClickAction: draft.rightClickAction, copyOnSelect: draft.copyOnSelect })
+      await onSave({ maxPoolSize: parseInt(draft.maxPoolSize, 10) || 10, defaultKeepAlive: parseInt(draft.defaultKeepAlive, 10) || 60, defaultTermType: draft.defaultTermType, uiFontFamily: draft.uiFontFamily, uiFontFallbackFamily: draft.uiFontFallbackFamily, uiFontSize: parseInt(draft.uiFontSize, 10) || 14, windowOpacity: parseInt(draft.windowOpacity, 10) || 100, rightClickAction: draft.rightClickAction, copyOnSelect: draft.copyOnSelect, closeButtonAction: draft.closeButtonAction })
     } finally { setSaving(false) }
   }
   return <form onSubmit={handleSubmit} className="flex flex-col gap-3 pt-2">
     <ConnectionDefaults draft={draft} setDraft={setDraft} />
+    <ApplicationBehaviorSettingsSection closeButtonAction={draft.closeButtonAction} onCloseButtonActionChange={(value) => setDraft({ ...draft, closeButtonAction: value })} />
     <TerminalBehaviorSettingsSection rightClickAction={draft.rightClickAction} copyOnSelect={draft.copyOnSelect} onRightClickActionChange={(value) => setDraft({ ...draft, rightClickAction: value })} onCopyOnSelectChange={(value) => setDraft({ ...draft, copyOnSelect: value })} />
     <UIFontSettings draft={draft} systemFonts={systemFonts} onChange={previewDraft} />
     <WindowOpacitySettings value={draft.windowOpacity} onChange={previewOpacity} />
