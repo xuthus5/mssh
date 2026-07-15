@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Dialogs } from '@wailsio/runtime'
 import { FontService, KeyService, SettingService, SyncService } from '@/lib/wails'
 import { logger } from '@/lib/logger'
+import { toast } from '@/components/ui/toast'
 import { KeyType } from '../../bindings/github.com/xuthus5/mssh/internal/model/models'
 import { settingEntry, useGeneralSettings } from '@/hooks/useGeneralSettings'
 
@@ -27,6 +28,15 @@ export interface KeyInfo {
   createdAt: string
 }
 
+export interface KeyMaterial extends KeyInfo {
+  privateKey: string
+}
+
+export interface KeyImportFile {
+  name: string
+  privateKey: string
+}
+
 export interface SyncConfig {
   enabled: boolean
   url: string
@@ -44,6 +54,15 @@ function keyTypeName(type: KeyType): KeyInfo['type'] {
 
 function keyInfo(key: { id: number; name: string; type: KeyType; public_key: string; created_at: string }, bits: number): KeyInfo {
   return { id: String(key.id), name: key.name, type: keyTypeName(key.type), bits, publicKey: key.public_key, createdAt: key.created_at }
+}
+
+function keyMaterial(key: { id: number; name: string; type: KeyType; private_key: string; public_key: string; created_at: string }, bits: number): KeyMaterial {
+  return { ...keyInfo(key, bits), privateKey: key.private_key }
+}
+
+function keyOperationFailed(action: string, error: unknown) {
+  logger.error(`${action} failed`, error)
+  toast(`${action}失败: ${error instanceof Error ? error.message : String(error)}`, 'error')
 }
 
 function useSystemFonts() {
@@ -66,14 +85,20 @@ function useKeySettings() {
     try {
       const keyType = ({ rsa: KeyType.KeyTypeRSA, ed25519: KeyType.KeyTypeED25519, ecdsa: KeyType.KeyTypeECDSA } as const)[type]
       const result = await KeyService.Generate(name, keyType, bits)
-      if (result) setKeys((current) => [...current, keyInfo(result, bits)])
-    } catch (error) { logger.debug('generateKey error', error) }
+      if (!result) return undefined
+      const material = keyMaterial(result, bits)
+      setKeys((current) => [...current, keyInfo(result, bits)])
+      return material
+    } catch (error) { keyOperationFailed('生成密钥', error); return undefined }
   }, [])
   const importKey = useCallback(async (name: string, privateKey: string) => {
     try {
       const result = await KeyService.Import(name, privateKey)
-      if (result) setKeys((current) => [...current, keyInfo(result, 0)])
-    } catch (error) { logger.debug('importKey error', error) }
+      if (!result) return undefined
+      const imported = keyInfo(result, 0)
+      setKeys((current) => [...current, imported])
+      return imported
+    } catch (error) { keyOperationFailed('导入密钥', error); return undefined }
   }, [])
   const deleteKey = useCallback(async (id: string) => {
     try { await KeyService.Delete(Number(id)); setKeys((current) => current.filter((key) => key.id !== id)) }
@@ -81,10 +106,29 @@ function useKeySettings() {
   }, [])
   const exportKey = useCallback(async (id: string) => {
     try { return await KeyService.ExportPublicKey(Number(id)) }
-    catch (error) { logger.debug('exportKey error', error); return undefined }
+    catch (error) { keyOperationFailed('复制公钥', error); return undefined }
+  }, [])
+  const loadKeyMaterial = useCallback(async (id: string) => {
+    try { const result = await KeyService.GetMaterial(Number(id)); return result ? keyMaterial(result, 0) : undefined }
+    catch (error) { keyOperationFailed('读取密钥', error); return undefined }
+  }, [])
+  const updateKey = useCallback(async (material: KeyMaterial) => {
+    try {
+      const result = await KeyService.Update({ id: Number(material.id), name: material.name, private_key: material.privateKey, public_key: material.publicKey })
+      if (!result) return undefined
+      const updated = keyMaterial(result, material.bits)
+      setKeys((current) => current.map((key) => key.id === updated.id ? keyInfo(result, material.bits) : key))
+      return updated
+    } catch (error) { keyOperationFailed('更新密钥', error); return undefined }
+  }, [])
+  const selectKeyImportFile = useCallback(async (): Promise<KeyImportFile | undefined> => {
+    try {
+      const file = await KeyService.SelectImportFile()
+      return file ? { name: file.name, privateKey: file.private_key } : undefined
+    } catch (error) { keyOperationFailed('读取私钥文件', error); return undefined }
   }, [])
   useEffect(() => { void listKeys() }, [listKeys])
-  return { keys, listKeys, generateKey, importKey, deleteKey, exportKey }
+  return { keys, listKeys, generateKey, importKey, deleteKey, exportKey, loadKeyMaterial, updateKey, selectKeyImportFile }
 }
 
 function useSyncSettings() {

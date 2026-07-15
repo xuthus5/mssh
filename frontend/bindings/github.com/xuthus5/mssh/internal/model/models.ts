@@ -263,6 +263,105 @@ export class SSHKey {
     }
 }
 
+export class SSHKeyImportFile {
+    "name": string;
+    "private_key": string;
+
+    /** Creates a new SSHKeyImportFile instance. */
+    constructor($$source: Partial<SSHKeyImportFile> = {}) {
+        if (!("name" in $$source)) {
+            this["name"] = "";
+        }
+        if (!("private_key" in $$source)) {
+            this["private_key"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new SSHKeyImportFile instance from a string or object.
+     */
+    static createFrom($$source: any = {}): SSHKeyImportFile {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new SSHKeyImportFile($$parsedSource as Partial<SSHKeyImportFile>);
+    }
+}
+
+export class SSHKeyMaterial {
+    "id": number;
+    "name": string;
+    "type": KeyType;
+    "private_key": string;
+    "public_key": string;
+    "created_at": string;
+
+    /** Creates a new SSHKeyMaterial instance. */
+    constructor($$source: Partial<SSHKeyMaterial> = {}) {
+        if (!("id" in $$source)) {
+            this["id"] = 0;
+        }
+        if (!("name" in $$source)) {
+            this["name"] = "";
+        }
+        if (!("type" in $$source)) {
+            this["type"] = KeyType.$zero;
+        }
+        if (!("private_key" in $$source)) {
+            this["private_key"] = "";
+        }
+        if (!("public_key" in $$source)) {
+            this["public_key"] = "";
+        }
+        if (!("created_at" in $$source)) {
+            this["created_at"] = "0001-01-01T00:00:00.000Z";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new SSHKeyMaterial instance from a string or object.
+     */
+    static createFrom($$source: any = {}): SSHKeyMaterial {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new SSHKeyMaterial($$parsedSource as Partial<SSHKeyMaterial>);
+    }
+}
+
+export class SSHKeyUpdateInput {
+    "id": number;
+    "name": string;
+    "private_key": string;
+    "public_key": string;
+
+    /** Creates a new SSHKeyUpdateInput instance. */
+    constructor($$source: Partial<SSHKeyUpdateInput> = {}) {
+        if (!("id" in $$source)) {
+            this["id"] = 0;
+        }
+        if (!("name" in $$source)) {
+            this["name"] = "";
+        }
+        if (!("private_key" in $$source)) {
+            this["private_key"] = "";
+        }
+        if (!("public_key" in $$source)) {
+            this["public_key"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new SSHKeyUpdateInput instance from a string or object.
+     */
+    static createFrom($$source: any = {}): SSHKeyUpdateInput {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new SSHKeyUpdateInput($$parsedSource as Partial<SSHKeyUpdateInput>);
+    }
+}
+
 export class Session {
     "id": number;
     "folder_id": number | null;

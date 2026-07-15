@@ -6,7 +6,7 @@ import { ThemeManager } from '@/components/settings/ThemeManager'
 import { KeyManager } from '@/components/settings/KeyManager'
 import { SyncPanel } from '@/components/settings/SyncPanel'
 import { AboutPanel } from '@/components/settings/AboutPanel'
-import type { GeneralSettings, KeyInfo, SyncConfig } from '@/hooks/useSettings'
+import type { GeneralSettings, KeyImportFile, KeyInfo, KeyMaterial, SyncConfig } from '@/hooks/useSettings'
 import type { ColorMode } from '@/lib/effectiveTerminalTheme'
 import type { BuiltinThemeResetResult, TerminalGlobalStyle, ThemeAssignments, ThemeConfigurationInput, ThemeImportSummary, ThemeProfile, ThemeProfileInput } from '../../../bindings/github.com/xuthus5/mssh/internal/model/models'
 
@@ -29,10 +29,13 @@ export interface SettingsViewProps {
   onDeleteThemeProfile: (id: number) => Promise<void>
   onDeleteThemeDefinition: (id: number) => Promise<void>
   onResetBuiltinThemes: () => Promise<BuiltinThemeResetResult>
-  onGenerateKey: (name: string, type: KeyInfo['type'], bits: number) => void
-  onImportKey: (name: string, privateKey: string) => void
+  onGenerateKey: (name: string, type: KeyInfo['type'], bits: number) => Promise<KeyMaterial | undefined>
+  onImportKey: (name: string, privateKey: string) => Promise<KeyInfo | undefined>
   onDeleteKey: (id: string) => void
   onExportKey: (id: string) => Promise<string | undefined>
+  onLoadKeyMaterial: (id: string) => Promise<KeyMaterial | undefined>
+  onUpdateKey: (material: KeyMaterial) => Promise<KeyMaterial | undefined>
+  onSelectKeyImportFile: () => Promise<KeyImportFile | undefined>
   onSaveSync: (config: SyncConfig) => void
   onExportConfig: () => void
   onImportConfig: () => void
@@ -42,7 +45,7 @@ function SettingsTabPanels(props: SettingsViewProps) {
   return <>
     <TabsContent value="general" className="min-h-0 min-w-0 overflow-y-auto overscroll-contain pr-2"><GeneralSettingsPanel general={props.general} systemFonts={props.systemFonts} onSave={props.onSaveGeneral} onPreviewUIFont={props.onPreviewUIFont} onPreviewWindowOpacity={props.onPreviewWindowOpacity} /></TabsContent>
     <TabsContent value="terminal" className="min-h-0 min-w-0 overflow-y-auto overscroll-contain pr-2"><div className="flex flex-col gap-5"><ThemeEditor profiles={props.themeProfiles} assignments={props.themeAssignments} globalStyle={props.terminalGlobalStyle} colorMode={props.colorMode} onSave={props.onSaveThemeConfiguration} onResetBuiltins={props.onResetBuiltinThemes} /><ThemeManager profiles={props.themeProfiles} onImport={props.onImportThemes} onCreateProfile={props.onCreateThemeProfile} onUpdateProfile={props.onUpdateThemeProfile} onDeleteProfile={props.onDeleteThemeProfile} onDeleteDefinition={props.onDeleteThemeDefinition} /></div></TabsContent>
-    <TabsContent value="keys" className="min-h-0 min-w-0 overflow-y-auto overscroll-contain pr-2"><KeyManager keys={props.keys} onGenerate={props.onGenerateKey} onImport={props.onImportKey} onDelete={props.onDeleteKey} onExport={props.onExportKey} /></TabsContent>
+    <TabsContent value="keys" className="min-h-0 min-w-0 overflow-y-auto overscroll-contain pr-2"><KeyManager keys={props.keys} onGenerate={props.onGenerateKey} onImport={props.onImportKey} onDelete={props.onDeleteKey} onExport={props.onExportKey} onLoadMaterial={props.onLoadKeyMaterial} onUpdate={props.onUpdateKey} onSelectImportFile={props.onSelectKeyImportFile} /></TabsContent>
     <TabsContent value="sync" className="min-h-0 min-w-0 overflow-y-auto overscroll-contain pr-2"><SyncPanel sync={props.sync} onSave={props.onSaveSync} onExport={props.onExportConfig} onImport={props.onImportConfig} /></TabsContent>
     <TabsContent value="about" className="min-h-0 min-w-0 overflow-y-auto overscroll-contain pr-2"><AboutPanel /></TabsContent>
   </>

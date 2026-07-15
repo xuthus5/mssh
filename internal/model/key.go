@@ -19,3 +19,24 @@ type SSHKey struct {
 	HasPassphrase bool      `json:"has_passphrase"`
 	CreatedAt     time.Time `json:"created_at"`
 }
+
+type SSHKeyMaterial struct {
+	ID         int64     `json:"id"`
+	Name       string    `json:"name"`
+	Type       KeyType   `json:"type"`
+	PrivateKey string    `json:"private_key"`
+	PublicKey  string    `json:"public_key"`
+	CreatedAt  time.Time `json:"created_at"`
+}
+
+type SSHKeyUpdateInput struct {
+	ID         int64  `json:"id"`
+	Name       string `json:"name"`
+	PrivateKey string `json:"private_key"`
+	PublicKey  string `json:"public_key"`
+}
+
+type SSHKeyImportFile struct {
+	Name       string `json:"name"`
+	PrivateKey string `json:"private_key"`
+}

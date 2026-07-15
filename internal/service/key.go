@@ -24,14 +24,24 @@ type KeyCrypto interface {
 	Decrypt(ciphertext []byte) ([]byte, error)
 }
 
+type keyFilePicker interface {
+	SelectPrivateKey(directory string) (string, error)
+}
+
 type KeyService struct {
 	db     *sql.DB
 	crypto KeyCrypto
 	logger *slog.Logger
+	picker keyFilePicker
 }
 
 func NewKeyService(db *sql.DB, crypto KeyCrypto, logger *slog.Logger) *KeyService {
 	return &KeyService{db: db, crypto: crypto, logger: logger}
+}
+
+//wails:ignore
+func (k *KeyService) SetFilePicker(picker keyFilePicker) {
+	k.picker = picker
 }
 
 func (k *KeyService) List() ([]model.SSHKey, error) {
@@ -39,11 +49,14 @@ func (k *KeyService) List() ([]model.SSHKey, error) {
 	return store.ListKeys(k.db)
 }
 
-func (k *KeyService) Generate(name string, keyType model.KeyType, bits int) (*model.SSHKey, error) {
+func (k *KeyService) Generate(name string, keyType model.KeyType, bits int) (*model.SSHKeyMaterial, error) {
+	name, err := normalizedKeyName(name)
+	if err != nil {
+		return nil, fmt.Errorf("generate key: %w", err)
+	}
 	k.logger.Info("generating key", "name", name, "keyType", keyType, "bits", bits)
 	var privPEM []byte
 	var pubSSH string
-	var err error
 
 	switch keyType {
 	case model.KeyTypeRSA:
@@ -70,10 +83,18 @@ func (k *KeyService) Generate(name string, keyType model.KeyType, bits int) (*mo
 		PrivateKey: string(encrypted),
 		PublicKey:  pubSSH,
 	}
-	return store.CreateKey(k.db, key)
+	created, err := store.CreateKey(k.db, key)
+	if err != nil {
+		return nil, err
+	}
+	return keyMaterial(created, string(privPEM)), nil
 }
 
 func (k *KeyService) Import(name, privateKeyPEM string) (*model.SSHKey, error) {
+	name, err := normalizedKeyName(name)
+	if err != nil {
+		return nil, fmt.Errorf("import key: %w", err)
+	}
 	k.logger.Info("importing key", "name", name)
 	keyType, pubKey, err := k.extractPublicKeyWithType([]byte(privateKeyPEM))
 	if err != nil {
