@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { create } from 'zustand'
+import { Events } from '@wailsio/runtime'
 import { SettingService, ThemeService } from '@/lib/wails'
 import { logger } from '@/lib/logger'
 import { toast } from '@/components/ui/toast'
@@ -7,6 +8,7 @@ import { resolveEffectiveTerminalProfile, type ColorMode } from '@/lib/effective
 import { profileToTerminalTheme } from '@/lib/terminalThemeCatalog'
 import { useAppStore } from '@/store/appStore'
 import type { TerminalGlobalStyle, ThemeAssignments, ThemeConfigurationInput, ThemeDefinition, ThemeImportSummary, ThemeProfile, ThemeProfileInput } from '../../bindings/github.com/xuthus5/mssh/internal/model/models'
+import { COLOR_MODE_CHANGED_EVENT, THEME_CATALOG_CHANGED_EVENT } from '@/lib/settingsWindowEvents'
 
 export type { ColorMode } from '@/lib/effectiveTerminalTheme'
 
@@ -32,11 +34,29 @@ const initialState: ThemeCatalogState = {
   error: null,
 }
 
+interface ThemeCatalogSnapshot {
+  definitions: ThemeDefinition[]
+  profiles: ThemeProfile[]
+  assignments: ThemeAssignments
+  globalStyle: TerminalGlobalStyle
+}
+
+interface EventEnvelope<T> { data?: T }
+
 export const useThemeCatalogStore = create<ThemeCatalogState>(() => initialState)
 
 export function useThemeCatalog() {
   const state = useThemeCatalogStore()
   useEffect(() => { void loadThemeCatalog() }, [])
+  useEffect(() => {
+    const stopCatalog = Events.On(THEME_CATALOG_CHANGED_EVENT, (event: EventEnvelope<ThemeCatalogSnapshot>) => {
+      if (event.data) applyCatalogSnapshot(event.data)
+    })
+    const stopMode = Events.On(COLOR_MODE_CHANGED_EVENT, (event: EventEnvelope<ColorMode>) => {
+      if (event.data) applySynchronizedColorMode(event.data)
+    })
+    return () => { stopCatalog(); stopMode() }
+  }, [])
   return { ...state, reload: loadThemeCatalog, setColorMode: changeColorMode, saveAssignments, saveConfiguration, saveProfile, createProfile, importThemes, deleteProfile, deleteDefinition, resetBuiltinStyles }
 }
 
@@ -68,6 +88,7 @@ export async function changeColorMode(nextMode: ColorMode) {
   try {
     if (followsInterfaceMode) applyEffectiveTerminalTheme()
     await SettingService.Set({ key: 'appearance.color_mode', namespace: 'appearance', value: JSON.stringify(nextMode), value_type: 'string', version: 1 })
+    emitThemeEvent(COLOR_MODE_CHANGED_EVENT, nextMode)
   } catch (error) {
     applyInterfaceColorMode(previousMode)
     if (followsInterfaceMode) applyEffectiveTerminalTheme()
@@ -80,43 +101,44 @@ export async function saveAssignments(assignments: ThemeAssignments) {
   await ThemeService.SaveAssignments(assignments)
   useThemeCatalogStore.setState({ assignments })
   applyEffectiveTerminalTheme()
+  broadcastThemeCatalog()
 }
 
 export async function saveProfile(profile: ThemeProfileInput) {
   await ThemeService.UpdateProfile(profile)
-  await loadThemeCatalogFresh()
+  await refreshThemeCatalog()
 }
 
 export async function createProfile(profile: ThemeProfileInput) {
   const created = await ThemeService.CreateCustomProfile(profile)
-  await loadThemeCatalogFresh()
+  await refreshThemeCatalog()
   return created
 }
 
 export async function saveConfiguration(configuration: ThemeConfigurationInput) {
   await ThemeService.SaveConfiguration(configuration)
-  await loadThemeCatalogFresh()
+  await refreshThemeCatalog()
 }
 
 export async function importThemes(paths: string[]): Promise<ThemeImportSummary> {
   const summary = await ThemeService.ImportFiles(paths)
-  await loadThemeCatalogFresh()
+  await refreshThemeCatalog()
   return summary
 }
 
 export async function deleteProfile(id: number) {
   await ThemeService.DeleteProfile(id)
-  await loadThemeCatalogFresh()
+  await refreshThemeCatalog()
 }
 
 export async function deleteDefinition(id: number) {
   await ThemeService.DeleteDefinition(id)
-  await loadThemeCatalogFresh()
+  await refreshThemeCatalog()
 }
 
 export async function resetBuiltinStyles() {
   const result = await ThemeService.ResetBuiltinStyles()
-  await loadThemeCatalogFresh()
+  await refreshThemeCatalog()
   return result
 }
 
@@ -126,10 +148,39 @@ function applyInterfaceColorMode(mode: ColorMode) {
   useThemeCatalogStore.setState({ colorMode: mode })
 }
 
+function applySynchronizedColorMode(mode: ColorMode) {
+  applyInterfaceColorMode(mode)
+  if (useThemeCatalogStore.getState().assignments.follow_interface_mode) applyEffectiveTerminalTheme()
+}
+
 function applyEffectiveTerminalTheme() {
   const state = useThemeCatalogStore.getState()
   const profile = resolveEffectiveTerminalProfile(state.assignments, state.colorMode, state.profiles)
   useAppStore.getState().setTerminalTheme(profileToTerminalTheme(profile, state.globalStyle))
+}
+
+function applyCatalogSnapshot(snapshot: ThemeCatalogSnapshot) {
+  useThemeCatalogStore.setState({ ...snapshot, loaded: true, loading: false, error: null })
+  applyEffectiveTerminalTheme()
+}
+
+function emitThemeEvent(name: string, data: unknown) {
+  void Events.Emit(name, data).catch((error: unknown) => logger.error(`emit ${name} failed`, error))
+}
+
+function broadcastThemeCatalog() {
+  const state = useThemeCatalogStore.getState()
+  emitThemeEvent(THEME_CATALOG_CHANGED_EVENT, {
+    definitions: state.definitions,
+    profiles: state.profiles,
+    assignments: state.assignments,
+    globalStyle: state.globalStyle,
+  } satisfies ThemeCatalogSnapshot)
+}
+
+async function refreshThemeCatalog() {
+  await loadThemeCatalogFresh()
+  broadcastThemeCatalog()
 }
 
 async function loadThemeCatalogFresh() {
