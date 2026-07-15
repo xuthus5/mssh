@@ -17,6 +17,8 @@ function settingsViewProps(
     onDeleteThemeProfile: catalog.deleteProfile, onDeleteThemeDefinition: catalog.deleteDefinition,
     onResetBuiltinThemes: catalog.resetBuiltinStyles, onGenerateKey: settings.generateKey,
     onImportKey: settings.importKey, onDeleteKey: settings.deleteKey, onExportKey: settings.exportKey,
+    onLoadKeyMaterial: settings.loadKeyMaterial, onUpdateKey: settings.updateKey,
+    onSelectKeyImportFile: settings.selectKeyImportFile,
     onSaveSync: settings.saveSync, onExportConfig: settings.exportConfig, onImportConfig: settings.importConfig,
   }
 }

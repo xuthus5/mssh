@@ -1,7 +1,9 @@
 package main
 
 import (
+	"context"
 	_ "embed"
+	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -29,7 +31,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	wailsApp := newWailsApplication(appInstance)
+	wailsApp := newWailsApplication(appInstance, logger)
 	configureWindows(wailsApp, windowConfiguration{Settings: appInstance.Setting, Logger: logger})
 	wailsApp.OnShutdown(func() { appInstance.Shutdown() })
 
@@ -40,11 +42,12 @@ func main() {
 	}
 }
 
-func newWailsApplication(appInstance *app.App) *application.App {
-	return application.New(application.Options{
+func newWailsApplication(appInstance *app.App, logger *slog.Logger) *application.App {
+	wailsApp := application.New(application.Options{
 		Name:        "mssh",
 		Description: "A cross-platform SSH client",
 		Icon:        appIcon,
+		Logger:      newWailsSystemLogger(logger),
 		Services: []application.Service{
 			application.NewService(appInstance.Session),
 			application.NewService(appInstance.Terminal),
@@ -66,6 +69,54 @@ func newWailsApplication(appInstance *app.App) *application.App {
 			ApplicationShouldTerminateAfterLastWindowClosed: false,
 		},
 	})
+	appInstance.Key.SetFilePicker(&wailsKeyFilePicker{app: wailsApp})
+	return wailsApp
+}
+
+type wailsKeyFilePicker struct {
+	app *application.App
+}
+
+func (p *wailsKeyFilePicker) SelectPrivateKey(directory string) (string, error) {
+	if p.app == nil {
+		return "", fmt.Errorf("wails application is not initialized")
+	}
+	dialog := p.app.Dialog.OpenFile().SetTitle("选择 SSH 私钥").SetDirectory(directory).
+		ShowHiddenFiles(true).AllowsOtherFileTypes(true)
+	if window, exists := p.app.Window.GetByName(windowing.SettingsWindowName); exists {
+		dialog.AttachToWindow(window)
+	}
+	return dialog.PromptForSingleSelection()
+}
+
+type wailsSystemLogHandler struct {
+	next slog.Handler
+}
+
+func newWailsSystemLogger(logger *slog.Logger) *slog.Logger {
+	return slog.New(&wailsSystemLogHandler{next: logger.Handler()})
+}
+
+func (h *wailsSystemLogHandler) Enabled(ctx context.Context, level slog.Level) bool {
+	if level < slog.LevelInfo {
+		return false
+	}
+	return h.next.Enabled(ctx, level)
+}
+
+func (h *wailsSystemLogHandler) Handle(ctx context.Context, record slog.Record) error {
+	if record.Level < slog.LevelInfo || record.Message == "Runtime call:" || record.Message == "Binding call complete:" {
+		return nil
+	}
+	return h.next.Handle(ctx, record)
+}
+
+func (h *wailsSystemLogHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
+	return &wailsSystemLogHandler{next: h.next.WithAttrs(attrs)}
+}
+
+func (h *wailsSystemLogHandler) WithGroup(name string) slog.Handler {
+	return &wailsSystemLogHandler{next: h.next.WithGroup(name)}
 }
 
 type windowConfiguration struct {

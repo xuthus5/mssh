@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { Dialogs } from '@wailsio/runtime'
-import { useSettings } from '@/hooks/useSettings'
+import { useSettings, type KeyImportFile, type KeyMaterial } from '@/hooks/useSettings'
 import { DEFAULT_TERMINAL_BEHAVIOR, useTerminalBehaviorStore } from '@/store/terminalBehaviorStore'
 import { __registerHandler, __clearHandlers } from '@/test/__mocks__/wails-runtime'
 
@@ -13,6 +13,7 @@ describe('useSettings', () => {
   let writtenSettings: any[]
 
   beforeEach(() => {
+    vi.restoreAllMocks()
     __clearHandlers()
     _settings = {}
     _counter = 0
@@ -193,19 +194,21 @@ describe('useSettings', () => {
 
   it('generates a key and adds to state', async () => {
     __registerHandler('github.com/xuthus5/mssh/internal/service.KeyService.Generate', async (name: string, keyType: string, bits: number) => ({
-      id: nextId(), name, type: keyType, public_key: 'mock-pub', created_at: new Date().toISOString(),
+      id: nextId(), name, type: keyType, private_key: 'mock-private', public_key: 'mock-pub', created_at: new Date().toISOString(),
     }))
 
     const { result } = renderHook(() => useSettings())
-    await act(async () => { await result.current.generateKey('my-key', 'ed25519', 256) })
+    let generated: KeyMaterial | undefined
+    await act(async () => { generated = await result.current.generateKey('my-key', 'ed25519', 256) })
     expect(result.current.keys).toHaveLength(1)
     expect(result.current.keys[0].name).toBe('my-key')
     expect(result.current.keys[0].type).toBe('ed25519')
+    expect(generated).toMatchObject({ privateKey: 'mock-private', publicKey: 'mock-pub' })
   })
 
   it('deletes a key and removes from state', async () => {
     __registerHandler('github.com/xuthus5/mssh/internal/service.KeyService.Generate', async (name: string, keyType: string, bits: number) => ({
-      id: nextId(), name, type: keyType, public_key: 'mock-pub', created_at: new Date().toISOString(),
+      id: nextId(), name, type: keyType, private_key: 'mock-private', public_key: 'mock-pub', created_at: new Date().toISOString(),
     }))
     __registerHandler('github.com/xuthus5/mssh/internal/service.KeyService.Delete', async () => {})
 
@@ -230,7 +233,7 @@ describe('useSettings', () => {
 
   it('exports a key returns public key string', async () => {
     __registerHandler('github.com/xuthus5/mssh/internal/service.KeyService.Generate', async (name: string, keyType: string, bits: number) => ({
-      id: nextId(), name, type: keyType, public_key: 'mock-pub', created_at: new Date().toISOString(),
+      id: nextId(), name, type: keyType, private_key: 'mock-private', public_key: 'mock-pub', created_at: new Date().toISOString(),
     }))
     __registerHandler('github.com/xuthus5/mssh/internal/service.KeyService.ExportPublicKey', async () => 'mock-key')
 
@@ -251,6 +254,34 @@ describe('useSettings', () => {
     })
     expect(result.current.sync.enabled).toBe(true)
     expect(result.current.sync.url).toBe('http://sync.local')
+  })
+
+  it('loads, updates, and replaces explicit key material without storing private data in the list', async () => {
+    const createdAt = new Date().toISOString()
+    __registerHandler('github.com/xuthus5/mssh/internal/service.KeyService.List', async () => [{ id: 7, name: 'before', type: 'ed25519', public_key: 'ssh-ed25519 AAAA', created_at: createdAt }])
+    __registerHandler('github.com/xuthus5/mssh/internal/service.KeyService.GetMaterial', async () => ({ id: 7, name: 'before', type: 'ed25519', private_key: 'private', public_key: 'ssh-ed25519 AAAA', created_at: createdAt }))
+    __registerHandler('github.com/xuthus5/mssh/internal/service.KeyService.Update', async (input) => ({ id: input.id, name: input.name, type: 'ed25519', private_key: input.private_key, public_key: input.public_key, created_at: createdAt }))
+    const { result } = renderHook(() => useSettings())
+    await act(async () => {})
+
+    let loaded: KeyMaterial | undefined
+    await act(async () => { loaded = await result.current.loadKeyMaterial('7') })
+    expect(loaded).toMatchObject({ id: '7', privateKey: 'private' })
+    if (!loaded) throw new Error('key material was not loaded')
+    const loadedMaterial = loaded
+    await act(async () => { await result.current.updateKey({ ...loadedMaterial, name: 'after' }) })
+    expect(result.current.keys[0]).toMatchObject({ id: '7', name: 'after', publicKey: 'ssh-ed25519 AAAA' })
+    expect(result.current.keys[0]).not.toHaveProperty('privateKey')
+  })
+
+  it('opens key import in the user SSH directory and reads the selected file', async () => {
+    __registerHandler('github.com/xuthus5/mssh/internal/service.KeyService.SelectImportFile', async () => ({ name: 'id_ed25519', private_key: 'private-content' }))
+    const { result } = renderHook(() => useSettings())
+
+    let selected: KeyImportFile | undefined
+    await act(async () => { selected = await result.current.selectKeyImportFile() })
+
+    expect(selected).toEqual({ name: 'id_ed25519', privateKey: 'private-content' })
   })
 
   it('handles generateKey error gracefully', async () => {
