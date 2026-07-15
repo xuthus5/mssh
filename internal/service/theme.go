@@ -103,7 +103,10 @@ func (service *ThemeService) SaveAssignments(input model.ThemeAssignmentsInput) 
 	if err != nil {
 		return fmt.Errorf("begin save theme assignments: %w", err)
 	}
-	if err = validateThemeAssignments(tx, assignments); err == nil {
+	if _, err = loadValidatedThemeAssignments(tx); err == nil {
+		err = validateThemeAssignments(tx, assignments)
+	}
+	if err == nil {
 		err = store.SaveThemeAssignmentsDB(tx, assignments)
 	}
 	if err != nil {
@@ -117,31 +120,16 @@ func (service *ThemeService) SaveAssignments(input model.ThemeAssignmentsInput) 
 }
 
 func (service *ThemeService) SaveConfiguration(input model.ThemeConfigurationInput) error {
-	globalStyle := normalizeTerminalGlobalStyle(input.GlobalStyle.TerminalGlobalStyle())
-	if err := validateTerminalGlobalStyle(globalStyle); err != nil {
-		return fmt.Errorf("terminal global style: %w", err)
-	}
-	profiles, err := validatedThemeProfiles(input.Profiles)
-	if err != nil {
-		return err
-	}
 	tx, err := service.db.Begin()
 	if err != nil {
 		return fmt.Errorf("begin theme configuration: %w", err)
 	}
-	assignments := input.Assignments.ThemeAssignments()
-	if err = validateThemeAssignments(tx, assignments); err == nil {
-		for _, profile := range profiles {
-			if err = store.UpdateThemeProfile(tx, profile); err != nil {
-				break
-			}
+	if err = validateStoredThemeConfiguration(tx); err == nil {
+		var configuration validatedThemeConfiguration
+		configuration, err = prepareThemeConfiguration(tx, input)
+		if err == nil {
+			err = saveThemeConfiguration(tx, configuration)
 		}
-	}
-	if err == nil {
-		err = store.SaveTerminalGlobalStyleDB(tx, globalStyle)
-	}
-	if err == nil {
-		err = store.SaveThemeAssignmentsDB(tx, assignments)
 	}
 	if err != nil {
 		_ = tx.Rollback()
@@ -151,6 +139,68 @@ func (service *ThemeService) SaveConfiguration(input model.ThemeConfigurationInp
 		return fmt.Errorf("commit theme configuration: %w", err)
 	}
 	return nil
+}
+
+type validatedThemeConfiguration struct {
+	globalStyle model.TerminalGlobalStyle
+	profiles    []model.ThemeProfile
+	assignments model.ThemeAssignments
+}
+
+func validateStoredThemeConfiguration(db themeDatabase) error {
+	if _, err := loadValidatedThemeAssignments(db); err != nil {
+		return err
+	}
+	style, exists, err := store.LoadTerminalGlobalStyle(db)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		return fmt.Errorf("terminal global style is not initialized")
+	}
+	return validateTerminalGlobalStyle(style)
+}
+
+func loadValidatedThemeAssignments(db themeDatabase) (model.ThemeAssignments, error) {
+	assignments, exists, err := store.LoadThemeAssignments(db)
+	if err != nil {
+		return model.ThemeAssignments{}, err
+	}
+	if !exists {
+		return model.ThemeAssignments{}, fmt.Errorf("theme assignments are not initialized")
+	}
+	if err = validateThemeAssignments(db, assignments); err != nil {
+		return model.ThemeAssignments{}, err
+	}
+	return assignments, nil
+}
+
+func prepareThemeConfiguration(db themeDatabase, input model.ThemeConfigurationInput) (validatedThemeConfiguration, error) {
+	globalStyle := normalizeTerminalGlobalStyle(input.GlobalStyle.TerminalGlobalStyle())
+	if err := validateTerminalGlobalStyle(globalStyle); err != nil {
+		return validatedThemeConfiguration{}, fmt.Errorf("terminal global style: %w", err)
+	}
+	profiles, err := validatedThemeProfiles(input.Profiles)
+	if err != nil {
+		return validatedThemeConfiguration{}, err
+	}
+	assignments := input.Assignments.ThemeAssignments()
+	if err = validateThemeAssignments(db, assignments); err != nil {
+		return validatedThemeConfiguration{}, err
+	}
+	return validatedThemeConfiguration{globalStyle: globalStyle, profiles: profiles, assignments: assignments}, nil
+}
+
+func saveThemeConfiguration(db themeDatabase, configuration validatedThemeConfiguration) error {
+	for _, profile := range configuration.profiles {
+		if err := store.UpdateThemeProfile(db, profile); err != nil {
+			return err
+		}
+	}
+	if err := store.SaveTerminalGlobalStyleDB(db, configuration.globalStyle); err != nil {
+		return err
+	}
+	return store.SaveThemeAssignmentsDB(db, configuration.assignments)
 }
 
 func validatedThemeProfiles(inputs []model.ThemeProfileInput) ([]model.ThemeProfile, error) {
@@ -176,18 +226,16 @@ func normalizeThemeProfile(profile model.ThemeProfile) model.ThemeProfile {
 }
 
 func validateThemeAssignments(db themeDatabase, assignments model.ThemeAssignments) error {
-	checks := []struct {
+	type assignmentCheck struct {
 		label string
 		id    int64
-	}{{label: "dark", id: assignments.DarkProfileID}, {label: "light", id: assignments.LightProfileID}}
-	if !assignments.FollowInterfaceMode {
-		if assignments.FixedProfileID < 1 {
-			return fmt.Errorf("fixed theme profile is required when follow mode is disabled")
-		}
-		checks = append(checks, struct {
-			label string
-			id    int64
-		}{label: "fixed", id: assignments.FixedProfileID})
+	}
+	checks := []assignmentCheck{{label: "dark", id: assignments.DarkProfileID}, {label: "light", id: assignments.LightProfileID}}
+	if !assignments.FollowInterfaceMode && assignments.FixedProfileID < 1 {
+		return fmt.Errorf("fixed theme profile is required when follow mode is disabled")
+	}
+	if assignments.FixedProfileID != 0 {
+		checks = append(checks, assignmentCheck{label: "fixed", id: assignments.FixedProfileID})
 	}
 	for _, check := range checks {
 		if _, err := store.GetThemeProfile(db, check.id); err != nil {

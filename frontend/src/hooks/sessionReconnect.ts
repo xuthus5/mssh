@@ -13,10 +13,11 @@ interface ReconnectSession {
 
 function currentReconnectTarget(tabId: string, sessions: ReconnectSession[]) {
   const state = useAppStore.getState()
-  const tab = state.tabs.find((item) => item.id === tabId && item.type === 'terminal')
-  const terminalId = tab?.terminalId
-  const session = sessions.find((item) => Number(item.id) === tab?.sessionId)
-  if (!tab || !terminalId || !session || state.connectionStatus[terminalId] === 'connecting') return null
+  const tab = state.tabs.find((item) => item.id === tabId)
+  if (!tab || tab.type !== 'terminal' || state.connectionStatus[tab.terminalId] === 'connecting') return null
+  const session = sessions.find((item) => Number(item.id) === tab.sessionId)
+  if (!session) return null
+  const terminalId = tab.terminalId
   return { state, tab, terminalId, session }
 }
 
@@ -31,7 +32,7 @@ async function closeStaleTerminal(terminalId: string) {
 function restoreDisconnectedState(tabId: string, terminalId: string) {
   const state = useAppStore.getState()
   const currentTab = state.tabs.find((item) => item.id === tabId)
-  if (currentTab?.terminalId !== terminalId) return false
+  if (currentTab?.type !== 'terminal' || currentTab.terminalId !== terminalId) return false
   state.setConnectionStatus(terminalId, 'disconnected')
   return true
 }

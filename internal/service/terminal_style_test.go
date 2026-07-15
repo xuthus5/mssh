@@ -13,7 +13,7 @@ import (
 	"github.com/xuthus5/mssh/internal/service/testutil"
 )
 
-func TestThemeServiceInitializesAndRepairsTerminalGlobalStyle(t *testing.T) {
+func TestThemeServiceInitializesAndRejectsCorruptTerminalGlobalStyle(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	themeService := NewThemeService(db, testutil.NewTestLogger())
 	require.NoError(t, themeService.InitializeDefaults())
@@ -27,10 +27,11 @@ func TestThemeServiceInitializesAndRepairsTerminalGlobalStyle(t *testing.T) {
 
 	_, err = db.Exec(`UPDATE settings SET value = '"large"' WHERE key = 'terminal.style.font_size'`)
 	require.NoError(t, err)
-	require.NoError(t, themeService.InitializeDefaults())
-	style, err = themeService.GetGlobalStyle()
-	require.NoError(t, err)
-	assert.Equal(t, terminalStyleDefaults(), style)
+	err = themeService.InitializeDefaults()
+	assert.ErrorContains(t, err, "terminal.style.font_size")
+	var stored string
+	require.NoError(t, db.QueryRow(`SELECT value FROM settings WHERE key = 'terminal.style.font_size'`).Scan(&stored))
+	assert.Equal(t, `"large"`, stored)
 }
 
 func TestThemeServiceValidatesGlobalAndProfileFallbackStyles(t *testing.T) {

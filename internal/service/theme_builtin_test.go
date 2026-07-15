@@ -1,9 +1,9 @@
 package service
 
 import (
+	"database/sql"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -13,73 +13,6 @@ import (
 	"github.com/xuthus5/mssh/internal/service/testutil"
 	"github.com/xuthus5/mssh/internal/store"
 )
-
-func TestThemeServiceReplacesStaleBuiltinsWithoutCompatibility(t *testing.T) {
-	db := testutil.NewTestDB(t)
-	legacyDefinition, err := store.CreateThemeDefinition(db, model.ThemeDefinition{
-		Name: "GitHub Dark", Mode: model.ThemeModeDark, SourceType: model.ThemeSourceBuiltin,
-		SourceName: "MSSH", SourceLicense: "MIT", SourceVersion: "1",
-		SourceFingerprint: "builtin:github-dark:v1", ColorPayload: `{"background":"#000000","foreground":"#ffffff","cursor":"#ffffff","selection":"#333333","ansi":["#000000","#000000","#000000","#000000","#000000","#000000","#000000","#000000","#000000","#000000","#000000","#000000","#000000","#000000","#000000","#000000"]}`, IsBuiltin: true,
-	})
-	require.NoError(t, err)
-	legacyProfile, err := store.CreateThemeProfile(db, model.ThemeProfile{Name: "Renamed Dark", ThemeID: legacyDefinition.ID, FontFamily: "User Font", FontSize: 20, CursorStyle: model.CursorStyleUnderline, ColorOverrides: `{"background":"#123456"}`})
-	require.NoError(t, err)
-	themeService := NewThemeService(db, testutil.NewTestLogger())
-
-	require.NoError(t, themeService.InitializeDefaults())
-	definitions, err := themeService.ListDefinitions("")
-	require.NoError(t, err)
-	require.Len(t, definitions, 24)
-	_, err = themeService.GetProfile(legacyProfile.ID)
-	assert.Error(t, err)
-	profiles := mustThemeProfiles(t, themeService)
-	require.Len(t, profiles, 24)
-	replacement := mustThemeProfileNamed(t, profiles, "GitHub Dark")
-	assert.NotEqual(t, legacyProfile.ID, replacement.ID)
-	assert.True(t, replacement.FollowGlobalStyle)
-	assert.Equal(t, model.DefaultTerminalFontFamily, replacement.FontFamily)
-	assert.Equal(t, expectedBuiltinThemeVersion, replacement.Definition.SourceVersion)
-}
-
-func TestThemeServiceDoesNotReuseImportedDefinitionWithBuiltinColors(t *testing.T) {
-	db := testutil.NewTestDB(t)
-	githubDark := mustBuiltinDefinitionNamed(t, "GitHub Dark")
-	legacy, err := store.CreateThemeDefinition(db, model.ThemeDefinition{
-		Name: "GitHub Dark", Mode: model.ThemeModeDark, SourceType: model.ThemeSourceBuiltin,
-		SourceName: "MSSH", SourceFingerprint: "builtin:github-dark:v1", ColorPayload: githubDark.ColorPayload, IsBuiltin: true,
-	})
-	require.NoError(t, err)
-	legacyProfile, err := store.CreateThemeProfile(db, model.ThemeProfile{Name: "Legacy Dark", ThemeID: legacy.ID, FontFamily: "User Font", FontSize: 18, CursorStyle: model.CursorStyleBar, ColorOverrides: `{}`})
-	require.NoError(t, err)
-	importedDefinition, err := store.CreateThemeDefinition(db, model.ThemeDefinition{
-		Name: "Imported GitHub Colors", Mode: model.ThemeModeDark, SourceType: model.ThemeSourceITerm2,
-		SourceFingerprint: strings.TrimPrefix(githubDark.SourceFingerprint, "builtin:"), ColorPayload: githubDark.ColorPayload,
-	})
-	require.NoError(t, err)
-	importedProfile, err := store.CreateThemeProfile(db, model.ThemeProfile{Name: "Imported", ThemeID: importedDefinition.ID, FontFamily: "Imported Font", FontSize: 15, CursorStyle: model.CursorStyleUnderline, ColorOverrides: `{}`})
-	require.NoError(t, err)
-	themeService := NewThemeService(db, testutil.NewTestLogger())
-
-	require.NoError(t, themeService.InitializeDefaults())
-	definitions, err := themeService.ListDefinitions("")
-	require.NoError(t, err)
-	builtinCount := 0
-	for _, definition := range definitions {
-		if definition.IsBuiltin {
-			builtinCount++
-		}
-	}
-	assert.Equal(t, 24, builtinCount)
-	_, err = themeService.GetProfile(legacyProfile.ID)
-	assert.Error(t, err)
-	storedImported, err := themeService.GetProfile(importedProfile.ID)
-	require.NoError(t, err)
-	assert.Equal(t, model.ThemeSourceITerm2, storedImported.Definition.SourceType)
-	assignments, err := themeService.GetAssignments()
-	require.NoError(t, err)
-	assert.NotEqual(t, legacyProfile.ID, assignments.DarkProfileID)
-	assert.Equal(t, mustThemeProfileNamed(t, mustThemeProfiles(t, themeService), "GitHub Dark").ID, assignments.DarkProfileID)
-}
 
 func TestThemeServiceRestoresMissingBuiltinsWithoutOverwritingProfiles(t *testing.T) {
 	db := testutil.NewTestDB(t)
@@ -169,7 +102,7 @@ func TestThemeServiceResetsBothDefaultBuiltinStyles(t *testing.T) {
 	assert.True(t, result.LightReset)
 }
 
-func TestThemeServiceRepairsInvalidFixedAssignment(t *testing.T) {
+func TestThemeServiceRejectsInvalidFixedAssignment(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	themeService := NewThemeService(db, testutil.NewTestLogger())
 	require.NoError(t, themeService.InitializeDefaults())
@@ -179,11 +112,65 @@ func TestThemeServiceRepairsInvalidFixedAssignment(t *testing.T) {
 	assignments.FixedProfileID = 99999
 	require.NoError(t, store.SaveThemeAssignments(db, assignments))
 
-	require.NoError(t, themeService.InitializeDefaults())
-	repaired, err := themeService.GetAssignments()
+	err = themeService.InitializeDefaults()
+	assert.ErrorContains(t, err, "fixed theme profile: get theme profile")
+}
+
+func TestThemeServiceRejectsStoredAssignmentStatesWithoutRepair(t *testing.T) {
+	tests := []struct {
+		name  string
+		setup func(*testing.T, *sql.DB)
+		want  string
+	}{
+		{name: "partial", setup: deleteFixedAssignment, want: "incomplete"},
+		{name: "zero", setup: saveZeroAssignments, want: "fixed theme profile is required"},
+		{name: "corrupt", setup: corruptDarkAssignment, want: "parse theme assignment"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			db := testutil.NewTestDB(t)
+			themeService := NewThemeService(db, testutil.NewTestLogger())
+			require.NoError(t, themeService.InitializeDefaults())
+			test.setup(t, db)
+			before := storedThemeAssignmentValues(t, db)
+
+			err := themeService.InitializeDefaults()
+			assert.ErrorContains(t, err, test.want)
+			assert.Equal(t, before, storedThemeAssignmentValues(t, db))
+		})
+	}
+}
+
+func deleteFixedAssignment(t *testing.T, db *sql.DB) {
+	t.Helper()
+	_, err := db.Exec(`DELETE FROM settings WHERE key = 'terminal.theme.fixed_profile_id'`)
 	require.NoError(t, err)
-	assert.False(t, repaired.FollowInterfaceMode)
-	assert.Equal(t, repaired.DarkProfileID, repaired.FixedProfileID)
+}
+
+func saveZeroAssignments(t *testing.T, db *sql.DB) {
+	t.Helper()
+	require.NoError(t, store.SaveThemeAssignments(db, model.ThemeAssignments{}))
+}
+
+func corruptDarkAssignment(t *testing.T, db *sql.DB) {
+	t.Helper()
+	_, err := db.Exec(`UPDATE settings SET value = 'invalid' WHERE key = 'terminal.theme.dark_profile_id'`)
+	require.NoError(t, err)
+}
+
+func storedThemeAssignmentValues(t *testing.T, db *sql.DB) []string {
+	t.Helper()
+	rows, err := db.Query(`SELECT key || '=' || value FROM settings WHERE key LIKE 'terminal.theme.%' ORDER BY key`)
+	require.NoError(t, err)
+	values := make([]string, 0, 4)
+	for rows.Next() {
+		var value string
+		require.NoError(t, rows.Scan(&value))
+		values = append(values, value)
+	}
+	require.NoError(t, rows.Err())
+	require.NoError(t, rows.Close())
+	return values
 }
 
 func TestThemeServiceResetsAndDeduplicatesFixedBuiltinStyle(t *testing.T) {

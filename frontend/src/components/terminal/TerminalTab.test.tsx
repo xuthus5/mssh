@@ -76,7 +76,7 @@ describe('TerminalTab', () => {
     expect(useAppStore.getState().recordingState['term-1']).toBe('idle')
   })
 
-  it('restores recording state when start and stop requests fail', async () => {
+  it('marks failed stops as ended and allows recording to restart', async () => {
     const loggerError = vi.spyOn(logger, 'error').mockImplementation(() => {})
     logService.start.mockRejectedValueOnce(new Error('start failed'))
     const view = render(<TerminalTab terminalID="term-1" sessionId={7} active focusRequest={focusRequest} onOpenFiles={vi.fn()} />)
@@ -87,7 +87,11 @@ describe('TerminalTab', () => {
     logService.stop.mockRejectedValueOnce(new Error('stop failed'))
     view.rerender(<TerminalTab terminalID="term-1" sessionId={7} active focusRequest={focusRequest} onOpenFiles={vi.fn()} />)
     fireEvent.click(screen.getByRole('button', { name: '停止录制' }))
-    await waitFor(() => expect(useAppStore.getState().recordingState['term-1']).toBe('recording'))
+    await waitFor(() => expect(useAppStore.getState().recordingState['term-1']).toBe('error'))
+
+    fireEvent.click(screen.getByRole('button', { name: '开始录制' }))
+    await waitFor(() => expect(logService.start).toHaveBeenCalledTimes(2))
+    expect(useAppStore.getState().recordingState['term-1']).toBe('recording')
     expect(loggerError).toHaveBeenCalledTimes(2)
   })
 

@@ -20,7 +20,7 @@ function useLayerFocusRequest(tab: Tab, active: boolean, focusRequest: AppState[
   const resolvedRequestRef = useRef<TerminalFocusRequest>(noFocusRequest)
   if (tab.type !== 'terminal' || focusRequest.id !== tab.id || focusRequest.sequence === 0) return noFocusRequest
   if (resolvedRequestRef.current.sequence !== focusRequest.sequence) {
-    const primaryTerminalID = tab.terminalId ?? tab.id
+    const primaryTerminalID = tab.terminalId
     const canUseActivePane = active && (lastActiveTerminalTabID === null || lastActiveTerminalTabID === tab.id)
     resolvedRequestRef.current = {
       sequence: focusRequest.sequence,
@@ -93,13 +93,13 @@ function DynamicLayer({ tab, active, activePaneID, lastActiveTerminalTabID, file
       <TerminalErrorBoundary onClose={onClose}>
         {tab.type === 'terminal' ? <>
           <div className="flex min-w-0 flex-1 flex-col">
-            <TerminalTab terminalID={tab.terminalId ?? tab.id} sessionId={tab.sessionId ?? 0}
+            <TerminalTab terminalID={tab.terminalId} sessionId={tab.sessionId}
               onOpenFiles={onToggleFiles} active={active} focusRequest={terminalFocusRequest} onReconnect={onReconnect} />
           </div>
-          {filePanelOpen && tab.sessionId !== undefined
-            ? <FilePanelContainer sessionID={tab.sessionId} terminalID={tab.terminalId ?? tab.id} onClose={onCloseFiles} />
+          {filePanelOpen
+            ? <FilePanelContainer sessionID={tab.sessionId} terminalID={tab.terminalId} onClose={onCloseFiles} />
             : null}
-        </> : <PlaybackTab recordingId={tab.terminalId ?? tab.id} title={tab.title} active={active} />}
+        </> : <PlaybackTab recordingId={tab.recordingPath} title={tab.title} active={active} />}
       </TerminalErrorBoundary>
     </div>
   )

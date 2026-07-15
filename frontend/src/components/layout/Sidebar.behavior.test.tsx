@@ -143,7 +143,7 @@ describe('Sidebar behavior', () => {
     macroService.List.mockResolvedValue([{ id: 1, name: 'Initial', shortcut: 'Ctrl+I', command: 'initial' }])
     useAppStore.setState({
       workspaceTab: 'macros',
-      tabs: [{ id: 'tab-1', title: 'Terminal', type: 'terminal', terminalId: 'term-1' }],
+      tabs: [{ id: 'tab-1', title: 'Terminal', type: 'terminal', terminalId: 'term-1', sessionId: 1 }],
       activeSurface: { type: 'terminal', id: 'tab-1' },
       activePaneId: 'pane-1',
     })

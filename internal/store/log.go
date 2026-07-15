@@ -93,6 +93,21 @@ func UpdateSessionLog(db *sql.DB, l model.SessionLog) error {
 	return nil
 }
 
+func EndSessionLog(db *sql.DB, id int64) error {
+	result, err := db.Exec("UPDATE session_logs SET ended_at = datetime('now') WHERE id = ?", id)
+	if err != nil {
+		return fmt.Errorf("end session log: %w", err)
+	}
+	updated, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("end session log: rows affected: %w", err)
+	}
+	if updated == 0 {
+		return fmt.Errorf("end session log: log %d not found", id)
+	}
+	return nil
+}
+
 func DeleteSessionLog(db *sql.DB, id int64) error {
 	_, err := db.Exec("DELETE FROM session_logs WHERE id = ?", id)
 	if err != nil {

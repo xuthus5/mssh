@@ -1,4 +1,4 @@
-import type { Tab } from '@/store/appStore'
+import type { Tab, TerminalTab } from '@/store/appStore'
 
 interface CreateTerminalTabOptions {
   sessionID: number
@@ -10,7 +10,7 @@ interface CreateTerminalTabOptions {
 function nextTerminalInstance(sessionID: number, tabs: Tab[]): number {
   const used = new Set(
     tabs
-      .filter((tab) => tab.type === 'terminal' && tab.sessionId === sessionID)
+      .filter((tab): tab is TerminalTab => tab.type === 'terminal' && tab.sessionId === sessionID)
       .map((tab) => tab.terminalInstance)
       .filter((instance): instance is number => instance !== undefined),
   )
@@ -19,7 +19,7 @@ function nextTerminalInstance(sessionID: number, tabs: Tab[]): number {
   return instance
 }
 
-export function createTerminalTab({ sessionID, sessionName, terminalID, tabs }: CreateTerminalTabOptions): Tab {
+export function createTerminalTab({ sessionID, sessionName, terminalID, tabs }: CreateTerminalTabOptions): TerminalTab {
   const terminalInstance = nextTerminalInstance(sessionID, tabs)
   return {
     id: `terminal-${terminalID}`,
