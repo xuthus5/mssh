@@ -24,6 +24,7 @@ export function hasValidTerminalThemeColors(theme: TerminalTheme): boolean {
   return isHexColor(theme.background)
     && isHexColor(theme.foreground)
     && isHexColor(theme.cursorColor)
+    && isHexColor(theme.selectionBackground)
     && theme.ansi.length === 16
     && theme.ansi.every(isHexColor)
 }
@@ -34,6 +35,7 @@ export function normalizeTerminalThemeColors(theme: TerminalTheme): TerminalThem
     background: safeHexColor(theme.background),
     foreground: safeHexColor(theme.foreground),
     cursorColor: safeHexColor(theme.cursorColor),
+    selectionBackground: safeHexColor(theme.selectionBackground),
     ansi: theme.ansi.map(safeHexColor),
   }
 }

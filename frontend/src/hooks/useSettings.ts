@@ -11,6 +11,7 @@ export interface TerminalTheme {
   background: string
   foreground: string
   cursorColor: string
+  selectionBackground: string
   cursorStyle: 'block' | 'underline' | 'bar'
   fontFamily: string
   fontSize: number
