@@ -7,6 +7,7 @@ const theme = {
   background: '#000000',
   foreground: '#ffffff',
   cursorColor: '#888888',
+  selectionBackground: '#264f78',
   cursorStyle: 'bar' as const,
   fontFamily: 'monospace',
   fontSize: 14,
