@@ -2,10 +2,11 @@ import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { minimise, toggleMaximise, close, getSetting, setSetting } = vi.hoisted(() => ({
+const { minimise, toggleMaximise, close, emit, getSetting, setSetting } = vi.hoisted(() => ({
   minimise: vi.fn(async () => {}),
   toggleMaximise: vi.fn(async () => {}),
   close: vi.fn(async () => {}),
+  emit: vi.fn(async () => {}),
   getSetting: vi.fn(async () => ''),
   setSetting: vi.fn(async (_setting: unknown) => {}),
 }))
@@ -14,6 +15,7 @@ let triggerTabResize = () => {}
 
 vi.mock('@wailsio/runtime', () => ({
   Window: { Minimise: minimise, ToggleMaximise: toggleMaximise, Close: close },
+  Events: { Emit: emit, On: vi.fn(() => () => {}) },
 }))
 
 vi.mock('@/lib/wails', () => ({
@@ -88,13 +90,10 @@ describe('WindowTitleBar', () => {
     expect(screen.getByRole('button', { name: '切换到深色模式' })).toBeInTheDocument()
   })
 
-  it('requests the settings dialog from the title bar', async () => {
-    const listener = vi.fn()
-    window.addEventListener('mssh:open-settings', listener)
+  it('requests the native settings window from the title bar', async () => {
     render(<WindowTitleBar />)
     await userEvent.click(screen.getByRole('button', { name: '打开设置' }))
-    expect(listener).toHaveBeenCalledOnce()
-    window.removeEventListener('mssh:open-settings', listener)
+    expect(emit).toHaveBeenCalledWith('window:open-settings')
   })
 
   it('switches the sidebar navigation from the window title bar', async () => {

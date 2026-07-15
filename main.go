@@ -9,6 +9,7 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/events"
 
 	"github.com/xuthus5/mssh/internal/app"
+	"github.com/xuthus5/mssh/internal/windowing"
 )
 
 func main() {
@@ -24,7 +25,19 @@ func main() {
 		os.Exit(1)
 	}
 
-	wailsApp := application.New(application.Options{
+	wailsApp := newWailsApplication(appInstance)
+	configureWindows(wailsApp)
+	wailsApp.OnShutdown(func() { appInstance.Shutdown() })
+
+	logger.Info("MSSH started")
+	if err := wailsApp.Run(); err != nil {
+		logger.Error("MSSH run failed", "error", err)
+		os.Exit(1)
+	}
+}
+
+func newWailsApplication(appInstance *app.App) *application.App {
+	return application.New(application.Options{
 		Name:        "mssh",
 		Description: "A cross-platform SSH client",
 		Services: []application.Service{
@@ -48,28 +61,28 @@ func main() {
 			ApplicationShouldTerminateAfterLastWindowClosed: true,
 		},
 	})
+}
 
+func configureWindows(wailsApp *application.App) {
 	mainWindow := wailsApp.Window.NewWithOptions(mainWindowOptions())
-	mainWindow.OnWindowEvent(events.Common.WindowFilesDropped, func(event *application.WindowEvent) {
-		wailsApp.Event.Emit("sftp:files-dropped", map[string]any{
+	settingsController := windowing.NewSettingsWindowController(wailsApp.Window, mainWindow, wailsApp.Event.Emit)
+	_ = wailsApp.Event.On(windowing.OpenSettingsWindowEvent, func(*application.CustomEvent) {
+		settingsController.Open()
+	})
+	_ = mainWindow.RegisterHook(events.Common.WindowClosing, func(*application.WindowEvent) {
+		settingsController.Close()
+	})
+	_ = mainWindow.OnWindowEvent(events.Common.WindowFilesDropped, func(event *application.WindowEvent) {
+		_ = wailsApp.Event.Emit("sftp:files-dropped", map[string]any{
 			"files":   event.Context().DroppedFiles(),
 			"details": event.Context().DropTargetDetails(),
 		})
 	})
-
-	wailsApp.OnShutdown(func() {
-		appInstance.Shutdown()
-	})
-
-	logger.Info("MSSH started")
-	if err := wailsApp.Run(); err != nil {
-		logger.Error("MSSH run failed", "error", err)
-		os.Exit(1)
-	}
 }
 
 func mainWindowOptions() application.WebviewWindowOptions {
 	return application.WebviewWindowOptions{
+		Name:           "main",
 		Title:          "MSSH",
 		Width:          1280,
 		Height:         800,
