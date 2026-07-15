@@ -81,6 +81,43 @@ describe('DynamicTabStrip', () => {
     expect(connect).toHaveBeenCalledWith('7')
   })
 
+  it('opens quick session search from the button after the last terminal tab', async () => {
+    const openSearch = vi.fn()
+    window.addEventListener('mssh:open-session-search', openSearch)
+    useAppStore.setState({
+      tabs: [
+        { id: 'terminal-1', title: '生产服务器', type: 'terminal', terminalId: 'term-1', sessionId: 7, terminalInstance: 1 },
+        { id: 'playback-1', title: '回放 #1', type: 'playback', recordingPath: '/tmp/recording-1.msshlog' },
+        { id: 'terminal-2', title: '测试服务器', type: 'terminal', terminalId: 'term-2', sessionId: 8, terminalInstance: 1 },
+        { id: 'playback-2', title: '回放 #2', type: 'playback', recordingPath: '/tmp/recording-2.msshlog' },
+      ],
+      activeSurface: { type: 'playback', id: 'playback-2' },
+      connectionStatus: { 'term-1': 'connected', 'term-2': 'connecting' },
+    })
+    render(<DynamicTabStrip />)
+
+    const terminalTab = screen.getByRole('tab', { name: /测试服务器/ })
+    const playbackTab = screen.getByRole('tab', { name: /回放 #2/ })
+    const quickConnect = screen.getByRole('button', { name: '快速连接会话' })
+    expect(terminalTab.compareDocumentPosition(quickConnect) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(quickConnect.compareDocumentPosition(playbackTab) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+
+    await userEvent.click(quickConnect)
+    expect(openSearch).toHaveBeenCalledOnce()
+    window.removeEventListener('mssh:open-session-search', openSearch)
+  })
+
+  it('hides quick connect when no SSH terminal tab exists', () => {
+    useAppStore.setState({
+      tabs: [{ id: 'playback-1', title: '回放 #1', type: 'playback', recordingPath: '/tmp/recording-1.msshlog' }],
+      activeSurface: { type: 'playback', id: 'playback-1' },
+    })
+
+    render(<DynamicTabStrip />)
+
+    expect(screen.queryByRole('button', { name: '快速连接会话' })).not.toBeInTheDocument()
+  })
+
   it('does not offer terminal duplication for playback tabs', () => {
     seedTabs()
     render(<DynamicTabStrip />)
