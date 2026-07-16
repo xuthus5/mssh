@@ -4,11 +4,14 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/google/uuid"
 
+	"github.com/xuthus5/mssh/internal/model"
 	ssh "github.com/xuthus5/mssh/internal/ssh"
 	"github.com/xuthus5/mssh/pkg/event"
 )
@@ -26,10 +29,25 @@ type TerminalService struct {
 	sessionSvc    *SessionService
 	outputHandler func(terminalID string, data []byte)
 	closeHandler  func(terminalID string)
+	systemMu      sync.Mutex
+	systemSamples map[string]systemSample
 	logger        *slog.Logger
 }
 
 var _openPTY = ssh.PreparePTY
+
+var _runSystemInfoCommand = func(wrapper *ssh.ClientWrapper, command string) ([]byte, error) {
+	session, err := wrapper.Inner.NewSession()
+	if err != nil {
+		return nil, fmt.Errorf("system info session: %w", err)
+	}
+	defer func() { _ = session.Close() }()
+	output, err := session.CombinedOutput(command)
+	if err != nil {
+		return nil, fmt.Errorf("system info command: %w", err)
+	}
+	return output, nil
+}
 
 func (t *TerminalService) SetOutputHandler(fn func(terminalID string, data []byte)) {
 	t.mu.Lock()
@@ -57,7 +75,94 @@ func NewTerminalService(sessionSvc *SessionService, eventBus EventBus, maxSize i
 		lastUsed:      make(map[string]time.Time),
 		sessionSvc:    sessionSvc,
 		logger:        logger,
+		systemSamples: make(map[string]systemSample),
 	}
+}
+
+type systemSample struct {
+	total, idle, received, transmitted uint64
+	at                                 time.Time
+}
+
+func (t *TerminalService) SystemInfo(terminalID string) (*model.SystemInfo, error) {
+	t.mu.RLock()
+	connID, ok := t.connIDs[terminalID]
+	t.mu.RUnlock()
+	if !ok {
+		return nil, fmt.Errorf("terminal %s not found", terminalID)
+	}
+	wrapper, err := t.sessionSvc.GetClientWrapper(connID)
+	if err != nil {
+		return nil, err
+	}
+	command := `awk '/^cpu / {print "CPU", $2+$3+$4+$5+$6+$7+$8+$9, $5+$6} /^MemTotal:/ {print "MEMTOTAL", $2*1024} /^MemAvailable:/ {print "MEMAVAILABLE", $2*1024}' /proc/stat /proc/meminfo; awk 'NR>2 {rx+=$2; tx+=$10} END {print "NET", rx, tx}' /proc/net/dev; df -P -B1 / | awk 'NR==2 {print "DISK", $3, $2}'; nproc`
+	output, err := _runSystemInfoCommand(wrapper, command)
+	if err != nil {
+		return nil, err
+	}
+	values := strings.Fields(string(output))
+	info, sample, err := parseSystemInfo(values)
+	if err != nil {
+		return nil, err
+	}
+	now := time.Now()
+	t.systemMu.Lock()
+	previous, exists := t.systemSamples[terminalID]
+	t.systemSamples[terminalID] = systemSample{total: sample.total, idle: sample.idle, received: sample.received, transmitted: sample.transmitted, at: now}
+	t.systemMu.Unlock()
+	if exists {
+		elapsed := now.Sub(previous.at).Seconds()
+		if elapsed > 0 {
+			info.CPUPercent = cpuPercent(previous, sample)
+			info.DownloadRate = uint64(float64(sample.received-previous.received) / elapsed)
+			info.UploadRate = uint64(float64(sample.transmitted-previous.transmitted) / elapsed)
+		}
+	}
+	return info, nil
+}
+
+func parseSystemInfo(values []string) (*model.SystemInfo, systemSample, error) {
+	if len(values) < 14 {
+		return nil, systemSample{}, fmt.Errorf("invalid system info response")
+	}
+	result := &model.SystemInfo{}
+	sample := systemSample{}
+	for index := 0; index < len(values); {
+		switch values[index] {
+		case "CPU":
+			sample.total, _ = strconv.ParseUint(values[index+1], 10, 64)
+			sample.idle, _ = strconv.ParseUint(values[index+2], 10, 64)
+			index += 3
+		case "MEMTOTAL":
+			result.MemoryTotal, _ = strconv.ParseUint(values[index+1], 10, 64)
+			index += 2
+		case "MEMAVAILABLE":
+			available, _ := strconv.ParseUint(values[index+1], 10, 64)
+			result.MemoryUsed = result.MemoryTotal - available
+			index += 2
+		case "NET":
+			sample.received, _ = strconv.ParseUint(values[index+1], 10, 64)
+			sample.transmitted, _ = strconv.ParseUint(values[index+2], 10, 64)
+			index += 3
+		case "DISK":
+			result.DiskUsed, _ = strconv.ParseUint(values[index+1], 10, 64)
+			result.DiskTotal, _ = strconv.ParseUint(values[index+2], 10, 64)
+			index += 3
+		default:
+			result.CPUCount, _ = strconv.Atoi(values[index])
+			index++
+		}
+	}
+	return result, sample, nil
+}
+
+func cpuPercent(previous, current systemSample) float64 {
+	total := current.total - previous.total
+	idle := current.idle - previous.idle
+	if total == 0 || idle > total {
+		return 0
+	}
+	return float64(total-idle) / float64(total) * 100
 }
 
 func (t *TerminalService) Open(ctx context.Context, sessionID int64, cols, rows int) (string, error) {
