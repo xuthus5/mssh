@@ -14,6 +14,7 @@ import { useAppStore, type AppState } from '@/store/appStore'
 import { recordCommand } from '@/lib/commandHistory'
 
 const TERMINAL_SCROLLBACK = 10000
+const RESIZE_DEBOUNCE_MS = 80
 
 interface TerminalOutputEvent {
   terminal_id?: string
@@ -42,6 +43,7 @@ interface TerminalLifecycleRefs {
   handledSequenceRef: RefObject<number>
   writeFailureReportedRef: RefObject<boolean>
   lastResizeRef: RefObject<{ terminalID: string; cols: number; rows: number } | null>
+  resizeTimerRef: RefObject<number | null>
 }
 
 function hasVisibleSize(container: HTMLDivElement | null): container is HTMLDivElement {
@@ -193,7 +195,11 @@ function observeResize({ term, fitAddon, containerRef, refs, reportRuntimeError 
         return
       }
       if (!fitAndRefresh(term, fitAddon, containerRef.current)) return
-      reportResize(refs.terminalIDRef.current, term, 'terminal resize error', refs.lastResizeRef)
+      if (refs.resizeTimerRef.current !== null) window.clearTimeout(refs.resizeTimerRef.current)
+      refs.resizeTimerRef.current = window.setTimeout(() => {
+        refs.resizeTimerRef.current = null
+        reportResize(refs.terminalIDRef.current, term, 'terminal resize error', refs.lastResizeRef)
+      }, RESIZE_DEBOUNCE_MS)
     })
   })
 }
@@ -233,6 +239,7 @@ function initializeTerminal(containerRef: RefObject<HTMLDivElement | null>, refs
     if (disposed) return
     disposed = true
     cancelActivationFrame(refs.activationFrameRef)
+    if (refs.resizeTimerRef.current !== null) window.clearTimeout(refs.resizeTimerRef.current)
     container?.removeEventListener('focusin', focusHandler)
     container?.removeEventListener('pointerdown', focusHandler)
     safelyDispose('data subscription', () => dataDispose.dispose())
@@ -305,6 +312,7 @@ export function useTerminal(terminalID: string, containerRef: RefObject<HTMLDivE
     handledSequenceRef: useRef(0),
     writeFailureReportedRef: useRef(false),
     lastResizeRef: useRef<{ terminalID: string; cols: number; rows: number } | null>(null),
+    resizeTimerRef: useRef<number | null>(null),
   }
   if (refs.terminalIDRef.current !== terminalID) {
     refs.terminalIDRef.current = terminalID
