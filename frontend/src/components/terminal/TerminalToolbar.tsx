@@ -1,6 +1,8 @@
 import { useCallback, useState, type Dispatch, type SetStateAction } from 'react'
-import { Circle, ClipboardPaste, Copy, FolderOpen, Split, Square, Trash2 } from 'lucide-react'
+import { Circle, ClipboardPaste, Copy, FolderOpen, Network, Split, Square, Trash2 } from 'lucide-react'
 import SessionLog from '@/components/terminal/SessionLog'
+import TunnelDialog from '@/components/session/TunnelDialog'
+import { useTunnelManager } from '@/hooks/useTunnelManager'
 import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from '@/components/ui/popover'
 import { logger } from '@/lib/logger'
 import { LogService } from '@/lib/wails'
@@ -143,6 +145,7 @@ interface ToolbarActionsProps extends Pick<TerminalToolbarProps, 'sessionId' | '
   setLogOpen: Dispatch<SetStateAction<boolean>>
   setLogBlocked: Dispatch<SetStateAction<boolean>>
   onLogOpenChange: (open: boolean) => void
+  onOpenTunnels: () => void
 }
 
 function ToolbarActions(props: ToolbarActionsProps) {
@@ -151,6 +154,9 @@ function ToolbarActions(props: ToolbarActionsProps) {
     <div className="w-px h-4 bg-border mx-0.5" />
     <button type="button" className={actionClass} onClick={props.onOpenFiles} title="文件管理">
       <FolderOpen className="h-3 w-3" /><span className="hidden sm:inline">文件</span>
+    </button>
+    <button type="button" className={actionClass} onClick={props.onOpenTunnels} title="隧道管理">
+      <Network className="h-3 w-3" /><span className="hidden sm:inline">隧道</span>
     </button>
     <div className="w-px h-4 bg-border mx-0.5" />
     <SplitAction active={props.split} onToggle={props.onToggleSplit} />
@@ -164,6 +170,8 @@ function ToolbarActions(props: ToolbarActionsProps) {
 export function TerminalToolbar(props: TerminalToolbarProps) {
   const [showSessionLog, setShowSessionLog] = useState(false)
   const [sessionLogBlocked, setSessionLogBlocked] = useState(false)
+  const [tunnelOpen, setTunnelOpen] = useState(false)
+  const tunnels = useTunnelManager(props.sessionId)
   const terminal = useTerminalAccess(props.terminalID)
   const clipboard = useClipboardActions(terminal.getTerminal, terminal.restoreFocus)
   const handleSessionLogOpenChange = useCallback((open: boolean) => {
@@ -172,7 +180,9 @@ export function TerminalToolbar(props: TerminalToolbarProps) {
   }, [sessionLogBlocked])
   return <div className="relative flex h-8 flex-shrink-0 items-center gap-1 bg-muted/30 px-2">
     <span className="text-xs text-muted-foreground truncate mr-2">{props.hostname ?? 'Terminal'}</span>
-    <ToolbarActions {...props} clipboard={clipboard} logOpen={showSessionLog} setLogOpen={setShowSessionLog}
+    <ToolbarActions {...props} onOpenTunnels={() => { setTunnelOpen(true); void tunnels.load() }} clipboard={clipboard} logOpen={showSessionLog} setLogOpen={setShowSessionLog}
       setLogBlocked={setSessionLogBlocked} onLogOpenChange={handleSessionLogOpenChange} />
+    <TunnelDialog open={tunnelOpen} onOpenChange={setTunnelOpen} tunnels={tunnels.tunnels}
+      onStart={tunnels.start} onStop={tunnels.stop} sessionId={String(props.sessionId)} />
   </div>
 }

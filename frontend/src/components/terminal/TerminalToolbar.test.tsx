@@ -17,6 +17,9 @@ vi.mock('@/components/terminal/SessionLog', () => ({
     <button type="button" onClick={() => onDeleteDialogOpenChange(false)}>allow close</button>
   </div>,
 }))
+vi.mock('@/components/session/TunnelDialog', () => ({
+  default: ({ open, sessionId }: { open: boolean; sessionId: string }) => <div data-testid="tunnel-dialog" data-open={open} data-session-id={sessionId} />,
+}))
 
 import { TerminalToolbar } from '@/components/terminal/TerminalToolbar'
 import { useAppStore } from '@/store/appStore'
@@ -70,6 +73,16 @@ describe('TerminalToolbar', () => {
     expect(primary.focus).not.toHaveBeenCalled()
     expect(screen.getByText('server')).toBeInTheDocument()
     expect(screen.getByText('server').parentElement).not.toHaveClass('border-b')
+  })
+
+  it('opens tunnel management beside the file action', async () => {
+    render(<TerminalToolbar terminalID="primary-1" sessionId={7} isRecording={false} recordingLogId={null}
+      onToggleRecording={vi.fn()} hostname="server" onOpenFiles={vi.fn()} onToggleSplit={vi.fn()} split={false} />)
+
+    expect(screen.getByTitle('隧道管理')).toBeInTheDocument()
+    await userEvent.click(screen.getByTitle('隧道管理'))
+    expect(screen.getByTestId('tunnel-dialog')).toHaveAttribute('data-open', 'true')
+    expect(screen.getByTestId('tunnel-dialog')).toHaveAttribute('data-session-id', '7')
   })
 
   it('runs toolbar callbacks and bridges recording list actions', async () => {
