@@ -231,7 +231,29 @@ describe('DynamicTabStrip', () => {
     render(<DynamicTabStrip />)
 
     const tabList = screen.getByRole('tablist', { name: '动态标签' })
-    expect(tabList).toHaveClass('overflow-x-auto', 'overflow-y-hidden', '[scrollbar-width:none]', '[&::-webkit-scrollbar]:hidden')
+    expect(tabList).toHaveClass('gap-1', 'overflow-x-auto', 'overflow-y-hidden', '[scrollbar-width:none]', '[&::-webkit-scrollbar]:hidden')
+  })
+
+  it('converts the mouse wheel into horizontal tab scrolling', () => {
+    seedTabs()
+    render(<DynamicTabStrip />)
+    const tabList = screen.getByRole('tablist', { name: '动态标签' })
+    Object.defineProperty(tabList, 'clientWidth', { configurable: true, value: 100 })
+    Object.defineProperty(tabList, 'scrollWidth', { configurable: true, value: 300 })
+    tabList.scrollLeft = 0
+
+    fireEvent.wheel(tabList, { deltaY: 48 })
+
+    expect(tabList.scrollLeft).toBe(48)
+  })
+
+  it('keeps every terminal close button visibly available', () => {
+    seedTabs()
+    render(<DynamicTabStrip />)
+
+    const close = screen.getByRole('button', { name: '关闭 生产服务器' })
+    expect(close).toHaveClass('rounded-full', 'size-5')
+    expect(close).not.toHaveClass('opacity-0')
   })
 
   it('links each dynamic tab to its persistent panel', () => {
