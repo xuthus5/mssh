@@ -2,6 +2,7 @@ package service
 
 import (
 	"database/sql"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -9,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	backupcrypto "github.com/xuthus5/mssh/internal/crypto"
 	"github.com/xuthus5/mssh/internal/model"
 	"github.com/xuthus5/mssh/internal/service/testutil"
 	"github.com/xuthus5/mssh/internal/store"
@@ -35,7 +37,19 @@ func TestSyncServiceExportImportRestoresEncryptedFullSnapshot(t *testing.T) {
 
 	db2 := testutil.NewTestDB(t)
 	setSyncMasterKey(t, db2, syncTestMasterKey)
-	require.NoError(t, NewSyncService(db2, testutil.NewTestLogger()).Import(path))
+	local, err := store.CreateSession(db2, model.Session{Name: "local-before-import", Host: "127.0.0.1", Port: 22, Username: "local", AuthMethod: model.AuthPassword, KeepAlive: 30, TermType: "xterm"})
+	require.NoError(t, err)
+	syncService := NewSyncService(db2, testutil.NewTestLogger())
+	require.NoError(t, syncService.Import(path))
+	recoveryPath, err := syncService.recoveryPath()
+	require.NoError(t, err)
+	recoveryContent, err := os.ReadFile(recoveryPath)
+	require.NoError(t, err)
+	var recoveryEnvelope backupcrypto.BackupEnvelope
+	require.NoError(t, json.Unmarshal(recoveryContent, &recoveryEnvelope))
+	recoveryPlaintext, err := backupcrypto.DecryptBackup(recoveryEnvelope, []byte(syncTestMasterKey))
+	require.NoError(t, err)
+	assert.Contains(t, string(recoveryPlaintext), local.Name)
 	folders, err := store.ListFolders(db2)
 	require.NoError(t, err)
 	assert.Equal(t, "生产环境", folders[1].Name)
