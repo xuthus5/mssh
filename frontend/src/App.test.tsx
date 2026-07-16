@@ -123,11 +123,9 @@ describe('persistent content layers', () => {
     expect(screen.getByText('Secure Shell Client & Session Manager')).toBeInTheDocument()
     expect(screen.getByText('快捷键').parentElement).toHaveClass('rounded-xl')
     act(() => useAppStore.getState().activateWorkspace('sessions'))
-    expect(screen.queryByText('Secure Shell Client & Session Manager')).not.toBeInTheDocument()
-    expect(screen.getByText('会话资产工作区')).toBeInTheDocument()
+    expect(screen.getByText('Secure Shell Client & Session Manager')).toBeInTheDocument()
     act(() => useAppStore.getState().activateWorkspace('macros'))
-    expect(screen.queryByText('Secure Shell Client & Session Manager')).not.toBeInTheDocument()
-    expect(screen.getByLabelText('宏工作区')).toBeInTheDocument()
+    expect(screen.getByText('Secure Shell Client & Session Manager')).toBeInTheDocument()
   })
 
   it('keeps terminal and playback layers mounted behind the workspace', async () => {
@@ -153,11 +151,11 @@ describe('persistent content layers', () => {
 
     act(() => useAppStore.getState().activateWorkspace('sessions'))
     view.rerender(<App />)
-    expect(screen.getByText('会话资产工作区')).toBeInTheDocument()
-    expect(screen.getByTestId('terminal-term-1')).toHaveAttribute('data-active', 'false')
+    expect(screen.getByText('Secure Shell Client & Session Manager')).toBeInTheDocument()
+    expect(screen.getByTestId('terminal-term-1')).toHaveAttribute('data-active', 'true')
     expect(screen.getByTestId('playback-recording-1')).toBeInTheDocument()
     const terminalLayer = screen.getByTestId('terminal-term-1').closest('[data-layer-id="terminal-1"]') as HTMLElement
-    expect(terminalLayer).toHaveClass('invisible', 'pointer-events-none')
+    expect(terminalLayer).toHaveClass('visible')
     expect(within(terminalLayer).getByTestId('file-panel')).toBeInTheDocument()
   })
 

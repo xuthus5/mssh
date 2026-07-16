@@ -9,6 +9,7 @@ import {
   persistSidebarWidth,
   surfaceForTab,
   type ActiveSurface,
+  type OverviewSection,
   type WorkspaceID,
 } from '@/store/tabNavigation'
 import type { AppState, Tab } from '@/store/appStore'
@@ -17,7 +18,7 @@ type StoreSet = StoreApi<AppState>['setState']
 type StoreGet = StoreApi<AppState>['getState']
 type TransferActions = Pick<AppState, 'addTransfer' | 'removeTransfer' | 'updateTransfer' | 'clearFinishedTransfers' | 'setTransferCenterOpen'>
 type TabActions = Pick<AppState, 'openTab' | 'closeTab' | 'removeTabLocal' | 'replaceTerminalConnection'>
-type NavigationActions = Pick<AppState, 'activateWorkspace' | 'activateTab' | 'requestTerminalFocus' | 'toggleNavigation' | 'setSidebarWidth'>
+type NavigationActions = Pick<AppState, 'activateWorkspace' | 'setOverviewSection' | 'leaveOverview' | 'activateTab' | 'requestTerminalFocus' | 'toggleNavigation' | 'setSidebarWidth'>
 type PoolActions = Pick<AppState, 'registerTerminal' | 'unregisterTerminal' | 'updateLastUsed' | 'evictLRU'>
 type StatusActions = Pick<AppState, 'setConnectionStatus' | 'setActivePane' | 'setRecordingState' | 'setTunnelState' | 'setAppStatus' | 'setTerminalTheme' | 'setMaxPoolSize'>
 
@@ -152,11 +153,9 @@ export function createTabActions(set: StoreSet, get: StoreGet): TabActions {
 
 export function createNavigationActions(set: StoreSet, get: StoreGet): NavigationActions {
   return {
-    activateWorkspace: (id) => set((state) => (
-      id === 'macros' && state.activeSurface?.type === 'terminal'
-        ? { workspaceTab: id }
-        : { activeSurface: { type: 'workspace', id }, workspaceTab: id }
-    )),
+    activateWorkspace: (id) => set((state) => activateWorkspaceState(state, id)),
+    setOverviewSection: (overviewSection: OverviewSection) => set({ overviewSection }),
+    leaveOverview: () => set((state) => leaveOverviewState(state)),
     activateTab: (id, focus = false) => activateTab(set, get, id, focus),
     requestTerminalFocus: (tabID, terminalID) => set((state) => requestTerminalFocusState(state, tabID, terminalID)),
     toggleNavigation: () => set((state) => {
@@ -166,6 +165,23 @@ export function createNavigationActions(set: StoreSet, get: StoreGet): Navigatio
     }),
     setSidebarWidth: (sidebarWidth) => set({ sidebarWidth: persistSidebarWidth(sidebarWidth) }),
   }
+}
+
+function activateWorkspaceState(state: AppState, id: WorkspaceID): Partial<AppState> {
+  if (id === 'overview') {
+    if (state.activeSurface?.type === 'workspace' && state.activeSurface.id === 'overview') return {}
+    return { activeSurface: { type: 'workspace', id }, overviewReturnSurface: state.activeSurface }
+  }
+  return { workspaceTab: id }
+}
+
+function leaveOverviewState(state: AppState): Partial<AppState> {
+  if (state.activeSurface?.type !== 'workspace' || state.activeSurface.id !== 'overview') return {}
+  const target = state.overviewReturnSurface
+  if (target && target.type !== 'workspace' && !state.tabs.some((tab) => tab.id === target.id)) {
+    return { activeSurface: null, overviewReturnSurface: null }
+  }
+  return { activeSurface: target?.type === 'workspace' && target.id === 'overview' ? null : target, overviewReturnSurface: null }
 }
 
 function registerTerminalState(state: AppState, get: StoreGet, id: string, terminal: Terminal): Partial<AppState> {

@@ -69,7 +69,7 @@ describe('Sidebar behavior', () => {
     macroService.Delete.mockReset().mockResolvedValue(undefined)
     logger.debug.mockClear()
     logger.error.mockClear()
-    useAppStore.setState({ tabs: [], activeSurface: { type: 'workspace', id: 'sessions' }, activePaneId: null, workspaceTab: 'sessions' })
+    useAppStore.setState({ tabs: [], activeSurface: { type: 'workspace', id: 'sessions' }, activePaneId: null, workspaceTab: 'sessions', overviewSection: 'sessions', overviewReturnSurface: null })
   })
 
   it('filters sessions with folder ancestry and retries failed loads', async () => {
@@ -194,5 +194,18 @@ describe('Sidebar behavior', () => {
     macroService.List.mockRejectedValue(new Error('list failed'))
     render(<Sidebar />)
     await waitFor(() => expect(logger.error).toHaveBeenCalledWith('Sidebar: list macros error', expect.any(Error)))
+  })
+
+  it('navigates overview sections and returns to the previous workspace', async () => {
+    useAppStore.setState({ activeSurface: { type: 'workspace', id: 'overview' }, overviewReturnSurface: null })
+    render(<Sidebar />)
+
+    expect(screen.getByRole('navigation', { name: '总览导航' })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: '密钥配置' }))
+    expect(useAppStore.getState().overviewSection).toBe('keys')
+    await userEvent.click(screen.getByRole('button', { name: '隧道配置' }))
+    expect(useAppStore.getState().overviewSection).toBe('tunnels')
+    await userEvent.click(screen.getByRole('button', { name: '返回工作区' }))
+    expect(useAppStore.getState().activeSurface).toBeNull()
   })
 })
