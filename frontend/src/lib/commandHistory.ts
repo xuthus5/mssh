@@ -1,4 +1,6 @@
 export interface CommandHistoryEntry { id: string; command: string; createdAt: number }
+import { CommandHistoryService } from '@/lib/wails'
+import { logger } from '@/lib/logger'
 const prefix = 'mssh:command-history:'
 const limit = 10000
 
@@ -9,6 +11,8 @@ export function readCommandHistory(sessionID: number): CommandHistoryEntry[] {
 export function recordCommand(sessionID: number, command: string): void {
   const value = command.trim()
   if (!value || /(^|\s)(password|passwd|token|secret|--password)(=|\s|$)/i.test(value)) return
+  const persist = CommandHistoryService?.Add
+  if (typeof persist === 'function') void persist(sessionID, value).catch((error: unknown) => logger.error('command history persistence failed', error))
   const entries = readCommandHistory(sessionID)
   entries.unshift({ id: `${Date.now()}-${Math.random().toString(36).slice(2)}`, command: value, createdAt: Date.now() })
   localStorage.setItem(`${prefix}${sessionID}`, JSON.stringify(entries.slice(0, limit)))
