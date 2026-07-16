@@ -113,7 +113,7 @@ func (s *SessionService) ListRecentSessions(limit int) ([]model.Session, error) 
 
 func (s *SessionService) CreateSession(input model.SessionInput) (*model.Session, error) {
 	session := input.Session()
-	s.logger.Info("creating session", "name", session.Name, "authMethod", session.AuthMethod, "passwordLen", len(session.Password))
+	s.logger.Info("creating session", "name", session.Name, "authMethod", session.AuthMethod)
 	result, err := store.CreateSession(s.db, session)
 	if err != nil {
 		s.logger.Error("create session failed", "error", err)
@@ -123,7 +123,7 @@ func (s *SessionService) CreateSession(input model.SessionInput) (*model.Session
 
 func (s *SessionService) UpdateSession(input model.SessionInput) error {
 	session := input.Session()
-	s.logger.Info("updating session", "id", session.ID, "name", session.Name, "passwordLen", len(session.Password))
+	s.logger.Info("updating session", "id", session.ID, "name", session.Name)
 	err := store.UpdateSession(s.db, session)
 	if err != nil {
 		s.logger.Error("update session failed", "error", err)
@@ -228,7 +228,7 @@ func (s *SessionService) buildAuthMethods(sess *model.Session) ([]gossh.AuthMeth
 }
 
 func (s *SessionService) buildPasswordAuth(sess *model.Session) ([]gossh.AuthMethod, error) {
-	s.logger.Info("using password auth", "passwordLen", len(sess.Password))
+	s.logger.Info("using password authentication")
 	methods := []gossh.AuthMethod{gossh.Password(sess.Password)}
 	if sess.Password != "" {
 		methods = append(methods, s.buildKeyboardInteractiveAuth(sess)...)
