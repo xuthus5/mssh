@@ -207,12 +207,23 @@ describe('DynamicTabStrip', () => {
     render(<DynamicTabStrip />)
 
     expect(screen.getByRole('tab', { name: '生产服务器，状态：已连接' })).toBeInTheDocument()
+    expect(screen.getByTestId('server-icon-terminal-1')).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: '生产服务器，状态：已连接' })).toHaveClass('flex-1')
     expect(screen.getByRole('tab', { name: '回放 #1，状态：回放' })).toBeInTheDocument()
     expect(screen.queryByRole('img')).not.toBeInTheDocument()
 
     act(() => useAppStore.setState({ connectionStatus: { 'term-1': 'disconnected' } }))
 
     expect(screen.getByRole('tab', { name: '生产服务器，状态：未连接' })).toBeInTheDocument()
+  })
+
+  it('keeps quick connect borderless and shows a server icon before terminal titles', () => {
+    seedTabs()
+    render(<DynamicTabStrip />)
+
+    const quickConnect = screen.getByRole('button', { name: '快速连接会话' })
+    expect(quickConnect).toHaveClass('border-0', 'rounded-md')
+    expect(screen.getByTestId('server-icon-terminal-1').compareDocumentPosition(screen.getByText('生产服务器')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
   it('links each dynamic tab to its persistent panel', () => {
