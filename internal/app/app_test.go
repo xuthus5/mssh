@@ -148,6 +148,7 @@ func TestApp_Shutdown(t *testing.T) {
 	require.NoError(t, err)
 
 	appInstance.Shutdown()
+	appInstance.Shutdown()
 
 	pingErr := appInstance.DB.Ping()
 	assert.Error(t, pingErr, "db should be closed after shutdown")
