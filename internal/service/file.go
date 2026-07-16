@@ -2,13 +2,14 @@ package service
 
 import (
 	"context"
-	"crypto/rand"
 	"errors"
 	"fmt"
 	"log/slog"
 	"os"
 	"sync"
 	"time"
+
+	"github.com/google/uuid"
 
 	"github.com/xuthus5/mssh/internal/ssh"
 	"github.com/xuthus5/mssh/pkg/event"
@@ -185,6 +186,18 @@ func (f *FileService) CancelTransfer(taskID string) error {
 	return nil
 }
 
+func (f *FileService) CancelAll() {
+	f.mu.Lock()
+	cancels := make([]context.CancelFunc, 0, len(f.tasks))
+	for _, cancel := range f.tasks {
+		cancels = append(cancels, cancel)
+	}
+	f.mu.Unlock()
+	for _, cancel := range cancels {
+		cancel()
+	}
+}
+
 // Delete removes a remote file via SFTP.
 func (f *FileService) Delete(sessionID int64, path string) error {
 	wrapper, connID, err := f.connect(sessionID)
@@ -343,7 +356,5 @@ func (f *FileService) getRemoteFileSize(client *ssh.SFTPClient, remotePath strin
 
 // generateFileTaskID generates a unique task ID with a file- prefix.
 func generateFileTaskID() string {
-	b := make([]byte, 8)
-	_, _ = rand.Read(b)
-	return fmt.Sprintf("file-%x", b)
+	return "file-" + uuid.NewString()
 }
