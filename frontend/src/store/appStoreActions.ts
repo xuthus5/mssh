@@ -172,6 +172,7 @@ function activateWorkspaceState(state: AppState, id: WorkspaceID): Partial<AppSt
     if (state.activeSurface?.type === 'workspace' && state.activeSurface.id === 'overview') return {}
     return { activeSurface: { type: 'workspace', id }, overviewReturnSurface: state.activeSurface }
   }
+  if (state.activeSurface === null) return { activeSurface: { type: 'workspace', id }, workspaceTab: id }
   return { workspaceTab: id }
 }
 
