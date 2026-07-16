@@ -263,6 +263,17 @@ func (a *App) Shutdown() {
 	if err := service.CloseAllActiveRecordings(a.Log); err != nil {
 		logger.Error("close active recordings during shutdown failed", "error", err)
 	}
+	if a.File != nil {
+		a.File.CancelAll()
+	}
+	if a.Tunnel != nil {
+		a.Tunnel.StopAll()
+	}
+	if a.Session != nil {
+		if err := a.Session.CloseAll(); err != nil {
+			logger.Error("close SSH connections during shutdown failed", "error", err)
+		}
+	}
 	if a.DB != nil {
 		if err := a.DB.Close(); err != nil {
 			logger.Error("close database during shutdown failed", "error", err)
