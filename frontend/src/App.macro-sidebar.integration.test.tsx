@@ -101,6 +101,6 @@ describe('App macro sidebar integration', () => {
       activeSurface: { type: 'workspace', id: 'sessions' },
       workspaceTab: 'sessions',
     })
-    expect(screen.getByText('会话资产工作区')).toBeInTheDocument()
+    expect(screen.getByText('Secure Shell Client & Session Manager')).toBeInTheDocument()
   })
 })

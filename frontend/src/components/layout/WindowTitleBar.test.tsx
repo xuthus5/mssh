@@ -59,6 +59,8 @@ describe('WindowTitleBar', () => {
       activeSurface: null,
       navigationCollapsed: false,
       workspaceTab: 'sessions',
+      overviewSection: 'sessions',
+      overviewReturnSurface: null,
       connectionStatus: {},
     })
   })
@@ -100,14 +102,14 @@ describe('WindowTitleBar', () => {
     render(<WindowTitleBar />)
     const sessionsButton = screen.getByRole('button', { name: '会话' })
     const macrosButton = screen.getByRole('button', { name: '宏' })
-    expect(sessionsButton).toHaveAttribute('aria-pressed', 'false')
+    expect(sessionsButton).toHaveAttribute('aria-pressed', 'true')
     expect(sessionsButton.querySelector('svg')).toBeInTheDocument()
     expect(macrosButton.querySelector('svg')).toBeInTheDocument()
 
     await userEvent.click(macrosButton)
 
     expect(useAppStore.getState().workspaceTab).toBe('macros')
-    expect(useAppStore.getState().activeSurface).toEqual({ type: 'workspace', id: 'macros' })
+    expect(useAppStore.getState().activeSurface).toBeNull()
     expect(macrosButton).toHaveAttribute('aria-pressed', 'true')
     expect(screen.queryByText('Secure Shell Client')).not.toBeInTheDocument()
   })
@@ -133,9 +135,28 @@ describe('WindowTitleBar', () => {
 
     await userEvent.click(screen.getByRole('button', { name: '会话' }))
     expect(useAppStore.getState()).toMatchObject({
-      activeSurface: { type: 'workspace', id: 'sessions' },
+      activeSurface: { type: 'terminal', id: 'terminal-1' },
       workspaceTab: 'sessions',
     })
+  })
+
+  it('opens overview and hides session and macro navigation', async () => {
+    useAppStore.setState({
+      tabs: [{ id: 'terminal-1', title: '生产服务器', type: 'terminal', terminalId: 'term-1', sessionId: 1 }],
+      activeSurface: { type: 'terminal', id: 'terminal-1' },
+    })
+    render(<WindowTitleBar />)
+
+    await userEvent.click(screen.getByRole('button', { name: '总览' }))
+
+    expect(useAppStore.getState()).toMatchObject({
+      activeSurface: { type: 'workspace', id: 'overview' },
+      overviewReturnSurface: { type: 'terminal', id: 'terminal-1' },
+    })
+    expect(screen.getByRole('button', { name: '总览' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.queryByRole('button', { name: '会话' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '宏' })).not.toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: /生产服务器/ })).toBeInTheDocument()
   })
 
   it('links fixed navigation buttons to the sidebar', () => {
@@ -145,6 +166,7 @@ describe('WindowTitleBar', () => {
     expect(screen.getByRole('button', { name: '会话' })).toHaveAttribute('aria-controls', 'sidebar-navigation')
     expect(screen.getByRole('button', { name: '宏' })).toHaveAttribute('id', 'workspace-tab-macros')
     expect(screen.getByRole('button', { name: '宏' })).toHaveAttribute('aria-controls', 'sidebar-navigation')
+    expect(screen.getByRole('button', { name: '总览' })).toHaveAttribute('id', 'workspace-tab-overview')
   })
 
   it('collapses fixed navigation and the sidebar together', async () => {

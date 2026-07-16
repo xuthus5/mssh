@@ -1,4 +1,4 @@
-import { Search } from 'lucide-react'
+import { ArrowLeft, KeyRound, Network, Search, Server } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -11,6 +11,25 @@ import { useResizablePanel } from '@/hooks/useResizablePanel'
 import { useSidebarDialogs, useSidebarFilter, useSidebarMacros } from '@/hooks/useSidebarState'
 import { useAppStore } from '@/store/appStore'
 import { workspaceTabID } from '@/store/tabNavigation'
+
+const overviewItems = [
+  { id: 'sessions', label: '会话', icon: Server },
+  { id: 'keys', label: '密钥配置', icon: KeyRound },
+  { id: 'tunnels', label: '隧道配置', icon: Network },
+] as const
+
+function OverviewPanel() {
+  const section = useAppStore((state) => state.overviewSection)
+  const setSection = useAppStore((state) => state.setOverviewSection)
+  const leaveOverview = useAppStore((state) => state.leaveOverview)
+  return <div className="flex min-h-0 flex-1 flex-col p-2">
+    <div className="px-2 pb-3 pt-1"><p className="text-sm font-semibold text-foreground">总览</p><p className="text-xs text-muted-foreground">资产与连接配置</p></div>
+    <nav aria-label="总览导航" className="flex flex-col gap-1">
+      {overviewItems.map(({ id, label, icon: Icon }) => <Button key={id} type="button" variant={section === id ? 'secondary' : 'ghost'} className="justify-start" aria-pressed={section === id} onClick={() => setSection(id)}><Icon data-icon="inline-start" />{label}</Button>)}
+    </nav>
+    <div className="mt-auto border-t border-border pt-2"><Button type="button" variant="ghost" className="w-full justify-start" onClick={leaveOverview}><ArrowLeft data-icon="inline-start" />返回工作区</Button></div>
+  </div>
+}
 
 function SessionPanel({ workspace, filter, editSession }: {
   workspace: ReturnType<typeof useSessionWorkspace>
@@ -29,6 +48,7 @@ function SessionPanel({ workspace, filter, editSession }: {
 
 export default function Sidebar() {
   const activeTab = useAppStore((state) => state.workspaceTab)
+  const overviewActive = useAppStore((state) => state.activeSurface?.type === 'workspace' && state.activeSurface.id === 'overview')
   const panel = useResizablePanel()
   const workspace = useSessionWorkspace()
   const dialogs = useSidebarDialogs(workspace)
@@ -37,8 +57,7 @@ export default function Sidebar() {
   return <div style={{ width: panel.displayedWidth }} className="relative shrink-0 transition-[width] duration-200 ease-out">
     <aside id="sidebar-navigation" style={{ width: panel.width }} aria-labelledby={workspaceTabID(activeTab)} aria-hidden={panel.collapsed} inert={panel.collapsed ? true : undefined} className={`relative flex h-full flex-col border-r border-border bg-card transition-transform duration-200 ease-out ${panel.collapsed ? '-translate-x-full pointer-events-none' : 'translate-x-0'}`}>
       {!panel.collapsed && <div {...panel.resizeHandleProps} className="absolute inset-y-0 -right-1 z-20 w-2 cursor-col-resize touch-none outline-none after:absolute after:inset-y-0 after:left-1/2 after:w-px after:-translate-x-1/2 after:bg-transparent hover:after:bg-primary/60 focus-visible:after:bg-primary active:after:bg-primary" />}
-      {activeTab === 'sessions' && <SessionPanel workspace={workspace} filter={filter} editSession={dialogs.editSession} />}
-      {activeTab === 'macros' && <div className="min-h-0 flex-1"><QuickCommands commands={macro.macros} onExecute={macro.execute} onAdd={macro.add} onDelete={macro.remove} showAddForm /></div>}
+      {overviewActive ? <OverviewPanel /> : activeTab === 'sessions' ? <SessionPanel workspace={workspace} filter={filter} editSession={dialogs.editSession} /> : <div className="min-h-0 flex-1"><QuickCommands commands={macro.macros} onExecute={macro.execute} onAdd={macro.add} onDelete={macro.remove} showAddForm /></div>}
       <SidebarDialogs sessionDialogOpen={dialogs.sessionDialogOpen} onSessionOpenChange={(open) => { dialogs.setSessionDialogOpen(open); if (!open) dialogs.setEditingSession(null) }} editingSession={dialogs.editingSession} onSaveSession={dialogs.saveSession} folders={workspace.folders} folderDialogOpen={dialogs.folderDialogOpen} onFolderOpenChange={(open) => { dialogs.setFolderDialogOpen(open); if (!open) { dialogs.setEditingFolder(null); dialogs.setFolderName('') } }} editingFolder={dialogs.editingFolder} folderName={dialogs.folderName} setFolderName={dialogs.setFolderName} onCreateOrUpdateFolder={dialogs.saveFolder} />
     </aside>
   </div>

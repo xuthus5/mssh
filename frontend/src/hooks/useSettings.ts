@@ -75,7 +75,7 @@ function useSystemFonts() {
   return systemFonts
 }
 
-function useKeySettings() {
+export function useKeySettings() {
   const [keys, setKeys] = useState<KeyInfo[]>([])
   const listKeys = useCallback(async () => {
     try { setKeys((await KeyService.List() ?? []).map((key) => keyInfo(key, 0))) }

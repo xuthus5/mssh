@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Menu, Minus, Moon, Settings, Square, SquareTerminal, Sun, Workflow, X } from 'lucide-react'
+import { LayoutDashboard, Menu, Minus, Moon, Settings, Square, SquareTerminal, Sun, Workflow, X } from 'lucide-react'
 import { Events, Window } from '@wailsio/runtime'
 import { logger } from '@/lib/logger'
 import { useAppStore } from '@/store/appStore'
@@ -21,6 +21,7 @@ export function WindowTitleBar() {
   const navigationCollapsed = useAppStore((state) => state.navigationCollapsed)
   const activateWorkspace = useAppStore((state) => state.activateWorkspace)
   const toggleNavigation = useAppStore((state) => state.toggleNavigation)
+  const overviewActive = activeSurface?.type === 'workspace' && activeSurface.id === 'overview'
 
   const toggleColorMode = () => {
     const nextMode = colorMode === 'dark' ? 'light' : 'dark'
@@ -28,15 +29,15 @@ export function WindowTitleBar() {
   }
 
   const navigationButton = (tab: WorkspaceID, label: string) => {
-    const Icon = tab === 'sessions' ? SquareTerminal : Workflow
-    const selected = activeSurface !== null && workspaceTab === tab
+    const Icon = tab === 'overview' ? LayoutDashboard : tab === 'sessions' ? SquareTerminal : Workflow
+    const selected = tab === 'overview' ? overviewActive : !overviewActive && workspaceTab === tab
     return <button id={workspaceTabID(tab)} type="button" aria-controls="sidebar-navigation" aria-pressed={selected} className={`flex items-center gap-1.5 px-3.5 text-sm font-medium transition-colors [--wails-draggable:no-drag] ${selected ? 'bg-background text-foreground shadow-[inset_0_-2px_0_var(--primary)]' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`} onClick={() => activateWorkspace(tab)}><Icon data-icon="inline-start" aria-hidden="true" className="size-4" />{label}</button>
   }
 
   return <header className="flex h-9 shrink-0 select-none items-stretch border-b border-border bg-card">
     <div className="flex shrink-0 [--wails-draggable:no-drag]">
       <button type="button" aria-label={navigationCollapsed ? '展开导航' : '收起导航'} aria-controls="sidebar-navigation" aria-expanded={!navigationCollapsed} className="grid w-10 place-items-center text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={toggleNavigation}><Menu className="size-4" /></button>
-      {!navigationCollapsed && <nav aria-label="侧边栏导航" className="flex">{navigationButton('sessions', '会话')}{navigationButton('macros', '宏')}</nav>}
+      {!navigationCollapsed && <nav aria-label="侧边栏导航" className="flex">{navigationButton('overview', '总览')}{!overviewActive && <>{navigationButton('sessions', '会话')}{navigationButton('macros', '宏')}</>}</nav>}
     </div>
     <DynamicTabStrip onOverflowChange={setTabsOverflow} />
     <div data-testid="window-drag-region" className="min-w-20 flex-1 [--wails-draggable:drag]" onDoubleClick={() => runWindowAction('toggle maximise', Window.ToggleMaximise)} />

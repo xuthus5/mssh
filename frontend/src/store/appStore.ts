@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { Terminal } from '@xterm/xterm'
-import { initialNavigationState, type ActiveSurface, type WorkspaceID } from '@/store/tabNavigation'
+import { initialNavigationState, type ActiveSurface, type OverviewSection, type WorkspaceID } from '@/store/tabNavigation'
 import { createNavigationActions, createPoolActions, createStatusActions, createTabActions, createTransferActions } from '@/store/appStoreActions'
 export interface TerminalTab {
   id: string
@@ -98,6 +98,8 @@ export interface AppState {
   tabs: Tab[]
   activeSurface: ActiveSurface | null
   workspaceTab: WorkspaceID
+  overviewSection: OverviewSection
+  overviewReturnSurface: ActiveSurface | null
   navigationCollapsed: boolean
   sidebarWidth: number
   focusRequest: { id: string; terminalId?: string | null; sequence: number }
@@ -121,6 +123,8 @@ export interface AppState {
   removeTabLocal: (id: string) => void
   replaceTerminalConnection: (tabID: string, previousTerminalID: string, nextTerminalID: string) => boolean
   activateWorkspace: (id: WorkspaceID) => void
+  setOverviewSection: (section: OverviewSection) => void
+  leaveOverview: () => void
   activateTab: (id: string, focus?: boolean) => void
   requestTerminalFocus: (tabID: string, terminalID: string) => void
   toggleNavigation: () => void
@@ -144,6 +148,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   tabs: [],
   activeSurface: null,
   workspaceTab: 'sessions',
+  overviewSection: 'sessions',
+  overviewReturnSurface: null,
   ...initialNavigation,
   focusRequest: { id: '', terminalId: null, sequence: 0 },
   terminalPool: new Map(),

@@ -79,7 +79,7 @@ describe('Sidebar navigation collapse', () => {
 
     expect(useAppStore.getState()).toMatchObject({ activeSurface: { type: 'workspace', id: 'sessions' }, workspaceTab: 'sessions' })
     expect(screen.getByRole('button', { name: '会话' })).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByText('会话资产工作区')).toBeInTheDocument()
+    expect(screen.getByText('Secure Shell Client & Session Manager')).toBeInTheDocument()
     expect(screen.getByPlaceholderText('搜索会话...')).toBeInTheDocument()
   })
 })
