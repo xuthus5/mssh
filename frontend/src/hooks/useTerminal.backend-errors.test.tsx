@@ -46,6 +46,7 @@ vi.mock('@xterm/addon-fit', () => ({ FitAddon: class { fit() {}; dispose() {} } 
 vi.mock('@wailsio/runtime', () => ({ Events: { On: vi.fn(() => vi.fn()) } }))
 vi.mock('@/lib/wails', () => ({
   TerminalService: { Attach: backend.attach, Resize: backend.resize, Write: backend.write, Close: vi.fn(async () => {}) },
+  CommandHistoryService: { Add: vi.fn(async () => {}) },
 }))
 
 import { useTerminal } from '@/hooks/useTerminal'
