@@ -44,9 +44,11 @@ func TestThemeServiceValidatesGlobalAndProfileFallbackStyles(t *testing.T) {
 	assignments := model.ThemeAssignmentsInput{DarkProfileID: dark.ID, LightProfileID: light.ID, FollowInterfaceMode: true}
 
 	invalidStyles := []model.TerminalGlobalStyleInput{
-		{FontFamily: "", FontSize: 14, CursorStyle: model.CursorStyleBar},
-		{FontFamily: "mono", FontSize: 7, CursorStyle: model.CursorStyleBar},
-		{FontFamily: "mono", FontSize: 14, CursorStyle: "beam"},
+		{FontFamily: "", FontSize: 14, CursorStyle: model.CursorStyleBar, SelectionBackground: "#123456"},
+		{FontFamily: "mono", FontSize: 7, CursorStyle: model.CursorStyleBar, SelectionBackground: "#123456"},
+		{FontFamily: "mono", FontSize: 14, CursorStyle: "beam", SelectionBackground: "#123456"},
+		{FontFamily: "mono", FontSize: 14, CursorStyle: model.CursorStyleBar, SelectionBackground: "blue"},
+		{FontFamily: "mono", FontSize: 14, CursorStyle: model.CursorStyleBar, SelectionBackground: "#zzzzzz"},
 	}
 	for _, style := range invalidStyles {
 		err := themeService.SaveConfiguration(model.ThemeConfigurationInput{
@@ -83,7 +85,7 @@ func TestThemeServiceSavesTerminalConfigurationAtomically(t *testing.T) {
 	_, err = db.Exec(`CREATE TRIGGER fail_global_style BEFORE UPDATE ON settings WHEN NEW.key = 'terminal.style.font_size' BEGIN SELECT RAISE(FAIL, 'global style failed'); END`)
 	require.NoError(t, err)
 	err = themeService.SaveConfiguration(model.ThemeConfigurationInput{
-		GlobalStyle: model.TerminalGlobalStyleInput{FontFamily: "\x00 Iosevka \n", FontSize: 17, CursorStyle: model.CursorStyleUnderline},
+		GlobalStyle: model.TerminalGlobalStyleInput{FontFamily: "\x00 Iosevka \n", FontSize: 17, CursorStyle: model.CursorStyleUnderline, SelectionBackground: "#123456"},
 		Profiles:    []model.ThemeProfileInput{model.ThemeProfileInputFrom(dark), model.ThemeProfileInputFrom(light)},
 		Assignments: model.ThemeAssignmentsInput{DarkProfileID: light.ID, LightProfileID: dark.ID, FollowInterfaceMode: true},
 	})
@@ -118,7 +120,7 @@ func TestThemeServiceRollsBackWhenConfigurationAssignmentWriteFails(t *testing.T
 	_, err = db.Exec(`CREATE TRIGGER fail_configuration_assignment BEFORE UPDATE ON settings WHEN NEW.key = 'terminal.theme.fixed_profile_id' BEGIN SELECT RAISE(FAIL, 'assignment failed'); END`)
 	require.NoError(t, err)
 	err = themeService.SaveConfiguration(model.ThemeConfigurationInput{
-		GlobalStyle: model.TerminalGlobalStyleInput{FontFamily: "Changed Font", FontSize: 18, CursorStyle: model.CursorStyleBlock},
+		GlobalStyle: model.TerminalGlobalStyleInput{FontFamily: "Changed Font", FontSize: 18, CursorStyle: model.CursorStyleBlock, SelectionBackground: "#123456"},
 		Profiles:    []model.ThemeProfileInput{model.ThemeProfileInputFrom(dark), model.ThemeProfileInputFrom(light), model.ThemeProfileInputFrom(fixed)},
 		Assignments: model.ThemeAssignmentsInput{DarkProfileID: dark.ID, LightProfileID: light.ID, FollowInterfaceMode: false, FixedProfileID: fixed.ID},
 	})
@@ -147,7 +149,7 @@ func TestThemeServiceNormalizesAndResetsTerminalStyles(t *testing.T) {
 	dark.FontFamily = "Profile Font"
 	dark.FontSize = 20
 	dark.CursorStyle = model.CursorStyleBlock
-	global := model.TerminalGlobalStyleInput{FontFamily: "\x00 Iosevka \n", FontSize: 17, CursorStyle: model.CursorStyleUnderline}
+	global := model.TerminalGlobalStyleInput{FontFamily: "\x00 Iosevka \n", FontSize: 17, CursorStyle: model.CursorStyleUnderline, SelectionBackground: " #ABCDEF "}
 	require.NoError(t, themeService.SaveConfiguration(model.ThemeConfigurationInput{
 		GlobalStyle: global,
 		Profiles:    []model.ThemeProfileInput{model.ThemeProfileInputFrom(dark), model.ThemeProfileInputFrom(light)},
@@ -157,6 +159,7 @@ func TestThemeServiceNormalizesAndResetsTerminalStyles(t *testing.T) {
 	storedGlobal, err := themeService.GetGlobalStyle()
 	require.NoError(t, err)
 	assert.Equal(t, "Iosevka", storedGlobal.FontFamily)
+	assert.Equal(t, "#abcdef", storedGlobal.SelectionBackground)
 	_, err = themeService.ResetBuiltinStyles()
 	require.NoError(t, err)
 	resetDark, err := themeService.GetProfile(dark.ID)
@@ -179,7 +182,7 @@ func TestThemeServiceLimitsGlobalFontFamilyAndReportsClosedDatabase(t *testing.T
 	light := mustThemeProfileNamed(t, profiles, "GitHub Light")
 	longFontFamily := strings.Repeat("字", maxTerminalFontFamilyRunes+10)
 	require.NoError(t, themeService.SaveConfiguration(model.ThemeConfigurationInput{
-		GlobalStyle: model.TerminalGlobalStyleInput{FontFamily: longFontFamily, FontSize: 14, CursorStyle: model.CursorStyleBar},
+		GlobalStyle: model.TerminalGlobalStyleInput{FontFamily: longFontFamily, FontSize: 14, CursorStyle: model.CursorStyleBar, SelectionBackground: "#123456"},
 		Profiles:    []model.ThemeProfileInput{model.ThemeProfileInputFrom(dark), model.ThemeProfileInputFrom(light)},
 		Assignments: model.ThemeAssignmentsInput{DarkProfileID: dark.ID, LightProfileID: light.ID, FollowInterfaceMode: true},
 	}))
@@ -238,8 +241,9 @@ func TestNewCustomAndImportedProfilesFollowGlobalStyle(t *testing.T) {
 
 func terminalStyleDefaults() model.TerminalGlobalStyle {
 	return model.TerminalGlobalStyle{
-		FontFamily:  model.DefaultTerminalFontFamily,
-		FontSize:    model.DefaultTerminalFontSize,
-		CursorStyle: model.CursorStyleBar,
+		FontFamily:          model.DefaultTerminalFontFamily,
+		FontSize:            model.DefaultTerminalFontSize,
+		CursorStyle:         model.CursorStyleBar,
+		SelectionBackground: model.DefaultTerminalSelectionBackground,
 	}
 }

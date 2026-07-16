@@ -13,14 +13,16 @@ const maxTerminalFontFamilyRunes = 256
 
 func defaultTerminalGlobalStyle() model.TerminalGlobalStyle {
 	return model.TerminalGlobalStyle{
-		FontFamily:  model.DefaultTerminalFontFamily,
-		FontSize:    model.DefaultTerminalFontSize,
-		CursorStyle: model.CursorStyleBar,
+		FontFamily:          model.DefaultTerminalFontFamily,
+		FontSize:            model.DefaultTerminalFontSize,
+		CursorStyle:         model.CursorStyleBar,
+		SelectionBackground: model.DefaultTerminalSelectionBackground,
 	}
 }
 
 func normalizeTerminalGlobalStyle(style model.TerminalGlobalStyle) model.TerminalGlobalStyle {
 	style.FontFamily = normalizeTerminalFontFamily(style.FontFamily)
+	style.SelectionBackground = strings.ToLower(strings.TrimSpace(style.SelectionBackground))
 	return style
 }
 
@@ -53,7 +55,25 @@ func validateTerminalStyle(fontFamily string, fontSize int, cursorStyle model.Cu
 }
 
 func validateTerminalGlobalStyle(style model.TerminalGlobalStyle) error {
-	return validateTerminalStyle(style.FontFamily, style.FontSize, style.CursorStyle)
+	if err := validateTerminalStyle(style.FontFamily, style.FontSize, style.CursorStyle); err != nil {
+		return err
+	}
+	if !validTerminalHexColor(style.SelectionBackground) {
+		return fmt.Errorf("terminal selection background must use #RRGGBB format")
+	}
+	return nil
+}
+
+func validTerminalHexColor(value string) bool {
+	if len(value) != 7 || value[0] != '#' {
+		return false
+	}
+	for _, character := range value[1:] {
+		if !strings.ContainsRune("0123456789abcdefABCDEF", character) {
+			return false
+		}
+	}
+	return true
 }
 
 func initializeTerminalGlobalStyle(db themeDatabase) error {

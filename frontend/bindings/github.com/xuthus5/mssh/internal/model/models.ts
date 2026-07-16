@@ -654,6 +654,7 @@ export class TerminalGlobalStyle {
     "font_family": string;
     "font_size": number;
     "cursor_style": CursorStyle;
+    "selection_background": string;
 
     /** Creates a new TerminalGlobalStyle instance. */
     constructor($$source: Partial<TerminalGlobalStyle> = {}) {
@@ -665,6 +666,9 @@ export class TerminalGlobalStyle {
         }
         if (!("cursor_style" in $$source)) {
             this["cursor_style"] = CursorStyle.$zero;
+        }
+        if (!("selection_background" in $$source)) {
+            this["selection_background"] = "";
         }
 
         Object.assign(this, $$source);
@@ -683,6 +687,7 @@ export class TerminalGlobalStyleInput {
     "font_family": string;
     "font_size": number;
     "cursor_style": CursorStyle;
+    "selection_background": string;
 
     /** Creates a new TerminalGlobalStyleInput instance. */
     constructor($$source: Partial<TerminalGlobalStyleInput> = {}) {
@@ -694,6 +699,9 @@ export class TerminalGlobalStyleInput {
         }
         if (!("cursor_style" in $$source)) {
             this["cursor_style"] = CursorStyle.$zero;
+        }
+        if (!("selection_background" in $$source)) {
+            this["selection_background"] = "";
         }
 
         Object.assign(this, $$source);

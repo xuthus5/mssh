@@ -9,7 +9,7 @@ import {
 } from '@/components/settings/themeEditorState'
 
 const profiles = [profile(1, '#111111'), profile(2, '#eeeeee'), profile(3, '#333333')]
-const globalStyle = { font_family: 'Global Font', font_size: 16, cursor_style: 'underline' as const }
+const globalStyle = { font_family: 'Global Font', font_size: 16, cursor_style: 'underline' as const, selection_background: '#123456' }
 
 describe('theme editor state', () => {
   it('creates editable drafts keyed by Profile ID', () => {
@@ -45,14 +45,14 @@ describe('theme editor state', () => {
     expect(configuration.profiles.map((profile) => profile.id)).toEqual([1, 2, 3])
   })
 
-  it('resolves global typography without mutating Profile fallback values', () => {
+  it('resolves global style without mutating Profile fallback values', () => {
     const draft = createThemeDrafts(profiles as never).get(1)
     if (!draft) throw new Error('missing draft')
 
     const effective = effectiveDraftTheme(draft, globalStyle as never)
 
-    expect(effective).toMatchObject({ fontFamily: 'Global Font', fontSize: 16, cursorStyle: 'underline' })
-    expect(draft).toMatchObject({ fontFamily: 'Profile Font 1', fontSize: 13, cursorStyle: 'bar', followGlobalStyle: true })
+    expect(effective).toMatchObject({ fontFamily: 'Global Font', fontSize: 16, cursorStyle: 'underline', selectionBackground: '#123456' })
+    expect(draft).toMatchObject({ fontFamily: 'Profile Font 1', fontSize: 13, cursorStyle: 'bar', selectionBackground: '#264f78', followGlobalStyle: true })
   })
 
   it('restores the Profile fallback values when global following is disabled', () => {
@@ -61,7 +61,7 @@ describe('theme editor state', () => {
 
     const effective = effectiveDraftTheme({ ...draft, followGlobalStyle: false }, globalStyle as never)
 
-    expect(effective).toMatchObject({ fontFamily: 'Profile Font 1', fontSize: 13, cursorStyle: 'bar' })
+    expect(effective).toMatchObject({ fontFamily: 'Profile Font 1', fontSize: 13, cursorStyle: 'bar', selectionBackground: '#264f78' })
     expect(effective.cursorColor).toBe('#ffffff')
   })
 
