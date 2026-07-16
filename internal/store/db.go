@@ -74,6 +74,13 @@ const macrosTableSQL = `CREATE TABLE IF NOT EXISTS macros (
 	created_at TEXT NOT NULL DEFAULT (datetime('now'))
 )`
 
+const commandHistoryTableSQL = `CREATE TABLE IF NOT EXISTS command_history (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	session_id INTEGER NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+	command TEXT NOT NULL,
+	created_at TEXT NOT NULL DEFAULT (datetime('now'))
+)`
+
 const logsTableSQL = `CREATE TABLE IF NOT EXISTS session_logs (
 	id INTEGER PRIMARY KEY AUTOINCREMENT,
 	session_id INTEGER REFERENCES sessions(id),
@@ -93,6 +100,7 @@ var finalSchemaStatements = []schemaStatement{
 	{name: "sessions", sql: sessionsTableSQL},
 	{name: "tunnels", sql: tunnelsTableSQL},
 	{name: "macros", sql: macrosTableSQL},
+	{name: "command_history", sql: commandHistoryTableSQL},
 	{name: "session_logs", sql: logsTableSQL},
 	{name: "settings", sql: settingsTableSQL},
 	{name: "themes", sql: themeDefinitionsSchema},
@@ -109,6 +117,7 @@ var applicationTablesInDropOrder = []string{
 	"session_folders",
 	"settings",
 	"macros",
+	"command_history",
 }
 
 type dbFile interface {

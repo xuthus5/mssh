@@ -19,19 +19,20 @@ type App struct {
 	Crypto   []byte
 	Keychain crypto.KeychainAdapter
 
-	Session  *service.SessionService
-	Terminal *service.TerminalService
-	File     *service.FileService
-	Tunnel   *service.TunnelService
-	Key      *service.KeyService
-	Macro    *service.MacroService
-	Theme    *service.ThemeService
-	Log      *service.LogService
-	Sync     *service.SyncService
-	Setting  *service.SettingService
-	About    *service.AboutService
-	Font     *service.FontService
-	logger   *slog.Logger
+	Session        *service.SessionService
+	Terminal       *service.TerminalService
+	File           *service.FileService
+	Tunnel         *service.TunnelService
+	Key            *service.KeyService
+	Macro          *service.MacroService
+	CommandHistory *service.CommandHistoryService
+	Theme          *service.ThemeService
+	Log            *service.LogService
+	Sync           *service.SyncService
+	Setting        *service.SettingService
+	About          *service.AboutService
+	Font           *service.FontService
+	logger         *slog.Logger
 }
 
 type Options struct {
@@ -219,22 +220,23 @@ func initializeServices(input serviceInitialization) (*App, error) {
 	}
 	configureTerminalLogging(terminalSvc, logSvc, input.logger)
 	return &App{
-		DB:       input.db,
-		Crypto:   input.masterKey,
-		Keychain: input.keychain,
-		Session:  sessionSvc,
-		Terminal: terminalSvc,
-		File:     service.NewFileService(sessionSvc, input.eventBus, input.logger),
-		Tunnel:   service.NewTunnelService(input.db, sessionSvc, input.eventBus, input.logger),
-		Key:      service.NewKeyService(input.db, adapter, input.logger),
-		Macro:    service.NewMacroService(input.db, terminalSvc, input.logger),
-		Theme:    themeSvc,
-		Log:      logSvc,
-		Sync:     service.NewSyncService(input.db, input.logger),
-		Setting:  service.NewSettingService(input.db, input.logger),
-		About:    service.NewAboutService(),
-		Font:     service.NewFontService(input.logger),
-		logger:   input.logger,
+		DB:             input.db,
+		Crypto:         input.masterKey,
+		Keychain:       input.keychain,
+		Session:        sessionSvc,
+		Terminal:       terminalSvc,
+		File:           service.NewFileService(sessionSvc, input.eventBus, input.logger),
+		Tunnel:         service.NewTunnelService(input.db, sessionSvc, input.eventBus, input.logger),
+		Key:            service.NewKeyService(input.db, adapter, input.logger),
+		Macro:          service.NewMacroService(input.db, terminalSvc, input.logger),
+		CommandHistory: service.NewCommandHistoryService(input.db, input.logger),
+		Theme:          themeSvc,
+		Log:            logSvc,
+		Sync:           service.NewSyncService(input.db, input.logger),
+		Setting:        service.NewSettingService(input.db, input.logger),
+		About:          service.NewAboutService(),
+		Font:           service.NewFontService(input.logger),
+		logger:         input.logger,
 	}, nil
 }
 
