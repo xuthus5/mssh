@@ -43,6 +43,9 @@ export function DeleteFolder(id: number): $CancellablePromise<void> {
 export function DeleteSession(id: number): $CancellablePromise<void> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.SessionService.DeleteSession", id);
 }
+export function DeleteHostKey(line: number): $CancellablePromise<void> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.SessionService.DeleteHostKey", line);
+}
 
 export function GetClientWrapper(connID: string): $CancellablePromise<ssh$0.ClientWrapper | null> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.SessionService.GetClientWrapper", connID).then(($result: any) => {
@@ -60,6 +63,9 @@ export function ListFolders(): $CancellablePromise<model$0.SessionFolder[]> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.SessionService.ListFolders").then(($result: any) => {
         return $$createType6($result);
     });
+}
+export function ListHostKeys(): $CancellablePromise<any[]> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.SessionService.ListHostKeys");
 }
 
 export function ListRecentSessions(limit: number): $CancellablePromise<model$0.Session[]> {

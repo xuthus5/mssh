@@ -5,6 +5,7 @@ import { ThemeEditor } from '@/components/settings/ThemeEditor'
 import { ThemeManager } from '@/components/settings/ThemeManager'
 import { SyncPanel } from '@/components/settings/SyncPanel'
 import { AboutPanel } from '@/components/settings/AboutPanel'
+import { SecurityPanel } from '@/components/settings/SecurityPanel'
 import type { GeneralSettings, SyncConfig } from '@/hooks/useSettings'
 import type { ColorMode } from '@/lib/effectiveTerminalTheme'
 import type { BuiltinThemeResetResult, TerminalGlobalStyle, ThemeAssignments, ThemeConfigurationInput, ThemeImportSummary, ThemeProfile, ThemeProfileInput } from '../../../bindings/github.com/xuthus5/mssh/internal/model/models'
@@ -37,6 +38,7 @@ function SettingsTabPanels(props: SettingsViewProps) {
     <TabsContent value="general" className="min-h-0 min-w-0 overflow-y-auto overscroll-contain pr-2"><GeneralSettingsPanel general={props.general} systemFonts={props.systemFonts} onSave={props.onSaveGeneral} onPreviewUIFont={props.onPreviewUIFont} onPreviewWindowOpacity={props.onPreviewWindowOpacity} /></TabsContent>
     <TabsContent value="terminal" className="min-h-0 min-w-0 overflow-y-auto overscroll-contain pr-2"><div className="flex flex-col gap-5"><ThemeEditor profiles={props.themeProfiles} assignments={props.themeAssignments} globalStyle={props.terminalGlobalStyle} colorMode={props.colorMode} onSave={props.onSaveThemeConfiguration} onResetBuiltins={props.onResetBuiltinThemes} /><ThemeManager profiles={props.themeProfiles} onImport={props.onImportThemes} onCreateProfile={props.onCreateThemeProfile} onUpdateProfile={props.onUpdateThemeProfile} onDeleteProfile={props.onDeleteThemeProfile} onDeleteDefinition={props.onDeleteThemeDefinition} /></div></TabsContent>
     <TabsContent value="sync" className="min-h-0 min-w-0 overflow-y-auto overscroll-contain pr-2"><SyncPanel sync={props.sync} onSave={props.onSaveSync} onExport={props.onExportConfig} onImport={props.onImportConfig} /></TabsContent>
+    <TabsContent value="security" className="min-h-0 min-w-0 overflow-y-auto overscroll-contain pr-2"><SecurityPanel /></TabsContent>
     <TabsContent value="about" className="min-h-0 min-w-0 overflow-y-auto overscroll-contain pr-2"><AboutPanel /></TabsContent>
   </>
 }
@@ -49,6 +51,7 @@ export function SettingsView(props: SettingsViewProps) {
       <TabsTrigger value="general">通用</TabsTrigger>
       <TabsTrigger value="terminal">终端</TabsTrigger>
       <TabsTrigger value="sync">同步</TabsTrigger>
+      <TabsTrigger value="security">安全</TabsTrigger>
       <TabsTrigger value="about">关于</TabsTrigger>
     </TabsList>
     <SettingsTabPanels {...props} />
