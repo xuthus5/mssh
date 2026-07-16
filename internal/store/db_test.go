@@ -30,7 +30,7 @@ func TestOpenDB(t *testing.T) {
 }
 
 func TestDatabaseFormatVersion(t *testing.T) {
-	assert.Equal(t, 1, databaseFormatVersion)
+	assert.Equal(t, 2, databaseFormatVersion)
 }
 
 func TestInitializeSchemaResetsMismatchedDatabaseFormat(t *testing.T) {

@@ -21,6 +21,10 @@ export interface Session {
   host: string
   port: number
   username: string
+  tags?: string
+  notes?: string
+  environment?: string
+  project?: string
   authMethod: 'password' | 'key' | 'agent' | 'keyboard-interactive'
   password?: string
   keyId?: string
@@ -53,6 +57,10 @@ function mapSession(s: BindingSession): Session {
     host: s.host,
     port: s.port,
     username: s.username,
+    tags: s.tags,
+    notes: s.notes,
+    environment: s.environment,
+    project: s.project,
     authMethod: s.auth_method as Session['authMethod'],
     password: s.password,
     keyId: s.key_id != null ? String(s.key_id) : undefined,
@@ -176,6 +184,7 @@ export function useSession() {
         host: session.host,
         port: session.port,
         username: session.username,
+        tags: session.tags ?? '', notes: session.notes ?? '', environment: session.environment ?? '', project: session.project ?? '',
         auth_method: session.authMethod as SessionInput['auth_method'],
         password: session.password,
         key_id: session.keyId ? Number(session.keyId) : null,
@@ -204,6 +213,7 @@ export function useSession() {
         host: session.host,
         port: session.port,
         username: session.username,
+        tags: session.tags ?? '', notes: session.notes ?? '', environment: session.environment ?? '', project: session.project ?? '',
         auth_method: session.authMethod as SessionInput['auth_method'],
         password: session.password,
         key_id: session.keyId ? Number(session.keyId) : null,
