@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react'
+import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type WheelEvent } from 'react'
 import { Circle, Copy, List, Play, Plus, Server, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -97,6 +97,15 @@ function requestCloseFromKeyboard(event: KeyboardEvent<HTMLButtonElement>, tabID
   onClose(tabID)
 }
 
+function scrollTabsWithWheel(event: WheelEvent<HTMLDivElement>) {
+	const tabList = event.currentTarget
+	if (tabList.scrollWidth <= tabList.clientWidth) return
+	const distance = Math.abs(event.deltaY) >= Math.abs(event.deltaX) ? event.deltaY : event.deltaX
+	if (distance === 0) return
+	tabList.scrollLeft += distance
+	event.preventDefault()
+}
+
 function DynamicTab({ tab, active, connectionStatus, navigation, onActivate, onClose, onDuplicate }: {
   tab: Tab
   active: boolean
@@ -109,14 +118,14 @@ function DynamicTab({ tab, active, connectionStatus, navigation, onActivate, onC
   const statusLabel = tabStatusLabel(tab, connectionStatus)
   const content = (
     <div
-      className={`group flex h-8 shrink-0 items-center gap-1 rounded-md px-1.5 text-sm transition-colors duration-150 ${active ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground'}`}
+      className={`group flex h-8 shrink-0 items-center gap-1 rounded-md border px-1.5 text-sm transition-colors duration-150 ${active ? 'border-border/60 bg-background text-foreground shadow-sm' : 'border-transparent text-muted-foreground hover:bg-muted/60 hover:text-foreground'}`}
     >
       <button ref={(element) => navigation.registerTab(tab.id, element)} id={dynamicTabID(tab.id)} type="button" role="tab" tabIndex={active ? 0 : -1} aria-controls={dynamicPanelID(tab.id)} aria-label={`${tab.title}，状态：${statusLabel}`} aria-selected={active} className="flex h-full min-w-0 flex-1 items-center gap-1.5 rounded-sm px-1 focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={() => onActivate(tab.id)} onKeyDown={(event) => navigation.onKeyDown(event, tab.id)}>
         <TabLeadingIcon tab={tab} />
         <span className="min-w-0 max-w-40 truncate">{tab.title}</span>
         <TabStatusIcon tab={tab} connectionStatus={connectionStatus} />
       </button>
-      <button type="button" aria-label={`关闭 ${tab.title}`} className={`rounded-sm p-0.5 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${active ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100'}`} onClick={(event) => { event.stopPropagation(); onClose(tab.id) }} onKeyDown={(event) => requestCloseFromKeyboard(event, tab.id, onClose)}>
+      <button type="button" aria-label={`关闭 ${tab.title}`} className="grid size-5 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-destructive/15 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={(event) => { event.stopPropagation(); onClose(tab.id) }} onKeyDown={(event) => requestCloseFromKeyboard(event, tab.id, onClose)}>
         <X aria-hidden="true" className="size-3.5" />
       </button>
     </div>
@@ -193,7 +202,7 @@ export function DynamicTabStrip({ onOverflowChange }: { onOverflowChange?: (over
 
   return (
     <div className="flex min-w-0 shrink overflow-hidden [--wails-draggable:no-drag]">
-      <div ref={tabListRef} role="tablist" aria-label="动态标签" className="flex h-9 min-w-0 items-center gap-0.5 overflow-x-auto overflow-y-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div ref={tabListRef} role="tablist" aria-label="动态标签" className="flex h-9 min-w-0 items-center gap-1 overflow-x-auto overflow-y-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" onWheel={scrollTabsWithWheel}>
         {tabs.map((tab, index) => <Fragment key={tab.id}>
           <DynamicTab tab={tab} active={activeSurface?.id === tab.id} connectionStatus={connectionStatus} navigation={navigation} onActivate={activateWithFocus} onClose={closeCoordinator.requestClose} onDuplicate={duplicateTerminal} />
           {index === quickConnectAfter && <QuickConnectButton />}
