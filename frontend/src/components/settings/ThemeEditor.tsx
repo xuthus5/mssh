@@ -18,7 +18,7 @@ import { TerminalThemeInspector } from '@/components/settings/TerminalThemeInspe
 import { TerminalThemePreview } from '@/components/settings/TerminalThemePreview'
 import { ThemeModeSelector } from '@/components/settings/ThemeModeSelector'
 import { buildThemeConfiguration, configurationProfileIDs, createThemeDrafts, effectiveDraftTheme, profileIDForSlot, validTerminalFontFamily, validTerminalFontSize, type ThemeDraft, type ThemeEditorSlot } from '@/components/settings/themeEditorState'
-import { hasValidTerminalThemeColors } from '@/components/settings/terminalThemeValidation'
+import { hasValidTerminalThemeColors, isHexColor } from '@/components/settings/terminalThemeValidation'
 import type { ColorMode } from '@/lib/effectiveTerminalTheme'
 import type { TerminalTheme } from '@/hooks/useSettings'
 import type { BuiltinThemeResetResult, TerminalGlobalStyle, ThemeAssignments, ThemeConfigurationInput, ThemeProfile } from '../../../bindings/github.com/xuthus5/mssh/internal/model/models'
@@ -211,5 +211,5 @@ function hasValidTerminalStyle(theme: ThemeDraft): boolean {
 }
 
 function hasValidGlobalStyle(style: TerminalGlobalStyle): boolean {
-  return validTerminalFontFamily(style.font_family) && validTerminalFontSize(style.font_size)
+  return validTerminalFontFamily(style.font_family) && validTerminalFontSize(style.font_size) && isHexColor(style.selection_background)
 }
