@@ -9,6 +9,7 @@ import { logger } from '@/lib/logger'
 import { toast } from '@/components/ui/toast'
 import type { TerminalFocusRequest } from '@/hooks/useTerminal'
 import { Button } from '@/components/ui/button'
+import { CommandHistoryPanel } from '@/components/terminal/CommandHistoryPanel'
 
 const noFocusRequest: TerminalFocusRequest = { sequence: 0, targetTerminalID: null }
 
@@ -91,6 +92,7 @@ function ConnectionOverlay({ status, onReconnect }: {
 
 export function TerminalTab({ terminalID, sessionId, onOpenFiles, active, focusRequest, onReconnect }: Props) {
   const [split, setSplit] = useState(false)
+  const [historyOpen, setHistoryOpen] = useState(false)
   const tabs = useAppStore((state) => state.tabs)
   const currentTab = tabs.find((tab) => tab.type === 'terminal' && tab.terminalId === terminalID)
   const recording = useRecordingControl(terminalID, sessionId)
@@ -108,10 +110,12 @@ export function TerminalTab({ terminalID, sessionId, onOpenFiles, active, focusR
         onOpenFiles={onOpenFiles}
         onToggleSplit={() => setSplit((current) => !current)}
         split={split}
+        onOpenHistory={() => setHistoryOpen(true)}
       />
       <div className="relative min-h-0 flex-1">
         <TerminalViewport split={split} sessionId={sessionId} terminalID={terminalID} active={active} focusRequest={focusRequest} />
         <ConnectionOverlay status={connectionStatus} onReconnect={onReconnect} />
+        {historyOpen && <CommandHistoryPanel sessionID={sessionId} onClose={() => setHistoryOpen(false)} onFill={(command) => { const terminal = useAppStore.getState().terminalPool.get(terminalID)?.terminal; terminal?.paste(command); terminal?.focus() }} />}
       </div>
     </div>
   )

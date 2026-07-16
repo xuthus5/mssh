@@ -1,5 +1,5 @@
 import { useCallback, useState, type Dispatch, type SetStateAction } from 'react'
-import { Circle, ClipboardPaste, Copy, FolderOpen, Network, Split, Square, Trash2 } from 'lucide-react'
+import { Circle, ClipboardPaste, Copy, FolderOpen, History, Network, Split, Square, Trash2 } from 'lucide-react'
 import SessionLog from '@/components/terminal/SessionLog'
 import TunnelDialog from '@/components/session/TunnelDialog'
 import { useTunnelManager } from '@/hooks/useTunnelManager'
@@ -18,6 +18,7 @@ interface TerminalToolbarProps {
   onOpenFiles: () => void
   onToggleSplit: () => void
   split: boolean
+  onOpenHistory?: () => void
 }
 
 interface ToolbarTerminal {
@@ -146,6 +147,7 @@ interface ToolbarActionsProps extends Pick<TerminalToolbarProps, 'sessionId' | '
   setLogBlocked: Dispatch<SetStateAction<boolean>>
   onLogOpenChange: (open: boolean) => void
   onOpenTunnels: () => void
+  onOpenHistory: () => void
 }
 
 function ToolbarActions(props: ToolbarActionsProps) {
@@ -158,6 +160,7 @@ function ToolbarActions(props: ToolbarActionsProps) {
     <button type="button" className={actionClass} onClick={props.onOpenTunnels} title="隧道管理">
       <Network className="h-3 w-3" /><span className="hidden sm:inline">隧道</span>
     </button>
+    <button type="button" className={actionClass} onClick={props.onOpenHistory} title="命令历史"><History className="h-3 w-3" /><span className="hidden sm:inline">历史</span></button>
     <div className="w-px h-4 bg-border mx-0.5" />
     <SplitAction active={props.split} onToggle={props.onToggleSplit} />
     <div className="w-px h-4 bg-border mx-0.5" />
@@ -180,7 +183,7 @@ export function TerminalToolbar(props: TerminalToolbarProps) {
   }, [sessionLogBlocked])
   return <div className="relative flex h-8 flex-shrink-0 items-center gap-1 bg-muted/30 px-2">
     <span className="text-xs text-muted-foreground truncate mr-2">{props.hostname ?? 'Terminal'}</span>
-    <ToolbarActions {...props} onOpenTunnels={() => { setTunnelOpen(true); void tunnels.load() }} clipboard={clipboard} logOpen={showSessionLog} setLogOpen={setShowSessionLog}
+    <ToolbarActions {...props} onOpenHistory={props.onOpenHistory ?? (() => {})} onOpenTunnels={() => { setTunnelOpen(true); void tunnels.load() }} clipboard={clipboard} logOpen={showSessionLog} setLogOpen={setShowSessionLog}
       setLogBlocked={setSessionLogBlocked} onLogOpenChange={handleSessionLogOpenChange} />
     <TunnelDialog open={tunnelOpen} onOpenChange={setTunnelOpen} tunnels={tunnels.tunnels}
       onStart={tunnels.start} onStop={tunnels.stop} sessionId={String(props.sessionId)} />
