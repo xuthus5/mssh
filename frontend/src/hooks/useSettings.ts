@@ -42,6 +42,7 @@ export interface SyncConfig {
   url: string
   username: string
   password: string
+  masterKey?: string
 }
 
 function keyTypeName(type: KeyType): KeyInfo['type'] {
@@ -132,21 +133,21 @@ export function useKeySettings() {
 }
 
 function useSyncSettings() {
-  const [sync, setSync] = useState<SyncConfig>({ enabled: false, url: '', username: '', password: '' })
+  const [sync, setSync] = useState<SyncConfig>({ enabled: false, url: '', username: '', password: '', masterKey: '' })
   const revision = useRef(0)
   const saveSync = useCallback(async (config: SyncConfig) => {
     try {
       revision.current++
-      await SettingService.SetMany([settingEntry('sync.enabled', config.enabled), settingEntry('sync.url', config.url), settingEntry('sync.username', config.username)])
+      await SettingService.SetMany([settingEntry('sync.enabled', config.enabled), settingEntry('sync.url', config.url), settingEntry('sync.username', config.username), settingEntry('sync.master_key', config.masterKey)])
       setSync(config)
     } catch (error) { logger.debug('saveSync error', error) }
   }, [])
   const loadSync = useCallback(async () => {
     try {
       const currentRevision = revision.current
-      const settings = await SettingService.GetMany(['sync.enabled', 'sync.url', 'sync.username'])
+      const settings = await SettingService.GetMany(['sync.enabled', 'sync.url', 'sync.username', 'sync.master_key'])
       const value = <T,>(key: string, fallback: T) => settings[key] ? JSON.parse(settings[key].value) as T : fallback
-      if (currentRevision === revision.current) setSync({ enabled: value('sync.enabled', false), url: value('sync.url', ''), username: value('sync.username', ''), password: '' })
+      if (currentRevision === revision.current) setSync({ enabled: value('sync.enabled', false), url: value('sync.url', ''), username: value('sync.username', ''), password: '', masterKey: value('sync.master_key', '') })
     } catch (error) { logger.debug('loadSync error', error) }
   }, [])
   useEffect(() => { void loadSync() }, [loadSync])
@@ -156,13 +157,13 @@ function useSyncSettings() {
 function useConfigTransfer() {
   const exportConfig = useCallback(async () => {
     try {
-      const path = await Dialogs.SaveFile({ Title: '导出 MSSH 配置', Filename: 'mssh-export.json', CanCreateDirectories: true })
+      const path = await Dialogs.SaveFile({ Title: '导出 MSSH 加密备份', Filename: 'mssh-backup.msshbackup', CanCreateDirectories: true, Filters: [{ DisplayName: 'MSSH Backup', Pattern: '*.msshbackup' }] })
       if (path) await SyncService.Export(path)
     } catch (error) { logger.debug('exportConfig error', error) }
   }, [])
   const importConfig = useCallback(async () => {
     try {
-      const selected = await Dialogs.OpenFile({ Title: '导入 MSSH 配置', CanChooseFiles: true, AllowsMultipleSelection: false, Filters: [{ DisplayName: 'JSON', Pattern: '*.json' }] })
+      const selected = await Dialogs.OpenFile({ Title: '导入 MSSH 加密备份', CanChooseFiles: true, AllowsMultipleSelection: false, Filters: [{ DisplayName: 'MSSH Backup', Pattern: '*.msshbackup' }] })
       const path = typeof selected === 'string' ? selected : selected[0]
       if (path) await SyncService.Import(path)
     } catch (error) { logger.debug('importConfig error', error) }
