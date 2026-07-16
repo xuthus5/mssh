@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"strconv"
 	"sync"
 
 	"github.com/xuthus5/mssh/internal/model"
@@ -20,23 +21,23 @@ type ForwardConfig struct {
 func StartForward(cw *ClientWrapper, cfg ForwardConfig) (interface{}, func() error, error) {
 	switch cfg.Type {
 	case model.TunnelLocal:
-		localAddr := fmt.Sprintf("%s:%d", cfg.LocalHost, cfg.LocalPort)
-		remoteAddr := fmt.Sprintf("%s:%d", cfg.RemoteHost, cfg.RemotePort)
+		localAddr := net.JoinHostPort(cfg.LocalHost, strconv.Itoa(cfg.LocalPort))
+		remoteAddr := net.JoinHostPort(cfg.RemoteHost, strconv.Itoa(cfg.RemotePort))
 		ln, err := StartLocalForward(cw, localAddr, remoteAddr)
 		if err != nil {
 			return nil, nil, err
 		}
 		return ln, ln.Close, nil
 	case model.TunnelRemote:
-		remoteAddr := fmt.Sprintf("%s:%d", cfg.RemoteHost, cfg.RemotePort)
-		localAddr := fmt.Sprintf("%s:%d", cfg.LocalHost, cfg.LocalPort)
+		remoteAddr := net.JoinHostPort(cfg.RemoteHost, strconv.Itoa(cfg.RemotePort))
+		localAddr := net.JoinHostPort(cfg.LocalHost, strconv.Itoa(cfg.LocalPort))
 		ln, err := StartRemoteForward(cw, remoteAddr, localAddr)
 		if err != nil {
 			return nil, nil, err
 		}
 		return ln, ln.Close, nil
 	case model.TunnelDynamic:
-		localAddr := fmt.Sprintf("%s:%d", cfg.LocalHost, cfg.LocalPort)
+		localAddr := net.JoinHostPort(cfg.LocalHost, strconv.Itoa(cfg.LocalPort))
 		ln, err := StartDynamicForward(cw, localAddr)
 		if err != nil {
 			return nil, nil, err
