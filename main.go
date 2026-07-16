@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
@@ -17,6 +18,11 @@ import (
 
 //go:embed build/appicon.png
 var appIcon []byte
+
+const (
+	windowCloseTimeout      = 2 * time.Second
+	windowClosePollInterval = 10 * time.Millisecond
+)
 
 func main() {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo}))
@@ -153,11 +159,31 @@ func configureSystemTray(wailsApp *application.App, controller *windowing.Applic
 	menu.Add("显示主窗口").OnClick(func(*application.Context) { controller.ShowMainWindow() })
 	menu.Add("隐藏到托盘").OnClick(func(*application.Context) { controller.HideMainWindow() })
 	menu.AddSeparator()
-	menu.Add("退出").OnClick(func(*application.Context) { controller.QuitApplication() })
+	menu.Add("退出").OnClick(func(*application.Context) {
+		controller.QuitApplicationAfter(func() { closeWindowsBeforeQuit(wailsApp) })
+	})
 	tray := wailsApp.SystemTray.New()
 	tray.SetIcon(appIcon).SetMenu(menu).OnClick(controller.ShowMainWindow)
 	tray.SetTooltip("MSSH")
 	return tray, menu
+}
+
+func closeWindowsBeforeQuit(wailsApp *application.App) {
+	for _, window := range wailsApp.Window.GetAll() {
+		window.Close()
+	}
+	_ = waitForWindowsClosed(func() int { return len(wailsApp.Window.GetAll()) }, windowCloseTimeout, windowClosePollInterval)
+}
+
+func waitForWindowsClosed(count func() int, timeout, interval time.Duration) bool {
+	deadline := time.Now().Add(timeout)
+	for count() > 0 {
+		if !time.Now().Before(deadline) {
+			return false
+		}
+		time.Sleep(interval)
+	}
+	return true
 }
 
 func mainWindowOptions() application.WebviewWindowOptions {
