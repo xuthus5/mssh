@@ -2,13 +2,15 @@ package service
 
 import (
 	"context"
-	"crypto/rand"
 	"database/sql"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net"
 	"os"
 	"sync"
+
+	"github.com/google/uuid"
 
 	gossh "golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
@@ -193,6 +195,23 @@ func (s *SessionService) ConnectionCount() int {
 	return len(s.conns)
 }
 
+func (s *SessionService) CloseAll() error {
+	s.mu.Lock()
+	connections := make(map[string]*ssh.ClientWrapper, len(s.conns))
+	for id, wrapper := range s.conns {
+		connections[id] = wrapper
+	}
+	s.conns = make(map[string]*ssh.ClientWrapper)
+	s.mu.Unlock()
+	var closeErr error
+	for id, wrapper := range connections {
+		if err := wrapper.Close(); err != nil {
+			closeErr = errors.Join(closeErr, fmt.Errorf("close connection %s: %w", id, err))
+		}
+	}
+	return closeErr
+}
+
 func (s *SessionService) buildAuthMethods(sess *model.Session) ([]gossh.AuthMethod, error) {
 	switch sess.AuthMethod {
 	case model.AuthPassword:
@@ -269,6 +288,7 @@ func (s *SessionService) buildAgentAuth() ([]gossh.AuthMethod, error) {
 		return nil, fmt.Errorf("ssh agent: %w", err)
 	}
 	agentClient := agent.NewClient(sock)
+	defer func() { _ = sock.Close() }()
 	signers, err := agentClient.Signers()
 	if err != nil {
 		return nil, fmt.Errorf("ssh agent signers: %w", err)
@@ -277,13 +297,9 @@ func (s *SessionService) buildAgentAuth() ([]gossh.AuthMethod, error) {
 }
 
 func generateTerminalID() string {
-	b := make([]byte, 8)
-	_, _ = rand.Read(b)
-	return fmt.Sprintf("term-%x", b)
+	return "term-" + uuid.NewString()
 }
 
 func generateConnectionAttemptID() string {
-	b := make([]byte, 8)
-	_, _ = rand.Read(b)
-	return fmt.Sprintf("connect-%x", b)
+	return "connect-" + uuid.NewString()
 }

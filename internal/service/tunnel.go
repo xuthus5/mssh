@@ -96,3 +96,21 @@ func (t *TunnelService) Stop(tunnelID int64) error {
 
 	return nil
 }
+
+func (t *TunnelService) StopAll() {
+	t.mu.Lock()
+	states := make([]*TunnelState, 0, len(t.tunnels))
+	for id, state := range t.tunnels {
+		states = append(states, state)
+		delete(t.tunnels, id)
+	}
+	t.mu.Unlock()
+	for _, state := range states {
+		if state.closed != nil {
+			_ = state.closed()
+		}
+		if state.connID != "" {
+			_ = t.sessions.disconnect(state.connID, false)
+		}
+	}
+}

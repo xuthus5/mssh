@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strconv"
 	"time"
 
 	gossh "golang.org/x/crypto/ssh"
@@ -61,7 +62,7 @@ func ConnectWithVerifier(ctx context.Context, s model.Session, auth []gossh.Auth
 		HostKeyCallback: hostKeyCallback,
 		Timeout:         10 * time.Second,
 	}
-	addr := fmt.Sprintf("%s:%d", s.Host, s.Port)
+	addr := net.JoinHostPort(s.Host, strconv.Itoa(s.Port))
 	dialer := &net.Dialer{Timeout: 10 * time.Second}
 	conn, err := dialer.DialContext(ctx, "tcp", addr)
 	if err != nil {
