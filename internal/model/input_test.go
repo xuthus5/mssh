@@ -25,7 +25,7 @@ func TestWriteInputsExcludeServerManagedTimestamps(t *testing.T) {
 }
 
 func TestTerminalGlobalStyleInputConversions(t *testing.T) {
-	input := TerminalGlobalStyleInput{FontFamily: "JetBrains Mono", FontSize: 16, CursorStyle: CursorStyleBlock}
+	input := TerminalGlobalStyleInput{FontFamily: "JetBrains Mono", FontSize: 16, CursorStyle: CursorStyleBlock, SelectionBackground: "#123456"}
 	assert.Equal(t, TerminalGlobalStyle(input), input.TerminalGlobalStyle())
 	assert.Equal(t, input, TerminalGlobalStyleInputFrom(input.TerminalGlobalStyle()))
 

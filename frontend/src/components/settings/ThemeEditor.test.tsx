@@ -10,7 +10,7 @@ const profiles = [
   profile({ id: 2, name: 'GitHub Light', mode: 'light', background: '#ffffff' }),
   profile({ id: 3, name: 'Dracula', mode: 'dark', background: '#282a36' }),
 ]
-const globalStyle = { font_family: 'Global Font', font_size: 16, cursor_style: 'underline' as const }
+const globalStyle = { font_family: 'Global Font', font_size: 16, cursor_style: 'underline' as const, selection_background: '#123456' }
 type ThemeEditorProps = ComponentProps<typeof ThemeEditor>
 
 describe('ThemeEditor dual mode profiles', () => {
@@ -23,18 +23,22 @@ describe('ThemeEditor dual mode profiles', () => {
     expect(screen.getByRole('combobox', { name: 'Light Mode 终端主题' })).toBeInTheDocument()
   })
 
-  it('previews and saves global terminal typography atomically', async () => {
+  it('previews and saves global terminal style atomically', async () => {
     const onSave = vi.fn(async () => {})
     renderEditor({ onSave })
 
     expect(screen.getByTestId('terminal-theme-preview')).toHaveStyle({ fontFamily: 'Global Font', fontSize: '16px' })
+    expect(screen.getByTestId('terminal-selection-preview')).toHaveStyle({ backgroundColor: '#123456' })
     await userEvent.clear(screen.getByLabelText('全局终端字体'))
     await userEvent.type(screen.getByLabelText('全局终端字体'), 'Cascadia Code')
+    await userEvent.clear(screen.getByLabelText('全局选区背景色 HEX'))
+    await userEvent.type(screen.getByLabelText('全局选区背景色 HEX'), '#4f46e5')
     expect(screen.getByTestId('terminal-theme-preview')).toHaveStyle({ fontFamily: 'Cascadia Code' })
+    expect(screen.getByTestId('terminal-selection-preview')).toHaveStyle({ backgroundColor: '#4f46e5' })
     await userEvent.click(screen.getByRole('button', { name: '保存主题配置' }))
 
     expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
-      global_style: { font_family: 'Cascadia Code', font_size: 16, cursor_style: 'underline' },
+      global_style: { font_family: 'Cascadia Code', font_size: 16, cursor_style: 'underline', selection_background: '#4f46e5' },
       profiles: expect.arrayContaining([expect.objectContaining({ id: 1, follow_global_style: true, font_family: 'monospace' })]),
     }))
   })
@@ -58,8 +62,9 @@ describe('ThemeEditor dual mode profiles', () => {
     const onSave = vi.fn<ThemeEditorProps['onSave']>(async () => {})
     renderEditor({ onSave })
 
-    await userEvent.clear(screen.getByLabelText('选区背景色 HEX'))
-    await userEvent.type(screen.getByLabelText('选区背景色 HEX'), '#4f46e5')
+    await userEvent.click(screen.getByRole('switch', { name: '跟随全局字体与光标' }))
+    await userEvent.clear(screen.getByLabelText('主题选区背景色 HEX'))
+    await userEvent.type(screen.getByLabelText('主题选区背景色 HEX'), '#4f46e5')
     expect(screen.getByTestId('terminal-selection-preview')).toHaveStyle({ backgroundColor: '#4f46e5' })
     await userEvent.click(screen.getByRole('button', { name: '保存主题配置' }))
 
@@ -77,6 +82,11 @@ describe('ThemeEditor dual mode profiles', () => {
     await userEvent.clear(screen.getByLabelText('全局终端字号'))
     expect(saveButton).toBeDisabled()
     await userEvent.type(screen.getByLabelText('全局终端字号'), '16')
+    expect(saveButton).toBeEnabled()
+
+    await userEvent.clear(screen.getByLabelText('全局选区背景色 HEX'))
+    expect(saveButton).toBeDisabled()
+    await userEvent.type(screen.getByLabelText('全局选区背景色 HEX'), '#123456')
     expect(saveButton).toBeEnabled()
 
     await userEvent.click(screen.getByRole('switch', { name: '跟随全局字体与光标' }))

@@ -20,6 +20,7 @@ func TestLoadTerminalGlobalStyleReportsAbsentStateAndRoundTrip(t *testing.T) {
 
 	expected := model.TerminalGlobalStyle{
 		FontFamily: "Iosevka", FontSize: 17, CursorStyle: model.CursorStyleUnderline,
+		SelectionBackground: "#123456",
 	}
 	require.NoError(t, SaveTerminalGlobalStyleDB(db, expected))
 	loaded, exists, err := LoadTerminalGlobalStyle(db)
@@ -52,6 +53,7 @@ func TestLoadTerminalGlobalStyleRejectsInvalidSettingContract(t *testing.T) {
 		{name: "font family", query: "UPDATE settings SET value = '1', value_type = 'number' WHERE key = ?", args: []any{terminalFontFamilyKey}},
 		{name: "font size", query: "UPDATE settings SET value = '\"large\"', value_type = 'string' WHERE key = ?", args: []any{terminalFontSizeKey}},
 		{name: "cursor style", query: "UPDATE settings SET value = '1', value_type = 'number' WHERE key = ?", args: []any{terminalCursorStyleKey}},
+		{name: "selection background", query: "UPDATE settings SET value = '1', value_type = 'number' WHERE key = ?", args: []any{terminalSelectionKey}},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

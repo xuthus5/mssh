@@ -39,6 +39,7 @@ export default defineConfig({
         'src/components/settings/KeyManager.tsx',
         'src/components/settings/TerminalGlobalStyleEditor.tsx',
         'src/components/settings/TerminalProfileStyleEditor.tsx',
+        'src/components/settings/TerminalSelectionBackgroundField.tsx',
         'src/components/settings/TerminalThemeInspector.tsx',
         'src/components/settings/ThemeEditor.tsx',
         'src/components/settings/ThemeModeSelector.tsx',

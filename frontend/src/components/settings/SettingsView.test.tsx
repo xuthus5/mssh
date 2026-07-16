@@ -23,7 +23,7 @@ function settingsProps() {
     systemFonts: ['Arial', 'Microsoft YaHei', 'Segoe UI'],
     themeProfiles: [themeProfile(1, 'dark', '#000000'), themeProfile(2, 'light', '#ffffff')],
     themeAssignments: { dark_profile_id: 1, light_profile_id: 2, follow_interface_mode: true, fixed_profile_id: 0 },
-    terminalGlobalStyle: { font_family: 'Global Font', font_size: 16, cursor_style: CursorStyle.CursorStyleUnderline },
+    terminalGlobalStyle: { font_family: 'Global Font', font_size: 16, cursor_style: CursorStyle.CursorStyleUnderline, selection_background: '#264f78' },
     colorMode: 'dark' as const,
     keys: [],
     sync: { enabled: false, url: '', username: '', password: '' },

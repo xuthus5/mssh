@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { LabeledSelect } from '@/components/ui/labeled-select'
+import { TerminalSelectionBackgroundField } from '@/components/settings/TerminalSelectionBackgroundField'
 import { validTerminalFontFamily, validTerminalFontSize } from '@/components/settings/themeEditorState'
 import type { TerminalGlobalStyle } from '../../../bindings/github.com/xuthus5/mssh/internal/model/models'
 
@@ -35,7 +36,7 @@ export function TerminalGlobalStyleEditor({ style, disabled = false, onChange }:
   return <Card>
     <CardHeader>
       <CardTitle className="flex items-center gap-2 text-sm"><TextCursorInput className="size-4" />全局字体与光标</CardTitle>
-      <p className="mt-1 text-sm text-muted-foreground">作为所有终端主题的默认排版；颜色仍由各个主题独立管理。</p>
+      <p className="mt-1 text-sm text-muted-foreground">作为所有终端主题的默认字体、光标样式和选区高亮配置。</p>
     </CardHeader>
     <CardContent>
       <FieldGroup>
@@ -56,6 +57,7 @@ export function TerminalGlobalStyleEditor({ style, disabled = false, onChange }:
             <LabeledSelect ariaLabel="全局光标样式" value={style.cursor_style} options={CURSOR_STYLE_OPTIONS} disabled={disabled} onValueChange={(value) => onChange('cursor_style', value as TerminalGlobalStyle['cursor_style'])} />
           </Field>
         </div>
+        <TerminalSelectionBackgroundField id="terminal-global-selection-background" ariaPrefix="全局" value={style.selection_background} disabled={disabled} onChange={(value) => onChange('selection_background', value)} />
       </FieldGroup>
     </CardContent>
   </Card>

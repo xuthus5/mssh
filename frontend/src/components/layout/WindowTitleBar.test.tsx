@@ -25,7 +25,7 @@ vi.mock('@/lib/wails', () => ({
     ListDefinitions: vi.fn(async () => themeProfiles.map((profile) => profile.definition)),
     ListProfiles: vi.fn(async () => themeProfiles),
     GetAssignments: vi.fn(async () => ({ dark_profile_id: 1, light_profile_id: 2, follow_interface_mode: true, fixed_profile_id: 0 })),
-    GetGlobalStyle: vi.fn(async () => ({ font_family: 'monospace', font_size: 14, cursor_style: 'bar' })),
+    GetGlobalStyle: vi.fn(async () => ({ font_family: 'monospace', font_size: 14, cursor_style: 'bar', selection_background: '#264f78' })),
   },
 }))
 

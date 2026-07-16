@@ -5,8 +5,8 @@ import { Field, FieldContent, FieldDescription, FieldError, FieldGroup, FieldLab
 import { Input } from '@/components/ui/input'
 import { LabeledSelect } from '@/components/ui/labeled-select'
 import { Switch } from '@/components/ui/switch'
+import { TerminalSelectionBackgroundField } from '@/components/settings/TerminalSelectionBackgroundField'
 import { effectiveDraftTheme, validTerminalFontFamily, validTerminalFontSize, type ThemeDraft } from '@/components/settings/themeEditorState'
-import { isHexColor, safeHexColor } from '@/components/settings/terminalThemeValidation'
 import type { TerminalGlobalStyle } from '../../../bindings/github.com/xuthus5/mssh/internal/model/models'
 
 const CURSOR_STYLE_OPTIONS = [
@@ -20,19 +20,6 @@ interface Props {
   globalStyle: TerminalGlobalStyle
   disabled?: boolean
   onDraftChange: (draft: ThemeDraft) => void
-}
-
-function SelectionBackgroundField({ value, disabled, onChange }: { value: string; disabled: boolean; onChange: (value: string) => void }) {
-  const valid = isHexColor(value)
-  return <Field data-disabled={disabled || undefined} data-invalid={!valid}>
-    <FieldLabel htmlFor="terminal-profile-selection-background-hex">选区背景色</FieldLabel>
-    <div className="grid grid-cols-[3rem_minmax(0,1fr)] gap-2">
-      <input aria-label="选区背景色选择器" type="color" value={safeHexColor(value)} disabled={disabled} onChange={(event) => onChange(event.target.value)} className="size-8 self-center rounded-lg border border-input bg-transparent p-0.5" />
-      <Input id="terminal-profile-selection-background-hex" aria-label="选区背景色 HEX" aria-invalid={!valid} value={value} disabled={disabled} onChange={(event) => onChange(event.target.value)} />
-    </div>
-    <FieldDescription>控制鼠标选中文本时的背景高亮颜色。</FieldDescription>
-    {!valid && <FieldError>请输入 #RRGGBB 格式的颜色值。</FieldError>}
-  </Field>
 }
 
 export function TerminalProfileStyleEditor({ draft, globalStyle, disabled = false, onDraftChange }: Props) {
@@ -54,14 +41,14 @@ export function TerminalProfileStyleEditor({ draft, globalStyle, disabled = fals
   return <Card>
     <CardHeader>
       <CardTitle className="flex items-center gap-2 text-sm"><Blend className="size-4" />当前主题字体与光标</CardTitle>
-      <p className="mt-1 text-sm text-muted-foreground">字体与光标样式默认继承全局配置；选区背景色由当前 Profile 独立管理。</p>
+      <p className="mt-1 text-sm text-muted-foreground">字体、光标样式和选区背景色默认继承全局配置。</p>
     </CardHeader>
     <CardContent>
       <FieldGroup>
         <Field orientation="horizontal" data-disabled={disabled || undefined}>
           <FieldContent>
             <FieldLabel htmlFor="terminal-profile-follow-global">跟随全局字体与光标</FieldLabel>
-            <FieldDescription>光标颜色和选区背景色始终属于当前主题。</FieldDescription>
+            <FieldDescription>关闭后可为当前主题单独设置字体、光标样式和选区背景色；光标颜色始终属于主题。</FieldDescription>
           </FieldContent>
           <Switch id="terminal-profile-follow-global" checked={draft.followGlobalStyle} disabled={disabled} onCheckedChange={(checked) => update('followGlobalStyle', checked)} />
         </Field>
@@ -81,7 +68,7 @@ export function TerminalProfileStyleEditor({ draft, globalStyle, disabled = fals
             <LabeledSelect ariaLabel="主题光标样式" value={effective.cursorStyle} options={CURSOR_STYLE_OPTIONS} disabled={fieldsDisabled} onValueChange={(value) => update('cursorStyle', value as ThemeDraft['cursorStyle'])} />
           </Field>
         </div>
-        <SelectionBackgroundField value={draft.selectionBackground} disabled={disabled} onChange={(value) => update('selectionBackground', value)} />
+        <TerminalSelectionBackgroundField id="terminal-profile-selection-background" ariaPrefix="主题" value={effective.selectionBackground} disabled={fieldsDisabled} onChange={(value) => update('selectionBackground', value)} />
       </FieldGroup>
     </CardContent>
   </Card>

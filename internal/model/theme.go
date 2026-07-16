@@ -22,17 +22,19 @@ const (
 type CursorStyle string
 
 const (
-	CursorStyleBlock          CursorStyle = "block"
-	CursorStyleUnderline      CursorStyle = "underline"
-	CursorStyleBar            CursorStyle = "bar"
-	DefaultTerminalFontFamily             = `"JetBrains Mono", "Cascadia Code", monospace`
-	DefaultTerminalFontSize               = 14
+	CursorStyleBlock                   CursorStyle = "block"
+	CursorStyleUnderline               CursorStyle = "underline"
+	CursorStyleBar                     CursorStyle = "bar"
+	DefaultTerminalFontFamily                      = `"JetBrains Mono", "Cascadia Code", monospace`
+	DefaultTerminalFontSize                        = 14
+	DefaultTerminalSelectionBackground             = "#264f78"
 )
 
 type TerminalGlobalStyle struct {
-	FontFamily  string      `json:"font_family"`
-	FontSize    int         `json:"font_size"`
-	CursorStyle CursorStyle `json:"cursor_style"`
+	FontFamily          string      `json:"font_family"`
+	FontSize            int         `json:"font_size"`
+	CursorStyle         CursorStyle `json:"cursor_style"`
+	SelectionBackground string      `json:"selection_background"`
 }
 
 type TerminalColorPayload struct {

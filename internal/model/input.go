@@ -119,9 +119,10 @@ func ThemeProfileInputFrom(profile ThemeProfile) ThemeProfileInput {
 }
 
 type TerminalGlobalStyleInput struct {
-	FontFamily  string      `json:"font_family"`
-	FontSize    int         `json:"font_size"`
-	CursorStyle CursorStyle `json:"cursor_style"`
+	FontFamily          string      `json:"font_family"`
+	FontSize            int         `json:"font_size"`
+	CursorStyle         CursorStyle `json:"cursor_style"`
+	SelectionBackground string      `json:"selection_background"`
 }
 
 func (input TerminalGlobalStyleInput) TerminalGlobalStyle() TerminalGlobalStyle {

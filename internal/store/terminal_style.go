@@ -14,14 +14,16 @@ const (
 	terminalFontFamilyKey  = "terminal.style.font_family"
 	terminalFontSizeKey    = "terminal.style.font_size"
 	terminalCursorStyleKey = "terminal.style.cursor_style"
+	terminalSelectionKey   = "terminal.style.selection_background"
 )
 
-var terminalGlobalStyleKeys = []string{terminalFontFamilyKey, terminalFontSizeKey, terminalCursorStyleKey}
+var terminalGlobalStyleKeys = []string{terminalFontFamilyKey, terminalFontSizeKey, terminalCursorStyleKey, terminalSelectionKey}
 
 var terminalGlobalStyleValueTypes = map[string]string{
 	terminalFontFamilyKey:  "string",
 	terminalFontSizeKey:    "number",
 	terminalCursorStyleKey: "string",
+	terminalSelectionKey:   "string",
 }
 
 func LoadTerminalGlobalStyle(db themeDB) (model.TerminalGlobalStyle, bool, error) {
@@ -103,6 +105,7 @@ func parseTerminalGlobalStyle(values map[string]string) (model.TerminalGlobalSty
 		terminalFontFamilyKey:  &style.FontFamily,
 		terminalFontSizeKey:    &style.FontSize,
 		terminalCursorStyleKey: &style.CursorStyle,
+		terminalSelectionKey:   &style.SelectionBackground,
 	}
 	for _, key := range terminalGlobalStyleKeys {
 		if err := json.Unmarshal([]byte(values[key]), targets[key]); err != nil {
@@ -121,6 +124,7 @@ func SaveTerminalGlobalStyleDB(db themeDB, style model.TerminalGlobalStyle) erro
 		{key: terminalFontFamilyKey, value: style.FontFamily, valueType: "string"},
 		{key: terminalFontSizeKey, value: style.FontSize, valueType: "number"},
 		{key: terminalCursorStyleKey, value: style.CursorStyle, valueType: "string"},
+		{key: terminalSelectionKey, value: style.SelectionBackground, valueType: "string"},
 	}
 	for _, setting := range settings {
 		value, err := json.Marshal(setting.value)
