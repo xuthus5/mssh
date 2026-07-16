@@ -75,6 +75,15 @@ func TestSyncServiceRejectsInvalidPathAndClosedDatabase(t *testing.T) {
 	assert.Error(t, svc.Export(filepath.Join(t.TempDir(), "backup.msshbackup")))
 }
 
+func TestValidateSnapshotRejectsUnknownColumnsBeforeRestore(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	data, err := NewSyncService(db, testutil.NewTestLogger()).snapshot()
+	require.NoError(t, err)
+	data.Tables["sessions"] = append(data.Tables["sessions"], map[string]any{"unknown_column": "bad"})
+	err = validateSnapshot(db, data)
+	assert.ErrorContains(t, err, "unknown column unknown_column")
+}
+
 func setSyncMasterKey(t *testing.T, db *sql.DB, key string) {
 	t.Helper()
 	require.NoError(t, store.SetSettings(db, []model.Setting{{Key: SyncMasterKeySetting, Namespace: "sync", Value: `"` + key + `"`, ValueType: "string", Version: 1}}))
