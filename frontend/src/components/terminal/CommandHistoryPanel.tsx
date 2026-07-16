@@ -1,12 +1,23 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Clipboard, History, Trash2, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { clearCommandHistory, readCommandHistory, type CommandHistoryEntry } from '@/lib/commandHistory'
+import { CommandHistoryService } from '@/lib/wails'
+import { logger } from '@/lib/logger'
 
 export function CommandHistoryPanel({ sessionID, onClose, onFill }: { sessionID: number; onClose: () => void; onFill: (command: string) => void }) {
   const [entries, setEntries] = useState<CommandHistoryEntry[]>(() => readCommandHistory(sessionID))
   const [query, setQuery] = useState('')
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const items = await CommandHistoryService.List(sessionID, '')
+        setEntries((items ?? []).map((item: { id: number; command: string; created_at?: string; createdAt?: string }) => ({ id: String(item.id), command: item.command, createdAt: Date.parse(item.created_at ?? item.createdAt ?? '') || Date.now() })))
+      } catch (error: unknown) { logger.error('command history loading failed', error) }
+    }
+    if (typeof CommandHistoryService?.List === 'function') void load()
+  }, [sessionID])
   const filtered = useMemo(() => entries.filter((entry) => entry.command.toLowerCase().includes(query.toLowerCase())), [entries, query])
   const copy = async (command: string) => { try { await navigator.clipboard.writeText(command) } catch { /* clipboard unavailable */ } }
   const clear = () => { clearCommandHistory(sessionID); setEntries([]) }
