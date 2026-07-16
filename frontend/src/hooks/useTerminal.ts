@@ -210,7 +210,7 @@ function initializeTerminal(containerRef: RefObject<HTMLDivElement | null>, refs
     term.open(container)
     term.loadAddon(unicodeAddon)
     unicodeAddonOwnedByTerminal = true
-    term.unicode.activeVersion = '11'
+    if (term.unicode) term.unicode.activeVersion = '11'
     cleanupCopyOnSelect = installTerminalCopyOnSelect(term, 'terminal')
     term.loadAddon(fitAddon)
     addonOwnedByTerminal = true
