@@ -9,6 +9,8 @@ import { DynamicTabOverflowMenu, DynamicTabStrip } from '@/components/layout/Dyn
 import { WINDOW_OPEN_SETTINGS_EVENT } from '@/lib/settingsWindowEvents'
 import { cn } from '@/lib/utils'
 
+const COLLAPSED_NAVIGATION_WIDTH = 36
+
 function runWindowAction(name: string, action: () => Promise<unknown>) {
   void action().catch((error: unknown) => logger.error(`window ${name} failed`, error))
 }
@@ -20,6 +22,7 @@ export function WindowTitleBar() {
   const activeSurface = useAppStore((state) => state.activeSurface)
   const workspaceTab = useAppStore((state) => state.workspaceTab)
   const navigationCollapsed = useAppStore((state) => state.navigationCollapsed)
+  const sidebarWidth = useAppStore((state) => state.sidebarWidth)
   const activateWorkspace = useAppStore((state) => state.activateWorkspace)
   const toggleNavigation = useAppStore((state) => state.toggleNavigation)
   const overviewActive = activeSurface?.type === 'workspace' && activeSurface.id === 'overview'
@@ -37,7 +40,7 @@ export function WindowTitleBar() {
   }
 
   return <header className={cn('flex h-9 shrink-0 select-none items-stretch bg-card', !terminalSurfaceActive && 'border-b border-border')}>
-    <div className="flex shrink-0 items-center gap-1 px-1 [--wails-draggable:no-drag]">
+    <div data-testid="title-navigation-region" style={{ width: navigationCollapsed ? COLLAPSED_NAVIGATION_WIDTH : sidebarWidth }} className="flex shrink-0 items-center gap-1 overflow-hidden px-1 transition-[width] duration-200 ease-out [--wails-draggable:no-drag]">
       <button type="button" aria-label={navigationCollapsed ? '展开导航' : '收起导航'} aria-controls="sidebar-navigation" aria-expanded={!navigationCollapsed} className="grid size-7 place-items-center rounded-md text-muted-foreground transition-colors duration-150 hover:bg-muted/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70" onClick={toggleNavigation}><Menu className="size-3.5" /></button>
       {!navigationCollapsed && <nav aria-label="侧边栏导航" className="flex h-7 items-center gap-0.5 rounded-lg border border-border/60 bg-muted/40 p-0.5">{navigationButton('overview', '总览')}{!overviewActive && <>{navigationButton('sessions', '会话')}{navigationButton('macros', '宏')}</>}</nav>}
     </div>

@@ -58,6 +58,7 @@ describe('WindowTitleBar', () => {
       tabs: [],
       activeSurface: null,
       navigationCollapsed: false,
+      sidebarWidth: 280,
       workspaceTab: 'sessions',
       overviewSection: 'sessions',
       overviewReturnSurface: null,
@@ -199,6 +200,21 @@ describe('WindowTitleBar', () => {
     expect(tab.compareDocumentPosition(dragRegion) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(dragRegion).toHaveClass('min-w-20', 'flex-1')
     expect(tab.closest('header')).not.toHaveClass('border-b')
+  })
+
+  it('aligns dynamic tabs with the resizable sidebar edge', () => {
+    useAppStore.setState({
+      sidebarWidth: 360,
+      tabs: [{ id: 'terminal-1', title: '生产服务器', type: 'terminal', terminalId: 'term-1', sessionId: 1 }],
+      activeSurface: { type: 'terminal', id: 'terminal-1' },
+    })
+    const { rerender } = render(<WindowTitleBar />)
+
+    expect(screen.getByTestId('title-navigation-region')).toHaveStyle({ width: '360px' })
+
+    useAppStore.setState({ navigationCollapsed: true })
+    rerender(<WindowTitleBar />)
+    expect(screen.getByTestId('title-navigation-region')).toHaveStyle({ width: '36px' })
   })
 
   it('shows the overflow menu before the theme toggle only when tabs overflow', () => {
