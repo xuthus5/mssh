@@ -7,6 +7,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { LabeledSelect } from '@/components/ui/labeled-select'
 import { Button } from '@/components/ui/button'
 import { KeyService } from '@/lib/wails'
@@ -43,6 +44,10 @@ export default function SessionDialog({ open, onOpenChange, session, folders, on
   const [host, setHost] = useState(session?.host ?? '')
   const [port, setPort] = useState(session?.port?.toString() ?? '22')
   const [username, setUsername] = useState(session?.username ?? '')
+  const [tags, setTags] = useState(session?.tags ?? '')
+  const [notes, setNotes] = useState(session?.notes ?? '')
+  const [environment, setEnvironment] = useState(session?.environment ?? '')
+  const [project, setProject] = useState(session?.project ?? '')
   const [authMethod, setAuthMethod] = useState<string>(session?.authMethod ?? 'password')
   const [password, setPassword] = useState(session?.password ?? '')
   const [keyId, setKeyId] = useState<string>(session?.keyId ?? '')
@@ -80,6 +85,7 @@ export default function SessionDialog({ open, onOpenChange, session, folders, on
       await onSave({
         name: name.trim(), host: host.trim(), port: parseInt(port, 10) || 22,
         username: username.trim(), authMethod: authMethod as Session["authMethod"],
+        tags: tags.trim(), notes: notes.trim(), environment: environment.trim(), project: project.trim(),
         password: needsPassword ? password : undefined, keyId: authMethod === 'key' ? keyId : undefined,
         keepAlive: parseInt(keepAlive, 10) || 60, termType: termType.trim() || 'xterm-256color', folderId: folderId || null,
       })
@@ -88,7 +94,7 @@ export default function SessionDialog({ open, onOpenChange, session, folders, on
     } finally {
       setPending(false)
     }
-  }, [name, host, port, username, authMethod, password, keyId, keepAlive, termType, folderId, onSave, onOpenChange])
+  }, [name, host, port, username, tags, notes, environment, project, authMethod, password, keyId, keepAlive, termType, folderId, onSave])
 
   const isEditing = !!session
 
@@ -124,6 +130,13 @@ export default function SessionDialog({ open, onOpenChange, session, folders, on
             <span className="text-xs font-medium text-muted-foreground">用户名</span>
             <Input value={username} onChange={(e) => setUsername(e.target.value)} required placeholder="root" />
           </label>
+
+          <div className="grid grid-cols-2 gap-3">
+            <label className="flex flex-col gap-1.5"><span className="text-xs font-medium text-muted-foreground">环境</span><Input value={environment} onChange={(event) => setEnvironment(event.target.value)} placeholder="生产 / 测试" /></label>
+            <label className="flex flex-col gap-1.5"><span className="text-xs font-medium text-muted-foreground">项目</span><Input value={project} onChange={(event) => setProject(event.target.value)} placeholder="项目名称" /></label>
+          </div>
+          <label className="flex flex-col gap-1.5"><span className="text-xs font-medium text-muted-foreground">标签</span><Input value={tags} onChange={(event) => setTags(event.target.value)} placeholder="数据库, 核心服务, 运维" /></label>
+          <label className="flex flex-col gap-1.5"><span className="text-xs font-medium text-muted-foreground">备注</span><Textarea value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="记录用途、负责人或注意事项" rows={3} /></label>
 
           <label className="flex flex-col gap-1.5">
             <span className="text-xs font-medium text-muted-foreground">认证方式</span>

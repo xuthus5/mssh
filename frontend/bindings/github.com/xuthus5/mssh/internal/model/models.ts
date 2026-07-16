@@ -369,6 +369,10 @@ export class Session {
     "host": string;
     "port": number;
     "username": string;
+    "tags": string;
+    "notes": string;
+    "environment": string;
+    "project": string;
     "auth_method": AuthMethod;
     "password"?: string;
     "key_id"?: number | null;
@@ -400,6 +404,10 @@ export class Session {
         if (!("username" in $$source)) {
             this["username"] = "";
         }
+        if (!("tags" in $$source)) this["tags"] = "";
+        if (!("notes" in $$source)) this["notes"] = "";
+        if (!("environment" in $$source)) this["environment"] = "";
+        if (!("project" in $$source)) this["project"] = "";
         if (!("auth_method" in $$source)) {
             this["auth_method"] = AuthMethod.$zero;
         }
@@ -486,6 +494,10 @@ export class SessionInput {
     "host": string;
     "port": number;
     "username": string;
+    "tags": string;
+    "notes": string;
+    "environment": string;
+    "project": string;
     "auth_method": AuthMethod;
     "password"?: string;
     "key_id"?: number | null;
@@ -513,6 +525,10 @@ export class SessionInput {
         if (!("username" in $$source)) {
             this["username"] = "";
         }
+        if (!("tags" in $$source)) this["tags"] = "";
+        if (!("notes" in $$source)) this["notes"] = "";
+        if (!("environment" in $$source)) this["environment"] = "";
+        if (!("project" in $$source)) this["project"] = "";
         if (!("auth_method" in $$source)) {
             this["auth_method"] = AuthMethod.$zero;
         }
