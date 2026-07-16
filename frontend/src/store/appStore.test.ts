@@ -40,11 +40,12 @@ describe('appStore', () => {
     expect(useAppStore.getState().activeSurface).toEqual({ type: 'workspace', id: 'sessions' })
   })
 
-  it('keeps session and macro navigation independent from the active surface', () => {
+  it('opens the selected workspace from the welcome surface', () => {
     const store = useAppStore.getState()
 
     store.activateWorkspace('sessions')
-    expect(useAppStore.getState().activeSurface).toBeNull()
+    expect(useAppStore.getState().activeSurface).toEqual({ type: 'workspace', id: 'sessions' })
+    expect(useAppStore.getState().workspaceTab).toBe('sessions')
 
     store.openTab({ id: 'terminal-1', title: 'one', type: 'terminal', terminalId: 'term-1', sessionId: 1 })
     expect(useAppStore.getState().activeSurface).toEqual({ type: 'terminal', id: 'terminal-1' })
