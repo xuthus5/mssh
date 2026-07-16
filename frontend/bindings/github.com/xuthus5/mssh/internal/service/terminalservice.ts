@@ -40,3 +40,7 @@ export function SetOutputHandler(fn: any): $CancellablePromise<void> {
 export function Write(terminalID: string, data: string): $CancellablePromise<number> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.TerminalService.Write", terminalID, data);
 }
+
+export function SystemInfo(terminalID: string): $CancellablePromise<any> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.TerminalService.SystemInfo", terminalID);
+}
