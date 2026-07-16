@@ -13,6 +13,7 @@ import { ChevronRight, ChevronDown, Folder as FolderIcon, Server } from 'lucide-
 import type { Folder, Session } from '@/hooks/useSession'
 import { logger } from '@/lib/logger'
 import { Badge } from '@/components/ui/badge'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 interface Props {
   folders: Folder[]
@@ -134,10 +135,18 @@ export default function SessionTree({
       }}
       onKeyDown={(event) => { if (event.key === 'Enter') onConnect(session.id) }}
     ><Server className="size-3.5 shrink-0 text-muted-foreground" /><span className="truncate">{session.name}</span></div>
-    if (navigationOnly) return <div key={session.id}>{sessionRow}</div>
+    const sessionTooltip = <Tooltip>
+      <TooltipTrigger render={sessionRow} />
+      <TooltipContent side="right" align="start" className="flex flex-col items-start gap-0.5">
+        <span>主机：{session.host}</span>
+        <span>端口：{session.port}</span>
+        <span>用户：{session.username}</span>
+      </TooltipContent>
+    </Tooltip>
+    if (navigationOnly) return <div key={session.id}>{sessionTooltip}</div>
     return <ContextMenu key={session.id}>
       <ContextMenuTrigger>
-        {sessionRow}
+        {sessionTooltip}
       </ContextMenuTrigger>
       <ContextMenuContent>
         <ContextMenuItem onClick={() => { logger.debug('SessionTree: onConnect', session.id); onConnect(session.id) }}>

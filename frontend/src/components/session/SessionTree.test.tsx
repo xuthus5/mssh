@@ -84,6 +84,17 @@ describe('SessionTree', () => {
     expect(await screen.findByRole('menuitem', { name: '连接' })).toBeInTheDocument()
   })
 
+  it('shows session connection details on hover', async () => {
+    const user = userEvent.setup()
+    render(<SessionTree folders={[]} sessions={[SESSIONS[0]]} onConnect={vi.fn()} navigationOnly />)
+
+    await user.hover(screen.getByRole('treeitem', { name: 'web-01' }))
+
+    expect(await screen.findByText('主机：10.0.0.1')).toBeInTheDocument()
+    expect(screen.getByText('端口：22')).toBeInTheDocument()
+    expect(screen.getByText('用户：root')).toBeInTheDocument()
+  })
+
   it('prevents browser text selection when a folder is double clicked', () => {
     render(<SessionTree
       folders={FOLDERS}
