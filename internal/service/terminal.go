@@ -36,17 +36,42 @@ type TerminalService struct {
 
 var _openPTY = ssh.PreparePTY
 
+const maxSystemProbeOutput = 4 * 1024 * 1024
+
+var systemProbeTimeout = 5 * time.Second
+
 var _runSystemInfoCommand = func(wrapper *ssh.ClientWrapper, command string) ([]byte, error) {
 	session, err := wrapper.Inner.NewSession()
 	if err != nil {
 		return nil, fmt.Errorf("system info session: %w", err)
 	}
 	defer func() { _ = session.Close() }()
-	output, err := session.CombinedOutput(command)
+	output, err := waitSystemProbe(func() ([]byte, error) { return session.CombinedOutput(command) }, session.Close)
 	if err != nil {
 		return nil, fmt.Errorf("system info command: %w", err)
 	}
+	if len(output) > maxSystemProbeOutput {
+		return nil, fmt.Errorf("system info command: output exceeds %d bytes", maxSystemProbeOutput)
+	}
 	return output, nil
+}
+
+func waitSystemProbe(run func() ([]byte, error), cancel func() error) ([]byte, error) {
+	type result struct {
+		output []byte
+		err    error
+	}
+	completed := make(chan result, 1)
+	go func() { output, err := run(); completed <- result{output: output, err: err} }()
+	timer := time.NewTimer(systemProbeTimeout)
+	defer timer.Stop()
+	select {
+	case value := <-completed:
+		return value.output, value.err
+	case <-timer.C:
+		_ = cancel()
+		return nil, fmt.Errorf("probe timeout after %s", systemProbeTimeout)
+	}
 }
 
 func (t *TerminalService) SetOutputHandler(fn func(terminalID string, data []byte)) {
@@ -162,6 +187,9 @@ func parseSystemInfo(values []string) (*model.SystemInfo, systemSample, error) {
 	sample := systemSample{}
 	for index := 0; index < len(values); {
 		consumed := parseSystemInfoField(result, &sample, values[index:])
+		if consumed < 0 {
+			return nil, systemSample{}, fmt.Errorf("invalid system info field %s", values[index])
+		}
 		if consumed == 0 {
 			result.CPUCount, _ = strconv.Atoi(values[index])
 			consumed = 1
@@ -177,25 +205,16 @@ func parseSystemInfoField(result *model.SystemInfo, sample *systemSample, values
 	}
 	uint := func(value string) uint64 { parsed, _ := strconv.ParseUint(value, 10, 64); return parsed }
 	float := func(value string) float64 { parsed, _ := strconv.ParseFloat(value, 64); return parsed }
+	if consumed := parseWideSystemInfoField(result, sample, values, uint, float); consumed != 0 {
+		return consumed
+	}
 	switch values[0] {
-	case "CPU":
-		sample.total, sample.idle = uint(values[1]), uint(values[2])
-		return 3
 	case "MEMTOTAL":
 		result.MemoryTotal = uint(values[1])
 		return 2
 	case "MEMAVAILABLE":
 		result.MemoryUsed = result.MemoryTotal - uint(values[1])
 		return 2
-	case "NET":
-		sample.received, sample.transmitted = uint(values[1]), uint(values[2])
-		return 3
-	case "DISK":
-		result.DiskUsed, result.DiskTotal = uint(values[1]), uint(values[2])
-		return 3
-	case "LOAD":
-		result.Load1, result.Load5, result.Load15 = float(values[1]), float(values[2]), float(values[3])
-		return 4
 	case "UPTIME":
 		result.UptimeSeconds = int64(float(values[1]))
 		return 2
@@ -214,6 +233,36 @@ func parseSystemInfoField(result *model.SystemInfo, sample *systemSample, values
 			result.SwapUsed = result.SwapTotal - free
 		}
 		return 2
+	}
+	return 0
+}
+
+func parseWideSystemInfoField(result *model.SystemInfo, sample *systemSample, values []string, uint func(string) uint64, float func(string) float64) int {
+	switch values[0] {
+	case "CPU":
+		if len(values) < 3 {
+			return -1
+		}
+		sample.total, sample.idle = uint(values[1]), uint(values[2])
+		return 3
+	case "NET":
+		if len(values) < 3 {
+			return -1
+		}
+		sample.received, sample.transmitted = uint(values[1]), uint(values[2])
+		return 3
+	case "DISK":
+		if len(values) < 3 {
+			return -1
+		}
+		result.DiskUsed, result.DiskTotal = uint(values[1]), uint(values[2])
+		return 3
+	case "LOAD":
+		if len(values) < 4 {
+			return -1
+		}
+		result.Load1, result.Load5, result.Load15 = float(values[1]), float(values[2]), float(values[3])
+		return 4
 	}
 	return 0
 }
