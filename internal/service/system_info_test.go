@@ -31,6 +31,33 @@ func TestParseSystemInfoRejectsIncompleteResponse(t *testing.T) {
 	require.ErrorContains(t, err, "invalid system info response")
 }
 
+func TestParseSystemInfoRejectsTruncatedStructuredField(t *testing.T) {
+	values := []string{"CPU", "100", "20", "MEMTOTAL", "10", "MEMAVAILABLE", "5", "NET", "1", "2", "DISK", "1", "2", "4", "LOAD", "1"}
+	_, _, err := parseSystemInfo(values)
+	require.ErrorContains(t, err, "invalid system info field")
+}
+
+func TestWaitSystemProbeTimesOutAndCancels(t *testing.T) {
+	original := systemProbeTimeout
+	systemProbeTimeout = 10 * time.Millisecond
+	t.Cleanup(func() { systemProbeTimeout = original })
+	cancelled := make(chan struct{})
+	release := make(chan struct{})
+	_, err := waitSystemProbe(func() ([]byte, error) { <-release; return nil, nil }, func() error { close(cancelled); close(release); return nil })
+	require.ErrorContains(t, err, "probe timeout")
+	select {
+	case <-cancelled:
+	default:
+		t.Fatal("probe session was not cancelled")
+	}
+}
+
+func TestWaitSystemProbeReturnsCommandResult(t *testing.T) {
+	output, err := waitSystemProbe(func() ([]byte, error) { return []byte("ok"), nil }, func() error { return nil })
+	require.NoError(t, err)
+	require.Equal(t, []byte("ok"), output)
+}
+
 func TestCPUPercent(t *testing.T) {
 	previous := systemSample{total: 100, idle: 40}
 	current := systemSample{total: 200, idle: 80}
