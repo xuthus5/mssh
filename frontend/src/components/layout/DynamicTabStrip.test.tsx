@@ -226,6 +226,14 @@ describe('DynamicTabStrip', () => {
     expect(screen.getByTestId('server-icon-terminal-1').compareDocumentPosition(screen.getByText('生产服务器')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
+  it('allows only horizontal tab overflow and hides the native scrollbar', () => {
+    seedTabs()
+    render(<DynamicTabStrip />)
+
+    const tabList = screen.getByRole('tablist', { name: '动态标签' })
+    expect(tabList).toHaveClass('overflow-x-auto', 'overflow-y-hidden', '[scrollbar-width:none]', '[&::-webkit-scrollbar]:hidden')
+  })
+
   it('links each dynamic tab to its persistent panel', () => {
     seedTabs()
     render(<DynamicTabStrip />)
