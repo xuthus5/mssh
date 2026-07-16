@@ -130,6 +130,16 @@ describe('Sidebar behavior', () => {
 
   })
 
+  it('keeps the session tree mounted while refreshing existing data', () => {
+    const { rerender } = render(<Sidebar />)
+    const tree = screen.getByTestId('tree-state')
+
+    workspace.loading = true
+    rerender(<Sidebar />)
+
+    expect(screen.getByTestId('tree-state')).toBe(tree)
+  })
+
   it('loads, executes, creates, and deletes macros with failure handling', async () => {
     const user = userEvent.setup()
     macroService.List.mockResolvedValue([{ id: 1, name: 'Initial', shortcut: 'Ctrl+I', command: 'initial' }])
