@@ -23,6 +23,16 @@ describe('ThemeEditor dual mode profiles', () => {
     expect(screen.getByRole('combobox', { name: 'Light Mode 终端主题' })).toBeInTheDocument()
   })
 
+  it('embeds the horizontal preview mode tabs in the preview header', () => {
+    renderEditor()
+
+    const tabs = screen.getByRole('tablist', { name: '预览模式' })
+    expect(tabs.closest('[data-slot="card-header"]')).toHaveTextContent('实时终端预览')
+    expect(tabs).toHaveAttribute('data-orientation', 'horizontal')
+    expect(screen.getByRole('tab', { name: 'Dark Mode' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Light Mode' })).toBeInTheDocument()
+  })
+
   it('previews and saves global terminal style atomically', async () => {
     const onSave = vi.fn(async () => {})
     renderEditor({ onSave })
