@@ -7,6 +7,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -85,6 +86,24 @@ func TestClientWrapperClose(t *testing.T) {
 	require.NoError(t, err)
 	err = cw.Close()
 	assert.NoError(t, err)
+}
+
+func TestClientWrapperCloseIsConcurrentAndIdempotent(t *testing.T) {
+	addr, cleanup := testutil.NewMockServer(t)
+	defer cleanup()
+	cw, err := Connect(context.Background(), model.Session{Host: "127.0.0.1", Port: mustParsePort(addr), Username: "test"}, nil, "", slog.Default())
+	require.NoError(t, err)
+	var waitGroup sync.WaitGroup
+	errors := make(chan error, 16)
+	for range 16 {
+		waitGroup.Add(1)
+		go func() { defer waitGroup.Done(); errors <- cw.Close() }()
+	}
+	waitGroup.Wait()
+	close(errors)
+	for closeErr := range errors {
+		assert.NoError(t, closeErr)
+	}
 }
 
 func TestConnectWithKnownHosts(t *testing.T) {

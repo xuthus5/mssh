@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"sync"
 	"time"
 
 	gossh "golang.org/x/crypto/ssh"
@@ -29,6 +30,8 @@ type ClientWrapper struct {
 	Inner           *gossh.Client
 	keepAliveCtx    context.Context
 	keepAliveCancel context.CancelFunc
+	closeOnce       sync.Once
+	closeErr        error
 }
 
 // Connect establishes an SSH connection to the given session host.
@@ -91,8 +94,15 @@ func ConnectWithVerifier(ctx context.Context, s model.Session, auth []gossh.Auth
 
 // Close stops keep-alive and closes the underlying SSH connection.
 func (c *ClientWrapper) Close() error {
-	c.keepAliveCancel()
-	return c.Inner.Close()
+	c.closeOnce.Do(func() {
+		if c.keepAliveCancel != nil {
+			c.keepAliveCancel()
+		}
+		if c.Inner != nil {
+			c.closeErr = c.Inner.Close()
+		}
+	})
+	return c.closeErr
 }
 
 func (c *ClientWrapper) startKeepAlive(interval time.Duration, logger *slog.Logger) {
