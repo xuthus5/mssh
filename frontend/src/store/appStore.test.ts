@@ -10,6 +10,8 @@ describe('appStore', () => {
       tabs: [],
       activeSurface: null,
       workspaceTab: 'sessions',
+      overviewSection: 'sessions',
+      overviewReturnSurface: null,
       navigationCollapsed: false,
       sidebarWidth: 280,
       focusRequest: { id: '', sequence: 0 },
@@ -38,11 +40,11 @@ describe('appStore', () => {
     expect(useAppStore.getState().activeSurface).toEqual({ type: 'workspace', id: 'sessions' })
   })
 
-  it('uses one active surface for workspaces and dynamic tabs', () => {
+  it('keeps session and macro navigation independent from the active surface', () => {
     const store = useAppStore.getState()
 
     store.activateWorkspace('sessions')
-    expect(useAppStore.getState().activeSurface).toEqual({ type: 'workspace', id: 'sessions' })
+    expect(useAppStore.getState().activeSurface).toBeNull()
 
     store.openTab({ id: 'terminal-1', title: 'one', type: 'terminal', terminalId: 'term-1', sessionId: 1 })
     expect(useAppStore.getState().activeSurface).toEqual({ type: 'terminal', id: 'terminal-1' })
@@ -61,8 +63,27 @@ describe('appStore', () => {
 
     store.activateWorkspace('sessions')
     expect(useAppStore.getState()).toMatchObject({
-      activeSurface: { type: 'workspace', id: 'sessions' },
+      activeSurface: { type: 'terminal', id: 'terminal-1' },
       workspaceTab: 'sessions',
+    })
+  })
+
+  it('restores the previous surface after leaving overview', () => {
+    const store = useAppStore.getState()
+    store.openTab({ id: 'terminal-1', title: 'one', type: 'terminal', terminalId: 'term-1', sessionId: 1 })
+
+    store.activateWorkspace('overview')
+    store.setOverviewSection('keys')
+
+    expect(useAppStore.getState()).toMatchObject({
+      activeSurface: { type: 'workspace', id: 'overview' },
+      overviewSection: 'keys',
+      overviewReturnSurface: { type: 'terminal', id: 'terminal-1' },
+    })
+    store.leaveOverview()
+    expect(useAppStore.getState()).toMatchObject({
+      activeSurface: { type: 'terminal', id: 'terminal-1' },
+      overviewReturnSurface: null,
     })
   })
 

@@ -1,8 +1,8 @@
 import { render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-vi.mock('@/components/session/SessionAssetCenter', () => ({
-  SessionAssetCenter: () => <div>会话资产工作区</div>,
+vi.mock('@/components/layout/OverviewContent', () => ({
+  OverviewContent: () => <div>总览工作区</div>,
 }))
 
 import { WorkspaceContent } from '@/components/layout/WorkspaceContent'
@@ -19,5 +19,13 @@ describe('WorkspaceContent accessibility', () => {
     const panel = screen.getByRole('region')
     expect(panel).toHaveAttribute('id', 'workspace-panel')
     expect(panel).toHaveAttribute('aria-labelledby', 'workspace-tab-sessions')
+  })
+
+  it('renders overview as a dedicated workspace', () => {
+    useAppStore.setState({ activeSurface: { type: 'workspace', id: 'overview' } })
+    render(<WorkspaceContent />)
+
+    expect(screen.getByText('总览工作区')).toBeInTheDocument()
+    expect(screen.getByRole('region')).toHaveAttribute('aria-labelledby', 'workspace-tab-overview')
   })
 })

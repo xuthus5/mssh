@@ -133,7 +133,7 @@ describe('TerminalSplit focus requests', () => {
     expect(terminalInstances[1].focus).toHaveBeenCalledOnce()
   })
 
-  it('preserves a workspace selected while split close is pending', async () => {
+  it('keeps the active terminal visible when session navigation changes during split close', async () => {
     const close = deferred<void>()
     vi.mocked(TerminalService.Close).mockReturnValueOnce(close.promise as ReturnType<typeof TerminalService.Close>)
     render(<StoreDrivenSplit />)
@@ -147,11 +147,11 @@ describe('TerminalSplit focus requests', () => {
 
     await waitFor(() => expect(screen.queryByTitle('关闭分屏')).not.toBeInTheDocument())
     expect(useAppStore.getState()).toMatchObject({
-      activeSurface: { type: 'workspace', id: 'sessions' },
+      activeSurface: { type: 'terminal', id: 'tab-1' },
       activePaneId: 'primary-1',
-      focusRequest,
+      focusRequest: { id: 'tab-1', terminalId: 'primary-1', sequence: focusRequest.sequence + 1 },
     })
-    expect(terminalInstances[0].focus).not.toHaveBeenCalled()
+    expect(terminalInstances[0].focus).toHaveBeenCalledOnce()
   })
 
   it('keeps the split open and reports an explicit close failure', async () => {

@@ -1,5 +1,5 @@
 import { FileText, Keyboard, Shield, Terminal } from 'lucide-react'
-import { SessionAssetCenter } from '@/components/session/SessionAssetCenter'
+import { OverviewContent } from '@/components/layout/OverviewContent'
 import { useAppStore } from '@/store/appStore'
 import { WORKSPACE_PANEL_ID, workspaceTabID } from '@/store/tabNavigation'
 
@@ -70,8 +70,10 @@ export function WorkspaceContent() {
     >
       {activeSurface === null
         ? <WelcomeScreen />
-        : workspaceTab === 'sessions'
-          ? <SessionAssetCenter />
+        : activeSurface.type === 'workspace' && activeSurface.id === 'overview'
+          ? <OverviewContent />
+          : workspaceTab === 'sessions'
+            ? <WelcomeScreen />
           : <div aria-label="宏工作区" className="flex-1 bg-background" />}
     </div>
   )
