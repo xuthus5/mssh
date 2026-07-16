@@ -138,9 +138,9 @@ func CreateSession(db *sql.DB, s model.Session) (*model.Session, error) {
 		s.FolderID = &defaultID
 	}
 	result, err := db.Exec(
-		`INSERT INTO sessions (folder_id, name, host, port, username, auth_method, password, key_id, keep_alive, term_type, sort_order)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		s.FolderID, s.Name, s.Host, s.Port, s.Username, s.AuthMethod, s.Password, s.KeyID, s.KeepAlive, s.TermType, s.SortOrder,
+		`INSERT INTO sessions (folder_id, name, host, port, username, tags, notes, environment, project, auth_method, password, key_id, keep_alive, term_type, sort_order)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		s.FolderID, s.Name, s.Host, s.Port, s.Username, s.Tags, s.Notes, s.Environment, s.Project, s.AuthMethod, s.Password, s.KeyID, s.KeepAlive, s.TermType, s.SortOrder,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("create session: %w", err)
@@ -189,9 +189,9 @@ func ListSessions(db *sql.DB, folderID *int64) ([]model.Session, error) {
 
 func UpdateSession(db *sql.DB, s model.Session) error {
 	_, err := db.Exec(
-		`UPDATE sessions SET folder_id=?, name=?, host=?, port=?, username=?, auth_method=?, password=?, key_id=?, keep_alive=?, term_type=?, sort_order=?, updated_at=datetime('now')
+		`UPDATE sessions SET folder_id=?, name=?, host=?, port=?, username=?, tags=?, notes=?, environment=?, project=?, auth_method=?, password=?, key_id=?, keep_alive=?, term_type=?, sort_order=?, updated_at=datetime('now')
 		 WHERE id=?`,
-		s.FolderID, s.Name, s.Host, s.Port, s.Username, s.AuthMethod, s.Password, s.KeyID, s.KeepAlive, s.TermType, s.SortOrder, s.ID,
+		s.FolderID, s.Name, s.Host, s.Port, s.Username, s.Tags, s.Notes, s.Environment, s.Project, s.AuthMethod, s.Password, s.KeyID, s.KeepAlive, s.TermType, s.SortOrder, s.ID,
 	)
 	if err != nil {
 		return fmt.Errorf("update session: %w", err)
@@ -215,7 +215,7 @@ func GetSession(db *sql.DB, id int64) (*model.Session, error) {
 	return &s, nil
 }
 
-const sessionSelectColumns = `SELECT id, folder_id, name, host, port, username, auth_method, password, key_id, keep_alive, term_type, sort_order, last_connected_at, connection_count, created_at, updated_at`
+const sessionSelectColumns = `SELECT id, folder_id, name, host, port, username, tags, notes, environment, project, auth_method, password, key_id, keep_alive, term_type, sort_order, last_connected_at, connection_count, created_at, updated_at`
 
 type sessionScanner interface{ Scan(...any) error }
 
@@ -223,7 +223,7 @@ func scanSession(scanner sessionScanner) (model.Session, error) {
 	var session model.Session
 	var lastConnected sql.NullString
 	var createdAt, updatedAt string
-	err := scanner.Scan(&session.ID, &session.FolderID, &session.Name, &session.Host, &session.Port, &session.Username, &session.AuthMethod, &session.Password, &session.KeyID, &session.KeepAlive, &session.TermType, &session.SortOrder, &lastConnected, &session.ConnectionCount, &createdAt, &updatedAt)
+	err := scanner.Scan(&session.ID, &session.FolderID, &session.Name, &session.Host, &session.Port, &session.Username, &session.Tags, &session.Notes, &session.Environment, &session.Project, &session.AuthMethod, &session.Password, &session.KeyID, &session.KeepAlive, &session.TermType, &session.SortOrder, &lastConnected, &session.ConnectionCount, &createdAt, &updatedAt)
 	if err != nil {
 		return session, err
 	}

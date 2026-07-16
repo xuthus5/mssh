@@ -11,7 +11,7 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-const databaseFormatVersion = 1
+const databaseFormatVersion = 2
 
 const foldersTableSQL = `CREATE TABLE IF NOT EXISTS session_folders (
 	id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -40,6 +40,10 @@ const sessionsTableSQL = `CREATE TABLE IF NOT EXISTS sessions (
 	host TEXT NOT NULL,
 	port INTEGER NOT NULL DEFAULT 22,
 	username TEXT NOT NULL,
+	tags TEXT NOT NULL DEFAULT '',
+	notes TEXT NOT NULL DEFAULT '',
+	environment TEXT NOT NULL DEFAULT '',
+	project TEXT NOT NULL DEFAULT '',
 	auth_method TEXT NOT NULL CHECK(auth_method IN ('password','key','agent','keyboard-interactive')),
 	password TEXT,
 	key_id INTEGER REFERENCES ssh_keys(id),

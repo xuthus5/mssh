@@ -28,6 +28,10 @@ type Session struct {
 	Host            string     `json:"host"`
 	Port            int        `json:"port"`
 	Username        string     `json:"username"`
+	Tags            string     `json:"tags"`
+	Notes           string     `json:"notes"`
+	Environment     string     `json:"environment"`
+	Project         string     `json:"project"`
 	AuthMethod      AuthMethod `json:"auth_method"`
 	Password        string     `json:"password,omitempty"`
 	KeyID           *int64     `json:"key_id,omitempty"`
