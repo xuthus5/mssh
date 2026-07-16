@@ -193,7 +193,7 @@ export function DynamicTabStrip({ onOverflowChange }: { onOverflowChange?: (over
 
   return (
     <div className="flex min-w-0 shrink overflow-hidden [--wails-draggable:no-drag]">
-      <div ref={tabListRef} role="tablist" aria-label="动态标签" className="flex min-w-0 gap-0.5 overflow-x-auto p-0.5">
+      <div ref={tabListRef} role="tablist" aria-label="动态标签" className="flex h-9 min-w-0 items-center gap-0.5 overflow-x-auto overflow-y-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {tabs.map((tab, index) => <Fragment key={tab.id}>
           <DynamicTab tab={tab} active={activeSurface?.id === tab.id} connectionStatus={connectionStatus} navigation={navigation} onActivate={activateWithFocus} onClose={closeCoordinator.requestClose} onDuplicate={duplicateTerminal} />
           {index === quickConnectAfter && <QuickConnectButton />}
