@@ -222,7 +222,7 @@ describe('DynamicTabStrip', () => {
     render(<DynamicTabStrip />)
 
     const quickConnect = screen.getByRole('button', { name: '快速连接会话' })
-    expect(quickConnect).toHaveClass('border-0', 'rounded-md')
+    expect(quickConnect).toHaveClass('border-0', 'rounded-t-md', 'rounded-b-none')
     expect(screen.getByTestId('server-icon-terminal-1').compareDocumentPosition(screen.getByText('生产服务器')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
@@ -254,6 +254,17 @@ describe('DynamicTabStrip', () => {
     const close = screen.getByRole('button', { name: '关闭 生产服务器' })
     expect(close).toHaveClass('rounded-full', 'size-5')
     expect(close).not.toHaveClass('opacity-0')
+  })
+
+  it('fuses the active tab with the terminal toolbar surface', () => {
+    seedTabs()
+    useAppStore.setState({ activeSurface: { type: 'terminal', id: 'terminal-1' } })
+    render(<DynamicTabStrip />)
+
+    const activeTab = screen.getByRole('tab', { name: /生产服务器/ }).parentElement
+    if (!activeTab) throw new Error('active tab surface not found')
+    expect(activeTab).toHaveClass('rounded-t-md', 'rounded-b-none', 'bg-muted/30')
+    expect(activeTab).not.toHaveClass('shadow-sm')
   })
 
   it('links each dynamic tab to its persistent panel', () => {
