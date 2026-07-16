@@ -118,7 +118,7 @@ function DynamicTab({ tab, active, connectionStatus, navigation, onActivate, onC
   const statusLabel = tabStatusLabel(tab, connectionStatus)
   const content = (
     <div
-      className={`group flex h-8 shrink-0 items-center gap-1 rounded-md border px-1.5 text-sm transition-colors duration-150 ${active ? 'border-border/60 bg-background text-foreground shadow-sm' : 'border-transparent text-muted-foreground hover:bg-muted/60 hover:text-foreground'}`}
+      className={`group flex h-8 shrink-0 items-center gap-1 border px-1.5 text-sm transition-colors duration-150 ${active ? 'rounded-t-md rounded-b-none border-transparent bg-muted/30 text-foreground' : 'rounded-md border-transparent bg-transparent text-muted-foreground hover:bg-muted/60 hover:text-foreground'}`}
     >
       <button ref={(element) => navigation.registerTab(tab.id, element)} id={dynamicTabID(tab.id)} type="button" role="tab" tabIndex={active ? 0 : -1} aria-controls={dynamicPanelID(tab.id)} aria-label={`${tab.title}，状态：${statusLabel}`} aria-selected={active} className="flex h-full min-w-0 flex-1 items-center gap-1.5 rounded-sm px-1 focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={() => onActivate(tab.id)} onKeyDown={(event) => navigation.onKeyDown(event, tab.id)}>
         <TabLeadingIcon tab={tab} />
@@ -171,7 +171,7 @@ function lastTerminalTabIndex(tabs: Tab[]) {
 function QuickConnectButton() {
   const openSearch = () => window.dispatchEvent(new CustomEvent(SESSION_QUICK_SEARCH_EVENT))
   return <Button type="button" variant="ghost" size="icon-sm" aria-label="快速连接会话" title="快速连接会话"
-    className="h-8 w-8 shrink-0 rounded-md border-0 text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground" onClick={openSearch}>
+    className="h-8 w-8 shrink-0 rounded-t-md rounded-b-none border-0 text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground" onClick={openSearch}>
     <Plus aria-hidden="true" />
   </Button>
 }
@@ -202,7 +202,7 @@ export function DynamicTabStrip({ onOverflowChange }: { onOverflowChange?: (over
 
   return (
     <div className="flex min-w-0 shrink overflow-hidden [--wails-draggable:no-drag]">
-      <div ref={tabListRef} role="tablist" aria-label="动态标签" className="flex h-9 min-w-0 items-center gap-1 overflow-x-auto overflow-y-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" onWheel={scrollTabsWithWheel}>
+      <div ref={tabListRef} role="tablist" aria-label="动态标签" className="flex h-9 min-w-0 items-end gap-1 overflow-x-auto overflow-y-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" onWheel={scrollTabsWithWheel}>
         {tabs.map((tab, index) => <Fragment key={tab.id}>
           <DynamicTab tab={tab} active={activeSurface?.id === tab.id} connectionStatus={connectionStatus} navigation={navigation} onActivate={activateWithFocus} onClose={closeCoordinator.requestClose} onDuplicate={duplicateTerminal} />
           {index === quickConnectAfter && <QuickConnectButton />}
