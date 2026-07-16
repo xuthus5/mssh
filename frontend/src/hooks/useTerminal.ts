@@ -41,14 +41,18 @@ interface TerminalLifecycleRefs {
   requestedSequenceRef: RefObject<number>
   handledSequenceRef: RefObject<number>
   writeFailureReportedRef: RefObject<boolean>
+  lastResizeRef: RefObject<{ terminalID: string; cols: number; rows: number } | null>
 }
 
 function hasVisibleSize(container: HTMLDivElement | null): container is HTMLDivElement {
   return container !== null && container.clientWidth > 0 && container.clientHeight > 0
 }
 
-function reportResize(terminalID: string, term: Terminal, context: string) {
+function reportResize(terminalID: string, term: Terminal, context: string, lastResizeRef: RefObject<{ terminalID: string; cols: number; rows: number } | null>) {
   if (term.cols < 1 || term.rows < 1) return
+  const previous = lastResizeRef.current
+  if (previous?.terminalID === terminalID && previous.cols === term.cols && previous.rows === term.rows) return
+  lastResizeRef.current = { terminalID, cols: term.cols, rows: term.rows }
   try {
     void TerminalService.Resize(terminalID, term.cols, term.rows).catch((error: unknown) => logger.error(context, error))
   } catch (error: unknown) {
@@ -151,7 +155,7 @@ function subscribeToTheme({ term, fitAddon, containerRef, refs, reportRuntimeErr
           return
         }
         refs.recoveryPendingRef.current = false
-        reportResize(refs.terminalIDRef.current, term, 'terminal theme resize error')
+        reportResize(refs.terminalIDRef.current, term, 'terminal theme resize error', refs.lastResizeRef)
       })
     }
   })
@@ -170,7 +174,7 @@ function recoverTerminal({ term, fitAddon, container, refs }: {
     refs.handledSequenceRef.current = refs.requestedSequenceRef.current
   }
   refs.recoveryPendingRef.current = false
-  reportResize(refs.terminalIDRef.current, term, 'terminal activation resize error')
+  reportResize(refs.terminalIDRef.current, term, 'terminal activation resize error', refs.lastResizeRef)
   return true
 }
 
@@ -189,7 +193,7 @@ function observeResize({ term, fitAddon, containerRef, refs, reportRuntimeError 
         return
       }
       if (!fitAndRefresh(term, fitAddon, containerRef.current)) return
-      reportResize(refs.terminalIDRef.current, term, 'terminal resize error')
+      reportResize(refs.terminalIDRef.current, term, 'terminal resize error', refs.lastResizeRef)
     })
   })
 }
@@ -300,6 +304,7 @@ export function useTerminal(terminalID: string, containerRef: RefObject<HTMLDivE
     requestedSequenceRef: useRef(focusRequest.sequence),
     handledSequenceRef: useRef(0),
     writeFailureReportedRef: useRef(false),
+    lastResizeRef: useRef<{ terminalID: string; cols: number; rows: number } | null>(null),
   }
   if (refs.terminalIDRef.current !== terminalID) {
     refs.terminalIDRef.current = terminalID
