@@ -44,3 +44,6 @@ export function Write(terminalID: string, data: string): $CancellablePromise<num
 export function SystemInfo(terminalID: string): $CancellablePromise<any> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.TerminalService.SystemInfo", terminalID);
 }
+export function ProcessInfo(terminalID: string): $CancellablePromise<any> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.TerminalService.ProcessInfo", terminalID);
+}
