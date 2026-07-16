@@ -21,6 +21,7 @@ vi.mock('@xterm/xterm', () => ({
   Terminal: class {
     cols = 80
     rows = 24
+    unicode = { activeVersion: '6' }
     options = {}
     open() { calls.push('open') }
     private addons: Array<{ dispose: () => void }> = []
@@ -56,6 +57,13 @@ vi.mock('@xterm/addon-fit', () => ({
       if (runtimeFailure === 'fit') throw new Error('fit failed')
     }
     dispose() { this.addonDispose() }
+  },
+}))
+
+vi.mock('@xterm/addon-unicode11', () => ({
+  Unicode11Addon: class {
+    name = 'unicode11'
+    dispose() { calls.push('dispose:unicode11') }
   },
 }))
 
@@ -125,7 +133,8 @@ describe('useTerminal', () => {
 
     const { unmount } = renderHook(() => useTerminal('term-1', containerRef, { active: true, focusRequest: { sequence: 0 } }))
 
-    expect(calls).toEqual(['open', 'load:fit'])
+    expect(calls).toEqual(['open', 'load:unicode11', 'load:fit'])
+    expect(terminalOptions[0]).toBeDefined()
     expect(selectionDisposes).toHaveLength(1)
     act(() => unmount())
     expect(selectionDisposes[0]).toHaveBeenCalledOnce()
