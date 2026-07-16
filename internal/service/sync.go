@@ -91,10 +91,60 @@ func (s *SyncService) Import(path string) error {
 	if err := decodeSnapshot(plaintext, &data); err != nil {
 		return fmt.Errorf("import: %w", err)
 	}
+	if err := validateSnapshot(s.db, data); err != nil {
+		return fmt.Errorf("import: validate: %w", err)
+	}
 	if err := s.restore(data); err != nil {
 		return fmt.Errorf("import: %w", err)
 	}
 	s.logger.Info("imported encrypted configuration", "path", path)
+	return nil
+}
+
+func validateSnapshot(db *sql.DB, data ExportData) error {
+	for _, table := range backupTables {
+		columns, err := tableColumns(db, table)
+		if err != nil {
+			return err
+		}
+		if err := validateTableRows(table, data.Tables[table], columns); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func tableColumns(db *sql.DB, table string) (map[string]struct{}, error) {
+	rows, err := db.Query("PRAGMA table_info(" + table + ")")
+	if err != nil {
+		return nil, fmt.Errorf("inspect %s: %w", table, err)
+	}
+	defer func() { _ = rows.Close() }()
+	columns := make(map[string]struct{})
+	for rows.Next() {
+		var cid int
+		var name, columnType string
+		var notNull, primaryKey int
+		var defaultValue any
+		if err := rows.Scan(&cid, &name, &columnType, &notNull, &defaultValue, &primaryKey); err != nil {
+			return nil, fmt.Errorf("inspect %s: %w", table, err)
+		}
+		columns[name] = struct{}{}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("inspect %s: %w", table, err)
+	}
+	return columns, nil
+}
+
+func validateTableRows(table string, rows []map[string]any, columns map[string]struct{}) error {
+	for index, record := range rows {
+		for column := range record {
+			if _, ok := columns[column]; !ok {
+				return fmt.Errorf("table %s row %d contains unknown column %s", table, index, column)
+			}
+		}
+	}
 	return nil
 }
 
