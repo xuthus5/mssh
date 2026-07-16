@@ -8,12 +8,20 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"sort"
+	"strings"
 
-	"github.com/xuthus5/mssh/internal/model"
-	"github.com/xuthus5/mssh/internal/store"
+	backupcrypto "github.com/xuthus5/mssh/internal/crypto"
 )
 
-const syncFormatVersion = 1
+const (
+	SyncMasterKeySetting = "sync.master_key"
+	syncFormatVersion    = 2
+)
+
+var backupTables = []string{"session_folders", "ssh_keys", "sessions", "tunnels", "macros", "settings", "themes", "terminal_theme_profiles"}
+
+var backupDeleteOrder = []string{"terminal_theme_profiles", "themes", "tunnels", "sessions", "ssh_keys", "session_folders", "macros", "settings"}
 
 type SyncService struct {
 	db     *sql.DB
@@ -25,160 +33,207 @@ func NewSyncService(db *sql.DB, logger *slog.Logger) *SyncService {
 }
 
 type ExportData struct {
-	FormatVersion int             `json:"format_version"`
-	Sessions      []model.Session `json:"sessions"`
-	Keys          []model.SSHKey  `json:"keys"`
-	Macros        []model.Macro   `json:"macros"`
-}
-
-type syncImportDocument struct {
-	FormatVersion json.RawMessage `json:"format_version"`
-	Sessions      []model.Session `json:"sessions"`
-	Keys          []model.SSHKey  `json:"keys"`
-	Macros        []model.Macro   `json:"macros"`
+	FormatVersion int                         `json:"format_version"`
+	Tables        map[string][]map[string]any `json:"tables"`
 }
 
 func (s *SyncService) Export(path string) error {
-	s.logger.Info("exporting data", "path", path)
-	sessions, err := store.ListSessions(s.db, nil)
+	masterKey, err := s.masterKey()
 	if err != nil {
 		return fmt.Errorf("export: %w", err)
 	}
-	keys, err := store.ListKeys(s.db)
+	data, err := s.snapshot()
 	if err != nil {
 		return fmt.Errorf("export: %w", err)
 	}
-	macros, err := store.ListMacros(s.db)
+	plaintext, err := json.Marshal(data)
 	if err != nil {
-		return fmt.Errorf("export: %w", err)
+		return fmt.Errorf("export: encode data: %w", err)
 	}
-
-	// Strip sensitive fields from sessions before export.
-	safeSessions := make([]model.Session, len(sessions))
-	for i, sess := range sessions {
-		sess.Password = ""
-		safeSessions[i] = sess
+	envelope, err := backupcrypto.EncryptBackup(plaintext, []byte(masterKey))
+	if err != nil {
+		return fmt.Errorf("export: encrypt: %w", err)
 	}
-
-	data := ExportData{
-		FormatVersion: syncFormatVersion,
-		Sessions:      safeSessions,
-		Keys:          keys,
-		Macros:        macros,
+	content, err := backupcrypto.EncodeBackup(envelope)
+	if err != nil {
+		return fmt.Errorf("export: encode envelope: %w", err)
 	}
-
 	file, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
 	if err != nil {
 		return fmt.Errorf("export: %w", err)
 	}
 	defer func() { _ = file.Close() }()
-
-	if err := json.NewEncoder(file).Encode(data); err != nil {
-		return fmt.Errorf("export: %w", err)
+	if _, err := file.Write(content); err != nil {
+		return fmt.Errorf("export: write: %w", err)
 	}
+	s.logger.Info("exported encrypted configuration", "path", path)
 	return nil
 }
 
 func (s *SyncService) Import(path string) error {
-	s.logger.Info("importing data", "path", path)
-	file, err := os.Open(path)
+	masterKey, err := s.masterKey()
 	if err != nil {
 		return fmt.Errorf("import: %w", err)
 	}
-	defer func() { _ = file.Close() }()
-
-	data, err := decodeSyncData(file)
+	content, err := os.ReadFile(path)
 	if err != nil {
 		return fmt.Errorf("import: %w", err)
 	}
-
-	for _, sess := range data.Sessions {
-		copySess := sess
-		copySess.ID = 0
-		if _, err := store.CreateSession(s.db, copySess); err != nil {
-			return fmt.Errorf("import: %w", err)
-		}
+	var envelope backupcrypto.BackupEnvelope
+	if err := json.Unmarshal(content, &envelope); err != nil {
+		return fmt.Errorf("import: decode envelope: %w", err)
 	}
-	for _, key := range data.Keys {
-		copyKey := key
-		copyKey.ID = 0
-		if _, err := store.CreateKey(s.db, copyKey); err != nil {
-			return fmt.Errorf("import: %w", err)
-		}
+	plaintext, err := backupcrypto.DecryptBackup(envelope, []byte(masterKey))
+	if err != nil {
+		return fmt.Errorf("import: %w", err)
 	}
-	for _, macro := range data.Macros {
-		copyMacro := macro
-		copyMacro.ID = 0
-		if _, err := store.CreateMacro(s.db, copyMacro); err != nil {
-			return fmt.Errorf("import: %w", err)
-		}
+	var data ExportData
+	if err := decodeSnapshot(plaintext, &data); err != nil {
+		return fmt.Errorf("import: %w", err)
 	}
-
+	if err := s.restore(data); err != nil {
+		return fmt.Errorf("import: %w", err)
+	}
+	s.logger.Info("imported encrypted configuration", "path", path)
 	return nil
 }
 
-func decodeSyncData(reader io.Reader) (ExportData, error) {
-	decoder := json.NewDecoder(reader)
-	decoder.DisallowUnknownFields()
-
-	var document syncImportDocument
-	if err := decoder.Decode(&document); err != nil {
-		return ExportData{}, fmt.Errorf("decode sync document: %w", err)
+func (s *SyncService) masterKey() (string, error) {
+	var raw string
+	err := s.db.QueryRow("SELECT value FROM settings WHERE key = ?", SyncMasterKeySetting).Scan(&raw)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", errors.New("master key is not configured")
 	}
-	formatVersion, err := decodeSyncFormatVersion(document.FormatVersion)
 	if err != nil {
-		return ExportData{}, fmt.Errorf("decode sync document: %w", err)
+		return "", fmt.Errorf("read master key: %w", err)
 	}
+	var key string
+	if err := json.Unmarshal([]byte(raw), &key); err != nil || len(key) < 12 {
+		return "", errors.New("master key is invalid")
+	}
+	return key, nil
+}
 
-	var trailing json.RawMessage
-	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
-		if err == nil {
-			return ExportData{}, fmt.Errorf("decode sync document trailer: trailing JSON value")
+func (s *SyncService) snapshot() (ExportData, error) {
+	tables := make(map[string][]map[string]any, len(backupTables))
+	for _, table := range backupTables {
+		rows, err := readTable(s.db, table)
+		if err != nil {
+			return ExportData{}, fmt.Errorf("read %s: %w", table, err)
 		}
-		return ExportData{}, fmt.Errorf("decode sync document trailer: %w", err)
+		if table == "settings" {
+			filtered := rows[:0]
+			for _, row := range rows {
+				if row["key"] != SyncMasterKeySetting {
+					filtered = append(filtered, row)
+				}
+			}
+			rows = filtered
+		}
+		tables[table] = rows
 	}
-	data := ExportData{
-		FormatVersion: formatVersion,
-		Sessions:      document.Sessions,
-		Keys:          document.Keys,
-		Macros:        document.Macros,
-	}
+	return ExportData{FormatVersion: syncFormatVersion, Tables: tables}, nil
+}
 
+func decodeSnapshot(content []byte, data *ExportData) error {
+	decoder := json.NewDecoder(strings.NewReader(string(content)))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(data); err != nil {
+		return fmt.Errorf("decode snapshot: %w", err)
+	}
+	var trailing any
+	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
+		return errors.New("decode snapshot: trailing JSON value")
+	}
 	if data.FormatVersion != syncFormatVersion {
-		return ExportData{}, fmt.Errorf("validate sync document: format_version must be %d, got %d", syncFormatVersion, data.FormatVersion)
+		return fmt.Errorf("snapshot format_version must be %d, got %d", syncFormatVersion, data.FormatVersion)
 	}
-	if data.Sessions == nil {
-		return ExportData{}, fmt.Errorf("validate sync document: sessions array is required")
+	for _, table := range backupTables {
+		if _, ok := data.Tables[table]; !ok {
+			return fmt.Errorf("snapshot table %s is required", table)
+		}
 	}
-	if data.Keys == nil {
-		return ExportData{}, fmt.Errorf("validate sync document: keys array is required")
-	}
-	if data.Macros == nil {
-		return ExportData{}, fmt.Errorf("validate sync document: macros array is required")
-	}
-
-	return data, nil
+	return nil
 }
 
-func decodeSyncFormatVersion(raw json.RawMessage) (int, error) {
-	if len(raw) == 0 {
-		return 0, nil
+func (s *SyncService) restore(data ExportData) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return fmt.Errorf("begin restore: %w", err)
 	}
-	if string(raw) == "null" {
-		return 0, errors.New("format_version must be an integer")
+	defer func() { _ = tx.Rollback() }()
+	for _, table := range backupDeleteOrder {
+		statement := "DELETE FROM " + table
+		arguments := []any(nil)
+		if table == "settings" {
+			statement = "DELETE FROM settings WHERE key <> ?"
+			arguments = []any{SyncMasterKeySetting}
+		}
+		if _, err := tx.Exec(statement, arguments...); err != nil {
+			return fmt.Errorf("clear %s: %w", table, err)
+		}
 	}
-
-	var version int
-	if err := json.Unmarshal(raw, &version); err != nil {
-		return 0, errors.New("format_version must be an integer")
+	for _, table := range []string{"session_folders", "ssh_keys", "sessions", "tunnels", "macros", "settings", "themes", "terminal_theme_profiles"} {
+		for _, row := range data.Tables[table] {
+			if err := insertRow(tx, table, row); err != nil {
+				return fmt.Errorf("restore %s: %w", table, err)
+			}
+		}
 	}
-	return version, nil
+	return tx.Commit()
 }
 
-func (s *SyncService) SyncToCloud() error {
-	return fmt.Errorf("cloud sync not implemented")
+func readTable(db *sql.DB, table string) ([]map[string]any, error) {
+	rows, err := db.Query("SELECT * FROM " + table)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	columns, err := rows.Columns()
+	if err != nil {
+		return nil, err
+	}
+	result := make([]map[string]any, 0)
+	for rows.Next() {
+		values := make([]any, len(columns))
+		pointers := make([]any, len(columns))
+		for i := range values {
+			pointers[i] = &values[i]
+		}
+		if err := rows.Scan(pointers...); err != nil {
+			return nil, err
+		}
+		row := make(map[string]any, len(columns))
+		for i, value := range values {
+			if bytes, ok := value.([]byte); ok {
+				row[columns[i]] = string(bytes)
+			} else {
+				row[columns[i]] = value
+			}
+		}
+		result = append(result, row)
+	}
+	return result, rows.Err()
 }
 
-func (s *SyncService) SyncFromCloud() error {
-	return fmt.Errorf("cloud sync not implemented")
+func insertRow(tx *sql.Tx, table string, row map[string]any) error {
+	columns := make([]string, 0, len(row))
+	for column := range row {
+		columns = append(columns, column)
+	}
+	sort.Strings(columns)
+	values := make([]any, len(columns))
+	for index, column := range columns {
+		values[index] = row[column]
+	}
+	placeholders := make([]string, len(columns))
+	for i := range placeholders {
+		placeholders[i] = "?"
+	}
+	_, err := tx.Exec("INSERT INTO "+table+" ("+strings.Join(columns, ",")+") VALUES ("+strings.Join(placeholders, ",")+")", values...)
+	return err
 }
+
+func (s *SyncService) SyncToCloud() error { return fmt.Errorf("cloud sync not implemented") }
+
+func (s *SyncService) SyncFromCloud() error { return fmt.Errorf("cloud sync not implemented") }
