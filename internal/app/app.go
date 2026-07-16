@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"sync"
 
 	"github.com/xuthus5/mssh/internal/crypto"
 	"github.com/xuthus5/mssh/internal/service"
@@ -33,6 +34,7 @@ type App struct {
 	About          *service.AboutService
 	Font           *service.FontService
 	logger         *slog.Logger
+	shutdownOnce   sync.Once
 }
 
 type Options struct {
@@ -286,6 +288,10 @@ func handleTerminalRecordingClose(stopper terminalRecordingStopper, logger *slog
 }
 
 func (a *App) Shutdown() {
+	a.shutdownOnce.Do(a.shutdown)
+}
+
+func (a *App) shutdown() {
 	logger := a.logger
 	if logger == nil {
 		logger = slog.Default()
