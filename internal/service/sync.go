@@ -8,6 +8,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -17,6 +18,7 @@ import (
 const (
 	SyncMasterKeySetting = "sync.master_key"
 	syncFormatVersion    = 2
+	syncRecoveryFileName = "pre-import.msshbackup"
 )
 
 var backupTables = []string{"session_folders", "ssh_keys", "sessions", "tunnels", "macros", "settings", "themes", "terminal_theme_profiles"}
@@ -46,25 +48,12 @@ func (s *SyncService) Export(path string) error {
 	if err != nil {
 		return fmt.Errorf("export: %w", err)
 	}
-	plaintext, err := json.Marshal(data)
-	if err != nil {
-		return fmt.Errorf("export: encode data: %w", err)
-	}
-	envelope, err := backupcrypto.EncryptBackup(plaintext, []byte(masterKey))
-	if err != nil {
-		return fmt.Errorf("export: encrypt: %w", err)
-	}
-	content, err := backupcrypto.EncodeBackup(envelope)
-	if err != nil {
-		return fmt.Errorf("export: encode envelope: %w", err)
-	}
-	file, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
+	content, err := encodeEncryptedSnapshot(data, masterKey)
 	if err != nil {
 		return fmt.Errorf("export: %w", err)
 	}
-	defer func() { _ = file.Close() }()
-	if _, err := file.Write(content); err != nil {
-		return fmt.Errorf("export: write: %w", err)
+	if err := writePrivateFileAtomic(path, content); err != nil {
+		return fmt.Errorf("export: %w", err)
 	}
 	s.logger.Info("exported encrypted configuration", "path", path)
 	return nil
@@ -94,11 +83,88 @@ func (s *SyncService) Import(path string) error {
 	if err := validateSnapshot(s.db, data); err != nil {
 		return fmt.Errorf("import: validate: %w", err)
 	}
+	if err := s.writeRecoveryPoint(masterKey); err != nil {
+		return fmt.Errorf("import: recovery point: %w", err)
+	}
 	if err := s.restore(data); err != nil {
 		return fmt.Errorf("import: %w", err)
 	}
 	s.logger.Info("imported encrypted configuration", "path", path)
 	return nil
+}
+
+func encodeEncryptedSnapshot(data ExportData, masterKey string) ([]byte, error) {
+	plaintext, err := json.Marshal(data)
+	if err != nil {
+		return nil, fmt.Errorf("encode data: %w", err)
+	}
+	envelope, err := backupcrypto.EncryptBackup(plaintext, []byte(masterKey))
+	if err != nil {
+		return nil, fmt.Errorf("encrypt: %w", err)
+	}
+	content, err := backupcrypto.EncodeBackup(envelope)
+	if err != nil {
+		return nil, fmt.Errorf("encode envelope: %w", err)
+	}
+	return content, nil
+}
+
+func writePrivateFileAtomic(path string, content []byte) error {
+	directory := filepath.Dir(path)
+	temporary, err := os.CreateTemp(directory, ".mssh-backup-*.tmp")
+	if err != nil {
+		return err
+	}
+	temporaryPath := temporary.Name()
+	defer func() { _ = os.Remove(temporaryPath) }()
+	if err := temporary.Chmod(0o600); err != nil {
+		_ = temporary.Close()
+		return err
+	}
+	if _, err := temporary.Write(content); err != nil {
+		_ = temporary.Close()
+		return err
+	}
+	if err := temporary.Sync(); err != nil {
+		_ = temporary.Close()
+		return err
+	}
+	if err := temporary.Close(); err != nil {
+		return err
+	}
+	return os.Rename(temporaryPath, path)
+}
+
+func (s *SyncService) writeRecoveryPoint(masterKey string) error {
+	data, err := s.snapshot()
+	if err != nil {
+		return err
+	}
+	content, err := encodeEncryptedSnapshot(data, masterKey)
+	if err != nil {
+		return err
+	}
+	path, err := s.recoveryPath()
+	if err != nil {
+		return err
+	}
+	if err := writePrivateFileAtomic(path, content); err != nil {
+		return err
+	}
+	s.logger.Info("created pre-import recovery point", "path", path)
+	return nil
+}
+
+func (s *SyncService) recoveryPath() (string, error) {
+	var sequence int
+	var name, databasePath string
+	if err := s.db.QueryRow("PRAGMA database_list").Scan(&sequence, &name, &databasePath); err != nil {
+		return "", err
+	}
+	if databasePath == "" {
+		return "", errors.New("database path is unavailable")
+	}
+	return filepath.Join(filepath.Dir(databasePath), syncRecoveryFileName), nil
 }
 
 func validateSnapshot(db *sql.DB, data ExportData) error {
