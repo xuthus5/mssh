@@ -7,6 +7,7 @@ import { workspaceTabID, type WorkspaceID } from '@/store/tabNavigation'
 import { useThemeCatalog } from '@/hooks/useThemeCatalog'
 import { DynamicTabOverflowMenu, DynamicTabStrip } from '@/components/layout/DynamicTabStrip'
 import { WINDOW_OPEN_SETTINGS_EVENT } from '@/lib/settingsWindowEvents'
+import { cn } from '@/lib/utils'
 
 function runWindowAction(name: string, action: () => Promise<unknown>) {
   void action().catch((error: unknown) => logger.error(`window ${name} failed`, error))
@@ -31,13 +32,13 @@ export function WindowTitleBar() {
   const navigationButton = (tab: WorkspaceID, label: string) => {
     const Icon = tab === 'overview' ? LayoutDashboard : tab === 'sessions' ? SquareTerminal : Workflow
     const selected = tab === 'overview' ? overviewActive : !overviewActive && workspaceTab === tab
-    return <button id={workspaceTabID(tab)} type="button" aria-controls="sidebar-navigation" aria-pressed={selected} className={`flex items-center gap-1.5 px-3.5 text-sm font-medium transition-colors [--wails-draggable:no-drag] ${selected ? 'bg-background text-foreground shadow-[inset_0_-2px_0_var(--primary)]' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`} onClick={() => activateWorkspace(tab)}><Icon data-icon="inline-start" aria-hidden="true" className="size-4" />{label}</button>
+    return <button id={workspaceTabID(tab)} type="button" aria-controls="sidebar-navigation" aria-pressed={selected} className={cn('flex h-6 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition-colors duration-150 [--wails-draggable:no-drag] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70', selected ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground')} onClick={() => activateWorkspace(tab)}><Icon data-icon="inline-start" aria-hidden="true" className="size-3.5" />{label}</button>
   }
 
   return <header className="flex h-9 shrink-0 select-none items-stretch border-b border-border bg-card">
-    <div className="flex shrink-0 [--wails-draggable:no-drag]">
-      <button type="button" aria-label={navigationCollapsed ? '展开导航' : '收起导航'} aria-controls="sidebar-navigation" aria-expanded={!navigationCollapsed} className="grid w-10 place-items-center text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={toggleNavigation}><Menu className="size-4" /></button>
-      {!navigationCollapsed && <nav aria-label="侧边栏导航" className="flex">{navigationButton('overview', '总览')}{!overviewActive && <>{navigationButton('sessions', '会话')}{navigationButton('macros', '宏')}</>}</nav>}
+    <div className="flex shrink-0 items-center gap-1 px-1 [--wails-draggable:no-drag]">
+      <button type="button" aria-label={navigationCollapsed ? '展开导航' : '收起导航'} aria-controls="sidebar-navigation" aria-expanded={!navigationCollapsed} className="grid size-7 place-items-center rounded-md text-muted-foreground transition-colors duration-150 hover:bg-muted/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70" onClick={toggleNavigation}><Menu className="size-3.5" /></button>
+      {!navigationCollapsed && <nav aria-label="侧边栏导航" className="flex h-7 items-center gap-0.5 rounded-lg border border-border/60 bg-muted/40 p-0.5">{navigationButton('overview', '总览')}{!overviewActive && <>{navigationButton('sessions', '会话')}{navigationButton('macros', '宏')}</>}</nav>}
     </div>
     <DynamicTabStrip onOverflowChange={setTabsOverflow} />
     <div data-testid="window-drag-region" className="min-w-20 flex-1 [--wails-draggable:drag]" onDoubleClick={() => runWindowAction('toggle maximise', Window.ToggleMaximise)} />

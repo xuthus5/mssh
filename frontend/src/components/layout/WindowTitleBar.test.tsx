@@ -167,6 +167,8 @@ describe('WindowTitleBar', () => {
     expect(screen.getByRole('button', { name: '宏' })).toHaveAttribute('id', 'workspace-tab-macros')
     expect(screen.getByRole('button', { name: '宏' })).toHaveAttribute('aria-controls', 'sidebar-navigation')
     expect(screen.getByRole('button', { name: '总览' })).toHaveAttribute('id', 'workspace-tab-overview')
+    expect(screen.getByRole('navigation', { name: '侧边栏导航' })).toHaveClass('rounded-lg', 'bg-muted/40')
+    expect(screen.getByRole('button', { name: '会话' })).toHaveClass('rounded-md', 'h-6')
   })
 
   it('collapses fixed navigation and the sidebar together', async () => {
