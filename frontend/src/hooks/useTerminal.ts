@@ -1,5 +1,6 @@
 import { useEffect, useRef, type RefObject } from 'react'
 import { FitAddon } from '@xterm/addon-fit'
+import { Unicode11Addon } from '@xterm/addon-unicode11'
 import { Terminal } from '@xterm/xterm'
 import { Events } from '@wailsio/runtime'
 import { useTerminalRuntimeErrorReporter, type TerminalRuntimeErrorReporter } from '@/components/terminal/TerminalErrorBoundary'
@@ -47,6 +48,7 @@ function hasVisibleSize(container: HTMLDivElement | null): container is HTMLDivE
 }
 
 function reportResize(terminalID: string, term: Terminal, context: string) {
+  if (term.cols < 1 || term.rows < 1) return
   try {
     void TerminalService.Resize(terminalID, term.cols, term.rows).catch((error: unknown) => logger.error(context, error))
   } catch (error: unknown) {
@@ -195,15 +197,20 @@ function observeResize({ term, fitAddon, containerRef, refs, reportRuntimeError 
 function initializeTerminal(containerRef: RefObject<HTMLDivElement | null>, refs: TerminalLifecycleRefs, reportRuntimeError: TerminalRuntimeErrorReporter) {
   let disposed = false
   let addonOwnedByTerminal = false
+  let unicodeAddonOwnedByTerminal = false
   let cleanupCopyOnSelect: (() => void) | undefined
   const container = containerRef.current
   const term = createTerminal()
   const fitAddon = new FitAddon()
+  const unicodeAddon = new Unicode11Addon()
   const initialTerminalID = refs.terminalIDRef.current
   refs.termRef.current = term
   refs.fitAddonRef.current = fitAddon
   if (container) {
     term.open(container)
+    term.loadAddon(unicodeAddon)
+    unicodeAddonOwnedByTerminal = true
+    term.unicode.activeVersion = '11'
     cleanupCopyOnSelect = installTerminalCopyOnSelect(term, 'terminal')
     term.loadAddon(fitAddon)
     addonOwnedByTerminal = true
@@ -230,6 +237,7 @@ function initializeTerminal(containerRef: RefObject<HTMLDivElement | null>, refs
     safelyDispose('resize observer', () => resizeObserver.disconnect())
     if (cleanupCopyOnSelect) safelyDispose('copy-on-select subscription', cleanupCopyOnSelect)
     if (!addonOwnedByTerminal) safelyDispose('fit addon', () => fitAddon.dispose())
+    if (!unicodeAddonOwnedByTerminal) safelyDispose('unicode addon', () => unicodeAddon.dispose())
     refs.storeRef.current.unregisterTerminal(refs.terminalIDRef.current)
     safelyDispose('instance', () => term.dispose())
     refs.fitAddonRef.current = null
