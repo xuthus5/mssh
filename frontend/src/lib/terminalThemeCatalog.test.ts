@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { profileToTerminalTheme } from '@/lib/terminalThemeCatalog'
 
-const globalStyle = { font_family: 'Global Font', font_size: 15, cursor_style: 'bar' }
+const globalStyle = { font_family: 'Global Font', font_size: 15, cursor_style: 'bar', selection_background: '#4f46e5' }
 const profile = {
   id: 1,
   name: 'Dark',
@@ -39,9 +39,9 @@ describe('profileToTerminalTheme', () => {
     expect(result).toMatchObject({ background: '#000000', foreground: '#ffffff', cursor: '#abcdef', selectionBackground: '#fedcba', fontFamily: 'Profile Font', fontSize: 16, cursorStyle: 'underline', ansiBlack: '#111111', ansiBrightWhite: '#111111' })
   })
 
-  it('uses global typography without replacing the profile cursor color', () => {
+  it('uses global style without replacing the profile cursor color', () => {
     const result = profileToTerminalTheme({ ...profile, follow_global_style: true } as never, globalStyle as never)
 
-    expect(result).toMatchObject({ cursor: '#abcdef', fontFamily: 'Global Font', fontSize: 15, cursorStyle: 'bar' })
+    expect(result).toMatchObject({ cursor: '#abcdef', selectionBackground: '#4f46e5', fontFamily: 'Global Font', fontSize: 15, cursorStyle: 'bar' })
   })
 })

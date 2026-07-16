@@ -20,12 +20,13 @@ export function profileToTerminalTheme(profile: ThemeProfile, globalStyle: Termi
   const fontFamily = profile.follow_global_style ? globalStyle.font_family : profile.font_family
   const fontSize = profile.follow_global_style ? globalStyle.font_size : profile.font_size
   const cursorStyle = profile.follow_global_style ? globalStyle.cursor_style : profile.cursor_style
+  const selectionBackground = profile.follow_global_style ? globalStyle.selection_background : merged.selection
   return {
     background: merged.background,
     foreground: merged.foreground,
     cursor: merged.cursor,
     cursorAccent: merged.background,
-    selectionBackground: merged.selection,
+    selectionBackground,
     cursorStyle: cursorStyle as TerminalTheme['cursorStyle'],
     fontFamily,
     fontSize,
