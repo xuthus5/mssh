@@ -67,6 +67,9 @@ func loadMasterKey(dataDir string, keychain crypto.KeychainAdapter, logger *slog
 	}
 
 	keyPath := filepath.Join(dataDir, masterKeyFile)
+	if err := ensureMasterKeyStorage(dataDir, keyPath); err != nil {
+		return nil, err
+	}
 	data, err := os.ReadFile(keyPath)
 	if err == nil && len(data) == 32 {
 		logger.Info("master key loaded from file")
@@ -74,6 +77,29 @@ func loadMasterKey(dataDir string, keychain crypto.KeychainAdapter, logger *slog
 	}
 
 	return nil, nil
+}
+
+func ensureMasterKeyStorage(dataDir, keyPath string) error {
+	if err := os.MkdirAll(dataDir, 0o700); err != nil {
+		return fmt.Errorf("create master key directory: %w", err)
+	}
+	if err := os.Chmod(dataDir, 0o700); err != nil {
+		return fmt.Errorf("secure master key directory: %w", err)
+	}
+	info, err := os.Stat(keyPath)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("inspect master key file: %w", err)
+	}
+	if !info.Mode().IsRegular() {
+		return errors.New("master key path is not a regular file")
+	}
+	if err := os.Chmod(keyPath, 0o600); err != nil {
+		return fmt.Errorf("secure master key file: %w", err)
+	}
+	return nil
 }
 
 type masterKeyPersistence struct {
@@ -93,6 +119,10 @@ func persistMasterKey(input masterKeyPersistence) {
 	}
 
 	keyPath := filepath.Join(input.dataDir, masterKeyFile)
+	if err := ensureMasterKeyStorage(input.dataDir, keyPath); err != nil {
+		input.logger.Warn("secure master key storage failed", "error", err)
+		return
+	}
 	if err := os.WriteFile(keyPath, input.key, 0o600); err != nil {
 		input.logger.Warn("write master key file failed", "error", err)
 	} else {

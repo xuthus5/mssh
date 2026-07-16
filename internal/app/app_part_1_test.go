@@ -59,6 +59,37 @@ func TestPersistMasterKey(t *testing.T) {
 	saved, err := os.ReadFile(keyPath)
 	require.NoError(t, err)
 	assert.Equal(t, key, saved)
+	directoryInfo, err := os.Stat(dataDir)
+	require.NoError(t, err)
+	assert.Equal(t, os.FileMode(0o700), directoryInfo.Mode().Perm())
+	fileInfo, err := os.Stat(keyPath)
+	require.NoError(t, err)
+	assert.Equal(t, os.FileMode(0o600), fileInfo.Mode().Perm())
+}
+
+func TestLoadMasterKeyRepairsOverlyBroadPermissions(t *testing.T) {
+	dataDir := filepath.Join(t.TempDir(), "keys")
+	require.NoError(t, os.MkdirAll(dataDir, 0o755))
+	keyPath := filepath.Join(dataDir, masterKeyFile)
+	key := make([]byte, 32)
+	require.NoError(t, os.WriteFile(keyPath, key, 0o644))
+
+	loaded, err := loadMasterKey(dataDir, &stubKeychain{}, slog.Default())
+	require.NoError(t, err)
+	assert.Equal(t, key, loaded)
+	directoryInfo, err := os.Stat(dataDir)
+	require.NoError(t, err)
+	assert.Equal(t, os.FileMode(0o700), directoryInfo.Mode().Perm())
+	fileInfo, err := os.Stat(keyPath)
+	require.NoError(t, err)
+	assert.Equal(t, os.FileMode(0o600), fileInfo.Mode().Perm())
+}
+
+func TestLoadMasterKeyRejectsNonRegularKeyPath(t *testing.T) {
+	dataDir := t.TempDir()
+	require.NoError(t, os.Mkdir(filepath.Join(dataDir, masterKeyFile), 0o700))
+	_, err := loadMasterKey(dataDir, &stubKeychain{}, slog.Default())
+	assert.ErrorContains(t, err, "not a regular file")
 }
 
 func TestDefaultTestLogger(t *testing.T) {
