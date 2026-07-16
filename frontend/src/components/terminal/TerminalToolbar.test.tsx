@@ -69,6 +69,7 @@ describe('TerminalToolbar', () => {
     expect(split.focus).toHaveBeenCalledTimes(3)
     expect(primary.focus).not.toHaveBeenCalled()
     expect(screen.getByText('server')).toBeInTheDocument()
+    expect(screen.getByText('server').parentElement).not.toHaveClass('border-b')
   })
 
   it('runs toolbar callbacks and bridges recording list actions', async () => {

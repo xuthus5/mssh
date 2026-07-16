@@ -170,7 +170,7 @@ export function TerminalToolbar(props: TerminalToolbarProps) {
     if (!open && sessionLogBlocked) return
     setShowSessionLog(open)
   }, [sessionLogBlocked])
-  return <div className="relative flex items-center gap-1 h-8 px-2 bg-muted/30 border-b flex-shrink-0">
+  return <div className="relative flex h-8 flex-shrink-0 items-center gap-1 bg-muted/30 px-2">
     <span className="text-xs text-muted-foreground truncate mr-2">{props.hostname ?? 'Terminal'}</span>
     <ToolbarActions {...props} clipboard={clipboard} logOpen={showSessionLog} setLogOpen={setShowSessionLog}
       setLogBlocked={setSessionLogBlocked} onLogOpenChange={handleSessionLogOpenChange} />

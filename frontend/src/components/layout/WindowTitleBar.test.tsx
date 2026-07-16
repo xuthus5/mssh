@@ -68,6 +68,7 @@ describe('WindowTitleBar', () => {
   it('routes window controls to the Wails runtime', async () => {
     const user = userEvent.setup()
     render(<WindowTitleBar />)
+    expect(screen.getByRole('banner')).toHaveClass('border-b', 'border-border')
     await user.click(screen.getByRole('button', { name: '最小化窗口' }))
     await user.click(screen.getByRole('button', { name: '最大化或还原窗口' }))
     await user.click(screen.getByRole('button', { name: '关闭窗口' }))
@@ -197,6 +198,7 @@ describe('WindowTitleBar', () => {
     const dragRegion = screen.getByTestId('window-drag-region')
     expect(tab.compareDocumentPosition(dragRegion) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(dragRegion).toHaveClass('min-w-20', 'flex-1')
+    expect(tab.closest('header')).not.toHaveClass('border-b')
   })
 
   it('shows the overflow menu before the theme toggle only when tabs overflow', () => {
