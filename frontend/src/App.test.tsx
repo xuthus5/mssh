@@ -118,14 +118,17 @@ describe('persistent content layers', () => {
     })
   })
 
-  it('shows welcome only while activeSurface is null', () => {
+  it('leaves the welcome surface when a workspace is selected', () => {
     render(<App />)
     expect(screen.getByText('Secure Shell Client & Session Manager')).toBeInTheDocument()
     expect(screen.getByText('快捷键').parentElement).toHaveClass('rounded-xl')
     act(() => useAppStore.getState().activateWorkspace('sessions'))
+    expect(useAppStore.getState().activeSurface).toEqual({ type: 'workspace', id: 'sessions' })
     expect(screen.getByText('Secure Shell Client & Session Manager')).toBeInTheDocument()
     act(() => useAppStore.getState().activateWorkspace('macros'))
-    expect(screen.getByText('Secure Shell Client & Session Manager')).toBeInTheDocument()
+    expect(useAppStore.getState().activeSurface).toEqual({ type: 'workspace', id: 'sessions' })
+    expect(useAppStore.getState().workspaceTab).toBe('macros')
+    expect(screen.queryByText('Secure Shell Client & Session Manager')).not.toBeInTheDocument()
   })
 
   it('keeps terminal and playback layers mounted behind the workspace', async () => {

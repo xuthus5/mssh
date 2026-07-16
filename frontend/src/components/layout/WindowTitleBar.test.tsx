@@ -111,7 +111,7 @@ describe('WindowTitleBar', () => {
     await userEvent.click(macrosButton)
 
     expect(useAppStore.getState().workspaceTab).toBe('macros')
-    expect(useAppStore.getState().activeSurface).toBeNull()
+    expect(useAppStore.getState().activeSurface).toEqual({ type: 'workspace', id: 'macros' })
     expect(macrosButton).toHaveAttribute('aria-pressed', 'true')
     expect(screen.queryByText('Secure Shell Client')).not.toBeInTheDocument()
   })
