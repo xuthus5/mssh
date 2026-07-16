@@ -76,10 +76,15 @@ func (c *ApplicationLifecycleController) HideMainWindow() {
 }
 
 func (c *ApplicationLifecycleController) QuitApplication() {
+	c.QuitApplicationAfter(nil)
+}
+
+func (c *ApplicationLifecycleController) QuitApplicationAfter(prepare func()) {
 	if !c.quitting.CompareAndSwap(false, true) {
 		return
 	}
 	c.closeSettings()
+	call(prepare)
 	call(c.options.Quit)
 }
 
