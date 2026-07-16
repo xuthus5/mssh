@@ -155,6 +155,7 @@ func (f *FileService) Download(sessionID int64, remotePath, localPath string) (s
 		})
 
 		if downloadErr != nil {
+			_ = os.Remove(partialPath)
 			if errors.Is(downloadErr, context.Canceled) {
 				f.emitTransferCancelled(taskID)
 				return
@@ -163,6 +164,7 @@ func (f *FileService) Download(sessionID int64, remotePath, localPath string) (s
 			return
 		}
 		if renameErr := os.Rename(partialPath, localPath); renameErr != nil {
+			_ = os.Remove(partialPath)
 			f.emitTransferError(taskID, fmt.Errorf("finalize download: %w", renameErr))
 			return
 		}
