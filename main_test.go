@@ -2,6 +2,7 @@ package main
 
 import (
 	"path/filepath"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -60,4 +61,19 @@ func TestSystemTrayMenuContainsRequiredActions(t *testing.T) {
 	assert.NotNil(t, menu.FindByLabel("显示主窗口"))
 	assert.NotNil(t, menu.FindByLabel("隐藏到托盘"))
 	assert.NotNil(t, menu.FindByLabel("退出"))
+}
+
+func TestWaitForWindowsClosedObservesAsynchronousCleanup(t *testing.T) {
+	var count atomic.Int32
+	count.Store(1)
+	go func() {
+		time.Sleep(10 * time.Millisecond)
+		count.Store(0)
+	}()
+
+	assert.True(t, waitForWindowsClosed(func() int { return int(count.Load()) }, time.Second, time.Millisecond))
+}
+
+func TestWaitForWindowsClosedTimesOut(t *testing.T) {
+	assert.False(t, waitForWindowsClosed(func() int { return 1 }, 5*time.Millisecond, time.Millisecond))
 }

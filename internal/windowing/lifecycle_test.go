@@ -83,6 +83,19 @@ func TestApplicationLifecycleTrayActions(t *testing.T) {
 	assert.Equal(t, 1, counters.quit)
 }
 
+func TestApplicationLifecyclePreparesExplicitQuitBeforeQuitting(t *testing.T) {
+	counters := &lifecycleCounters{}
+	controller := newLifecycleController(fakeSettingReader{}, counters)
+	prepared := 0
+
+	controller.QuitApplicationAfter(func() { prepared++ })
+	controller.QuitApplicationAfter(func() { prepared++ })
+
+	assert.Equal(t, 1, prepared)
+	assert.Equal(t, 1, counters.closeSettings)
+	assert.Equal(t, 1, counters.quit)
+}
+
 func TestApplicationLifecycleExplicitQuitBypassesCloseInterception(t *testing.T) {
 	counters := &lifecycleCounters{}
 	controller := newLifecycleController(fakeSettingReader{}, counters)
