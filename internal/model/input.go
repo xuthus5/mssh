@@ -17,26 +17,30 @@ func SettingInputFrom(setting Setting) SettingInput {
 }
 
 type SessionInput struct {
-	ID         int64      `json:"id"`
-	FolderID   *int64     `json:"folder_id"`
-	Name       string     `json:"name"`
-	Host       string     `json:"host"`
-	Port       int        `json:"port"`
-	Username   string     `json:"username"`
-	AuthMethod AuthMethod `json:"auth_method"`
-	Password   string     `json:"password,omitempty"`
-	KeyID      *int64     `json:"key_id,omitempty"`
-	KeepAlive  int        `json:"keep_alive"`
-	TermType   string     `json:"term_type"`
-	SortOrder  int        `json:"sort_order"`
+	ID          int64      `json:"id"`
+	FolderID    *int64     `json:"folder_id"`
+	Name        string     `json:"name"`
+	Host        string     `json:"host"`
+	Port        int        `json:"port"`
+	Username    string     `json:"username"`
+	Tags        string     `json:"tags"`
+	Notes       string     `json:"notes"`
+	Environment string     `json:"environment"`
+	Project     string     `json:"project"`
+	AuthMethod  AuthMethod `json:"auth_method"`
+	Password    string     `json:"password,omitempty"`
+	KeyID       *int64     `json:"key_id,omitempty"`
+	KeepAlive   int        `json:"keep_alive"`
+	TermType    string     `json:"term_type"`
+	SortOrder   int        `json:"sort_order"`
 }
 
 func (input SessionInput) Session() Session {
-	return Session{ID: input.ID, FolderID: input.FolderID, Name: input.Name, Host: input.Host, Port: input.Port, Username: input.Username, AuthMethod: input.AuthMethod, Password: input.Password, KeyID: input.KeyID, KeepAlive: input.KeepAlive, TermType: input.TermType, SortOrder: input.SortOrder}
+	return Session{ID: input.ID, FolderID: input.FolderID, Name: input.Name, Host: input.Host, Port: input.Port, Username: input.Username, Tags: input.Tags, Notes: input.Notes, Environment: input.Environment, Project: input.Project, AuthMethod: input.AuthMethod, Password: input.Password, KeyID: input.KeyID, KeepAlive: input.KeepAlive, TermType: input.TermType, SortOrder: input.SortOrder}
 }
 
 func SessionInputFrom(session Session) SessionInput {
-	return SessionInput{ID: session.ID, FolderID: session.FolderID, Name: session.Name, Host: session.Host, Port: session.Port, Username: session.Username, AuthMethod: session.AuthMethod, Password: session.Password, KeyID: session.KeyID, KeepAlive: session.KeepAlive, TermType: session.TermType, SortOrder: session.SortOrder}
+	return SessionInput{ID: session.ID, FolderID: session.FolderID, Name: session.Name, Host: session.Host, Port: session.Port, Username: session.Username, Tags: session.Tags, Notes: session.Notes, Environment: session.Environment, Project: session.Project, AuthMethod: session.AuthMethod, Password: session.Password, KeyID: session.KeyID, KeepAlive: session.KeepAlive, TermType: session.TermType, SortOrder: session.SortOrder}
 }
 
 type TunnelInput struct {
