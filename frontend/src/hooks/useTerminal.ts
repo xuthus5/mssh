@@ -10,6 +10,7 @@ import { toast } from '@/components/ui/toast'
 import { applyTerminalTheme, xtermTheme } from '@/lib/terminalTheme'
 import { TerminalService } from '@/lib/wails'
 import { useAppStore, type AppState } from '@/store/appStore'
+import { recordCommand } from '@/lib/commandHistory'
 
 const TERMINAL_SCROLLBACK = 10000
 
@@ -107,10 +108,19 @@ function writeTerminalInput(data: string, refs: TerminalLifecycleRefs) {
 }
 
 function subscribeToData(term: Terminal, refs: TerminalLifecycleRefs) {
+  let commandBuffer = ''
   return term.onData((data) => {
     const terminalID = refs.terminalIDRef.current
     refs.storeRef.current.updateLastUsed(terminalID)
     writeTerminalInput(data, refs)
+    const tab = refs.storeRef.current.tabs.find((item) => item.type === 'terminal' && item.terminalId === terminalID)
+    if (tab?.type === 'terminal') {
+      for (const character of data) {
+        if (character === '\r' || character === '\n') { recordCommand(tab.sessionId, commandBuffer); commandBuffer = '' }
+        else if (character === '\u007f') commandBuffer = commandBuffer.slice(0, -1)
+        else if (character >= ' ' && character !== '\u001b') commandBuffer += character
+      }
+    }
   })
 }
 
