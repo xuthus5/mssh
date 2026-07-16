@@ -37,11 +37,12 @@ function SessionPanel({ workspace, filter, editSession }: {
   editSession: ReturnType<typeof useSidebarDialogs>['editSession']
 }) {
   const retry = () => { void Promise.all([workspace.listFolders(), workspace.listSessions()]) }
+  const hasSessionData = workspace.folders.length > 0 || workspace.sessions.length > 0
   return <>
     <div className="flex flex-col gap-1.5 border-b border-border/50 px-2 py-2"><div className="relative"><Search className="absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" /><Input value={filter.searchQuery} onChange={(event) => filter.setSearchQuery(event.target.value)} placeholder="搜索会话..." className="h-7 pl-7 text-xs" /></div></div>
     <div className="flex items-center justify-between border-b border-border/30 px-3 py-1"><span className="text-[11px] text-muted-foreground">{filter.searchQuery.trim() ? `匹配 ${filter.filteredSessions.length} 个会话` : `共 ${workspace.sessions.length} 个会话`}</span>{filter.searchQuery.trim() && <span className="text-[10px] text-muted-foreground/60">已筛选</span>}</div>
     <div className="min-h-0 flex-1">
-      {workspace.loading ? <div className="flex flex-col gap-2 p-3"><Skeleton className="h-7 w-full" /><Skeleton className="h-7 w-4/5" /><Skeleton className="h-7 w-3/5" /></div> : workspace.error ? <Alert variant="destructive" className="m-2"><AlertDescription>{workspace.error}<Button size="xs" variant="outline" className="mt-2" onClick={retry}>重试</Button></AlertDescription></Alert> : <SessionTree folders={filter.filteredFolders} sessions={filter.filteredSessions} onConnect={workspace.connect} onEditSession={editSession} onSelectFolder={(id) => window.dispatchEvent(new CustomEvent('mssh:select-folder', { detail: id }))} navigationOnly revealAll={Boolean(filter.searchQuery.trim())} />}
+      {workspace.error ? <Alert variant="destructive" className="m-2"><AlertDescription>{workspace.error}<Button size="xs" variant="outline" className="mt-2" onClick={retry}>重试</Button></AlertDescription></Alert> : !hasSessionData && workspace.loading ? <div className="flex flex-col gap-2 p-3"><Skeleton className="h-7 w-full" /><Skeleton className="h-7 w-4/5" /><Skeleton className="h-7 w-3/5" /></div> : <SessionTree folders={filter.filteredFolders} sessions={filter.filteredSessions} onConnect={workspace.connect} onEditSession={editSession} onSelectFolder={(id) => window.dispatchEvent(new CustomEvent('mssh:select-folder', { detail: id }))} navigationOnly revealAll={Boolean(filter.searchQuery.trim())} />}
     </div>
   </>
 }
