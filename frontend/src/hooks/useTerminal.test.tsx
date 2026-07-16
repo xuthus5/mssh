@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const calls: string[] = []
 const terminalOptions: Record<string, unknown>[] = []
+const terminalInstances: Array<{ cols: number; rows: number }> = []
 const terminalDisposes: Array<ReturnType<typeof vi.fn>> = []
 const dataDisposes: Array<ReturnType<typeof vi.fn>> = []
 const addonDisposes: Array<ReturnType<typeof vi.fn>> = []
@@ -27,7 +28,7 @@ vi.mock('@xterm/xterm', () => ({
     private addons: Array<{ dispose: () => void }> = []
     loadAddon(addon: { name: string; dispose: () => void }) { calls.push(`load:${addon.name}`); this.addons.push(addon) }
     private terminalDispose = vi.fn(() => calls.push('dispose'))
-    constructor(options: Record<string, unknown>) { terminalOptions.push(options); terminalDisposes.push(this.terminalDispose); this.options = options }
+    constructor(options: Record<string, unknown>) { terminalOptions.push(options); terminalInstances.push(this); terminalDisposes.push(this.terminalDispose); this.options = options }
     onData() {
       const dispose = vi.fn()
       dataDisposes.push(dispose)
@@ -94,6 +95,7 @@ describe('useTerminal', () => {
     vi.clearAllMocks()
     calls.length = 0
     terminalOptions.length = 0
+    terminalInstances.length = 0
     terminalDisposes.length = 0
     dataDisposes.length = 0
     addonDisposes.length = 0
@@ -305,5 +307,27 @@ describe('useTerminal', () => {
     act(() => resizeHandlers[0]([], {} as ResizeObserver))
 
     expect(screen.getByText('终端渲染失败')).toBeInTheDocument()
+  })
+
+  it('debounces repeated backend resize notifications', () => {
+    vi.useFakeTimers()
+    const containerRef = createRef<HTMLDivElement>()
+    const container = document.createElement('div')
+    Object.defineProperty(container, 'clientWidth', { value: 800 })
+    Object.defineProperty(container, 'clientHeight', { value: 500 })
+    containerRef.current = container
+    const hook = renderHook(() => useTerminal('term-debounce', containerRef, { active: true, focusRequest: { sequence: 0 } }))
+    act(flushAnimationFrame)
+    act(() => resizeHandlers[0]([], {} as ResizeObserver))
+    act(() => vi.advanceTimersByTime(80))
+    vi.mocked(TerminalService.Resize).mockClear()
+    terminalInstances[0].cols = 100
+
+    act(() => { resizeHandlers[0]([], {} as ResizeObserver); resizeHandlers[0]([], {} as ResizeObserver) })
+    expect(TerminalService.Resize).not.toHaveBeenCalled()
+    act(() => vi.advanceTimersByTime(80))
+    expect(TerminalService.Resize).toHaveBeenCalledOnce()
+    act(() => hook.unmount())
+    vi.useRealTimers()
   })
 })
