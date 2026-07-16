@@ -1,6 +1,7 @@
 import type { Tab } from '@/store/appStore'
 
-export type WorkspaceID = 'sessions' | 'macros'
+export type WorkspaceID = 'overview' | 'sessions' | 'macros'
+export type OverviewSection = 'sessions' | 'keys' | 'tunnels'
 
 export type ActiveSurface =
   | { type: 'workspace'; id: WorkspaceID }
