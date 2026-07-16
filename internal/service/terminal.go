@@ -95,7 +95,7 @@ func (t *TerminalService) SystemInfo(terminalID string) (*model.SystemInfo, erro
 	if err != nil {
 		return nil, err
 	}
-	command := `awk '/^cpu / {print "CPU", $2+$3+$4+$5+$6+$7+$8+$9, $5+$6} /^MemTotal:/ {print "MEMTOTAL", $2*1024} /^MemAvailable:/ {print "MEMAVAILABLE", $2*1024}' /proc/stat /proc/meminfo; awk 'NR>2 {rx+=$2; tx+=$10} END {print "NET", rx, tx}' /proc/net/dev; df -P -B1 / | awk 'NR==2 {print "DISK", $3, $2}'; nproc`
+	command := `printf 'LOAD '; cat /proc/loadavg; printf 'UPTIME '; cat /proc/uptime; printf 'KERNEL '; uname -r; awk -F= '/^PRETTY_NAME=/ {gsub(/"/,"",$2); print "OS",$2}' /etc/os-release 2>/dev/null; awk '/^cpu / {print "CPU", $2+$3+$4+$5+$6+$7+$8+$9, $5+$6} /^MemTotal:/ {print "MEMTOTAL", $2*1024} /^MemAvailable:/ {print "MEMAVAILABLE", $2*1024} /^SwapTotal:/ {print "SWAPTOTAL", $2*1024} /^SwapFree:/ {print "SWAPFREE", $2*1024}' /proc/stat /proc/meminfo; awk 'NR>2 {rx+=$2; tx+=$10} END {print "NET", rx, tx}' /proc/net/dev; df -P -B1 / | awk 'NR==2 {print "DISK", $3, $2}'; nproc`
 	output, err := _runSystemInfoCommand(wrapper, command)
 	if err != nil {
 		return nil, err
@@ -121,6 +121,39 @@ func (t *TerminalService) SystemInfo(terminalID string) (*model.SystemInfo, erro
 	return info, nil
 }
 
+func (t *TerminalService) ProcessInfo(terminalID string) ([]model.ProcessInfo, error) {
+	t.mu.RLock()
+	connID, ok := t.connIDs[terminalID]
+	t.mu.RUnlock()
+	if !ok {
+		return nil, fmt.Errorf("terminal %s not found", terminalID)
+	}
+	wrapper, err := t.sessionSvc.GetClientWrapper(connID)
+	if err != nil {
+		return nil, err
+	}
+	output, err := _runSystemInfoCommand(wrapper, `ps -eo pid=,ppid=,user=,state=,%cpu=,rss=,comm= --sort=-%cpu`)
+	if err != nil {
+		return nil, err
+	}
+	processes := make([]model.ProcessInfo, 0)
+	for _, line := range strings.Split(string(output), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) < 7 {
+			continue
+		}
+		pid, e1 := strconv.ParseInt(fields[0], 10, 64)
+		ppid, e2 := strconv.ParseInt(fields[1], 10, 64)
+		cpu, e3 := strconv.ParseFloat(fields[4], 64)
+		rss, e4 := strconv.ParseUint(fields[5], 10, 64)
+		if e1 != nil || e2 != nil || e3 != nil || e4 != nil {
+			continue
+		}
+		processes = append(processes, model.ProcessInfo{PID: pid, PPID: ppid, User: fields[2], State: fields[3], CPUPercent: cpu, RSSBytes: rss * 1024, MemoryBytes: rss * 1024, Command: strings.Join(fields[6:], " ")})
+	}
+	return processes, nil
+}
+
 func parseSystemInfo(values []string) (*model.SystemInfo, systemSample, error) {
 	if len(values) < 14 {
 		return nil, systemSample{}, fmt.Errorf("invalid system info response")
@@ -128,32 +161,61 @@ func parseSystemInfo(values []string) (*model.SystemInfo, systemSample, error) {
 	result := &model.SystemInfo{}
 	sample := systemSample{}
 	for index := 0; index < len(values); {
-		switch values[index] {
-		case "CPU":
-			sample.total, _ = strconv.ParseUint(values[index+1], 10, 64)
-			sample.idle, _ = strconv.ParseUint(values[index+2], 10, 64)
-			index += 3
-		case "MEMTOTAL":
-			result.MemoryTotal, _ = strconv.ParseUint(values[index+1], 10, 64)
-			index += 2
-		case "MEMAVAILABLE":
-			available, _ := strconv.ParseUint(values[index+1], 10, 64)
-			result.MemoryUsed = result.MemoryTotal - available
-			index += 2
-		case "NET":
-			sample.received, _ = strconv.ParseUint(values[index+1], 10, 64)
-			sample.transmitted, _ = strconv.ParseUint(values[index+2], 10, 64)
-			index += 3
-		case "DISK":
-			result.DiskUsed, _ = strconv.ParseUint(values[index+1], 10, 64)
-			result.DiskTotal, _ = strconv.ParseUint(values[index+2], 10, 64)
-			index += 3
-		default:
+		consumed := parseSystemInfoField(result, &sample, values[index:])
+		if consumed == 0 {
 			result.CPUCount, _ = strconv.Atoi(values[index])
-			index++
+			consumed = 1
 		}
+		index += consumed
 	}
 	return result, sample, nil
+}
+
+func parseSystemInfoField(result *model.SystemInfo, sample *systemSample, values []string) int {
+	if len(values) < 2 {
+		return 0
+	}
+	uint := func(value string) uint64 { parsed, _ := strconv.ParseUint(value, 10, 64); return parsed }
+	float := func(value string) float64 { parsed, _ := strconv.ParseFloat(value, 64); return parsed }
+	switch values[0] {
+	case "CPU":
+		sample.total, sample.idle = uint(values[1]), uint(values[2])
+		return 3
+	case "MEMTOTAL":
+		result.MemoryTotal = uint(values[1])
+		return 2
+	case "MEMAVAILABLE":
+		result.MemoryUsed = result.MemoryTotal - uint(values[1])
+		return 2
+	case "NET":
+		sample.received, sample.transmitted = uint(values[1]), uint(values[2])
+		return 3
+	case "DISK":
+		result.DiskUsed, result.DiskTotal = uint(values[1]), uint(values[2])
+		return 3
+	case "LOAD":
+		result.Load1, result.Load5, result.Load15 = float(values[1]), float(values[2]), float(values[3])
+		return 4
+	case "UPTIME":
+		result.UptimeSeconds = int64(float(values[1]))
+		return 2
+	case "KERNEL":
+		result.KernelVersion = values[1]
+		return 2
+	case "OS":
+		result.OSName = values[1]
+		return 2
+	case "SWAPTOTAL":
+		result.SwapTotal = uint(values[1])
+		return 2
+	case "SWAPFREE":
+		free := uint(values[1])
+		if result.SwapTotal >= free {
+			result.SwapUsed = result.SwapTotal - free
+		}
+		return 2
+	}
+	return 0
 }
 
 func cpuPercent(previous, current systemSample) float64 {
