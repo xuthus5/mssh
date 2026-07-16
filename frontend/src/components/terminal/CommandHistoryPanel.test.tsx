@@ -4,6 +4,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { CommandHistoryPanel } from '@/components/terminal/CommandHistoryPanel'
 import { recordCommand } from '@/lib/commandHistory'
 
+vi.mock('@/lib/wails', () => ({ CommandHistoryService: { List: vi.fn(async () => [{ id: 1, command: 'git status' }, { id: 2, command: 'npm test' }]) } }))
+
 describe('CommandHistoryPanel', () => {
   beforeEach(() => localStorage.clear())
   it('searches and fills a stored command', async () => {
