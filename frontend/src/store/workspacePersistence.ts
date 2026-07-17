@@ -80,7 +80,7 @@ function isActive(value: unknown, tabCount: number): value is WorkspaceSnapshot[
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null
 const isWorkspaceID = (value: unknown): value is WorkspaceID => value === 'overview' || value === 'sessions' || value === 'macros'
-const isOverviewSection = (value: unknown): value is OverviewSection => value === 'sessions' || value === 'keys' || value === 'tunnels'
+const isOverviewSection = (value: unknown): value is OverviewSection => value === 'sessions' || value === 'keys' || value === 'tunnels' || value === 'audit'
 
 export async function restoreWorkspaceSnapshot(snapshot: WorkspaceSnapshot, sessionIDs: Set<number>, openTerminal: (sessionID: number) => Promise<string>): Promise<RestoredWorkspace> {
   const restored = await restoreTabIntents(snapshot.tabs, sessionIDs, openTerminal)

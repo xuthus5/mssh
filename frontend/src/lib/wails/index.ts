@@ -14,6 +14,7 @@ import * as _SyncService from '../../../bindings/github.com/xuthus5/mssh/interna
 import * as _AboutService from '../../../bindings/github.com/xuthus5/mssh/internal/service/aboutservice'
 import * as _FontService from '../../../bindings/github.com/xuthus5/mssh/internal/service/fontservice'
 import * as _CommandHistoryService from '../../../bindings/github.com/xuthus5/mssh/internal/service/commandhistoryservice'
+import * as _AuditService from '../../../bindings/github.com/xuthus5/mssh/internal/service/auditservice'
 
 export const SessionService = _SessionService
 export const TerminalService = _TerminalService
@@ -28,3 +29,4 @@ export const SyncService = _SyncService
 export const AboutService = _AboutService
 export const FontService = _FontService
 export const CommandHistoryService = _CommandHistoryService
+export const AuditService = _AuditService
