@@ -16,6 +16,7 @@ import { recordCommand } from '@/lib/commandHistory'
 import { TerminalCommandCapture } from '@/lib/terminalCommandCapture'
 import { registerTerminalSearch, unregisterTerminalSearch } from '@/lib/terminalSearchRegistry'
 import { useTerminalActivation, useTerminalAttachment } from '@/hooks/terminalLifecycleRuntime'
+import { fitAndRefresh } from '@/hooks/terminalFitRuntime'
 
 const TERMINAL_SCROLLBACK = 10000
 const RESIZE_DEBOUNCE_MS = 80
@@ -50,10 +51,6 @@ interface TerminalLifecycleRefs {
   resizeTimerRef: RefObject<number | null>
 }
 
-function hasVisibleSize(container: HTMLDivElement | null): container is HTMLDivElement {
-  return container !== null && container.clientWidth > 0 && container.clientHeight > 0
-}
-
 function reportResize(terminalID: string, term: Terminal, context: string, lastResizeRef: RefObject<{ terminalID: string; cols: number; rows: number } | null>) {
   if (term.cols < 1 || term.rows < 1) return
   const previous = lastResizeRef.current
@@ -64,13 +61,6 @@ function reportResize(terminalID: string, term: Terminal, context: string, lastR
   } catch (error: unknown) {
     logger.error(context, error)
   }
-}
-
-function fitAndRefresh(term: Terminal, fitAddon: FitAddon, container: HTMLDivElement | null) {
-  if (!hasVisibleSize(container)) return false
-  fitAddon.fit()
-  term.refresh(0, term.rows - 1)
-  return true
 }
 
 function safelyDispose(label: string, dispose: () => void) {
