@@ -1,5 +1,6 @@
 import { useEffect, useRef, type RefObject } from 'react'
 import { FitAddon } from '@xterm/addon-fit'
+import { SearchAddon } from '@xterm/addon-search'
 import { Unicode11Addon } from '@xterm/addon-unicode11'
 import { Terminal } from '@xterm/xterm'
 import { Events } from '@wailsio/runtime'
@@ -13,6 +14,8 @@ import { TerminalService } from '@/lib/wails'
 import { useAppStore, type AppState } from '@/store/appStore'
 import { recordCommand } from '@/lib/commandHistory'
 import { TerminalCommandCapture } from '@/lib/terminalCommandCapture'
+import { registerTerminalSearch, unregisterTerminalSearch } from '@/lib/terminalSearchRegistry'
+import { useTerminalActivation, useTerminalAttachment } from '@/hooks/terminalLifecycleRuntime'
 
 const TERMINAL_SCROLLBACK = 10000
 const RESIZE_DEBOUNCE_MS = 80
@@ -206,11 +209,13 @@ function initializeTerminal(containerRef: RefObject<HTMLDivElement | null>, refs
   let disposed = false
   let addonOwnedByTerminal = false
   let unicodeAddonOwnedByTerminal = false
+  let searchAddonOwnedByTerminal = false
   let cleanupCopyOnSelect: (() => void) | undefined
   const container = containerRef.current
   const term = createTerminal()
   const fitAddon = new FitAddon()
   const unicodeAddon = new Unicode11Addon()
+  const searchAddon = new SearchAddon({ highlightLimit: 1000 })
   const initialTerminalID = refs.terminalIDRef.current
   refs.termRef.current = term
   refs.fitAddonRef.current = fitAddon
@@ -219,6 +224,9 @@ function initializeTerminal(containerRef: RefObject<HTMLDivElement | null>, refs
     term.loadAddon(unicodeAddon)
     unicodeAddonOwnedByTerminal = true
     if (term.unicode) term.unicode.activeVersion = '11'
+    term.loadAddon(searchAddon)
+    searchAddonOwnedByTerminal = true
+    registerTerminalSearch(initialTerminalID, searchAddon)
     cleanupCopyOnSelect = installTerminalCopyOnSelect(term, 'terminal')
     term.loadAddon(fitAddon)
     addonOwnedByTerminal = true
@@ -245,8 +253,10 @@ function initializeTerminal(containerRef: RefObject<HTMLDivElement | null>, refs
     safelyDispose('theme subscription', unsubscribeTheme)
     safelyDispose('resize observer', () => resizeObserver.disconnect())
     if (cleanupCopyOnSelect) safelyDispose('copy-on-select subscription', cleanupCopyOnSelect)
+    unregisterTerminalSearch(refs.terminalIDRef.current)
     if (!addonOwnedByTerminal) safelyDispose('fit addon', () => fitAddon.dispose())
     if (!unicodeAddonOwnedByTerminal) safelyDispose('unicode addon', () => unicodeAddon.dispose())
+    if (!searchAddonOwnedByTerminal) safelyDispose('search addon', () => searchAddon.dispose())
     refs.storeRef.current.unregisterTerminal(refs.terminalIDRef.current)
     safelyDispose('instance', () => term.dispose())
     refs.fitAddonRef.current = null
@@ -256,44 +266,6 @@ function initializeTerminal(containerRef: RefObject<HTMLDivElement | null>, refs
 
 function useTerminalLifecycle(containerRef: RefObject<HTMLDivElement | null>, refs: TerminalLifecycleRefs, reportRuntimeError: TerminalRuntimeErrorReporter) {
   useEffect(() => initializeTerminal(containerRef, refs, reportRuntimeError), [containerRef, reportRuntimeError])
-}
-
-function useTerminalActivation({ containerRef, refs, active, sequence, reportRuntimeError }: {
-  containerRef: RefObject<HTMLDivElement | null>
-  refs: TerminalLifecycleRefs
-  active: boolean
-  sequence: number
-  reportRuntimeError: TerminalRuntimeErrorReporter
-}) {
-  useEffect(() => {
-    const term = refs.termRef.current
-    if (!term) return
-    cancelActivationFrame(refs.activationFrameRef)
-    if (!active) {
-      refs.recoveryPendingRef.current = false
-      runTerminalRuntime(reportRuntimeError, 'terminal blur', () => term.blur())
-      return
-    }
-    refs.recoveryPendingRef.current = true
-    refs.activationFrameRef.current = window.requestAnimationFrame(() => {
-      refs.activationFrameRef.current = null
-      runTerminalRuntime(reportRuntimeError, 'terminal activation', () => {
-        const fitAddon = refs.fitAddonRef.current
-        if (fitAddon) recoverTerminal({ term, fitAddon, container: containerRef.current, refs })
-      })
-    })
-    return () => cancelActivationFrame(refs.activationFrameRef)
-  }, [active, reportRuntimeError, sequence])
-}
-
-function useTerminalAttachment(terminalID: string) {
-  useEffect(() => {
-    try {
-      void TerminalService.Attach(terminalID).catch((error: unknown) => logger.error('terminal attach error', error))
-    } catch (error: unknown) {
-      logger.error('terminal attach error', error)
-    }
-  }, [terminalID])
 }
 
 export function useTerminal(terminalID: string, containerRef: RefObject<HTMLDivElement | null>, { active, focusRequest }: UseTerminalOptions) {
@@ -321,6 +293,7 @@ export function useTerminal(terminalID: string, containerRef: RefObject<HTMLDivE
   refs.requestedSequenceRef.current = focusRequest.sequence
   useTerminalLifecycle(containerRef, refs, reportRuntimeError)
   useTerminalAttachment(terminalID)
-  useTerminalActivation({ containerRef, refs, active, sequence: focusRequest.sequence, reportRuntimeError })
+  useTerminalActivation({ refs, active, sequence: focusRequest.sequence, reportRuntimeError,
+    recover: (term, fitAddon) => recoverTerminal({ term, fitAddon, container: containerRef.current, refs }) })
   return refs.termRef
 }

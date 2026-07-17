@@ -79,6 +79,13 @@ vi.mock('@xterm/addon-unicode11', () => ({
   },
 }))
 
+vi.mock('@xterm/addon-search', () => ({
+  SearchAddon: class {
+    name = 'search'
+    dispose() { calls.push('dispose:search') }
+  },
+}))
+
 vi.mock('@wailsio/runtime', () => ({
   Events: {
     On: vi.fn((_name: string, handler: (event: { data?: { terminal_id?: string; data?: string } }) => void) => {
@@ -100,6 +107,7 @@ import { TerminalService } from '@/lib/wails'
 import { useAppStore } from '@/store/appStore'
 import { useTerminalBehaviorStore } from '@/store/terminalBehaviorStore'
 import { TerminalErrorBoundary } from '@/components/terminal/TerminalErrorBoundary'
+import { getTerminalSearch } from '@/lib/terminalSearchRegistry'
 
 describe('useTerminal', () => {
   beforeEach(() => {
@@ -146,10 +154,12 @@ describe('useTerminal', () => {
 
     const { unmount } = renderHook(() => useTerminal('term-1', containerRef, { active: true, focusRequest: { sequence: 0 } }))
 
-    expect(calls).toEqual(['open', 'load:unicode11', 'load:fit'])
+    expect(calls).toEqual(['open', 'load:unicode11', 'load:search', 'load:fit'])
     expect(terminalOptions[0]).toEqual(expect.objectContaining({ allowProposedApi: true }))
+    expect(getTerminalSearch('term-1')).not.toBeNull()
     expect(selectionDisposes).toHaveLength(1)
     act(() => unmount())
+    expect(getTerminalSearch('term-1')).toBeNull()
     expect(selectionDisposes[0]).toHaveBeenCalledOnce()
     expect(calls.at(-1)).toBe('dispose')
   })
