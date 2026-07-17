@@ -5,6 +5,10 @@
 // @ts-ignore: Unused imports
 import { Call as $Call, CancellablePromise as $CancellablePromise, Create as $Create } from "@wailsio/runtime";
 
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
+import * as model$0 from "../model/models.js";
+
 export function Attach(terminalID: string): $CancellablePromise<void> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.TerminalService.Attach", terminalID);
 }
@@ -19,6 +23,12 @@ export function Count(): $CancellablePromise<number> {
 
 export function Open(sessionID: number, cols: number, rows: number): $CancellablePromise<string> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.TerminalService.Open", sessionID, cols, rows);
+}
+
+export function ProcessInfo(terminalID: string): $CancellablePromise<model$0.ProcessInfo[]> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.TerminalService.ProcessInfo", terminalID).then(($result: any) => {
+        return $$createType1($result);
+    });
 }
 
 export function Resize(terminalID: string, cols: number, rows: number): $CancellablePromise<void> {
@@ -37,13 +47,18 @@ export function SetOutputHandler(fn: any): $CancellablePromise<void> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.TerminalService.SetOutputHandler", fn);
 }
 
+export function SystemInfo(terminalID: string): $CancellablePromise<model$0.SystemInfo | null> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.TerminalService.SystemInfo", terminalID).then(($result: any) => {
+        return $$createType3($result);
+    });
+}
+
 export function Write(terminalID: string, data: string): $CancellablePromise<number> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.TerminalService.Write", terminalID, data);
 }
 
-export function SystemInfo(terminalID: string): $CancellablePromise<any> {
-    return $Call.ByName("github.com/xuthus5/mssh/internal/service.TerminalService.SystemInfo", terminalID);
-}
-export function ProcessInfo(terminalID: string): $CancellablePromise<any> {
-    return $Call.ByName("github.com/xuthus5/mssh/internal/service.TerminalService.ProcessInfo", terminalID);
-}
+// Private type creation functions
+const $$createType0 = model$0.ProcessInfo.createFrom;
+const $$createType1 = $Create.Array($$createType0);
+const $$createType2 = model$0.SystemInfo.createFrom;
+const $$createType3 = $Create.Nullable($$createType2);

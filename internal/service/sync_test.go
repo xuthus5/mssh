@@ -27,7 +27,14 @@ func TestSyncServiceExportImportRestoresEncryptedFullSnapshot(t *testing.T) {
 	setSyncMasterKey(t, db, syncTestMasterKey)
 	folder, err := store.CreateFolder(db, "生产环境", nil)
 	require.NoError(t, err)
-	created, err := store.CreateSession(db, model.Session{FolderID: &folder.ID, Name: "s1", Host: "10.0.0.1", Port: 22, Username: "root", AuthMethod: model.AuthPassword, Password: "secret", KeepAlive: 30, TermType: "xterm"})
+	catalog := NewAssetCatalogService(db, testutil.NewTestLogger())
+	environment, err := catalog.CreateEnvironment(model.AssetEnvironmentInput{Name: "生产", ColorToken: model.AssetColorRed})
+	require.NoError(t, err)
+	project, err := catalog.CreateProject(model.AssetProjectInput{Name: "支付平台", Code: "PAY", Description: "核心支付"})
+	require.NoError(t, err)
+	tag, err := catalog.CreateTag(model.AssetTagInput{Name: "数据库", ColorToken: model.AssetColorBlue})
+	require.NoError(t, err)
+	created, err := store.CreateSessionWithTags(db, model.Session{FolderID: &folder.ID, Name: "s1", Host: "10.0.0.1", Port: 22, Username: "root", AuthMethod: model.AuthPassword, Password: "secret", KeepAlive: 30, TermType: "xterm", EnvironmentID: &environment.ID, ProjectID: &project.ID, Notes: "维护说明"}, []int64{tag.ID})
 	require.NoError(t, err)
 	_, err = store.CreateTunnel(db, model.Tunnel{SessionID: created.ID, Name: "web", Type: model.TunnelLocal, LocalHost: "127.0.0.1", LocalPort: 8080, RemoteHost: "127.0.0.1", RemotePort: 80})
 	require.NoError(t, err)
@@ -61,9 +68,33 @@ func TestSyncServiceExportImportRestoresEncryptedFullSnapshot(t *testing.T) {
 	session, err := store.GetSession(db2, created.ID)
 	require.NoError(t, err)
 	assert.Equal(t, "secret", session.Password)
+	require.NotNil(t, session.Environment)
+	require.NotNil(t, session.Project)
+	assert.Equal(t, "生产", session.Environment.Name)
+	assert.Equal(t, "PAY", session.Project.Code)
+	require.Len(t, session.Tags, 1)
+	assert.Equal(t, "数据库", session.Tags[0].Name)
+	assert.Equal(t, "维护说明", session.Notes)
 	tunnels, err := store.ListTunnels(db2)
 	require.NoError(t, err)
 	assert.Len(t, tunnels, 1)
+}
+
+func TestSyncServiceStrictlyRejectsOldOrIncompleteFormats(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	data, err := NewSyncService(db, testutil.NewTestLogger()).snapshot()
+	require.NoError(t, err)
+	data.FormatVersion = syncFormatVersion - 1
+	content, err := json.Marshal(data)
+	require.NoError(t, err)
+	var decoded ExportData
+	assert.ErrorContains(t, decodeSnapshot(content, &decoded), "format_version")
+
+	data.FormatVersion = syncFormatVersion
+	delete(data.Tables, "session_tags")
+	content, err = json.Marshal(data)
+	require.NoError(t, err)
+	assert.ErrorContains(t, decodeSnapshot(content, &decoded), "snapshot table session_tags is required")
 }
 
 func TestSyncServiceRequiresMasterKey(t *testing.T) {
@@ -136,7 +167,7 @@ func TestCloudSyncUploadDownloadAndConflict(t *testing.T) {
 	require.NoError(t, syncService.SyncToCloud(server.URL, "", ""))
 	require.NoError(t, syncService.TestCloudConnection(server.URL, "", ""))
 	assert.Equal(t, `"upload"`, settingValue(t, db, syncDirectionSetting))
-	assert.Equal(t, `2`, settingValue(t, db, syncVersionSetting))
+	assert.Equal(t, `3`, settingValue(t, db, syncVersionSetting))
 	auditEvents, err := store.ListAuditEvents(db, model.AuditFilter{Action: "cloud_upload", Limit: 10})
 	require.NoError(t, err)
 	require.Len(t, auditEvents, 1)
@@ -167,6 +198,62 @@ func TestReadCloudBackupRejectsOversizedPayload(t *testing.T) {
 	require.ErrorContains(t, err, "exceeds")
 }
 
+func TestSyncCodecAndCloudErrorPaths(t *testing.T) {
+	t.Run("snapshot encoding and database errors", func(t *testing.T) {
+		_, err := encodeEncryptedSnapshot(ExportData{Tables: map[string][]map[string]any{"bad": {{"value": make(chan int)}}}}, syncTestMasterKey)
+		require.Error(t, err)
+		require.Error(t, writePrivateFileAtomic(filepath.Join(t.TempDir(), "missing", "backup"), []byte("x")))
+
+		memoryDB, err := sql.Open("sqlite", ":memory:")
+		require.NoError(t, err)
+		defer func() { _ = memoryDB.Close() }()
+		memoryService := NewSyncService(memoryDB, testutil.NewTestLogger())
+		_, err = memoryService.recoveryPath()
+		require.ErrorContains(t, err, "database path is unavailable")
+
+		db := testutil.NewTestDB(t)
+		setSyncMasterKey(t, db, syncTestMasterKey)
+		service := NewSyncService(db, testutil.NewTestLogger())
+		require.NoError(t, db.Close())
+		_, err = tableColumns(db, "sessions")
+		require.Error(t, err)
+		require.Error(t, validateSnapshot(db, ExportData{Tables: map[string][]map[string]any{}}))
+		require.Error(t, service.writeRecoveryPoint(syncTestMasterKey))
+		require.Error(t, service.saveCloudMetadata("etag", "upload"))
+	})
+
+	t.Run("cloud request and response errors", func(t *testing.T) {
+		_, err := cloudRequest(http.MethodGet, "file:///tmp/config", "", "", nil)
+		require.Error(t, err)
+		request, err := cloudRequest(http.MethodGet, "https://example.com/config", "user", "pass", nil)
+		require.NoError(t, err)
+		username, password, ok := request.BasicAuth()
+		assert.True(t, ok)
+		assert.Equal(t, "user", username)
+		assert.Equal(t, "pass", password)
+
+		failureServer := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) { writer.WriteHeader(http.StatusInternalServerError) }))
+		defer failureServer.Close()
+		db := testutil.NewTestDB(t)
+		setSyncMasterKey(t, db, syncTestMasterKey)
+		service := NewSyncService(db, testutil.NewTestLogger())
+		require.ErrorContains(t, service.TestCloudConnection(failureServer.URL, "", ""), "500")
+		require.Error(t, service.SyncToCloud(failureServer.URL, "", ""))
+		require.ErrorContains(t, service.SyncFromCloud(failureServer.URL, "", ""), "500")
+	})
+
+	t.Run("cloud payload decoding errors", func(t *testing.T) {
+		_, err := decodeEncryptedSnapshot([]byte("not-json"), syncTestMasterKey)
+		require.Error(t, err)
+		content, err := encodeEncryptedSnapshot(ExportData{FormatVersion: syncFormatVersion, Tables: map[string][]map[string]any{}}, syncTestMasterKey)
+		require.NoError(t, err)
+		_, err = decodeEncryptedSnapshot(content, "wrong master key")
+		require.Error(t, err)
+		_, err = readCloudBackup(errorReader{})
+		require.Error(t, err)
+	})
+}
+
 type zeroReader struct{}
 
 func (zeroReader) Read(buffer []byte) (int, error) {
@@ -175,6 +262,10 @@ func (zeroReader) Read(buffer []byte) (int, error) {
 	}
 	return len(buffer), nil
 }
+
+type errorReader struct{}
+
+func (errorReader) Read([]byte) (int, error) { return 0, assert.AnError }
 
 func settingValue(t *testing.T, db *sql.DB, key string) string {
 	t.Helper()

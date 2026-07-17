@@ -250,6 +250,9 @@ function registerInitial({ folders = [], sessions = [], recent = [] }: { folders
   __registerHandler(service + 'SessionService.ListFolders', async () => folders)
   __registerHandler(service + 'SessionService.ListSessions', async () => sessions)
   __registerHandler(service + 'SessionService.ListRecentSessions', async () => recent)
+	__registerHandler(service + 'AssetCatalogService.ListEnvironments', async () => [])
+	__registerHandler(service + 'AssetCatalogService.ListProjects', async () => [])
+	__registerHandler(service + 'AssetCatalogService.ListTags', async () => [])
 }
 
 function folder(id: number, name: string, parentID: number | null, isDefault: boolean) {
