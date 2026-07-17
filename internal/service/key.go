@@ -120,6 +120,14 @@ func (k *KeyService) Delete(id int64) error {
 	return store.DeleteKey(k.db, id)
 }
 
+func (k *KeyService) UsageCount(id int64) (int, error) {
+	var count int
+	if err := k.db.QueryRow("SELECT COUNT(*) FROM sessions WHERE key_id = ?", id).Scan(&count); err != nil {
+		return 0, fmt.Errorf("key usage count: %w", err)
+	}
+	return count, nil
+}
+
 func (k *KeyService) ExportPublicKey(id int64) (string, error) {
 	key, err := store.GetKey(k.db, id)
 	if err != nil {

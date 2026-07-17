@@ -140,6 +140,24 @@ func (s *SessionService) DeleteSession(id int64) error {
 	return err
 }
 
+func (s *SessionService) SessionDeleteImpact(id int64) (*model.SessionDeleteImpact, error) {
+	impact := &model.SessionDeleteImpact{}
+	queries := []struct {
+		query  string
+		target *int
+	}{
+		{"SELECT COUNT(*) FROM tunnels WHERE session_id = ?", &impact.Tunnels},
+		{"SELECT COUNT(*) FROM command_history WHERE session_id = ?", &impact.History},
+		{"SELECT COUNT(*) FROM session_logs WHERE session_id = ?", &impact.Recordings},
+	}
+	for _, item := range queries {
+		if err := s.db.QueryRow(item.query, id).Scan(item.target); err != nil {
+			return nil, fmt.Errorf("session delete impact: %w", err)
+		}
+	}
+	return impact, nil
+}
+
 func (s *SessionService) MoveSession(id int64, newFolderID *int64) error {
 	s.logger.Info("moving session", "id", id, "newFolderID", newFolderID)
 	err := store.MoveSession(s.db, id, newFolderID)

@@ -4,6 +4,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { toast } from '@/components/ui/toast'
 import { KeyGenerateDialog, KeyImportDialog, KeyMaterialDialog, type KeyMaterialMode } from '@/components/settings/KeyDialogs'
 import type { KeyImportFile, KeyInfo, KeyMaterial } from '@/hooks/useSettings'
+import { KeyService } from '@/lib/wails'
 
 interface Props {
   keys: KeyInfo[]
@@ -57,6 +58,13 @@ export function KeyManager(props: Props) {
       toast(`复制公钥失败: ${error instanceof Error ? error.message : String(error)}`, 'error')
     }
   }
+  const deleteKey = async (key: KeyInfo) => {
+    try {
+      const usage = await KeyService.UsageCount(Number(key.id))
+      if (!window.confirm(usage > 0 ? `该密钥被 ${usage} 个会话引用，删除后这些会话将无法使用密钥认证。仍要删除吗？` : `删除密钥“${key.name}”？`)) return
+      props.onDelete(key.id)
+    } catch (error) { toast(`分析密钥影响失败: ${error instanceof Error ? error.message : String(error)}`, 'error') }
+  }
 
   return <div className="flex flex-col gap-3 pt-2">
     <div className="flex items-center gap-2">
@@ -72,7 +80,7 @@ export function KeyManager(props: Props) {
             <Button size="xs" variant="ghost" aria-label={`查看 ${key.name}`} disabled={loadingID === key.id} onClick={() => { void openMaterial(key.id, 'view') }}>查看</Button>
             <Button size="xs" variant="ghost" aria-label={`编辑 ${key.name}`} disabled={loadingID === key.id} onClick={() => { void openMaterial(key.id, 'edit') }}>编辑</Button>
             <Button size="xs" variant="ghost" aria-label={`复制 ${key.name} 公钥`} onClick={() => { void copyPublicKey(key.id) }}>复制公钥</Button>
-            <Button size="xs" variant="ghost" className="text-destructive" aria-label={`删除 ${key.name}`} onClick={() => props.onDelete(key.id)}>删除</Button>
+            <Button size="xs" variant="ghost" className="text-destructive" aria-label={`删除 ${key.name}`} onClick={() => { void deleteKey(key) }}>删除</Button>
           </div></TableCell>
         </TableRow>)}
       </TableBody>
