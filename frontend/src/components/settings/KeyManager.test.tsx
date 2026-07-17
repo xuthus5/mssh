@@ -4,6 +4,7 @@ import type { ComponentProps } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { KeyManager } from '@/components/settings/KeyManager'
 import { useToastStore } from '@/components/ui/toast'
+import { __clearHandlers, __registerHandler } from '@/test/__mocks__/wails-runtime'
 
 const material = {
   id: '7', name: 'generated', type: 'ed25519' as const, bits: 256,
@@ -24,6 +25,9 @@ function props(): ComponentProps<typeof KeyManager> {
 
 describe('KeyManager', () => {
   beforeEach(() => {
+    __clearHandlers()
+    __registerHandler('github.com/xuthus5/mssh/internal/service.KeyService.UsageCount', async () => 0)
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: vi.fn(async () => {}) } })
     useToastStore.setState({ toasts: [] })
   })

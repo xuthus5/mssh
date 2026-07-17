@@ -91,6 +91,9 @@ export function MoveSession(id: number, newFolderID: number | null): $Cancellabl
 export function SetDefaultFolder(id: number): $CancellablePromise<void> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.SessionService.SetDefaultFolder", id);
 }
+export function SessionDeleteImpact(id: number): $CancellablePromise<any> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.SessionService.SessionDeleteImpact", id);
+}
 
 export function UpdateFolder(id: number, name: string): $CancellablePromise<void> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.SessionService.UpdateFolder", id, name);
