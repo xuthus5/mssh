@@ -33,6 +33,17 @@ func TestDatabaseFormatVersion(t *testing.T) {
 	assert.Equal(t, 4, databaseFormatVersion)
 }
 
+func TestListSessionsAcceptsNullPassword(t *testing.T) {
+	db := setupTestDB(t)
+	_, err := db.Exec(`INSERT INTO sessions (folder_id, name, host, username, auth_method, password) SELECT id, 'agent', '127.0.0.1', 'root', 'agent', NULL FROM session_folders WHERE is_default = 1`)
+	require.NoError(t, err)
+
+	sessions, err := ListSessions(db, nil)
+	require.NoError(t, err)
+	require.Len(t, sessions, 1)
+	assert.Empty(t, sessions[0].Password)
+}
+
 func TestInitializeSchemaResetsMismatchedDatabaseFormat(t *testing.T) {
 	db, err := OpenDB(t.TempDir())
 	require.NoError(t, err)
