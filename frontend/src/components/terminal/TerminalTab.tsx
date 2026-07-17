@@ -1,15 +1,16 @@
-import { useState, useCallback } from 'react'
+import { useCallback } from 'react'
 import { RefreshCw, WifiOff } from 'lucide-react'
 import { TerminalEmulator } from '@/components/terminal/TerminalEmulator'
 import { TerminalSplit } from '@/components/terminal/TerminalSplit'
 import { TerminalToolbar } from '@/components/terminal/TerminalToolbar'
-import { useAppStore } from '@/store/appStore'
+import { useAppStore, type TerminalTab as TerminalTabState } from '@/store/appStore'
 import { LogService } from '@/lib/wails'
 import { logger } from '@/lib/logger'
 import { toast } from '@/components/ui/toast'
 import type { TerminalFocusRequest } from '@/hooks/useTerminal'
 import { Button } from '@/components/ui/button'
 import { CommandHistoryPanel } from '@/components/terminal/CommandHistoryPanel'
+import { SystemPanel } from '@/components/terminal/SystemPanel'
 
 const noFocusRequest: TerminalFocusRequest = { sequence: 0, targetTerminalID: null }
 
@@ -53,15 +54,17 @@ function useRecordingControl(terminalID: string, sessionId: number) {
   return { isRecording, toggle }
 }
 
-function TerminalViewport({ split, sessionId, terminalID, active, focusRequest }: {
+function TerminalViewport({ split, sessionId, terminalID, active, focusRequest, direction, onDirectionChange }: {
   split: boolean
   sessionId?: number
   terminalID: string
   active: boolean
   focusRequest: TerminalFocusRequest
+  direction: 'horizontal' | 'vertical'
+  onDirectionChange: (direction: 'horizontal' | 'vertical') => void
 }) {
   if (split && sessionId) {
-    return <TerminalSplit primaryID={terminalID} sessionId={sessionId} active={active} focusRequest={focusRequest} />
+    return <TerminalSplit primaryID={terminalID} sessionId={sessionId} active={active} focusRequest={focusRequest} direction={direction} onDirectionChange={onDirectionChange} />
   }
   const primaryFocusRequest = focusRequest.targetTerminalID === terminalID ? focusRequest : noFocusRequest
   return <TerminalEmulator terminalID={terminalID} active={active} focusRequest={primaryFocusRequest} />
@@ -91,10 +94,15 @@ function ConnectionOverlay({ status, onReconnect }: {
 }
 
 export function TerminalTab({ terminalID, sessionId, onOpenFiles, active, focusRequest, onReconnect }: Props) {
-  const [split, setSplit] = useState(false)
-  const [historyOpen, setHistoryOpen] = useState(false)
   const tabs = useAppStore((state) => state.tabs)
-  const currentTab = tabs.find((tab) => tab.type === 'terminal' && tab.terminalId === terminalID)
+  const updateTerminalWorkspace = useAppStore((state) => state.updateTerminalWorkspace)
+  const currentTab = tabs.find((tab): tab is TerminalTabState => tab.type === 'terminal' && tab.terminalId === terminalID)
+  const split = currentTab?.split ?? false
+  const splitDirection = currentTab?.splitDirection ?? 'horizontal'
+  const toolPanel = currentTab?.toolPanel ?? null
+  const updateWorkspace = (updates: Parameters<typeof updateTerminalWorkspace>[1]) => {
+    if (currentTab) updateTerminalWorkspace(currentTab.id, updates)
+  }
   const recording = useRecordingControl(terminalID, sessionId)
   const connectionStatus = useAppStore((state) => state.connectionStatus[terminalID])
 
@@ -108,14 +116,16 @@ export function TerminalTab({ terminalID, sessionId, onOpenFiles, active, focusR
         onToggleRecording={recording.toggle}
         hostname={currentTab?.title}
         onOpenFiles={onOpenFiles}
-        onToggleSplit={() => setSplit((current) => !current)}
+        onToggleSplit={() => updateWorkspace({ split: !split })}
         split={split}
-        onOpenHistory={() => setHistoryOpen(true)}
+        onOpenHistory={() => updateWorkspace({ toolPanel: toolPanel === 'history' ? null : 'history' })}
+        onOpenSystem={() => updateWorkspace({ toolPanel: toolPanel === 'system' ? null : 'system' })}
       />
       <div className="relative min-h-0 flex-1">
-        <TerminalViewport split={split} sessionId={sessionId} terminalID={terminalID} active={active} focusRequest={focusRequest} />
+        <TerminalViewport split={split} sessionId={sessionId} terminalID={terminalID} active={active} focusRequest={focusRequest} direction={splitDirection} onDirectionChange={(direction) => updateWorkspace({ splitDirection: direction })} />
         <ConnectionOverlay status={connectionStatus} onReconnect={onReconnect} />
-        {historyOpen && <CommandHistoryPanel sessionID={sessionId} onClose={() => setHistoryOpen(false)} onFill={(command) => { const terminal = useAppStore.getState().terminalPool.get(terminalID)?.terminal; terminal?.paste(command); terminal?.focus() }} />}
+        {toolPanel === 'history' && <CommandHistoryPanel sessionID={sessionId} onClose={() => updateWorkspace({ toolPanel: null })} onFill={(command) => { const terminal = useAppStore.getState().terminalPool.get(terminalID)?.terminal; terminal?.paste(command); terminal?.focus() }} />}
+        {toolPanel === 'system' && <SystemPanel terminalID={terminalID} onClose={() => updateWorkspace({ toolPanel: null })} />}
       </div>
     </div>
   )

@@ -14,6 +14,8 @@ interface Props {
   sessionId: number
   active: boolean
   focusRequest: TerminalFocusRequest
+  direction?: 'horizontal' | 'vertical'
+  onDirectionChange?: (direction: 'horizontal' | 'vertical') => void
 }
 
 function closeSplitTerminalInBackground(terminalID: string, context: string) {
@@ -155,14 +157,13 @@ function SplitPanes({ primaryID, splitID, active, activePaneID, direction, focus
   </div>
 }
 
-export function TerminalSplit({ primaryID, sessionId, active, focusRequest }: Props) {
-  const [direction, setDirection] = useState<'horizontal' | 'vertical'>('horizontal')
+export function TerminalSplit({ primaryID, sessionId, active, focusRequest, direction = 'horizontal', onDirectionChange = () => {} }: Props) {
   const activePaneID = useAppStore((state) => state.activePaneId)
   const split = useSplitTerminal(sessionId, primaryID)
 
   return (
     <div className="flex flex-col h-full">
-      <SplitToolbar direction={direction} splitOpen={split.splitID !== null} closing={split.closing} onDirection={setDirection} onClose={() => { void split.close() }} />
+      <SplitToolbar direction={direction} splitOpen={split.splitID !== null} closing={split.closing} onDirection={onDirectionChange} onClose={() => { void split.close() }} />
       <SplitPanes primaryID={primaryID} sessionId={sessionId} active={active} focusRequest={focusRequest}
         splitID={split.splitID} activePaneID={activePaneID} direction={direction} />
     </div>

@@ -9,6 +9,9 @@ export interface TerminalTab {
   terminalId: string
   sessionId: number
   terminalInstance?: number
+  split?: boolean
+  splitDirection?: 'horizontal' | 'vertical'
+  toolPanel?: 'files' | 'history' | 'system' | null
 }
 
 export interface PlaybackTab {
@@ -122,6 +125,7 @@ export interface AppState {
   closeTab: (id: string) => Promise<void>
   removeTabLocal: (id: string) => void
   replaceTerminalConnection: (tabID: string, previousTerminalID: string, nextTerminalID: string) => boolean
+  updateTerminalWorkspace: (tabID: string, updates: Pick<Partial<TerminalTab>, 'split' | 'splitDirection' | 'toolPanel'>) => void
   activateWorkspace: (id: WorkspaceID) => void
   setOverviewSection: (section: OverviewSection) => void
   leaveOverview: () => void

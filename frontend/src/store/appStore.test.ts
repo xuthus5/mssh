@@ -242,6 +242,15 @@ describe('appStore', () => {
     expect(useAppStore.getState().activeSurface).toEqual({ type: 'terminal', id: 'tab-1' })
   })
 
+  it('updates persistent terminal workspace state', () => {
+    const store = useAppStore.getState()
+    store.openTab({ id: 'tab-1', title: 'A', type: 'terminal', terminalId: 'term-1', sessionId: 1 })
+
+    store.updateTerminalWorkspace('tab-1', { split: true, splitDirection: 'vertical', toolPanel: 'history' })
+
+    expect(useAppStore.getState().tabs[0]).toMatchObject({ split: true, splitDirection: 'vertical', toolPanel: 'history' })
+  })
+
   it('registers and unregisters terminals', () => {
     const { registerTerminal, unregisterTerminal } = useAppStore.getState()
     const mockTerminal = { dispose: () => {} } as unknown as import('@xterm/xterm').Terminal
