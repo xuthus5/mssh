@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { useAppStore } from '@/store/appStore'
+import { canTransitionConnection } from '@/store/appStoreActions'
 import { __registerHandler, __clearHandlers } from '@/test/__mocks__/wails-runtime'
 
 describe('appStore', () => {
@@ -317,5 +318,13 @@ describe('appStore', () => {
     useAppStore.getState().clearFinishedTransfers()
 
     expect(useAppStore.getState().transfers.map((item) => item.id)).toEqual(['running'])
+  })
+})
+
+describe('connection state machine', () => {
+  it('accepts valid transitions and rejects stale connected events', () => {
+    expect(canTransitionConnection('connected', 'reconnecting')).toBe(true)
+    expect(canTransitionConnection('reconnecting', 'error')).toBe(true)
+    expect(canTransitionConnection('closing', 'connected')).toBe(false)
   })
 })

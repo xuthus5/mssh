@@ -107,14 +107,13 @@ describe('TerminalTab', () => {
     expect(onReconnect).toHaveBeenCalledOnce()
   })
 
-  it('prevents duplicate reconnect requests while connecting', () => {
+  it('allows cancelling an active reconnect request', () => {
     const onReconnect = vi.fn()
     useAppStore.setState({ connectionStatus: { 'term-1': 'connecting' } })
 
     render(<TerminalTab terminalID="term-1" sessionId={7} active focusRequest={focusRequest} onOpenFiles={vi.fn()} onReconnect={onReconnect} />)
 
-    expect(screen.getByRole('button', { name: '正在重连' })).toBeDisabled()
-    fireEvent.click(screen.getByRole('button', { name: '正在重连' }))
-    expect(onReconnect).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: '取消重连' }))
+    expect(onReconnect).toHaveBeenCalledOnce()
   })
 })
