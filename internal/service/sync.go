@@ -21,9 +21,9 @@ const (
 	syncRecoveryFileName = "pre-import.msshbackup"
 )
 
-var backupTables = []string{"session_folders", "ssh_keys", "sessions", "tunnels", "macros", "settings", "themes", "terminal_theme_profiles"}
+var backupTables = []string{"session_folders", "ssh_keys", "sessions", "tunnels", "macros", "settings", "themes", "terminal_theme_profiles", "transfer_jobs"}
 
-var backupDeleteOrder = []string{"terminal_theme_profiles", "themes", "tunnels", "sessions", "ssh_keys", "session_folders", "macros", "settings"}
+var backupDeleteOrder = []string{"transfer_jobs", "terminal_theme_profiles", "themes", "tunnels", "sessions", "ssh_keys", "session_folders", "macros", "settings"}
 
 type SyncService struct {
 	db     *sql.DB
@@ -289,7 +289,7 @@ func (s *SyncService) restore(data ExportData) error {
 			return fmt.Errorf("clear %s: %w", table, err)
 		}
 	}
-	for _, table := range []string{"session_folders", "ssh_keys", "sessions", "tunnels", "macros", "settings", "themes", "terminal_theme_profiles"} {
+	for _, table := range []string{"session_folders", "ssh_keys", "sessions", "tunnels", "macros", "settings", "themes", "terminal_theme_profiles", "transfer_jobs"} {
 		for _, row := range data.Tables[table] {
 			if err := insertRow(tx, table, row); err != nil {
 				return fmt.Errorf("restore %s: %w", table, err)

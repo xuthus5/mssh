@@ -11,7 +11,7 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-const databaseFormatVersion = 2
+const databaseFormatVersion = 3
 
 const foldersTableSQL = `CREATE TABLE IF NOT EXISTS session_folders (
 	id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -93,6 +93,23 @@ const logsTableSQL = `CREATE TABLE IF NOT EXISTS session_logs (
 	data_path TEXT NOT NULL
 )`
 
+const transferJobsTableSQL = `CREATE TABLE IF NOT EXISTS transfer_jobs (
+	id TEXT PRIMARY KEY,
+	session_id INTEGER NOT NULL,
+	session_name TEXT NOT NULL,
+	direction TEXT NOT NULL CHECK(direction IN ('upload','download')),
+	source_path TEXT NOT NULL,
+	target_path TEXT NOT NULL,
+	total_bytes INTEGER NOT NULL DEFAULT 0,
+	transferred_bytes INTEGER NOT NULL DEFAULT 0,
+	speed INTEGER NOT NULL DEFAULT 0,
+	eta INTEGER NOT NULL DEFAULT 0,
+	status TEXT NOT NULL CHECK(status IN ('queued','running','completed','failed','cancelled')),
+	error TEXT NOT NULL DEFAULT '',
+	started_at TEXT NOT NULL,
+	completed_at TEXT
+)`
+
 type schemaStatement struct {
 	name string
 	sql  string
@@ -106,6 +123,7 @@ var finalSchemaStatements = []schemaStatement{
 	{name: "macros", sql: macrosTableSQL},
 	{name: "command_history", sql: commandHistoryTableSQL},
 	{name: "session_logs", sql: logsTableSQL},
+	{name: "transfer_jobs", sql: transferJobsTableSQL},
 	{name: "settings", sql: settingsTableSQL},
 	{name: "themes", sql: themeDefinitionsSchema},
 	{name: "terminal_theme_profiles", sql: themeProfilesSchema},
@@ -115,6 +133,7 @@ var applicationTablesInDropOrder = []string{
 	"terminal_theme_profiles",
 	"themes",
 	"session_logs",
+	"transfer_jobs",
 	"tunnels",
 	"sessions",
 	"ssh_keys",
