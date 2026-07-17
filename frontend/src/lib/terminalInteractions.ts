@@ -5,12 +5,16 @@ export interface CopyOnSelectController {
   dispose: () => void
 }
 
-export async function copyTerminalSelection(term: Terminal, clipboard: Pick<Clipboard, 'writeText'>): Promise<boolean> {
-  term.focus()
+async function writeTerminalSelection(term: Terminal, clipboard: Pick<Clipboard, 'writeText'>): Promise<boolean> {
   const selection = term.getSelection()
   if (!selection) return false
   await clipboard.writeText(selection)
   return true
+}
+
+export async function copyTerminalSelection(term: Terminal, clipboard: Pick<Clipboard, 'writeText'>): Promise<boolean> {
+  term.focus()
+  return writeTerminalSelection(term, clipboard)
 }
 
 export async function pasteClipboardIntoTerminal(term: Terminal, clipboard: Pick<Clipboard, 'readText'>): Promise<void> {
@@ -47,7 +51,7 @@ export function createCopyOnSelectController(term: Terminal, options: {
   const copy = () => {
     timer = undefined
     const clipboard = options.clipboard ?? navigator.clipboard
-    void copyTerminalSelection(term, clipboard).catch((error: unknown) => reportCopyError(options.onError, error))
+    void writeTerminalSelection(term, clipboard).catch((error: unknown) => reportCopyError(options.onError, error))
   }
   const schedule = () => {
     if (!enabled || disposed) return
