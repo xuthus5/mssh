@@ -239,3 +239,71 @@ func TestSessionService_NewSessionService(t *testing.T) {
 	assert.NotNil(t, svc.conns)
 	assert.Equal(t, 0, len(svc.conns))
 }
+
+func TestSessionService_ResolveKeepAlive(t *testing.T) {
+	tests := []struct {
+		name             string
+		sessionKeepAlive int
+		defaultKeepAlive int
+		persistedDefault *model.Setting
+		want             int
+	}{
+		{
+			name:             "session override wins",
+			sessionKeepAlive: 15,
+			defaultKeepAlive: 30,
+			persistedDefault: &model.Setting{Key: "terminal.default_keep_alive", Namespace: "terminal", Value: "90", ValueType: "number", Version: 1},
+			want:             15,
+		},
+		{
+			name:             "zero follows persisted default",
+			sessionKeepAlive: 0,
+			defaultKeepAlive: 30,
+			persistedDefault: &model.Setting{Key: "terminal.default_keep_alive", Namespace: "terminal", Value: "90", ValueType: "number", Version: 1},
+			want:             90,
+		},
+		{
+			name:             "missing setting uses service default",
+			sessionKeepAlive: 0,
+			defaultKeepAlive: 45,
+			want:             45,
+		},
+		{
+			name:             "invalid setting uses service default",
+			sessionKeepAlive: 0,
+			defaultKeepAlive: 45,
+			persistedDefault: &model.Setting{Key: "terminal.default_keep_alive", Namespace: "terminal", Value: `"invalid"`, ValueType: "string", Version: 1},
+			want:             45,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			db := testutil.NewTestDB(t)
+			if test.persistedDefault != nil {
+				require.NoError(t, NewSettingService(db, testutil.NewTestLogger()).Set(model.SettingInputFrom(*test.persistedDefault)))
+			}
+			svc := NewSessionService(db, newMockEventBus(), test.defaultKeepAlive, "", nil, testutil.NewTestLogger())
+			session := model.Session{KeepAlive: test.sessionKeepAlive}
+
+			require.NoError(t, svc.resolveKeepAlive(&session))
+			assert.Equal(t, test.want, session.KeepAlive)
+		})
+	}
+}
+
+func TestSessionService_ResolveKeepAliveDatabaseError(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	svc := NewSessionService(db, newMockEventBus(), 30, "", nil, testutil.NewTestLogger())
+	require.NoError(t, db.Close())
+
+	err := svc.resolveKeepAlive(&model.Session{})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "load default keep-alive")
+}
+
+func TestSessionService_NewSessionServiceNormalizesKeepAlive(t *testing.T) {
+	svc := NewSessionService(testutil.NewTestDB(t), newMockEventBus(), 0, "", nil, testutil.NewTestLogger())
+
+	assert.Equal(t, DefaultKeepAliveSeconds, svc.keepAlive)
+}

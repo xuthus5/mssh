@@ -53,7 +53,7 @@ function ConnectionDefaults({ draft, setDraft }: { draft: GeneralDraft; setDraft
       </div>
       <div className="flex flex-col gap-1.5">
         <label className="text-xs font-medium text-muted-foreground">默认保活间隔 (秒)</label>
-        <Input type="number" value={draft.defaultKeepAlive} onChange={(event) => setDraft({ ...draft, defaultKeepAlive: event.target.value })} />
+        <Input type="number" min={1} value={draft.defaultKeepAlive} onChange={(event) => setDraft({ ...draft, defaultKeepAlive: event.target.value })} />
       </div>
     </div>
     <div className="flex flex-col gap-1.5">

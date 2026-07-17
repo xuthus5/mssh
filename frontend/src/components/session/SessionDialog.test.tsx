@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import SessionDialog from '@/components/session/SessionDialog'
 
@@ -73,9 +73,15 @@ describe('SessionDialog', () => {
 
     expect(defaultProps.onSave).toHaveBeenCalledWith(
       expect.objectContaining({
-        name: 'test', host: '10.0.0.1', username: 'root',
+        name: 'test', host: '10.0.0.1', username: 'root', keepAlive: 0,
       }),
     )
+  })
+
+  it('uses the global keep-alive default for new sessions', async () => {
+    render(<SessionDialog {...defaultProps} />)
+
+    await waitFor(() => expect(screen.getByRole('spinbutton', { name: '保活间隔 (秒，0 使用全局默认)' })).toHaveValue(0))
   })
 
   it('closes dialog when close button clicked', async () => {
