@@ -84,6 +84,15 @@ describe('SessionDialog', () => {
     await waitFor(() => expect(screen.getByRole('spinbutton', { name: '保活间隔 (秒，0 使用全局默认)' })).toHaveValue(0))
   })
 
+  it('explains the keep-alive limitation', async () => {
+    const user = userEvent.setup()
+    render(<SessionDialog {...defaultProps} />)
+
+    await user.hover(screen.getByRole('button', { name: '会话保活说明' }))
+
+    expect(await screen.findByText('会话保活仅维持底层 SSH 连接，不能控制服务端 Shell 的空闲自动登出策略。')).toBeInTheDocument()
+  })
+
   it('closes dialog when close button clicked', async () => {
     const user = userEvent.setup()
     render(<SessionDialog {...defaultProps} />)

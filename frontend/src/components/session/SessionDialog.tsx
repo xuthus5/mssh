@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from 'react'
+import { CircleHelp } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -10,6 +11,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { LabeledSelect } from '@/components/ui/labeled-select'
 import { Button } from '@/components/ui/button'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { KeyService } from '@/lib/wails'
 import type { Session, Folder } from '@/hooks/useSession'
 
@@ -171,10 +173,18 @@ export default function SessionDialog({ open, onOpenChange, session, folders, on
           )}
 
           <div className="grid grid-cols-2 gap-3">
-            <label className="flex flex-col gap-1.5">
-              <span className="text-xs font-medium text-muted-foreground">保活间隔 (秒，0 使用全局默认)</span>
-              <Input type="number" value={keepAlive} onChange={(e) => setKeepAlive(e.target.value)} min={0} />
-            </label>
+            <div className="flex flex-col gap-1.5">
+              <div className="flex items-center gap-1">
+                <label htmlFor="session-keep-alive" className="text-xs font-medium text-muted-foreground">保活间隔 (秒，0 使用全局默认)</label>
+                <Tooltip>
+                  <TooltipTrigger render={<Button type="button" variant="ghost" size="icon-xs" aria-label="会话保活说明" />}>
+                    <CircleHelp />
+                  </TooltipTrigger>
+                  <TooltipContent>会话保活仅维持底层 SSH 连接，不能控制服务端 Shell 的空闲自动登出策略。</TooltipContent>
+                </Tooltip>
+              </div>
+              <Input id="session-keep-alive" type="number" value={keepAlive} onChange={(e) => setKeepAlive(e.target.value)} min={0} />
+            </div>
             <label className="flex flex-col gap-1.5">
               <span className="text-xs font-medium text-muted-foreground">终端类型</span>
               <LabeledSelect value={termType} options={termOptions} onValueChange={setTermType} />
