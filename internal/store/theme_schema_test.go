@@ -28,6 +28,34 @@ var expectedFinalSchemaSQL = map[string]string{
 		has_passphrase INTEGER NOT NULL DEFAULT 0,
 		created_at TEXT NOT NULL DEFAULT (datetime('now'))
 	)`,
+	"asset_environments": `CREATE TABLE asset_environments (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		name TEXT NOT NULL,
+		name_key TEXT NOT NULL UNIQUE,
+		color_token TEXT NOT NULL CHECK(color_token IN ('slate','red','orange','amber','yellow','lime','green','teal','cyan','blue','violet','pink')),
+		sort_order INTEGER NOT NULL DEFAULT 0,
+		created_at TEXT NOT NULL DEFAULT (datetime('now')),
+		updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+	)`,
+	"asset_projects": `CREATE TABLE asset_projects (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		name TEXT NOT NULL,
+		name_key TEXT NOT NULL UNIQUE,
+		code TEXT NOT NULL DEFAULT '',
+		code_key TEXT,
+		description TEXT NOT NULL DEFAULT '',
+		sort_order INTEGER NOT NULL DEFAULT 0,
+		created_at TEXT NOT NULL DEFAULT (datetime('now')),
+		updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+	)`,
+	"asset_tags": `CREATE TABLE asset_tags (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		name TEXT NOT NULL,
+		name_key TEXT NOT NULL UNIQUE,
+		color_token TEXT NOT NULL CHECK(color_token IN ('slate','red','orange','amber','yellow','lime','green','teal','cyan','blue','violet','pink')),
+		created_at TEXT NOT NULL DEFAULT (datetime('now')),
+		updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+	)`,
 	"sessions": `CREATE TABLE sessions (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		folder_id INTEGER REFERENCES session_folders(id),
@@ -35,10 +63,9 @@ var expectedFinalSchemaSQL = map[string]string{
 		host TEXT NOT NULL,
 		port INTEGER NOT NULL DEFAULT 22,
 		username TEXT NOT NULL,
-		tags TEXT NOT NULL DEFAULT '',
 		notes TEXT NOT NULL DEFAULT '',
-		environment TEXT NOT NULL DEFAULT '',
-		project TEXT NOT NULL DEFAULT '',
+		environment_id INTEGER REFERENCES asset_environments(id) ON DELETE RESTRICT,
+		project_id INTEGER REFERENCES asset_projects(id) ON DELETE RESTRICT,
 		auth_method TEXT NOT NULL CHECK(auth_method IN ('password','key','agent','keyboard-interactive')),
 		password TEXT,
 		key_id INTEGER REFERENCES ssh_keys(id),
@@ -49,6 +76,12 @@ var expectedFinalSchemaSQL = map[string]string{
 		connection_count INTEGER NOT NULL DEFAULT 0,
 		created_at TEXT NOT NULL DEFAULT (datetime('now')),
 		updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+	)`,
+	"session_tags": `CREATE TABLE session_tags (
+		session_id INTEGER NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+		tag_id INTEGER NOT NULL REFERENCES asset_tags(id) ON DELETE CASCADE,
+		created_at TEXT NOT NULL DEFAULT (datetime('now')),
+		PRIMARY KEY(session_id, tag_id)
 	)`,
 	"tunnels": `CREATE TABLE tunnels (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,

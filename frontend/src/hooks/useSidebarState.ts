@@ -7,6 +7,7 @@ import { logger } from '@/lib/logger'
 import { recordCommand } from '@/lib/commandHistory'
 import { useAppStore } from '@/store/appStore'
 import type { Macro, MacroInput } from '../../bindings/github.com/xuthus5/mssh/internal/model/models'
+import { sessionAssetSearchText } from '@/lib/sessionAssetSearch'
 
 type Workspace = ReturnType<typeof useSessionWorkspace>
 
@@ -71,8 +72,9 @@ export function useSidebarFilter(folders: Folder[], sessions: Session[]) {
   const [searchQuery, setSearchQuery] = useState('')
   const filteredSessions = useMemo(() => {
     const query = searchQuery.trim().toLowerCase()
-    return query ? sessions.filter((session) => [session.name, session.host, session.username].some((value) => value.toLowerCase().includes(query))) : sessions
-  }, [sessions, searchQuery])
+    const folderNames = new Map(folders.map((folder) => [folder.id, folder.name]))
+    return query ? sessions.filter((session) => sessionAssetSearchText(session, folderNames.get(session.folderId ?? '') ?? '').includes(query)) : sessions
+  }, [folders, sessions, searchQuery])
   const filteredFolders = useMemo(() => {
     if (!searchQuery.trim()) return folders
     const included = new Set<string>()

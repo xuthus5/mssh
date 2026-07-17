@@ -31,7 +31,7 @@ func TestNewInitializesFinalDatabaseFormat(t *testing.T) {
 	var version, sentinelCount int
 	require.NoError(t, appInstance.DB.QueryRow("PRAGMA user_version").Scan(&version))
 	require.NoError(t, appInstance.DB.QueryRow("SELECT count(*) FROM sessions WHERE name = 'legacy-sentinel'").Scan(&sentinelCount))
-	assert.Equal(t, 4, version)
+	assert.Equal(t, 5, version)
 	assert.Zero(t, sentinelCount)
 }
 

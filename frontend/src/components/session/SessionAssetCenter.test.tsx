@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { useSessionAssetFilterStore } from '@/store/sessionAssetFilterStore'
 
 const state = {
   folders: [{ id: '1', name: '默认分组', parentId: null, isDefault: true }, { id: '2', name: '生产环境', parentId: null, isDefault: false }],
@@ -8,9 +9,14 @@ const state = {
   recentSessions: [{ ...session('1', '生产服务器', '2'), lastConnectedAt: '2026-07-12T12:00:00Z', connectionCount: 3 }],
   loading: false,
   error: '',
+  environments: [], projects: [], tags: [],
   listFolders: vi.fn(async () => {}), listSessions: vi.fn(async () => {}), listRecentSessions: vi.fn(async () => {}),
   connect: vi.fn(async () => {}), deleteFolder: vi.fn(async () => {}), deleteSession: vi.fn(async () => {}), setDefaultFolder: vi.fn(async () => {}),
   moveSession: vi.fn(async () => {}),
+  listAssetCatalogs: vi.fn(async () => {}),
+  bulkSetEnvironment: vi.fn(async () => 0), bulkSetProject: vi.fn(async () => 0), bulkUpdateTags: vi.fn(async () => 0),
+  createEnvironment: vi.fn(), createProject: vi.fn(), createTag: vi.fn(), updateEnvironment: vi.fn(), updateProject: vi.fn(), updateTag: vi.fn(),
+  deleteEnvironment: vi.fn(), deleteProject: vi.fn(), deleteTag: vi.fn(), reorderEnvironments: vi.fn(), reorderProjects: vi.fn(),
   batchConnect: vi.fn(async (ids: string[]) => ids.map((id) => ({ sessionId: id, name: id === '1' ? '生产服务器' : '测试服务器', success: id === '1' }))),
   batchExecuteMacro: vi.fn(async () => []),
 }
@@ -18,17 +24,20 @@ const state = {
 vi.mock('@/hooks/SessionWorkspaceContext', () => ({ useSessionWorkspace: () => state }))
 vi.mock('@/lib/wails', () => ({
   SessionService: { SessionDeleteImpact: vi.fn(async () => ({ tunnels: 0, history: 0, recordings: 0 })) },
+  AssetCatalogService: { EnvironmentDeleteImpact: vi.fn(), ProjectDeleteImpact: vi.fn(), TagDeleteImpact: vi.fn() },
   MacroService: { List: vi.fn(async () => [{ id: 9, name: '巡检', command: 'uptime\n' }]) },
 }))
 
 import { SessionAssetCenter } from '@/components/session/SessionAssetCenter'
 
 describe('SessionAssetCenter', () => {
+  beforeEach(() => useSessionAssetFilterStore.getState().resetFilters())
   it('renders recent, folder, and node asset tabs', () => {
     render(<SessionAssetCenter />)
     expect(screen.getByRole('tab', { name: /最近连接/ })).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: /分组/ })).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: /所有节点/ })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: /分类管理/ })).toBeInTheDocument()
     expect(screen.getByText('生产服务器')).toBeInTheDocument()
   })
 

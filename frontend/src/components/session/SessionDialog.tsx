@@ -13,13 +13,21 @@ import { LabeledSelect } from '@/components/ui/labeled-select'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { KeyService } from '@/lib/wails'
-import type { Session, Folder } from '@/hooks/useSession'
+import type { AssetEnvironment, AssetProject, AssetTag, Session, Folder } from '@/hooks/useSession'
+import type { AssetColorToken } from '@/lib/sessionModels'
+import { SessionAssetFields } from '@/components/session/SessionAssetFields'
 
 interface Props {
   open: boolean
   onOpenChange: (open: boolean) => void
   session?: Session | null
   folders?: Folder[]
+  environments: AssetEnvironment[]
+  projects: AssetProject[]
+  assetTags: AssetTag[]
+  onCreateEnvironment: (name: string, color: AssetColorToken) => Promise<AssetEnvironment>
+  onCreateProject: (name: string, code: string) => Promise<AssetProject>
+  onCreateTag: (name: string, color: AssetColorToken) => Promise<AssetTag>
   onSave: (data: Omit<Session, 'id'>) => Promise<void>
 }
 
@@ -50,15 +58,15 @@ function FormSection({ title, children }: { title: string; children: ReactNode }
   )
 }
 
-export default function SessionDialog({ open, onOpenChange, session, folders, onSave }: Props) {
+export default function SessionDialog({ open, onOpenChange, session, folders, environments, projects, assetTags, onCreateEnvironment, onCreateProject, onCreateTag, onSave }: Props) {
   const [name, setName] = useState(session?.name ?? '')
   const [host, setHost] = useState(session?.host ?? '')
   const [port, setPort] = useState(session?.port?.toString() ?? '22')
   const [username, setUsername] = useState(session?.username ?? '')
-  const [tags, setTags] = useState(session?.tags ?? '')
   const [notes, setNotes] = useState(session?.notes ?? '')
-  const [environment, setEnvironment] = useState(session?.environment ?? '')
-  const [project, setProject] = useState(session?.project ?? '')
+  const [environmentId, setEnvironmentId] = useState(session?.environmentId ?? '')
+  const [projectId, setProjectId] = useState(session?.projectId ?? '')
+  const [tagIds, setTagIds] = useState(() => (session?.tags ?? []).map((tag) => tag.id))
   const [authMethod, setAuthMethod] = useState<string>(session?.authMethod ?? 'password')
   const [password, setPassword] = useState(session?.password ?? '')
   const [keyId, setKeyId] = useState<string>(session?.keyId ?? '')
@@ -96,7 +104,7 @@ export default function SessionDialog({ open, onOpenChange, session, folders, on
       await onSave({
         name: name.trim(), host: host.trim(), port: parseInt(port, 10) || 22,
         username: username.trim(), authMethod: authMethod as Session["authMethod"],
-        tags: tags.trim(), notes: notes.trim(), environment: environment.trim(), project: project.trim(),
+        tags: assetTags.filter((tag) => tagIds.includes(tag.id)), notes: notes.trim(), environmentId: environmentId || undefined, projectId: projectId || undefined,
         password: needsPassword ? password : undefined, keyId: authMethod === 'key' ? keyId : undefined,
         keepAlive: Math.max(0, Number.parseInt(keepAlive, 10) || 0), termType: termType.trim() || 'xterm-256color', folderId: folderId || null,
       })
@@ -105,7 +113,7 @@ export default function SessionDialog({ open, onOpenChange, session, folders, on
     } finally {
       setPending(false)
     }
-  }, [name, host, port, username, tags, notes, environment, project, authMethod, password, keyId, keepAlive, termType, folderId, onSave])
+  }, [name, host, port, username, notes, environmentId, projectId, tagIds, assetTags, authMethod, password, keyId, keepAlive, termType, folderId, onSave])
 
   const isEditing = !!session
 
@@ -173,24 +181,7 @@ export default function SessionDialog({ open, onOpenChange, session, folders, on
                 <LabeledSelect value={folderId} options={folderOptions} onValueChange={setFolderId} placeholder="无分组" />
               </label>
             )}
-            <div className="grid grid-cols-2 gap-3">
-              <label className="flex flex-col gap-1.5">
-                <span className="text-xs font-medium text-muted-foreground">环境</span>
-                <Input value={environment} onChange={(event) => setEnvironment(event.target.value)} placeholder="生产 / 测试" />
-              </label>
-              <label className="flex flex-col gap-1.5">
-                <span className="text-xs font-medium text-muted-foreground">项目</span>
-                <Input value={project} onChange={(event) => setProject(event.target.value)} placeholder="项目名称" />
-              </label>
-            </div>
-            <label className="flex flex-col gap-1.5">
-              <span className="text-xs font-medium text-muted-foreground">标签</span>
-              <Input value={tags} onChange={(event) => setTags(event.target.value)} placeholder="数据库, 核心服务, 运维" />
-            </label>
-            <label className="flex flex-col gap-1.5">
-              <span className="text-xs font-medium text-muted-foreground">备注</span>
-              <Textarea value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="记录用途、负责人或注意事项" rows={2} />
-            </label>
+            <SessionAssetFields environments={environments} projects={projects} tags={assetTags} environmentId={environmentId} projectId={projectId} tagIds={tagIds} notes={notes} onEnvironmentChange={setEnvironmentId} onProjectChange={setProjectId} onTagIdsChange={setTagIds} onNotesChange={setNotes} onCreateEnvironment={onCreateEnvironment} onCreateProject={onCreateProject} onCreateTag={onCreateTag} />
           </FormSection>
 
           <FormSection title="终端选项">

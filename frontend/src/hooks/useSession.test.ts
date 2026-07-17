@@ -16,6 +16,10 @@ describe('useSession', () => {
     __clearHandlers()
     resetAppStore()
     _counter = 0
+	__registerHandler('github.com/xuthus5/mssh/internal/service.SessionService.ListRecentSessions', async () => [])
+	__registerHandler('github.com/xuthus5/mssh/internal/service.AssetCatalogService.ListEnvironments', async () => [])
+	__registerHandler('github.com/xuthus5/mssh/internal/service.AssetCatalogService.ListProjects', async () => [])
+	__registerHandler('github.com/xuthus5/mssh/internal/service.AssetCatalogService.ListTags', async () => [])
   })
 
   it('creates a folder and adds it to state', async () => {
@@ -89,6 +93,7 @@ describe('useSession', () => {
       return Object.assign({}, s, { id: sessionId })
     })
     __registerHandler('github.com/xuthus5/mssh/internal/service.SessionService.UpdateSession', async () => {})
+	__registerHandler('github.com/xuthus5/mssh/internal/service.SessionService.GetSession', async () => ({ ...baseSession, name: 'new', port: 2222 }))
 
     const { result } = renderHook(() => useSession())
 

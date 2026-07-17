@@ -30,7 +30,7 @@ func TestOpenDB(t *testing.T) {
 }
 
 func TestDatabaseFormatVersion(t *testing.T) {
-	assert.Equal(t, 4, databaseFormatVersion)
+	assert.Equal(t, 5, databaseFormatVersion)
 }
 
 func TestListSessionsAcceptsNullPassword(t *testing.T) {
