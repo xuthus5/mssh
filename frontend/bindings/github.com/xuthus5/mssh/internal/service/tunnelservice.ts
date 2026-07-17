@@ -33,6 +33,10 @@ export function Stop(tunnelID: number): $CancellablePromise<void> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.TunnelService.Stop", tunnelID);
 }
 
+export function StopAll(): $CancellablePromise<void> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.TunnelService.StopAll");
+}
+
 export function Update(input: model$0.TunnelInput): $CancellablePromise<void> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.TunnelService.Update", input);
 }

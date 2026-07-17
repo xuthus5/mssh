@@ -1,20 +1,15 @@
 package service
 
 import (
-	"bytes"
 	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"log/slog"
-	"net/http"
-	"net/url"
 	"os"
-	"path/filepath"
 	"sort"
 	"strings"
-	"time"
 
 	backupcrypto "github.com/xuthus5/mssh/internal/crypto"
 	"github.com/xuthus5/mssh/internal/model"
@@ -22,7 +17,7 @@ import (
 
 const (
 	SyncMasterKeySetting = "sync.master_key"
-	syncFormatVersion    = 2
+	syncFormatVersion    = 3
 	syncRecoveryFileName = "pre-import.msshbackup"
 	syncETagSetting      = "sync.etag"
 	syncLastAtSetting    = "sync.last_at"
@@ -39,9 +34,9 @@ var syncLocalOnlySettings = map[any]struct{}{
 	syncVersionSetting:   {},
 }
 
-var backupTables = []string{"session_folders", "ssh_keys", "sessions", "tunnels", "macros", "settings", "themes", "terminal_theme_profiles", "transfer_jobs"}
+var backupTables = []string{"session_folders", "ssh_keys", "asset_environments", "asset_projects", "asset_tags", "sessions", "session_tags", "tunnels", "macros", "settings", "themes", "terminal_theme_profiles", "transfer_jobs"}
 
-var backupDeleteOrder = []string{"transfer_jobs", "terminal_theme_profiles", "themes", "tunnels", "sessions", "ssh_keys", "session_folders", "macros", "settings"}
+var backupDeleteOrder = []string{"transfer_jobs", "terminal_theme_profiles", "themes", "tunnels", "session_tags", "sessions", "asset_tags", "asset_projects", "asset_environments", "ssh_keys", "session_folders", "macros", "settings"}
 
 type SyncService struct {
 	db     *sql.DB
@@ -121,127 +116,6 @@ func (s *SyncService) Import(path string) error {
 	return nil
 }
 
-func encodeEncryptedSnapshot(data ExportData, masterKey string) ([]byte, error) {
-	plaintext, err := json.Marshal(data)
-	if err != nil {
-		return nil, fmt.Errorf("encode data: %w", err)
-	}
-	envelope, err := backupcrypto.EncryptBackup(plaintext, []byte(masterKey))
-	if err != nil {
-		return nil, fmt.Errorf("encrypt: %w", err)
-	}
-	content, err := backupcrypto.EncodeBackup(envelope)
-	if err != nil {
-		return nil, fmt.Errorf("encode envelope: %w", err)
-	}
-	return content, nil
-}
-
-func writePrivateFileAtomic(path string, content []byte) error {
-	directory := filepath.Dir(path)
-	temporary, err := os.CreateTemp(directory, ".mssh-backup-*.tmp")
-	if err != nil {
-		return err
-	}
-	temporaryPath := temporary.Name()
-	defer func() { _ = os.Remove(temporaryPath) }()
-	if err := temporary.Chmod(0o600); err != nil {
-		_ = temporary.Close()
-		return err
-	}
-	if _, err := temporary.Write(content); err != nil {
-		_ = temporary.Close()
-		return err
-	}
-	if err := temporary.Sync(); err != nil {
-		_ = temporary.Close()
-		return err
-	}
-	if err := temporary.Close(); err != nil {
-		return err
-	}
-	return os.Rename(temporaryPath, path)
-}
-
-func (s *SyncService) writeRecoveryPoint(masterKey string) error {
-	data, err := s.snapshot()
-	if err != nil {
-		return err
-	}
-	content, err := encodeEncryptedSnapshot(data, masterKey)
-	if err != nil {
-		return err
-	}
-	path, err := s.recoveryPath()
-	if err != nil {
-		return err
-	}
-	if err := writePrivateFileAtomic(path, content); err != nil {
-		return err
-	}
-	s.logger.Info("created pre-import recovery point", "path", path)
-	return nil
-}
-
-func (s *SyncService) recoveryPath() (string, error) {
-	var sequence int
-	var name, databasePath string
-	if err := s.db.QueryRow("PRAGMA database_list").Scan(&sequence, &name, &databasePath); err != nil {
-		return "", err
-	}
-	if databasePath == "" {
-		return "", errors.New("database path is unavailable")
-	}
-	return filepath.Join(filepath.Dir(databasePath), syncRecoveryFileName), nil
-}
-
-func validateSnapshot(db *sql.DB, data ExportData) error {
-	for _, table := range backupTables {
-		columns, err := tableColumns(db, table)
-		if err != nil {
-			return err
-		}
-		if err := validateTableRows(table, data.Tables[table], columns); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func tableColumns(db *sql.DB, table string) (map[string]struct{}, error) {
-	rows, err := db.Query("PRAGMA table_info(" + table + ")")
-	if err != nil {
-		return nil, fmt.Errorf("inspect %s: %w", table, err)
-	}
-	defer func() { _ = rows.Close() }()
-	columns := make(map[string]struct{})
-	for rows.Next() {
-		var cid int
-		var name, columnType string
-		var notNull, primaryKey int
-		var defaultValue any
-		if err := rows.Scan(&cid, &name, &columnType, &notNull, &defaultValue, &primaryKey); err != nil {
-			return nil, fmt.Errorf("inspect %s: %w", table, err)
-		}
-		columns[name] = struct{}{}
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("inspect %s: %w", table, err)
-	}
-	return columns, nil
-}
-
-func validateTableRows(table string, rows []map[string]any, columns map[string]struct{}) error {
-	for index, record := range rows {
-		for column := range record {
-			if _, ok := columns[column]; !ok {
-				return fmt.Errorf("table %s row %d contains unknown column %s", table, index, column)
-			}
-		}
-	}
-	return nil
-}
-
 func (s *SyncService) masterKey() (string, error) {
 	var raw string
 	err := s.db.QueryRow("SELECT value FROM settings WHERE key = ?", SyncMasterKeySetting).Scan(&raw)
@@ -280,6 +154,7 @@ func (s *SyncService) snapshot() (ExportData, error) {
 }
 
 func decodeSnapshot(content []byte, data *ExportData) error {
+	*data = ExportData{}
 	decoder := json.NewDecoder(strings.NewReader(string(content)))
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(data); err != nil {
@@ -317,7 +192,7 @@ func (s *SyncService) restore(data ExportData) error {
 			return fmt.Errorf("clear %s: %w", table, err)
 		}
 	}
-	for _, table := range []string{"session_folders", "ssh_keys", "sessions", "tunnels", "macros", "settings", "themes", "terminal_theme_profiles", "transfer_jobs"} {
+	for _, table := range backupTables {
 		for _, row := range data.Tables[table] {
 			if err := insertRow(tx, table, row); err != nil {
 				return fmt.Errorf("restore %s: %w", table, err)
@@ -376,188 +251,4 @@ func insertRow(tx *sql.Tx, table string, row map[string]any) error {
 	}
 	_, err := tx.Exec("INSERT INTO "+table+" ("+strings.Join(columns, ",")+") VALUES ("+strings.Join(placeholders, ",")+")", values...)
 	return err
-}
-
-func (s *SyncService) TestCloudConnection(endpoint, username, password string) error {
-	request, err := cloudRequest(http.MethodGet, endpoint, username, password, nil)
-	if err != nil {
-		return err
-	}
-	response, err := cloudHTTPClient().Do(request)
-	if err != nil {
-		return fmt.Errorf("cloud connection: %w", err)
-	}
-	defer func() { _ = response.Body.Close() }()
-	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return fmt.Errorf("cloud connection returned %s", response.Status)
-	}
-	return nil
-}
-
-func (s *SyncService) SyncToCloud(endpoint, username, password string) error {
-	outcome := "failed"
-	defer func() {
-		recordAudit(s.db, s.logger, model.AuditEvent{Action: "cloud_upload", TargetType: "backup", Summary: "上传云端配置", Outcome: outcome})
-	}()
-	masterKey, err := s.masterKey()
-	if err != nil {
-		return err
-	}
-	data, err := s.snapshot()
-	if err != nil {
-		return err
-	}
-	content, err := encodeEncryptedSnapshot(data, masterKey)
-	if err != nil {
-		return err
-	}
-	request, err := cloudRequest(http.MethodPut, endpoint, username, password, bytes.NewReader(content))
-	if err != nil {
-		return err
-	}
-	request.Header.Set("Content-Type", "application/json; charset=utf-8")
-	if etag := s.cloudETag(); etag != "" {
-		request.Header.Set("If-Match", etag)
-	} else {
-		request.Header.Set("If-None-Match", "*")
-	}
-	response, err := cloudHTTPClient().Do(request)
-	if err != nil {
-		return fmt.Errorf("cloud upload: %w", err)
-	}
-	defer func() { _ = response.Body.Close() }()
-	if response.StatusCode == http.StatusPreconditionFailed {
-		return errors.New("cloud sync conflict: remote configuration changed")
-	}
-	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return fmt.Errorf("cloud upload returned %s", response.Status)
-	}
-	if err := s.saveCloudMetadata(response.Header.Get("ETag"), "upload"); err != nil {
-		return err
-	}
-	outcome = "success"
-	return nil
-}
-
-func (s *SyncService) SyncFromCloud(endpoint, username, password string) error {
-	outcome := "failed"
-	defer func() {
-		recordAudit(s.db, s.logger, model.AuditEvent{Action: "cloud_download", TargetType: "backup", Summary: "下载云端配置", Outcome: outcome})
-	}()
-	request, err := cloudRequest(http.MethodGet, endpoint, username, password, nil)
-	if err != nil {
-		return err
-	}
-	response, err := cloudHTTPClient().Do(request)
-	if err != nil {
-		return fmt.Errorf("cloud download: %w", err)
-	}
-	defer func() { _ = response.Body.Close() }()
-	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return fmt.Errorf("cloud download returned %s", response.Status)
-	}
-	content, err := readCloudBackup(response.Body)
-	if err != nil {
-		return err
-	}
-	masterKey, err := s.masterKey()
-	if err != nil {
-		return err
-	}
-	data, err := decodeEncryptedSnapshot(content, masterKey)
-	if err != nil {
-		return err
-	}
-	if err := validateSnapshot(s.db, data); err != nil {
-		return err
-	}
-	if err := s.writeRecoveryPoint(masterKey); err != nil {
-		return err
-	}
-	if err := s.restore(data); err != nil {
-		return err
-	}
-	if err := s.saveCloudMetadata(response.Header.Get("ETag"), "download"); err != nil {
-		return err
-	}
-	outcome = "success"
-	return nil
-}
-
-func readCloudBackup(reader io.Reader) ([]byte, error) {
-	content, err := io.ReadAll(io.LimitReader(reader, maxCloudBackupSize+1))
-	if err != nil {
-		return nil, fmt.Errorf("read cloud backup: %w", err)
-	}
-	if len(content) > maxCloudBackupSize {
-		return nil, fmt.Errorf("cloud backup exceeds %d bytes", maxCloudBackupSize)
-	}
-	return content, nil
-}
-
-func decodeEncryptedSnapshot(content []byte, masterKey string) (ExportData, error) {
-	var envelope backupcrypto.BackupEnvelope
-	if err := json.Unmarshal(content, &envelope); err != nil {
-		return ExportData{}, err
-	}
-	plaintext, err := backupcrypto.DecryptBackup(envelope, []byte(masterKey))
-	if err != nil {
-		return ExportData{}, err
-	}
-	var data ExportData
-	if err := decodeSnapshot(plaintext, &data); err != nil {
-		return ExportData{}, err
-	}
-	return data, nil
-}
-
-func cloudRequest(method, endpoint, username, password string, body io.Reader) (*http.Request, error) {
-	parsed, err := url.ParseRequestURI(strings.TrimSpace(endpoint))
-	if err != nil || (parsed.Scheme != "https" && parsed.Scheme != "http") {
-		return nil, errors.New("cloud sync URL must use http or https")
-	}
-	request, err := http.NewRequest(method, parsed.String(), body)
-	if err != nil {
-		return nil, err
-	}
-	if username != "" {
-		request.SetBasicAuth(username, password)
-	}
-	return request, nil
-}
-
-func cloudHTTPClient() *http.Client { return &http.Client{Timeout: 20 * time.Second} }
-
-func (s *SyncService) cloudETag() string {
-	var raw string
-	if err := s.db.QueryRow("SELECT value FROM settings WHERE key = ?", syncETagSetting).Scan(&raw); err != nil {
-		return ""
-	}
-	var value string
-	_ = json.Unmarshal([]byte(raw), &value)
-	return value
-}
-
-func (s *SyncService) saveCloudMetadata(etag, direction string) error {
-	values := map[string]any{
-		syncETagSetting:      etag,
-		syncLastAtSetting:    time.Now().UTC().Format(time.RFC3339),
-		syncDirectionSetting: direction,
-		syncVersionSetting:   syncFormatVersion,
-	}
-	tx, err := s.db.Begin()
-	if err != nil {
-		return err
-	}
-	defer func() { _ = tx.Rollback() }()
-	for key, value := range values {
-		encoded, marshalErr := json.Marshal(value)
-		if marshalErr != nil {
-			return marshalErr
-		}
-		if _, execErr := tx.Exec(`INSERT INTO settings (key, namespace, value, value_type, version) VALUES (?, 'sync', ?, 'string', 1) ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=datetime('now')`, key, string(encoded)); execErr != nil {
-			return execErr
-		}
-	}
-	return tx.Commit()
 }

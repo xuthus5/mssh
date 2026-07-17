@@ -30,6 +30,318 @@ export class AboutInfo {
     }
 }
 
+export enum AssetColorToken {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    AssetColorSlate = "slate",
+    AssetColorRed = "red",
+    AssetColorOrange = "orange",
+    AssetColorAmber = "amber",
+    AssetColorYellow = "yellow",
+    AssetColorLime = "lime",
+    AssetColorGreen = "green",
+    AssetColorTeal = "teal",
+    AssetColorCyan = "cyan",
+    AssetColorBlue = "blue",
+    AssetColorViolet = "violet",
+    AssetColorPink = "pink",
+};
+
+export class AssetDeleteImpact {
+    "id": number;
+    "name": string;
+    "session_count": number;
+
+    /** Creates a new AssetDeleteImpact instance. */
+    constructor($$source: Partial<AssetDeleteImpact> = {}) {
+        if (!("id" in $$source)) {
+            this["id"] = 0;
+        }
+        if (!("name" in $$source)) {
+            this["name"] = "";
+        }
+        if (!("session_count" in $$source)) {
+            this["session_count"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new AssetDeleteImpact instance from a string or object.
+     */
+    static createFrom($$source: any = {}): AssetDeleteImpact {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new AssetDeleteImpact($$parsedSource as Partial<AssetDeleteImpact>);
+    }
+}
+
+export class AssetDeleteInput {
+    "id": number;
+    "mode": string;
+    "replacement_id": number | null;
+
+    /** Creates a new AssetDeleteInput instance. */
+    constructor($$source: Partial<AssetDeleteInput> = {}) {
+        if (!("id" in $$source)) {
+            this["id"] = 0;
+        }
+        if (!("mode" in $$source)) {
+            this["mode"] = "";
+        }
+        if (!("replacement_id" in $$source)) {
+            this["replacement_id"] = null;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new AssetDeleteInput instance from a string or object.
+     */
+    static createFrom($$source: any = {}): AssetDeleteInput {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new AssetDeleteInput($$parsedSource as Partial<AssetDeleteInput>);
+    }
+}
+
+export class AssetEnvironment {
+    "id": number;
+    "name": string;
+    "color_token": AssetColorToken;
+    "sort_order": number;
+    "session_count": number;
+    "created_at": string;
+    "updated_at": string;
+
+    /** Creates a new AssetEnvironment instance. */
+    constructor($$source: Partial<AssetEnvironment> = {}) {
+        if (!("id" in $$source)) {
+            this["id"] = 0;
+        }
+        if (!("name" in $$source)) {
+            this["name"] = "";
+        }
+        if (!("color_token" in $$source)) {
+            this["color_token"] = AssetColorToken.$zero;
+        }
+        if (!("sort_order" in $$source)) {
+            this["sort_order"] = 0;
+        }
+        if (!("session_count" in $$source)) {
+            this["session_count"] = 0;
+        }
+        if (!("created_at" in $$source)) {
+            this["created_at"] = "0001-01-01T00:00:00.000Z";
+        }
+        if (!("updated_at" in $$source)) {
+            this["updated_at"] = "0001-01-01T00:00:00.000Z";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new AssetEnvironment instance from a string or object.
+     */
+    static createFrom($$source: any = {}): AssetEnvironment {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new AssetEnvironment($$parsedSource as Partial<AssetEnvironment>);
+    }
+}
+
+export class AssetEnvironmentInput {
+    "id": number;
+    "name": string;
+    "color_token": AssetColorToken;
+    "sort_order": number;
+
+    /** Creates a new AssetEnvironmentInput instance. */
+    constructor($$source: Partial<AssetEnvironmentInput> = {}) {
+        if (!("id" in $$source)) {
+            this["id"] = 0;
+        }
+        if (!("name" in $$source)) {
+            this["name"] = "";
+        }
+        if (!("color_token" in $$source)) {
+            this["color_token"] = AssetColorToken.$zero;
+        }
+        if (!("sort_order" in $$source)) {
+            this["sort_order"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new AssetEnvironmentInput instance from a string or object.
+     */
+    static createFrom($$source: any = {}): AssetEnvironmentInput {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new AssetEnvironmentInput($$parsedSource as Partial<AssetEnvironmentInput>);
+    }
+}
+
+export class AssetProject {
+    "id": number;
+    "name": string;
+    "code": string;
+    "description": string;
+    "sort_order": number;
+    "session_count": number;
+    "created_at": string;
+    "updated_at": string;
+
+    /** Creates a new AssetProject instance. */
+    constructor($$source: Partial<AssetProject> = {}) {
+        if (!("id" in $$source)) {
+            this["id"] = 0;
+        }
+        if (!("name" in $$source)) {
+            this["name"] = "";
+        }
+        if (!("code" in $$source)) {
+            this["code"] = "";
+        }
+        if (!("description" in $$source)) {
+            this["description"] = "";
+        }
+        if (!("sort_order" in $$source)) {
+            this["sort_order"] = 0;
+        }
+        if (!("session_count" in $$source)) {
+            this["session_count"] = 0;
+        }
+        if (!("created_at" in $$source)) {
+            this["created_at"] = "0001-01-01T00:00:00.000Z";
+        }
+        if (!("updated_at" in $$source)) {
+            this["updated_at"] = "0001-01-01T00:00:00.000Z";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new AssetProject instance from a string or object.
+     */
+    static createFrom($$source: any = {}): AssetProject {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new AssetProject($$parsedSource as Partial<AssetProject>);
+    }
+}
+
+export class AssetProjectInput {
+    "id": number;
+    "name": string;
+    "code": string;
+    "description": string;
+    "sort_order": number;
+
+    /** Creates a new AssetProjectInput instance. */
+    constructor($$source: Partial<AssetProjectInput> = {}) {
+        if (!("id" in $$source)) {
+            this["id"] = 0;
+        }
+        if (!("name" in $$source)) {
+            this["name"] = "";
+        }
+        if (!("code" in $$source)) {
+            this["code"] = "";
+        }
+        if (!("description" in $$source)) {
+            this["description"] = "";
+        }
+        if (!("sort_order" in $$source)) {
+            this["sort_order"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new AssetProjectInput instance from a string or object.
+     */
+    static createFrom($$source: any = {}): AssetProjectInput {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new AssetProjectInput($$parsedSource as Partial<AssetProjectInput>);
+    }
+}
+
+export class AssetTag {
+    "id": number;
+    "name": string;
+    "color_token": AssetColorToken;
+    "session_count": number;
+    "created_at": string;
+    "updated_at": string;
+
+    /** Creates a new AssetTag instance. */
+    constructor($$source: Partial<AssetTag> = {}) {
+        if (!("id" in $$source)) {
+            this["id"] = 0;
+        }
+        if (!("name" in $$source)) {
+            this["name"] = "";
+        }
+        if (!("color_token" in $$source)) {
+            this["color_token"] = AssetColorToken.$zero;
+        }
+        if (!("session_count" in $$source)) {
+            this["session_count"] = 0;
+        }
+        if (!("created_at" in $$source)) {
+            this["created_at"] = "0001-01-01T00:00:00.000Z";
+        }
+        if (!("updated_at" in $$source)) {
+            this["updated_at"] = "0001-01-01T00:00:00.000Z";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new AssetTag instance from a string or object.
+     */
+    static createFrom($$source: any = {}): AssetTag {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new AssetTag($$parsedSource as Partial<AssetTag>);
+    }
+}
+
+export class AssetTagInput {
+    "id": number;
+    "name": string;
+    "color_token": AssetColorToken;
+
+    /** Creates a new AssetTagInput instance. */
+    constructor($$source: Partial<AssetTagInput> = {}) {
+        if (!("id" in $$source)) {
+            this["id"] = 0;
+        }
+        if (!("name" in $$source)) {
+            this["name"] = "";
+        }
+        if (!("color_token" in $$source)) {
+            this["color_token"] = AssetColorToken.$zero;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new AssetTagInput instance from a string or object.
+     */
+    static createFrom($$source: any = {}): AssetTagInput {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new AssetTagInput($$parsedSource as Partial<AssetTagInput>);
+    }
+}
+
 export class AuditEvent {
     "id": number;
     "action": string;
@@ -40,20 +352,41 @@ export class AuditEvent {
     "outcome": string;
     "created_at": string;
 
+    /** Creates a new AuditEvent instance. */
     constructor($$source: Partial<AuditEvent> = {}) {
-        this["id"] = 0;
-        this["action"] = "";
-        this["target_type"] = "";
-        this["target_id"] = "";
-        this["session_id"] = null;
-        this["summary"] = "";
-        this["outcome"] = "";
-        this["created_at"] = "0001-01-01T00:00:00.000Z";
+        if (!("id" in $$source)) {
+            this["id"] = 0;
+        }
+        if (!("action" in $$source)) {
+            this["action"] = "";
+        }
+        if (!("target_type" in $$source)) {
+            this["target_type"] = "";
+        }
+        if (!("target_id" in $$source)) {
+            this["target_id"] = "";
+        }
+        if (!("session_id" in $$source)) {
+            this["session_id"] = null;
+        }
+        if (!("summary" in $$source)) {
+            this["summary"] = "";
+        }
+        if (!("outcome" in $$source)) {
+            this["outcome"] = "";
+        }
+        if (!("created_at" in $$source)) {
+            this["created_at"] = "0001-01-01T00:00:00.000Z";
+        }
+
         Object.assign(this, $$source);
     }
 
+    /**
+     * Creates a new AuditEvent instance from a string or object.
+     */
     static createFrom($$source: any = {}): AuditEvent {
-        const $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         return new AuditEvent($$parsedSource as Partial<AuditEvent>);
     }
 }
@@ -65,17 +398,32 @@ export class AuditFilter {
     "to": string;
     "limit": number;
 
+    /** Creates a new AuditFilter instance. */
     constructor($$source: Partial<AuditFilter> = {}) {
-        this["action"] = "";
-        this["session_id"] = null;
-        this["from"] = "";
-        this["to"] = "";
-        this["limit"] = 0;
+        if (!("action" in $$source)) {
+            this["action"] = "";
+        }
+        if (!("session_id" in $$source)) {
+            this["session_id"] = null;
+        }
+        if (!("from" in $$source)) {
+            this["from"] = "";
+        }
+        if (!("to" in $$source)) {
+            this["to"] = "";
+        }
+        if (!("limit" in $$source)) {
+            this["limit"] = 0;
+        }
+
         Object.assign(this, $$source);
     }
 
+    /**
+     * Creates a new AuditFilter instance from a string or object.
+     */
     static createFrom($$source: any = {}): AuditFilter {
-        const $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         return new AuditFilter($$parsedSource as Partial<AuditFilter>);
     }
 }
@@ -121,6 +469,105 @@ export class BuiltinThemeResetResult {
     }
 }
 
+export class BulkAssetAssignmentInput {
+    "session_ids": number[];
+    "target_id": number | null;
+
+    /** Creates a new BulkAssetAssignmentInput instance. */
+    constructor($$source: Partial<BulkAssetAssignmentInput> = {}) {
+        if (!("session_ids" in $$source)) {
+            this["session_ids"] = [];
+        }
+        if (!("target_id" in $$source)) {
+            this["target_id"] = null;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new BulkAssetAssignmentInput instance from a string or object.
+     */
+    static createFrom($$source: any = {}): BulkAssetAssignmentInput {
+        const $$createField0_0 = $$createType0;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("session_ids" in $$parsedSource) {
+            $$parsedSource["session_ids"] = $$createField0_0($$parsedSource["session_ids"]);
+        }
+        return new BulkAssetAssignmentInput($$parsedSource as Partial<BulkAssetAssignmentInput>);
+    }
+}
+
+export class BulkTagUpdateInput {
+    "session_ids": number[];
+    "tag_ids": number[];
+    "operation": string;
+
+    /** Creates a new BulkTagUpdateInput instance. */
+    constructor($$source: Partial<BulkTagUpdateInput> = {}) {
+        if (!("session_ids" in $$source)) {
+            this["session_ids"] = [];
+        }
+        if (!("tag_ids" in $$source)) {
+            this["tag_ids"] = [];
+        }
+        if (!("operation" in $$source)) {
+            this["operation"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new BulkTagUpdateInput instance from a string or object.
+     */
+    static createFrom($$source: any = {}): BulkTagUpdateInput {
+        const $$createField0_0 = $$createType0;
+        const $$createField1_0 = $$createType0;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("session_ids" in $$parsedSource) {
+            $$parsedSource["session_ids"] = $$createField0_0($$parsedSource["session_ids"]);
+        }
+        if ("tag_ids" in $$parsedSource) {
+            $$parsedSource["tag_ids"] = $$createField1_0($$parsedSource["tag_ids"]);
+        }
+        return new BulkTagUpdateInput($$parsedSource as Partial<BulkTagUpdateInput>);
+    }
+}
+
+export class CommandHistory {
+    "id": number;
+    "session_id": number;
+    "command": string;
+    "created_at": string;
+
+    /** Creates a new CommandHistory instance. */
+    constructor($$source: Partial<CommandHistory> = {}) {
+        if (!("id" in $$source)) {
+            this["id"] = 0;
+        }
+        if (!("session_id" in $$source)) {
+            this["session_id"] = 0;
+        }
+        if (!("command" in $$source)) {
+            this["command"] = "";
+        }
+        if (!("created_at" in $$source)) {
+            this["created_at"] = "0001-01-01T00:00:00.000Z";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new CommandHistory instance from a string or object.
+     */
+    static createFrom($$source: any = {}): CommandHistory {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new CommandHistory($$parsedSource as Partial<CommandHistory>);
+    }
+}
+
 export enum CursorStyle {
     /**
      * The Go zero value for the underlying type of the enum.
@@ -131,6 +578,39 @@ export enum CursorStyle {
     CursorStyleUnderline = "underline",
     CursorStyleBar = "bar",
 };
+
+export class HostKeyEntry {
+    "line": number;
+    "hosts": string;
+    "algorithm": string;
+    "fingerprint": string;
+
+    /** Creates a new HostKeyEntry instance. */
+    constructor($$source: Partial<HostKeyEntry> = {}) {
+        if (!("line" in $$source)) {
+            this["line"] = 0;
+        }
+        if (!("hosts" in $$source)) {
+            this["hosts"] = "";
+        }
+        if (!("algorithm" in $$source)) {
+            this["algorithm"] = "";
+        }
+        if (!("fingerprint" in $$source)) {
+            this["fingerprint"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new HostKeyEntry instance from a string or object.
+     */
+    static createFrom($$source: any = {}): HostKeyEntry {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new HostKeyEntry($$parsedSource as Partial<HostKeyEntry>);
+    }
+}
 
 export enum KeyType {
     /**
@@ -226,6 +706,92 @@ export class MacroInput {
     static createFrom($$source: any = {}): MacroInput {
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         return new MacroInput($$parsedSource as Partial<MacroInput>);
+    }
+}
+
+export class NetworkInterface {
+    "name": string;
+    "received_bytes": number;
+    "transmitted_bytes": number;
+    "download_rate": number;
+    "upload_rate": number;
+
+    /** Creates a new NetworkInterface instance. */
+    constructor($$source: Partial<NetworkInterface> = {}) {
+        if (!("name" in $$source)) {
+            this["name"] = "";
+        }
+        if (!("received_bytes" in $$source)) {
+            this["received_bytes"] = 0;
+        }
+        if (!("transmitted_bytes" in $$source)) {
+            this["transmitted_bytes"] = 0;
+        }
+        if (!("download_rate" in $$source)) {
+            this["download_rate"] = 0;
+        }
+        if (!("upload_rate" in $$source)) {
+            this["upload_rate"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new NetworkInterface instance from a string or object.
+     */
+    static createFrom($$source: any = {}): NetworkInterface {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new NetworkInterface($$parsedSource as Partial<NetworkInterface>);
+    }
+}
+
+export class ProcessInfo {
+    "pid": number;
+    "ppid": number;
+    "user": string;
+    "state": string;
+    "cpu_percent": number;
+    "memory_bytes": number;
+    "rss_bytes": number;
+    "command": string;
+
+    /** Creates a new ProcessInfo instance. */
+    constructor($$source: Partial<ProcessInfo> = {}) {
+        if (!("pid" in $$source)) {
+            this["pid"] = 0;
+        }
+        if (!("ppid" in $$source)) {
+            this["ppid"] = 0;
+        }
+        if (!("user" in $$source)) {
+            this["user"] = "";
+        }
+        if (!("state" in $$source)) {
+            this["state"] = "";
+        }
+        if (!("cpu_percent" in $$source)) {
+            this["cpu_percent"] = 0;
+        }
+        if (!("memory_bytes" in $$source)) {
+            this["memory_bytes"] = 0;
+        }
+        if (!("rss_bytes" in $$source)) {
+            this["rss_bytes"] = 0;
+        }
+        if (!("command" in $$source)) {
+            this["command"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new ProcessInfo instance from a string or object.
+     */
+    static createFrom($$source: any = {}): ProcessInfo {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new ProcessInfo($$parsedSource as Partial<ProcessInfo>);
     }
 }
 
@@ -419,10 +985,12 @@ export class Session {
     "host": string;
     "port": number;
     "username": string;
-    "tags": string;
     "notes": string;
-    "environment": string;
-    "project": string;
+    "environment_id"?: number | null;
+    "project_id"?: number | null;
+    "environment"?: AssetEnvironment | null;
+    "project"?: AssetProject | null;
+    "tags": AssetTag[];
     "auth_method": AuthMethod;
     "password"?: string;
     "key_id"?: number | null;
@@ -454,10 +1022,12 @@ export class Session {
         if (!("username" in $$source)) {
             this["username"] = "";
         }
-        if (!("tags" in $$source)) this["tags"] = "";
-        if (!("notes" in $$source)) this["notes"] = "";
-        if (!("environment" in $$source)) this["environment"] = "";
-        if (!("project" in $$source)) this["project"] = "";
+        if (!("notes" in $$source)) {
+            this["notes"] = "";
+        }
+        if (!("tags" in $$source)) {
+            this["tags"] = [];
+        }
         if (!("auth_method" in $$source)) {
             this["auth_method"] = AuthMethod.$zero;
         }
@@ -487,8 +1057,49 @@ export class Session {
      * Creates a new Session instance from a string or object.
      */
     static createFrom($$source: any = {}): Session {
+        const $$createField9_0 = $$createType2;
+        const $$createField10_0 = $$createType4;
+        const $$createField11_0 = $$createType6;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("environment" in $$parsedSource) {
+            $$parsedSource["environment"] = $$createField9_0($$parsedSource["environment"]);
+        }
+        if ("project" in $$parsedSource) {
+            $$parsedSource["project"] = $$createField10_0($$parsedSource["project"]);
+        }
+        if ("tags" in $$parsedSource) {
+            $$parsedSource["tags"] = $$createField11_0($$parsedSource["tags"]);
+        }
         return new Session($$parsedSource as Partial<Session>);
+    }
+}
+
+export class SessionDeleteImpact {
+    "tunnels": number;
+    "history": number;
+    "recordings": number;
+
+    /** Creates a new SessionDeleteImpact instance. */
+    constructor($$source: Partial<SessionDeleteImpact> = {}) {
+        if (!("tunnels" in $$source)) {
+            this["tunnels"] = 0;
+        }
+        if (!("history" in $$source)) {
+            this["history"] = 0;
+        }
+        if (!("recordings" in $$source)) {
+            this["recordings"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new SessionDeleteImpact instance from a string or object.
+     */
+    static createFrom($$source: any = {}): SessionDeleteImpact {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new SessionDeleteImpact($$parsedSource as Partial<SessionDeleteImpact>);
     }
 }
 
@@ -544,10 +1155,10 @@ export class SessionInput {
     "host": string;
     "port": number;
     "username": string;
-    "tags": string;
     "notes": string;
-    "environment": string;
-    "project": string;
+    "environment_id"?: number | null;
+    "project_id"?: number | null;
+    "tag_ids": number[];
     "auth_method": AuthMethod;
     "password"?: string;
     "key_id"?: number | null;
@@ -575,10 +1186,12 @@ export class SessionInput {
         if (!("username" in $$source)) {
             this["username"] = "";
         }
-        if (!("tags" in $$source)) this["tags"] = "";
-        if (!("notes" in $$source)) this["notes"] = "";
-        if (!("environment" in $$source)) this["environment"] = "";
-        if (!("project" in $$source)) this["project"] = "";
+        if (!("notes" in $$source)) {
+            this["notes"] = "";
+        }
+        if (!("tag_ids" in $$source)) {
+            this["tag_ids"] = [];
+        }
         if (!("auth_method" in $$source)) {
             this["auth_method"] = AuthMethod.$zero;
         }
@@ -599,7 +1212,11 @@ export class SessionInput {
      * Creates a new SessionInput instance from a string or object.
      */
     static createFrom($$source: any = {}): SessionInput {
+        const $$createField9_0 = $$createType0;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("tag_ids" in $$parsedSource) {
+            $$parsedSource["tag_ids"] = $$createField9_0($$parsedSource["tag_ids"]);
+        }
         return new SessionInput($$parsedSource as Partial<SessionInput>);
     }
 }
@@ -713,6 +1330,99 @@ export class SettingInput {
     static createFrom($$source: any = {}): SettingInput {
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         return new SettingInput($$parsedSource as Partial<SettingInput>);
+    }
+}
+
+export class SystemInfo {
+    "cpu_percent": number;
+    "cpu_count": number;
+    "memory_used": number;
+    "memory_total": number;
+    "disk_used": number;
+    "disk_total": number;
+    "download_rate": number;
+    "upload_rate": number;
+    "swap_used": number;
+    "swap_total": number;
+    "load_1": number;
+    "load_5": number;
+    "load_15": number;
+    "uptime_seconds": number;
+    "os_name": string;
+    "kernel_version": string;
+    "latency_ms": number;
+    "interfaces": NetworkInterface[];
+
+    /** Creates a new SystemInfo instance. */
+    constructor($$source: Partial<SystemInfo> = {}) {
+        if (!("cpu_percent" in $$source)) {
+            this["cpu_percent"] = 0;
+        }
+        if (!("cpu_count" in $$source)) {
+            this["cpu_count"] = 0;
+        }
+        if (!("memory_used" in $$source)) {
+            this["memory_used"] = 0;
+        }
+        if (!("memory_total" in $$source)) {
+            this["memory_total"] = 0;
+        }
+        if (!("disk_used" in $$source)) {
+            this["disk_used"] = 0;
+        }
+        if (!("disk_total" in $$source)) {
+            this["disk_total"] = 0;
+        }
+        if (!("download_rate" in $$source)) {
+            this["download_rate"] = 0;
+        }
+        if (!("upload_rate" in $$source)) {
+            this["upload_rate"] = 0;
+        }
+        if (!("swap_used" in $$source)) {
+            this["swap_used"] = 0;
+        }
+        if (!("swap_total" in $$source)) {
+            this["swap_total"] = 0;
+        }
+        if (!("load_1" in $$source)) {
+            this["load_1"] = 0;
+        }
+        if (!("load_5" in $$source)) {
+            this["load_5"] = 0;
+        }
+        if (!("load_15" in $$source)) {
+            this["load_15"] = 0;
+        }
+        if (!("uptime_seconds" in $$source)) {
+            this["uptime_seconds"] = 0;
+        }
+        if (!("os_name" in $$source)) {
+            this["os_name"] = "";
+        }
+        if (!("kernel_version" in $$source)) {
+            this["kernel_version"] = "";
+        }
+        if (!("latency_ms" in $$source)) {
+            this["latency_ms"] = 0;
+        }
+        if (!("interfaces" in $$source)) {
+            this["interfaces"] = [];
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new SystemInfo instance from a string or object.
+     */
+    static createFrom($$source: any = {}): SystemInfo {
+        const $$createField17_0 = $$createType8;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("interfaces" in $$parsedSource) {
+            $$parsedSource["interfaces"] = $$createField17_0($$parsedSource["interfaces"]);
+        }
+        return new SystemInfo($$parsedSource as Partial<SystemInfo>);
     }
 }
 
@@ -872,9 +1582,9 @@ export class ThemeConfigurationInput {
      * Creates a new ThemeConfigurationInput instance from a string or object.
      */
     static createFrom($$source: any = {}): ThemeConfigurationInput {
-        const $$createField0_0 = $$createType0;
-        const $$createField1_0 = $$createType2;
-        const $$createField2_0 = $$createType3;
+        const $$createField0_0 = $$createType9;
+        const $$createField1_0 = $$createType11;
+        const $$createField2_0 = $$createType12;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("global_style" in $$parsedSource) {
             $$parsedSource["global_style"] = $$createField0_0($$parsedSource["global_style"]);
@@ -1034,7 +1744,7 @@ export class ThemeImportSummary {
      * Creates a new ThemeImportSummary instance from a string or object.
      */
     static createFrom($$source: any = {}): ThemeImportSummary {
-        const $$createField0_0 = $$createType5;
+        const $$createField0_0 = $$createType14;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("results" in $$parsedSource) {
             $$parsedSource["results"] = $$createField0_0($$parsedSource["results"]);
@@ -1107,7 +1817,7 @@ export class ThemeProfile {
      * Creates a new ThemeProfile instance from a string or object.
      */
     static createFrom($$source: any = {}): ThemeProfile {
-        const $$createField3_0 = $$createType7;
+        const $$createField3_0 = $$createType16;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("definition" in $$parsedSource) {
             $$parsedSource["definition"] = $$createField3_0($$parsedSource["definition"]);
@@ -1176,6 +1886,73 @@ export enum ThemeSourceType {
     ThemeSourceCommunity = "community",
     ThemeSourceCustom = "custom",
 };
+
+export class TransferJob {
+    "id": string;
+    "session_id": number;
+    "session_name": string;
+    "direction": string;
+    "source_path": string;
+    "target_path": string;
+    "total_bytes": number;
+    "transferred_bytes": number;
+    "speed": number;
+    "eta": number;
+    "status": string;
+    "error"?: string;
+    "started_at": string;
+    "completed_at"?: string | null;
+
+    /** Creates a new TransferJob instance. */
+    constructor($$source: Partial<TransferJob> = {}) {
+        if (!("id" in $$source)) {
+            this["id"] = "";
+        }
+        if (!("session_id" in $$source)) {
+            this["session_id"] = 0;
+        }
+        if (!("session_name" in $$source)) {
+            this["session_name"] = "";
+        }
+        if (!("direction" in $$source)) {
+            this["direction"] = "";
+        }
+        if (!("source_path" in $$source)) {
+            this["source_path"] = "";
+        }
+        if (!("target_path" in $$source)) {
+            this["target_path"] = "";
+        }
+        if (!("total_bytes" in $$source)) {
+            this["total_bytes"] = 0;
+        }
+        if (!("transferred_bytes" in $$source)) {
+            this["transferred_bytes"] = 0;
+        }
+        if (!("speed" in $$source)) {
+            this["speed"] = 0;
+        }
+        if (!("eta" in $$source)) {
+            this["eta"] = 0;
+        }
+        if (!("status" in $$source)) {
+            this["status"] = "";
+        }
+        if (!("started_at" in $$source)) {
+            this["started_at"] = "0001-01-01T00:00:00.000Z";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new TransferJob instance from a string or object.
+     */
+    static createFrom($$source: any = {}): TransferJob {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new TransferJob($$parsedSource as Partial<TransferJob>);
+    }
+}
 
 export class Tunnel {
     "id": number;
@@ -1312,11 +2089,20 @@ export class UpdateInfo {
 }
 
 // Private type creation functions
-const $$createType0 = TerminalGlobalStyleInput.createFrom;
-const $$createType1 = ThemeProfileInput.createFrom;
-const $$createType2 = $Create.Array($$createType1);
-const $$createType3 = ThemeAssignmentsInput.createFrom;
-const $$createType4 = ThemeImportResult.createFrom;
-const $$createType5 = $Create.Array($$createType4);
-const $$createType6 = ThemeDefinition.createFrom;
-const $$createType7 = $Create.Nullable($$createType6);
+const $$createType0 = $Create.Array($Create.Any);
+const $$createType1 = AssetEnvironment.createFrom;
+const $$createType2 = $Create.Nullable($$createType1);
+const $$createType3 = AssetProject.createFrom;
+const $$createType4 = $Create.Nullable($$createType3);
+const $$createType5 = AssetTag.createFrom;
+const $$createType6 = $Create.Array($$createType5);
+const $$createType7 = NetworkInterface.createFrom;
+const $$createType8 = $Create.Array($$createType7);
+const $$createType9 = TerminalGlobalStyleInput.createFrom;
+const $$createType10 = ThemeProfileInput.createFrom;
+const $$createType11 = $Create.Array($$createType10);
+const $$createType12 = ThemeAssignmentsInput.createFrom;
+const $$createType13 = ThemeImportResult.createFrom;
+const $$createType14 = $Create.Array($$createType13);
+const $$createType15 = ThemeDefinition.createFrom;
+const $$createType16 = $Create.Nullable($$createType15);
