@@ -5,88 +5,24 @@ import { useConnectDialog } from '@/store/connectDialog'
 import { toast } from '@/components/ui/toast'
 import { logger } from '@/lib/logger'
 import { createTerminalTab } from '@/lib/terminalTabs'
-import type { Session as BindingSession, SessionInput, Tunnel as BindingTunnel } from '../../bindings/github.com/xuthus5/mssh/internal/model/models'
+import type { SessionInput } from '../../bindings/github.com/xuthus5/mssh/internal/model/models'
 import { reconnectSessionTab } from '@/hooks/sessionReconnect'
+import { runBatchSessions } from '@/lib/sessionBatch'
+import { mapFolder, mapSession, mapTunnel, type Folder, type Session, type Tunnel } from '@/lib/sessionModels'
 
-export interface Folder {
-  id: string
-  name: string
-  parentId: string | null
-  isDefault: boolean
-}
+export type { BatchSessionResult } from '@/lib/sessionBatch'
+export type { Folder, Session, Tunnel } from '@/lib/sessionModels'
 
-export interface Session {
-  id: string
-  name: string
-  host: string
-  port: number
-  username: string
-  tags?: string
-  notes?: string
-  environment?: string
-  project?: string
-  authMethod: 'password' | 'key' | 'agent' | 'keyboard-interactive'
-  password?: string
-  keyId?: string
-  keepAlive: number
-  termType: string
-  folderId: string | null
-  lastConnectedAt?: string
-  connectionCount?: number
-}
-
-export interface Tunnel {
-  id: string
-  sessionId: string
-  type: 'local' | 'remote' | 'dynamic'
-  localAddress: string
-  localPort: number
-  remoteAddress: string
-  remotePort: number
-  running: boolean
-}
-
-function mapFolder(f: { id: number; name: string; parent_id: number | null; is_default: boolean }): Folder {
-  return { id: String(f.id), name: f.name, parentId: f.parent_id ? String(f.parent_id) : null, isDefault: f.is_default }
-}
-
-function mapSession(s: BindingSession): Session {
-  return {
-    id: String(s.id),
-    name: s.name,
-    host: s.host,
-    port: s.port,
-    username: s.username,
-    tags: s.tags,
-    notes: s.notes,
-    environment: s.environment,
-    project: s.project,
-    authMethod: s.auth_method as Session['authMethod'],
-    password: s.password,
-    keyId: s.key_id != null ? String(s.key_id) : undefined,
-    keepAlive: s.keep_alive,
-    termType: s.term_type,
-    folderId: s.folder_id != null ? String(s.folder_id) : null,
-    lastConnectedAt: s.last_connected_at ?? undefined,
-    connectionCount: s.connection_count,
-  }
-}
-
-function mapTunnel(t: BindingTunnel): Tunnel {
-  return {
-    id: String(t.id),
-    sessionId: String(t.session_id),
-    type: t.type as Tunnel['type'],
-    localAddress: t.local_host ?? '',
-    localPort: t.local_port,
-    remoteAddress: t.remote_host ?? '',
-    remotePort: t.remote_port,
-    running: false,
-  }
+async function openSessionTab(session: Session): Promise<string> {
+  const terminalId = await TerminalService.Open(Number(session.id), 80, 24)
+  const store = useAppStore.getState()
+  const tab = createTerminalTab({ sessionID: Number(session.id), sessionName: session.name, terminalID: terminalId, tabs: store.tabs })
+  store.setConnectionStatus(terminalId, 'connected')
+  store.openTab(tab)
+  return terminalId
 }
 
 export function useSession() {
-  const openTab = useAppStore((s) => s.openTab)
   const [folders, setFolders] = useState<Folder[]>([])
   const [sessions, setSessions] = useState<Session[]>([])
   const [recentSessions, setRecentSessions] = useState<Session[]>([])
@@ -258,17 +194,7 @@ export function useSession() {
     if (dialog.open) return void toast('已有 SSH 连接正在处理，请先完成或关闭当前连接窗口', 'info')
     dialog.openDialog(session.host, session.port, session.username, () => { void connect(sessionId) })
     try {
-      const terminalId = await TerminalService.Open(Number(sessionId), 80, 24)
-      const tab = createTerminalTab({
-        sessionID: Number(sessionId),
-        sessionName: session.name,
-        terminalID: terminalId,
-        tabs: useAppStore.getState().tabs,
-      })
-      if (useAppStore.getState().connectionStatus[terminalId] === undefined) {
-        useAppStore.getState().setConnectionStatus(terminalId, 'connected')
-      }
-      openTab(tab)
+      const terminalId = await openSessionTab(session)
       await Promise.all([listRecentSessions(), listSessions()])
       dialog.setState('connected')
       logger.info('connected', { terminalId, host: session.host })
@@ -277,7 +203,16 @@ export function useSession() {
       const msg = err instanceof Error ? err.message : String(err)
       dialog.setError(msg)
     }
-  }, [listRecentSessions, listSessions, openTab, sessions])
+  }, [listRecentSessions, listSessions, sessions])
+
+  const runBatch = useCallback(async (sessionIDs: string[], command?: string) => {
+    const selected = sessionIDs.map((id) => sessions.find((session) => session.id === id)).filter((session): session is Session => session !== undefined)
+    const results = await runBatchSessions(selected, command)
+    await Promise.all([listRecentSessions(), listSessions()])
+    return results
+  }, [listRecentSessions, listSessions, sessions])
+  const batchConnect = useCallback((sessionIDs: string[]) => runBatch(sessionIDs), [runBatch])
+  const batchExecuteMacro = useCallback((sessionIDs: string[], command: string) => runBatch(sessionIDs, command), [runBatch])
 
   const disconnect = useCallback(async (terminalId: string) => {
     try {
@@ -307,6 +242,6 @@ export function useSession() {
     folders, sessions, recentSessions, tunnels, loading, sessionsLoaded, error,
     listFolders, createFolder, deleteFolder, updateFolder, setDefaultFolder,
     listSessions, listRecentSessions, createSession, updateSession, deleteSession, moveSession,
-    connect, reconnect, disconnect, listTunnels,
+    connect, batchConnect, batchExecuteMacro, reconnect, disconnect, listTunnels,
   }
 }
