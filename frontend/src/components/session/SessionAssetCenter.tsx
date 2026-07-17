@@ -14,6 +14,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { toast } from '@/components/ui/toast'
+import { SessionService } from '@/lib/wails'
 
 type AssetTab = 'recent' | 'folders' | 'nodes'
 type DeleteTarget = { type: 'folder' | 'session'; item: Folder | Session }
@@ -80,8 +81,15 @@ function NodeBreadcrumb({ folder, onClear }: { folder?: Folder; onClear: () => v
 }
 
 function DeleteDialog({ target, folders, sessions, onOpenChange, onConfirm }: { target: DeleteTarget | null; folders: Folder[]; sessions: Session[]; onOpenChange: (open: boolean) => void; onConfirm: () => void }) {
+  const [impact, setImpact] = useState<{ tunnels: number; history: number; recordings: number } | null>(null)
+  useEffect(() => {
+    if (target?.type !== 'session') { setImpact(null); return }
+    let current = true
+    void SessionService.SessionDeleteImpact(Number(target.item.id)).then((value) => { if (current) setImpact(value) }).catch(() => { if (current) setImpact(null) })
+    return () => { current = false }
+  }, [target])
   const folder = target?.type === 'folder' ? target.item as Folder : undefined
-  const description = folder ? `其中 ${sessions.filter((session) => session.folderId === folder.id).length} 个会话和 ${folders.filter((item) => item.parentId === folder.id).length} 个子分组将迁移到默认分组。` : '删除后无法恢复该会话配置。'
+  const description = folder ? `其中 ${sessions.filter((session) => session.folderId === folder.id).length} 个会话和 ${folders.filter((item) => item.parentId === folder.id).length} 个子分组将迁移到默认分组。` : impact ? `将同时影响 ${impact.tunnels} 条隧道、${impact.history} 条命令历史和 ${impact.recordings} 条录制记录。` : '正在分析关联资产影响范围。'
   return <AlertDialog open={Boolean(target)} onOpenChange={onOpenChange}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>删除“{target?.item.name}”？</AlertDialogTitle><AlertDialogDescription>{description}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>取消</AlertDialogCancel><AlertDialogAction variant="destructive" onClick={onConfirm}>确认删除</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
 }
 
