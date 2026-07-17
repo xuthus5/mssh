@@ -1,6 +1,7 @@
 import { useRef } from 'react'
 import { TerminalInteractionSurface } from '@/components/terminal/TerminalInteractionSurface'
 import { useTerminal, type TerminalFocusRequest } from '@/hooks/useTerminal'
+import { cn } from '@/lib/utils'
 import '@xterm/xterm/css/xterm.css'
 
 interface Props {
@@ -18,7 +19,7 @@ export function TerminalEmulator({ terminalID, className, active, focusRequest }
     <TerminalInteractionSurface terminalRef={terminalRef}>
       <div
         ref={containerRef}
-        className={className}
+        className={cn('[&>.xterm]:pl-1.5', className)}
         style={{
           width: '100%',
           height: '100%',
