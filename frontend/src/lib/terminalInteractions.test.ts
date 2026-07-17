@@ -68,6 +68,7 @@ describe('terminal interactions', () => {
 
     expect(clipboard.writeText).toHaveBeenCalledOnce()
     expect(clipboard.writeText).toHaveBeenCalledWith('final')
+    expect(terminal.focus).not.toHaveBeenCalled()
     vi.useRealTimers()
   })
 
