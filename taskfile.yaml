@@ -44,6 +44,16 @@ tasks:
       - go test -race -coverprofile=coverage.out -covermode=atomic ./...
       - go tool cover -func=coverage.out
 
+  test:e2e:
+    desc: 运行真实 SSH、tmux 与 SFTP 集成测试
+    cmds:
+      - go test -race -tags=e2e ./e2e -run 'TestCommercialSSHWorkflow|TestConcurrentResourcesReturnToBaseline' -count=1 -timeout=2m
+
+  benchmark:
+    desc: 运行商业性能基准
+    cmds:
+      - go test -run '^$' -bench 'BenchmarkCommercial' -benchmem ./internal/store ./internal/service
+
   clean:
     desc: 清理临时产物
     cmds:

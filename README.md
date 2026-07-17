@@ -61,6 +61,12 @@ go tool cover -func=coverage.out | tail -1
 
 # Frontend
 cd frontend && npx vitest run && npx tsc -b --noEmit
+
+# Isolated local sshd + tmux + SFTP integration
+task test:e2e
+
+# Performance budgets and allocation benchmarks
+task benchmark
 ```
 
 ### Build
