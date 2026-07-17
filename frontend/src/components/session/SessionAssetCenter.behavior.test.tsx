@@ -16,6 +16,8 @@ const state = vi.hoisted(() => ({
   deleteSession: vi.fn(),
   setDefaultFolder: vi.fn(),
   moveSession: vi.fn(),
+  batchConnect: vi.fn(),
+  batchExecuteMacro: vi.fn(),
 }))
 const toast = vi.hoisted(() => vi.fn())
 

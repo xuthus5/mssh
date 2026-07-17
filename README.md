@@ -8,6 +8,7 @@ A cross-platform SSH client built with Go + Wails v3 + React + xterm.js.
 - Overview workspace for sessions, SSH keys, and tunnels, plus non-disruptive session and macro sidebars
 - Encrypted text backups (`.msshbackup`) and conflict-safe HTTP/WebDAV synchronization using Argon2id, AES-256-GCM, and ETags
 - Session management (folders, SSH password/key/agent auth)
+- Confirmed multi-session connection and macro execution with per-node results
 - Commercial folder management with one configurable default group and safe reassignment on deletion
 - SFTP file transfer with native dialogs and a global progress, retry, history, ETA, and cancellation center
 - Port forwarding (local/remote/dynamic)

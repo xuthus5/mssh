@@ -11,9 +11,15 @@ const state = {
   listFolders: vi.fn(async () => {}), listSessions: vi.fn(async () => {}), listRecentSessions: vi.fn(async () => {}),
   connect: vi.fn(async () => {}), deleteFolder: vi.fn(async () => {}), deleteSession: vi.fn(async () => {}), setDefaultFolder: vi.fn(async () => {}),
   moveSession: vi.fn(async () => {}),
+  batchConnect: vi.fn(async (ids: string[]) => ids.map((id) => ({ sessionId: id, name: id === '1' ? '生产服务器' : '测试服务器', success: id === '1' }))),
+  batchExecuteMacro: vi.fn(async () => []),
 }
 
 vi.mock('@/hooks/SessionWorkspaceContext', () => ({ useSessionWorkspace: () => state }))
+vi.mock('@/lib/wails', () => ({
+  SessionService: { SessionDeleteImpact: vi.fn(async () => ({ tunnels: 0, history: 0, recordings: 0 })) },
+  MacroService: { List: vi.fn(async () => [{ id: 9, name: '巡检', command: 'uptime\n' }]) },
+}))
 
 import { SessionAssetCenter } from '@/components/session/SessionAssetCenter'
 
@@ -40,6 +46,22 @@ describe('SessionAssetCenter', () => {
     await userEvent.click(screen.getByRole('button', { name: '创建' }))
     expect(await screen.findByText('新建会话')).toBeInTheDocument()
     expect(screen.getByText('新建分组目录')).toBeInTheDocument()
+  })
+
+  it('selects multiple sessions, confirms batch connection, and shows per-node results', async () => {
+    render(<SessionAssetCenter />)
+    await userEvent.click(screen.getByRole('tab', { name: /所有节点/ }))
+    await userEvent.click(screen.getByRole('checkbox', { name: '选择 生产服务器' }))
+    await userEvent.click(screen.getByRole('checkbox', { name: '选择 测试服务器' }))
+    await userEvent.click(screen.getByRole('button', { name: '批量连接' }))
+
+    expect(screen.getByRole('alertdialog')).toHaveTextContent('即将为 2 个会话建立 SSH 连接')
+    await userEvent.click(screen.getByRole('button', { name: '确认执行' }))
+
+    expect(state.batchConnect).toHaveBeenCalledWith(['1', '2'])
+    expect(await screen.findByText('成功 1 项，失败 1 项。')).toBeInTheDocument()
+    expect(screen.getAllByText('生产服务器')).toHaveLength(2)
+    expect(screen.getAllByText('测试服务器')).toHaveLength(2)
   })
 })
 

@@ -105,6 +105,28 @@ describe('useSession behavior', () => {
     expect(useConnectDialog.getState().host).toBe('other.internal')
   })
 
+  it('runs batch macros independently and closes failed partial terminals', async () => {
+    registerInitial({ sessions: [bindingSession(5, 'One', null), bindingSession(6, 'Two', null)] })
+    __registerHandler(service + 'TerminalService.Open', async (sessionID: number) => `term-${sessionID}`)
+    __registerHandler(service + 'MacroService.Execute', async (terminalID: string) => {
+      if (terminalID === 'term-6') throw new Error('write failed')
+    })
+    const closeTerminal = vi.fn(async () => {})
+    __registerHandler(service + 'TerminalService.Close', closeTerminal)
+    const { result } = renderHook(() => useSession())
+    await waitFor(() => expect(result.current.sessions).toHaveLength(2))
+
+    let batchResults: Awaited<ReturnType<typeof result.current.batchExecuteMacro>> = []
+    await act(async () => { batchResults = await result.current.batchExecuteMacro(['5', '6'], 'uptime\n') })
+
+    expect(batchResults).toEqual([
+      expect.objectContaining({ sessionId: '5', success: true, terminalId: 'term-5' }),
+      expect.objectContaining({ sessionId: '6', success: false, error: 'write failed' }),
+    ])
+    expect(closeTerminal).toHaveBeenCalledWith('term-6')
+    expect(useAppStore.getState().tabs).toHaveLength(1)
+  })
+
   it('disconnects a specific terminal instance by backend terminal ID', async () => {
     registerInitial({ sessions: [bindingSession(5, 'Connect', null)] })
     const closeTerminal = vi.fn(async () => {})
