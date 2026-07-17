@@ -11,9 +11,12 @@ interface Props {
   onSave: (c: SyncConfig) => void
   onExport: () => void
   onImport: () => void
+  onTestCloud: (config: SyncConfig) => Promise<void>
+  onPushCloud: (config: SyncConfig) => Promise<void>
+  onPullCloud: (config: SyncConfig) => Promise<void>
 }
 
-export function SyncPanel({ sync, onSave, onExport, onImport }: Props) {
+export function SyncPanel({ sync, onSave, onExport, onImport, onTestCloud, onPushCloud, onPullCloud }: Props) {
   const [enabled, setEnabled] = useState(sync.enabled)
   const [url, setUrl] = useState(sync.url)
   const [username, setUsername] = useState(sync.username)
@@ -21,12 +24,20 @@ export function SyncPanel({ sync, onSave, onExport, onImport }: Props) {
   const [masterKey, setMasterKey] = useState(sync.masterKey ?? '')
   const [masterKeyConfirmation, setMasterKeyConfirmation] = useState(sync.masterKey ?? '')
   const [showMasterKey, setShowMasterKey] = useState(false)
+  const [cloudPending, setCloudPending] = useState(false)
   const masterKeyValid = masterKey.length >= 12 && masterKey === masterKeyConfirmation
+  const cloudConfig = { enabled, url, username, password, masterKey }
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault()
     if (!masterKeyValid) return
     onSave({ enabled, url, username, password, masterKey })
+  }
+
+  const runCloudAction = async (action: (config: SyncConfig) => Promise<void>) => {
+    if (cloudPending) return
+    setCloudPending(true)
+    try { await action(cloudConfig) } finally { setCloudPending(false) }
   }
 
   return (
@@ -61,15 +72,11 @@ export function SyncPanel({ sync, onSave, onExport, onImport }: Props) {
       </div>
       <div className="border-t border-border pt-4">
         <h4 className="text-sm font-medium mb-3">云同步</h4>
-        <Alert className="mb-3">
-          <AlertTitle>云同步暂不可用</AlertTitle>
-          <AlertDescription>当前版本仅支持本地配置导入和导出。</AlertDescription>
-        </Alert>
-        <form onSubmit={(event) => { event.preventDefault(); onSave({ enabled, url, username, password, masterKey: sync.masterKey ?? '' }) }} className="flex flex-col gap-3">
+        <Alert className="mb-3"><AlertTitle>加密文本同步</AlertTitle><AlertDescription>支持 HTTPS/WebDAV 文本端点，并使用 ETag 防止覆盖远端新版本。</AlertDescription></Alert>
+        <form onSubmit={(event) => { event.preventDefault(); if (masterKeyValid) onSave(cloudConfig) }} className="flex flex-col gap-3">
           <div className="flex items-center gap-2">
             <Checkbox
               checked={enabled}
-              disabled
               onCheckedChange={(checked) =>
                 setEnabled(checked === true)
               }
@@ -81,10 +88,10 @@ export function SyncPanel({ sync, onSave, onExport, onImport }: Props) {
               同步 URL
             </label>
             <Input
+              aria-label="同步 URL"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               placeholder="https://sync.example.com/api"
-              disabled
             />
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -93,9 +100,9 @@ export function SyncPanel({ sync, onSave, onExport, onImport }: Props) {
                 用户名
               </label>
               <Input
+                aria-label="用户名"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                disabled
               />
             </div>
             <div className="flex flex-col gap-1.5">
@@ -103,15 +110,17 @@ export function SyncPanel({ sync, onSave, onExport, onImport }: Props) {
                 密码
               </label>
               <Input
+                aria-label="密码"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                disabled
               />
             </div>
           </div>
+          {sync.lastSyncedAt && <div className="rounded-xl border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground" data-testid="cloud-sync-version">备份格式 v{sync.formatVersion || 2} · 最近{sync.lastDirection === 'download' ? '下载' : '上传'} {new Date(sync.lastSyncedAt).toLocaleString()} · ETag {sync.etag || '未提供'}</div>}
           <div className="flex justify-end">
-            <Button type="submit" size="sm" disabled>
+            <div className="flex flex-wrap justify-end gap-2"><Button type="button" size="sm" variant="outline" disabled={cloudPending || !url} onClick={() => void runCloudAction(onTestCloud)}>测试连接</Button><Button type="button" size="sm" variant="outline" disabled={cloudPending || !url || !masterKeyValid} onClick={() => void runCloudAction(onPullCloud)}>从云端下载</Button><Button type="button" size="sm" variant="outline" disabled={cloudPending || !url || !masterKeyValid} onClick={() => void runCloudAction(onPushCloud)}>上传到云端</Button></div>
+            <Button type="submit" size="sm" disabled={cloudPending || !masterKeyValid}>
               保存同步配置
             </Button>
           </div>

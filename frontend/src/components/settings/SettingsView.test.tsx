@@ -47,6 +47,9 @@ function settingsProps() {
     onSaveSync: vi.fn(),
     onExportConfig: vi.fn(),
     onImportConfig: vi.fn(),
+    onTestCloud: vi.fn(async () => {}),
+    onPushCloud: vi.fn(async () => {}),
+    onPullCloud: vi.fn(async () => {}),
   }
 }
 

@@ -17,6 +17,7 @@ function settingsViewProps(
     onDeleteThemeProfile: catalog.deleteProfile, onDeleteThemeDefinition: catalog.deleteDefinition,
     onResetBuiltinThemes: catalog.resetBuiltinStyles,
     onSaveSync: settings.saveSync, onExportConfig: settings.exportConfig, onImportConfig: settings.importConfig,
+    onTestCloud: settings.testCloud, onPushCloud: settings.pushCloud, onPullCloud: settings.pullCloud,
   }
 }
 
