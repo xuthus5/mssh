@@ -51,7 +51,7 @@ export default function SessionDialog({ open, onOpenChange, session, folders, on
   const [authMethod, setAuthMethod] = useState<string>(session?.authMethod ?? 'password')
   const [password, setPassword] = useState(session?.password ?? '')
   const [keyId, setKeyId] = useState<string>(session?.keyId ?? '')
-  const [keepAlive, setKeepAlive] = useState(session?.keepAlive?.toString() ?? '60')
+  const [keepAlive, setKeepAlive] = useState(session?.keepAlive?.toString() ?? '0')
   const [termType, setTermType] = useState(session?.termType ?? 'xterm-256color')
   const defaultFolderID = folders?.find((folder) => folder.isDefault)?.id ?? ''
   const folderOptions = (folders ?? []).map((folder) => ({
@@ -87,7 +87,7 @@ export default function SessionDialog({ open, onOpenChange, session, folders, on
         username: username.trim(), authMethod: authMethod as Session["authMethod"],
         tags: tags.trim(), notes: notes.trim(), environment: environment.trim(), project: project.trim(),
         password: needsPassword ? password : undefined, keyId: authMethod === 'key' ? keyId : undefined,
-        keepAlive: parseInt(keepAlive, 10) || 60, termType: termType.trim() || 'xterm-256color', folderId: folderId || null,
+        keepAlive: Math.max(0, Number.parseInt(keepAlive, 10) || 0), termType: termType.trim() || 'xterm-256color', folderId: folderId || null,
       })
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : String(err))
@@ -172,7 +172,7 @@ export default function SessionDialog({ open, onOpenChange, session, folders, on
 
           <div className="grid grid-cols-2 gap-3">
             <label className="flex flex-col gap-1.5">
-              <span className="text-xs font-medium text-muted-foreground">保活间隔 (秒)</span>
+              <span className="text-xs font-medium text-muted-foreground">保活间隔 (秒，0 使用全局默认)</span>
               <Input type="number" value={keepAlive} onChange={(e) => setKeepAlive(e.target.value)} min={0} />
             </label>
             <label className="flex flex-col gap-1.5">
