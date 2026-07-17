@@ -77,7 +77,7 @@ function LeafView(props: TreeViewProps & { node: Extract<SplitNode, { kind: 'lea
   const terminalID = props.node.terminalID
   const selected = props.activePaneID ? props.activePaneID === terminalID : props.primaryID === terminalID
   const request = props.focusRequest.targetTerminalID === terminalID ? props.focusRequest : noFocusRequest
-  return <div className={`group relative min-h-0 min-w-0 overflow-hidden ${selected ? 'ring-1 ring-inset ring-primary/35' : ''}`}>
+  return <div className={`group relative h-full w-full min-h-0 min-w-0 flex-1 overflow-hidden ${selected ? 'ring-1 ring-inset ring-primary/35' : ''}`}>
     <TerminalEmulator key={terminalID} terminalID={terminalID} active={props.active && selected} focusRequest={request} />
     {props.paneCount > 1 ? <button type="button" title="关闭当前窗格" aria-label="关闭当前窗格"
       disabled={props.closingID !== null} onClick={() => props.onClose(terminalID)}
@@ -224,7 +224,7 @@ export const TerminalSplit = forwardRef<TerminalSplitHandle, Props>(function Ter
     }
   }
 
-  return <div className="flex h-full min-h-0 min-w-0">
+  return <div className="flex h-full w-full min-h-0 min-w-0 flex-1">
     <TreeView node={tree} primaryID={primaryID} active={active} activePaneID={activePaneID} focusRequest={focusRequest}
       paneCount={paneCount} closingID={closingID} onClose={(id) => { void closePane(id) }}
       onReconnect={(id) => { void reconnectPane(id) }} onRatio={(id, ratio) => setTree((current) => updateSplitRatio(current, id, ratio))} />
