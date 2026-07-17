@@ -7,7 +7,6 @@ import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from '@/compone
 import { logger } from '@/lib/logger'
 import { LogService } from '@/lib/wails'
 import { useAppStore } from '@/store/appStore'
-import { SystemPanel } from '@/components/terminal/SystemPanel'
 
 interface TerminalToolbarProps {
   terminalID: string
@@ -20,6 +19,7 @@ interface TerminalToolbarProps {
   onToggleSplit: () => void
   split: boolean
   onOpenHistory?: () => void
+  onOpenSystem?: () => void
 }
 
 interface ToolbarTerminal {
@@ -177,7 +177,6 @@ export function TerminalToolbar(props: TerminalToolbarProps) {
   const [showSessionLog, setShowSessionLog] = useState(false)
   const [sessionLogBlocked, setSessionLogBlocked] = useState(false)
   const [tunnelOpen, setTunnelOpen] = useState(false)
-  const [systemOpen, setSystemOpen] = useState(false)
   const tunnels = useTunnelManager(props.sessionId)
   const terminal = useTerminalAccess(props.terminalID)
   const clipboard = useClipboardActions(terminal.getTerminal, terminal.restoreFocus)
@@ -187,10 +186,9 @@ export function TerminalToolbar(props: TerminalToolbarProps) {
   }, [sessionLogBlocked])
   return <div className="relative flex h-8 flex-shrink-0 items-center gap-1 bg-muted/30 px-2">
     <span className="text-xs text-muted-foreground truncate mr-2">{props.hostname ?? 'Terminal'}</span>
-    <ToolbarActions {...props} onOpenSystem={() => setSystemOpen(true)} onOpenHistory={props.onOpenHistory ?? (() => {})} onOpenTunnels={() => { setTunnelOpen(true); void tunnels.load() }} clipboard={clipboard} logOpen={showSessionLog} setLogOpen={setShowSessionLog}
+    <ToolbarActions {...props} onOpenSystem={props.onOpenSystem ?? (() => {})} onOpenHistory={props.onOpenHistory ?? (() => {})} onOpenTunnels={() => { setTunnelOpen(true); void tunnels.load() }} clipboard={clipboard} logOpen={showSessionLog} setLogOpen={setShowSessionLog}
       setLogBlocked={setSessionLogBlocked} onLogOpenChange={handleSessionLogOpenChange} />
     <TunnelDialog open={tunnelOpen} onOpenChange={setTunnelOpen} tunnels={tunnels.tunnels}
       onStart={tunnels.start} onStop={tunnels.stop} sessionId={String(props.sessionId)} />
-    {systemOpen && <SystemPanel terminalID={props.terminalID} onClose={() => setSystemOpen(false)} />}
   </div>
 }
