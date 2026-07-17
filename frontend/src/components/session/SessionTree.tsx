@@ -141,6 +141,9 @@ export default function SessionTree({
         <span>主机：{session.host}</span>
         <span>端口：{session.port}</span>
         <span>用户：{session.username}</span>
+        <span>环境：{session.environment?.name ?? '未设置'}</span>
+        <span>项目：{session.project?.name ?? '未关联'}</span>
+        <span>标签：{(session.tags ?? []).map((tag) => tag.name).join('、') || '无'}</span>
       </TooltipContent>
     </Tooltip>
     if (navigationOnly) return <div key={session.id}>{sessionTooltip}</div>

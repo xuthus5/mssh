@@ -1,6 +1,7 @@
 import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { useSessionAssetFilterStore } from '@/store/sessionAssetFilterStore'
 
 const state = vi.hoisted(() => ({
   folders: [] as any[],
@@ -8,6 +9,7 @@ const state = vi.hoisted(() => ({
   recentSessions: [] as any[],
   loading: false,
   error: '',
+  environments: [] as any[], projects: [] as any[], tags: [] as any[],
   listFolders: vi.fn(),
   listSessions: vi.fn(),
   listRecentSessions: vi.fn(),
@@ -18,6 +20,9 @@ const state = vi.hoisted(() => ({
   moveSession: vi.fn(),
   batchConnect: vi.fn(),
   batchExecuteMacro: vi.fn(),
+  listAssetCatalogs: vi.fn(), bulkSetEnvironment: vi.fn(), bulkSetProject: vi.fn(), bulkUpdateTags: vi.fn(),
+  createEnvironment: vi.fn(), createProject: vi.fn(), createTag: vi.fn(), updateEnvironment: vi.fn(), updateProject: vi.fn(), updateTag: vi.fn(),
+  deleteEnvironment: vi.fn(), deleteProject: vi.fn(), deleteTag: vi.fn(), reorderEnvironments: vi.fn(), reorderProjects: vi.fn(),
 }))
 const toast = vi.hoisted(() => vi.fn())
 
@@ -60,6 +65,7 @@ const sessions = [
 
 describe('SessionAssetCenter behavior', () => {
   beforeEach(() => {
+	useSessionAssetFilterStore.getState().resetFilters()
     Object.assign(state, { folders: [...folders], sessions: [...sessions], recentSessions: [{ ...sessions[0], lastConnectedAt: '2026-07-12T12:00:00Z', connectionCount: 3 }], loading: false, error: '' })
     for (const value of Object.values(state)) if (typeof value === 'function' && 'mockReset' in value) value.mockReset().mockResolvedValue(undefined)
     toast.mockClear()

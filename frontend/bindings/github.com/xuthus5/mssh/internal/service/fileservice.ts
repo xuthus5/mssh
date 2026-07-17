@@ -12,7 +12,14 @@ import { Call as $Call, CancellablePromise as $CancellablePromise, Create as $Cr
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
+import * as model$0 from "../model/models.js";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
 import * as ssh$0 from "../ssh/models.js";
+
+export function CancelAll(): $CancellablePromise<void> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.FileService.CancelAll");
+}
 
 /**
  * CancelTransfer cancels an in-progress file transfer.
@@ -43,8 +50,11 @@ export function ListDir(sessionID: number, path: string): $CancellablePromise<ss
         return $$createType1($result);
     });
 }
-export function ListTransfers(): $CancellablePromise<any[]> {
-    return $Call.ByName("github.com/xuthus5/mssh/internal/service.FileService.ListTransfers");
+
+export function ListTransfers(): $CancellablePromise<model$0.TransferJob[]> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.FileService.ListTransfers").then(($result: any) => {
+        return $$createType3($result);
+    });
 }
 
 /**
@@ -71,3 +81,5 @@ export function Upload(sessionID: number, localPath: string, remotePath: string)
 // Private type creation functions
 const $$createType0 = ssh$0.FileEntry.createFrom;
 const $$createType1 = $Create.Array($$createType0);
+const $$createType2 = model$0.TransferJob.createFrom;
+const $$createType3 = $Create.Array($$createType2);

@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import SessionDialog from '@/components/session/SessionDialog'
+import type { AssetColorToken } from '@/lib/sessionModels'
 
 describe('SessionDialog', () => {
   const defaultProps = {
@@ -9,6 +10,12 @@ describe('SessionDialog', () => {
     onOpenChange: vi.fn(),
     session: undefined as undefined | null,
     onSave: vi.fn(),
+    environments: [],
+    projects: [],
+    assetTags: [],
+    onCreateEnvironment: vi.fn(async (name: string, colorToken: AssetColorToken) => ({ id: 'environment-1', name, colorToken, sortOrder: 0, sessionCount: 0 })),
+    onCreateProject: vi.fn(async (name: string, code: string) => ({ id: 'project-1', name, code, description: '', sortOrder: 0, sessionCount: 0 })),
+    onCreateTag: vi.fn(async (name: string, colorToken: AssetColorToken) => ({ id: 'tag-1', name, colorToken, sessionCount: 0 })),
   }
 
   beforeEach(() => {
@@ -91,6 +98,21 @@ describe('SessionDialog', () => {
         name: 'test', host: '10.0.0.1', username: 'root', keepAlive: 0,
       }),
     )
+  })
+
+  it('preserves asset input and displays the save error', async () => {
+    const user = userEvent.setup()
+    defaultProps.onSave.mockRejectedValueOnce(new Error('保存失败'))
+    render(<SessionDialog {...defaultProps} environments={[{ id: 'env', name: '生产', colorToken: 'red', sortOrder: 0, sessionCount: 0 }]} />)
+    const inputs = screen.getAllByRole('textbox')
+    await user.type(inputs[0], 'server')
+    await user.type(inputs[1], '127.0.0.1')
+    await user.type(inputs[2], 'root')
+    await user.type(screen.getByLabelText('备注'), '不要丢失')
+    await user.click(screen.getByRole('button', { name: '创建会话' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('保存失败')
+    expect(screen.getByLabelText('备注')).toHaveValue('不要丢失')
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
   })
 
   it('uses the global keep-alive default for new sessions', async () => {

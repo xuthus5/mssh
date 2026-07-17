@@ -15,6 +15,7 @@ import * as _AboutService from '../../../bindings/github.com/xuthus5/mssh/intern
 import * as _FontService from '../../../bindings/github.com/xuthus5/mssh/internal/service/fontservice'
 import * as _CommandHistoryService from '../../../bindings/github.com/xuthus5/mssh/internal/service/commandhistoryservice'
 import * as _AuditService from '../../../bindings/github.com/xuthus5/mssh/internal/service/auditservice'
+import * as _AssetCatalogService from '../../../bindings/github.com/xuthus5/mssh/internal/service/assetcatalogservice'
 
 export const SessionService = _SessionService
 export const TerminalService = _TerminalService
@@ -30,3 +31,4 @@ export const AboutService = _AboutService
 export const FontService = _FontService
 export const CommandHistoryService = _CommandHistoryService
 export const AuditService = _AuditService
+export const AssetCatalogService = _AssetCatalogService

@@ -8,10 +8,11 @@ import { createTerminalTab } from '@/lib/terminalTabs'
 import type { SessionInput } from '../../bindings/github.com/xuthus5/mssh/internal/model/models'
 import { reconnectSessionTab } from '@/hooks/sessionReconnect'
 import { runBatchSessions } from '@/lib/sessionBatch'
-import { mapFolder, mapSession, mapTunnel, type Folder, type Session, type Tunnel } from '@/lib/sessionModels'
+import { mapFolder, mapSession, mapTunnel, type AssetEnvironment, type AssetProject, type AssetTag, type Folder, type Session, type Tunnel } from '@/lib/sessionModels'
+import { useSessionAssetCatalog } from '@/hooks/useSessionAssetCatalog'
 
 export type { BatchSessionResult } from '@/lib/sessionBatch'
-export type { Folder, Session, Tunnel } from '@/lib/sessionModels'
+export type { AssetColorToken, AssetEnvironment, AssetProject, AssetTag, Folder, Session, Tunnel } from '@/lib/sessionModels'
 
 async function openSessionTab(session: Session): Promise<string> {
   const terminalId = await TerminalService.Open(Number(session.id), 80, 24)
@@ -27,9 +28,14 @@ export function useSession() {
   const [sessions, setSessions] = useState<Session[]>([])
   const [recentSessions, setRecentSessions] = useState<Session[]>([])
   const [tunnels, setTunnels] = useState<Tunnel[]>([])
+  const [environments, setEnvironments] = useState<AssetEnvironment[]>([])
+  const [projects, setProjects] = useState<AssetProject[]>([])
+  const [tags, setTags] = useState<AssetTag[]>([])
   const [loading, setLoading] = useState(false)
   const [sessionsLoaded, setSessionsLoaded] = useState(false)
   const [error, setError] = useState('')
+  const assetCatalog = useSessionAssetCatalog({ environments, projects, setEnvironments, setProjects, setTags, setSessions, setRecentSessions, setError })
+  const { listAssetCatalogs } = assetCatalog
 
   const listFolders = useCallback(async () => {
     setLoading(true)
@@ -122,7 +128,8 @@ export function useSession() {
         host: session.host,
         port: session.port,
         username: session.username,
-        tags: session.tags ?? '', notes: session.notes ?? '', environment: session.environment ?? '', project: session.project ?? '',
+        notes: session.notes ?? '', environment_id: session.environmentId ? Number(session.environmentId) : null,
+        project_id: session.projectId ? Number(session.projectId) : null, tag_ids: (session.tags ?? []).map((tag) => Number(tag.id)),
         auth_method: session.authMethod as SessionInput['auth_method'],
         password: session.password,
         key_id: session.keyId ? Number(session.keyId) : null,
@@ -134,6 +141,7 @@ export function useSession() {
       } satisfies SessionInput)
       if (result) {
         setSessions((prev) => [...prev, mapSession(result)])
+        await listAssetCatalogs()
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
@@ -141,7 +149,7 @@ export function useSession() {
       toast(`创建会话失败: ${msg}`, 'error')
       throw err
     }
-  }, [])
+  }, [listAssetCatalogs])
 
   const updateSession = useCallback(async (session: Session) => {
     try {
@@ -151,7 +159,8 @@ export function useSession() {
         host: session.host,
         port: session.port,
         username: session.username,
-        tags: session.tags ?? '', notes: session.notes ?? '', environment: session.environment ?? '', project: session.project ?? '',
+        notes: session.notes ?? '', environment_id: session.environmentId ? Number(session.environmentId) : null,
+        project_id: session.projectId ? Number(session.projectId) : null, tag_ids: (session.tags ?? []).map((tag) => Number(tag.id)),
         auth_method: session.authMethod as SessionInput['auth_method'],
         password: session.password,
         key_id: session.keyId ? Number(session.keyId) : null,
@@ -160,14 +169,16 @@ export function useSession() {
         folder_id: session.folderId ? Number(session.folderId) : null,
         sort_order: 0,
       } satisfies SessionInput)
-      setSessions((prev) => prev.map((s) => (s.id === session.id ? session : s)))
+      const refreshed = await SessionService.GetSession(Number(session.id))
+      if (refreshed) setSessions((prev) => prev.map((item) => (item.id === session.id ? mapSession(refreshed) : item)))
+      await listAssetCatalogs()
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       logger.error('updateSession error', err)
       toast(`更新会话失败: ${msg}`, 'error')
       throw err
     }
-  }, [])
+  }, [listAssetCatalogs])
 
   const deleteSession = useCallback(async (id: string) => {
     try {
@@ -236,12 +247,14 @@ export function useSession() {
     listFolders()
     listSessions()
     listRecentSessions()
-  }, [listFolders, listRecentSessions, listSessions])
+    listAssetCatalogs()
+  }, [listAssetCatalogs, listFolders, listRecentSessions, listSessions])
 
   return {
-    folders, sessions, recentSessions, tunnels, loading, sessionsLoaded, error,
+    folders, sessions, recentSessions, tunnels, environments, projects, tags, loading, sessionsLoaded, error,
     listFolders, createFolder, deleteFolder, updateFolder, setDefaultFolder,
     listSessions, listRecentSessions, createSession, updateSession, deleteSession, moveSession,
     connect, batchConnect, batchExecuteMacro, reconnect, disconnect, listTunnels,
+    ...assetCatalog,
   }
 }

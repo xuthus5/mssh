@@ -40,9 +40,6 @@ export function List(): $CancellablePromise<model$0.SSHKey[]> {
         return $$createType4($result);
     });
 }
-export function UsageCount(id: number): $CancellablePromise<number> {
-    return $Call.ByName("github.com/xuthus5/mssh/internal/service.KeyService.UsageCount", id);
-}
 
 export function SelectImportFile(): $CancellablePromise<model$0.SSHKeyImportFile | null> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.KeyService.SelectImportFile").then(($result: any) => {
@@ -54,6 +51,10 @@ export function Update(input: model$0.SSHKeyUpdateInput): $CancellablePromise<mo
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.KeyService.Update", input).then(($result: any) => {
         return $$createType1($result);
     });
+}
+
+export function UsageCount(id: number): $CancellablePromise<number> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.KeyService.UsageCount", id);
 }
 
 // Private type creation functions

@@ -28,6 +28,17 @@ func TestCommandHistoryCRUD(t *testing.T) {
 	require.Empty(t, items)
 }
 
+func TestCommandHistoryClosedDatabaseErrors(t *testing.T) {
+	db := setupTestDB(t)
+	require.NoError(t, db.Close())
+	_, err := AddCommandHistory(db, 1, "pwd")
+	require.Error(t, err)
+	_, err = ListCommandHistory(db, 1, "", 10)
+	require.Error(t, err)
+	require.Error(t, DeleteCommandHistory(db, 1))
+	require.Error(t, ClearCommandHistory(db, 1))
+}
+
 func testCommandSession() model.Session {
 	return model.Session{Name: "history", Host: "127.0.0.1", Port: 22, Username: "root", AuthMethod: model.AuthPassword, KeepAlive: 30, TermType: "xterm"}
 }

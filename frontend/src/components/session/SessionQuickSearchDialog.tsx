@@ -12,6 +12,8 @@ import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import type { Folder, Session } from '@/hooks/useSession'
 import { SESSION_QUICK_SEARCH_EVENT } from '@/lib/sessionQuickSearch'
+import { sessionAssetSearchText } from '@/lib/sessionAssetSearch'
+import { Badge } from '@/components/ui/badge'
 
 interface Props {
   open: boolean
@@ -26,7 +28,7 @@ function folderNames(folders: Folder[]) {
 }
 
 function sessionSearchText(session: Session, folderName: string) {
-  return [session.name, session.host, session.username, folderName].join('\n').toLocaleLowerCase()
+  return sessionAssetSearchText(session, folderName)
 }
 
 function filterSessions(sessions: Session[], folders: Folder[], query: string) {
@@ -49,7 +51,7 @@ function EmptyResults({ hasSessions }: { hasSessions: boolean }) {
     <Server className="size-8 text-muted-foreground/50" />
     <p className="text-sm font-medium">{hasSessions ? '未找到匹配会话' : '暂无会话'}</p>
     <p className="text-xs text-muted-foreground">
-      {hasSessions ? '尝试搜索会话名称、主机、用户名或分组' : '请先创建会话，再使用快速连接'}
+      {hasSessions ? '尝试搜索名称、主机、用户、分组、环境、项目或标签' : '请先创建会话，再使用快速连接'}
     </p>
   </div>
 }
@@ -75,6 +77,12 @@ function SessionResult({ session, optionId, folderName, selected, onSelect, onAc
       <span className="block truncate text-xs font-normal text-muted-foreground">
         {session.username}@{session.host}:{session.port}
       </span>
+      <span className="mt-1 flex min-w-0 items-center gap-1 overflow-hidden">
+        {session.environment && <Badge variant="outline" data-asset-color={session.environment.colorToken} className="asset-color-badge max-w-24 truncate">{session.environment.name}</Badge>}
+        {session.project && <Badge variant="secondary" className="max-w-24 truncate">{session.project.code || session.project.name}</Badge>}
+        {(session.tags ?? []).slice(0, 2).map((tag) => <Badge key={tag.id} variant="outline" data-asset-color={tag.colorToken} className="asset-color-badge max-w-20 truncate">{tag.name}</Badge>)}
+        {(session.tags?.length ?? 0) > 2 && <span className="text-[10px] text-muted-foreground">+{(session.tags?.length ?? 0) - 2}</span>}
+      </span>
     </span>
     <span className="flex max-w-36 shrink-0 items-center gap-1 truncate text-xs font-normal text-muted-foreground">
       <FolderIcon className="size-3.5" />{folderName}
@@ -99,7 +107,7 @@ function SearchHeader() {
         Ctrl F
       </span>
     </div>
-    <DialogDescription>搜索会话名称、主机、用户名或分组</DialogDescription>
+    <DialogDescription>搜索名称、主机、用户、分组、环境、项目或标签</DialogDescription>
   </DialogHeader>
 }
 

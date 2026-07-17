@@ -130,17 +130,26 @@ func GetDefaultFolderID(db *sql.DB) (int64, error) {
 }
 
 func CreateSession(db *sql.DB, s model.Session) (*model.Session, error) {
+	return CreateSessionWithTags(db, s, nil)
+}
+
+func CreateSessionWithTags(db *sql.DB, s model.Session, tagIDs []int64) (*model.Session, error) {
+	tx, err := db.Begin()
+	if err != nil {
+		return nil, fmt.Errorf("create session: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
 	if s.FolderID == nil {
-		defaultID, err := GetDefaultFolderID(db)
-		if err != nil {
-			return nil, err
+		var defaultID int64
+		if err := tx.QueryRow("SELECT id FROM session_folders WHERE is_default = 1").Scan(&defaultID); err != nil {
+			return nil, fmt.Errorf("create session: default folder: %w", err)
 		}
 		s.FolderID = &defaultID
 	}
-	result, err := db.Exec(
-		`INSERT INTO sessions (folder_id, name, host, port, username, tags, notes, environment, project, auth_method, password, key_id, keep_alive, term_type, sort_order)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		s.FolderID, s.Name, s.Host, s.Port, s.Username, s.Tags, s.Notes, s.Environment, s.Project, s.AuthMethod, s.Password, s.KeyID, s.KeepAlive, s.TermType, s.SortOrder,
+	result, err := tx.Exec(
+		`INSERT INTO sessions (folder_id, name, host, port, username, notes, environment_id, project_id, auth_method, password, key_id, keep_alive, term_type, sort_order)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		s.FolderID, s.Name, s.Host, s.Port, s.Username, s.Notes, s.EnvironmentID, s.ProjectID, s.AuthMethod, s.Password, s.KeyID, s.KeepAlive, s.TermType, s.SortOrder,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("create session: %w", err)
@@ -149,10 +158,13 @@ func CreateSession(db *sql.DB, s model.Session) (*model.Session, error) {
 	if err != nil {
 		return nil, fmt.Errorf("create session: last insert id: %w", err)
 	}
-	s.ID = id
-	s.CreatedAt = time.Now()
-	s.UpdatedAt = time.Now()
-	return &s, nil
+	if err := replaceSessionTags(tx, id, tagIDs); err != nil {
+		return nil, fmt.Errorf("create session: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("create session: %w", err)
+	}
+	return GetSession(db, id)
 }
 
 func ListSessions(db *sql.DB, folderID *int64) ([]model.Session, error) {
@@ -161,12 +173,12 @@ func ListSessions(db *sql.DB, folderID *int64) ([]model.Session, error) {
 	if folderID != nil {
 		rows, err = db.Query(
 			sessionSelectColumns+`
-			 FROM sessions WHERE folder_id = ? ORDER BY sort_order`, *folderID,
+			 FROM sessions s LEFT JOIN asset_environments e ON e.id = s.environment_id LEFT JOIN asset_projects p ON p.id = s.project_id WHERE s.folder_id = ? ORDER BY s.sort_order`, *folderID,
 		)
 	} else {
 		rows, err = db.Query(
 			sessionSelectColumns + `
-			 FROM sessions ORDER BY sort_order`,
+			 FROM sessions s LEFT JOIN asset_environments e ON e.id = s.environment_id LEFT JOIN asset_projects p ON p.id = s.project_id ORDER BY s.sort_order`,
 		)
 	}
 	if err != nil {
@@ -184,19 +196,40 @@ func ListSessions(db *sql.DB, folderID *int64) ([]model.Session, error) {
 	if sessions == nil {
 		sessions = []model.Session{}
 	}
-	return sessions, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if err := attachSessionTags(db, sessions); err != nil {
+		return nil, err
+	}
+	return sessions, nil
 }
 
 func UpdateSession(db *sql.DB, s model.Session) error {
-	_, err := db.Exec(
-		`UPDATE sessions SET folder_id=?, name=?, host=?, port=?, username=?, tags=?, notes=?, environment=?, project=?, auth_method=?, password=?, key_id=?, keep_alive=?, term_type=?, sort_order=?, updated_at=datetime('now')
+	return UpdateSessionWithTags(db, s, tagIDsFromAssets(s.Tags))
+}
+
+func UpdateSessionWithTags(db *sql.DB, s model.Session, tagIDs []int64) error {
+	tx, err := db.Begin()
+	if err != nil {
+		return fmt.Errorf("update session: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	result, err := tx.Exec(
+		`UPDATE sessions SET folder_id=?, name=?, host=?, port=?, username=?, notes=?, environment_id=?, project_id=?, auth_method=?, password=?, key_id=?, keep_alive=?, term_type=?, sort_order=?, updated_at=datetime('now')
 		 WHERE id=?`,
-		s.FolderID, s.Name, s.Host, s.Port, s.Username, s.Tags, s.Notes, s.Environment, s.Project, s.AuthMethod, s.Password, s.KeyID, s.KeepAlive, s.TermType, s.SortOrder, s.ID,
+		s.FolderID, s.Name, s.Host, s.Port, s.Username, s.Notes, s.EnvironmentID, s.ProjectID, s.AuthMethod, s.Password, s.KeyID, s.KeepAlive, s.TermType, s.SortOrder, s.ID,
 	)
 	if err != nil {
 		return fmt.Errorf("update session: %w", err)
 	}
-	return nil
+	if err := requireAffected(result, "session"); err != nil {
+		return err
+	}
+	if err := replaceSessionTags(tx, s.ID, tagIDs); err != nil {
+		return fmt.Errorf("update session: %w", err)
+	}
+	return tx.Commit()
 }
 
 func DeleteSession(db *sql.DB, id int64) error {
@@ -208,46 +241,15 @@ func DeleteSession(db *sql.DB, id int64) error {
 }
 
 func GetSession(db *sql.DB, id int64) (*model.Session, error) {
-	s, err := scanSession(db.QueryRow(sessionSelectColumns+" FROM sessions WHERE id = ?", id))
+	s, err := scanSession(db.QueryRow(sessionSelectColumns+" FROM sessions s LEFT JOIN asset_environments e ON e.id = s.environment_id LEFT JOIN asset_projects p ON p.id = s.project_id WHERE s.id = ?", id))
 	if err != nil {
 		return nil, fmt.Errorf("get session: %w", err)
 	}
-	return &s, nil
-}
-
-const sessionSelectColumns = `SELECT id, folder_id, name, host, port, username, tags, notes, environment, project, auth_method, password, key_id, keep_alive, term_type, sort_order, last_connected_at, connection_count, created_at, updated_at`
-
-type sessionScanner interface{ Scan(...any) error }
-
-func scanSession(scanner sessionScanner) (model.Session, error) {
-	var session model.Session
-	var password sql.NullString
-	var lastConnected sql.NullString
-	var createdAt, updatedAt string
-	err := scanner.Scan(&session.ID, &session.FolderID, &session.Name, &session.Host, &session.Port, &session.Username, &session.Tags, &session.Notes, &session.Environment, &session.Project, &session.AuthMethod, &password, &session.KeyID, &session.KeepAlive, &session.TermType, &session.SortOrder, &lastConnected, &session.ConnectionCount, &createdAt, &updatedAt)
-	if err != nil {
-		return session, err
+	items := []model.Session{s}
+	if err := attachSessionTags(db, items); err != nil {
+		return nil, err
 	}
-	if lastConnected.Valid {
-		parsed, parseErr := time.Parse("2006-01-02 15:04:05", lastConnected.String)
-		if parseErr != nil {
-			return session, fmt.Errorf("parse last_connected_at: %w", parseErr)
-		}
-		session.LastConnectedAt = &parsed
-	}
-	if password.Valid {
-		session.Password = password.String
-	}
-	var parseErr error
-	session.CreatedAt, parseErr = time.Parse("2006-01-02 15:04:05", createdAt)
-	if parseErr != nil {
-		return session, fmt.Errorf("parse created_at: %w", parseErr)
-	}
-	session.UpdatedAt, parseErr = time.Parse("2006-01-02 15:04:05", updatedAt)
-	if parseErr != nil {
-		return session, fmt.Errorf("parse updated_at: %w", parseErr)
-	}
-	return session, nil
+	return &items[0], nil
 }
 
 func MarkSessionConnected(db *sql.DB, id int64) error {
@@ -256,26 +258,6 @@ func MarkSessionConnected(db *sql.DB, id int64) error {
 		return fmt.Errorf("mark session connected: %w", err)
 	}
 	return requireAffected(result, "session")
-}
-
-func ListRecentSessions(db *sql.DB, limit int) ([]model.Session, error) {
-	if limit < 1 || limit > 10 {
-		limit = 10
-	}
-	rows, err := db.Query(sessionSelectColumns+" FROM sessions WHERE last_connected_at IS NOT NULL ORDER BY last_connected_at DESC, id DESC LIMIT ?", limit)
-	if err != nil {
-		return nil, fmt.Errorf("list recent sessions: %w", err)
-	}
-	defer func() { _ = rows.Close() }()
-	sessions := make([]model.Session, 0, limit)
-	for rows.Next() {
-		session, scanErr := scanSession(rows)
-		if scanErr != nil {
-			return nil, fmt.Errorf("scan recent session: %w", scanErr)
-		}
-		sessions = append(sessions, session)
-	}
-	return sessions, rows.Err()
 }
 
 func MoveFolder(db *sql.DB, id int64, newParentID *int64) error {

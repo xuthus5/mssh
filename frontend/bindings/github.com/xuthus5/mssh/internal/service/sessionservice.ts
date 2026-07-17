@@ -16,6 +16,10 @@ export function CancelConnect(attemptID: string): $CancellablePromise<void> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.SessionService.CancelConnect", attemptID);
 }
 
+export function CloseAll(): $CancellablePromise<void> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.SessionService.CloseAll");
+}
+
 export function ConnectionCount(): $CancellablePromise<number> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.SessionService.ConnectionCount");
 }
@@ -40,11 +44,12 @@ export function DeleteFolder(id: number): $CancellablePromise<void> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.SessionService.DeleteFolder", id);
 }
 
-export function DeleteSession(id: number): $CancellablePromise<void> {
-    return $Call.ByName("github.com/xuthus5/mssh/internal/service.SessionService.DeleteSession", id);
-}
 export function DeleteHostKey(line: number): $CancellablePromise<void> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.SessionService.DeleteHostKey", line);
+}
+
+export function DeleteSession(id: number): $CancellablePromise<void> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.SessionService.DeleteSession", id);
 }
 
 export function GetClientWrapper(connID: string): $CancellablePromise<ssh$0.ClientWrapper | null> {
@@ -64,19 +69,22 @@ export function ListFolders(): $CancellablePromise<model$0.SessionFolder[]> {
         return $$createType6($result);
     });
 }
-export function ListHostKeys(): $CancellablePromise<any[]> {
-    return $Call.ByName("github.com/xuthus5/mssh/internal/service.SessionService.ListHostKeys");
+
+export function ListHostKeys(): $CancellablePromise<model$0.HostKeyEntry[]> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.SessionService.ListHostKeys").then(($result: any) => {
+        return $$createType8($result);
+    });
 }
 
 export function ListRecentSessions(limit: number): $CancellablePromise<model$0.Session[]> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.SessionService.ListRecentSessions", limit).then(($result: any) => {
-        return $$createType7($result);
+        return $$createType9($result);
     });
 }
 
 export function ListSessions(folderID: number | null): $CancellablePromise<model$0.Session[]> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.SessionService.ListSessions", folderID).then(($result: any) => {
-        return $$createType7($result);
+        return $$createType9($result);
     });
 }
 
@@ -88,11 +96,14 @@ export function MoveSession(id: number, newFolderID: number | null): $Cancellabl
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.SessionService.MoveSession", id, newFolderID);
 }
 
+export function SessionDeleteImpact(id: number): $CancellablePromise<model$0.SessionDeleteImpact | null> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.SessionService.SessionDeleteImpact", id).then(($result: any) => {
+        return $$createType11($result);
+    });
+}
+
 export function SetDefaultFolder(id: number): $CancellablePromise<void> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.SessionService.SetDefaultFolder", id);
-}
-export function SessionDeleteImpact(id: number): $CancellablePromise<any> {
-    return $Call.ByName("github.com/xuthus5/mssh/internal/service.SessionService.SessionDeleteImpact", id);
 }
 
 export function UpdateFolder(id: number, name: string): $CancellablePromise<void> {
@@ -111,4 +122,8 @@ const $$createType3 = $Create.Nullable($$createType2);
 const $$createType4 = ssh$0.ClientWrapper.createFrom;
 const $$createType5 = $Create.Nullable($$createType4);
 const $$createType6 = $Create.Array($$createType0);
-const $$createType7 = $Create.Array($$createType2);
+const $$createType7 = model$0.HostKeyEntry.createFrom;
+const $$createType8 = $Create.Array($$createType7);
+const $$createType9 = $Create.Array($$createType2);
+const $$createType10 = model$0.SessionDeleteImpact.createFrom;
+const $$createType11 = $Create.Nullable($$createType10);
