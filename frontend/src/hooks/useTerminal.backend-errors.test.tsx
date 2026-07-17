@@ -43,7 +43,7 @@ vi.mock('@xterm/xterm', () => ({
     dispose() { this.addons.forEach((addon) => addon.dispose()); this.terminalDispose() }
   },
 }))
-vi.mock('@xterm/addon-fit', () => ({ FitAddon: class { fit() {}; dispose() {} } }))
+vi.mock('@xterm/addon-fit', () => ({ FitAddon: class { proposeDimensions() { return { cols: 80, rows: 24 } }; fit() {}; dispose() {} } }))
 vi.mock('@xterm/addon-unicode11', () => ({ Unicode11Addon: class { dispose() {} } }))
 vi.mock('@xterm/addon-search', () => ({ SearchAddon: class { dispose() {} } }))
 vi.mock('@wailsio/runtime', () => ({ Events: { On: vi.fn(() => vi.fn()) } }))

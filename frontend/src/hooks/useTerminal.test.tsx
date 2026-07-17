@@ -17,6 +17,7 @@ const cancelledAnimationFrames: number[] = []
 const outputHandlers: Array<(event: { data?: { terminal_id?: string; data?: string } }) => void> = []
 const resizeHandlers: ResizeObserverCallback[] = []
 let runtimeFailure: 'fit' | 'refresh' | 'focus' | 'write' | null = null
+let proposedDimensions: Array<{ cols: number; rows: number } | undefined> = []
 
 vi.mock('@xterm/xterm', () => ({
   Terminal: class {
@@ -64,6 +65,10 @@ vi.mock('@xterm/addon-fit', () => ({
     name = 'fit'
     private addonDispose = vi.fn()
     constructor() { addonDisposes.push(this.addonDispose) }
+    proposeDimensions() {
+      if (proposedDimensions.length > 0) return proposedDimensions.shift()
+      return { cols: 80, rows: 24 }
+    }
     fit() {
       calls.push('fit')
       if (runtimeFailure === 'fit') throw new Error('fit failed')
@@ -127,6 +132,8 @@ describe('useTerminal', () => {
     outputHandlers.length = 0
     resizeHandlers.length = 0
     runtimeFailure = null
+    proposedDimensions = []
+    Object.defineProperty(document, 'fonts', { configurable: true, value: undefined })
     useTerminalBehaviorStore.setState({ rightClickAction: 'menu', copyOnSelect: false })
     vi.stubGlobal('ResizeObserver', class {
       observe() {}
@@ -257,6 +264,55 @@ describe('useTerminal', () => {
 
     act(() => resizeHandlers[0]([], {} as ResizeObserver))
     expect(calls.filter((call) => call === 'focus')).toHaveLength(1)
+  })
+
+  it('retries activation until terminal character dimensions are ready', () => {
+    proposedDimensions = [undefined, { cols: 100, rows: 30 }]
+    const containerRef = createRef<HTMLDivElement>()
+    const container = document.createElement('div')
+    Object.defineProperty(container, 'clientWidth', { value: 800 })
+    Object.defineProperty(container, 'clientHeight', { value: 500 })
+    containerRef.current = container
+    const hook = renderHook(({ active, sequence }) => useTerminal('term-font-ready', containerRef, { active, focusRequest: { sequence } }), { initialProps: { active: false, sequence: 0 } })
+
+    calls.length = 0
+    hook.rerender({ active: true, sequence: 1 })
+    act(flushAnimationFrame)
+    expect(calls).toEqual([])
+    expect(animationFrames).toHaveLength(1)
+
+    act(flushAnimationFrame)
+    expect(calls).toEqual(['fit', 'refresh', 'focus'])
+    expect(TerminalService.Resize).toHaveBeenCalledWith('term-font-ready', 80, 24)
+    act(() => hook.unmount())
+  })
+
+  it('refits after document fonts finish loading', async () => {
+    proposedDimensions = [undefined, undefined, undefined, undefined, { cols: 100, rows: 30 }]
+    let resolveFonts: (fonts: FontFaceSet) => void = () => {}
+    const fontsReady = new Promise<FontFaceSet>((resolve) => { resolveFonts = resolve })
+    Object.defineProperty(document, 'fonts', { configurable: true, value: { ready: fontsReady } })
+    const containerRef = createRef<HTMLDivElement>()
+    const container = document.createElement('div')
+    Object.defineProperty(container, 'clientWidth', { value: 800 })
+    Object.defineProperty(container, 'clientHeight', { value: 500 })
+    containerRef.current = container
+    const hook = renderHook(({ active, sequence }) => useTerminal('term-font-loaded', containerRef, { active, focusRequest: { sequence } }), { initialProps: { active: false, sequence: 0 } })
+
+    hook.rerender({ active: true, sequence: 1 })
+    act(() => {
+      flushAnimationFrame()
+      flushAnimationFrame()
+      flushAnimationFrame()
+      flushAnimationFrame()
+    })
+    expect(animationFrames).toHaveLength(0)
+
+    await act(async () => { resolveFonts({} as FontFaceSet); await fontsReady })
+    expect(animationFrames).toHaveLength(1)
+    act(flushAnimationFrame)
+    expect(calls.slice(-3)).toEqual(['fit', 'refresh', 'focus'])
+    act(() => hook.unmount())
   })
 
   it('disposes every effect resource once under StrictMode cleanup', () => {
