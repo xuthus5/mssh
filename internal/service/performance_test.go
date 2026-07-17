@@ -61,5 +61,5 @@ func BenchmarkCommercialMonitorParsing(b *testing.B) {
 }
 
 func sampleSystemInfoValues() []string {
-	return []string{"LOAD", "0.1", "0.2", "0.3", "UPTIME", "3600", "KERNEL", "6.12", "OS", "Linux", "CPU", "1000", "200", "MEMTOTAL", "8589934592", "MEMAVAILABLE", "4294967296", "SWAPTOTAL", "2147483648", "SWAPFREE", "1073741824", "NET", "100000", "50000", "DISK", "1000000", "2000000", "4"}
+	return []string{"LOAD", "0.1", "0.2", "0.3", "UPTIME", "3600", "KERNEL", "6.12", "OS", "Linux", "CPU", "1000", "200", "MEMTOTAL", "8589934592", "MEMAVAILABLE", "4294967296", "SWAPTOTAL", "2147483648", "SWAPFREE", "1073741824", "NET", "100000", "50000", "DISK", "1000000", "2000000", "CPUCOUNT", "4"}
 }
