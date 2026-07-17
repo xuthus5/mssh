@@ -221,9 +221,10 @@ type sessionScanner interface{ Scan(...any) error }
 
 func scanSession(scanner sessionScanner) (model.Session, error) {
 	var session model.Session
+	var password sql.NullString
 	var lastConnected sql.NullString
 	var createdAt, updatedAt string
-	err := scanner.Scan(&session.ID, &session.FolderID, &session.Name, &session.Host, &session.Port, &session.Username, &session.Tags, &session.Notes, &session.Environment, &session.Project, &session.AuthMethod, &session.Password, &session.KeyID, &session.KeepAlive, &session.TermType, &session.SortOrder, &lastConnected, &session.ConnectionCount, &createdAt, &updatedAt)
+	err := scanner.Scan(&session.ID, &session.FolderID, &session.Name, &session.Host, &session.Port, &session.Username, &session.Tags, &session.Notes, &session.Environment, &session.Project, &session.AuthMethod, &password, &session.KeyID, &session.KeepAlive, &session.TermType, &session.SortOrder, &lastConnected, &session.ConnectionCount, &createdAt, &updatedAt)
 	if err != nil {
 		return session, err
 	}
@@ -233,6 +234,9 @@ func scanSession(scanner sessionScanner) (model.Session, error) {
 			return session, fmt.Errorf("parse last_connected_at: %w", parseErr)
 		}
 		session.LastConnectedAt = &parsed
+	}
+	if password.Valid {
+		session.Password = password.String
 	}
 	var parseErr error
 	session.CreatedAt, parseErr = time.Parse("2006-01-02 15:04:05", createdAt)
