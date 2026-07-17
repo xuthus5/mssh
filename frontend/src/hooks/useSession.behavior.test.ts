@@ -219,7 +219,7 @@ describe('useSession behavior', () => {
     expect(useAppStore.getState().tabs).toEqual([
       expect.objectContaining({ terminalId: 'term-old' }),
     ])
-    expect(useAppStore.getState().connectionStatus['term-old']).toBe('disconnected')
+    expect(useAppStore.getState().connectionStatus['term-old']).toBe('error')
     expect(useConnectDialog.getState()).toMatchObject({ state: 'failed', error: 'network unavailable' })
   })
 })
