@@ -1,26 +1,22 @@
-import { useCallback } from 'react'
-import { RefreshCw, WifiOff } from 'lucide-react'
-import { TerminalEmulator } from '@/components/terminal/TerminalEmulator'
-import { TerminalSplit } from '@/components/terminal/TerminalSplit'
+import { useCallback, useRef, useState } from 'react'
+import { TerminalSplit, type TerminalSplitHandle } from '@/components/terminal/TerminalSplit'
 import { TerminalToolbar } from '@/components/terminal/TerminalToolbar'
 import { useAppStore, type TerminalTab as TerminalTabState } from '@/store/appStore'
 import { LogService } from '@/lib/wails'
 import { logger } from '@/lib/logger'
 import { toast } from '@/components/ui/toast'
 import type { TerminalFocusRequest } from '@/hooks/useTerminal'
-import { Button } from '@/components/ui/button'
 import { CommandHistoryPanel } from '@/components/terminal/CommandHistoryPanel'
 import { SystemPanel } from '@/components/terminal/SystemPanel'
-
-const noFocusRequest: TerminalFocusRequest = { sequence: 0, targetTerminalID: null }
 
 interface Props {
   terminalID: string
   sessionId: number
-  onOpenFiles: () => void
+  onOpenFiles: (terminalID: string) => void
   active: boolean
   focusRequest: TerminalFocusRequest
-  onReconnect?: () => void
+  onPaneClosed?: (terminalID: string) => void
+  onPaneReplaced?: (previousID: string, nextID: string) => void
 }
 
 function useRecordingControl(terminalID: string, sessionId: number) {
@@ -54,78 +50,42 @@ function useRecordingControl(terminalID: string, sessionId: number) {
   return { isRecording, toggle }
 }
 
-function TerminalViewport({ split, sessionId, terminalID, active, focusRequest, direction, onDirectionChange }: {
-  split: boolean
-  sessionId?: number
-  terminalID: string
-  active: boolean
-  focusRequest: TerminalFocusRequest
-  direction: 'horizontal' | 'vertical'
-  onDirectionChange: (direction: 'horizontal' | 'vertical') => void
-}) {
-  if (split && sessionId) {
-    return <TerminalSplit primaryID={terminalID} sessionId={sessionId} active={active} focusRequest={focusRequest} direction={direction} onDirectionChange={onDirectionChange} />
-  }
-  const primaryFocusRequest = focusRequest.targetTerminalID === terminalID ? focusRequest : noFocusRequest
-  return <TerminalEmulator terminalID={terminalID} active={active} focusRequest={primaryFocusRequest} />
-}
-
-function ConnectionOverlay({ status, onReconnect }: {
-  status: import('@/store/appStore').ConnectionStatus | undefined
-  onReconnect?: () => void
-}) {
-  if (status === 'connected' || status === undefined) return null
-  const connecting = status === 'connecting' || status === 'reconnecting'
-  return <div className="absolute inset-0 z-10 grid place-items-center bg-background/70 p-6 backdrop-blur-[1px]">
-    <div className="flex max-w-sm flex-col items-center rounded-xl border border-border bg-card/95 p-5 text-center shadow-lg">
-      {connecting
-        ? <RefreshCw aria-hidden="true" className="mb-3 size-8 animate-spin text-primary" />
-        : <WifiOff aria-hidden="true" className="mb-3 size-8 text-destructive" />}
-      <h3 className="text-sm font-semibold text-foreground">{connecting ? '正在重新连接' : '连接已断开'}</h3>
-      <p className="mt-1 text-xs leading-5 text-muted-foreground">
-        {connecting ? '正在为当前标签创建新的 SSH 通道。' : '远端会话可能因空闲超时或网络中断而结束，可在当前标签中重新连接。'}
-      </p>
-      <Button type="button" size="sm" className="mt-4" onClick={onReconnect}>
-        <RefreshCw aria-hidden="true" />
-        {connecting ? '取消重连' : '重新连接'}
-      </Button>
-    </div>
-  </div>
-}
-
-export function TerminalTab({ terminalID, sessionId, onOpenFiles, active, focusRequest, onReconnect }: Props) {
+export function TerminalTab({ terminalID, sessionId, onOpenFiles, active, focusRequest, onPaneClosed, onPaneReplaced }: Props) {
   const tabs = useAppStore((state) => state.tabs)
+  const activePaneID = useAppStore((state) => state.activePaneId)
   const updateTerminalWorkspace = useAppStore((state) => state.updateTerminalWorkspace)
   const currentTab = tabs.find((tab): tab is TerminalTabState => tab.type === 'terminal' && tab.terminalId === terminalID)
-  const split = currentTab?.split ?? false
-  const splitDirection = currentTab?.splitDirection ?? 'horizontal'
   const toolPanel = currentTab?.toolPanel ?? null
+  const splitRef = useRef<TerminalSplitHandle>(null)
+  const [splitState, setSplitState] = useState({ paneCount: 1, busy: false })
+  const activeTerminalID = activePaneID ?? terminalID
   const updateWorkspace = (updates: Parameters<typeof updateTerminalWorkspace>[1]) => {
     if (currentTab) updateTerminalWorkspace(currentTab.id, updates)
   }
-  const recording = useRecordingControl(terminalID, sessionId)
-  const connectionStatus = useAppStore((state) => state.connectionStatus[terminalID])
+  const recording = useRecordingControl(activeTerminalID, sessionId)
 
   return (
     <div className="flex flex-col h-full">
       <TerminalToolbar
-        terminalID={terminalID}
+        terminalID={activeTerminalID}
         sessionId={sessionId}
         isRecording={recording.isRecording}
         recordingLogId={null}
         onToggleRecording={recording.toggle}
         hostname={currentTab?.title}
-        onOpenFiles={onOpenFiles}
-        onToggleSplit={() => updateWorkspace({ split: !split })}
-        split={split}
+        onOpenFiles={() => onOpenFiles(activeTerminalID)}
+        onSplit={(direction) => splitRef.current?.split(direction)}
+        splitDisabled={splitState.busy || splitState.paneCount >= 8}
+        paneCount={splitState.paneCount}
         onOpenHistory={() => updateWorkspace({ toolPanel: toolPanel === 'history' ? null : 'history' })}
         onOpenSystem={() => updateWorkspace({ toolPanel: toolPanel === 'system' ? null : 'system' })}
       />
       <div className="relative min-h-0 flex-1">
-        <TerminalViewport split={split} sessionId={sessionId} terminalID={terminalID} active={active} focusRequest={focusRequest} direction={splitDirection} onDirectionChange={(direction) => updateWorkspace({ splitDirection: direction })} />
-        <ConnectionOverlay status={connectionStatus} onReconnect={onReconnect} />
-        {toolPanel === 'history' && <CommandHistoryPanel sessionID={sessionId} onClose={() => updateWorkspace({ toolPanel: null })} onFill={(command) => { const terminal = useAppStore.getState().terminalPool.get(terminalID)?.terminal; terminal?.paste(command); terminal?.focus() }} />}
-        {toolPanel === 'system' && <SystemPanel terminalID={terminalID} onClose={() => updateWorkspace({ toolPanel: null })} />}
+        {currentTab ? <TerminalSplit ref={splitRef} tabID={currentTab.id} primaryID={terminalID} sessionId={sessionId}
+          active={active} focusRequest={focusRequest} onStateChange={setSplitState}
+          onPaneClosed={onPaneClosed} onPaneReplaced={onPaneReplaced} /> : null}
+        {toolPanel === 'history' && <CommandHistoryPanel sessionID={sessionId} onClose={() => updateWorkspace({ toolPanel: null })} onFill={(command) => { const terminal = useAppStore.getState().terminalPool.get(activeTerminalID)?.terminal; terminal?.paste(command); terminal?.focus() }} />}
+        {toolPanel === 'system' && <SystemPanel terminalID={activeTerminalID} onClose={() => updateWorkspace({ toolPanel: null })} />}
       </div>
     </div>
   )
