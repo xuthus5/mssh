@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { __clearHandlers, __emitEvent } from '@/test/__mocks__/wails-runtime'
-import { startEventBridge } from '@/store/eventBridge'
+import { __clearHandlers, __emitEvent, __registerHandler } from '@/test/__mocks__/wails-runtime'
+import { restoreTransfers, startEventBridge } from '@/store/eventBridge'
 import { useAppStore } from '@/store/appStore'
 import { useConnectDialog } from '@/store/connectDialog'
 
@@ -86,5 +86,14 @@ describe('eventBridge', () => {
     __emitEvent('file:error', { data: { task_id: 'task-2' } })
     expect(useAppStore.getState().transfers[0]).toMatchObject({ status: 'failed', error: '文件传输失败' })
     stop()
+  })
+})
+
+describe('restoreTransfers', () => {
+  it('restores persisted backend transfer history', async () => {
+    __clearHandlers()
+    __registerHandler('github.com/xuthus5/mssh/internal/service.FileService.ListTransfers', async () => [{ id: 'saved', session_id: 3, session_name: 'server', direction: 'upload', source_path: '/tmp/a.txt', target_path: '/a.txt', total_bytes: 10, transferred_bytes: 10, speed: 2, eta: 0, status: 'completed', error: '', started_at: '2026-07-17T00:00:00Z', completed_at: '2026-07-17T00:00:05Z' }])
+    await restoreTransfers()
+    expect(useAppStore.getState().transfers).toEqual([expect.objectContaining({ id: 'saved', fileName: 'a.txt', status: 'completed', sessionId: 3 })])
   })
 })
