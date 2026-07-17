@@ -17,6 +17,15 @@ export function unregisterTerminalSearch(terminalID: string) {
   notify()
 }
 
+export function replaceTerminalSearch(previousID: string, nextID: string) {
+  if (previousID === nextID) return
+  const addon = searchAddons.get(previousID)
+  if (!addon) return
+  searchAddons.delete(previousID)
+  searchAddons.set(nextID, addon)
+  notify()
+}
+
 export function getTerminalSearch(terminalID: string) {
   return searchAddons.get(terminalID) ?? null
 }
