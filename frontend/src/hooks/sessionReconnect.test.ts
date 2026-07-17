@@ -100,4 +100,29 @@ describe('reconnectSessionTab', () => {
 
     expect(loggerError).toHaveBeenCalledWith('reconnect stale terminal cleanup failed', error)
   })
+
+  it('retries with backoff and exposes the final error', async () => {
+    vi.useFakeTimers()
+    const open = vi.fn(async () => { throw new Error('network failed') })
+    __registerHandler(service + 'Open', open)
+
+    const reconnecting = reconnectSessionTab('tab-1', sessions)
+    await vi.runAllTimersAsync()
+    await reconnecting
+
+    expect(open).toHaveBeenCalledTimes(3)
+    expect(useAppStore.getState().connectionStatus['term-old']).toBe('error')
+    expect(useConnectDialog.getState().error).toContain('network failed')
+    vi.useRealTimers()
+  })
+
+  it('cancels an in-flight reconnect from a second request', async () => {
+    const open = deferred<string>()
+    __registerHandler(service + 'Open', async () => open.promise)
+    const first = reconnectSessionTab('tab-1', sessions)
+    await reconnectSessionTab('tab-1', sessions)
+    open.reject(new Error('cancelled'))
+    await first
+    expect(useAppStore.getState().connectionStatus['term-old']).toBe('disconnected')
+  })
 })
