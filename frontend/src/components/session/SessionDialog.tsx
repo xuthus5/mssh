@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, type ReactNode } from 'react'
 import { CircleHelp } from 'lucide-react'
 import {
   Dialog,
@@ -40,6 +40,15 @@ const TERM_TYPES = [
   'linux',
   'ansi',
 ]
+
+function FormSection({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <fieldset className="rounded-xl border border-border bg-card px-3 pb-3 pt-2 shadow-sm">
+      <legend className="px-1 text-xs font-semibold text-foreground">{title}</legend>
+      <div className="flex flex-col gap-3">{children}</div>
+    </fieldset>
+  )
+}
 
 export default function SessionDialog({ open, onOpenChange, session, folders, onSave }: Props) {
   const [name, setName] = useState(session?.name ?? '')
@@ -102,7 +111,7 @@ export default function SessionDialog({ open, onOpenChange, session, folders, on
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="max-h-[calc(100vh-2rem)] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{isEditing ? '编辑会话' : '新建会话'}</DialogTitle>
         </DialogHeader>
@@ -112,84 +121,98 @@ export default function SessionDialog({ open, onOpenChange, session, folders, on
           className="flex flex-col gap-3"
         >
           {submitError && <div role="alert" className="rounded-lg border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">{submitError}</div>}
-          <label className="flex flex-col gap-1.5">
-            <span className="text-xs font-medium text-muted-foreground">名称</span>
-            <Input value={name} onChange={(e) => setName(e.target.value)} required autoFocus />
-          </label>
-
-          <div className="grid grid-cols-2 gap-3">
+          <FormSection title="连接与认证">
             <label className="flex flex-col gap-1.5">
-              <span className="text-xs font-medium text-muted-foreground">主机</span>
-              <Input value={host} onChange={(e) => setHost(e.target.value)} required placeholder="192.168.1.1" />
+              <span className="text-xs font-medium text-muted-foreground">名称</span>
+              <Input value={name} onChange={(e) => setName(e.target.value)} required autoFocus />
             </label>
-            <label className="flex flex-col gap-1.5">
-              <span className="text-xs font-medium text-muted-foreground">端口</span>
-              <Input type="number" value={port} onChange={(e) => setPort(e.target.value)} required min={1} max={65535} />
-            </label>
-          </div>
+            <div className="grid grid-cols-[minmax(0,1fr)_6rem] gap-3">
+              <label className="flex flex-col gap-1.5">
+                <span className="text-xs font-medium text-muted-foreground">主机</span>
+                <Input value={host} onChange={(e) => setHost(e.target.value)} required placeholder="192.168.1.1" />
+              </label>
+              <label className="flex flex-col gap-1.5">
+                <span className="text-xs font-medium text-muted-foreground">端口</span>
+                <Input type="number" value={port} onChange={(e) => setPort(e.target.value)} required min={1} max={65535} />
+              </label>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <label className="flex flex-col gap-1.5">
+                <span className="text-xs font-medium text-muted-foreground">用户名</span>
+                <Input value={username} onChange={(e) => setUsername(e.target.value)} required placeholder="root" />
+              </label>
+              <label className="flex flex-col gap-1.5">
+                <span className="text-xs font-medium text-muted-foreground">认证方式</span>
+                <LabeledSelect value={authMethod} options={AUTH_OPTIONS} onValueChange={setAuthMethod} />
+              </label>
+            </div>
+            {(authMethod === 'password' || authMethod === 'keyboard-interactive') && (
+              <label className="flex flex-col gap-1.5">
+                <span className="text-xs font-medium text-muted-foreground">密码</span>
+                <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="输入SSH密码" />
+              </label>
+            )}
+            {authMethod === 'key' && (
+              <label className="flex flex-col gap-1.5">
+                <span className="text-xs font-medium text-muted-foreground">SSH 密钥</span>
+                {keys.length === 0 ? (
+                  <div className="rounded-lg border border-dashed px-3 py-2 text-xs text-muted-foreground">
+                    暂无可用密钥，请先在总览 → 密钥配置中导入
+                  </div>
+                ) : (
+                  <LabeledSelect value={keyId} options={keyOptions} onValueChange={setKeyId} placeholder="选择密钥..." />
+                )}
+              </label>
+            )}
+          </FormSection>
 
-          <label className="flex flex-col gap-1.5">
-            <span className="text-xs font-medium text-muted-foreground">用户名</span>
-            <Input value={username} onChange={(e) => setUsername(e.target.value)} required placeholder="root" />
-          </label>
-
-          <div className="grid grid-cols-2 gap-3">
-            <label className="flex flex-col gap-1.5"><span className="text-xs font-medium text-muted-foreground">环境</span><Input value={environment} onChange={(event) => setEnvironment(event.target.value)} placeholder="生产 / 测试" /></label>
-            <label className="flex flex-col gap-1.5"><span className="text-xs font-medium text-muted-foreground">项目</span><Input value={project} onChange={(event) => setProject(event.target.value)} placeholder="项目名称" /></label>
-          </div>
-          <label className="flex flex-col gap-1.5"><span className="text-xs font-medium text-muted-foreground">标签</span><Input value={tags} onChange={(event) => setTags(event.target.value)} placeholder="数据库, 核心服务, 运维" /></label>
-          <label className="flex flex-col gap-1.5"><span className="text-xs font-medium text-muted-foreground">备注</span><Textarea value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="记录用途、负责人或注意事项" rows={3} /></label>
-
-          <label className="flex flex-col gap-1.5">
-            <span className="text-xs font-medium text-muted-foreground">认证方式</span>
-            <LabeledSelect value={authMethod} options={AUTH_OPTIONS} onValueChange={setAuthMethod} />
-          </label>
-
-          {(authMethod === 'password' || authMethod === 'keyboard-interactive') && (
-            <label className="flex flex-col gap-1.5">
-              <span className="text-xs font-medium text-muted-foreground">密码</span>
-              <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="输入SSH密码" />
-            </label>
-          )}
-
-          {authMethod === 'key' && (
-            <label className="flex flex-col gap-1.5">
-              <span className="text-xs font-medium text-muted-foreground">SSH 密钥</span>
-              {keys.length === 0 ? (
-                <div className="text-xs text-muted-foreground py-2 px-3 border rounded-lg border-dashed">
-                  暂无可用密钥，请先在设置 → 密钥管理中导入
-                </div>
-              ) : (
-                <LabeledSelect value={keyId} options={keyOptions} onValueChange={setKeyId} placeholder="选择密钥..." />
-              )}
-            </label>
-          )}
-
-          {folders && folders.length > 0 && (
-            <label className="flex flex-col gap-1.5">
-              <span className="text-xs font-medium text-muted-foreground">分组</span>
-              <LabeledSelect value={folderId} options={folderOptions} onValueChange={setFolderId} placeholder="无分组" />
-            </label>
-          )}
-
-          <div className="grid grid-cols-2 gap-3">
-            <div className="flex flex-col gap-1.5">
-              <div className="flex items-center gap-1">
-                <label htmlFor="session-keep-alive" className="text-xs font-medium text-muted-foreground">保活间隔 (秒，0 使用全局默认)</label>
-                <Tooltip>
-                  <TooltipTrigger render={<Button type="button" variant="ghost" size="icon-xs" aria-label="会话保活说明" />}>
-                    <CircleHelp />
-                  </TooltipTrigger>
-                  <TooltipContent>会话保活仅维持底层 SSH 连接，不能控制服务端 Shell 的空闲自动登出策略。</TooltipContent>
-                </Tooltip>
-              </div>
-              <Input id="session-keep-alive" type="number" value={keepAlive} onChange={(e) => setKeepAlive(e.target.value)} min={0} />
+          <FormSection title="资产归属">
+            {folders && folders.length > 0 && (
+              <label className="flex flex-col gap-1.5">
+                <span className="text-xs font-medium text-muted-foreground">分组</span>
+                <LabeledSelect value={folderId} options={folderOptions} onValueChange={setFolderId} placeholder="无分组" />
+              </label>
+            )}
+            <div className="grid grid-cols-2 gap-3">
+              <label className="flex flex-col gap-1.5">
+                <span className="text-xs font-medium text-muted-foreground">环境</span>
+                <Input value={environment} onChange={(event) => setEnvironment(event.target.value)} placeholder="生产 / 测试" />
+              </label>
+              <label className="flex flex-col gap-1.5">
+                <span className="text-xs font-medium text-muted-foreground">项目</span>
+                <Input value={project} onChange={(event) => setProject(event.target.value)} placeholder="项目名称" />
+              </label>
             </div>
             <label className="flex flex-col gap-1.5">
-              <span className="text-xs font-medium text-muted-foreground">终端类型</span>
-              <LabeledSelect value={termType} options={termOptions} onValueChange={setTermType} />
+              <span className="text-xs font-medium text-muted-foreground">标签</span>
+              <Input value={tags} onChange={(event) => setTags(event.target.value)} placeholder="数据库, 核心服务, 运维" />
             </label>
-          </div>
+            <label className="flex flex-col gap-1.5">
+              <span className="text-xs font-medium text-muted-foreground">备注</span>
+              <Textarea value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="记录用途、负责人或注意事项" rows={2} />
+            </label>
+          </FormSection>
+
+          <FormSection title="终端选项">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex flex-col gap-1.5">
+                <div className="flex items-center gap-1">
+                  <label htmlFor="session-keep-alive" className="text-xs font-medium text-muted-foreground">保活间隔 (秒，0 使用全局默认)</label>
+                  <Tooltip>
+                    <TooltipTrigger render={<Button type="button" variant="ghost" size="icon-xs" aria-label="会话保活说明" />}>
+                      <CircleHelp />
+                    </TooltipTrigger>
+                    <TooltipContent>会话保活仅维持底层 SSH 连接，不能控制服务端 Shell 的空闲自动登出策略。</TooltipContent>
+                  </Tooltip>
+                </div>
+                <Input id="session-keep-alive" type="number" value={keepAlive} onChange={(e) => setKeepAlive(e.target.value)} min={0} />
+              </div>
+              <label className="flex flex-col gap-1.5">
+                <span className="text-xs font-medium text-muted-foreground">终端类型</span>
+                <LabeledSelect value={termType} options={termOptions} onValueChange={setTermType} />
+              </label>
+            </div>
+          </FormSection>
 
           <DialogFooter showCloseButton>
             <Button type="submit" disabled={pending}>{pending ? '保存中...' : isEditing ? '保存' : '创建会话'}</Button>
