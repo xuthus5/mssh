@@ -92,6 +92,7 @@ export function useSession() {
   const [recentSessions, setRecentSessions] = useState<Session[]>([])
   const [tunnels, setTunnels] = useState<Tunnel[]>([])
   const [loading, setLoading] = useState(false)
+  const [sessionsLoaded, setSessionsLoaded] = useState(false)
   const [error, setError] = useState('')
 
   const listFolders = useCallback(async () => {
@@ -164,6 +165,7 @@ export function useSession() {
       setError(err instanceof Error ? err.message : String(err))
     } finally {
       setLoading(false)
+      setSessionsLoaded(true)
     }
   }, [])
 
@@ -302,7 +304,7 @@ export function useSession() {
   }, [listFolders, listRecentSessions, listSessions])
 
   return {
-    folders, sessions, recentSessions, tunnels, loading, error,
+    folders, sessions, recentSessions, tunnels, loading, sessionsLoaded, error,
     listFolders, createFolder, deleteFolder, updateFolder, setDefaultFolder,
     listSessions, listRecentSessions, createSession, updateSession, deleteSession, moveSession,
     connect, reconnect, disconnect, listTunnels,

@@ -22,6 +22,9 @@ describe('createTerminalTab', () => {
       terminalId: 'term-abc',
       sessionId: 7,
       terminalInstance: 1,
+      split: false,
+      splitDirection: 'horizontal',
+      toolPanel: null,
     })
   })
 

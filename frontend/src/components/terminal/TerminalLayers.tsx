@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useRef } from 'react'
 import { Dialogs, Events } from '@wailsio/runtime'
 import { Spinner } from '@/components/ui/spinner'
 import { TerminalErrorBoundary } from '@/components/terminal/TerminalErrorBoundary'
@@ -111,7 +111,7 @@ export function TerminalLayers() {
   const activeSurface = useAppStore((state) => state.activeSurface)
   const focusRequest = useAppStore((state) => state.focusRequest)
   const activePaneID = useAppStore((state) => state.activePaneId)
-  const [filePanelTabIDs, setFilePanelTabIDs] = useState<Set<string>>(() => new Set())
+  const updateTerminalWorkspace = useAppStore((state) => state.updateTerminalWorkspace)
   const lastActiveTerminalTabIDRef = useRef<string | null>(null)
   const closeCoordinator = useTabCloseCoordinator()
 
@@ -119,36 +119,19 @@ export function TerminalLayers() {
     if (activeSurface?.type === 'terminal') lastActiveTerminalTabIDRef.current = activeSurface.id
   }, [activeSurface])
 
-  useEffect(() => {
-    const currentTabIDs = new Set(tabs.map((tab) => tab.id))
-    setFilePanelTabIDs((current) => {
-      const next = new Set([...current].filter((tabID) => currentTabIDs.has(tabID)))
-      return next.size === current.size ? current : next
-    })
-  }, [tabs])
-
   const toggleFiles = useCallback((tabID: string) => {
-    setFilePanelTabIDs((current) => {
-      const next = new Set(current)
-      if (next.has(tabID)) next.delete(tabID)
-      else next.add(tabID)
-      return next
-    })
-  }, [])
+    const tab = useAppStore.getState().tabs.find((item) => item.id === tabID)
+    if (tab?.type === 'terminal') updateTerminalWorkspace(tabID, { toolPanel: tab.toolPanel === 'files' ? null : 'files' })
+  }, [updateTerminalWorkspace])
 
   const closeFiles = useCallback((tabID: string) => {
-    setFilePanelTabIDs((current) => {
-      if (!current.has(tabID)) return current
-      const next = new Set(current)
-      next.delete(tabID)
-      return next
-    })
-  }, [])
+    updateTerminalWorkspace(tabID, { toolPanel: null })
+  }, [updateTerminalWorkspace])
 
   return <>{tabs.map((tab) => <DynamicLayer key={tab.id} tab={tab}
     active={activeSurface?.type === tab.type && activeSurface.id === tab.id}
     activePaneID={activePaneID} lastActiveTerminalTabID={lastActiveTerminalTabIDRef.current}
-    filePanelOpen={filePanelTabIDs.has(tab.id)} onToggleFiles={() => toggleFiles(tab.id)}
+    filePanelOpen={tab.type === 'terminal' && tab.toolPanel === 'files'} onToggleFiles={() => toggleFiles(tab.id)}
     focusRequest={focusRequest} onCloseFiles={() => closeFiles(tab.id)}
     onReconnect={() => { void reconnect(tab.id) }}
     onClose={() => closeCoordinator.requestClose(tab.id)} />)}
