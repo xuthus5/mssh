@@ -57,6 +57,7 @@ import { useAppStore } from '@/store/appStore'
 import { TerminalErrorBoundary } from '@/components/terminal/TerminalErrorBoundary'
 import { logger } from '@/lib/logger'
 import { ToastContainer, useToastStore } from '@/components/ui/toast'
+import { getTerminalSearch } from '@/lib/terminalSearchRegistry'
 
 function boundary({ children }: { children: ReactNode }) {
   return <TerminalErrorBoundary onClose={vi.fn()}>{children}</TerminalErrorBoundary>
@@ -126,6 +127,7 @@ describe('useTerminal backend failures', () => {
       active: false,
       focusRequest: { sequence: 0 },
     }), { initialProps: { terminalID: 'term-old' } })
+    expect(getTerminalSearch('term-old')).not.toBeNull()
 
     act(() => expect(useAppStore.getState().replaceTerminalConnection('tab-1', 'term-old', 'term-new')).toBe(true))
     hook.rerender({ terminalID: 'term-new' })
@@ -135,6 +137,8 @@ describe('useTerminal backend failures', () => {
     expect(terminalDisposes).toHaveLength(1)
     expect(terminalDisposes[0]).not.toHaveBeenCalled()
     expect(dataHandlers).toHaveLength(1)
+    expect(getTerminalSearch('term-old')).toBeNull()
+    expect(getTerminalSearch('term-new')).not.toBeNull()
     expect(backend.attach).toHaveBeenNthCalledWith(1, 'term-old')
     expect(backend.attach).toHaveBeenNthCalledWith(2, 'term-new')
   })

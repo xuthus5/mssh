@@ -96,7 +96,7 @@ function DynamicLayer({ tab, active, activePaneID, fileTargetID, lastActiveTermi
           <div className="flex min-w-0 flex-1 flex-col">
             <TerminalTab terminalID={tab.terminalId} sessionId={tab.sessionId}
               onOpenFiles={onToggleFiles} active={active} focusRequest={terminalFocusRequest}
-              onPaneClosed={onPaneClosed} onPaneReplaced={onPaneReplaced} />
+              onPaneClosed={onPaneClosed} onPaneReplaced={onPaneReplaced} onCloseTerminal={onClose} />
           </div>
           {filePanelOpen
             ? <FilePanelContainer sessionID={tab.sessionId} terminalID={fileTargetID ?? tab.terminalId} onClose={onCloseFiles} />
