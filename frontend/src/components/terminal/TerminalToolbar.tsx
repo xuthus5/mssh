@@ -1,5 +1,5 @@
 import { useCallback, useState, type Dispatch, type SetStateAction } from 'react'
-import { Activity, ChevronDown, Circle, ClipboardPaste, Columns2, Copy, FolderOpen, History, Network, Rows2, Split, Square, Trash2 } from 'lucide-react'
+import { Activity, ChevronDown, Circle, ClipboardPaste, Columns2, Copy, FolderOpen, History, Network, Rows2, Search, Split, Square, Trash2 } from 'lucide-react'
 import SessionLog from '@/components/terminal/SessionLog'
 import TunnelDialog from '@/components/session/TunnelDialog'
 import { useTunnelManager } from '@/hooks/useTunnelManager'
@@ -21,6 +21,8 @@ interface TerminalToolbarProps {
   onSplit: (direction: SplitDirection) => void
   splitDisabled: boolean
   paneCount: number
+  searchOpen: boolean
+  onToggleSearch: () => void
   onOpenHistory?: () => void
   onOpenSystem?: () => void
 }
@@ -149,7 +151,7 @@ function SessionLogPopover({ open, sessionId, setOpen, setBlocked, onOpenChange 
   </Popover>
 }
 
-interface ToolbarActionsProps extends Pick<TerminalToolbarProps, 'sessionId' | 'isRecording' | 'onToggleRecording' | 'onOpenFiles' | 'onSplit' | 'splitDisabled' | 'paneCount'> {
+interface ToolbarActionsProps extends Pick<TerminalToolbarProps, 'sessionId' | 'isRecording' | 'onToggleRecording' | 'onOpenFiles' | 'onSplit' | 'splitDisabled' | 'paneCount' | 'searchOpen' | 'onToggleSearch'> {
   clipboard: ReturnType<typeof useClipboardActions>
   logOpen: boolean
   setLogOpen: Dispatch<SetStateAction<boolean>>
@@ -163,6 +165,10 @@ interface ToolbarActionsProps extends Pick<TerminalToolbarProps, 'sessionId' | '
 function ToolbarActions(props: ToolbarActionsProps) {
   return <div className="flex items-center gap-0.5 ml-auto">
     <ClipboardActions {...props.clipboard} />
+    <button type="button" className={props.searchOpen ? `${actionClass} bg-primary/15 text-primary` : actionClass}
+      onClick={props.onToggleSearch} title={props.searchOpen ? '关闭终端搜索' : '搜索终端内容'}>
+      <Search className="h-3 w-3" /><span className="hidden sm:inline">搜索</span>
+    </button>
     <div className="w-px h-4 bg-border mx-0.5" />
     <button type="button" className={actionClass} onClick={props.onOpenFiles} title="文件管理">
       <FolderOpen className="h-3 w-3" /><span className="hidden sm:inline">文件</span>
