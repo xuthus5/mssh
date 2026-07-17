@@ -87,6 +87,7 @@ function cancelActivationFrame(frameRef: RefObject<number | null>) {
 function createTerminal() {
   const theme = useAppStore.getState().terminalTheme
   return new Terminal({
+    allowProposedApi: true,
     cursorBlink: true,
     cursorStyle: theme.cursorStyle,
     fontSize: theme.fontSize,

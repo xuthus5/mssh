@@ -22,13 +22,24 @@ vi.mock('@xterm/xterm', () => ({
   Terminal: class {
     cols = 80
     rows = 24
-    unicode = { activeVersion: '6' }
     options = {}
+    private allowProposedApi = false
+    private unicodeApi = { activeVersion: '6' }
     open() { calls.push('open') }
     private addons: Array<{ dispose: () => void }> = []
     loadAddon(addon: { name: string; dispose: () => void }) { calls.push(`load:${addon.name}`); this.addons.push(addon) }
     private terminalDispose = vi.fn(() => calls.push('dispose'))
-    constructor(options: Record<string, unknown>) { terminalOptions.push(options); terminalInstances.push(this); terminalDisposes.push(this.terminalDispose); this.options = options }
+    constructor(options: Record<string, unknown>) {
+      terminalOptions.push(options)
+      terminalInstances.push(this)
+      terminalDisposes.push(this.terminalDispose)
+      this.options = options
+      this.allowProposedApi = options.allowProposedApi === true
+    }
+    get unicode() {
+      if (!this.allowProposedApi) throw new Error('you must set the allowProposedApi option to true to use proposed api')
+      return this.unicodeApi
+    }
     onData() {
       const dispose = vi.fn()
       dataDisposes.push(dispose)
@@ -136,7 +147,7 @@ describe('useTerminal', () => {
     const { unmount } = renderHook(() => useTerminal('term-1', containerRef, { active: true, focusRequest: { sequence: 0 } }))
 
     expect(calls).toEqual(['open', 'load:unicode11', 'load:fit'])
-    expect(terminalOptions[0]).toBeDefined()
+    expect(terminalOptions[0]).toEqual(expect.objectContaining({ allowProposedApi: true }))
     expect(selectionDisposes).toHaveLength(1)
     act(() => unmount())
     expect(selectionDisposes[0]).toHaveBeenCalledOnce()
