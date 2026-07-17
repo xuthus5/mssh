@@ -1,5 +1,5 @@
 import { useCallback, useState, type Dispatch, type SetStateAction } from 'react'
-import { Activity, ChevronDown, Circle, ClipboardPaste, Columns2, Copy, FolderOpen, History, Network, Rows2, Search, Split, Square, Trash2 } from 'lucide-react'
+import { Activity, ChevronDown, Circle, ClipboardPaste, Columns2, Copy, FolderOpen, History, Network, PenLine, Rows2, Search, Split, Square, Trash2 } from 'lucide-react'
 import SessionLog from '@/components/terminal/SessionLog'
 import TunnelDialog from '@/components/session/TunnelDialog'
 import { useTunnelManager } from '@/hooks/useTunnelManager'
@@ -23,6 +23,8 @@ interface TerminalToolbarProps {
   paneCount: number
   searchOpen: boolean
   onToggleSearch: () => void
+  composeOpen?: boolean
+  onToggleCompose?: () => void
   onOpenHistory?: () => void
   onOpenSystem?: () => void
 }
@@ -151,7 +153,7 @@ function SessionLogPopover({ open, sessionId, setOpen, setBlocked, onOpenChange 
   </Popover>
 }
 
-interface ToolbarActionsProps extends Pick<TerminalToolbarProps, 'sessionId' | 'isRecording' | 'onToggleRecording' | 'onOpenFiles' | 'onSplit' | 'splitDisabled' | 'paneCount' | 'searchOpen' | 'onToggleSearch'> {
+interface ToolbarActionsProps extends Pick<TerminalToolbarProps, 'sessionId' | 'isRecording' | 'onToggleRecording' | 'onOpenFiles' | 'onSplit' | 'splitDisabled' | 'paneCount' | 'searchOpen' | 'onToggleSearch' | 'composeOpen' | 'onToggleCompose'> {
   clipboard: ReturnType<typeof useClipboardActions>
   logOpen: boolean
   setLogOpen: Dispatch<SetStateAction<boolean>>
@@ -173,6 +175,10 @@ function ToolbarActions(props: ToolbarActionsProps) {
     <div className="w-px h-4 bg-border mx-0.5" />
     <button type="button" className={actionClass} onClick={props.onOpenFiles} title="文件管理">
       <FolderOpen className="h-3 w-3" /><span className="hidden sm:inline">文件</span>
+    </button>
+    <button type="button" className={props.composeOpen ? `${actionClass} bg-primary/15 text-primary` : actionClass}
+      onClick={props.onToggleCompose} title={props.composeOpen ? '关闭撰写面板' : '撰写终端内容'}>
+      <PenLine className="h-3 w-3" /><span className="hidden sm:inline">撰写</span>
     </button>
     <button type="button" className={actionClass} onClick={props.onOpenTunnels} title="隧道管理">
       <Network className="h-3 w-3" /><span className="hidden sm:inline">隧道</span>

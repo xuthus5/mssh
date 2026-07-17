@@ -85,6 +85,23 @@ describe('TerminalToolbar', () => {
     expect(screen.getByTestId('tunnel-dialog')).toHaveAttribute('data-session-id', '7')
   })
 
+  it('places compose directly after files and toggles its active state', async () => {
+    const onToggleCompose = vi.fn()
+    const view = render(<TerminalToolbar terminalID="primary-1" sessionId={7} isRecording={false} recordingLogId={null}
+      onToggleRecording={vi.fn()} hostname="server" onOpenFiles={vi.fn()} onSplit={vi.fn()} splitDisabled={false}
+      paneCount={1} searchOpen={false} onToggleSearch={vi.fn()} composeOpen={false} onToggleCompose={onToggleCompose} />)
+
+    const titles = screen.getAllByRole('button').map((button) => button.getAttribute('title'))
+    expect(titles.indexOf('撰写终端内容')).toBe(titles.indexOf('文件管理') + 1)
+    await userEvent.click(screen.getByTitle('撰写终端内容'))
+    expect(onToggleCompose).toHaveBeenCalledOnce()
+
+    view.rerender(<TerminalToolbar terminalID="primary-1" sessionId={7} isRecording={false} recordingLogId={null}
+      onToggleRecording={vi.fn()} hostname="server" onOpenFiles={vi.fn()} onSplit={vi.fn()} splitDisabled={false}
+      paneCount={1} searchOpen={false} onToggleSearch={vi.fn()} composeOpen onToggleCompose={onToggleCompose} />)
+    expect(screen.getByTitle('关闭撰写面板')).toHaveClass('text-primary')
+  })
+
   it('toggles terminal search from the toolbar', async () => {
     const onToggleSearch = vi.fn()
     const view = render(<TerminalToolbar terminalID="primary-1" sessionId={1} isRecording={false} recordingLogId={null}
