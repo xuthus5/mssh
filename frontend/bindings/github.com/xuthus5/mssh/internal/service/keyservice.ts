@@ -40,6 +40,9 @@ export function List(): $CancellablePromise<model$0.SSHKey[]> {
         return $$createType4($result);
     });
 }
+export function UsageCount(id: number): $CancellablePromise<number> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.KeyService.UsageCount", id);
+}
 
 export function SelectImportFile(): $CancellablePromise<model$0.SSHKeyImportFile | null> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.KeyService.SelectImportFile").then(($result: any) => {
