@@ -48,7 +48,7 @@ describe('TerminalToolbar recording history integration', () => {
     deleteRecording.mockReturnValue(deletion.promise)
     render(<TerminalToolbar terminalID="terminal-1" sessionId={1} isRecording={false}
       recordingLogId={null} onToggleRecording={vi.fn()} onOpenFiles={vi.fn()}
-      onSplit={vi.fn()} splitDisabled={false} paneCount={1} />)
+      onSplit={vi.fn()} splitDisabled={false} paneCount={1} searchOpen={false} onToggleSearch={vi.fn()} />)
 
     const historyButton = screen.getByTitle('录制记录')
     await userEvent.click(historyButton)

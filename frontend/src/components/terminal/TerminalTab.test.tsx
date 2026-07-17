@@ -19,14 +19,19 @@ vi.mock('@/components/terminal/TerminalSplit', () => ({
     return <div data-testid="terminal-split" />
   }),
 }))
+vi.mock('@/components/terminal/TerminalSearchBar', () => ({
+  TerminalSearchBar: ({ terminalID, open }: { terminalID: string; open: boolean }) => open ? <div data-testid={`search-${terminalID}`} /> : null,
+}))
 vi.mock('@/components/terminal/TerminalToolbar', () => ({
-  TerminalToolbar: ({ isRecording, onToggleRecording, onSplit }: {
+  TerminalToolbar: ({ isRecording, onToggleRecording, onSplit, onToggleSearch }: {
     isRecording: boolean
     onToggleRecording: () => void
     onSplit: (direction: 'horizontal') => void
+    onToggleSearch: () => void
   }) => <div>
     <button type="button" onClick={onToggleRecording}>{isRecording ? '停止录制' : '开始录制'}</button>
     <button type="button" onClick={() => onSplit('horizontal')}>向右分屏</button>
+    <button type="button" onClick={onToggleSearch}>搜索终端</button>
   </div>,
 }))
 
@@ -58,6 +63,8 @@ describe('TerminalTab', () => {
     fireEvent.click(screen.getByRole('button', { name: '向右分屏' }))
     expect(splitAction).toHaveBeenCalledTimes(2)
     expect(splitAction).toHaveBeenCalledWith('horizontal')
+    fireEvent.click(screen.getByRole('button', { name: '搜索终端' }))
+    expect(screen.getByTestId('search-split-1')).toBeInTheDocument()
   })
 
   it('starts and stops recording with the active terminal dimensions', async () => {

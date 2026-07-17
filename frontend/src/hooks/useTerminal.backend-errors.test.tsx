@@ -45,6 +45,7 @@ vi.mock('@xterm/xterm', () => ({
 }))
 vi.mock('@xterm/addon-fit', () => ({ FitAddon: class { fit() {}; dispose() {} } }))
 vi.mock('@xterm/addon-unicode11', () => ({ Unicode11Addon: class { dispose() {} } }))
+vi.mock('@xterm/addon-search', () => ({ SearchAddon: class { dispose() {} } }))
 vi.mock('@wailsio/runtime', () => ({ Events: { On: vi.fn(() => vi.fn()) } }))
 vi.mock('@/lib/wails', () => ({
   TerminalService: { Attach: backend.attach, Resize: backend.resize, Write: backend.write, Close: vi.fn(async () => {}) },

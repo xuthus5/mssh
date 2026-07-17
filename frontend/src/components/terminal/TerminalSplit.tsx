@@ -78,7 +78,7 @@ function LeafView(props: TreeViewProps & { node: Extract<SplitNode, { kind: 'lea
   const selected = props.activePaneID ? props.activePaneID === terminalID : props.primaryID === terminalID
   const request = props.focusRequest.targetTerminalID === terminalID ? props.focusRequest : noFocusRequest
   return <div className={`group relative min-h-0 min-w-0 overflow-hidden ${selected ? 'ring-1 ring-inset ring-primary/35' : ''}`}>
-    <TerminalEmulator terminalID={terminalID} active={props.active && selected} focusRequest={request} />
+    <TerminalEmulator key={terminalID} terminalID={terminalID} active={props.active && selected} focusRequest={request} />
     {props.paneCount > 1 ? <button type="button" title="关闭当前窗格" aria-label="关闭当前窗格"
       disabled={props.closingID !== null} onClick={() => props.onClose(terminalID)}
       className="absolute right-2 top-2 z-20 grid size-6 place-items-center rounded-md bg-background/80 text-muted-foreground opacity-0 shadow-sm ring-1 ring-border backdrop-blur transition hover:bg-destructive hover:text-destructive-foreground group-hover:opacity-100 focus-visible:opacity-100 disabled:pointer-events-none">

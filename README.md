@@ -6,6 +6,7 @@ A cross-platform SSH client built with Go + Wails v3 + React + xterm.js.
 
 - Persistent top-level terminal and playback tabs with multi-instance connections, terminal duplication, restart recovery, and per-tab tool panels
 - Recursive terminal splitting supports up to eight independently closable and reconnectable panes with draggable dividers
+- Active terminal content search supports plain text or regular expressions, highlighted matches, and previous/next navigation
 - Overview workspace for sessions, SSH keys, and tunnels, plus non-disruptive session and macro sidebars
 - Encrypted text backups (`.msshbackup`) and conflict-safe HTTP/WebDAV synchronization using Argon2id, AES-256-GCM, and ETags
 - Session management (folders, SSH password/key/agent auth)
