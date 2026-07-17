@@ -4,6 +4,7 @@ import type { Folder, Session } from '@/hooks/useSession'
 import { useSessionWorkspace } from '@/hooks/SessionWorkspaceContext'
 import { MacroService } from '@/lib/wails'
 import { logger } from '@/lib/logger'
+import { recordCommand } from '@/lib/commandHistory'
 import { useAppStore } from '@/store/appStore'
 import type { Macro, MacroInput } from '../../bindings/github.com/xuthus5/mssh/internal/model/models'
 
@@ -119,7 +120,7 @@ export function useSidebarMacros() {
     const activeTab = state.tabs.find((tab) => tab.id === state.activeSurface?.id)
     if (!activeTab || activeTab.type !== 'terminal') return
     const terminalID = state.activePaneId ?? activeTab.terminalId
-    MacroService.Execute(terminalID, command).catch((error: unknown) => logger.error('Sidebar: execute macro error', error))
+    MacroService.Execute(terminalID, command).then(() => recordCommand(activeTab.sessionId, command)).catch((error: unknown) => logger.error('Sidebar: execute macro error', error))
   }, [])
   const add = useCallback((item: Omit<CommandItem, 'id'>) => addMacro(item, setMacros), [])
   const remove = useCallback((id: string) => deleteMacro(id, setMacros), [])
