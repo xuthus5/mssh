@@ -27,6 +27,21 @@ describe('SessionDialog', () => {
     expect(screen.getByText('认证方式')).toBeInTheDocument()
   })
 
+  it('groups credentials before asset metadata', () => {
+    render(<SessionDialog {...defaultProps} />)
+
+    expect(screen.getByRole('dialog')).toHaveClass('max-h-[calc(100vh-2rem)]', 'overflow-y-auto', 'sm:max-w-lg')
+    expect(screen.getByText('连接与认证')).toBeInTheDocument()
+    expect(screen.getByText('资产归属')).toBeInTheDocument()
+    expect(screen.getByText('终端选项')).toBeInTheDocument()
+
+    const username = screen.getByLabelText('用户名')
+    const password = screen.getByLabelText('密码')
+    const environment = screen.getByLabelText('环境')
+    expect(username.compareDocumentPosition(password) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(password.compareDocumentPosition(environment) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
   it('shows password field by default (auth=password)', () => {
     render(<SessionDialog {...defaultProps} />)
     expect(screen.getAllByText('密码').length).toBeGreaterThan(0)
