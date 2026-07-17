@@ -246,9 +246,27 @@ describe('appStore', () => {
     const store = useAppStore.getState()
     store.openTab({ id: 'tab-1', title: 'A', type: 'terminal', terminalId: 'term-1', sessionId: 1 })
 
-    store.updateTerminalWorkspace('tab-1', { split: true, splitDirection: 'vertical', toolPanel: 'history' })
+    store.updateTerminalWorkspace('tab-1', { toolPanel: 'history' })
 
-    expect(useAppStore.getState().tabs[0]).toMatchObject({ split: true, splitDirection: 'vertical', toolPanel: 'history' })
+    expect(useAppStore.getState().tabs[0]).toMatchObject({ toolPanel: 'history' })
+  })
+
+  it('promotes an existing split terminal without replacing its pooled instance', () => {
+    const primary = { dispose: vi.fn() } as unknown as import('@xterm/xterm').Terminal
+    const sibling = { dispose: vi.fn() } as unknown as import('@xterm/xterm').Terminal
+    const store = useAppStore.getState()
+    store.openTab({ id: 'tab-1', title: 'A', type: 'terminal', terminalId: 'primary-1', sessionId: 1 })
+    store.registerTerminal('primary-1', primary)
+    store.registerTerminal('split-1', sibling)
+    store.setActivePane('primary-1')
+
+    expect(store.promoteTerminalConnection('tab-1', 'primary-1', 'split-1')).toBe(true)
+
+    const state = useAppStore.getState()
+    expect(state.tabs[0]).toMatchObject({ terminalId: 'split-1' })
+    expect(state.terminalPool.get('split-1')?.terminal).toBe(sibling)
+    expect(state.terminalPool.has('primary-1')).toBe(false)
+    expect(state.activePaneId).toBe('split-1')
   })
 
   it('registers and unregisters terminals', () => {
@@ -259,6 +277,23 @@ describe('appStore', () => {
 
     unregisterTerminal('term-1')
     expect(useAppStore.getState().terminalPool.has('term-1')).toBe(false)
+  })
+
+  it('forgets all runtime state for a closed split terminal', () => {
+    const terminal = { dispose: vi.fn() } as unknown as import('@xterm/xterm').Terminal
+    const store = useAppStore.getState()
+    store.registerTerminal('split-1', terminal)
+    store.setConnectionStatus('split-1', 'connected')
+    store.setRecordingState('split-1', 'recording')
+    store.setActivePane('split-1')
+
+    store.forgetTerminal('split-1')
+
+    const state = useAppStore.getState()
+    expect(state.terminalPool.has('split-1')).toBe(false)
+    expect(state.connectionStatus['split-1']).toBeUndefined()
+    expect(state.recordingState['split-1']).toBeUndefined()
+    expect(state.activePaneId).toBeNull()
   })
 
   it('removes a remotely closed tab without disposing the React-owned terminal', () => {

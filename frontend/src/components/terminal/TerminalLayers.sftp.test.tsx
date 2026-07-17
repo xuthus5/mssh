@@ -2,9 +2,17 @@ import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/components/terminal/TerminalTab', () => ({
-  TerminalTab: ({ terminalID, onOpenFiles }: { terminalID: string; onOpenFiles: () => void }) => (
+  TerminalTab: ({ terminalID, onOpenFiles, onPaneClosed, onPaneReplaced }: {
+    terminalID: string
+    onOpenFiles: (terminalID: string) => void
+    onPaneClosed: (terminalID: string) => void
+    onPaneReplaced: (previousID: string, nextID: string) => void
+  }) => (
     <div data-testid={`terminal-${terminalID}`}>
-      <button type="button" onClick={onOpenFiles}>files</button>
+      <button type="button" onClick={() => onOpenFiles(terminalID)}>files</button>
+      <button type="button" onClick={() => onOpenFiles(`split-${terminalID}`)}>split files</button>
+      <button type="button" onClick={() => onPaneClosed(`split-${terminalID}`)}>close split</button>
+      <button type="button" onClick={() => onPaneReplaced(`split-${terminalID}`, `replacement-${terminalID}`)}>reconnect split</button>
     </div>
   ),
 }))
@@ -59,6 +67,15 @@ describe('TerminalLayers SFTP isolation', () => {
 
     fireEvent.click(within(terminalA).getByRole('button', { name: 'files' }))
     expect(await within(terminalA).findByTestId('file-panel')).toHaveAttribute('data-drop-target-id', 'sftp-drop-zone-term-a')
+    fireEvent.click(within(terminalA).getByRole('button', { name: 'split files' }))
+    expect(await within(terminalA).findByTestId('file-panel')).toHaveAttribute('data-drop-target-id', 'sftp-drop-zone-split-term-a')
+    fireEvent.click(within(terminalA).getByRole('button', { name: 'reconnect split' }))
+    expect(await within(terminalA).findByTestId('file-panel')).toHaveAttribute('data-drop-target-id', 'sftp-drop-zone-replacement-term-a')
+    fireEvent.click(within(terminalA).getByRole('button', { name: 'split files' }))
+    fireEvent.click(within(terminalA).getByRole('button', { name: 'close split' }))
+    expect(within(terminalA).queryByTestId('file-panel')).not.toBeInTheDocument()
+
+    fireEvent.click(within(terminalA).getByRole('button', { name: 'files' }))
 
     act(() => store.activateTab('terminal-b'))
     expect(within(terminalB).queryByTestId('file-panel')).not.toBeInTheDocument()

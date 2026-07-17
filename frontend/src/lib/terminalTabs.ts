@@ -28,8 +28,6 @@ export function createTerminalTab({ sessionID, sessionName, terminalID, tabs }: 
     terminalId: terminalID,
     sessionId: sessionID,
     terminalInstance,
-    split: false,
-    splitDirection: 'horizontal',
     toolPanel: null,
   }
 }
