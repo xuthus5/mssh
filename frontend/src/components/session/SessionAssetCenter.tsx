@@ -17,6 +17,7 @@ import { toast } from '@/components/ui/toast'
 import { SessionService } from '@/lib/wails'
 import { Checkbox } from '@/components/ui/checkbox'
 import { SessionBatchActions } from '@/components/session/SessionBatchActions'
+import { useAsyncAction } from '@/hooks/useAsyncAction'
 
 type AssetTab = 'recent' | 'folders' | 'nodes'
 type DeleteTarget = { type: 'folder' | 'session'; item: Folder | Session }
@@ -28,6 +29,10 @@ export function SessionAssetCenter() {
   const [query, setQuery] = useState('')
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null)
   const [selectedIDs, setSelectedIDs] = useState<Set<string>>(() => new Set())
+  const deleteAction = useAsyncAction(async (target: DeleteTarget) => {
+    if (target.type === 'folder') await state.deleteFolder(target.item.id)
+    else await state.deleteSession(target.item.id)
+  })
   useEffect(() => {
     const selectFolder = (event: Event) => {
       const id = (event as CustomEvent<string>).detail
@@ -43,9 +48,8 @@ export function SessionAssetCenter() {
   }
   const confirmDelete = async () => {
     if (!deleteTarget) return
-    if (deleteTarget.type === 'folder') await run(() => state.deleteFolder(deleteTarget.item.id))
-    else await run(() => state.deleteSession(deleteTarget.item.id))
-    setDeleteTarget(null)
+    try { await deleteAction.run(deleteTarget); setDeleteTarget(null) }
+    catch (error) { toast(error instanceof Error ? error.message : String(error), 'error') }
   }
   return <section className="flex min-h-0 flex-1 flex-col bg-background p-5">
     <header className="flex shrink-0 items-start justify-between gap-4">
@@ -63,7 +67,7 @@ export function SessionAssetCenter() {
         <SessionTable sessions={filteredSessions} folders={state.folders} selectedIDs={selectedIDs} onSelectionChange={setSelectedIDs} onConnect={state.connect} onEdit={editSession} onDelete={(session) => setDeleteTarget({ type: 'session', item: session })} onMove={state.moveSession} />
       </TabsContent>
     </Tabs>
-    <DeleteDialog target={deleteTarget} folders={state.folders} sessions={state.sessions} onOpenChange={(open) => { if (!open) setDeleteTarget(null) }} onConfirm={() => { void confirmDelete() }} />
+    <DeleteDialog target={deleteTarget} folders={state.folders} sessions={state.sessions} pending={deleteAction.pending} error={deleteAction.error} onOpenChange={(open) => { if (!open && !deleteAction.pending) setDeleteTarget(null) }} onConfirm={() => { void confirmDelete() }} />
   </section>
 }
 
@@ -87,7 +91,7 @@ function NodeBreadcrumb({ folder, onClear }: { folder?: Folder; onClear: () => v
   return <Breadcrumb><BreadcrumbList><BreadcrumbItem>{folder ? <BreadcrumbLink render={<button type="button" onClick={onClear} />}>所有节点</BreadcrumbLink> : <BreadcrumbPage>所有节点</BreadcrumbPage>}</BreadcrumbItem>{folder && <><BreadcrumbSeparator /><BreadcrumbItem><BreadcrumbPage>{folder.name}</BreadcrumbPage></BreadcrumbItem></>}</BreadcrumbList></Breadcrumb>
 }
 
-function DeleteDialog({ target, folders, sessions, onOpenChange, onConfirm }: { target: DeleteTarget | null; folders: Folder[]; sessions: Session[]; onOpenChange: (open: boolean) => void; onConfirm: () => void }) {
+function DeleteDialog({ target, folders, sessions, pending, error, onOpenChange, onConfirm }: { target: DeleteTarget | null; folders: Folder[]; sessions: Session[]; pending: boolean; error: string; onOpenChange: (open: boolean) => void; onConfirm: () => void }) {
   const [impact, setImpact] = useState<{ tunnels: number; history: number; recordings: number } | null>(null)
   useEffect(() => {
     if (target?.type !== 'session') { setImpact(null); return }
@@ -97,7 +101,7 @@ function DeleteDialog({ target, folders, sessions, onOpenChange, onConfirm }: { 
   }, [target])
   const folder = target?.type === 'folder' ? target.item as Folder : undefined
   const description = folder ? `其中 ${sessions.filter((session) => session.folderId === folder.id).length} 个会话和 ${folders.filter((item) => item.parentId === folder.id).length} 个子分组将迁移到默认分组。` : impact ? `将同时影响 ${impact.tunnels} 条隧道、${impact.history} 条命令历史和 ${impact.recordings} 条录制记录。` : '正在分析关联资产影响范围。'
-  return <AlertDialog open={Boolean(target)} onOpenChange={onOpenChange}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>删除“{target?.item.name}”？</AlertDialogTitle><AlertDialogDescription>{description}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>取消</AlertDialogCancel><AlertDialogAction variant="destructive" onClick={onConfirm}>确认删除</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+  return <AlertDialog open={Boolean(target)} onOpenChange={onOpenChange}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>删除“{target?.item.name}”？</AlertDialogTitle><AlertDialogDescription>{description}</AlertDialogDescription></AlertDialogHeader>{error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}<AlertDialogFooter><AlertDialogCancel disabled={pending}>取消</AlertDialogCancel><AlertDialogAction variant="destructive" disabled={pending} onClick={onConfirm}>{pending ? '删除中…' : '确认删除'}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
 }
 
 function LoadingRows() { return <div className="flex flex-col gap-2"><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /></div> }
