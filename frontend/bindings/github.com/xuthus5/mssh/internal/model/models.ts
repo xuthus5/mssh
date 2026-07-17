@@ -30,6 +30,56 @@ export class AboutInfo {
     }
 }
 
+export class AuditEvent {
+    "id": number;
+    "action": string;
+    "target_type": string;
+    "target_id": string;
+    "session_id": number | null;
+    "summary": string;
+    "outcome": string;
+    "created_at": string;
+
+    constructor($$source: Partial<AuditEvent> = {}) {
+        this["id"] = 0;
+        this["action"] = "";
+        this["target_type"] = "";
+        this["target_id"] = "";
+        this["session_id"] = null;
+        this["summary"] = "";
+        this["outcome"] = "";
+        this["created_at"] = "0001-01-01T00:00:00.000Z";
+        Object.assign(this, $$source);
+    }
+
+    static createFrom($$source: any = {}): AuditEvent {
+        const $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new AuditEvent($$parsedSource as Partial<AuditEvent>);
+    }
+}
+
+export class AuditFilter {
+    "action": string;
+    "session_id": number | null;
+    "from": string;
+    "to": string;
+    "limit": number;
+
+    constructor($$source: Partial<AuditFilter> = {}) {
+        this["action"] = "";
+        this["session_id"] = null;
+        this["from"] = "";
+        this["to"] = "";
+        this["limit"] = 0;
+        Object.assign(this, $$source);
+    }
+
+    static createFrom($$source: any = {}): AuditFilter {
+        const $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new AuditFilter($$parsedSource as Partial<AuditFilter>);
+    }
+}
+
 export enum AuthMethod {
     /**
      * The Go zero value for the underlying type of the enum.

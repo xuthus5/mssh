@@ -11,7 +11,6 @@ import (
 	"sync"
 
 	"github.com/google/uuid"
-
 	gossh "golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
 
@@ -79,10 +78,16 @@ func (s *SessionService) UpdateFolder(id int64, name string) error {
 }
 
 func (s *SessionService) DeleteFolder(id int64) error {
+	outcome := "failed"
+	defer func() {
+		recordAudit(s.db, s.logger, model.AuditEvent{Action: "delete", TargetType: "folder", TargetID: fmt.Sprint(id), Summary: "删除会话分组", Outcome: outcome})
+	}()
 	s.logger.Info("deleting folder", "id", id)
 	err := store.DeleteFolder(s.db, id)
 	if err != nil {
 		s.logger.Error("delete folder failed", "error", err)
+	} else {
+		outcome = "success"
 	}
 	return err
 }
@@ -132,10 +137,16 @@ func (s *SessionService) UpdateSession(input model.SessionInput) error {
 }
 
 func (s *SessionService) DeleteSession(id int64) error {
+	outcome := "failed"
+	defer func() {
+		recordAudit(s.db, s.logger, model.AuditEvent{Action: "delete", TargetType: "session", TargetID: fmt.Sprint(id), SessionID: &id, Summary: "删除 SSH 会话", Outcome: outcome})
+	}()
 	s.logger.Info("deleting session", "id", id)
 	err := store.DeleteSession(s.db, id)
 	if err != nil {
 		s.logger.Error("delete session failed", "error", err)
+	} else {
+		outcome = "success"
 	}
 	return err
 }

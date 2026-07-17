@@ -17,6 +17,10 @@ import (
 const maxPrivateKeyFileSize = 1024 * 1024
 
 func (k *KeyService) GetMaterial(id int64) (*model.SSHKeyMaterial, error) {
+	outcome := "failed"
+	defer func() {
+		recordAudit(k.db, k.logger, model.AuditEvent{Action: "key_view", TargetType: "key", TargetID: fmt.Sprint(id), Summary: "查看 SSH 密钥材料", Outcome: outcome})
+	}()
 	key, err := store.GetKey(k.db, id)
 	if err != nil {
 		return nil, fmt.Errorf("get key material: %w", err)
@@ -25,6 +29,7 @@ func (k *KeyService) GetMaterial(id int64) (*model.SSHKeyMaterial, error) {
 	if err != nil {
 		return nil, fmt.Errorf("get key material: decrypt private key: %w", err)
 	}
+	outcome = "success"
 	return keyMaterial(key, string(privateKey)), nil
 }
 

@@ -23,6 +23,7 @@ const syncTestMasterKey = "correct horse battery staple"
 
 func TestSyncServiceExportImportRestoresEncryptedFullSnapshot(t *testing.T) {
 	db := testutil.NewTestDB(t)
+	require.NoError(t, store.SetAuditEnabled(db, true))
 	setSyncMasterKey(t, db, syncTestMasterKey)
 	folder, err := store.CreateFolder(db, "生产环境", nil)
 	require.NoError(t, err)
@@ -74,6 +75,7 @@ func TestSyncServiceRequiresMasterKey(t *testing.T) {
 
 func TestSyncServiceImportRejectsWrongMasterKey(t *testing.T) {
 	db := testutil.NewTestDB(t)
+	require.NoError(t, store.SetAuditEnabled(db, true))
 	setSyncMasterKey(t, db, syncTestMasterKey)
 	path := filepath.Join(t.TempDir(), "backup.msshbackup")
 	require.NoError(t, NewSyncService(db, testutil.NewTestLogger()).Export(path))
@@ -126,6 +128,7 @@ func TestCloudSyncUploadDownloadAndConflict(t *testing.T) {
 	defer server.Close()
 
 	db := testutil.NewTestDB(t)
+	require.NoError(t, store.SetAuditEnabled(db, true))
 	setSyncMasterKey(t, db, syncTestMasterKey)
 	_, err := store.CreateSession(db, model.Session{Name: "cloud", Host: "10.0.0.1", Port: 22, Username: "root", AuthMethod: model.AuthPassword, KeepAlive: 30, TermType: "xterm"})
 	require.NoError(t, err)
@@ -134,6 +137,10 @@ func TestCloudSyncUploadDownloadAndConflict(t *testing.T) {
 	require.NoError(t, syncService.TestCloudConnection(server.URL, "", ""))
 	assert.Equal(t, `"upload"`, settingValue(t, db, syncDirectionSetting))
 	assert.Equal(t, `2`, settingValue(t, db, syncVersionSetting))
+	auditEvents, err := store.ListAuditEvents(db, model.AuditFilter{Action: "cloud_upload", Limit: 10})
+	require.NoError(t, err)
+	require.Len(t, auditEvents, 1)
+	assert.NotContains(t, auditEvents[0].Summary, server.URL)
 
 	db2 := testutil.NewTestDB(t)
 	setSyncMasterKey(t, db2, syncTestMasterKey)

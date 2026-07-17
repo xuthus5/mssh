@@ -3,6 +3,8 @@
 
 export {
     AboutInfo,
+    AuditEvent,
+    AuditFilter,
     AuthMethod,
     BuiltinThemeResetResult,
     CursorStyle,

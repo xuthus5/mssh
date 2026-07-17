@@ -17,6 +17,7 @@ import (
 	"time"
 
 	backupcrypto "github.com/xuthus5/mssh/internal/crypto"
+	"github.com/xuthus5/mssh/internal/model"
 )
 
 const (
@@ -57,6 +58,10 @@ type ExportData struct {
 }
 
 func (s *SyncService) Export(path string) error {
+	outcome := "failed"
+	defer func() {
+		recordAudit(s.db, s.logger, model.AuditEvent{Action: "export", TargetType: "backup", Summary: "导出加密配置", Outcome: outcome})
+	}()
 	masterKey, err := s.masterKey()
 	if err != nil {
 		return fmt.Errorf("export: %w", err)
@@ -73,10 +78,15 @@ func (s *SyncService) Export(path string) error {
 		return fmt.Errorf("export: %w", err)
 	}
 	s.logger.Info("exported encrypted configuration", "path", path)
+	outcome = "success"
 	return nil
 }
 
 func (s *SyncService) Import(path string) error {
+	outcome := "failed"
+	defer func() {
+		recordAudit(s.db, s.logger, model.AuditEvent{Action: "import", TargetType: "backup", Summary: "导入加密配置", Outcome: outcome})
+	}()
 	masterKey, err := s.masterKey()
 	if err != nil {
 		return fmt.Errorf("import: %w", err)
@@ -107,6 +117,7 @@ func (s *SyncService) Import(path string) error {
 		return fmt.Errorf("import: %w", err)
 	}
 	s.logger.Info("imported encrypted configuration", "path", path)
+	outcome = "success"
 	return nil
 }
 
@@ -384,6 +395,10 @@ func (s *SyncService) TestCloudConnection(endpoint, username, password string) e
 }
 
 func (s *SyncService) SyncToCloud(endpoint, username, password string) error {
+	outcome := "failed"
+	defer func() {
+		recordAudit(s.db, s.logger, model.AuditEvent{Action: "cloud_upload", TargetType: "backup", Summary: "上传云端配置", Outcome: outcome})
+	}()
 	masterKey, err := s.masterKey()
 	if err != nil {
 		return err
@@ -417,10 +432,18 @@ func (s *SyncService) SyncToCloud(endpoint, username, password string) error {
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
 		return fmt.Errorf("cloud upload returned %s", response.Status)
 	}
-	return s.saveCloudMetadata(response.Header.Get("ETag"), "upload")
+	if err := s.saveCloudMetadata(response.Header.Get("ETag"), "upload"); err != nil {
+		return err
+	}
+	outcome = "success"
+	return nil
 }
 
 func (s *SyncService) SyncFromCloud(endpoint, username, password string) error {
+	outcome := "failed"
+	defer func() {
+		recordAudit(s.db, s.logger, model.AuditEvent{Action: "cloud_download", TargetType: "backup", Summary: "下载云端配置", Outcome: outcome})
+	}()
 	request, err := cloudRequest(http.MethodGet, endpoint, username, password, nil)
 	if err != nil {
 		return err
@@ -454,7 +477,11 @@ func (s *SyncService) SyncFromCloud(endpoint, username, password string) error {
 	if err := s.restore(data); err != nil {
 		return err
 	}
-	return s.saveCloudMetadata(response.Header.Get("ETag"), "download")
+	if err := s.saveCloudMetadata(response.Header.Get("ETag"), "download"); err != nil {
+		return err
+	}
+	outcome = "success"
+	return nil
 }
 
 func readCloudBackup(reader io.Reader) ([]byte, error) {
