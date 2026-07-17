@@ -3,6 +3,9 @@ package service
 import (
 	"database/sql"
 	"encoding/json"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
@@ -96,6 +99,81 @@ func TestValidateSnapshotRejectsUnknownColumnsBeforeRestore(t *testing.T) {
 	data.Tables["sessions"] = append(data.Tables["sessions"], map[string]any{"unknown_column": "bad"})
 	err = validateSnapshot(db, data)
 	assert.ErrorContains(t, err, "unknown column unknown_column")
+}
+
+func TestCloudSyncUploadDownloadAndConflict(t *testing.T) {
+	var content []byte
+	etag := ""
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if request.Method == http.MethodPut {
+			if (etag == "" && request.Header.Get("If-None-Match") != "*") || (etag != "" && request.Header.Get("If-Match") != etag) {
+				writer.WriteHeader(http.StatusPreconditionFailed)
+				return
+			}
+			content, _ = io.ReadAll(request.Body)
+			etag = `"v1"`
+			writer.Header().Set("ETag", etag)
+			writer.WriteHeader(http.StatusNoContent)
+			return
+		}
+		if len(content) == 0 {
+			writer.WriteHeader(http.StatusNotFound)
+			return
+		}
+		writer.Header().Set("ETag", etag)
+		_, _ = writer.Write(content)
+	}))
+	defer server.Close()
+
+	db := testutil.NewTestDB(t)
+	setSyncMasterKey(t, db, syncTestMasterKey)
+	_, err := store.CreateSession(db, model.Session{Name: "cloud", Host: "10.0.0.1", Port: 22, Username: "root", AuthMethod: model.AuthPassword, KeepAlive: 30, TermType: "xterm"})
+	require.NoError(t, err)
+	syncService := NewSyncService(db, testutil.NewTestLogger())
+	require.NoError(t, syncService.SyncToCloud(server.URL, "", ""))
+	require.NoError(t, syncService.TestCloudConnection(server.URL, "", ""))
+	assert.Equal(t, `"upload"`, settingValue(t, db, syncDirectionSetting))
+	assert.Equal(t, `2`, settingValue(t, db, syncVersionSetting))
+
+	db2 := testutil.NewTestDB(t)
+	setSyncMasterKey(t, db2, syncTestMasterKey)
+	syncService2 := NewSyncService(db2, testutil.NewTestLogger())
+	require.NoError(t, syncService2.SyncFromCloud(server.URL, "", ""))
+	assert.Equal(t, `"download"`, settingValue(t, db2, syncDirectionSetting))
+	sessions, err := store.ListSessions(db2, nil)
+	require.NoError(t, err)
+	found := false
+	for _, session := range sessions {
+		if session.Name == "cloud" {
+			found = true
+		}
+	}
+	require.True(t, found)
+
+	etag = `"remote-change"`
+	err = syncService.SyncToCloud(server.URL, "", "")
+	require.ErrorContains(t, err, "conflict")
+}
+
+func TestReadCloudBackupRejectsOversizedPayload(t *testing.T) {
+	_, err := readCloudBackup(io.LimitReader(zeroReader{}, maxCloudBackupSize+1))
+	require.ErrorContains(t, err, "exceeds")
+}
+
+type zeroReader struct{}
+
+func (zeroReader) Read(buffer []byte) (int, error) {
+	for index := range buffer {
+		buffer[index] = 0
+	}
+	return len(buffer), nil
+}
+
+func settingValue(t *testing.T, db *sql.DB, key string) string {
+	t.Helper()
+	var value string
+	require.NoError(t, db.QueryRow("SELECT value FROM settings WHERE key = ?", key).Scan(&value))
+	return value
 }
 
 func setSyncMasterKey(t *testing.T, db *sql.DB, key string) {

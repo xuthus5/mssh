@@ -43,6 +43,10 @@ export interface SyncConfig {
   username: string
   password: string
   masterKey?: string
+  etag?: string
+  lastSyncedAt?: string
+  lastDirection?: 'upload' | 'download' | ''
+  formatVersion?: number
 }
 
 function keyTypeName(type: KeyType): KeyInfo['type'] {
@@ -135,23 +139,39 @@ export function useKeySettings() {
 function useSyncSettings() {
   const [sync, setSync] = useState<SyncConfig>({ enabled: false, url: '', username: '', password: '', masterKey: '' })
   const revision = useRef(0)
+  const persistSync = useCallback(async (config: SyncConfig) => {
+    await SettingService.SetMany([settingEntry('sync.enabled', config.enabled), settingEntry('sync.url', config.url), settingEntry('sync.username', config.username), settingEntry('sync.master_key', config.masterKey)])
+  }, [])
   const saveSync = useCallback(async (config: SyncConfig) => {
     try {
       revision.current++
-      await SettingService.SetMany([settingEntry('sync.enabled', config.enabled), settingEntry('sync.url', config.url), settingEntry('sync.username', config.username), settingEntry('sync.master_key', config.masterKey)])
+      await persistSync(config)
       setSync(config)
-    } catch (error) { logger.debug('saveSync error', error) }
-  }, [])
+      toast('同步配置已保存', 'success')
+    } catch (error) { keyOperationFailed('保存同步配置', error) }
+  }, [persistSync])
   const loadSync = useCallback(async () => {
     try {
       const currentRevision = revision.current
-      const settings = await SettingService.GetMany(['sync.enabled', 'sync.url', 'sync.username', 'sync.master_key'])
+      const settings = await SettingService.GetMany(['sync.enabled', 'sync.url', 'sync.username', 'sync.master_key', 'sync.etag', 'sync.last_at', 'sync.last_direction', 'sync.format_version'])
       const value = <T,>(key: string, fallback: T) => settings[key] ? JSON.parse(settings[key].value) as T : fallback
-      if (currentRevision === revision.current) setSync({ enabled: value('sync.enabled', false), url: value('sync.url', ''), username: value('sync.username', ''), password: '', masterKey: value('sync.master_key', '') })
+      if (currentRevision === revision.current) setSync({ enabled: value('sync.enabled', false), url: value('sync.url', ''), username: value('sync.username', ''), password: '', masterKey: value('sync.master_key', ''), etag: value('sync.etag', ''), lastSyncedAt: value('sync.last_at', ''), lastDirection: value('sync.last_direction', ''), formatVersion: value('sync.format_version', 0) })
     } catch (error) { logger.debug('loadSync error', error) }
   }, [])
   useEffect(() => { void loadSync() }, [loadSync])
-  return { sync, saveSync }
+  const runCloud = useCallback(async (action: string, config: SyncConfig, operation: () => Promise<void>) => {
+    try {
+      revision.current++
+      await persistSync(config)
+      await operation()
+      await loadSync()
+      toast(action, 'success')
+    } catch (error) { keyOperationFailed(action, error) }
+  }, [loadSync, persistSync])
+  const testCloud = useCallback(async (config: SyncConfig) => { await runCloud('云同步连接成功', config, () => SyncService.TestCloudConnection(config.url, config.username, config.password)) }, [runCloud])
+  const pushCloud = useCallback(async (config: SyncConfig) => { await runCloud('配置已上传到云端', config, () => SyncService.SyncToCloud(config.url, config.username, config.password)) }, [runCloud])
+  const pullCloud = useCallback(async (config: SyncConfig) => { await runCloud('云端配置已导入', config, () => SyncService.SyncFromCloud(config.url, config.username, config.password)) }, [runCloud])
+  return { sync, saveSync, testCloud, pushCloud, pullCloud }
 }
 
 function useConfigTransfer() {

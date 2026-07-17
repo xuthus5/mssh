@@ -13,10 +13,14 @@ export function Import(path: string): $CancellablePromise<void> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.SyncService.Import", path);
 }
 
-export function SyncFromCloud(): $CancellablePromise<void> {
-    return $Call.ByName("github.com/xuthus5/mssh/internal/service.SyncService.SyncFromCloud");
+export function SyncFromCloud(endpoint: string, username: string, password: string): $CancellablePromise<void> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.SyncService.SyncFromCloud", endpoint, username, password);
 }
 
-export function SyncToCloud(): $CancellablePromise<void> {
-    return $Call.ByName("github.com/xuthus5/mssh/internal/service.SyncService.SyncToCloud");
+export function SyncToCloud(endpoint: string, username: string, password: string): $CancellablePromise<void> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.SyncService.SyncToCloud", endpoint, username, password);
+}
+
+export function TestCloudConnection(endpoint: string, username: string, password: string): $CancellablePromise<void> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.SyncService.TestCloudConnection", endpoint, username, password);
 }
