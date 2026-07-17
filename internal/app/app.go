@@ -244,7 +244,7 @@ func initializeMasterKey(dataDir string, keychain crypto.KeychainAdapter, logger
 
 func initializeServices(input serviceInitialization) (*App, error) {
 	adapter := &cryptoAdapter{key: input.masterKey}
-	sessionSvc := service.NewSessionService(input.db, input.eventBus, 30, input.opts.DataDir, adapter, input.logger)
+	sessionSvc := service.NewSessionService(input.db, input.eventBus, service.DefaultKeepAliveSeconds, input.opts.DataDir, adapter, input.logger)
 	terminalSvc := service.NewTerminalService(sessionSvc, input.eventBus, 32, input.logger)
 	logSvc := service.NewLogService(input.db, input.opts.DataDir, input.logger)
 	themeSvc := service.NewThemeService(input.db, input.logger)

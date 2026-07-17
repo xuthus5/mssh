@@ -2,13 +2,17 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"path/filepath"
 
+	"github.com/xuthus5/mssh/internal/model"
 	ssh "github.com/xuthus5/mssh/internal/ssh"
 	"github.com/xuthus5/mssh/internal/store"
 	"github.com/xuthus5/mssh/pkg/event"
 )
+
+const defaultKeepAliveSettingKey = "terminal.default_keep_alive"
 
 func (s *SessionService) connect(ctx context.Context, sessionID int64, emitState bool) (string, error) {
 	s.logger.Info("connecting to session", "sessionID", sessionID)
@@ -18,6 +22,9 @@ func (s *SessionService) connect(ctx context.Context, sessionID int64, emitState
 	s.eventBus.Emit(event.ConnectionAttempt, event.ConnectionStatePayload{AttemptID: attemptID, State: "connecting"})
 	sess, err := store.GetSession(s.db, sessionID)
 	if err != nil {
+		return "", fmt.Errorf("connect: %w", err)
+	}
+	if err := s.resolveKeepAlive(sess); err != nil {
 		return "", fmt.Errorf("connect: %w", err)
 	}
 	authMethods, err := s.buildAuthMethods(sess)
@@ -46,6 +53,27 @@ func (s *SessionService) connect(ctx context.Context, sessionID int64, emitState
 		s.eventBus.Emit(event.ConnectionState, event.ConnectionStatePayload{TerminalID: terminalID, AttemptID: attemptID, State: "connected"})
 	}
 	return terminalID, nil
+}
+
+func (s *SessionService) resolveKeepAlive(session *model.Session) error {
+	if session.KeepAlive > 0 {
+		return nil
+	}
+	setting, err := store.GetSettingEntry(s.db, defaultKeepAliveSettingKey)
+	if err != nil {
+		return fmt.Errorf("load default keep-alive: %w", err)
+	}
+	keepAlive := s.keepAlive
+	if setting != nil {
+		var configured int
+		if parseErr := json.Unmarshal([]byte(setting.Value), &configured); parseErr != nil || configured <= 0 {
+			s.logger.Warn("invalid default keep-alive setting", "value", setting.Value, "error", parseErr)
+		} else {
+			keepAlive = configured
+		}
+	}
+	session.KeepAlive = keepAlive
+	return nil
 }
 
 func (s *SessionService) registerConnectAttempt(cancel context.CancelFunc) string {

@@ -24,6 +24,8 @@ type EventBus interface {
 	Emit(name string, payload interface{})
 }
 
+const DefaultKeepAliveSeconds = 60
+
 type SessionService struct {
 	db        *sql.DB
 	mu        sync.RWMutex
@@ -42,6 +44,9 @@ type connectAttempt struct {
 }
 
 func NewSessionService(db *sql.DB, eventBus EventBus, keepAlive int, dataDir string, crypto KeyCrypto, logger *slog.Logger) *SessionService {
+	if keepAlive <= 0 {
+		keepAlive = DefaultKeepAliveSeconds
+	}
 	return &SessionService{
 		db:        db,
 		conns:     make(map[string]*ssh.ClientWrapper),
