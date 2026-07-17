@@ -1,10 +1,11 @@
-import { useState, type FormEvent } from 'react'
+import { useCallback, useState, type FormEvent } from 'react'
 import { Eye, EyeOff } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import type { SyncConfig } from '@/hooks/useSettings'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { useAsyncAction } from '@/hooks/useAsyncAction'
 
 interface Props {
   sync: SyncConfig
@@ -24,9 +25,10 @@ export function SyncPanel({ sync, onSave, onExport, onImport, onTestCloud, onPus
   const [masterKey, setMasterKey] = useState(sync.masterKey ?? '')
   const [masterKeyConfirmation, setMasterKeyConfirmation] = useState(sync.masterKey ?? '')
   const [showMasterKey, setShowMasterKey] = useState(false)
-  const [cloudPending, setCloudPending] = useState(false)
   const masterKeyValid = masterKey.length >= 12 && masterKey === masterKeyConfirmation
   const cloudConfig = { enabled, url, username, password, masterKey }
+  const executeCloud = useCallback(async (input: { action: (config: SyncConfig) => Promise<void>; config: SyncConfig }) => input.action(input.config), [])
+  const cloud = useAsyncAction(executeCloud)
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault()
@@ -35,9 +37,7 @@ export function SyncPanel({ sync, onSave, onExport, onImport, onTestCloud, onPus
   }
 
   const runCloudAction = async (action: (config: SyncConfig) => Promise<void>) => {
-    if (cloudPending) return
-    setCloudPending(true)
-    try { await action(cloudConfig) } finally { setCloudPending(false) }
+    await cloud.run({ action, config: cloudConfig }).catch(() => undefined)
   }
 
   return (
@@ -118,9 +118,10 @@ export function SyncPanel({ sync, onSave, onExport, onImport, onTestCloud, onPus
             </div>
           </div>
           {sync.lastSyncedAt && <div className="rounded-xl border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground" data-testid="cloud-sync-version">备份格式 v{sync.formatVersion || 2} · 最近{sync.lastDirection === 'download' ? '下载' : '上传'} {new Date(sync.lastSyncedAt).toLocaleString()} · ETag {sync.etag || '未提供'}</div>}
+          {cloud.error && <Alert variant="destructive"><AlertDescription>{cloud.error}</AlertDescription></Alert>}
           <div className="flex justify-end">
-            <div className="flex flex-wrap justify-end gap-2"><Button type="button" size="sm" variant="outline" disabled={cloudPending || !url} onClick={() => void runCloudAction(onTestCloud)}>测试连接</Button><Button type="button" size="sm" variant="outline" disabled={cloudPending || !url || !masterKeyValid} onClick={() => void runCloudAction(onPullCloud)}>从云端下载</Button><Button type="button" size="sm" variant="outline" disabled={cloudPending || !url || !masterKeyValid} onClick={() => void runCloudAction(onPushCloud)}>上传到云端</Button></div>
-            <Button type="submit" size="sm" disabled={cloudPending || !masterKeyValid}>
+            <div className="flex flex-wrap justify-end gap-2"><Button type="button" size="sm" variant="outline" disabled={cloud.pending || !url} onClick={() => void runCloudAction(onTestCloud)}>测试连接</Button><Button type="button" size="sm" variant="outline" disabled={cloud.pending || !url || !masterKeyValid} onClick={() => void runCloudAction(onPullCloud)}>从云端下载</Button><Button type="button" size="sm" variant="outline" disabled={cloud.pending || !url || !masterKeyValid} onClick={() => void runCloudAction(onPushCloud)}>上传到云端</Button></div>
+            <Button type="submit" size="sm" disabled={cloud.pending || !masterKeyValid}>
               保存同步配置
             </Button>
           </div>
