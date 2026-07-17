@@ -100,6 +100,16 @@ describe('TerminalToolbar', () => {
     expect(screen.getByTitle('关闭终端搜索')).toBeInTheDocument()
   })
 
+  it('places command history directly after terminal search', () => {
+    render(<TerminalToolbar terminalID="primary-1" sessionId={1} isRecording={false} recordingLogId={null}
+      onToggleRecording={vi.fn()} onOpenFiles={vi.fn()} onSplit={vi.fn()} splitDisabled={false} paneCount={1}
+      searchOpen={false} onToggleSearch={vi.fn()} onOpenHistory={vi.fn()} />)
+
+    const toolbarTitles = screen.getAllByRole('button').map((button) => button.getAttribute('title'))
+    expect(toolbarTitles.indexOf('命令历史')).toBe(toolbarTitles.indexOf('搜索终端内容') + 1)
+    expect(toolbarTitles.indexOf('命令历史')).toBeLessThan(toolbarTitles.indexOf('文件管理'))
+  })
+
   it('runs toolbar callbacks and bridges recording list actions', async () => {
     const onOpenFiles = vi.fn()
     const onSplit = vi.fn()

@@ -6,6 +6,8 @@ import { runTerminalRuntime } from '@/components/terminal/terminalRuntime'
 import { logger } from '@/lib/logger'
 import { TerminalService } from '@/lib/wails'
 
+const MAX_ACTIVATION_FRAMES = 4
+
 interface ActivationRefs {
   termRef: RefObject<Terminal | null>
   fitAddonRef: RefObject<FitAddon | null>
@@ -24,7 +26,7 @@ export function useTerminalActivation({ refs, active, sequence, reportRuntimeErr
   active: boolean
   sequence: number
   reportRuntimeError: TerminalRuntimeErrorReporter
-  recover: (term: Terminal, fitAddon: FitAddon) => void
+  recover: (term: Terminal, fitAddon: FitAddon) => boolean
 }) {
   useEffect(() => {
     const term = refs.termRef.current
@@ -36,14 +38,32 @@ export function useTerminalActivation({ refs, active, sequence, reportRuntimeErr
       return
     }
     refs.recoveryPendingRef.current = true
-    refs.activationFrameRef.current = window.requestAnimationFrame(() => {
+    let cancelled = false
+    let attempts = 0
+    const scheduleRecovery = () => {
+      if (cancelled || refs.activationFrameRef.current !== null) return
+      refs.activationFrameRef.current = window.requestAnimationFrame(recoverOnFrame)
+    }
+    const recoverOnFrame = () => {
       refs.activationFrameRef.current = null
-      runTerminalRuntime(reportRuntimeError, 'terminal activation', () => {
+      attempts += 1
+      let recovered = false
+      const succeeded = runTerminalRuntime(reportRuntimeError, 'terminal activation', () => {
         const fitAddon = refs.fitAddonRef.current
-        if (fitAddon) recover(term, fitAddon)
+        if (fitAddon) recovered = recover(term, fitAddon)
       })
-    })
-    return () => cancelFrame(refs.activationFrameRef)
+      if (cancelled || !succeeded || recovered || attempts >= MAX_ACTIVATION_FRAMES) return
+      scheduleRecovery()
+    }
+    scheduleRecovery()
+    const fontsReady = document.fonts?.ready
+    if (fontsReady) {
+      void fontsReady.then(scheduleRecovery, (error: unknown) => logger.error('terminal font readiness error', error))
+    }
+    return () => {
+      cancelled = true
+      cancelFrame(refs.activationFrameRef)
+    }
   }, [active, reportRuntimeError, sequence])
 }
 
