@@ -17,7 +17,7 @@ import type { AppState, Tab } from '@/store/appStore'
 type StoreSet = StoreApi<AppState>['setState']
 type StoreGet = StoreApi<AppState>['getState']
 type TransferActions = Pick<AppState, 'addTransfer' | 'removeTransfer' | 'updateTransfer' | 'clearFinishedTransfers' | 'setTransferCenterOpen'>
-type TabActions = Pick<AppState, 'openTab' | 'closeTab' | 'removeTabLocal' | 'replaceTerminalConnection'>
+type TabActions = Pick<AppState, 'openTab' | 'closeTab' | 'removeTabLocal' | 'replaceTerminalConnection' | 'updateTerminalWorkspace'>
 type NavigationActions = Pick<AppState, 'activateWorkspace' | 'setOverviewSection' | 'leaveOverview' | 'activateTab' | 'requestTerminalFocus' | 'toggleNavigation' | 'setSidebarWidth'>
 type PoolActions = Pick<AppState, 'registerTerminal' | 'unregisterTerminal' | 'updateLastUsed' | 'evictLRU'>
 type StatusActions = Pick<AppState, 'setConnectionStatus' | 'setActivePane' | 'setRecordingState' | 'setTunnelState' | 'setAppStatus' | 'setTerminalTheme' | 'setMaxPoolSize'>
@@ -148,6 +148,9 @@ export function createTabActions(set: StoreSet, get: StoreGet): TabActions {
       })
       return replaced
     },
+    updateTerminalWorkspace: (tabID, updates) => set((state) => ({
+      tabs: state.tabs.map((tab) => tab.id === tabID && tab.type === 'terminal' ? { ...tab, ...updates } : tab),
+    })),
   }
 }
 

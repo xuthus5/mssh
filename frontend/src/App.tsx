@@ -13,6 +13,7 @@ import { TerminalLayers } from '@/components/terminal/TerminalLayers'
 import { SessionQuickSearchHost } from '@/components/session/SessionQuickSearchHost'
 import { SESSION_QUICK_SEARCH_EVENT } from '@/lib/sessionQuickSearch'
 import { GeneralSettingsRuntime } from '@/components/layout/GeneralSettingsRuntime'
+import { WorkspacePersistence } from '@/components/layout/WorkspacePersistence'
 
 function activeTab(state: AppState): Tab | undefined {
   const surface = state.activeSurface
@@ -101,6 +102,7 @@ export default function App() {
     <div className="flex h-screen w-screen flex-col bg-background">
       <SessionWorkspaceProvider>
         <GeneralSettingsRuntime />
+        <WorkspacePersistence />
         <WindowTitleBar />
         <div className="flex min-h-0 flex-1">
           <div className={activeSurface === null ? 'hidden' : 'contents'}><Sidebar /></div>
