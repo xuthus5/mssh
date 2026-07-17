@@ -24,13 +24,13 @@ describe('WorkspacePersistence', () => {
 
   it('restores saved workspace intents and persists later layout changes', async () => {
     services.get.mockResolvedValue({ value: JSON.stringify({
-      version: 1,
-      tabs: [{ type: 'terminal', title: 'prod', sessionId: 7, split: true, splitDirection: 'vertical', toolPanel: 'history' }],
+      version: 2,
+      tabs: [{ type: 'terminal', title: 'prod', sessionId: 7, toolPanel: 'history' }],
       active: { type: 'tab', index: 0 }, workspaceTab: 'sessions', overviewSection: 'keys',
     }) })
     render(<WorkspacePersistence />)
 
-    await waitFor(() => expect(useAppStore.getState().tabs[0]).toMatchObject({ terminalId: 'fresh-terminal', split: true, toolPanel: 'history' }))
+    await waitFor(() => expect(useAppStore.getState().tabs[0]).toMatchObject({ terminalId: 'fresh-terminal', toolPanel: 'history' }))
     act(() => useAppStore.getState().updateTerminalWorkspace('terminal-fresh-terminal', { toolPanel: 'system' }))
     await waitFor(() => expect(services.set).toHaveBeenCalled(), { timeout: 1000 })
 

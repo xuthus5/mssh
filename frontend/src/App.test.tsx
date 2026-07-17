@@ -41,7 +41,7 @@ vi.mock('@/components/terminal/TerminalTab', async () => {
       terminalID: string
       active: boolean
       focusRequest: { sequence: number }
-      onOpenFiles: () => void
+      onOpenFiles: (terminalID: string) => void
     }) => {
       const [instance] = useState(() => `terminal-instance-${++layerLifecycle.nextInstance}`)
       const handledSequence = useRef(0)
@@ -54,7 +54,7 @@ vi.mock('@/components/terminal/TerminalTab', async () => {
         handledSequence.current = focusRequest.sequence
       }, [active, focusRequest.sequence, terminalID])
       return <div data-testid={`terminal-${terminalID}`} data-active={String(active)} data-instance={instance}>
-        terminal<button type="button" onClick={onOpenFiles}>files</button>
+        terminal<button type="button" onClick={() => onOpenFiles(terminalID)}>files</button>
       </div>
     },
   }

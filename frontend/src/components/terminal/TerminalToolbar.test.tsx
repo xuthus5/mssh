@@ -60,7 +60,7 @@ describe('TerminalToolbar', () => {
       ]),
     })
     render(<TerminalToolbar terminalID="primary-1" sessionId={1} isRecording={false} recordingLogId={null}
-      onToggleRecording={vi.fn()} hostname="server" onOpenFiles={vi.fn()} onToggleSplit={vi.fn()} split />)
+      onToggleRecording={vi.fn()} hostname="server" onOpenFiles={vi.fn()} onSplit={vi.fn()} splitDisabled={false} paneCount={2} />)
 
     await userEvent.click(screen.getByTitle('复制 (Ctrl+Shift+C)'))
     await userEvent.click(screen.getByTitle('粘贴 (Ctrl+Shift+V)'))
@@ -77,7 +77,7 @@ describe('TerminalToolbar', () => {
 
   it('opens tunnel management beside the file action', async () => {
     render(<TerminalToolbar terminalID="primary-1" sessionId={7} isRecording={false} recordingLogId={null}
-      onToggleRecording={vi.fn()} hostname="server" onOpenFiles={vi.fn()} onToggleSplit={vi.fn()} split={false} />)
+      onToggleRecording={vi.fn()} hostname="server" onOpenFiles={vi.fn()} onSplit={vi.fn()} splitDisabled={false} paneCount={1} />)
 
     expect(screen.getByTitle('隧道管理')).toBeInTheDocument()
     await userEvent.click(screen.getByTitle('隧道管理'))
@@ -87,14 +87,15 @@ describe('TerminalToolbar', () => {
 
   it('runs toolbar callbacks and bridges recording list actions', async () => {
     const onOpenFiles = vi.fn()
-    const onToggleSplit = vi.fn()
+    const onSplit = vi.fn()
     const onToggleRecording = vi.fn()
     const loggerError = vi.spyOn(logger, 'error').mockImplementation(() => {})
     render(<TerminalToolbar terminalID="primary-1" sessionId={1} isRecording recordingLogId={null}
-      onToggleRecording={onToggleRecording} onOpenFiles={onOpenFiles} onToggleSplit={onToggleSplit} split={false} />)
+      onToggleRecording={onToggleRecording} onOpenFiles={onOpenFiles} onSplit={onSplit} splitDisabled={false} paneCount={1} />)
 
     await userEvent.click(screen.getByTitle('文件管理'))
-    await userEvent.click(screen.getByTitle('分屏'))
+    await userEvent.click(screen.getByTitle('创建分屏'))
+    await userEvent.click(screen.getByText('向右分屏'))
     await userEvent.click(screen.getByTitle('停止录制'))
     const historyButton = screen.getByTitle('录制记录')
     await userEvent.click(historyButton)
@@ -108,7 +109,7 @@ describe('TerminalToolbar', () => {
     await userEvent.click(screen.getByRole('button', { name: 'log delete' }))
 
     expect(onOpenFiles).toHaveBeenCalledOnce()
-    expect(onToggleSplit).toHaveBeenCalledOnce()
+    expect(onSplit).toHaveBeenCalledWith('horizontal')
     expect(onToggleRecording).toHaveBeenCalledOnce()
     expect(useAppStore.getState().tabs).toContainEqual(expect.objectContaining({
       id: 'playback-回放 #9',
@@ -131,7 +132,7 @@ describe('TerminalToolbar', () => {
     const empty = terminal('')
     useAppStore.setState({ terminalPool: new Map([['primary-1', { terminal: empty as never, lastUsed: 0 }]]) })
     const view = render(<TerminalToolbar terminalID="primary-1" sessionId={1} isRecording={false} recordingLogId={null}
-      onToggleRecording={vi.fn()} onOpenFiles={vi.fn()} onToggleSplit={vi.fn()} split={false} />)
+      onToggleRecording={vi.fn()} onOpenFiles={vi.fn()} onSplit={vi.fn()} splitDisabled={false} paneCount={1} />)
 
     await userEvent.click(screen.getByTitle('复制 (Ctrl+Shift+C)'))
     expect(writeText).not.toHaveBeenCalled()
@@ -139,15 +140,22 @@ describe('TerminalToolbar', () => {
 
     useAppStore.setState({ terminalPool: new Map() })
     view.rerender(<TerminalToolbar terminalID="primary-1" sessionId={1} isRecording={false} recordingLogId={null}
-      onToggleRecording={vi.fn()} onOpenFiles={vi.fn()} onToggleSplit={vi.fn()} split={false} />)
+      onToggleRecording={vi.fn()} onOpenFiles={vi.fn()} onSplit={vi.fn()} splitDisabled={false} paneCount={1} />)
     await userEvent.click(screen.getByTitle('粘贴 (Ctrl+Shift+V)'))
     await userEvent.click(screen.getByTitle('清屏 (Ctrl+Shift+L)'))
     expect(readText).not.toHaveBeenCalled()
   })
 
+  it('disables splitting and explains the eight-pane limit', () => {
+    render(<TerminalToolbar terminalID="primary-1" sessionId={1} isRecording={false} recordingLogId={null}
+      onToggleRecording={vi.fn()} onOpenFiles={vi.fn()} onSplit={vi.fn()} splitDisabled paneCount={8} />)
+
+    expect(screen.getByTitle('已达到 8 个终端窗格上限')).toBeDisabled()
+  })
+
   it('keeps the recording popover open while its delete dialog is active', async () => {
     render(<TerminalToolbar terminalID="primary-1" sessionId={1} isRecording={false} recordingLogId={null}
-      onToggleRecording={vi.fn()} onOpenFiles={vi.fn()} onToggleSplit={vi.fn()} split={false} />)
+      onToggleRecording={vi.fn()} onOpenFiles={vi.fn()} onSplit={vi.fn()} splitDisabled={false} paneCount={1} />)
 
     await userEvent.click(screen.getByTitle('录制记录'))
     await userEvent.click(screen.getByRole('button', { name: 'block close' }))

@@ -9,8 +9,6 @@ export interface TerminalTab {
   terminalId: string
   sessionId: number
   terminalInstance?: number
-  split?: boolean
-  splitDirection?: 'horizontal' | 'vertical'
   toolPanel?: 'files' | 'history' | 'system' | null
 }
 
@@ -125,7 +123,8 @@ export interface AppState {
   closeTab: (id: string) => Promise<void>
   removeTabLocal: (id: string) => void
   replaceTerminalConnection: (tabID: string, previousTerminalID: string, nextTerminalID: string) => boolean
-  updateTerminalWorkspace: (tabID: string, updates: Pick<Partial<TerminalTab>, 'split' | 'splitDirection' | 'toolPanel'>) => void
+  promoteTerminalConnection: (tabID: string, previousTerminalID: string, nextTerminalID: string) => boolean
+  updateTerminalWorkspace: (tabID: string, updates: Pick<Partial<TerminalTab>, 'toolPanel'>) => void
   activateWorkspace: (id: WorkspaceID) => void
   setOverviewSection: (section: OverviewSection) => void
   leaveOverview: () => void
@@ -135,6 +134,7 @@ export interface AppState {
   setSidebarWidth: (width: number) => void
   registerTerminal: (id: string, terminal: Terminal) => void
   unregisterTerminal: (id: string) => void
+  forgetTerminal: (id: string) => void
   updateLastUsed: (id: string) => void
   evictLRU: () => void
   setConnectionStatus: (id: string, status: ConnectionStatus) => void

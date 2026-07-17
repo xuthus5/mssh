@@ -4,28 +4,28 @@ import { createWorkspaceSnapshot, parseWorkspaceSnapshot, restoreWorkspaceSnapsh
 describe('workspace persistence', () => {
   it('persists terminal intent without stale backend identifiers', () => {
     const snapshot = createWorkspaceSnapshot({
-      tabs: [{ id: 'terminal-dead', title: 'prod', type: 'terminal', terminalId: 'dead', sessionId: 7, terminalInstance: 2, split: true, splitDirection: 'vertical', toolPanel: 'system' }],
+      tabs: [{ id: 'terminal-dead', title: 'prod', type: 'terminal', terminalId: 'dead', sessionId: 7, terminalInstance: 2, toolPanel: 'system' }],
       activeSurface: { type: 'terminal', id: 'terminal-dead' }, workspaceTab: 'sessions', overviewSection: 'keys',
     })
 
     expect(JSON.stringify(snapshot)).not.toContain('dead')
     expect(snapshot).toMatchObject({
       active: { type: 'tab', index: 0 },
-      tabs: [{ type: 'terminal', sessionId: 7, split: true, splitDirection: 'vertical', toolPanel: 'system' }],
+      tabs: [{ type: 'terminal', sessionId: 7, toolPanel: 'system' }],
     })
   })
 
   it('rejects obsolete or malformed layouts instead of maintaining compatibility code', () => {
     expect(() => parseWorkspaceSnapshot('{"version":0,"tabs":[]}')).toThrow('workspace layout is invalid')
-    expect(() => parseWorkspaceSnapshot('{"version":1,"tabs":[],"active":null,"workspaceTab":"bad","overviewSection":"sessions"}')).toThrow('workspace layout is invalid')
+    expect(() => parseWorkspaceSnapshot('{"version":2,"tabs":[],"active":null,"workspaceTab":"bad","overviewSection":"sessions"}')).toThrow('workspace layout is invalid')
   })
 
   it('reconnects valid session intents with new terminal IDs and restores active layout state', async () => {
     const snapshot: WorkspaceSnapshot = {
-      version: 1,
+      version: 2,
       tabs: [
-        { type: 'terminal', title: 'prod', sessionId: 7, terminalInstance: 1, split: true, splitDirection: 'vertical', toolPanel: 'files' },
-        { type: 'terminal', title: 'missing', sessionId: 8, split: false, splitDirection: 'horizontal', toolPanel: null },
+        { type: 'terminal', title: 'prod', sessionId: 7, terminalInstance: 1, toolPanel: 'files' },
+        { type: 'terminal', title: 'missing', sessionId: 8, toolPanel: null },
         { type: 'playback', title: 'recording', recordingPath: '/tmp/a.msshlog' },
       ],
       active: { type: 'tab', index: 0 }, workspaceTab: 'macros', overviewSection: 'tunnels',
@@ -36,7 +36,7 @@ describe('workspace persistence', () => {
 
     expect(openTerminal).toHaveBeenCalledWith(7)
     expect(restored.tabs).toHaveLength(2)
-    expect(restored.tabs[0]).toMatchObject({ terminalId: 'fresh-7', split: true, toolPanel: 'files' })
+    expect(restored.tabs[0]).toMatchObject({ terminalId: 'fresh-7', toolPanel: 'files' })
     expect(restored.activeSurface).toEqual({ type: 'terminal', id: 'terminal-fresh-7' })
     expect(restored.activePaneId).toBe('fresh-7')
     expect(restored.connectionStatus).toEqual({ 'fresh-7': 'connected' })
@@ -55,7 +55,7 @@ describe('workspace persistence', () => {
       return `fresh-${sessionID}`
     })
     const snapshot: WorkspaceSnapshot = {
-      version: 1,
+      version: 2,
       tabs: Array.from({ length: 8 }, (_, index) => ({ type: 'terminal' as const, title: `s${index}`, sessionId: index + 1 })),
       active: null, workspaceTab: 'sessions', overviewSection: 'sessions',
     }

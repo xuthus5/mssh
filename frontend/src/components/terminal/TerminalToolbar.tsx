@@ -1,5 +1,5 @@
 import { useCallback, useState, type Dispatch, type SetStateAction } from 'react'
-import { Activity, Circle, ClipboardPaste, Copy, FolderOpen, History, Network, Split, Square, Trash2 } from 'lucide-react'
+import { Activity, ChevronDown, Circle, ClipboardPaste, Columns2, Copy, FolderOpen, History, Network, Rows2, Split, Square, Trash2 } from 'lucide-react'
 import SessionLog from '@/components/terminal/SessionLog'
 import TunnelDialog from '@/components/session/TunnelDialog'
 import { useTunnelManager } from '@/hooks/useTunnelManager'
@@ -7,6 +7,8 @@ import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from '@/compone
 import { logger } from '@/lib/logger'
 import { LogService } from '@/lib/wails'
 import { useAppStore } from '@/store/appStore'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import type { SplitDirection } from '@/components/terminal/splitTree'
 
 interface TerminalToolbarProps {
   terminalID: string
@@ -16,8 +18,9 @@ interface TerminalToolbarProps {
   onToggleRecording: () => void
   hostname?: string
   onOpenFiles: () => void
-  onToggleSplit: () => void
-  split: boolean
+  onSplit: (direction: SplitDirection) => void
+  splitDisabled: boolean
+  paneCount: number
   onOpenHistory?: () => void
   onOpenSystem?: () => void
 }
@@ -84,14 +87,19 @@ function ClipboardActions({ copy, paste, clear }: { copy: () => void; paste: () 
   </>
 }
 
-function SplitAction({ active, onToggle }: { active: boolean; onToggle: () => void }) {
-  const className = active
-    ? 'bg-primary/20 text-primary'
-    : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
-  return <button type="button" className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-xs transition-colors ${className}`}
-    onClick={onToggle} title="分屏">
-    <Split className="h-3 w-3" /><span className="hidden sm:inline">分屏</span>
-  </button>
+function SplitAction({ disabled, paneCount, onSplit }: { disabled: boolean; paneCount: number; onSplit: (direction: SplitDirection) => void }) {
+  const [open, setOpen] = useState(false)
+  const title = paneCount >= 8 ? '已达到 8 个终端窗格上限' : '创建分屏'
+  return <DropdownMenu open={open} onOpenChange={setOpen}>
+    <DropdownMenuTrigger render={<button type="button" disabled={disabled}
+      className={`${actionClass} disabled:pointer-events-none disabled:opacity-45`} title={title} onClick={() => setOpen(true)} />}>
+      <Split className="h-3 w-3" /><span className="hidden sm:inline">分屏</span><ChevronDown className="size-3" />
+    </DropdownMenuTrigger>
+    <DropdownMenuContent align="end" className="min-w-36">
+      <DropdownMenuItem onClick={() => onSplit('horizontal')}><Columns2 />向右分屏</DropdownMenuItem>
+      <DropdownMenuItem onClick={() => onSplit('vertical')}><Rows2 />向下分屏</DropdownMenuItem>
+    </DropdownMenuContent>
+  </DropdownMenu>
 }
 
 function RecordingAction({ active, onToggle }: { active: boolean; onToggle: () => void }) {
@@ -141,7 +149,7 @@ function SessionLogPopover({ open, sessionId, setOpen, setBlocked, onOpenChange 
   </Popover>
 }
 
-interface ToolbarActionsProps extends Pick<TerminalToolbarProps, 'sessionId' | 'isRecording' | 'onToggleRecording' | 'onOpenFiles' | 'onToggleSplit' | 'split'> {
+interface ToolbarActionsProps extends Pick<TerminalToolbarProps, 'sessionId' | 'isRecording' | 'onToggleRecording' | 'onOpenFiles' | 'onSplit' | 'splitDisabled' | 'paneCount'> {
   clipboard: ReturnType<typeof useClipboardActions>
   logOpen: boolean
   setLogOpen: Dispatch<SetStateAction<boolean>>
@@ -165,7 +173,7 @@ function ToolbarActions(props: ToolbarActionsProps) {
     <button type="button" className={actionClass} onClick={props.onOpenHistory} title="命令历史"><History className="h-3 w-3" /><span className="hidden sm:inline">历史</span></button>
     <button type="button" className={actionClass} onClick={props.onOpenSystem} title="系统监控"><Activity className="h-3 w-3" /><span className="hidden sm:inline">系统</span></button>
     <div className="w-px h-4 bg-border mx-0.5" />
-    <SplitAction active={props.split} onToggle={props.onToggleSplit} />
+    <SplitAction disabled={props.splitDisabled} paneCount={props.paneCount} onSplit={props.onSplit} />
     <div className="w-px h-4 bg-border mx-0.5" />
     <RecordingAction active={props.isRecording} onToggle={props.onToggleRecording} />
     <SessionLogPopover open={props.logOpen} sessionId={props.sessionId} setOpen={props.setLogOpen}

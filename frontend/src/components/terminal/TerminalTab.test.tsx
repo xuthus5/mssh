@@ -1,3 +1,4 @@
+import { forwardRef, useImperativeHandle } from 'react'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -11,22 +12,21 @@ vi.mock('@/lib/wails', () => ({
     StopTerminalRecording: logService.stop,
   },
 }))
-vi.mock('@/components/terminal/TerminalEmulator', () => ({
-  TerminalEmulator: ({ focusRequest }: { focusRequest: { sequence: number; targetTerminalID?: string | null } }) => (
-    <div data-testid="terminal-emulator">{focusRequest.sequence}:{focusRequest.targetTerminalID ?? 'none'}</div>
-  ),
-}))
+const splitAction = vi.hoisted(() => vi.fn())
 vi.mock('@/components/terminal/TerminalSplit', () => ({
-  TerminalSplit: () => <div data-testid="terminal-split" />,
+  TerminalSplit: forwardRef(function MockTerminalSplit(_props, ref) {
+    useImperativeHandle(ref, () => ({ split: splitAction }))
+    return <div data-testid="terminal-split" />
+  }),
 }))
 vi.mock('@/components/terminal/TerminalToolbar', () => ({
-  TerminalToolbar: ({ isRecording, onToggleRecording, onToggleSplit }: {
+  TerminalToolbar: ({ isRecording, onToggleRecording, onSplit }: {
     isRecording: boolean
     onToggleRecording: () => void
-    onToggleSplit: () => void
+    onSplit: (direction: 'horizontal') => void
   }) => <div>
     <button type="button" onClick={onToggleRecording}>{isRecording ? '停止录制' : '开始录制'}</button>
-    <button type="button" onClick={onToggleSplit}>切换分屏</button>
+    <button type="button" onClick={() => onSplit('horizontal')}>向右分屏</button>
   </div>,
 }))
 
@@ -48,21 +48,16 @@ describe('TerminalTab', () => {
     })
   })
 
-  it('preserves the selected split pane and toggles the split viewport', () => {
+  it('routes repeated split actions to the persistent split workspace', () => {
     useAppStore.setState({ activePaneId: 'split-1' })
     render(<TerminalTab terminalID="term-1" sessionId={7} active focusRequest={focusRequest} onOpenFiles={vi.fn()} />)
     expect(useAppStore.getState().activePaneId).toBe('split-1')
-    expect(screen.getByTestId('terminal-emulator')).toBeInTheDocument()
-
-    fireEvent.click(screen.getByRole('button', { name: '切换分屏' }))
     expect(screen.getByTestId('terminal-split')).toBeInTheDocument()
-  })
 
-  it('does not pass a split-targeted request to the unsplit primary pane', () => {
-    render(<TerminalTab terminalID="term-1" sessionId={7} active
-      focusRequest={{ sequence: 3, targetTerminalID: 'split-1' }} onOpenFiles={vi.fn()} />)
-
-    expect(screen.getByTestId('terminal-emulator')).toHaveTextContent('0:none')
+    fireEvent.click(screen.getByRole('button', { name: '向右分屏' }))
+    fireEvent.click(screen.getByRole('button', { name: '向右分屏' }))
+    expect(splitAction).toHaveBeenCalledTimes(2)
+    expect(splitAction).toHaveBeenCalledWith('horizontal')
   })
 
   it('starts and stops recording with the active terminal dimensions', async () => {
@@ -74,6 +69,18 @@ describe('TerminalTab', () => {
     fireEvent.click(screen.getByRole('button', { name: '停止录制' }))
     await waitFor(() => expect(logService.stop).toHaveBeenCalledWith('term-1'))
     expect(useAppStore.getState().recordingState['term-1']).toBe('idle')
+  })
+
+  it('records the active split terminal instead of the original primary terminal', async () => {
+    useAppStore.setState({
+      activePaneId: 'split-1',
+      terminalPool: new Map([['split-1', { terminal: { cols: 90, rows: 30 } as never, lastUsed: 1 }]]),
+    })
+    render(<TerminalTab terminalID="term-1" sessionId={7} active focusRequest={focusRequest} onOpenFiles={vi.fn()} />)
+
+    fireEvent.click(screen.getByRole('button', { name: '开始录制' }))
+
+    await waitFor(() => expect(logService.start).toHaveBeenCalledWith('split-1', 7, 90, 30, 'xterm-256color'))
   })
 
   it('marks failed stops as ended and allows recording to restart', async () => {
@@ -95,25 +102,4 @@ describe('TerminalTab', () => {
     expect(loggerError).toHaveBeenCalledTimes(2)
   })
 
-  it('keeps terminal output visible and offers reconnect after disconnection', () => {
-    const onReconnect = vi.fn()
-    useAppStore.setState({ connectionStatus: { 'term-1': 'disconnected' } })
-
-    render(<TerminalTab terminalID="term-1" sessionId={7} active focusRequest={focusRequest} onOpenFiles={vi.fn()} onReconnect={onReconnect} />)
-
-    expect(screen.getByTestId('terminal-emulator')).toBeInTheDocument()
-    expect(screen.getByText('连接已断开')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: '重新连接' }))
-    expect(onReconnect).toHaveBeenCalledOnce()
-  })
-
-  it('allows cancelling an active reconnect request', () => {
-    const onReconnect = vi.fn()
-    useAppStore.setState({ connectionStatus: { 'term-1': 'connecting' } })
-
-    render(<TerminalTab terminalID="term-1" sessionId={7} active focusRequest={focusRequest} onOpenFiles={vi.fn()} onReconnect={onReconnect} />)
-
-    fireEvent.click(screen.getByRole('button', { name: '取消重连' }))
-    expect(onReconnect).toHaveBeenCalledOnce()
-  })
 })

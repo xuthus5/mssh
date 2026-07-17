@@ -2,14 +2,14 @@ import type { AppState, ConnectionStatus, Tab, TerminalTab } from '@/store/appSt
 import type { ActiveSurface, OverviewSection, WorkspaceID } from '@/store/tabNavigation'
 
 export const WORKSPACE_LAYOUT_SETTING = 'workspace.layout'
-export const WORKSPACE_LAYOUT_VERSION = 1
+export const WORKSPACE_LAYOUT_VERSION = 2
 
-type TerminalIntent = Pick<TerminalTab, 'title' | 'sessionId' | 'terminalInstance' | 'split' | 'splitDirection' | 'toolPanel'> & { type: 'terminal' }
+type TerminalIntent = Pick<TerminalTab, 'title' | 'sessionId' | 'terminalInstance' | 'toolPanel'> & { type: 'terminal' }
 type PlaybackIntent = { type: 'playback'; title: string; recordingPath: string }
 type TabIntent = TerminalIntent | PlaybackIntent
 
 export interface WorkspaceSnapshot {
-  version: 1
+  version: 2
   tabs: TabIntent[]
   active: { type: 'workspace'; id: WorkspaceID } | { type: 'tab'; index: number } | null
   workspaceTab: WorkspaceID
@@ -45,7 +45,7 @@ function tabIntent(tab: Tab): TabIntent {
   if (tab.type === 'playback') return { type: 'playback', title: tab.title, recordingPath: tab.recordingPath }
   return {
     type: 'terminal', title: tab.title, sessionId: tab.sessionId, terminalInstance: tab.terminalInstance,
-    split: tab.split ?? false, splitDirection: tab.splitDirection ?? 'horizontal', toolPanel: tab.toolPanel ?? null,
+    toolPanel: tab.toolPanel ?? null,
   }
 }
 
@@ -66,8 +66,6 @@ function isTabIntent(value: unknown): value is TabIntent {
   if (value.type === 'playback') return typeof value.recordingPath === 'string' && value.recordingPath.length > 0
   return value.type === 'terminal' && Number.isSafeInteger(value.sessionId) && Number(value.sessionId) > 0
     && (value.terminalInstance === undefined || Number.isSafeInteger(value.terminalInstance))
-    && (value.split === undefined || typeof value.split === 'boolean')
-    && (value.splitDirection === undefined || value.splitDirection === 'horizontal' || value.splitDirection === 'vertical')
     && (value.toolPanel === undefined || value.toolPanel === null || value.toolPanel === 'files' || value.toolPanel === 'history' || value.toolPanel === 'system')
 }
 
