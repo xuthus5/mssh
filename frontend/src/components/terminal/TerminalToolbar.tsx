@@ -169,6 +169,7 @@ function ToolbarActions(props: ToolbarActionsProps) {
       onClick={props.onToggleSearch} title={props.searchOpen ? '关闭终端搜索' : '搜索终端内容'}>
       <Search className="h-3 w-3" /><span className="hidden sm:inline">搜索</span>
     </button>
+    <button type="button" className={actionClass} onClick={props.onOpenHistory} title="命令历史"><History className="h-3 w-3" /><span className="hidden sm:inline">历史</span></button>
     <div className="w-px h-4 bg-border mx-0.5" />
     <button type="button" className={actionClass} onClick={props.onOpenFiles} title="文件管理">
       <FolderOpen className="h-3 w-3" /><span className="hidden sm:inline">文件</span>
@@ -176,7 +177,6 @@ function ToolbarActions(props: ToolbarActionsProps) {
     <button type="button" className={actionClass} onClick={props.onOpenTunnels} title="隧道管理">
       <Network className="h-3 w-3" /><span className="hidden sm:inline">隧道</span>
     </button>
-    <button type="button" className={actionClass} onClick={props.onOpenHistory} title="命令历史"><History className="h-3 w-3" /><span className="hidden sm:inline">历史</span></button>
     <button type="button" className={actionClass} onClick={props.onOpenSystem} title="系统监控"><Activity className="h-3 w-3" /><span className="hidden sm:inline">系统</span></button>
     <div className="w-px h-4 bg-border mx-0.5" />
     <SplitAction disabled={props.splitDisabled} paneCount={props.paneCount} onSplit={props.onSplit} />
