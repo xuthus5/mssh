@@ -37,6 +37,7 @@ interface Props {
   onStateChange?: (state: { paneCount: number; busy: boolean }) => void
   onPaneClosed?: (terminalID: string) => void
   onPaneReplaced?: (previousID: string, nextID: string) => void
+  onCloseTerminal?: () => void
 }
 
 function closeInBackground(terminalID: string, context: string) {
@@ -45,19 +46,38 @@ function closeInBackground(terminalID: string, context: string) {
   })
 }
 
-function ConnectionOverlay({ terminalID, onReconnect }: { terminalID: string; onReconnect: () => void }) {
+function ConnectionOverlay({ terminalID, onReconnect, onClose }: { terminalID: string; onReconnect: () => void; onClose: () => void }) {
   const status = useAppStore((state) => state.connectionStatus[terminalID])
   if (status === undefined || status === 'connected') return null
   const connecting = status === 'connecting' || status === 'reconnecting'
-  return <div className="absolute inset-0 z-10 grid place-items-center bg-background/70 p-4 backdrop-blur-[1px]">
-    <div className="flex max-w-xs flex-col items-center rounded-xl border border-border bg-card/95 p-4 text-center shadow-lg">
-      {connecting ? <RefreshCw className="mb-2 size-6 animate-spin text-primary" /> : <WifiOff className="mb-2 size-6 text-destructive" />}
-      <p className="text-sm font-semibold">{connecting ? '正在重新连接' : '连接已断开'}</p>
-      <Button type="button" size="sm" className="mt-3" disabled={connecting} onClick={onReconnect}>
-        <RefreshCw />重新连接
-      </Button>
+  return <div role="alert" aria-live="polite" className="absolute inset-0 z-10 grid place-items-center bg-background/70 p-6 backdrop-blur-[1px]">
+    <div className="flex w-full max-w-sm flex-col items-center rounded-xl border border-border bg-card/95 p-5 text-center shadow-lg">
+      {connecting ? <RefreshCw aria-hidden="true" className="mb-3 size-8 animate-spin text-primary" /> : <WifiOff aria-hidden="true" className="mb-3 size-8 text-destructive" />}
+      <h3 className="text-sm font-semibold text-foreground">{connecting ? '正在重新连接' : '连接已断开'}</h3>
+      <p className="mt-1 text-xs leading-5 text-muted-foreground">
+        {connecting ? '正在为当前终端创建新的 SSH 通道。' : '远端会话可能因空闲超时或网络中断而结束，可在当前终端中重新连接。'}
+      </p>
+      <div className="mt-4 flex items-center gap-2">
+        <Button type="button" size="sm" variant="outline" disabled={connecting} onClick={onClose}><X />关闭终端</Button>
+        <Button type="button" size="sm" disabled={connecting} onClick={onReconnect}><RefreshCw />{connecting ? '正在重连' : '重新连接'}</Button>
+      </div>
     </div>
   </div>
+}
+
+function replaceSecondaryTerminalRuntime(previousID: string, nextID: string) {
+  useAppStore.setState((state) => {
+    const terminalPool = new Map(state.terminalPool)
+    const terminal = terminalPool.get(previousID)
+    terminalPool.delete(previousID)
+    if (terminal) terminalPool.set(nextID, terminal)
+    const connectionStatus = { ...state.connectionStatus }
+    delete connectionStatus[previousID]
+    connectionStatus[nextID] = 'connected'
+    const recordingState = { ...state.recordingState }
+    delete recordingState[previousID]
+    return { terminalPool, connectionStatus, recordingState, activePaneId: state.activePaneId === previousID ? nextID : state.activePaneId }
+  })
 }
 
 interface TreeViewProps {
@@ -70,6 +90,7 @@ interface TreeViewProps {
   closingID: string | null
   onClose: (terminalID: string) => void
   onReconnect: (terminalID: string) => void
+  onCloseTerminal: (terminalID: string) => void
   onRatio: (branchID: string, ratio: number) => void
 }
 
@@ -78,13 +99,13 @@ function LeafView(props: TreeViewProps & { node: Extract<SplitNode, { kind: 'lea
   const selected = props.activePaneID ? props.activePaneID === terminalID : props.primaryID === terminalID
   const request = props.focusRequest.targetTerminalID === terminalID ? props.focusRequest : noFocusRequest
   return <div className={`group relative h-full w-full min-h-0 min-w-0 flex-1 overflow-hidden ${selected ? 'ring-1 ring-inset ring-primary/35' : ''}`}>
-    <TerminalEmulator key={terminalID} terminalID={terminalID} active={props.active && selected} focusRequest={request} />
+    <TerminalEmulator key={props.node.id} terminalID={terminalID} active={props.active && selected} focusRequest={request} />
     {props.paneCount > 1 ? <button type="button" title="关闭当前窗格" aria-label="关闭当前窗格"
       disabled={props.closingID !== null} onClick={() => props.onClose(terminalID)}
       className="absolute right-2 top-2 z-20 grid size-6 place-items-center rounded-md bg-background/80 text-muted-foreground opacity-0 shadow-sm ring-1 ring-border backdrop-blur transition hover:bg-destructive hover:text-destructive-foreground group-hover:opacity-100 focus-visible:opacity-100 disabled:pointer-events-none">
       <X className="size-3.5" />
     </button> : null}
-    <ConnectionOverlay terminalID={terminalID} onReconnect={() => props.onReconnect(terminalID)} />
+    <ConnectionOverlay terminalID={terminalID} onReconnect={() => props.onReconnect(terminalID)} onClose={() => props.onCloseTerminal(terminalID)} />
   </div>
 }
 
@@ -122,7 +143,7 @@ function TreeView(props: TreeViewProps) {
   </div>
 }
 
-export const TerminalSplit = forwardRef<TerminalSplitHandle, Props>(function TerminalSplit({ tabID, primaryID, sessionId, active, focusRequest, onStateChange, onPaneClosed, onPaneReplaced }, ref) {
+export const TerminalSplit = forwardRef<TerminalSplitHandle, Props>(function TerminalSplit({ tabID, primaryID, sessionId, active, focusRequest, onStateChange, onPaneClosed, onPaneReplaced, onCloseTerminal }, ref) {
   const [tree, setTree] = useState<SplitNode>(() => splitLeaf(primaryID))
   const [busy, setBusy] = useState(false)
   const [closingID, setClosingID] = useState<string | null>(null)
@@ -207,9 +228,9 @@ export const TerminalSplit = forwardRef<TerminalSplitHandle, Props>(function Ter
       setTree((current) => replaceTerminal(current, terminalID, nextID))
       if (terminalID === primaryID) {
         primaryRef.current = nextID
-        useAppStore.getState().promoteTerminalConnection(tabID, terminalID, nextID)
+        useAppStore.getState().replaceTerminalConnection(tabID, terminalID, nextID)
       } else {
-        useAppStore.getState().forgetTerminal(terminalID)
+        replaceSecondaryTerminalRuntime(terminalID, nextID)
       }
       useAppStore.getState().setConnectionStatus(nextID, 'connected')
       onPaneReplaced?.(terminalID, nextID)
@@ -224,9 +245,18 @@ export const TerminalSplit = forwardRef<TerminalSplitHandle, Props>(function Ter
     }
   }
 
+  const closeDisconnectedTerminal = (terminalID: string) => {
+    if (terminalIDs(treeRef.current).length === 1) {
+      onCloseTerminal?.()
+      return
+    }
+    void closePane(terminalID)
+  }
+
   return <div className="flex h-full w-full min-h-0 min-w-0 flex-1">
     <TreeView node={tree} primaryID={primaryID} active={active} activePaneID={activePaneID} focusRequest={focusRequest}
       paneCount={paneCount} closingID={closingID} onClose={(id) => { void closePane(id) }}
-      onReconnect={(id) => { void reconnectPane(id) }} onRatio={(id, ratio) => setTree((current) => updateSplitRatio(current, id, ratio))} />
+      onReconnect={(id) => { void reconnectPane(id) }} onCloseTerminal={closeDisconnectedTerminal}
+      onRatio={(id, ratio) => setTree((current) => updateSplitRatio(current, id, ratio))} />
   </div>
 })

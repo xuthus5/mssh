@@ -19,6 +19,7 @@ import { ToastContainer, useToastStore } from '@/components/ui/toast'
 
 const focusRequest = { sequence: 0, targetTerminalID: null }
 const splitStateChange = vi.fn()
+const closeTerminal = vi.fn()
 
 function deferred<T>() {
   let resolve!: (value: T) => void
@@ -28,10 +29,11 @@ function deferred<T>() {
 
 function Harness() {
   const splitRef = createRef<TerminalSplitHandle>()
+  const terminalSplitProps = { onCloseTerminal: closeTerminal }
   return <>
     <button type="button" onClick={() => splitRef.current?.split('horizontal')}>向右</button>
     <button type="button" onClick={() => splitRef.current?.split('vertical')}>向下</button>
-    <TerminalSplit ref={splitRef} tabID="tab-1" primaryID="primary-1" sessionId={1} active focusRequest={focusRequest} onStateChange={splitStateChange} />
+    <TerminalSplit ref={splitRef} tabID="tab-1" primaryID="primary-1" sessionId={1} active focusRequest={focusRequest} onStateChange={splitStateChange} {...terminalSplitProps} />
   </>
 }
 
@@ -39,6 +41,7 @@ describe('TerminalSplit', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     splitStateChange.mockClear()
+    closeTerminal.mockClear()
     vi.mocked(TerminalService.Open).mockReset()
     vi.mocked(TerminalService.Open)
       .mockResolvedValueOnce('split-1')
@@ -154,15 +157,63 @@ describe('TerminalSplit', () => {
     render(<Harness />)
     fireEvent.click(screen.getByText('向右'))
     await screen.findByTestId('pane-split-1')
+    const previousPane = screen.getByTestId('pane-split-1')
+    const terminal = { focus: vi.fn() }
+    useAppStore.setState({ terminalPool: new Map([['split-1', { terminal: terminal as never, lastUsed: 10 }]]) })
     act(() => useAppStore.getState().setConnectionStatus('split-1', 'disconnected'))
 
     fireEvent.click(screen.getByRole('button', { name: '重新连接' }))
 
-    await screen.findByTestId('pane-split-2')
+    const reconnectedPane = await screen.findByTestId('pane-split-2')
     expect(screen.getByTestId('pane-primary-1')).toBeInTheDocument()
     expect(screen.queryByTestId('pane-split-1')).not.toBeInTheDocument()
+    expect(reconnectedPane).toBe(previousPane)
+    expect(useAppStore.getState().terminalPool.get('split-2')?.terminal).toBe(terminal)
+    expect(useAppStore.getState().terminalPool.has('split-1')).toBe(false)
     expect(TerminalService.Close).toHaveBeenCalledWith('split-1')
     expect(useAppStore.getState().connectionStatus['split-2']).toBe('connected')
+  })
+
+  it('preserves the primary terminal instance and runtime mapping after reconnect', async () => {
+    const terminal = { focus: vi.fn() }
+    useAppStore.setState({ terminalPool: new Map([['primary-1', { terminal: terminal as never, lastUsed: 10 }]]) })
+    render(<Harness />)
+    const previousPane = screen.getByTestId('pane-primary-1')
+    act(() => useAppStore.getState().setConnectionStatus('primary-1', 'disconnected'))
+
+    fireEvent.click(screen.getByRole('button', { name: '重新连接' }))
+
+    const reconnectedPane = await screen.findByTestId('pane-split-1')
+    expect(reconnectedPane).toBe(previousPane)
+    expect(useAppStore.getState().tabs[0]).toMatchObject({ terminalId: 'split-1' })
+    expect(useAppStore.getState().terminalPool.get('split-1')?.terminal).toBe(terminal)
+    expect(useAppStore.getState().terminalPool.has('primary-1')).toBe(false)
+  })
+
+  it('shows a spacious disconnect panel with reconnect and close actions', async () => {
+    render(<Harness />)
+    act(() => useAppStore.getState().setConnectionStatus('primary-1', 'disconnected'))
+
+    const alert = screen.getByRole('alert')
+    expect(alert.firstElementChild).toHaveClass('max-w-sm', 'p-5')
+    expect(screen.getByText('远端会话可能因空闲超时或网络中断而结束，可在当前终端中重新连接。')).toBeInTheDocument()
+    await fireEvent.click(screen.getByRole('button', { name: '关闭终端' }))
+    expect(closeTerminal).toHaveBeenCalledOnce()
+    expect(TerminalService.Close).not.toHaveBeenCalled()
+  })
+
+  it('closes a disconnected split pane from the overlay action', async () => {
+    render(<Harness />)
+    fireEvent.click(screen.getByText('向右'))
+    await screen.findByTestId('pane-split-1')
+    act(() => useAppStore.getState().setConnectionStatus('split-1', 'disconnected'))
+
+    fireEvent.click(screen.getByRole('button', { name: '关闭终端' }))
+
+    await waitFor(() => expect(screen.queryByTestId('pane-split-1')).not.toBeInTheDocument())
+    expect(screen.getByTestId('pane-primary-1')).toBeInTheDocument()
+    expect(TerminalService.Close).toHaveBeenCalledWith('split-1')
+    expect(closeTerminal).not.toHaveBeenCalled()
   })
 
   it('closes all secondary terminals when the tab unmounts', async () => {
