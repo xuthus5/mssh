@@ -56,6 +56,12 @@ describe('TerminalSplit', () => {
     })
   })
 
+  it('keeps the initial terminal pane expanded to the full viewport', () => {
+    render(<Harness />)
+
+    expect(screen.getByTestId('pane-primary-1').parentElement).toHaveClass('flex-1', 'h-full', 'w-full')
+  })
+
   it('adds a new terminal on every split request without recycling existing panes', async () => {
     render(<Harness />)
     fireEvent.click(screen.getByText('向右'))
