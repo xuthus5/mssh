@@ -237,7 +237,11 @@ export function createPoolActions(set: StoreSet, get: StoreGet): PoolActions {
 
 export function createStatusActions(set: StoreSet): StatusActions {
   return {
-    setConnectionStatus: (id, status) => set((state) => ({ connectionStatus: { ...state.connectionStatus, [id]: status } })),
+    setConnectionStatus: (id, status) => set((state) => {
+      const current = state.connectionStatus[id]
+      if (!canTransitionConnection(current, status)) return state
+      return { connectionStatus: { ...state.connectionStatus, [id]: status } }
+    }),
     setActivePane: (activePaneId) => set({ activePaneId }),
     setRecordingState: (id, recording) => set((state) => ({ recordingState: { ...state.recordingState, [id]: recording } })),
     setTunnelState: (id, tunnel) => set((state) => ({ tunnelState: { ...state.tunnelState, [id]: tunnel } })),
@@ -245,4 +249,17 @@ export function createStatusActions(set: StoreSet): StatusActions {
     setTerminalTheme: (terminalTheme) => set({ terminalTheme }),
     setMaxPoolSize: (maxPoolSize) => set({ maxPoolSize }),
   }
+}
+
+export function canTransitionConnection(current: AppState['connectionStatus'][string] | undefined, next: AppState['connectionStatus'][string]) {
+  if (current === next || current === undefined) return true
+  const transitions: Record<NonNullable<typeof current>, Array<typeof next>> = {
+    connecting: ['connected', 'disconnected', 'error', 'closing'],
+    connected: ['reconnecting', 'disconnected', 'error', 'closing'],
+    reconnecting: ['connected', 'disconnected', 'error', 'closing'],
+    closing: ['disconnected', 'error'],
+    disconnected: ['connecting', 'reconnecting', 'error'],
+    error: ['connecting', 'reconnecting', 'disconnected'],
+  }
+  return transitions[current].includes(next)
 }

@@ -66,7 +66,7 @@ export interface TerminalTheme {
   ansiBrightCyan: string
   ansiBrightWhite: string
 }
-export type ConnectionStatus = 'connecting' | 'connected' | 'disconnected'
+export type ConnectionStatus = 'connecting' | 'connected' | 'reconnecting' | 'closing' | 'disconnected' | 'error'
 
 const DEFAULT_THEME: TerminalTheme = {
   background: '#0d1117',

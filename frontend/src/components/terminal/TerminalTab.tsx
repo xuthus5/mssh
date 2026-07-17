@@ -68,11 +68,11 @@ function TerminalViewport({ split, sessionId, terminalID, active, focusRequest }
 }
 
 function ConnectionOverlay({ status, onReconnect }: {
-  status: 'connecting' | 'connected' | 'disconnected' | undefined
+  status: import('@/store/appStore').ConnectionStatus | undefined
   onReconnect?: () => void
 }) {
   if (status === 'connected' || status === undefined) return null
-  const connecting = status === 'connecting'
+  const connecting = status === 'connecting' || status === 'reconnecting'
   return <div className="absolute inset-0 z-10 grid place-items-center bg-background/70 p-6 backdrop-blur-[1px]">
     <div className="flex max-w-sm flex-col items-center rounded-xl border border-border bg-card/95 p-5 text-center shadow-lg">
       {connecting
@@ -82,9 +82,9 @@ function ConnectionOverlay({ status, onReconnect }: {
       <p className="mt-1 text-xs leading-5 text-muted-foreground">
         {connecting ? '正在为当前标签创建新的 SSH 通道。' : '远端会话可能因空闲超时或网络中断而结束，可在当前标签中重新连接。'}
       </p>
-      <Button type="button" size="sm" className="mt-4" disabled={connecting} onClick={onReconnect}>
+      <Button type="button" size="sm" className="mt-4" onClick={onReconnect}>
         <RefreshCw aria-hidden="true" />
-        {connecting ? '正在重连' : '重新连接'}
+        {connecting ? '取消重连' : '重新连接'}
       </Button>
     </div>
   </div>
