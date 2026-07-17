@@ -77,6 +77,22 @@ var expectedFinalSchemaSQL = map[string]string{
 		ended_at TEXT,
 		data_path TEXT NOT NULL
 	)`,
+	"transfer_jobs": `CREATE TABLE transfer_jobs (
+		id TEXT PRIMARY KEY,
+		session_id INTEGER NOT NULL,
+		session_name TEXT NOT NULL,
+		direction TEXT NOT NULL CHECK(direction IN ('upload','download')),
+		source_path TEXT NOT NULL,
+		target_path TEXT NOT NULL,
+		total_bytes INTEGER NOT NULL DEFAULT 0,
+		transferred_bytes INTEGER NOT NULL DEFAULT 0,
+		speed INTEGER NOT NULL DEFAULT 0,
+		eta INTEGER NOT NULL DEFAULT 0,
+		status TEXT NOT NULL CHECK(status IN ('queued','running','completed','failed','cancelled')),
+		error TEXT NOT NULL DEFAULT '',
+		started_at TEXT NOT NULL,
+		completed_at TEXT
+	)`,
 	"settings": `CREATE TABLE settings (
 		key TEXT PRIMARY KEY,
 		namespace TEXT NOT NULL,

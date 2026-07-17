@@ -43,6 +43,9 @@ export function ListDir(sessionID: number, path: string): $CancellablePromise<ss
         return $$createType1($result);
     });
 }
+export function ListTransfers(): $CancellablePromise<any[]> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.FileService.ListTransfers");
+}
 
 /**
  * Mkdir creates a remote directory via SFTP.

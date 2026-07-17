@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -11,7 +12,9 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/xuthus5/mssh/internal/model"
 	"github.com/xuthus5/mssh/internal/ssh"
+	"github.com/xuthus5/mssh/internal/store"
 	"github.com/xuthus5/mssh/pkg/event"
 )
 
@@ -24,17 +27,38 @@ type FileService struct {
 	progress sync.Mutex
 	startsAt map[string]time.Time
 	logger   *slog.Logger
+	db       *sql.DB
+}
+
+type FileServiceOption func(*FileService)
+
+func WithTransferDB(db *sql.DB) FileServiceOption {
+	return func(service *FileService) { service.db = db }
 }
 
 // NewFileService creates a new FileService.
-func NewFileService(sessions *SessionService, eventBus EventBus, logger *slog.Logger) *FileService {
-	return &FileService{
+func NewFileService(sessions *SessionService, eventBus EventBus, logger *slog.Logger, options ...FileServiceOption) *FileService {
+	service := &FileService{
 		sessions: sessions,
 		eventBus: eventBus,
 		tasks:    make(map[string]context.CancelFunc),
 		startsAt: make(map[string]time.Time),
 		logger:   logger,
 	}
+	for _, option := range options {
+		option(service)
+	}
+	return service
+}
+
+func (f *FileService) ListTransfers() ([]model.TransferJob, error) {
+	if f.db == nil {
+		return []model.TransferJob{}, nil
+	}
+	if err := store.MarkInterruptedTransfers(f.db); err != nil {
+		return nil, fmt.Errorf("mark interrupted transfers: %w", err)
+	}
+	return store.ListTransferJobs(f.db)
 }
 
 // ListDir lists remote directory entries via SFTP.
@@ -61,6 +85,9 @@ func (f *FileService) ListDir(sessionID int64, path string) ([]ssh.FileEntry, er
 func (f *FileService) Upload(sessionID int64, localPath, remotePath string) (string, error) {
 	f.logger.Info("uploading file", "sessionID", sessionID, "localPath", localPath, "remotePath", remotePath)
 	taskID := generateFileTaskID()
+	if err := f.createTransfer(taskID, sessionID, "upload", localPath, remotePath); err != nil {
+		return "", err
+	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	f.mu.Lock()
@@ -72,6 +99,7 @@ func (f *FileService) Upload(sessionID int64, localPath, remotePath string) (str
 		cancel()
 		f.removeTask(taskID)
 		f.logger.Error("upload failed", "sessionID", sessionID, "error", err)
+		f.finishTransfer(taskID, "failed", err.Error())
 		return "", fmt.Errorf("upload: %w", err)
 	}
 
@@ -111,6 +139,7 @@ func (f *FileService) Upload(sessionID int64, localPath, remotePath string) (str
 			return
 		}
 		f.eventBus.Emit(event.TransferComplete, event.TransferProgressPayload{TaskID: taskID, Status: "completed", Transferred: size, Total: size, Percent: 100})
+		f.finishTransfer(taskID, "completed", "")
 	}()
 
 	return taskID, nil
@@ -120,6 +149,9 @@ func (f *FileService) Upload(sessionID int64, localPath, remotePath string) (str
 func (f *FileService) Download(sessionID int64, remotePath, localPath string) (string, error) {
 	f.logger.Info("downloading file", "sessionID", sessionID, "remotePath", remotePath, "localPath", localPath)
 	taskID := generateFileTaskID()
+	if err := f.createTransfer(taskID, sessionID, "download", remotePath, localPath); err != nil {
+		return "", err
+	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	f.mu.Lock()
@@ -130,6 +162,7 @@ func (f *FileService) Download(sessionID int64, remotePath, localPath string) (s
 	if err != nil {
 		cancel()
 		f.removeTask(taskID)
+		f.finishTransfer(taskID, "failed", err.Error())
 		return "", fmt.Errorf("download: %w", err)
 	}
 
@@ -169,6 +202,7 @@ func (f *FileService) Download(sessionID int64, remotePath, localPath string) (s
 			return
 		}
 		f.eventBus.Emit(event.TransferComplete, event.TransferProgressPayload{TaskID: taskID, Status: "completed", Transferred: size, Total: size, Percent: 100})
+		f.finishTransfer(taskID, "completed", "")
 	}()
 
 	return taskID, nil
@@ -320,10 +354,16 @@ func (f *FileService) reportProgress(taskID string, transferred, total int64) {
 		Speed:       speed,
 		ETA:         eta,
 	})
+	if f.db != nil {
+		if err := store.UpdateTransferProgress(f.db, taskID, transferred, total, speed, eta); err != nil {
+			f.logger.Error("persist transfer progress failed", "taskID", taskID, "error", err)
+		}
+	}
 }
 
 // emitTransferError emits a transfer error event with the error message.
 func (f *FileService) emitTransferError(taskID string, err error) {
+	f.finishTransfer(taskID, "failed", err.Error())
 	f.eventBus.Emit(event.TransferError, event.TransferErrorPayload{
 		TaskID: taskID,
 		Status: "failed",
@@ -332,10 +372,35 @@ func (f *FileService) emitTransferError(taskID string, err error) {
 }
 
 func (f *FileService) emitTransferCancelled(taskID string) {
+	f.finishTransfer(taskID, "cancelled", "")
 	f.eventBus.Emit(event.TransferComplete, event.TransferProgressPayload{
 		TaskID: taskID,
 		Status: "cancelled",
 	})
+}
+
+func (f *FileService) createTransfer(taskID string, sessionID int64, direction, sourcePath, targetPath string) error {
+	if f.db == nil {
+		return nil
+	}
+	session, err := store.GetSession(f.db, sessionID)
+	if err != nil {
+		return fmt.Errorf("create transfer: %w", err)
+	}
+	job := model.TransferJob{ID: taskID, SessionID: sessionID, SessionName: session.Name, Direction: direction, SourcePath: sourcePath, TargetPath: targetPath, Status: "queued", StartedAt: time.Now()}
+	if err := store.CreateTransferJob(f.db, job); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (f *FileService) finishTransfer(taskID, status, errorMessage string) {
+	if f.db == nil {
+		return
+	}
+	if err := store.FinishTransferJob(f.db, taskID, status, errorMessage); err != nil {
+		f.logger.Error("persist transfer completion failed", "taskID", taskID, "error", err)
+	}
 }
 
 func (f *FileService) getFileSize(localPath string) int64 {

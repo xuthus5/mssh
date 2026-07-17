@@ -257,7 +257,7 @@ func initializeServices(input serviceInitialization) (*App, error) {
 		Keychain:       input.keychain,
 		Session:        sessionSvc,
 		Terminal:       terminalSvc,
-		File:           service.NewFileService(sessionSvc, input.eventBus, input.logger),
+		File:           service.NewFileService(sessionSvc, input.eventBus, input.logger, service.WithTransferDB(input.db)),
 		Tunnel:         service.NewTunnelService(input.db, sessionSvc, input.eventBus, input.logger),
 		Key:            service.NewKeyService(input.db, adapter, input.logger),
 		Macro:          service.NewMacroService(input.db, terminalSvc, input.logger),

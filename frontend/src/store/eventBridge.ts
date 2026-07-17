@@ -1,6 +1,7 @@
 import { Events } from '@wailsio/runtime'
 import { useAppStore } from '@/store/appStore'
 import { useConnectDialog } from '@/store/connectDialog'
+import { FileService } from '@/lib/wails'
 
 interface EventEnvelope<T> { data?: T }
 interface ConnectionPayload { terminal_id?: string; attempt_id?: string; state?: string }
@@ -84,6 +85,7 @@ function handleFileError(event: EventEnvelope<TransferErrorPayload>) {
 }
 
 export function startEventBridge(): () => void {
+  void restoreTransfers()
   const unsubscribers = [
     Events.On('session:attempt', handleSessionAttempt),
     Events.On('session:fingerprint', handleFingerprint),
@@ -97,4 +99,18 @@ export function startEventBridge(): () => void {
   return function stopEventBridge() {
     for (const unsubscribe of unsubscribers) unsubscribe()
   }
+}
+
+export async function restoreTransfers() {
+  try {
+    const jobs = await FileService.ListTransfers() as Array<Record<string, any>>
+    useAppStore.setState({ transfers: jobs.map((job) => ({
+      id: job.id, fileName: String(job.source_path).split(/[\\/]/).pop() ?? job.source_path,
+      direction: job.direction, sessionId: job.session_id, sessionName: job.session_name,
+      sourcePath: job.source_path, targetPath: job.target_path, totalBytes: job.total_bytes,
+      transferredBytes: job.transferred_bytes, speed: job.speed, eta: job.eta, status: job.status,
+      error: job.error || undefined, startedAt: Date.parse(job.started_at),
+      completedAt: job.completed_at ? Date.parse(job.completed_at) : undefined,
+    })) })
+  } catch {}
 }
