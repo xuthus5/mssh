@@ -15,7 +15,7 @@ import { useAppStore, type AppState } from '@/store/appStore'
 import { recordCommand } from '@/lib/commandHistory'
 import { TerminalCommandCapture } from '@/lib/terminalCommandCapture'
 import { registerTerminalSearch, unregisterTerminalSearch } from '@/lib/terminalSearchRegistry'
-import { useTerminalActivation, useTerminalAttachment } from '@/hooks/terminalLifecycleRuntime'
+import { useTerminalActivation, useTerminalAttachment, useTerminalIdentity } from '@/hooks/terminalLifecycleRuntime'
 import { fitAndRefresh } from '@/hooks/terminalFitRuntime'
 
 const TERMINAL_SCROLLBACK = 10000
@@ -41,6 +41,7 @@ interface TerminalLifecycleRefs {
   fitAddonRef: RefObject<FitAddon | null>
   activationFrameRef: RefObject<number | null>
   terminalIDRef: RefObject<string>
+  registeredTerminalIDRef: RefObject<string>
   activeRef: RefObject<boolean>
   storeRef: RefObject<AppState>
   recoveryPendingRef: RefObject<boolean>
@@ -243,7 +244,7 @@ function initializeTerminal(containerRef: RefObject<HTMLDivElement | null>, refs
     safelyDispose('theme subscription', unsubscribeTheme)
     safelyDispose('resize observer', () => resizeObserver.disconnect())
     if (cleanupCopyOnSelect) safelyDispose('copy-on-select subscription', cleanupCopyOnSelect)
-    unregisterTerminalSearch(refs.terminalIDRef.current)
+    unregisterTerminalSearch(refs.registeredTerminalIDRef.current)
     if (!addonOwnedByTerminal) safelyDispose('fit addon', () => fitAddon.dispose())
     if (!unicodeAddonOwnedByTerminal) safelyDispose('unicode addon', () => unicodeAddon.dispose())
     if (!searchAddonOwnedByTerminal) safelyDispose('search addon', () => searchAddon.dispose())
@@ -265,6 +266,7 @@ export function useTerminal(terminalID: string, containerRef: RefObject<HTMLDivE
     fitAddonRef: useRef<FitAddon | null>(null),
     activationFrameRef: useRef<number | null>(null),
     terminalIDRef: useRef(terminalID),
+    registeredTerminalIDRef: useRef(terminalID),
     activeRef: useRef(active),
     storeRef: useRef(useAppStore.getState()),
     recoveryPendingRef: useRef(false),
@@ -282,6 +284,7 @@ export function useTerminal(terminalID: string, containerRef: RefObject<HTMLDivE
   refs.storeRef.current = useAppStore.getState()
   refs.requestedSequenceRef.current = focusRequest.sequence
   useTerminalLifecycle(containerRef, refs, reportRuntimeError)
+  useTerminalIdentity(terminalID, refs.registeredTerminalIDRef)
   useTerminalAttachment(terminalID)
   useTerminalActivation({ refs, active, sequence: focusRequest.sequence, reportRuntimeError,
     recover: (term, fitAddon) => recoverTerminal({ term, fitAddon, container: containerRef.current, refs }) })

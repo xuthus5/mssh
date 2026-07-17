@@ -2,6 +2,7 @@ export type SplitDirection = 'horizontal' | 'vertical'
 
 export interface SplitLeaf {
   kind: 'leaf'
+  id: string
   terminalID: string
 }
 
@@ -16,7 +17,7 @@ export interface SplitBranch {
 
 export type SplitNode = SplitLeaf | SplitBranch
 
-export const splitLeaf = (terminalID: string): SplitLeaf => ({ kind: 'leaf', terminalID })
+export const splitLeaf = (terminalID: string, id = terminalID): SplitLeaf => ({ kind: 'leaf', id, terminalID })
 
 export function terminalIDs(node: SplitNode): string[] {
   return node.kind === 'leaf' ? [node.terminalID] : [...terminalIDs(node.first), ...terminalIDs(node.second)]
@@ -40,7 +41,7 @@ export function insertSplit(node: SplitNode, targetID: string, terminalID: strin
 }
 
 export function replaceTerminal(node: SplitNode, previousID: string, nextID: string): SplitNode {
-  if (node.kind === 'leaf') return node.terminalID === previousID ? splitLeaf(nextID) : node
+  if (node.kind === 'leaf') return node.terminalID === previousID ? { ...node, terminalID: nextID } : node
   const first = replaceTerminal(node.first, previousID, nextID)
   const second = replaceTerminal(node.second, previousID, nextID)
   return first === node.first && second === node.second ? node : { ...node, first, second }

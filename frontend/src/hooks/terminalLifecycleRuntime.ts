@@ -4,6 +4,7 @@ import type { Terminal } from '@xterm/xterm'
 import type { TerminalRuntimeErrorReporter } from '@/components/terminal/TerminalErrorBoundary'
 import { runTerminalRuntime } from '@/components/terminal/terminalRuntime'
 import { logger } from '@/lib/logger'
+import { replaceTerminalSearch } from '@/lib/terminalSearchRegistry'
 import { TerminalService } from '@/lib/wails'
 
 const MAX_ACTIVATION_FRAMES = 4
@@ -75,4 +76,13 @@ export function useTerminalAttachment(terminalID: string) {
       logger.error('terminal attach error', error)
     }
   }, [terminalID])
+}
+
+export function useTerminalIdentity(terminalID: string, registeredTerminalIDRef: RefObject<string>) {
+  useEffect(() => {
+    const previousID = registeredTerminalIDRef.current
+    if (previousID === terminalID) return
+    replaceTerminalSearch(previousID, terminalID)
+    registeredTerminalIDRef.current = terminalID
+  }, [registeredTerminalIDRef, terminalID])
 }

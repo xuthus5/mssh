@@ -18,6 +18,7 @@ interface Props {
   focusRequest: TerminalFocusRequest
   onPaneClosed?: (terminalID: string) => void
   onPaneReplaced?: (previousID: string, nextID: string) => void
+  onCloseTerminal?: () => void
 }
 
 function useRecordingControl(terminalID: string, sessionId: number) {
@@ -51,7 +52,7 @@ function useRecordingControl(terminalID: string, sessionId: number) {
   return { isRecording, toggle }
 }
 
-export function TerminalTab({ terminalID, sessionId, onOpenFiles, active, focusRequest, onPaneClosed, onPaneReplaced }: Props) {
+export function TerminalTab({ terminalID, sessionId, onOpenFiles, active, focusRequest, onPaneClosed, onPaneReplaced, onCloseTerminal }: Props) {
   const tabs = useAppStore((state) => state.tabs)
   const activePaneID = useAppStore((state) => state.activePaneId)
   const updateTerminalWorkspace = useAppStore((state) => state.updateTerminalWorkspace)
@@ -87,7 +88,7 @@ export function TerminalTab({ terminalID, sessionId, onOpenFiles, active, focusR
       <div className="relative min-h-0 flex-1">
         {currentTab ? <TerminalSplit ref={splitRef} tabID={currentTab.id} primaryID={terminalID} sessionId={sessionId}
           active={active} focusRequest={focusRequest} onStateChange={setSplitState}
-          onPaneClosed={onPaneClosed} onPaneReplaced={onPaneReplaced} /> : null}
+          onPaneClosed={onPaneClosed} onPaneReplaced={onPaneReplaced} onCloseTerminal={onCloseTerminal} /> : null}
         <TerminalSearchBar terminalID={activeTerminalID} open={searchOpen} onOpenChange={setSearchOpen} />
         {toolPanel === 'history' && <CommandHistoryPanel sessionID={sessionId} onClose={() => updateWorkspace({ toolPanel: null })} onFill={(command) => { const terminal = useAppStore.getState().terminalPool.get(activeTerminalID)?.terminal; terminal?.paste(command); terminal?.focus() }} />}
         {toolPanel === 'system' && <SystemPanel terminalID={activeTerminalID} onClose={() => updateWorkspace({ toolPanel: null })} />}
