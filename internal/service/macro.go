@@ -41,7 +41,7 @@ func (m *MacroService) Delete(id int64) error {
 }
 
 func (m *MacroService) Execute(terminalID, command string) error {
-	m.logger.Info("executing macro", "terminalID", terminalID, "command", command)
+	m.logger.Info("executing macro", "terminalID", terminalID)
 	if m.terminals == nil {
 		return fmt.Errorf("execute macro: no terminal service available")
 	}
