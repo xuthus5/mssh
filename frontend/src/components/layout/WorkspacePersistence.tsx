@@ -43,7 +43,7 @@ export function WorkspacePersistence() {
     if (!initialized.current) return
     const snapshot = createWorkspaceSnapshot({ tabs, activeSurface, workspaceTab, overviewSection })
     const timer = window.setTimeout(() => {
-      void SettingService.Set({ key: WORKSPACE_LAYOUT_SETTING, namespace: 'workspace', value: JSON.stringify(snapshot), value_type: 'json', version: 1 })
+      void SettingService.Set({ key: WORKSPACE_LAYOUT_SETTING, namespace: 'workspace', value: JSON.stringify(snapshot), value_type: 'object', version: 1 })
         .catch((error: unknown) => logger.error('save workspace failed', error))
     }, SAVE_DELAY_MS)
     return () => window.clearTimeout(timer)

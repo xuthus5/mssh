@@ -33,6 +33,7 @@ type App struct {
 	Setting        *service.SettingService
 	About          *service.AboutService
 	Font           *service.FontService
+	Audit          *service.AuditService
 	logger         *slog.Logger
 	shutdownOnce   sync.Once
 }
@@ -268,6 +269,7 @@ func initializeServices(input serviceInitialization) (*App, error) {
 		Setting:        service.NewSettingService(input.db, input.logger),
 		About:          service.NewAboutService(),
 		Font:           service.NewFontService(input.logger),
+		Audit:          service.NewAuditService(input.db, input.logger),
 		logger:         input.logger,
 	}, nil
 }

@@ -1,4 +1,4 @@
-import { MacroService, TerminalService } from '@/lib/wails'
+import { AuditService, MacroService, TerminalService } from '@/lib/wails'
 import { logger } from '@/lib/logger'
 import { createTerminalTab } from '@/lib/terminalTabs'
 import { useAppStore } from '@/store/appStore'
@@ -47,5 +47,10 @@ export async function runBatchSessions(sessions: BatchSession[], command?: strin
     }
   }
   await Promise.all(Array.from({ length: Math.min(4, sessions.length) }, worker))
+  try {
+    await AuditService.RecordBatch(command ? 'batch_macro' : 'batch_connect', results.map((result) => Number(result.sessionId)), results.map((result) => result.success ? 'success' : 'failed'))
+  } catch (error) {
+    logger.error('record batch audit failed', error)
+  }
   return results
 }

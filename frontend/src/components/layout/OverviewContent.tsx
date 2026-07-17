@@ -12,11 +12,13 @@ import { useSessionWorkspace } from '@/hooks/SessionWorkspaceContext'
 import { useTunnelManager } from '@/hooks/useTunnelManager'
 import { SessionAssetCenter } from '@/components/session/SessionAssetCenter'
 import { useAppStore } from '@/store/appStore'
+import { AuditPanel } from '@/components/layout/AuditPanel'
 
 export function OverviewContent() {
   const selected = useAppStore((state) => state.overviewSection)
   if (selected === 'keys') return <OverviewKeys />
   if (selected === 'tunnels') return <OverviewTunnels />
+  if (selected === 'audit') return <AuditPanel />
   return <SessionAssetCenter />
 }
 

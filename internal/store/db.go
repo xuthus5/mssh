@@ -11,7 +11,7 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-const databaseFormatVersion = 3
+const databaseFormatVersion = 4
 
 const foldersTableSQL = `CREATE TABLE IF NOT EXISTS session_folders (
 	id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -110,6 +110,17 @@ const transferJobsTableSQL = `CREATE TABLE IF NOT EXISTS transfer_jobs (
 	completed_at TEXT
 )`
 
+const auditEventsTableSQL = `CREATE TABLE IF NOT EXISTS audit_events (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	action TEXT NOT NULL,
+	target_type TEXT NOT NULL,
+	target_id TEXT NOT NULL DEFAULT '',
+	session_id INTEGER,
+	summary TEXT NOT NULL,
+	outcome TEXT NOT NULL CHECK(outcome IN ('success','failed')),
+	created_at TEXT NOT NULL
+)`
+
 type schemaStatement struct {
 	name string
 	sql  string
@@ -124,6 +135,9 @@ var finalSchemaStatements = []schemaStatement{
 	{name: "command_history", sql: commandHistoryTableSQL},
 	{name: "session_logs", sql: logsTableSQL},
 	{name: "transfer_jobs", sql: transferJobsTableSQL},
+	{name: "audit_events", sql: auditEventsTableSQL},
+	{name: "audit_events_action_idx", sql: "CREATE INDEX IF NOT EXISTS audit_events_action_idx ON audit_events(action, created_at DESC)"},
+	{name: "audit_events_session_idx", sql: "CREATE INDEX IF NOT EXISTS audit_events_session_idx ON audit_events(session_id, created_at DESC)"},
 	{name: "settings", sql: settingsTableSQL},
 	{name: "themes", sql: themeDefinitionsSchema},
 	{name: "terminal_theme_profiles", sql: themeProfilesSchema},
@@ -134,6 +148,7 @@ var applicationTablesInDropOrder = []string{
 	"themes",
 	"session_logs",
 	"transfer_jobs",
+	"audit_events",
 	"tunnels",
 	"sessions",
 	"ssh_keys",
