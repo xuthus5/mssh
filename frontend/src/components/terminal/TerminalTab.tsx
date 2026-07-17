@@ -9,6 +9,7 @@ import type { TerminalFocusRequest } from '@/hooks/useTerminal'
 import { CommandHistoryPanel } from '@/components/terminal/CommandHistoryPanel'
 import { SystemPanel } from '@/components/terminal/SystemPanel'
 import { TerminalSearchBar } from '@/components/terminal/TerminalSearchBar'
+import { TerminalComposePanel } from '@/components/terminal/TerminalComposePanel'
 
 interface Props {
   terminalID: string
@@ -61,6 +62,7 @@ export function TerminalTab({ terminalID, sessionId, onOpenFiles, active, focusR
   const splitRef = useRef<TerminalSplitHandle>(null)
   const [splitState, setSplitState] = useState({ paneCount: 1, busy: false })
   const [searchOpen, setSearchOpen] = useState(false)
+  const [composeOpen, setComposeOpen] = useState(false)
   const activeTerminalID = activePaneID ?? terminalID
   const updateWorkspace = (updates: Parameters<typeof updateTerminalWorkspace>[1]) => {
     if (currentTab) updateTerminalWorkspace(currentTab.id, updates)
@@ -82,6 +84,8 @@ export function TerminalTab({ terminalID, sessionId, onOpenFiles, active, focusR
         paneCount={splitState.paneCount}
         searchOpen={searchOpen}
         onToggleSearch={() => setSearchOpen((value) => !value)}
+        composeOpen={composeOpen}
+        onToggleCompose={() => setComposeOpen((value) => !value)}
         onOpenHistory={() => updateWorkspace({ toolPanel: toolPanel === 'history' ? null : 'history' })}
         onOpenSystem={() => updateWorkspace({ toolPanel: toolPanel === 'system' ? null : 'system' })}
       />
@@ -93,6 +97,7 @@ export function TerminalTab({ terminalID, sessionId, onOpenFiles, active, focusR
         {toolPanel === 'history' && <CommandHistoryPanel sessionID={sessionId} onClose={() => updateWorkspace({ toolPanel: null })} onFill={(command) => { const terminal = useAppStore.getState().terminalPool.get(activeTerminalID)?.terminal; terminal?.paste(command); terminal?.focus() }} />}
         {toolPanel === 'system' && <SystemPanel terminalID={activeTerminalID} onClose={() => updateWorkspace({ toolPanel: null })} />}
       </div>
+      <TerminalComposePanel open={composeOpen} terminalID={activeTerminalID} sessionID={sessionId} onClose={() => setComposeOpen(false)} />
     </div>
   )
 }
