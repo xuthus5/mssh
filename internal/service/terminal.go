@@ -277,6 +277,10 @@ func cpuPercent(previous, current systemSample) float64 {
 }
 
 func (t *TerminalService) Open(ctx context.Context, sessionID int64, cols, rows int) (string, error) {
+	outcome := "failed"
+	defer func() {
+		recordAudit(t.sessionSvc.db, t.logger, model.AuditEvent{Action: "connect", TargetType: "session", TargetID: fmt.Sprint(sessionID), SessionID: &sessionID, Summary: "SSH 连接", Outcome: outcome})
+	}()
 	t.logger.Info("opening terminal", "sessionID", sessionID, "cols", cols, "rows", rows)
 	connID, err := t.sessionSvc.connect(ctx, sessionID, false)
 	if err != nil {
@@ -330,6 +334,7 @@ func (t *TerminalService) Open(ctx context.Context, sessionID int64, cols, rows 
 	close(exitReady)
 
 	t.logger.Info("terminal opened", "terminalID", terminalID)
+	outcome = "success"
 	return terminalID, nil
 }
 

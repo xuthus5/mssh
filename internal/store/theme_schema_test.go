@@ -93,6 +93,16 @@ var expectedFinalSchemaSQL = map[string]string{
 		started_at TEXT NOT NULL,
 		completed_at TEXT
 	)`,
+	"audit_events": `CREATE TABLE audit_events (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		action TEXT NOT NULL,
+		target_type TEXT NOT NULL,
+		target_id TEXT NOT NULL DEFAULT '',
+		session_id INTEGER,
+		summary TEXT NOT NULL,
+		outcome TEXT NOT NULL CHECK(outcome IN ('success','failed')),
+		created_at TEXT NOT NULL
+	)`,
 	"settings": `CREATE TABLE settings (
 		key TEXT PRIMARY KEY,
 		namespace TEXT NOT NULL,

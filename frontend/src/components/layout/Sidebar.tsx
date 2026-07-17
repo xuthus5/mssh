@@ -1,4 +1,4 @@
-import { ArrowLeft, KeyRound, Network, Search, Server } from 'lucide-react'
+import { ArrowLeft, KeyRound, Network, ScrollText, Search, Server } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -16,6 +16,7 @@ const overviewItems = [
   { id: 'sessions', label: '会话', icon: Server },
   { id: 'keys', label: '密钥配置', icon: KeyRound },
   { id: 'tunnels', label: '隧道配置', icon: Network },
+  { id: 'audit', label: '审计日志', icon: ScrollText },
 ] as const
 
 function OverviewPanel() {

@@ -116,8 +116,16 @@ func (k *KeyService) Import(name, privateKeyPEM string) (*model.SSHKey, error) {
 }
 
 func (k *KeyService) Delete(id int64) error {
+	outcome := "failed"
+	defer func() {
+		recordAudit(k.db, k.logger, model.AuditEvent{Action: "delete", TargetType: "key", TargetID: fmt.Sprint(id), Summary: "删除 SSH 密钥", Outcome: outcome})
+	}()
 	k.logger.Info("deleting key", "id", id)
-	return store.DeleteKey(k.db, id)
+	err := store.DeleteKey(k.db, id)
+	if err == nil {
+		outcome = "success"
+	}
+	return err
 }
 
 func (k *KeyService) UsageCount(id int64) (int, error) {

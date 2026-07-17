@@ -5,6 +5,7 @@ import {
   FileService,
   KeyService,
   SettingService,
+  AuditService,
   TunnelService,
   MacroService,
   ThemeService,
@@ -47,6 +48,12 @@ describe('Generated Bindings Barrel', () => {
     expect(typeof SettingService.Set).toBe('function')
     expect('GetSetting' in SettingService).toBe(false)
     expect('SetSetting' in SettingService).toBe(false)
+  })
+
+  it('exports AuditService', () => {
+    expect(AuditService).toBeDefined()
+    expect(typeof AuditService.List).toBe('function')
+    expect(typeof AuditService.SetEnabled).toBe('function')
   })
 
   it('exports TunnelService', () => {
