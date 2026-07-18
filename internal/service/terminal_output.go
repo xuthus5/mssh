@@ -65,7 +65,16 @@ func (t *TerminalService) handlePTYOutput(terminalID string, data []byte) {
 }
 
 func (t *TerminalService) dispatchTerminalOutput(terminalID string, data []byte, handler func(string, []byte)) {
-	t.eventBus.Emit(event.TerminalOutput, event.TerminalOutputPayload{TerminalID: terminalID, Data: append([]byte(nil), data...)})
+	if t.outputSequences == nil {
+		t.outputSequences = make(map[string]uint64)
+	}
+	// Wails dispatches each event asynchronously, so the frontend restores PTY byte order with this sequence.
+	t.outputSequences[terminalID]++
+	t.eventBus.Emit(event.TerminalOutput, event.TerminalOutputPayload{
+		TerminalID: terminalID,
+		Sequence:   t.outputSequences[terminalID],
+		Data:       append([]byte(nil), data...),
+	})
 	if handler != nil {
 		handler(terminalID, data)
 	}
@@ -75,6 +84,9 @@ func (t *TerminalService) expirePendingOutput(terminalID string) {
 	t.mu.Lock()
 	if _, active := t.ptys[terminalID]; !active && !t.attached[terminalID] {
 		delete(t.pendingOutput, terminalID)
+		t.outputMu.Lock()
+		delete(t.outputSequences, terminalID)
+		t.outputMu.Unlock()
 	}
 	t.mu.Unlock()
 }

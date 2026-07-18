@@ -35,16 +35,16 @@ func TestConstantsFollowNamingConvention(t *testing.T) {
 }
 
 func TestTerminalOutputPayload_JSON(t *testing.T) {
-	p := TerminalOutputPayload{TerminalID: "term-1", Data: []byte{0xe4}}
+	p := TerminalOutputPayload{TerminalID: "term-1", Sequence: 7, Data: []byte{0xe4}}
 	data, err := json.Marshal(p)
 	assert.NoError(t, err)
 	assert.Contains(t, string(data), `"data":"5A=="`)
+	assert.Contains(t, string(data), `"sequence":7`)
 
 	var decoded TerminalOutputPayload
 	err = json.Unmarshal(data, &decoded)
 	assert.NoError(t, err)
-	assert.Equal(t, p.TerminalID, decoded.TerminalID)
-	assert.Equal(t, p.Data, decoded.Data)
+	assert.Equal(t, p, decoded)
 }
 
 func TestConnectionStatePayload_JSON(t *testing.T) {
