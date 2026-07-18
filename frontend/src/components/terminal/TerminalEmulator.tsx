@@ -19,7 +19,7 @@ export function TerminalEmulator({ terminalID, className, active, focusRequest }
     <TerminalInteractionSurface terminalRef={terminalRef}>
       <div
         ref={containerRef}
-        className={cn('[&>.xterm]:pl-1', className)}
+        className={cn('[&>.xterm]:h-full [&>.xterm]:min-h-0 [&>.xterm]:w-full [&>.xterm]:min-w-0 [&>.xterm]:pl-1', className)}
         style={{
           width: '100%',
           height: '100%',
