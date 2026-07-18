@@ -2,14 +2,14 @@ import { useEffect, useRef, type RefObject } from 'react'
 import { FitAddon } from '@xterm/addon-fit'
 import { SearchAddon } from '@xterm/addon-search'
 import { Unicode11Addon } from '@xterm/addon-unicode11'
-import { Terminal } from '@xterm/xterm'
+import type { Terminal } from '@xterm/xterm'
 import { Events } from '@wailsio/runtime'
 import { useTerminalRuntimeErrorReporter, type TerminalRuntimeErrorReporter } from '@/components/terminal/TerminalErrorBoundary'
 import { installTerminalCopyOnSelect } from '@/components/terminal/terminalBehaviorRuntime'
 import { runTerminalRuntime } from '@/components/terminal/terminalRuntime'
 import { logger } from '@/lib/logger'
 import { toast } from '@/components/ui/toast'
-import { applyTerminalTheme, xtermTheme } from '@/lib/terminalTheme'
+import { applyTerminalTheme } from '@/lib/terminalTheme'
 import { TerminalService } from '@/lib/wails'
 import { useAppStore, type AppState } from '@/store/appStore'
 import { recordCommand } from '@/lib/commandHistory'
@@ -18,8 +18,8 @@ import { registerTerminalSearch, unregisterTerminalSearch } from '@/lib/terminal
 import { useTerminalActivation, useTerminalAttachment, useTerminalIdentity } from '@/hooks/terminalLifecycleRuntime'
 import { fitAndRefresh } from '@/hooks/terminalFitRuntime'
 import { SynchronizedOutputWriter } from '@/components/terminal/terminalSynchronizedOutput'
+import { createTerminalInstance, loadCanvasRenderer, safelyDisposeTerminalResource } from '@/hooks/terminalInstanceRuntime'
 
-const TERMINAL_SCROLLBACK = 10000
 const RESIZE_DEBOUNCE_MS = 80
 
 interface TerminalOutputEvent {
@@ -65,31 +65,10 @@ function reportResize(terminalID: string, term: Terminal, context: string, lastR
   }
 }
 
-function safelyDispose(label: string, dispose: () => void) {
-  try {
-    dispose()
-  } catch (error: unknown) {
-    logger.error(`terminal ${label} cleanup error`, error)
-  }
-}
-
 function cancelActivationFrame(frameRef: RefObject<number | null>) {
   if (frameRef.current === null) return
   window.cancelAnimationFrame(frameRef.current)
   frameRef.current = null
-}
-
-function createTerminal() {
-  const theme = useAppStore.getState().terminalTheme
-  return new Terminal({
-    allowProposedApi: true,
-    cursorBlink: true,
-    cursorStyle: theme.cursorStyle,
-    fontSize: theme.fontSize,
-    fontFamily: theme.fontFamily,
-    theme: xtermTheme(theme),
-    scrollback: TERMINAL_SCROLLBACK,
-  })
 }
 
 function reportWriteFailure(terminalID: string, error: unknown, refs: TerminalLifecycleRefs) {
@@ -224,7 +203,7 @@ function initializeTerminal(containerRef: RefObject<HTMLDivElement | null>, refs
   let searchAddonOwnedByTerminal = false
   let cleanupCopyOnSelect: (() => void) | undefined
   const container = containerRef.current
-  const term = createTerminal()
+  const term = createTerminalInstance()
   const fitAddon = new FitAddon()
   const unicodeAddon = new Unicode11Addon()
   const searchAddon = new SearchAddon({ highlightLimit: 1000 })
@@ -233,6 +212,7 @@ function initializeTerminal(containerRef: RefObject<HTMLDivElement | null>, refs
   refs.fitAddonRef.current = fitAddon
   if (container) {
     term.open(container)
+    loadCanvasRenderer(term)
     term.loadAddon(unicodeAddon)
     unicodeAddonOwnedByTerminal = true
     if (term.unicode) term.unicode.activeVersion = '11'
@@ -261,18 +241,18 @@ function initializeTerminal(containerRef: RefObject<HTMLDivElement | null>, refs
     if (refs.resizeTimerRef.current !== null) window.clearTimeout(refs.resizeTimerRef.current)
     container?.removeEventListener('focusin', focusHandler)
     container?.removeEventListener('pointerdown', focusHandler)
-    safelyDispose('data subscription', () => dataDispose.dispose())
-    safelyDispose('synchronized output query', () => synchronizedOutputQueryDispose.dispose())
-    safelyDispose('output subscription', unsubOutput)
-    safelyDispose('theme subscription', unsubscribeTheme)
-    safelyDispose('resize observer', () => resizeObserver.disconnect())
-    if (cleanupCopyOnSelect) safelyDispose('copy-on-select subscription', cleanupCopyOnSelect)
+    safelyDisposeTerminalResource('data subscription', () => dataDispose.dispose())
+    safelyDisposeTerminalResource('synchronized output query', () => synchronizedOutputQueryDispose.dispose())
+    safelyDisposeTerminalResource('output subscription', unsubOutput)
+    safelyDisposeTerminalResource('theme subscription', unsubscribeTheme)
+    safelyDisposeTerminalResource('resize observer', () => resizeObserver.disconnect())
+    if (cleanupCopyOnSelect) safelyDisposeTerminalResource('copy-on-select subscription', cleanupCopyOnSelect)
     unregisterTerminalSearch(refs.registeredTerminalIDRef.current)
-    if (!addonOwnedByTerminal) safelyDispose('fit addon', () => fitAddon.dispose())
-    if (!unicodeAddonOwnedByTerminal) safelyDispose('unicode addon', () => unicodeAddon.dispose())
-    if (!searchAddonOwnedByTerminal) safelyDispose('search addon', () => searchAddon.dispose())
+    if (!addonOwnedByTerminal) safelyDisposeTerminalResource('fit addon', () => fitAddon.dispose())
+    if (!unicodeAddonOwnedByTerminal) safelyDisposeTerminalResource('unicode addon', () => unicodeAddon.dispose())
+    if (!searchAddonOwnedByTerminal) safelyDisposeTerminalResource('search addon', () => searchAddon.dispose())
     refs.storeRef.current.unregisterTerminal(refs.terminalIDRef.current)
-    safelyDispose('instance', () => term.dispose())
+    safelyDisposeTerminalResource('instance', () => term.dispose())
     refs.fitAddonRef.current = null
     refs.termRef.current = null
   }
