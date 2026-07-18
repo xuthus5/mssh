@@ -15,6 +15,7 @@ const selectionDisposes: Array<ReturnType<typeof vi.fn>> = []
 const animationFrames: FrameRequestCallback[] = []
 const cancelledAnimationFrames: number[] = []
 const outputHandlers: Array<(event: { data?: { terminal_id?: string; data?: string } }) => void> = []
+const terminalWrites: string[] = []
 const resizeHandlers: ResizeObserverCallback[] = []
 let runtimeFailure: 'fit' | 'refresh' | 'focus' | 'write' | null = null
 let proposedDimensions: Array<{ cols: number; rows: number } | undefined> = []
@@ -52,7 +53,7 @@ vi.mock('@xterm/xterm', () => ({
       selectionDisposes.push(dispose)
       return { dispose }
     }
-    write() { if (runtimeFailure === 'write') throw new Error('write failed') }
+    write(data: string) { terminalWrites.push(data); if (runtimeFailure === 'write') throw new Error('write failed') }
     focus() { calls.push('focus'); if (runtimeFailure === 'focus') throw new Error('focus failed') }
     blur() { calls.push('blur') }
     refresh() { calls.push('refresh'); if (runtimeFailure === 'refresh') throw new Error('refresh failed') }
@@ -130,6 +131,7 @@ describe('useTerminal', () => {
     animationFrames.length = 0
     cancelledAnimationFrames.length = 0
     outputHandlers.length = 0
+    terminalWrites.length = 0
     resizeHandlers.length = 0
     runtimeFailure = null
     proposedDimensions = []
@@ -369,6 +371,36 @@ describe('useTerminal', () => {
     act(() => outputHandlers[0]({ data: { terminal_id: 'term-output', data: 'hello' } }))
 
     expect(screen.getByText('终端渲染失败')).toBeInTheDocument()
+  })
+
+  it('renders synchronized TUI output only after the complete frame arrives', () => {
+    const containerRef = createRef<HTMLDivElement>()
+    containerRef.current = document.createElement('div')
+    renderHook(() => useTerminal('term-sync', containerRef, { active: false, focusRequest: { sequence: 0 } }))
+
+    act(() => outputHandlers[0]({ data: { terminal_id: 'other', data: 'ignored' } }))
+    act(() => outputHandlers[0]({ data: { terminal_id: 'term-sync', data: '\u001b[?2026h\u001b[3;1H\u001b[J' } }))
+    act(() => outputHandlers[0]({ data: { terminal_id: 'term-sync', data: 'Codex working' } }))
+    expect(terminalWrites).toEqual([])
+
+    act(() => outputHandlers[0]({ data: { terminal_id: 'term-sync', data: '\u001b[?2026l' } }))
+
+    expect(terminalWrites).toEqual(['\u001b[3;1H\u001b[JCodex working'])
+  })
+
+  it('separates an incomplete synchronized frame from reconnected output', () => {
+    const containerRef = createRef<HTMLDivElement>()
+    containerRef.current = document.createElement('div')
+    const hook = renderHook(({ terminalID }) => useTerminal(terminalID, containerRef, {
+      active: false,
+      focusRequest: { sequence: 0 },
+    }), { initialProps: { terminalID: 'term-old' } })
+
+    act(() => outputHandlers[0]({ data: { terminal_id: 'term-old', data: '\u001b[?2026hold frame' } }))
+    hook.rerender({ terminalID: 'term-new' })
+    act(() => outputHandlers[0]({ data: { terminal_id: 'term-new', data: 'new prompt' } }))
+
+    expect(terminalWrites).toEqual(['old frame', 'new prompt'])
   })
 
   it('reports fit failures from the resize observer callback', () => {
