@@ -17,7 +17,7 @@ const themeUnsubscribes: Array<ReturnType<typeof vi.fn>> = []
 const selectionDisposes: Array<ReturnType<typeof vi.fn>> = []
 const animationFrames: FrameRequestCallback[] = []
 const cancelledAnimationFrames: number[] = []
-const outputHandlers: Array<(event: { data?: { terminal_id?: string; data?: string } }) => void> = []
+const outputHandlers: Array<(event: { data?: { terminal_id?: string; sequence?: number; data?: string } }) => void> = []
 const terminalWrites: Array<string | Uint8Array> = []
 const resizeHandlers: ResizeObserverCallback[] = []
 let runtimeFailure: 'fit' | 'refresh' | 'focus' | 'write' | null = null
@@ -120,7 +120,7 @@ vi.mock('@xterm/addon-search', () => ({
 
 vi.mock('@wailsio/runtime', () => ({
   Events: {
-    On: vi.fn((_name: string, handler: (event: { data?: { terminal_id?: string; data?: string } }) => void) => {
+    On: vi.fn((_name: string, handler: (event: { data?: { terminal_id?: string; sequence?: number; data?: string } }) => void) => {
       const unsubscribe = vi.fn()
       outputHandlers.push(handler)
       outputUnsubscribes.push(unsubscribe)
@@ -507,6 +507,22 @@ describe('useTerminal', () => {
     ])
   })
 
+  it('reorders asynchronously delivered terminal output before writing to xterm', () => {
+    const containerRef = createRef<HTMLDivElement>()
+    containerRef.current = document.createElement('div')
+    renderHook(() => useTerminal('term-ordered', containerRef, { active: false, focusRequest: { sequence: 0 } }))
+
+    const encodedBytes = (value: string) => btoa(String.fromCharCode(...outputBytes(value)))
+    act(() => outputHandlers[0]({ data: { terminal_id: 'term-ordered', sequence: 2, data: encodedBytes('2m─') } }))
+    expect(terminalWrites).toEqual([])
+    act(() => outputHandlers[0]({ data: { terminal_id: 'term-ordered', sequence: 1, data: encodedBytes('\u001b[49;') } }))
+
+    expect(terminalWrites.map((data) => Array.from(data as Uint8Array))).toEqual([
+      Array.from(outputBytes('\u001b[49;')),
+      Array.from(outputBytes('2m─')),
+    ])
+  })
+
   it('reports malformed terminal byte payloads through the error boundary', () => {
     const containerRef = createRef<HTMLDivElement>()
     containerRef.current = document.createElement('div')
@@ -543,9 +559,9 @@ describe('useTerminal', () => {
       focusRequest: { sequence: 0 },
     }), { initialProps: { terminalID: 'term-old' } })
 
-    act(() => outputHandlers[0]({ data: { terminal_id: 'term-old', data: encodedOutput('\u001b[?2026hold frame') } }))
+    act(() => outputHandlers[0]({ data: { terminal_id: 'term-old', sequence: 1, data: encodedOutput('\u001b[?2026hold frame') } }))
     hook.rerender({ terminalID: 'term-new' })
-    act(() => outputHandlers[0]({ data: { terminal_id: 'term-new', data: encodedOutput('new prompt') } }))
+    act(() => outputHandlers[0]({ data: { terminal_id: 'term-new', sequence: 1, data: encodedOutput('new prompt') } }))
 
     expect(terminalWrites.map((data) => Array.from(data as Uint8Array))).toEqual([
       Array.from(outputBytes('old frame')),
