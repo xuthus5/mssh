@@ -4,6 +4,7 @@ import { Events } from '@wailsio/runtime'
 import type { TerminalRuntimeErrorReporter } from '@/components/terminal/TerminalErrorBoundary'
 import { runTerminalRuntime } from '@/components/terminal/terminalRuntime'
 import { SynchronizedOutputWriter } from '@/components/terminal/terminalSynchronizedOutput'
+import { logger } from '@/lib/logger'
 
 interface TerminalOutputEvent {
   terminal_id?: string
@@ -46,6 +47,11 @@ export function subscribeToTerminalOutput({ term, terminalIDRef, reportRuntimeEr
   let outputTerminalID = terminalIDRef.current
   const output = new SynchronizedOutputWriter((data) => {
     runTerminalRuntime(reportRuntimeError, 'terminal output write', () => term.write(data))
+  }, {
+    onDiagnostics: (diagnostics) => logger.info('terminal synchronized output diagnostics', {
+      terminalID: terminalIDRef.current,
+      ...diagnostics,
+    }),
   })
   const unsubscribe = Events.On('terminal:output', (event: { data?: TerminalOutputEvent }) => {
     const payload = event.data

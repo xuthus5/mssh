@@ -18,6 +18,36 @@ describe('SynchronizedOutputWriter', () => {
     expect(write).toHaveBeenCalledWith('hello')
   })
 
+  it('reports ordinary output without synchronized markers', () => {
+    const write = vi.fn()
+    const diagnostics = vi.fn()
+    const output = new SynchronizedOutputWriter(write, { diagnosticsIntervalMs: 100, onDiagnostics: diagnostics })
+
+    output.push('ordinary output')
+    vi.advanceTimersByTime(100)
+
+    expect(diagnostics).toHaveBeenCalledWith(expect.objectContaining({
+      reason: 'interval', inputChunks: 1, startMarkers: 0, endMarkers: 0,
+      completedFrames: 0, synchronized: false,
+    }))
+  })
+
+  it('reports synchronized frame statistics without changing output', () => {
+    const write = vi.fn()
+    const diagnostics = vi.fn()
+    const output = new SynchronizedOutputWriter(write, { diagnosticsIntervalMs: 100, onDiagnostics: diagnostics })
+
+    output.push(`${syncStart}frame${syncEnd}`)
+    vi.advanceTimersByTime(100)
+
+    expect(write).toHaveBeenCalledWith('frame')
+    expect(diagnostics).toHaveBeenCalledWith(expect.objectContaining({
+      reason: 'interval', inputChunks: 1, startMarkers: 1, endMarkers: 1, completedFrames: 1,
+      orphanEndMarkers: 0, nestedStartMarkers: 0, timeoutReleases: 0,
+      sizeLimitReleases: 0, bufferedBytes: 0, synchronized: false, maxFrameBytes: 5,
+    }))
+  })
+
   it('buffers a Codex frame across arbitrary SSH chunks', () => {
     const write = vi.fn()
     const output = new SynchronizedOutputWriter(write)
@@ -88,6 +118,21 @@ describe('SynchronizedOutputWriter', () => {
 
     output.push('next')
     expect(write).toHaveBeenLastCalledWith('next')
+  })
+
+  it('reports missing and nested markers when a frame times out', () => {
+    const write = vi.fn()
+    const diagnostics = vi.fn()
+    const output = new SynchronizedOutputWriter(write, { frameTimeoutMs: 100, diagnosticsIntervalMs: 100, onDiagnostics: diagnostics })
+
+    output.push(`${syncStart}outer${syncStart}inner`)
+    vi.advanceTimersByTime(100)
+
+    expect(write).toHaveBeenCalledWith('outer' + syncStart + 'inner')
+    expect(diagnostics).toHaveBeenLastCalledWith(expect.objectContaining({
+      reason: 'timeout', startMarkers: 1, endMarkers: 0, completedFrames: 0, nestedStartMarkers: 1,
+      timeoutReleases: 1, synchronized: false,
+    }))
   })
 
   it('flushes incomplete markers during disposal only once', () => {
