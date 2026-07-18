@@ -64,6 +64,21 @@ describe('TerminalLayers focus targeting', () => {
     expect(panel).toHaveAttribute('aria-labelledby', 'dynamic-tab-tab-1')
   })
 
+  it('directly hides the canvas cursor layer for inactive terminal tabs', () => {
+    useAppStore.setState({
+      tabs: [
+        { id: 'tab-1', title: 'First', type: 'terminal', terminalId: 'primary-1', sessionId: 1 },
+        { id: 'tab-2', title: 'Second', type: 'terminal', terminalId: 'primary-2', sessionId: 2 },
+      ],
+      activeSurface: { type: 'terminal', id: 'tab-1' },
+    })
+    render(<TerminalLayers />)
+
+    const inactivePanel = document.getElementById('dynamic-panel-tab-2')
+    expect(inactivePanel).toHaveAttribute('aria-hidden', 'true')
+    expect(inactivePanel).toHaveClass('[&_.xterm-cursor-layer]:hidden')
+  })
+
   it('confirms and reports an active connection close from the error boundary', async () => {
     const closeTab = vi.fn(async () => { throw new Error('connection lost') })
     vi.spyOn(console, 'error').mockImplementation(() => {})
