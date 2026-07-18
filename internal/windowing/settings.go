@@ -2,6 +2,7 @@ package windowing
 
 import (
 	"sync"
+	"sync/atomic"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
@@ -18,13 +19,14 @@ const (
 type windowHandle interface {
 	Show()
 	Focus()
+	Hide()
 	Close()
 	Center()
 	Position() (int, int)
 	Size() (int, int)
 	GetScreen() (*application.Screen, error)
 	SetPosition(x, y int)
-	OnClosing(callback func())
+	OnClosing(callback func() bool)
 }
 
 type windowRegistry interface {
@@ -37,6 +39,7 @@ type SettingsWindowController struct {
 	registry windowRegistry
 	main     windowHandle
 	emit     func(name string)
+	destroy  atomic.Bool
 }
 
 func NewSettingsWindowController(
@@ -65,24 +68,53 @@ func newSettingsWindowController(
 func (c *SettingsWindowController) Open() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if existing, ok := c.registry.Get(SettingsWindowName); ok {
-		existing.Show()
-		existing.Focus()
-		return
-	}
-	window := c.registry.Create(settingsWindowOptions())
-	window.OnClosing(func() { c.emit(SettingsPreviewCancelledEvent) })
+	window := c.ensureWindow()
 	c.position(window)
 	window.Show()
 	window.Focus()
+}
+
+func (c *SettingsWindowController) Preload() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.ensureWindow()
+}
+
+func (c *SettingsWindowController) Hide() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if window, ok := c.registry.Get(SettingsWindowName); ok {
+		c.hideWindow(window)
+	}
 }
 
 func (c *SettingsWindowController) Close() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if window, ok := c.registry.Get(SettingsWindowName); ok {
+		c.destroy.Store(true)
 		window.Close()
 	}
+}
+
+func (c *SettingsWindowController) ensureWindow() windowHandle {
+	if existing, ok := c.registry.Get(SettingsWindowName); ok {
+		return existing
+	}
+	window := c.registry.Create(settingsWindowOptions())
+	window.OnClosing(func() bool {
+		if c.destroy.Load() {
+			return false
+		}
+		c.hideWindow(window)
+		return true
+	})
+	return window
+}
+
+func (c *SettingsWindowController) hideWindow(window windowHandle) {
+	c.emit(SettingsPreviewCancelledEvent)
+	window.Hide()
 }
 
 func (c *SettingsWindowController) position(window windowHandle) {
@@ -155,6 +187,8 @@ func (w wailsWindowHandle) Show() { w.window.Show() }
 
 func (w wailsWindowHandle) Focus() { w.window.Focus() }
 
+func (w wailsWindowHandle) Hide() { w.window.Hide() }
+
 func (w wailsWindowHandle) Close() { w.window.Close() }
 
 func (w wailsWindowHandle) Center() { w.window.Center() }
@@ -167,6 +201,10 @@ func (w wailsWindowHandle) GetScreen() (*application.Screen, error) { return w.w
 
 func (w wailsWindowHandle) SetPosition(x, y int) { w.window.SetPosition(x, y) }
 
-func (w wailsWindowHandle) OnClosing(callback func()) {
-	_ = w.window.RegisterHook(events.Common.WindowClosing, func(*application.WindowEvent) { callback() })
+func (w wailsWindowHandle) OnClosing(callback func() bool) {
+	_ = w.window.RegisterHook(events.Common.WindowClosing, func(event *application.WindowEvent) {
+		if callback() {
+			event.Cancel()
+		}
+	})
 }

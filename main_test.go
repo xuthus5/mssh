@@ -37,10 +37,15 @@ func TestConfigureWindowsCreatesAndReusesSettingsWindow(t *testing.T) {
 	wailsApp := application.New(application.Options{Name: "mssh-window-test"})
 	configureWindows(wailsApp, windowConfiguration{})
 
+	settingsWindow, exists := wailsApp.Window.GetByName(windowing.SettingsWindowName)
+	assert.True(t, exists)
+	assert.NotNil(t, settingsWindow)
+	assert.Len(t, wailsApp.Window.GetAll(), 2)
+
 	assert.False(t, wailsApp.Event.Emit(windowing.OpenSettingsWindowEvent))
 	assert.Eventually(t, func() bool {
-		settingsWindow, exists := wailsApp.Window.GetByName(windowing.SettingsWindowName)
-		return exists && settingsWindow != nil
+		reused, found := wailsApp.Window.GetByName(windowing.SettingsWindowName)
+		return found && reused == settingsWindow
 	}, time.Second, 10*time.Millisecond)
 	assert.Len(t, wailsApp.Window.GetAll(), 2)
 

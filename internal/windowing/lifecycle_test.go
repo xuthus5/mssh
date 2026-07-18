@@ -25,7 +25,7 @@ type fakeSettingReader struct {
 func (r fakeSettingReader) Get(string) (*model.Setting, error) { return r.setting, r.err }
 
 type lifecycleCounters struct {
-	show, hide, focus, closeSettings, quit int
+	show, hide, focus, hideSettings, closeSettings, quit int
 }
 
 func newLifecycleController(reader CloseActionReader, counters *lifecycleCounters) *ApplicationLifecycleController {
@@ -35,6 +35,7 @@ func newLifecycleController(reader CloseActionReader, counters *lifecycleCounter
 		ShowMain:      func() { counters.show++ },
 		HideMain:      func() { counters.hide++ },
 		FocusMain:     func() { counters.focus++ },
+		HideSettings:  func() { counters.hideSettings++ },
 		CloseSettings: func() { counters.closeSettings++ },
 		Quit:          func() { counters.quit++ },
 	})
@@ -49,7 +50,8 @@ func TestApplicationLifecycleDefaultsCloseToTray(t *testing.T) {
 
 	assert.True(t, event.cancelled)
 	assert.Equal(t, 1, counters.hide)
-	assert.Equal(t, 1, counters.closeSettings)
+	assert.Equal(t, 1, counters.hideSettings)
+	assert.Zero(t, counters.closeSettings)
 	assert.Zero(t, counters.quit)
 }
 
@@ -62,6 +64,7 @@ func TestApplicationLifecycleHonoursExitCloseAction(t *testing.T) {
 	controller.HandleWindowClosing(event)
 
 	assert.False(t, event.cancelled)
+	assert.Zero(t, counters.hideSettings)
 	assert.Equal(t, 1, counters.closeSettings)
 	assert.Equal(t, 1, counters.quit)
 	assert.Zero(t, counters.hide)
@@ -123,6 +126,8 @@ func TestApplicationLifecycleFallsBackToTrayOnInvalidSetting(t *testing.T) {
 
 		assert.True(t, event.cancelled)
 		assert.Equal(t, 1, counters.hide)
+		assert.Equal(t, 1, counters.hideSettings)
+		assert.Zero(t, counters.closeSettings)
 		assert.Zero(t, counters.quit)
 	}
 }
