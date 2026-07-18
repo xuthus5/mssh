@@ -59,9 +59,21 @@ describe('SynchronizedOutputWriter', () => {
     expect(write).toHaveBeenCalledOnce()
     expect(write).toHaveBeenCalledWith('outerinnerafter')
     expect(diagnostics).toHaveBeenCalledWith(expect.objectContaining({
-      startMarkers: 2, endMarkers: 2, completedFrames: 1,
+      startMarkers: 2, endMarkers: 2, completedFrames: 2, nestedFrameReleases: 1,
       orphanEndMarkers: 0, nestedStartMarkers: 1, timeoutReleases: 0,
     }))
+  })
+
+  it('releases each nested update while retaining the outer tmux frame', () => {
+    const write = vi.fn()
+    const output = new SynchronizedOutputWriter(write)
+
+    output.push(syncStart)
+    output.push(`${syncStart}frame-1${syncEnd}`)
+    output.push(`${syncStart}frame-2${syncEnd}`)
+    output.push(syncEnd)
+
+    expect(write.mock.calls).toEqual([['frame-1'], ['frame-2']])
   })
 
   it('resets the frame timeout while synchronized output is active', () => {
