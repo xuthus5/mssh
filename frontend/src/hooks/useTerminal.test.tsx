@@ -8,6 +8,7 @@ const terminalInstances: Array<{ cols: number; rows: number }> = []
 const terminalDisposes: Array<ReturnType<typeof vi.fn>> = []
 const dataDisposes: Array<ReturnType<typeof vi.fn>> = []
 const addonDisposes: Array<ReturnType<typeof vi.fn>> = []
+const canvasDisposes: Array<ReturnType<typeof vi.fn>> = []
 const observerDisconnects: Array<ReturnType<typeof vi.fn>> = []
 const outputUnsubscribes: Array<ReturnType<typeof vi.fn>> = []
 const parserHandlers: Array<(params: Array<number | number[]>) => boolean> = []
@@ -21,6 +22,7 @@ const terminalWrites: string[] = []
 const resizeHandlers: ResizeObserverCallback[] = []
 let runtimeFailure: 'fit' | 'refresh' | 'focus' | 'write' | null = null
 let proposedDimensions: Array<{ cols: number; rows: number } | undefined> = []
+let canvasLoadFailure = false
 
 vi.mock('@xterm/xterm', () => ({
   Terminal: class {
@@ -31,7 +33,11 @@ vi.mock('@xterm/xterm', () => ({
     private unicodeApi = { activeVersion: '6' }
     open() { calls.push('open') }
     private addons: Array<{ dispose: () => void }> = []
-    loadAddon(addon: { name: string; dispose: () => void }) { calls.push(`load:${addon.name}`); this.addons.push(addon) }
+    loadAddon(addon: { name: string; dispose: () => void }) {
+      calls.push(`load:${addon.name}`)
+      this.addons.push(addon)
+      if (addon.name === 'canvas' && canvasLoadFailure) throw new Error('canvas unavailable')
+    }
     private terminalDispose = vi.fn(() => calls.push('dispose'))
     constructor(options: Record<string, unknown>) {
       terminalOptions.push(options)
@@ -89,6 +95,15 @@ vi.mock('@xterm/addon-fit', () => ({
   },
 }))
 
+vi.mock('@xterm/addon-canvas', () => ({
+  CanvasAddon: class {
+    name = 'canvas'
+    private canvasDispose = vi.fn()
+    constructor() { canvasDisposes.push(this.canvasDispose) }
+    dispose() { this.canvasDispose() }
+  },
+}))
+
 vi.mock('@xterm/addon-unicode11', () => ({
   Unicode11Addon: class {
     name = 'unicode11'
@@ -125,6 +140,7 @@ import { useAppStore } from '@/store/appStore'
 import { useTerminalBehaviorStore } from '@/store/terminalBehaviorStore'
 import { TerminalErrorBoundary } from '@/components/terminal/TerminalErrorBoundary'
 import { getTerminalSearch } from '@/lib/terminalSearchRegistry'
+import { logger } from '@/lib/logger'
 
 describe('useTerminal', () => {
   beforeEach(() => {
@@ -135,6 +151,7 @@ describe('useTerminal', () => {
     terminalDisposes.length = 0
     dataDisposes.length = 0
     addonDisposes.length = 0
+    canvasDisposes.length = 0
     observerDisconnects.length = 0
     outputUnsubscribes.length = 0
     parserHandlers.length = 0
@@ -148,6 +165,7 @@ describe('useTerminal', () => {
     resizeHandlers.length = 0
     runtimeFailure = null
     proposedDimensions = []
+    canvasLoadFailure = false
     Object.defineProperty(document, 'fonts', { configurable: true, value: undefined })
     useTerminalBehaviorStore.setState({ rightClickAction: 'menu', copyOnSelect: false })
     vi.stubGlobal('ResizeObserver', class {
@@ -176,7 +194,7 @@ describe('useTerminal', () => {
 
     const { unmount } = renderHook(() => useTerminal('term-1', containerRef, { active: true, focusRequest: { sequence: 0 } }))
 
-    expect(calls).toEqual(['open', 'load:unicode11', 'load:search', 'load:fit'])
+    expect(calls).toEqual(['open', 'load:canvas', 'load:unicode11', 'load:search', 'load:fit'])
     expect(terminalOptions[0]).toEqual(expect.objectContaining({ allowProposedApi: true }))
     expect(getTerminalSearch('term-1')).not.toBeNull()
     expect(selectionDisposes).toHaveLength(1)
@@ -196,6 +214,20 @@ describe('useTerminal', () => {
     expect(parserHandlers[0]([2026])).toBe(true)
     expect(parserHandlers[0]([25])).toBe(false)
     expect(calls).toContain('input:\u001b[?2026;2$y:false')
+  })
+
+  it('falls back to the DOM renderer when canvas activation fails', () => {
+    const warn = vi.spyOn(logger, 'warn').mockImplementation(() => {})
+    canvasLoadFailure = true
+    const containerRef = createRef<HTMLDivElement>()
+    containerRef.current = document.createElement('div')
+
+    const { unmount } = renderHook(() => useTerminal('term-canvas-fallback', containerRef, { active: false, focusRequest: { sequence: 0 } }))
+
+    expect(calls).toEqual(['open', 'load:canvas', 'load:unicode11', 'load:search', 'load:fit', 'blur'])
+    expect(warn).toHaveBeenCalledWith('terminal canvas renderer unavailable, using DOM renderer', expect.objectContaining({ message: 'canvas unavailable' }))
+    act(() => unmount())
+    expect(canvasDisposes[0]).toHaveBeenCalledOnce()
   })
 
   it('uses the restored global theme for the first terminal instance', () => {
@@ -407,6 +439,7 @@ describe('useTerminal', () => {
     expect(terminalDisposes.every((dispose) => dispose.mock.calls.length === 1)).toBe(true)
     expect(dataDisposes.every((dispose) => dispose.mock.calls.length === 1)).toBe(true)
     expect(addonDisposes.every((dispose) => dispose.mock.calls.length === 1)).toBe(true)
+    expect(canvasDisposes.every((dispose) => dispose.mock.calls.length === 1)).toBe(true)
     expect(observerDisconnects.every((disconnect) => disconnect.mock.calls.length === 1)).toBe(true)
     expect(outputUnsubscribes.every((unsubscribe) => unsubscribe.mock.calls.length === 1)).toBe(true)
     expect(themeUnsubscribes.every((unsubscribe) => unsubscribe.mock.calls.length === 1)).toBe(true)
