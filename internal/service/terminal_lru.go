@@ -26,6 +26,7 @@ func (t *TerminalService) evictLRU() {
 	delete(t.lastUsed, oldestID)
 	delete(t.attached, oldestID)
 	delete(t.pendingOutput, oldestID)
+	delete(t.outputSequences, oldestID)
 	delete(t.connIDs, oldestID)
 	if pty != nil {
 		_ = pty.Close()
