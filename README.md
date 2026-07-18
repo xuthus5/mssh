@@ -10,6 +10,7 @@ A cross-platform SSH client built with Go + Wails v3 + React + xterm.js.
 - Overview workspace for sessions, SSH keys, and tunnels, plus non-disruptive session and macro sidebars
 - Encrypted `.msshbackup` backups with GitHub Gist, WebDAV, and AWS S3/S3-compatible synchronization using Argon2id, AES-256-GCM, and conditional writes
 - Session management (folders, SSH password/key/agent auth)
+- Versioned CSV import and export for sessions, nested folders, asset metadata, and optional explicitly confirmed plaintext passwords
 - Governed session assets with environment/project catalogs, multi-tag assignment, advanced filtering, bulk updates, audited migration, and detail panels
 - Confirmed multi-session connection and macro execution with per-node results
 - Optional local audit log for connections, synchronization, deletion, key access, and batch actions
