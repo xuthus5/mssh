@@ -205,6 +205,7 @@ describe('useTerminal', () => {
     expect(getTerminalSearch('term-1')).toBeNull()
     expect(selectionDisposes[0]).toHaveBeenCalledOnce()
     expect(parserDisposes[0]).toHaveBeenCalledOnce()
+    expect(parserDisposes[1]).toHaveBeenCalledOnce()
     expect(calls.at(-1)).toBe('dispose')
   })
 
@@ -213,10 +214,22 @@ describe('useTerminal', () => {
     containerRef.current = document.createElement('div')
     renderHook(() => useTerminal('term-capability', containerRef, { active: false, focusRequest: { sequence: 0 } }))
 
-    expect(parserHandlers).toHaveLength(1)
+    expect(parserHandlers).toHaveLength(2)
     expect(parserHandlers[0]([2026])).toBe(true)
     expect(parserHandlers[0]([25])).toBe(false)
     expect(calls).toContain('input:\u001b[?2026;2$y:false')
+  })
+
+  it('answers the XTVERSION probe so tmux enables synchronized output', () => {
+    const containerRef = createRef<HTMLDivElement>()
+    containerRef.current = document.createElement('div')
+    renderHook(() => useTerminal('term-version', containerRef, { active: false, focusRequest: { sequence: 0 } }))
+
+    expect(parserHandlers).toHaveLength(2)
+    expect(parserHandlers[1]([0])).toBe(true)
+    expect(calls).toContain('input:\u001bP>|foot(1.16.2)\u001b\\:false')
+    expect(parserHandlers[1]([1])).toBe(false)
+    expect(parserHandlers[1]([0, 1])).toBe(false)
   })
 
   it('falls back to the DOM renderer when canvas activation fails', () => {
