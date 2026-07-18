@@ -65,7 +65,7 @@ func (t *TerminalService) handlePTYOutput(terminalID string, data []byte) {
 }
 
 func (t *TerminalService) dispatchTerminalOutput(terminalID string, data []byte, handler func(string, []byte)) {
-	t.eventBus.Emit(event.TerminalOutput, event.TerminalOutputPayload{TerminalID: terminalID, Data: string(data)})
+	t.eventBus.Emit(event.TerminalOutput, event.TerminalOutputPayload{TerminalID: terminalID, Data: append([]byte(nil), data...)})
 	if handler != nil {
 		handler(terminalID, data)
 	}

@@ -207,7 +207,7 @@ func TestTerminalService_ImmediateRemoteExitOrdersLifecycleAndCleans(t *testing.
 	assert.Equal(t, event.TerminalOutput, lastEvent.Name)
 	payload, ok := lastEvent.Payload.(event.TerminalOutputPayload)
 	require.True(t, ok)
-	assert.Contains(t, payload.Data, "auto-logout")
+	assert.Contains(t, string(payload.Data), "auto-logout")
 }
 
 func TestTerminalService_OpenSessionNotFound(t *testing.T) {
