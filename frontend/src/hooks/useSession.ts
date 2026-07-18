@@ -10,6 +10,7 @@ import { reconnectSessionTab } from '@/hooks/sessionReconnect'
 import { runBatchSessions } from '@/lib/sessionBatch'
 import { mapFolder, mapSession, mapTunnel, type AssetEnvironment, type AssetProject, type AssetTag, type Folder, type Session, type Tunnel } from '@/lib/sessionModels'
 import { useSessionAssetCatalog } from '@/hooks/useSessionAssetCatalog'
+import { useSessionCSVTransfer } from '@/hooks/useSessionCSVTransfer'
 
 export type { BatchSessionResult } from '@/lib/sessionBatch'
 export type { AssetColorToken, AssetEnvironment, AssetProject, AssetTag, Folder, Session, Tunnel } from '@/lib/sessionModels'
@@ -35,7 +36,7 @@ export function useSession() {
   const [sessionsLoaded, setSessionsLoaded] = useState(false)
   const [error, setError] = useState('')
   const assetCatalog = useSessionAssetCatalog({ environments, projects, setEnvironments, setProjects, setTags, setSessions, setRecentSessions, setError })
-  const { listAssetCatalogs } = assetCatalog
+  const { listAssetCatalogs, refreshAssets } = assetCatalog
 
   const listFolders = useCallback(async () => {
     setLoading(true)
@@ -120,6 +121,7 @@ export function useSession() {
       setError(err instanceof Error ? err.message : String(err))
     }
   }, [])
+  const csvTransfer = useSessionCSVTransfer({ refreshFolders: listFolders, refreshAssets })
 
   const createSession = useCallback(async (session: Omit<Session, 'id'>) => {
     try {
@@ -255,6 +257,7 @@ export function useSession() {
     listFolders, createFolder, deleteFolder, updateFolder, setDefaultFolder,
     listSessions, listRecentSessions, createSession, updateSession, deleteSession, moveSession,
     connect, batchConnect, batchExecuteMacro, reconnect, disconnect, listTunnels,
+    ...csvTransfer,
     ...assetCatalog,
   }
 }

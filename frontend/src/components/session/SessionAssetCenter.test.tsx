@@ -19,6 +19,8 @@ const state = {
   deleteEnvironment: vi.fn(), deleteProject: vi.fn(), deleteTag: vi.fn(), reorderEnvironments: vi.fn(), reorderProjects: vi.fn(),
   batchConnect: vi.fn(async (ids: string[]) => ids.map((id) => ({ sessionId: id, name: id === '1' ? '生产服务器' : '测试服务器', success: id === '1' }))),
   batchExecuteMacro: vi.fn(async () => []),
+  exportSessionsCSV: vi.fn(async () => ({ count: 0, included_passwords: false })),
+  importSessionsCSV: vi.fn(async () => ({ total: 0, imported: 0, updated: 0, skipped: 0, failed: 0, results: [] })),
 }
 
 vi.mock('@/hooks/SessionWorkspaceContext', () => ({ useSessionWorkspace: () => state }))
@@ -38,6 +40,8 @@ describe('SessionAssetCenter', () => {
     expect(screen.getByRole('tab', { name: /分组/ })).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: /所有节点/ })).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: /分类管理/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '导入' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '导出' })).toBeInTheDocument()
     expect(screen.getByText('生产服务器')).toBeInTheDocument()
   })
 
