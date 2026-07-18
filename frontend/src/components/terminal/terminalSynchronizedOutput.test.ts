@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { SynchronizedOutputWriter } from '@/components/terminal/terminalSynchronizedOutput'
+import { terminalAgentOutputSamples } from '@/components/terminal/terminalAgentOutputSamples'
 
 const syncStart = '\u001b[?2026h'
 const syncEnd = '\u001b[?2026l'
@@ -91,5 +92,23 @@ describe('SynchronizedOutputWriter', () => {
     output.push('new output')
 
     expect(write.mock.calls).toEqual([['old frame'], ['new output']])
+  })
+
+  it.each(Object.entries(terminalAgentOutputSamples))('preserves the captured %s ANSI/VT output sample', (_name, sample) => {
+    const write = vi.fn()
+    const output = new SynchronizedOutputWriter(write)
+    const chunkSizes = [1, 4, 7, 13, 29]
+    let offset = 0
+    let chunkIndex = 0
+    while (offset < sample.length) {
+      const size = chunkSizes[chunkIndex % chunkSizes.length]
+      output.push(sample.slice(offset, offset + size))
+      offset += size
+      chunkIndex += 1
+    }
+    output.dispose()
+
+    const expected = sample.replaceAll(syncStart, '').replaceAll(syncEnd, '')
+    expect(write.mock.calls.flat().join('')).toBe(expected)
   })
 })
