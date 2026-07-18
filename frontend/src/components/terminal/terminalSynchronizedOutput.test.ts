@@ -48,6 +48,46 @@ describe('SynchronizedOutputWriter', () => {
     }))
   })
 
+  it('keeps nested synchronized frames atomic and strips all markers', () => {
+    const write = vi.fn()
+    const diagnostics = vi.fn()
+    const output = new SynchronizedOutputWriter(write, { diagnosticsIntervalMs: 100, onDiagnostics: diagnostics })
+
+    output.push(`${syncStart}outer${syncStart}inner${syncEnd}after${syncEnd}`)
+    vi.advanceTimersByTime(100)
+
+    expect(write).toHaveBeenCalledOnce()
+    expect(write).toHaveBeenCalledWith('outerinnerafter')
+    expect(diagnostics).toHaveBeenCalledWith(expect.objectContaining({
+      startMarkers: 2, endMarkers: 2, completedFrames: 1,
+      orphanEndMarkers: 0, nestedStartMarkers: 1, timeoutReleases: 0,
+    }))
+  })
+
+  it('resets the frame timeout while synchronized output is active', () => {
+    const write = vi.fn()
+    const output = new SynchronizedOutputWriter(write, { frameTimeoutMs: 100 })
+
+    output.push(`${syncStart}part-1`)
+    vi.advanceTimersByTime(90)
+    output.push('part-2')
+    vi.advanceTimersByTime(90)
+    expect(write).not.toHaveBeenCalled()
+
+    output.push(syncEnd)
+
+    expect(write).toHaveBeenCalledWith('part-1part-2')
+  })
+
+  it('strips orphan synchronized end markers instead of sending them to xterm', () => {
+    const write = vi.fn()
+    const output = new SynchronizedOutputWriter(write)
+
+    output.push(`before${syncEnd}after`)
+
+    expect(write).toHaveBeenCalledWith('beforeafter')
+  })
+
   it('buffers a Codex frame across arbitrary SSH chunks', () => {
     const write = vi.fn()
     const output = new SynchronizedOutputWriter(write)
@@ -128,9 +168,9 @@ describe('SynchronizedOutputWriter', () => {
     output.push(`${syncStart}outer${syncStart}inner`)
     vi.advanceTimersByTime(100)
 
-    expect(write).toHaveBeenCalledWith('outer' + syncStart + 'inner')
+    expect(write).toHaveBeenCalledWith('outerinner')
     expect(diagnostics).toHaveBeenLastCalledWith(expect.objectContaining({
-      reason: 'timeout', startMarkers: 1, endMarkers: 0, completedFrames: 0, nestedStartMarkers: 1,
+      reason: 'timeout', startMarkers: 2, endMarkers: 0, completedFrames: 0, nestedStartMarkers: 1,
       timeoutReleases: 1, synchronized: false,
     }))
   })

@@ -53,22 +53,11 @@ function markerPrefixSuffixLength(value: string, marker: string): number {
   return 0
 }
 
-function countOccurrences(value: string, marker: string): number {
-  let count = 0
-  let offset = 0
-  while (offset < value.length) {
-    const index = value.indexOf(marker, offset)
-    if (index < 0) break
-    count += 1
-    offset = index + marker.length
-  }
-  return count
-}
-
 export class SynchronizedOutputWriter {
-  private buffer = ''
+  private pending = ''
+  private frameBuffer = ''
   private disposed = false
-  private synchronized = false
+  private syncDepth = 0
   private outputBytes = false
   private timeoutID: number | null = null
   private readonly frameTimeoutMs: number
@@ -95,9 +84,10 @@ export class SynchronizedOutputWriter {
     this.diagnostics.inputChunks += 1
     this.diagnostics.inputBytes += data.length
     if (data instanceof Uint8Array) this.outputBytes = true
-    this.buffer += data instanceof Uint8Array ? bytesToBinaryString(data) : data
+    this.pending += data instanceof Uint8Array ? bytesToBinaryString(data) : data
     this.scheduleDiagnostics()
     const ready = this.consume()
+    if (this.syncDepth > 0) this.resetFrameTimeout()
     if (ready) this.writeOutput(ready)
   }
 
@@ -119,46 +109,69 @@ export class SynchronizedOutputWriter {
 
   private consume(): string {
     let ready = ''
-    while (this.buffer) {
-      if (this.synchronized) {
-        const end = this.buffer.indexOf(synchronizedOutputEnd)
-        if (end < 0) {
-          this.updateMaxFrameBytes(this.buffer.length)
-          if (this.buffer.length > this.maxBufferedCharacters) ready += this.releaseFrame('size-limit')
-          else this.scheduleTimeout()
-          break
-        }
-        this.updateMaxFrameBytes(end)
-        this.diagnostics.nestedStartMarkers += countOccurrences(this.buffer.slice(0, end), synchronizedOutputStart)
-        ready += this.buffer.slice(0, end)
-        this.buffer = this.buffer.slice(end + synchronizedOutputEnd.length)
-        this.synchronized = false
-        this.diagnostics.endMarkers += 1
-        this.diagnostics.completedFrames += 1
-        this.clearTimeout()
-        continue
+    while (this.pending) {
+      const marker = this.nextMarker()
+      if (!marker) {
+        const suffixLength = Math.max(
+          markerPrefixSuffixLength(this.pending, synchronizedOutputStart),
+          markerPrefixSuffixLength(this.pending, synchronizedOutputEnd),
+        )
+        const readyLength = this.pending.length - suffixLength
+        const text = this.pending.slice(0, readyLength)
+        this.pending = this.pending.slice(readyLength)
+        ready = this.appendText(ready, text)
+        break
       }
-      const start = this.buffer.indexOf(synchronizedOutputStart)
-      if (start >= 0) {
-        ready += this.buffer.slice(0, start)
-        this.buffer = this.buffer.slice(start + synchronizedOutputStart.length)
-        this.synchronized = true
-        this.diagnostics.startMarkers += 1
-        this.scheduleTimeout()
-        continue
-      }
-      this.diagnostics.orphanEndMarkers += countOccurrences(this.buffer, synchronizedOutputEnd)
-      const suffixLength = markerPrefixSuffixLength(this.buffer, synchronizedOutputStart)
-      const readyLength = this.buffer.length - suffixLength
-      ready += this.buffer.slice(0, readyLength)
-      this.buffer = this.buffer.slice(readyLength)
-      break
+      const text = this.pending.slice(0, marker.index)
+      this.pending = this.pending.slice(marker.index + marker.value.length)
+      ready = this.appendText(ready, text)
+      ready = marker.value === synchronizedOutputStart ? this.openFrame(ready) : this.closeFrame(ready)
     }
     return ready
   }
 
-  private scheduleTimeout(): void {
-    if (this.timeoutID !== null) return
+  private nextMarker(): { index: number; value: string } | null {
+    const start = this.pending.indexOf(synchronizedOutputStart)
+    const end = this.pending.indexOf(synchronizedOutputEnd)
+    if (start < 0 && end < 0) return null
+    if (start >= 0 && (end < 0 || start < end)) return { index: start, value: synchronizedOutputStart }
+    return { index: end, value: synchronizedOutputEnd }
+  }
+
+  private appendText(ready: string, text: string): string {
+    if (!text) return ready
+    if (this.syncDepth === 0) return ready + text
+    this.frameBuffer += text
+    this.updateMaxFrameBytes(this.frameBuffer.length)
+    if (this.frameBuffer.length > this.maxBufferedCharacters) return ready + this.releaseFrame('size-limit')
+    return ready
+  }
+
+  private openFrame(ready: string): string {
+    this.diagnostics.startMarkers += 1
+    if (this.syncDepth > 0) this.diagnostics.nestedStartMarkers += 1
+    if (this.syncDepth === 0) this.frameBuffer = ''
+    this.syncDepth += 1
+    return ready
+  }
+
+  private closeFrame(ready: string): string {
+    if (this.syncDepth === 0) {
+      this.diagnostics.orphanEndMarkers += 1
+      return ready
+    }
+    this.syncDepth -= 1
+    this.diagnostics.endMarkers += 1
+    if (this.syncDepth > 0) return ready
+    this.diagnostics.completedFrames += 1
+    this.clearTimeout()
+    const frame = this.frameBuffer
+    this.frameBuffer = ''
+    return ready + frame
+  }
+
+  private resetFrameTimeout(): void {
+    this.clearTimeout()
     this.timeoutID = window.setTimeout(() => {
       this.timeoutID = null
       this.flushBuffered('timeout')
@@ -172,17 +185,17 @@ export class SynchronizedOutputWriter {
   }
 
   private releaseFrame(reason: 'dispose' | 'flush' | 'timeout' | 'size-limit'): string {
-    const data = this.buffer
-    if (this.synchronized) {
-      this.updateMaxFrameBytes(data.length)
-      this.diagnostics.nestedStartMarkers += countOccurrences(data, synchronizedOutputStart)
+    let data = this.frameBuffer
+    if (reason === 'dispose' || reason === 'flush') {
+      data += this.pending
+      this.pending = ''
     }
     if (reason === 'dispose') this.diagnostics.disposedReleases += 1
     if (reason === 'flush') this.diagnostics.manualFlushes += 1
     if (reason === 'timeout') this.diagnostics.timeoutReleases += 1
     if (reason === 'size-limit') this.diagnostics.sizeLimitReleases += 1
-    this.buffer = ''
-    this.synchronized = false
+    this.frameBuffer = ''
+    this.syncDepth = 0
     this.clearTimeout()
     if (reason === 'timeout' || reason === 'size-limit') this.reportDiagnostics(reason)
     return data
@@ -213,8 +226,8 @@ export class SynchronizedOutputWriter {
 
   private reportDiagnostics(reason: SynchronizedOutputDiagnosticsReason): void {
     if (!this.onDiagnostics) return
-    this.diagnostics.bufferedBytes = this.buffer.length
-    this.diagnostics.synchronized = this.synchronized
+    this.diagnostics.bufferedBytes = this.pending.length + this.frameBuffer.length
+    this.diagnostics.synchronized = this.syncDepth > 0
     this.onDiagnostics({ ...this.diagnostics, reason })
   }
 
