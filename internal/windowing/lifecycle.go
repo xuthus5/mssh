@@ -32,6 +32,7 @@ type ApplicationLifecycleOptions struct {
 	ShowMain      func()
 	HideMain      func()
 	FocusMain     func()
+	HideSettings  func()
 	CloseSettings func()
 	Quit          func()
 }
@@ -61,7 +62,7 @@ func (c *ApplicationLifecycleController) HandleWindowClosing(event closeCancelle
 		c.QuitApplication()
 		return
 	}
-	c.closeSettings()
+	c.hideSettings()
 	c.HideMainWindow()
 	event.Cancel()
 }
@@ -90,6 +91,10 @@ func (c *ApplicationLifecycleController) QuitApplicationAfter(prepare func()) {
 
 func (c *ApplicationLifecycleController) closeSettings() {
 	call(c.options.CloseSettings)
+}
+
+func (c *ApplicationLifecycleController) hideSettings() {
+	call(c.options.HideSettings)
 }
 
 func readCloseButtonAction(reader CloseActionReader) (CloseButtonAction, error) {

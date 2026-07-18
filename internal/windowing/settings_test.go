@@ -13,6 +13,7 @@ import (
 type fakeWindow struct {
 	showCount   int
 	focusCount  int
+	hideCount   int
 	closeCount  int
 	centerCount int
 	positionX   int
@@ -21,14 +22,19 @@ type fakeWindow struct {
 	height      int
 	screen      *application.Screen
 	screenErr   error
-	closing     []func()
+	closing     []func() bool
 }
 
 func (w *fakeWindow) Show() { w.showCount++ }
 
 func (w *fakeWindow) Focus() { w.focusCount++ }
 
-func (w *fakeWindow) Close() { w.closeCount++ }
+func (w *fakeWindow) Hide() { w.hideCount++ }
+
+func (w *fakeWindow) Close() {
+	w.closeCount++
+	w.emitClosing()
+}
 
 func (w *fakeWindow) Center() { w.centerCount++ }
 
@@ -40,12 +46,15 @@ func (w *fakeWindow) GetScreen() (*application.Screen, error) { return w.screen,
 
 func (w *fakeWindow) SetPosition(x, y int) { w.positionX, w.positionY = x, y }
 
-func (w *fakeWindow) OnClosing(callback func()) { w.closing = append(w.closing, callback) }
+func (w *fakeWindow) OnClosing(callback func() bool) { w.closing = append(w.closing, callback) }
 
-func (w *fakeWindow) emitClosing() {
+func (w *fakeWindow) emitClosing() bool {
 	for _, callback := range w.closing {
-		callback()
+		if callback() {
+			return true
+		}
 	}
+	return false
 }
 
 type fakeRegistry struct {
@@ -89,14 +98,19 @@ func TestSettingsWindowOptions(t *testing.T) {
 	assert.Equal(t, application.WebviewGpuPolicyNever, options.Linux.WebviewGpuPolicy)
 }
 
-func TestSettingsWindowControllerCreatesAndReusesWindow(t *testing.T) {
+func TestSettingsWindowControllerPreloadsAndReusesWindow(t *testing.T) {
 	registry := newFakeRegistry()
 	mainWindow := &fakeWindow{positionX: 200, positionY: 100, width: 1200, height: 800, screen: testScreen()}
 	controller := newSettingsWindowController(registry, mainWindow, nil)
 
-	controller.Open()
+	controller.Preload()
 	created := registry.windows[SettingsWindowName]
 	require.NotNil(t, created)
+	assert.Equal(t, 1, registry.created)
+	assert.Zero(t, created.showCount)
+	assert.Zero(t, created.focusCount)
+
+	controller.Open()
 	assert.Equal(t, 1, registry.created)
 	assert.Equal(t, 310, created.positionX)
 	assert.Equal(t, 140, created.positionY)
@@ -122,19 +136,46 @@ func TestSettingsWindowControllerSerializesConcurrentOpen(t *testing.T) {
 	assert.Equal(t, 1, registry.created)
 }
 
-func TestSettingsWindowControllerBroadcastsCloseAndClosesExisting(t *testing.T) {
+func TestSettingsWindowControllerHidesExistingWindow(t *testing.T) {
 	registry := newFakeRegistry()
 	events := make([]string, 0, 1)
 	controller := newSettingsWindowController(registry, &fakeWindow{screen: testScreen()}, func(name string) {
 		events = append(events, name)
 	})
-	controller.Open()
+	controller.Preload()
 	window := registry.windows[SettingsWindowName]
 
-	window.emitClosing()
-	controller.Close()
+	controller.Hide()
 
 	assert.Equal(t, []string{SettingsPreviewCancelledEvent}, events)
+	assert.Equal(t, 1, window.hideCount)
+	assert.Zero(t, window.closeCount)
+}
+
+func TestSettingsWindowControllerInterceptsUserClose(t *testing.T) {
+	registry := newFakeRegistry()
+	events := make([]string, 0, 1)
+	controller := newSettingsWindowController(registry, nil, func(name string) { events = append(events, name) })
+	controller.Preload()
+	window := registry.windows[SettingsWindowName]
+
+	assert.True(t, window.emitClosing())
+	assert.Equal(t, []string{SettingsPreviewCancelledEvent}, events)
+	assert.Equal(t, 1, window.hideCount)
+	assert.Zero(t, window.closeCount)
+}
+
+func TestSettingsWindowControllerAllowsApplicationClose(t *testing.T) {
+	registry := newFakeRegistry()
+	events := make([]string, 0, 1)
+	controller := newSettingsWindowController(registry, nil, func(name string) { events = append(events, name) })
+	controller.Preload()
+	window := registry.windows[SettingsWindowName]
+
+	controller.Close()
+
+	assert.Empty(t, events)
+	assert.Zero(t, window.hideCount)
 	assert.Equal(t, 1, window.closeCount)
 }
 
@@ -181,13 +222,14 @@ func TestWailsWindowAdaptersWithoutRunningGUI(t *testing.T) {
 	handle := wailsWindowHandle{window: mainWindow}
 	handle.Show()
 	handle.Focus()
+	handle.Hide()
 	handle.Close()
 	handle.Center()
 	_, _ = handle.Position()
 	_, _ = handle.Size()
 	_, _ = handle.GetScreen()
 	handle.SetPosition(10, 20)
-	handle.OnClosing(func() {})
+	handle.OnClosing(func() bool { return false })
 }
 
 func testScreen() *application.Screen {
