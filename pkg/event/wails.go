@@ -22,6 +22,8 @@ func (w *WailsEventBus) Emit(name string, payload interface{}) {
 		}
 		return
 	}
-	w.logger.Info("emitting event", "name", name)
+	if w.logger != nil && name != TerminalOutput {
+		w.logger.Info("emitting event", "name", name)
+	}
 	app.Event.Emit(name, payload)
 }
