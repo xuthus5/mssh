@@ -26,7 +26,11 @@ describe('TerminalEmulator', () => {
       active: true,
       focusRequest: { sequence: 7 },
     })
-    expect(view.container.querySelector('.terminal-shell')).toHaveClass('[&>.xterm]:pl-1')
+    expect(view.container.querySelector('.terminal-shell')).toHaveClass(
+      '[&>.xterm]:h-full',
+      '[&>.xterm]:w-full',
+      '[&>.xterm]:pl-1',
+    )
     expect(view.container.querySelector('[data-slot="context-menu-trigger"]')).toHaveClass('select-text')
   })
 })
