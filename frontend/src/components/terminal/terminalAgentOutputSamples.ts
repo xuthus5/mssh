@@ -19,6 +19,10 @@ export const terminalAgentOutputSamples = {
     `${escape}[?1049h${escape}[?1000h${escape}[?1002h${escape}[?1003h${escape}[?1004h${escape}[?1006h${escape}[?1015h`,
     `${escape}[?2026h${escape}[2;3H${escape}[1mGrok Build${escape}[22m${escape}[?2026l`,
   ].join(''),
+  tmux: [
+    `${escape}[c${escape}[>q${escape}[>c${escape}[?996n${escape}]10;?${stringTerminator}${escape}]11;?${stringTerminator}`,
+    `${escape}[?2026h${escape}[1;1H${escape}[Ktmux pane redraw${escape}[?2026l`,
+  ].join(''),
 } as const
 
 export type TerminalAgentName = keyof typeof terminalAgentOutputSamples
