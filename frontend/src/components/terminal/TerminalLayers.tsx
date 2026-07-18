@@ -93,7 +93,7 @@ function DynamicLayer({ tab, active, activePaneID, fileTargetID, lastActiveTermi
     <div id={dynamicPanelID(tab.id)} data-layer-id={tab.id} role="tabpanel" aria-labelledby={dynamicTabID(tab.id)} aria-hidden={!active} inert={active ? undefined : true} className={layerClass}>
       <TerminalErrorBoundary onClose={onClose}>
         {tab.type === 'terminal' ? <>
-          <div className="flex min-w-0 flex-1 flex-col">
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col">
             <TerminalTab terminalID={tab.terminalId} sessionId={tab.sessionId}
               onOpenFiles={onToggleFiles} active={active} focusRequest={terminalFocusRequest}
               onPaneClosed={onPaneClosed} onPaneReplaced={onPaneReplaced} onCloseTerminal={onClose} />

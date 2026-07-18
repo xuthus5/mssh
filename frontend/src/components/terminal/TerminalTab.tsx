@@ -70,7 +70,7 @@ export function TerminalTab({ terminalID, sessionId, onOpenFiles, active, focusR
   const recording = useRecordingControl(activeTerminalID, sessionId)
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex h-full min-h-0 flex-col">
       <TerminalToolbar
         terminalID={activeTerminalID}
         sessionId={sessionId}
