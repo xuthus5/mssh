@@ -17,7 +17,7 @@ import { registerTerminalSearch, unregisterTerminalSearch } from '@/lib/terminal
 import { useTerminalActivation, useTerminalAttachment, useTerminalIdentity } from '@/hooks/terminalLifecycleRuntime'
 import { fitAndRefresh } from '@/hooks/terminalFitRuntime'
 import { createTerminalInstance, loadCanvasRenderer, safelyDisposeTerminalResource } from '@/hooks/terminalInstanceRuntime'
-import { subscribeToSynchronizedOutputQuery, subscribeToTerminalOutput } from '@/hooks/terminalOutputRuntime'
+import { subscribeToSynchronizedOutputQuery, subscribeToTerminalOutput, subscribeToTerminalVersionQuery } from '@/hooks/terminalOutputRuntime'
 
 const RESIZE_DEBOUNCE_MS = 80
 
@@ -194,6 +194,7 @@ function initializeTerminal(containerRef: RefObject<HTMLDivElement | null>, refs
   container?.addEventListener('pointerdown', focusHandler)
   const dataDispose = subscribeToData(term, refs)
   const synchronizedOutputQueryDispose = subscribeToSynchronizedOutputQuery(term)
+  const terminalVersionQueryDispose = subscribeToTerminalVersionQuery(term)
   const unsubOutput = subscribeToTerminalOutput({ term, terminalIDRef: refs.terminalIDRef, reportRuntimeError })
   const unsubscribeTheme = subscribeToTheme({ term, fitAddon, containerRef, refs, reportRuntimeError })
   const resizeObserver = observeResize({ term, fitAddon, containerRef, refs, reportRuntimeError })
@@ -208,6 +209,7 @@ function initializeTerminal(containerRef: RefObject<HTMLDivElement | null>, refs
     container?.removeEventListener('pointerdown', focusHandler)
     safelyDisposeTerminalResource('data subscription', () => dataDispose.dispose())
     safelyDisposeTerminalResource('synchronized output query', () => synchronizedOutputQueryDispose.dispose())
+    safelyDisposeTerminalResource('terminal version query', () => terminalVersionQueryDispose.dispose())
     safelyDisposeTerminalResource('output subscription', unsubOutput)
     safelyDisposeTerminalResource('theme subscription', unsubscribeTheme)
     safelyDisposeTerminalResource('resize observer', () => resizeObserver.disconnect())
