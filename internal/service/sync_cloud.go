@@ -11,7 +11,6 @@ import (
 	"strings"
 	"time"
 
-	backupcrypto "github.com/xuthus5/mssh/internal/crypto"
 	"github.com/xuthus5/mssh/internal/model"
 )
 
@@ -133,19 +132,8 @@ func readCloudBackup(reader io.Reader) ([]byte, error) {
 }
 
 func decodeEncryptedSnapshot(content []byte, masterKey string) (ExportData, error) {
-	var envelope backupcrypto.BackupEnvelope
-	if err := json.Unmarshal(content, &envelope); err != nil {
-		return ExportData{}, err
-	}
-	plaintext, err := backupcrypto.DecryptBackup(envelope, []byte(masterKey))
-	if err != nil {
-		return ExportData{}, err
-	}
-	var data ExportData
-	if err := decodeSnapshot(plaintext, &data); err != nil {
-		return ExportData{}, err
-	}
-	return data, nil
+	artifact, err := decodeSyncArtifact(content, masterKey)
+	return artifact.Data, err
 }
 
 func cloudRequest(method, endpoint, username, password string, body io.Reader) (*http.Request, error) {
