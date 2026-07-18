@@ -3,7 +3,6 @@ import { FitAddon } from '@xterm/addon-fit'
 import { SearchAddon } from '@xterm/addon-search'
 import { Unicode11Addon } from '@xterm/addon-unicode11'
 import type { Terminal } from '@xterm/xterm'
-import { Events } from '@wailsio/runtime'
 import { useTerminalRuntimeErrorReporter, type TerminalRuntimeErrorReporter } from '@/components/terminal/TerminalErrorBoundary'
 import { installTerminalCopyOnSelect } from '@/components/terminal/terminalBehaviorRuntime'
 import { runTerminalRuntime } from '@/components/terminal/terminalRuntime'
@@ -17,15 +16,10 @@ import { TerminalCommandCapture } from '@/lib/terminalCommandCapture'
 import { registerTerminalSearch, unregisterTerminalSearch } from '@/lib/terminalSearchRegistry'
 import { useTerminalActivation, useTerminalAttachment, useTerminalIdentity } from '@/hooks/terminalLifecycleRuntime'
 import { fitAndRefresh } from '@/hooks/terminalFitRuntime'
-import { SynchronizedOutputWriter } from '@/components/terminal/terminalSynchronizedOutput'
 import { createTerminalInstance, loadCanvasRenderer, safelyDisposeTerminalResource } from '@/hooks/terminalInstanceRuntime'
+import { subscribeToSynchronizedOutputQuery, subscribeToTerminalOutput } from '@/hooks/terminalOutputRuntime'
 
 const RESIZE_DEBOUNCE_MS = 80
-
-interface TerminalOutputEvent {
-  terminal_id?: string
-  data?: string
-}
 
 export interface TerminalFocusRequest {
   sequence: number
@@ -102,35 +96,6 @@ function subscribeToData(term: Terminal, refs: TerminalLifecycleRefs) {
       for (const command of capture.feed(data)) recordCommand(tab.sessionId, command)
     }
   })
-}
-
-function subscribeToSynchronizedOutputQuery(term: Terminal) {
-  return term.parser.registerCsiHandler({ prefix: '?', intermediates: '$', final: 'p' }, (params) => {
-    if (params[0] !== 2026) return false
-    term.input('\u001b[?2026;2$y', false)
-    return true
-  })
-}
-
-function subscribeToOutput(term: Terminal, refs: TerminalLifecycleRefs, reportRuntimeError: TerminalRuntimeErrorReporter) {
-  let outputTerminalID = refs.terminalIDRef.current
-  const output = new SynchronizedOutputWriter((data) => {
-    runTerminalRuntime(reportRuntimeError, 'terminal output write', () => term.write(data))
-  })
-  const unsubscribe = Events.On('terminal:output', (event: { data?: TerminalOutputEvent }) => {
-    const payload = event.data
-    if (payload?.terminal_id === refs.terminalIDRef.current && payload.data) {
-      if (outputTerminalID !== payload.terminal_id) {
-        output.flush()
-        outputTerminalID = payload.terminal_id
-      }
-      output.push(payload.data)
-    }
-  })
-  return () => {
-    unsubscribe()
-    output.dispose()
-  }
 }
 
 function subscribeToTheme({ term, fitAddon, containerRef, refs, reportRuntimeError }: {
@@ -229,7 +194,7 @@ function initializeTerminal(containerRef: RefObject<HTMLDivElement | null>, refs
   container?.addEventListener('pointerdown', focusHandler)
   const dataDispose = subscribeToData(term, refs)
   const synchronizedOutputQueryDispose = subscribeToSynchronizedOutputQuery(term)
-  const unsubOutput = subscribeToOutput(term, refs, reportRuntimeError)
+  const unsubOutput = subscribeToTerminalOutput({ term, terminalIDRef: refs.terminalIDRef, reportRuntimeError })
   const unsubscribeTheme = subscribeToTheme({ term, fitAddon, containerRef, refs, reportRuntimeError })
   const resizeObserver = observeResize({ term, fitAddon, containerRef, refs, reportRuntimeError })
   if (container) resizeObserver.observe(container)

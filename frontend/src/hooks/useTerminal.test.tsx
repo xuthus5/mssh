@@ -18,7 +18,7 @@ const selectionDisposes: Array<ReturnType<typeof vi.fn>> = []
 const animationFrames: FrameRequestCallback[] = []
 const cancelledAnimationFrames: number[] = []
 const outputHandlers: Array<(event: { data?: { terminal_id?: string; data?: string } }) => void> = []
-const terminalWrites: string[] = []
+const terminalWrites: Array<string | Uint8Array> = []
 const resizeHandlers: ResizeObserverCallback[] = []
 let runtimeFailure: 'fit' | 'refresh' | 'focus' | 'write' | null = null
 let proposedDimensions: Array<{ cols: number; rows: number } | undefined> = []
@@ -70,7 +70,7 @@ vi.mock('@xterm/xterm', () => ({
       }),
     }
     input(data: string, wasUserInput: boolean) { calls.push(`input:${data}:${wasUserInput}`) }
-    write(data: string) { terminalWrites.push(data); if (runtimeFailure === 'write') throw new Error('write failed') }
+    write(data: string | Uint8Array) { terminalWrites.push(data); if (runtimeFailure === 'write') throw new Error('write failed') }
     focus() { calls.push('focus'); if (runtimeFailure === 'focus') throw new Error('focus failed') }
     blur() { calls.push('blur') }
     refresh() { calls.push('refresh'); if (runtimeFailure === 'refresh') throw new Error('refresh failed') }
@@ -187,6 +187,9 @@ describe('useTerminal', () => {
     const callback = animationFrames.shift()
     if (callback) callback(0)
   }
+
+  const encodedOutput = (value: string) => btoa(value)
+  const outputBytes = (value: string) => new TextEncoder().encode(value)
 
   it('opens the terminal before loading renderer addons', () => {
     const containerRef = createRef<HTMLDivElement>()
@@ -472,7 +475,32 @@ describe('useTerminal', () => {
     renderHook(() => useTerminal('term-output', containerRef, { active: false, focusRequest: { sequence: 0 } }), { wrapper })
 
     runtimeFailure = 'write'
-    act(() => outputHandlers[0]({ data: { terminal_id: 'term-output', data: 'hello' } }))
+    act(() => outputHandlers[0]({ data: { terminal_id: 'term-output', data: encodedOutput('hello') } }))
+
+    expect(screen.getByText('终端渲染失败')).toBeInTheDocument()
+  })
+
+  it('passes split UTF-8 output to xterm as lossless bytes', () => {
+    const containerRef = createRef<HTMLDivElement>()
+    containerRef.current = document.createElement('div')
+    renderHook(() => useTerminal('term-bytes', containerRef, { active: false, focusRequest: { sequence: 0 } }))
+
+    act(() => outputHandlers[0]({ data: { terminal_id: 'term-bytes', data: '5A==' } }))
+    act(() => outputHandlers[0]({ data: { terminal_id: 'term-bytes', data: 'uK0=' } }))
+
+    expect(terminalWrites).toEqual([
+      new Uint8Array([0xe4]),
+      new Uint8Array([0xb8, 0xad]),
+    ])
+  })
+
+  it('reports malformed terminal byte payloads through the error boundary', () => {
+    const containerRef = createRef<HTMLDivElement>()
+    containerRef.current = document.createElement('div')
+    const wrapper = ({ children }: { children: ReactNode }) => <TerminalErrorBoundary onClose={vi.fn()}>{children}</TerminalErrorBoundary>
+    renderHook(() => useTerminal('term-invalid-bytes', containerRef, { active: false, focusRequest: { sequence: 0 } }), { wrapper })
+
+    act(() => outputHandlers[0]({ data: { terminal_id: 'term-invalid-bytes', data: '*' } }))
 
     expect(screen.getByText('终端渲染失败')).toBeInTheDocument()
   })
@@ -482,14 +510,16 @@ describe('useTerminal', () => {
     containerRef.current = document.createElement('div')
     renderHook(() => useTerminal('term-sync', containerRef, { active: false, focusRequest: { sequence: 0 } }))
 
-    act(() => outputHandlers[0]({ data: { terminal_id: 'other', data: 'ignored' } }))
-    act(() => outputHandlers[0]({ data: { terminal_id: 'term-sync', data: '\u001b[?2026h\u001b[3;1H\u001b[J' } }))
-    act(() => outputHandlers[0]({ data: { terminal_id: 'term-sync', data: 'Codex working' } }))
+    act(() => outputHandlers[0]({ data: { terminal_id: 'other', data: encodedOutput('ignored') } }))
+    act(() => outputHandlers[0]({ data: { terminal_id: 'term-sync', data: encodedOutput('\u001b[?2026h\u001b[3;1H\u001b[J') } }))
+    act(() => outputHandlers[0]({ data: { terminal_id: 'term-sync', data: encodedOutput('Codex working') } }))
     expect(terminalWrites).toEqual([])
 
-    act(() => outputHandlers[0]({ data: { terminal_id: 'term-sync', data: '\u001b[?2026l' } }))
+    act(() => outputHandlers[0]({ data: { terminal_id: 'term-sync', data: encodedOutput('\u001b[?2026l') } }))
 
-    expect(terminalWrites).toEqual(['\u001b[3;1H\u001b[JCodex working'])
+    expect(terminalWrites.map((data) => Array.from(data as Uint8Array))).toEqual([
+      Array.from(outputBytes('\u001b[3;1H\u001b[JCodex working')),
+    ])
   })
 
   it('separates an incomplete synchronized frame from reconnected output', () => {
@@ -500,11 +530,14 @@ describe('useTerminal', () => {
       focusRequest: { sequence: 0 },
     }), { initialProps: { terminalID: 'term-old' } })
 
-    act(() => outputHandlers[0]({ data: { terminal_id: 'term-old', data: '\u001b[?2026hold frame' } }))
+    act(() => outputHandlers[0]({ data: { terminal_id: 'term-old', data: encodedOutput('\u001b[?2026hold frame') } }))
     hook.rerender({ terminalID: 'term-new' })
-    act(() => outputHandlers[0]({ data: { terminal_id: 'term-new', data: 'new prompt' } }))
+    act(() => outputHandlers[0]({ data: { terminal_id: 'term-new', data: encodedOutput('new prompt') } }))
 
-    expect(terminalWrites).toEqual(['old frame', 'new prompt'])
+    expect(terminalWrites.map((data) => Array.from(data as Uint8Array))).toEqual([
+      Array.from(outputBytes('old frame')),
+      Array.from(outputBytes('new prompt')),
+    ])
   })
 
   it('reports fit failures from the resize observer callback', () => {

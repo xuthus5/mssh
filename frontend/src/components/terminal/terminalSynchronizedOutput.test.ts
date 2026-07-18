@@ -34,6 +34,25 @@ describe('SynchronizedOutputWriter', () => {
     expect(write).toHaveBeenNthCalledWith(2, '\u001b[3;1H\u001b[Jworkingdone')
   })
 
+  it('preserves raw UTF-8 bytes across synchronized frame chunks', () => {
+    const write = vi.fn()
+    const output = new SynchronizedOutputWriter(write)
+    const frame = new Uint8Array([
+      ...new TextEncoder().encode(syncStart),
+      0xe4,
+      0xb8,
+      0xad,
+      ...new TextEncoder().encode(syncEnd),
+    ])
+
+    output.push(frame.slice(0, 8))
+    output.push(frame.slice(8, 11))
+    output.push(frame.slice(11))
+
+    expect(write).toHaveBeenCalledOnce()
+    expect(write).toHaveBeenCalledWith(new Uint8Array([0xe4, 0xb8, 0xad]))
+  })
+
   it('coalesces multiple complete frames received together', () => {
     const write = vi.fn()
     const output = new SynchronizedOutputWriter(write)

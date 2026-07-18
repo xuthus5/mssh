@@ -24,7 +24,7 @@ func newBlockingOutputBus() *blockingOutputBus {
 }
 
 func (b *blockingOutputBus) Emit(name string, payload interface{}) {
-	if output, ok := payload.(event.TerminalOutputPayload); name == event.TerminalOutput && ok && output.Data == "old" {
+	if output, ok := payload.(event.TerminalOutputPayload); name == event.TerminalOutput && ok && string(output.Data) == "old" {
 		close(b.blocked)
 		<-b.release
 	}
@@ -56,8 +56,8 @@ func TestTerminalService_AttachOrdersPendingBeforeLiveOutput(t *testing.T) {
 
 	events := bus.Events()
 	require.Len(t, events, 2)
-	assert.Equal(t, "old", events[0].Payload.(event.TerminalOutputPayload).Data)
-	assert.Equal(t, "new", events[1].Payload.(event.TerminalOutputPayload).Data)
+	assert.Equal(t, []byte("old"), events[0].Payload.(event.TerminalOutputPayload).Data)
+	assert.Equal(t, []byte("new"), events[1].Payload.(event.TerminalOutputPayload).Data)
 }
 
 func TestTerminalService_CloseWaitsForPendingOutputDrain(t *testing.T) {
