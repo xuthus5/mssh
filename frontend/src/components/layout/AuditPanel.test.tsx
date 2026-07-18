@@ -34,7 +34,7 @@ describe('AuditPanel', () => {
     await user.click(screen.getByRole('combobox', { name: '审计会话' }))
     await user.click(await screen.findByRole('option', { name: '生产服务器' }))
     await waitFor(() => expect(audit.list).toHaveBeenLastCalledWith(expect.objectContaining({ session_id: 7 })))
-    await user.click(screen.getByRole('switch', { name: '启用企业审计' }))
+    await user.click(screen.getByRole('switch', { name: '启用审计日志' }))
     expect(audit.setEnabled).toHaveBeenCalledWith(false)
   })
 })
