@@ -10,6 +10,8 @@ const dataDisposes: Array<ReturnType<typeof vi.fn>> = []
 const addonDisposes: Array<ReturnType<typeof vi.fn>> = []
 const observerDisconnects: Array<ReturnType<typeof vi.fn>> = []
 const outputUnsubscribes: Array<ReturnType<typeof vi.fn>> = []
+const parserHandlers: Array<(params: Array<number | number[]>) => boolean> = []
+const parserDisposes: Array<ReturnType<typeof vi.fn>> = []
 const themeUnsubscribes: Array<ReturnType<typeof vi.fn>> = []
 const selectionDisposes: Array<ReturnType<typeof vi.fn>> = []
 const animationFrames: FrameRequestCallback[] = []
@@ -53,6 +55,15 @@ vi.mock('@xterm/xterm', () => ({
       selectionDisposes.push(dispose)
       return { dispose }
     }
+    parser = {
+      registerCsiHandler: vi.fn((_id: unknown, handler: (params: Array<number | number[]>) => boolean) => {
+        parserHandlers.push(handler)
+        const dispose = vi.fn()
+        parserDisposes.push(dispose)
+        return { dispose }
+      }),
+    }
+    input(data: string, wasUserInput: boolean) { calls.push(`input:${data}:${wasUserInput}`) }
     write(data: string) { terminalWrites.push(data); if (runtimeFailure === 'write') throw new Error('write failed') }
     focus() { calls.push('focus'); if (runtimeFailure === 'focus') throw new Error('focus failed') }
     blur() { calls.push('blur') }
@@ -126,6 +137,8 @@ describe('useTerminal', () => {
     addonDisposes.length = 0
     observerDisconnects.length = 0
     outputUnsubscribes.length = 0
+    parserHandlers.length = 0
+    parserDisposes.length = 0
     themeUnsubscribes.length = 0
     selectionDisposes.length = 0
     animationFrames.length = 0
@@ -170,7 +183,19 @@ describe('useTerminal', () => {
     act(() => unmount())
     expect(getTerminalSearch('term-1')).toBeNull()
     expect(selectionDisposes[0]).toHaveBeenCalledOnce()
+    expect(parserDisposes[0]).toHaveBeenCalledOnce()
     expect(calls.at(-1)).toBe('dispose')
+  })
+
+  it('reports synchronized output as a recognized private mode', () => {
+    const containerRef = createRef<HTMLDivElement>()
+    containerRef.current = document.createElement('div')
+    renderHook(() => useTerminal('term-capability', containerRef, { active: false, focusRequest: { sequence: 0 } }))
+
+    expect(parserHandlers).toHaveLength(1)
+    expect(parserHandlers[0]([2026])).toBe(true)
+    expect(parserHandlers[0]([25])).toBe(false)
+    expect(calls).toContain('input:\u001b[?2026;2$y:false')
   })
 
   it('uses the restored global theme for the first terminal instance', () => {

@@ -36,6 +36,8 @@ vi.mock('@xterm/xterm', () => ({
     }
     getSelection() { return '' }
     onSelectionChange() { return { dispose: vi.fn() } }
+    parser = { registerCsiHandler: vi.fn(() => ({ dispose: vi.fn() })) }
+    input() {}
     write() {}
     focus() {}
     blur() {}
