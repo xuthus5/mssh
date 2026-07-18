@@ -314,6 +314,52 @@ describe('useTerminal', () => {
     act(() => hook.unmount())
   })
 
+  it('keeps activation pending when fit dimensions are not finite', () => {
+    proposedDimensions = [{ cols: Number.NaN, rows: Number.NaN }, { cols: 100, rows: 30 }]
+    const containerRef = createRef<HTMLDivElement>()
+    const container = document.createElement('div')
+    Object.defineProperty(container, 'clientWidth', { value: 800 })
+    Object.defineProperty(container, 'clientHeight', { value: 500 })
+    containerRef.current = container
+    const hook = renderHook(({ active, sequence }) => useTerminal('term-finite-dimensions', containerRef, { active, focusRequest: { sequence } }), { initialProps: { active: false, sequence: 0 } })
+
+    calls.length = 0
+    hook.rerender({ active: true, sequence: 1 })
+    act(flushAnimationFrame)
+
+    expect(calls).toEqual([])
+    expect(animationFrames).toHaveLength(1)
+
+    act(flushAnimationFrame)
+    expect(calls).toEqual(['fit', 'refresh', 'focus'])
+    act(() => hook.unmount())
+  })
+
+  it('continues activation recovery after the initial frame window', () => {
+    proposedDimensions = [undefined, undefined, undefined, undefined, { cols: 100, rows: 30 }]
+    const containerRef = createRef<HTMLDivElement>()
+    const container = document.createElement('div')
+    Object.defineProperty(container, 'clientWidth', { value: 800 })
+    Object.defineProperty(container, 'clientHeight', { value: 500 })
+    containerRef.current = container
+    const hook = renderHook(({ active, sequence }) => useTerminal('term-delayed-layout', containerRef, { active, focusRequest: { sequence } }), { initialProps: { active: false, sequence: 0 } })
+
+    calls.length = 0
+    hook.rerender({ active: true, sequence: 1 })
+    act(() => {
+      flushAnimationFrame()
+      flushAnimationFrame()
+      flushAnimationFrame()
+      flushAnimationFrame()
+    })
+
+    expect(calls).toEqual([])
+    expect(animationFrames).toHaveLength(1)
+    act(flushAnimationFrame)
+    expect(calls).toEqual(['fit', 'refresh', 'focus'])
+    act(() => hook.unmount())
+  })
+
   it('refits after document fonts finish loading', async () => {
     proposedDimensions = [undefined, undefined, undefined, undefined, { cols: 100, rows: 30 }]
     let resolveFonts: (fonts: FontFaceSet) => void = () => {}
@@ -333,7 +379,7 @@ describe('useTerminal', () => {
       flushAnimationFrame()
       flushAnimationFrame()
     })
-    expect(animationFrames).toHaveLength(0)
+    expect(animationFrames).toHaveLength(1)
 
     await act(async () => { resolveFonts({} as FontFaceSet); await fontsReady })
     expect(animationFrames).toHaveLength(1)

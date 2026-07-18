@@ -82,7 +82,7 @@ function TerminalContextMenu({ terminalRef, children, actions, pasteMode }: Term
   return (
     <ContextMenu disabled={pasteMode}>
       <ContextMenuTrigger
-        className="h-full w-full select-text bg-background text-foreground"
+        className="flex h-full min-h-0 min-w-0 w-full select-text bg-background text-foreground"
         onContextMenuCapture={(event) => {
           if (pasteMode) {
             event.preventDefault()
