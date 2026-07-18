@@ -12,6 +12,7 @@ export interface SynchronizedOutputDiagnostics {
   startMarkers: number
   endMarkers: number
   completedFrames: number
+  nestedFrameReleases: number
   orphanEndMarkers: number
   nestedStartMarkers: number
   timeoutReleases: number
@@ -67,7 +68,7 @@ export class SynchronizedOutputWriter {
   private diagnosticsTimeoutID: number | null = null
   private diagnostics: SynchronizedOutputDiagnostics = {
     reason: 'interval', inputChunks: 0, inputBytes: 0, startMarkers: 0, endMarkers: 0,
-    completedFrames: 0, orphanEndMarkers: 0, nestedStartMarkers: 0,
+    completedFrames: 0, nestedFrameReleases: 0, orphanEndMarkers: 0, nestedStartMarkers: 0,
     timeoutReleases: 0, sizeLimitReleases: 0, manualFlushes: 0,
     disposedReleases: 0, bufferedBytes: 0, synchronized: false, maxFrameBytes: 0,
   }
@@ -162,7 +163,14 @@ export class SynchronizedOutputWriter {
     }
     this.syncDepth -= 1
     this.diagnostics.endMarkers += 1
-    if (this.syncDepth > 0) return ready
+    if (this.syncDepth > 1) return ready
+    if (this.syncDepth === 1) {
+      this.diagnostics.completedFrames += 1
+      this.diagnostics.nestedFrameReleases += 1
+      const frame = this.frameBuffer
+      this.frameBuffer = ''
+      return ready + frame
+    }
     this.diagnostics.completedFrames += 1
     this.clearTimeout()
     const frame = this.frameBuffer
