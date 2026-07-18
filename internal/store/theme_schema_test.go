@@ -136,6 +136,30 @@ var expectedFinalSchemaSQL = map[string]string{
 		outcome TEXT NOT NULL CHECK(outcome IN ('success','failed')),
 		created_at TEXT NOT NULL
 	)`,
+	"sync_versions": `CREATE TABLE sync_versions (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		version_id TEXT NOT NULL UNIQUE,
+		version_number INTEGER NOT NULL DEFAULT 0,
+		parent_version_id TEXT NOT NULL DEFAULT '',
+		snapshot_fingerprint TEXT NOT NULL,
+		provider TEXT NOT NULL CHECK(provider IN ('gist','webdav','s3')),
+		source TEXT NOT NULL,
+		file_name TEXT NOT NULL UNIQUE,
+		size_bytes INTEGER NOT NULL DEFAULT 0,
+		protected INTEGER NOT NULL DEFAULT 0,
+		created_at TEXT NOT NULL
+	)`,
+	"sync_events": `CREATE TABLE sync_events (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		action TEXT NOT NULL,
+		provider TEXT NOT NULL CHECK(provider IN ('gist','webdav','s3')),
+		strategy TEXT NOT NULL CHECK(strategy IN ('smart','cloud_first','local_first')),
+		status TEXT NOT NULL CHECK(status IN ('success','failed','conflict','noop')),
+		local_version INTEGER NOT NULL DEFAULT 0,
+		remote_version INTEGER NOT NULL DEFAULT 0,
+		message TEXT NOT NULL DEFAULT '',
+		created_at TEXT NOT NULL
+	)`,
 	"settings": `CREATE TABLE settings (
 		key TEXT PRIMARY KEY,
 		namespace TEXT NOT NULL,

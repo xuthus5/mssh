@@ -147,6 +147,32 @@ const auditEventsTableSQL = `CREATE TABLE IF NOT EXISTS audit_events (
 	created_at TEXT NOT NULL
 )`
 
+const syncVersionsTableSQL = `CREATE TABLE IF NOT EXISTS sync_versions (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	version_id TEXT NOT NULL UNIQUE,
+	version_number INTEGER NOT NULL DEFAULT 0,
+	parent_version_id TEXT NOT NULL DEFAULT '',
+	snapshot_fingerprint TEXT NOT NULL,
+	provider TEXT NOT NULL CHECK(provider IN ('gist','webdav','s3')),
+	source TEXT NOT NULL,
+	file_name TEXT NOT NULL UNIQUE,
+	size_bytes INTEGER NOT NULL DEFAULT 0,
+	protected INTEGER NOT NULL DEFAULT 0,
+	created_at TEXT NOT NULL
+)`
+
+const syncEventsTableSQL = `CREATE TABLE IF NOT EXISTS sync_events (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	action TEXT NOT NULL,
+	provider TEXT NOT NULL CHECK(provider IN ('gist','webdav','s3')),
+	strategy TEXT NOT NULL CHECK(strategy IN ('smart','cloud_first','local_first')),
+	status TEXT NOT NULL CHECK(status IN ('success','failed','conflict','noop')),
+	local_version INTEGER NOT NULL DEFAULT 0,
+	remote_version INTEGER NOT NULL DEFAULT 0,
+	message TEXT NOT NULL DEFAULT '',
+	created_at TEXT NOT NULL
+)`
+
 type schemaStatement struct {
 	name string
 	sql  string
@@ -162,10 +188,14 @@ var finalSchemaStatements = []schemaStatement{
 	{name: "session_logs", sql: logsTableSQL}, {name: "transfer_jobs", sql: transferJobsTableSQL}, {name: "audit_events", sql: auditEventsTableSQL},
 	{name: "audit_events_action_idx", sql: "CREATE INDEX IF NOT EXISTS audit_events_action_idx ON audit_events(action, created_at DESC)"},
 	{name: "audit_events_session_idx", sql: "CREATE INDEX IF NOT EXISTS audit_events_session_idx ON audit_events(session_id, created_at DESC)"},
+	{name: "sync_versions", sql: syncVersionsTableSQL},
+	{name: "sync_versions_created_idx", sql: "CREATE INDEX IF NOT EXISTS sync_versions_created_idx ON sync_versions(created_at DESC)"},
+	{name: "sync_events", sql: syncEventsTableSQL},
+	{name: "sync_events_created_idx", sql: "CREATE INDEX IF NOT EXISTS sync_events_created_idx ON sync_events(created_at DESC)"},
 	{name: "settings", sql: settingsTableSQL}, {name: "themes", sql: themeDefinitionsSchema}, {name: "terminal_theme_profiles", sql: themeProfilesSchema},
 }
 
 var applicationTablesInDropOrder = []string{
-	"terminal_theme_profiles", "themes", "session_logs", "transfer_jobs", "audit_events", "tunnels", "session_tags", "sessions",
+	"terminal_theme_profiles", "themes", "sync_events", "sync_versions", "session_logs", "transfer_jobs", "audit_events", "tunnels", "session_tags", "sessions",
 	"asset_tags", "asset_projects", "asset_environments", "ssh_keys", "session_folders", "settings", "macros", "command_history",
 }

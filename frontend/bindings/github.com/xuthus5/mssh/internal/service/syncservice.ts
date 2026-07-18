@@ -5,6 +5,20 @@
 // @ts-ignore: Unused imports
 import { Call as $Call, CancellablePromise as $CancellablePromise, Create as $Create } from "@wailsio/runtime";
 
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
+import * as model$0 from "../model/models.js";
+
+export function Dashboard(): $CancellablePromise<model$0.SyncDashboard> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.SyncService.Dashboard").then(($result: any) => {
+        return $$createType0($result);
+    });
+}
+
+export function DeleteVersion(id: number): $CancellablePromise<void> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.SyncService.DeleteVersion", id);
+}
+
 export function Export(path: string): $CancellablePromise<void> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.SyncService.Export", path);
 }
@@ -13,8 +27,64 @@ export function Import(path: string): $CancellablePromise<void> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.SyncService.Import", path);
 }
 
+export function ListEvents(): $CancellablePromise<model$0.SyncEvent[]> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.SyncService.ListEvents").then(($result: any) => {
+        return $$createType2($result);
+    });
+}
+
+export function ListVersions(): $CancellablePromise<model$0.SyncVersion[]> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.SyncService.ListVersions").then(($result: any) => {
+        return $$createType4($result);
+    });
+}
+
+export function LoadConfig(): $CancellablePromise<model$0.SyncConfig> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.SyncService.LoadConfig").then(($result: any) => {
+        return $$createType5($result);
+    });
+}
+
+export function PullNow(): $CancellablePromise<model$0.SyncResult> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.SyncService.PullNow").then(($result: any) => {
+        return $$createType6($result);
+    });
+}
+
+export function PushNow(): $CancellablePromise<model$0.SyncResult> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.SyncService.PushNow").then(($result: any) => {
+        return $$createType6($result);
+    });
+}
+
+export function ResetLocalData(): $CancellablePromise<void> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.SyncService.ResetLocalData");
+}
+
+export function ResolveConflict(choice: model$0.SyncConflictChoice): $CancellablePromise<model$0.SyncResult> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.SyncService.ResolveConflict", choice).then(($result: any) => {
+        return $$createType6($result);
+    });
+}
+
+export function RestoreVersion(id: number): $CancellablePromise<void> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.SyncService.RestoreVersion", id);
+}
+
+export function SaveConfig(input: model$0.SyncConfigInput): $CancellablePromise<model$0.SyncDashboard> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.SyncService.SaveConfig", input).then(($result: any) => {
+        return $$createType0($result);
+    });
+}
+
 export function SyncFromCloud(endpoint: string, username: string, password: string): $CancellablePromise<void> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.SyncService.SyncFromCloud", endpoint, username, password);
+}
+
+export function SyncNow(): $CancellablePromise<model$0.SyncResult> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.SyncService.SyncNow").then(($result: any) => {
+        return $$createType6($result);
+    });
 }
 
 export function SyncToCloud(endpoint: string, username: string, password: string): $CancellablePromise<void> {
@@ -24,3 +94,16 @@ export function SyncToCloud(endpoint: string, username: string, password: string
 export function TestCloudConnection(endpoint: string, username: string, password: string): $CancellablePromise<void> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.SyncService.TestCloudConnection", endpoint, username, password);
 }
+
+export function TestProvider(input: model$0.SyncConfigInput): $CancellablePromise<void> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.SyncService.TestProvider", input);
+}
+
+// Private type creation functions
+const $$createType0 = model$0.SyncDashboard.createFrom;
+const $$createType1 = model$0.SyncEvent.createFrom;
+const $$createType2 = $Create.Array($$createType1);
+const $$createType3 = model$0.SyncVersion.createFrom;
+const $$createType4 = $Create.Array($$createType3);
+const $$createType5 = model$0.SyncConfig.createFrom;
+const $$createType6 = model$0.SyncResult.createFrom;

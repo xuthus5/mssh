@@ -2,41 +2,43 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { SyncPanel } from '@/components/settings/SyncPanel'
+import { SyncProvider, SyncState, SyncStrategy } from '../../../bindings/github.com/xuthus5/mssh/internal/model/models'
 
-describe('SyncPanel backup master key', () => {
-  const cloudProps = { onTestCloud: vi.fn(async () => {}), onPushCloud: vi.fn(async () => {}), onPullCloud: vi.fn(async () => {}) }
+function controller(overrides: Record<string, unknown> = {}) {
+  const dashboard = {
+    config: { enabled: false, master_key_saved: true, provider: SyncProvider.SyncProviderGist, strategy: SyncStrategy.SyncStrategySmart, interval_minutes: 15, retention_count: 30, retention_days: 90, gist: { gist_id: '', token_saved: false }, webdav: { url: '', username: '', password_saved: false }, s3: { endpoint: '', region: 'us-east-1', bucket: '', prefix: '', access_key_id: '', secret_key_saved: false, path_style: false } },
+    state: SyncState.SyncStateDisabled, message: '', last_synced_at: '', local_version: null, remote_version: null, conflict: null, versions: [], events: [],
+  }
+  return { dashboard, loading: false, pending: null, error: null, reload: vi.fn(async () => {}), saveConfig: vi.fn(async () => {}), testProvider: vi.fn(async () => {}), syncNow: vi.fn(async () => {}), pushNow: vi.fn(async () => {}), pullNow: vi.fn(async () => {}), resolveConflict: vi.fn(async () => {}), restoreVersion: vi.fn(async () => {}), deleteVersion: vi.fn(async () => {}), resetLocalData: vi.fn(async () => {}), ...overrides } as any
+}
 
-  it('requires and confirms a master key before saving', async () => {
-    const onSave = vi.fn()
-    render(<SyncPanel sync={{ enabled: false, url: '', username: '', password: '', masterKey: '' }} onSave={onSave} onExport={vi.fn()} onImport={vi.fn()} {...cloudProps} />)
-    const user = userEvent.setup()
-
-    await user.type(screen.getByLabelText('备份主密钥'), 'correct horse battery staple')
-    await user.type(screen.getByLabelText('确认备份主密钥'), 'correct horse battery staple')
-    await user.click(screen.getByRole('button', { name: '保存主密钥' }))
-
-    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ masterKey: 'correct horse battery staple' }))
+describe('SyncPanel', () => {
+  it('reveals provider and status tabs after enabling sync', async () => {
+    const sync = controller()
+    render(<SyncPanel controller={sync} onExport={vi.fn()} onImport={vi.fn()} />)
+    expect(screen.queryByRole('tab', { name: '云同步提供商' })).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('switch', { name: '启用云同步' }))
+    expect(screen.getByRole('tab', { name: '云同步提供商' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: '同步状态与配置' })).toBeInTheDocument()
   })
 
-  it('keeps backup actions disabled without a saved master key', () => {
-    render(<SyncPanel sync={{ enabled: false, url: '', username: '', password: '', masterKey: '' }} onSave={vi.fn()} onExport={vi.fn()} onImport={vi.fn()} {...cloudProps} />)
-    expect(screen.getByRole('button', { name: '导出配置' })).toBeDisabled()
-    expect(screen.getByRole('button', { name: '导入配置' })).toBeDisabled()
+  it('tests and saves selected provider credentials', async () => {
+    const sync = controller()
+    render(<SyncPanel controller={sync} onExport={vi.fn()} onImport={vi.fn()} />)
+    await userEvent.click(screen.getByRole('switch', { name: '启用云同步' }))
+    await userEvent.click(screen.getByRole('button', { name: /WebDAV/ }))
+    await userEvent.type(screen.getByLabelText('WebDAV URL'), 'https://dav.example/backups')
+    await userEvent.click(screen.getByRole('button', { name: '测试连接' }))
+    expect(sync.testProvider).toHaveBeenCalledWith(expect.objectContaining({ provider: SyncProvider.SyncProviderWebDAV, webdav: expect.objectContaining({ url: 'https://dav.example/backups' }) }))
+    await userEvent.click(screen.getByRole('button', { name: '保存配置' }))
+    expect(sync.saveConfig).toHaveBeenCalled()
   })
 
-  it('runs cloud actions with the current encrypted sync configuration', async () => {
-    const onPushCloud = vi.fn(async () => {})
-    render(<SyncPanel sync={{ enabled: true, url: 'https://sync.example/backup', username: 'alice', password: '', masterKey: 'correct horse battery staple' }} onSave={vi.fn()} onExport={vi.fn()} onImport={vi.fn()} {...cloudProps} onPushCloud={onPushCloud} />)
-
-    await userEvent.type(screen.getByLabelText('密码'), 'secret')
-    await userEvent.click(screen.getByRole('button', { name: '上传到云端' }))
-
-    expect(onPushCloud).toHaveBeenCalledWith(expect.objectContaining({ url: 'https://sync.example/backup', username: 'alice', password: 'secret', masterKey: 'correct horse battery staple' }))
-  })
-
-  it('shows the last synchronized backup version', () => {
-    render(<SyncPanel sync={{ enabled: true, url: 'https://sync.example/backup', username: '', password: '', masterKey: 'correct horse battery staple', etag: '"v2"', formatVersion: 2, lastDirection: 'download', lastSyncedAt: '2026-07-17T01:02:03Z' }} onSave={vi.fn()} onExport={vi.fn()} onImport={vi.fn()} {...cloudProps} />)
-    expect(screen.getByTestId('cloud-sync-version')).toHaveTextContent('备份格式 v2')
-    expect(screen.getByTestId('cloud-sync-version')).toHaveTextContent('ETag "v2"')
+  it('shows status controls and local reset action', async () => {
+    const sync = controller({ dashboard: { ...controller().dashboard, config: { ...controller().dashboard.config, enabled: true }, state: SyncState.SyncStateSynced } })
+    render(<SyncPanel controller={sync} onExport={vi.fn()} onImport={vi.fn()} />)
+    await userEvent.click(screen.getByRole('tab', { name: '同步状态与配置' }))
+    expect(screen.getByText('本地版本')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '清空本地业务数据' })).toBeInTheDocument()
   })
 })

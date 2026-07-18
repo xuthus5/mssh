@@ -579,6 +579,60 @@ export enum CursorStyle {
     CursorStyleBar = "bar",
 };
 
+export class GistSyncConfig {
+    "gist_id": string;
+    "token_saved": boolean;
+
+    /** Creates a new GistSyncConfig instance. */
+    constructor($$source: Partial<GistSyncConfig> = {}) {
+        if (!("gist_id" in $$source)) {
+            this["gist_id"] = "";
+        }
+        if (!("token_saved" in $$source)) {
+            this["token_saved"] = false;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new GistSyncConfig instance from a string or object.
+     */
+    static createFrom($$source: any = {}): GistSyncConfig {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new GistSyncConfig($$parsedSource as Partial<GistSyncConfig>);
+    }
+}
+
+export class GistSyncConfigInput {
+    "gist_id": string;
+    "token": string;
+    "clear_token": boolean;
+
+    /** Creates a new GistSyncConfigInput instance. */
+    constructor($$source: Partial<GistSyncConfigInput> = {}) {
+        if (!("gist_id" in $$source)) {
+            this["gist_id"] = "";
+        }
+        if (!("token" in $$source)) {
+            this["token"] = "";
+        }
+        if (!("clear_token" in $$source)) {
+            this["clear_token"] = false;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new GistSyncConfigInput instance from a string or object.
+     */
+    static createFrom($$source: any = {}): GistSyncConfigInput {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new GistSyncConfigInput($$parsedSource as Partial<GistSyncConfigInput>);
+    }
+}
+
 export class HostKeyEntry {
     "line": number;
     "hosts": string;
@@ -835,6 +889,100 @@ export class RecordingEntry {
             $$parsedSource["data"] = $$createField2_0($$parsedSource["data"]);
         }
         return new RecordingEntry($$parsedSource as Partial<RecordingEntry>);
+    }
+}
+
+export class S3SyncConfig {
+    "endpoint": string;
+    "region": string;
+    "bucket": string;
+    "prefix": string;
+    "access_key_id": string;
+    "secret_key_saved": boolean;
+    "path_style": boolean;
+
+    /** Creates a new S3SyncConfig instance. */
+    constructor($$source: Partial<S3SyncConfig> = {}) {
+        if (!("endpoint" in $$source)) {
+            this["endpoint"] = "";
+        }
+        if (!("region" in $$source)) {
+            this["region"] = "";
+        }
+        if (!("bucket" in $$source)) {
+            this["bucket"] = "";
+        }
+        if (!("prefix" in $$source)) {
+            this["prefix"] = "";
+        }
+        if (!("access_key_id" in $$source)) {
+            this["access_key_id"] = "";
+        }
+        if (!("secret_key_saved" in $$source)) {
+            this["secret_key_saved"] = false;
+        }
+        if (!("path_style" in $$source)) {
+            this["path_style"] = false;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new S3SyncConfig instance from a string or object.
+     */
+    static createFrom($$source: any = {}): S3SyncConfig {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new S3SyncConfig($$parsedSource as Partial<S3SyncConfig>);
+    }
+}
+
+export class S3SyncConfigInput {
+    "endpoint": string;
+    "region": string;
+    "bucket": string;
+    "prefix": string;
+    "access_key_id": string;
+    "secret_key": string;
+    "clear_secret_key": boolean;
+    "path_style": boolean;
+
+    /** Creates a new S3SyncConfigInput instance. */
+    constructor($$source: Partial<S3SyncConfigInput> = {}) {
+        if (!("endpoint" in $$source)) {
+            this["endpoint"] = "";
+        }
+        if (!("region" in $$source)) {
+            this["region"] = "";
+        }
+        if (!("bucket" in $$source)) {
+            this["bucket"] = "";
+        }
+        if (!("prefix" in $$source)) {
+            this["prefix"] = "";
+        }
+        if (!("access_key_id" in $$source)) {
+            this["access_key_id"] = "";
+        }
+        if (!("secret_key" in $$source)) {
+            this["secret_key"] = "";
+        }
+        if (!("clear_secret_key" in $$source)) {
+            this["clear_secret_key"] = false;
+        }
+        if (!("path_style" in $$source)) {
+            this["path_style"] = false;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new S3SyncConfigInput instance from a string or object.
+     */
+    static createFrom($$source: any = {}): S3SyncConfigInput {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new S3SyncConfigInput($$parsedSource as Partial<S3SyncConfigInput>);
     }
 }
 
@@ -1333,6 +1481,486 @@ export class SettingInput {
     }
 }
 
+export class SyncConfig {
+    "enabled": boolean;
+    "master_key_saved": boolean;
+    "provider": SyncProvider;
+    "strategy": SyncStrategy;
+    "interval_minutes": number;
+    "retention_count": number;
+    "retention_days": number;
+    "gist": GistSyncConfig;
+    "webdav": WebDAVSyncConfig;
+    "s3": S3SyncConfig;
+
+    /** Creates a new SyncConfig instance. */
+    constructor($$source: Partial<SyncConfig> = {}) {
+        if (!("enabled" in $$source)) {
+            this["enabled"] = false;
+        }
+        if (!("master_key_saved" in $$source)) {
+            this["master_key_saved"] = false;
+        }
+        if (!("provider" in $$source)) {
+            this["provider"] = SyncProvider.$zero;
+        }
+        if (!("strategy" in $$source)) {
+            this["strategy"] = SyncStrategy.$zero;
+        }
+        if (!("interval_minutes" in $$source)) {
+            this["interval_minutes"] = 0;
+        }
+        if (!("retention_count" in $$source)) {
+            this["retention_count"] = 0;
+        }
+        if (!("retention_days" in $$source)) {
+            this["retention_days"] = 0;
+        }
+        if (!("gist" in $$source)) {
+            this["gist"] = (new GistSyncConfig());
+        }
+        if (!("webdav" in $$source)) {
+            this["webdav"] = (new WebDAVSyncConfig());
+        }
+        if (!("s3" in $$source)) {
+            this["s3"] = (new S3SyncConfig());
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new SyncConfig instance from a string or object.
+     */
+    static createFrom($$source: any = {}): SyncConfig {
+        const $$createField7_0 = $$createType7;
+        const $$createField8_0 = $$createType8;
+        const $$createField9_0 = $$createType9;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("gist" in $$parsedSource) {
+            $$parsedSource["gist"] = $$createField7_0($$parsedSource["gist"]);
+        }
+        if ("webdav" in $$parsedSource) {
+            $$parsedSource["webdav"] = $$createField8_0($$parsedSource["webdav"]);
+        }
+        if ("s3" in $$parsedSource) {
+            $$parsedSource["s3"] = $$createField9_0($$parsedSource["s3"]);
+        }
+        return new SyncConfig($$parsedSource as Partial<SyncConfig>);
+    }
+}
+
+export class SyncConfigInput {
+    "enabled": boolean;
+    "provider": SyncProvider;
+    "strategy": SyncStrategy;
+    "interval_minutes": number;
+    "retention_count": number;
+    "retention_days": number;
+    "master_key": string;
+    "gist": GistSyncConfigInput;
+    "webdav": WebDAVSyncConfigInput;
+    "s3": S3SyncConfigInput;
+
+    /** Creates a new SyncConfigInput instance. */
+    constructor($$source: Partial<SyncConfigInput> = {}) {
+        if (!("enabled" in $$source)) {
+            this["enabled"] = false;
+        }
+        if (!("provider" in $$source)) {
+            this["provider"] = SyncProvider.$zero;
+        }
+        if (!("strategy" in $$source)) {
+            this["strategy"] = SyncStrategy.$zero;
+        }
+        if (!("interval_minutes" in $$source)) {
+            this["interval_minutes"] = 0;
+        }
+        if (!("retention_count" in $$source)) {
+            this["retention_count"] = 0;
+        }
+        if (!("retention_days" in $$source)) {
+            this["retention_days"] = 0;
+        }
+        if (!("master_key" in $$source)) {
+            this["master_key"] = "";
+        }
+        if (!("gist" in $$source)) {
+            this["gist"] = (new GistSyncConfigInput());
+        }
+        if (!("webdav" in $$source)) {
+            this["webdav"] = (new WebDAVSyncConfigInput());
+        }
+        if (!("s3" in $$source)) {
+            this["s3"] = (new S3SyncConfigInput());
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new SyncConfigInput instance from a string or object.
+     */
+    static createFrom($$source: any = {}): SyncConfigInput {
+        const $$createField7_0 = $$createType10;
+        const $$createField8_0 = $$createType11;
+        const $$createField9_0 = $$createType12;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("gist" in $$parsedSource) {
+            $$parsedSource["gist"] = $$createField7_0($$parsedSource["gist"]);
+        }
+        if ("webdav" in $$parsedSource) {
+            $$parsedSource["webdav"] = $$createField8_0($$parsedSource["webdav"]);
+        }
+        if ("s3" in $$parsedSource) {
+            $$parsedSource["s3"] = $$createField9_0($$parsedSource["s3"]);
+        }
+        return new SyncConfigInput($$parsedSource as Partial<SyncConfigInput>);
+    }
+}
+
+export class SyncConflict {
+    "local": SyncRemoteVersion;
+    "remote": SyncRemoteVersion;
+
+    /** Creates a new SyncConflict instance. */
+    constructor($$source: Partial<SyncConflict> = {}) {
+        if (!("local" in $$source)) {
+            this["local"] = (new SyncRemoteVersion());
+        }
+        if (!("remote" in $$source)) {
+            this["remote"] = (new SyncRemoteVersion());
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new SyncConflict instance from a string or object.
+     */
+    static createFrom($$source: any = {}): SyncConflict {
+        const $$createField0_0 = $$createType13;
+        const $$createField1_0 = $$createType13;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("local" in $$parsedSource) {
+            $$parsedSource["local"] = $$createField0_0($$parsedSource["local"]);
+        }
+        if ("remote" in $$parsedSource) {
+            $$parsedSource["remote"] = $$createField1_0($$parsedSource["remote"]);
+        }
+        return new SyncConflict($$parsedSource as Partial<SyncConflict>);
+    }
+}
+
+export enum SyncConflictChoice {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    SyncConflictUseCloud = "use_cloud",
+    SyncConflictUseLocal = "use_local",
+    SyncConflictCancel = "cancel",
+};
+
+export class SyncDashboard {
+    "config": SyncConfig;
+    "state": SyncState;
+    "message": string;
+    "last_synced_at": string;
+    "local_version"?: SyncVersion | null;
+    "remote_version"?: SyncRemoteVersion | null;
+    "conflict"?: SyncConflict | null;
+    "versions": SyncVersion[];
+    "events": SyncEvent[];
+
+    /** Creates a new SyncDashboard instance. */
+    constructor($$source: Partial<SyncDashboard> = {}) {
+        if (!("config" in $$source)) {
+            this["config"] = (new SyncConfig());
+        }
+        if (!("state" in $$source)) {
+            this["state"] = SyncState.$zero;
+        }
+        if (!("message" in $$source)) {
+            this["message"] = "";
+        }
+        if (!("last_synced_at" in $$source)) {
+            this["last_synced_at"] = "";
+        }
+        if (!("versions" in $$source)) {
+            this["versions"] = [];
+        }
+        if (!("events" in $$source)) {
+            this["events"] = [];
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new SyncDashboard instance from a string or object.
+     */
+    static createFrom($$source: any = {}): SyncDashboard {
+        const $$createField0_0 = $$createType14;
+        const $$createField4_0 = $$createType16;
+        const $$createField5_0 = $$createType17;
+        const $$createField6_0 = $$createType19;
+        const $$createField7_0 = $$createType20;
+        const $$createField8_0 = $$createType22;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("config" in $$parsedSource) {
+            $$parsedSource["config"] = $$createField0_0($$parsedSource["config"]);
+        }
+        if ("local_version" in $$parsedSource) {
+            $$parsedSource["local_version"] = $$createField4_0($$parsedSource["local_version"]);
+        }
+        if ("remote_version" in $$parsedSource) {
+            $$parsedSource["remote_version"] = $$createField5_0($$parsedSource["remote_version"]);
+        }
+        if ("conflict" in $$parsedSource) {
+            $$parsedSource["conflict"] = $$createField6_0($$parsedSource["conflict"]);
+        }
+        if ("versions" in $$parsedSource) {
+            $$parsedSource["versions"] = $$createField7_0($$parsedSource["versions"]);
+        }
+        if ("events" in $$parsedSource) {
+            $$parsedSource["events"] = $$createField8_0($$parsedSource["events"]);
+        }
+        return new SyncDashboard($$parsedSource as Partial<SyncDashboard>);
+    }
+}
+
+export class SyncEvent {
+    "id": number;
+    "action": string;
+    "provider": SyncProvider;
+    "strategy": SyncStrategy;
+    "status": SyncEventStatus;
+    "local_version": number;
+    "remote_version": number;
+    "message": string;
+    "created_at": string;
+
+    /** Creates a new SyncEvent instance. */
+    constructor($$source: Partial<SyncEvent> = {}) {
+        if (!("id" in $$source)) {
+            this["id"] = 0;
+        }
+        if (!("action" in $$source)) {
+            this["action"] = "";
+        }
+        if (!("provider" in $$source)) {
+            this["provider"] = SyncProvider.$zero;
+        }
+        if (!("strategy" in $$source)) {
+            this["strategy"] = SyncStrategy.$zero;
+        }
+        if (!("status" in $$source)) {
+            this["status"] = SyncEventStatus.$zero;
+        }
+        if (!("local_version" in $$source)) {
+            this["local_version"] = 0;
+        }
+        if (!("remote_version" in $$source)) {
+            this["remote_version"] = 0;
+        }
+        if (!("message" in $$source)) {
+            this["message"] = "";
+        }
+        if (!("created_at" in $$source)) {
+            this["created_at"] = "0001-01-01T00:00:00.000Z";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new SyncEvent instance from a string or object.
+     */
+    static createFrom($$source: any = {}): SyncEvent {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new SyncEvent($$parsedSource as Partial<SyncEvent>);
+    }
+}
+
+export enum SyncEventStatus {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    SyncEventSuccess = "success",
+    SyncEventFailed = "failed",
+    SyncEventConflict = "conflict",
+    SyncEventNoop = "noop",
+};
+
+export enum SyncProvider {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    SyncProviderGist = "gist",
+    SyncProviderWebDAV = "webdav",
+    SyncProviderS3 = "s3",
+};
+
+export class SyncRemoteVersion {
+    "version_id": string;
+    "version_number": number;
+    "snapshot_fingerprint": string;
+    "device_id": string;
+    "created_at": string;
+
+    /** Creates a new SyncRemoteVersion instance. */
+    constructor($$source: Partial<SyncRemoteVersion> = {}) {
+        if (!("version_id" in $$source)) {
+            this["version_id"] = "";
+        }
+        if (!("version_number" in $$source)) {
+            this["version_number"] = 0;
+        }
+        if (!("snapshot_fingerprint" in $$source)) {
+            this["snapshot_fingerprint"] = "";
+        }
+        if (!("device_id" in $$source)) {
+            this["device_id"] = "";
+        }
+        if (!("created_at" in $$source)) {
+            this["created_at"] = "0001-01-01T00:00:00.000Z";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new SyncRemoteVersion instance from a string or object.
+     */
+    static createFrom($$source: any = {}): SyncRemoteVersion {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new SyncRemoteVersion($$parsedSource as Partial<SyncRemoteVersion>);
+    }
+}
+
+export class SyncResult {
+    "state": SyncState;
+    "message": string;
+    "conflict"?: SyncConflict | null;
+
+    /** Creates a new SyncResult instance. */
+    constructor($$source: Partial<SyncResult> = {}) {
+        if (!("state" in $$source)) {
+            this["state"] = SyncState.$zero;
+        }
+        if (!("message" in $$source)) {
+            this["message"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new SyncResult instance from a string or object.
+     */
+    static createFrom($$source: any = {}): SyncResult {
+        const $$createField2_0 = $$createType19;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("conflict" in $$parsedSource) {
+            $$parsedSource["conflict"] = $$createField2_0($$parsedSource["conflict"]);
+        }
+        return new SyncResult($$parsedSource as Partial<SyncResult>);
+    }
+}
+
+export enum SyncState {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    SyncStateDisabled = "disabled",
+    SyncStateIdle = "idle",
+    SyncStateSyncing = "syncing",
+    SyncStateSynced = "synced",
+    SyncStatePending = "pending",
+    SyncStateConflict = "conflict",
+    SyncStateError = "error",
+};
+
+export enum SyncStrategy {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    SyncStrategySmart = "smart",
+    SyncStrategyCloudFirst = "cloud_first",
+    SyncStrategyLocalFirst = "local_first",
+};
+
+export class SyncVersion {
+    "id": number;
+    "version_id": string;
+    "version_number": number;
+    "parent_version_id": string;
+    "snapshot_fingerprint": string;
+    "provider": SyncProvider;
+    "source": string;
+    "file_name": string;
+    "size_bytes": number;
+    "protected": boolean;
+    "created_at": string;
+
+    /** Creates a new SyncVersion instance. */
+    constructor($$source: Partial<SyncVersion> = {}) {
+        if (!("id" in $$source)) {
+            this["id"] = 0;
+        }
+        if (!("version_id" in $$source)) {
+            this["version_id"] = "";
+        }
+        if (!("version_number" in $$source)) {
+            this["version_number"] = 0;
+        }
+        if (!("parent_version_id" in $$source)) {
+            this["parent_version_id"] = "";
+        }
+        if (!("snapshot_fingerprint" in $$source)) {
+            this["snapshot_fingerprint"] = "";
+        }
+        if (!("provider" in $$source)) {
+            this["provider"] = SyncProvider.$zero;
+        }
+        if (!("source" in $$source)) {
+            this["source"] = "";
+        }
+        if (!("file_name" in $$source)) {
+            this["file_name"] = "";
+        }
+        if (!("size_bytes" in $$source)) {
+            this["size_bytes"] = 0;
+        }
+        if (!("protected" in $$source)) {
+            this["protected"] = false;
+        }
+        if (!("created_at" in $$source)) {
+            this["created_at"] = "0001-01-01T00:00:00.000Z";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new SyncVersion instance from a string or object.
+     */
+    static createFrom($$source: any = {}): SyncVersion {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new SyncVersion($$parsedSource as Partial<SyncVersion>);
+    }
+}
+
 export class SystemInfo {
     "cpu_percent": number;
     "cpu_count": number;
@@ -1417,7 +2045,7 @@ export class SystemInfo {
      * Creates a new SystemInfo instance from a string or object.
      */
     static createFrom($$source: any = {}): SystemInfo {
-        const $$createField17_0 = $$createType8;
+        const $$createField17_0 = $$createType24;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("interfaces" in $$parsedSource) {
             $$parsedSource["interfaces"] = $$createField17_0($$parsedSource["interfaces"]);
@@ -1582,9 +2210,9 @@ export class ThemeConfigurationInput {
      * Creates a new ThemeConfigurationInput instance from a string or object.
      */
     static createFrom($$source: any = {}): ThemeConfigurationInput {
-        const $$createField0_0 = $$createType9;
-        const $$createField1_0 = $$createType11;
-        const $$createField2_0 = $$createType12;
+        const $$createField0_0 = $$createType25;
+        const $$createField1_0 = $$createType27;
+        const $$createField2_0 = $$createType28;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("global_style" in $$parsedSource) {
             $$parsedSource["global_style"] = $$createField0_0($$parsedSource["global_style"]);
@@ -1744,7 +2372,7 @@ export class ThemeImportSummary {
      * Creates a new ThemeImportSummary instance from a string or object.
      */
     static createFrom($$source: any = {}): ThemeImportSummary {
-        const $$createField0_0 = $$createType14;
+        const $$createField0_0 = $$createType30;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("results" in $$parsedSource) {
             $$parsedSource["results"] = $$createField0_0($$parsedSource["results"]);
@@ -1817,7 +2445,7 @@ export class ThemeProfile {
      * Creates a new ThemeProfile instance from a string or object.
      */
     static createFrom($$source: any = {}): ThemeProfile {
-        const $$createField3_0 = $$createType16;
+        const $$createField3_0 = $$createType32;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("definition" in $$parsedSource) {
             $$parsedSource["definition"] = $$createField3_0($$parsedSource["definition"]);
@@ -2088,6 +2716,68 @@ export class UpdateInfo {
     }
 }
 
+export class WebDAVSyncConfig {
+    "url": string;
+    "username": string;
+    "password_saved": boolean;
+
+    /** Creates a new WebDAVSyncConfig instance. */
+    constructor($$source: Partial<WebDAVSyncConfig> = {}) {
+        if (!("url" in $$source)) {
+            this["url"] = "";
+        }
+        if (!("username" in $$source)) {
+            this["username"] = "";
+        }
+        if (!("password_saved" in $$source)) {
+            this["password_saved"] = false;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new WebDAVSyncConfig instance from a string or object.
+     */
+    static createFrom($$source: any = {}): WebDAVSyncConfig {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new WebDAVSyncConfig($$parsedSource as Partial<WebDAVSyncConfig>);
+    }
+}
+
+export class WebDAVSyncConfigInput {
+    "url": string;
+    "username": string;
+    "password": string;
+    "clear_password": boolean;
+
+    /** Creates a new WebDAVSyncConfigInput instance. */
+    constructor($$source: Partial<WebDAVSyncConfigInput> = {}) {
+        if (!("url" in $$source)) {
+            this["url"] = "";
+        }
+        if (!("username" in $$source)) {
+            this["username"] = "";
+        }
+        if (!("password" in $$source)) {
+            this["password"] = "";
+        }
+        if (!("clear_password" in $$source)) {
+            this["clear_password"] = false;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new WebDAVSyncConfigInput instance from a string or object.
+     */
+    static createFrom($$source: any = {}): WebDAVSyncConfigInput {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new WebDAVSyncConfigInput($$parsedSource as Partial<WebDAVSyncConfigInput>);
+    }
+}
+
 // Private type creation functions
 const $$createType0 = $Create.Array($Create.Any);
 const $$createType1 = AssetEnvironment.createFrom;
@@ -2096,13 +2786,29 @@ const $$createType3 = AssetProject.createFrom;
 const $$createType4 = $Create.Nullable($$createType3);
 const $$createType5 = AssetTag.createFrom;
 const $$createType6 = $Create.Array($$createType5);
-const $$createType7 = NetworkInterface.createFrom;
-const $$createType8 = $Create.Array($$createType7);
-const $$createType9 = TerminalGlobalStyleInput.createFrom;
-const $$createType10 = ThemeProfileInput.createFrom;
-const $$createType11 = $Create.Array($$createType10);
-const $$createType12 = ThemeAssignmentsInput.createFrom;
-const $$createType13 = ThemeImportResult.createFrom;
-const $$createType14 = $Create.Array($$createType13);
-const $$createType15 = ThemeDefinition.createFrom;
+const $$createType7 = GistSyncConfig.createFrom;
+const $$createType8 = WebDAVSyncConfig.createFrom;
+const $$createType9 = S3SyncConfig.createFrom;
+const $$createType10 = GistSyncConfigInput.createFrom;
+const $$createType11 = WebDAVSyncConfigInput.createFrom;
+const $$createType12 = S3SyncConfigInput.createFrom;
+const $$createType13 = SyncRemoteVersion.createFrom;
+const $$createType14 = SyncConfig.createFrom;
+const $$createType15 = SyncVersion.createFrom;
 const $$createType16 = $Create.Nullable($$createType15);
+const $$createType17 = $Create.Nullable($$createType13);
+const $$createType18 = SyncConflict.createFrom;
+const $$createType19 = $Create.Nullable($$createType18);
+const $$createType20 = $Create.Array($$createType15);
+const $$createType21 = SyncEvent.createFrom;
+const $$createType22 = $Create.Array($$createType21);
+const $$createType23 = NetworkInterface.createFrom;
+const $$createType24 = $Create.Array($$createType23);
+const $$createType25 = TerminalGlobalStyleInput.createFrom;
+const $$createType26 = ThemeProfileInput.createFrom;
+const $$createType27 = $Create.Array($$createType26);
+const $$createType28 = ThemeAssignmentsInput.createFrom;
+const $$createType29 = ThemeImportResult.createFrom;
+const $$createType30 = $Create.Array($$createType29);
+const $$createType31 = ThemeDefinition.createFrom;
+const $$createType32 = $Create.Nullable($$createType31);
