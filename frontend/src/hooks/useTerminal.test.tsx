@@ -198,7 +198,7 @@ describe('useTerminal', () => {
     const { unmount } = renderHook(() => useTerminal('term-1', containerRef, { active: true, focusRequest: { sequence: 0 } }))
 
     expect(calls).toEqual(['open', 'load:canvas', 'load:unicode11', 'load:search', 'load:fit'])
-    expect(terminalOptions[0]).toEqual(expect.objectContaining({ allowProposedApi: true }))
+    expect(terminalOptions[0]).toEqual(expect.objectContaining({ allowProposedApi: true, cursorInactiveStyle: 'none' }))
     expect(getTerminalSearch('term-1')).not.toBeNull()
     expect(selectionDisposes).toHaveLength(1)
     act(() => unmount())

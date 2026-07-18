@@ -87,7 +87,7 @@ function DynamicLayer({ tab, active, activePaneID, fileTargetID, lastActiveTermi
   focusRequest: AppState['focusRequest']
   onClose: () => void
 }) {
-  const layerClass = `absolute inset-0 flex ${active ? 'visible' : 'invisible pointer-events-none'}`
+  const layerClass = `absolute inset-0 flex ${active ? 'visible' : 'invisible pointer-events-none [&_.xterm-cursor-layer]:hidden'}`
   const terminalFocusRequest = useLayerFocusRequest(tab, active, focusRequest, activePaneID, lastActiveTerminalTabID)
   return (
     <div id={dynamicPanelID(tab.id)} data-layer-id={tab.id} role="tabpanel" aria-labelledby={dynamicTabID(tab.id)} aria-hidden={!active} inert={active ? undefined : true} className={layerClass}>
