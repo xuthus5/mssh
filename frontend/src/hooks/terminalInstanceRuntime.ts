@@ -11,6 +11,7 @@ export function createTerminalInstance() {
   return new Terminal({
     allowProposedApi: true,
     cursorBlink: true,
+    cursorInactiveStyle: 'none',
     cursorStyle: theme.cursorStyle,
     fontSize: theme.fontSize,
     fontFamily: theme.fontFamily,
