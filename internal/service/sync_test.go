@@ -116,6 +116,20 @@ func TestSyncServiceImportRejectsWrongMasterKey(t *testing.T) {
 	assert.ErrorContains(t, err, "invalid master key")
 }
 
+func TestSyncServiceImportPreparesLifecycleAndNotifies(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	setSyncMasterKey(t, db, syncTestMasterKey)
+	path := filepath.Join(t.TempDir(), "backup.msshbackup")
+	require.NoError(t, NewSyncService(db, testutil.NewTestLogger()).Export(path))
+	lifecycle := &fakeSyncLifecycle{}
+	emitter := &fakeSyncEventBus{}
+	service := NewSyncService(db, testutil.NewTestLogger(), WithSyncDataDir(t.TempDir()), WithSyncLifecycle(lifecycle), WithSyncEventBus(emitter))
+	setSyncMasterKey(t, db, syncTestMasterKey)
+	require.NoError(t, service.Import(path))
+	assert.Equal(t, 1, lifecycle.calls)
+	assert.Equal(t, syncDataChangedEvent, emitter.name)
+}
+
 func TestSyncServiceRejectsInvalidPathAndClosedDatabase(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	setSyncMasterKey(t, db, syncTestMasterKey)
@@ -278,3 +292,7 @@ func setSyncMasterKey(t *testing.T, db *sql.DB, key string) {
 	t.Helper()
 	require.NoError(t, store.SetSettings(db, []model.Setting{{Key: SyncMasterKeySetting, Namespace: "sync", Value: `"` + key + `"`, ValueType: "string", Version: 1}}))
 }
+
+type fakeSyncEventBus struct{ name string }
+
+func (f *fakeSyncEventBus) Emit(name string, _ any) { f.name = name }

@@ -127,6 +127,9 @@ func startApp(opts Options, logger *slog.Logger, dependencies appDependencies) (
 	if err != nil {
 		return nil, err
 	}
+	if appInstance.Sync != nil {
+		appInstance.Sync.StartScheduler()
+	}
 	cleanup = false
 	return appInstance, nil
 }
@@ -155,12 +158,16 @@ func initializeServices(input serviceInitialization) (*App, error) {
 	adapter := &cryptoAdapter{key: input.masterKey}
 	sessionSvc := service.NewSessionService(input.db, input.eventBus, service.DefaultKeepAliveSeconds, input.opts.DataDir, adapter, input.logger)
 	terminalSvc := service.NewTerminalService(sessionSvc, input.eventBus, 32, input.logger)
+	tunnelSvc := service.NewTunnelService(input.db, sessionSvc, input.eventBus, input.logger)
 	logSvc := service.NewLogService(input.db, input.opts.DataDir, input.logger)
 	themeSvc := service.NewThemeService(input.db, input.logger)
 	if err := themeSvc.InitializeDefaults(); err != nil {
 		return nil, fmt.Errorf("initialize terminal themes: %w", err)
 	}
 	configureTerminalLogging(terminalSvc, logSvc, input.logger)
+	syncSvc := service.NewSyncService(input.db, input.logger,
+		service.WithSyncDataDir(input.opts.DataDir), service.WithSyncCrypto(adapter), service.WithSyncEventBus(input.eventBus),
+		service.WithSyncLifecycle(syncLifecycleAdapter{terminal: terminalSvc, tunnel: tunnelSvc, session: sessionSvc}))
 	return &App{
 		DB:             input.db,
 		Crypto:         input.masterKey,
@@ -168,13 +175,13 @@ func initializeServices(input serviceInitialization) (*App, error) {
 		Session:        sessionSvc,
 		Terminal:       terminalSvc,
 		File:           service.NewFileService(sessionSvc, input.eventBus, input.logger, service.WithTransferDB(input.db)),
-		Tunnel:         service.NewTunnelService(input.db, sessionSvc, input.eventBus, input.logger),
+		Tunnel:         tunnelSvc,
 		Key:            service.NewKeyService(input.db, adapter, input.logger),
 		Macro:          service.NewMacroService(input.db, terminalSvc, input.logger),
 		CommandHistory: service.NewCommandHistoryService(input.db, input.logger),
 		Theme:          themeSvc,
 		Log:            logSvc,
-		Sync:           service.NewSyncService(input.db, input.logger),
+		Sync:           syncSvc,
 		Setting:        service.NewSettingService(input.db, input.logger),
 		About:          service.NewAboutService(),
 		Font:           service.NewFontService(input.logger),
@@ -186,6 +193,25 @@ func initializeServices(input serviceInitialization) (*App, error) {
 
 type terminalRecordingStopper interface {
 	StopTerminalRecordingIfActive(terminalID string) error
+}
+
+type syncLifecycleAdapter struct {
+	terminal *service.TerminalService
+	tunnel   *service.TunnelService
+	session  *service.SessionService
+}
+
+func (s syncLifecycleAdapter) PrepareDestructiveSync() error {
+	if err := service.CloseAllTerminals(s.terminal); err != nil {
+		return err
+	}
+	if s.tunnel != nil {
+		s.tunnel.StopAll()
+	}
+	if s.session != nil {
+		return s.session.CloseAll()
+	}
+	return nil
 }
 
 func configureTerminalLogging(terminalSvc *service.TerminalService, logSvc *service.LogService, logger *slog.Logger) {
@@ -213,6 +239,9 @@ func (a *App) shutdown() {
 	}
 	if a.File != nil {
 		a.File.CancelAll()
+	}
+	if a.Sync != nil {
+		a.Sync.StopScheduler()
 	}
 	if a.Tunnel != nil {
 		a.Tunnel.StopAll()

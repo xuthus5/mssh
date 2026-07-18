@@ -14,6 +14,7 @@ import { SessionQuickSearchHost } from '@/components/session/SessionQuickSearchH
 import { SESSION_QUICK_SEARCH_EVENT } from '@/lib/sessionQuickSearch'
 import { GeneralSettingsRuntime } from '@/components/layout/GeneralSettingsRuntime'
 import { WorkspacePersistence } from '@/components/layout/WorkspacePersistence'
+import { registerSyncDataReload } from '@/lib/syncDataReload'
 
 function activeTab(state: AppState): Tab | undefined {
   const surface = state.activeSurface
@@ -97,6 +98,8 @@ export default function App() {
     document.addEventListener('keydown', handleShortcut)
     return () => document.removeEventListener('keydown', handleShortcut)
   }, [])
+
+  useEffect(() => registerSyncDataReload(() => window.location.reload()), [])
 
   return (
     <div className="flex h-screen w-screen flex-col bg-background">

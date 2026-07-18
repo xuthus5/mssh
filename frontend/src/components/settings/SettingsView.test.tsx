@@ -26,7 +26,12 @@ function settingsProps() {
     terminalGlobalStyle: { font_family: 'Global Font', font_size: 16, cursor_style: CursorStyle.CursorStyleUnderline, selection_background: '#264f78' },
     colorMode: 'dark' as const,
     keys: [],
-    sync: { enabled: false, url: '', username: '', password: '' },
+    cloudSync: {
+      dashboard: null, loading: false, pending: null, error: null,
+      reload: vi.fn(async () => {}), saveConfig: vi.fn(async () => {}), testProvider: vi.fn(async () => {}),
+      syncNow: vi.fn(async () => {}), pushNow: vi.fn(async () => {}), pullNow: vi.fn(async () => {}),
+      resolveConflict: vi.fn(async () => {}), restoreVersion: vi.fn(async () => {}), deleteVersion: vi.fn(async () => {}), resetLocalData: vi.fn(async () => {}),
+    },
     onSaveGeneral: vi.fn(async () => {}),
     onPreviewUIFont: vi.fn(),
     onPreviewWindowOpacity: vi.fn(),
@@ -44,12 +49,8 @@ function settingsProps() {
     onLoadKeyMaterial: vi.fn(async () => undefined),
     onUpdateKey: vi.fn(async () => undefined),
     onSelectKeyImportFile: vi.fn(async () => undefined),
-    onSaveSync: vi.fn(),
     onExportConfig: vi.fn(),
     onImportConfig: vi.fn(),
-    onTestCloud: vi.fn(async () => {}),
-    onPushCloud: vi.fn(async () => {}),
-    onPullCloud: vi.fn(async () => {}),
   }
 }
 

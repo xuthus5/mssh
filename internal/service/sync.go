@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -10,8 +11,8 @@ import (
 	"os"
 	"sort"
 	"strings"
+	"sync"
 
-	backupcrypto "github.com/xuthus5/mssh/internal/crypto"
 	"github.com/xuthus5/mssh/internal/model"
 )
 
@@ -26,25 +27,34 @@ const (
 	maxCloudBackupSize   = 32 * 1024 * 1024
 )
 
-var syncLocalOnlySettings = map[any]struct{}{
-	SyncMasterKeySetting: {},
-	syncETagSetting:      {},
-	syncLastAtSetting:    {},
-	syncDirectionSetting: {},
-	syncVersionSetting:   {},
-}
-
 var backupTables = []string{"session_folders", "ssh_keys", "asset_environments", "asset_projects", "asset_tags", "sessions", "session_tags", "tunnels", "macros", "settings", "themes", "terminal_theme_profiles", "transfer_jobs"}
 
 var backupDeleteOrder = []string{"transfer_jobs", "terminal_theme_profiles", "themes", "tunnels", "session_tags", "sessions", "asset_tags", "asset_projects", "asset_environments", "ssh_keys", "session_folders", "macros", "settings"}
 
 type SyncService struct {
-	db     *sql.DB
-	logger *slog.Logger
+	db              *sql.DB
+	logger          *slog.Logger
+	dataDir         string
+	crypto          KeyCrypto
+	eventBus        EventBus
+	lifecycle       syncLifecycle
+	providerFactory syncProviderFactory
+	operationMu     sync.Mutex
+	stateMu         sync.RWMutex
+	state           syncRuntimeState
+	schedulerMu     sync.Mutex
+	schedulerCancel context.CancelFunc
+	schedulerWG     sync.WaitGroup
 }
 
-func NewSyncService(db *sql.DB, logger *slog.Logger) *SyncService {
-	return &SyncService{db: db, logger: logger}
+type SyncOption func(*SyncService)
+
+func NewSyncService(db *sql.DB, logger *slog.Logger, options ...SyncOption) *SyncService {
+	service := &SyncService{db: db, logger: logger, providerFactory: defaultSyncProviderFactory{}}
+	for _, option := range options {
+		option(service)
+	}
+	return service
 }
 
 type ExportData struct {
@@ -90,27 +100,26 @@ func (s *SyncService) Import(path string) error {
 	if err != nil {
 		return fmt.Errorf("import: %w", err)
 	}
-	var envelope backupcrypto.BackupEnvelope
-	if err := json.Unmarshal(content, &envelope); err != nil {
-		return fmt.Errorf("import: decode envelope: %w", err)
-	}
-	plaintext, err := backupcrypto.DecryptBackup(envelope, []byte(masterKey))
+	artifact, err := decodeSyncArtifact(content, masterKey)
 	if err != nil {
 		return fmt.Errorf("import: %w", err)
 	}
-	var data ExportData
-	if err := decodeSnapshot(plaintext, &data); err != nil {
-		return fmt.Errorf("import: %w", err)
-	}
-	if err := validateSnapshot(s.db, data); err != nil {
+	if err := validateSnapshot(s.db, artifact.Data); err != nil {
 		return fmt.Errorf("import: validate: %w", err)
+	}
+	if s.lifecycle != nil {
+		if err := s.lifecycle.PrepareDestructiveSync(); err != nil {
+			return fmt.Errorf("import: prepare: %w", err)
+		}
 	}
 	if err := s.writeRecoveryPoint(masterKey); err != nil {
 		return fmt.Errorf("import: recovery point: %w", err)
 	}
-	if err := s.restore(data); err != nil {
+	if err := s.restore(artifact.Data); err != nil {
 		return fmt.Errorf("import: %w", err)
 	}
+	s.markPending("已导入本地版本，等待同步")
+	s.notifyDataChanged()
 	s.logger.Info("imported encrypted configuration", "path", path)
 	outcome = "success"
 	return nil
@@ -142,7 +151,8 @@ func (s *SyncService) snapshot() (ExportData, error) {
 		if table == "settings" {
 			filtered := rows[:0]
 			for _, row := range rows {
-				if _, localOnly := syncLocalOnlySettings[row["key"]]; !localOnly {
+				key, _ := row["key"].(string)
+				if !strings.HasPrefix(key, "sync.") {
 					filtered = append(filtered, row)
 				}
 			}
@@ -185,8 +195,7 @@ func (s *SyncService) restore(data ExportData) error {
 		statement := "DELETE FROM " + table
 		arguments := []any(nil)
 		if table == "settings" {
-			statement = "DELETE FROM settings WHERE key <> ?"
-			arguments = []any{SyncMasterKeySetting}
+			statement = "DELETE FROM settings WHERE key NOT LIKE 'sync.%'"
 		}
 		if _, err := tx.Exec(statement, arguments...); err != nil {
 			return fmt.Errorf("clear %s: %w", table, err)
