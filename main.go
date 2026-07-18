@@ -136,11 +136,13 @@ type windowConfiguration struct {
 func configureWindows(wailsApp *application.App, configuration windowConfiguration) {
 	mainWindow := wailsApp.Window.NewWithOptions(mainWindowOptions())
 	settingsController := windowing.NewSettingsWindowController(wailsApp.Window, mainWindow, wailsApp.Event.Emit)
+	settingsController.Preload()
 	lifecycleController := windowing.NewApplicationLifecycleController(windowing.ApplicationLifecycleOptions{
 		Settings: configuration.Settings, Logger: configuration.Logger,
 		ShowMain: func() { mainWindow.Show() }, HideMain: func() { mainWindow.Hide() },
-		FocusMain: func() { mainWindow.Focus() }, CloseSettings: settingsController.Close,
-		Quit: wailsApp.Quit,
+		FocusMain: func() { mainWindow.Focus() }, HideSettings: settingsController.Hide,
+		CloseSettings: settingsController.Close,
+		Quit:          wailsApp.Quit,
 	})
 	_ = wailsApp.Event.On(windowing.OpenSettingsWindowEvent, func(*application.CustomEvent) {
 		settingsController.Open()
