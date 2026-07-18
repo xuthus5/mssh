@@ -7,7 +7,7 @@ import { logger } from '@/lib/logger'
 import { replaceTerminalSearch } from '@/lib/terminalSearchRegistry'
 import { TerminalService } from '@/lib/wails'
 
-const MAX_ACTIVATION_FRAMES = 4
+const MAX_ACTIVATION_FRAMES = 30
 
 interface ActivationRefs {
   termRef: RefObject<Terminal | null>
