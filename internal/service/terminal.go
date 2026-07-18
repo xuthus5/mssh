@@ -15,21 +15,22 @@ import (
 )
 
 type TerminalService struct {
-	mu            sync.RWMutex
-	outputMu      sync.Mutex
-	ptys          map[string]*ssh.PTYSession
-	connIDs       map[string]string
-	attached      map[string]bool
-	pendingOutput map[string][]byte
-	eventBus      EventBus
-	maxSize       int
-	lastUsed      map[string]time.Time
-	sessionSvc    *SessionService
-	outputHandler func(terminalID string, data []byte)
-	closeHandler  func(terminalID string)
-	systemMu      sync.Mutex
-	systemSamples map[string]systemSample
-	logger        *slog.Logger
+	mu              sync.RWMutex
+	outputMu        sync.Mutex
+	ptys            map[string]*ssh.PTYSession
+	connIDs         map[string]string
+	attached        map[string]bool
+	pendingOutput   map[string][]byte
+	outputSequences map[string]uint64
+	eventBus        EventBus
+	maxSize         int
+	lastUsed        map[string]time.Time
+	sessionSvc      *SessionService
+	outputHandler   func(terminalID string, data []byte)
+	closeHandler    func(terminalID string)
+	systemMu        sync.Mutex
+	systemSamples   map[string]systemSample
+	logger          *slog.Logger
 }
 
 var _openPTY = ssh.PreparePTY
@@ -51,16 +52,17 @@ func NewTerminalService(sessionSvc *SessionService, eventBus EventBus, maxSize i
 		maxSize = 32
 	}
 	return &TerminalService{
-		ptys:          make(map[string]*ssh.PTYSession),
-		connIDs:       make(map[string]string),
-		attached:      make(map[string]bool),
-		pendingOutput: make(map[string][]byte),
-		eventBus:      eventBus,
-		maxSize:       maxSize,
-		lastUsed:      make(map[string]time.Time),
-		sessionSvc:    sessionSvc,
-		logger:        logger,
-		systemSamples: make(map[string]systemSample),
+		ptys:            make(map[string]*ssh.PTYSession),
+		connIDs:         make(map[string]string),
+		attached:        make(map[string]bool),
+		pendingOutput:   make(map[string][]byte),
+		outputSequences: make(map[string]uint64),
+		eventBus:        eventBus,
+		maxSize:         maxSize,
+		lastUsed:        make(map[string]time.Time),
+		sessionSvc:      sessionSvc,
+		logger:          logger,
+		systemSamples:   make(map[string]systemSample),
 	}
 }
 
@@ -142,6 +144,7 @@ func (t *TerminalService) handlePTYExit(terminalID string, exitedPTY *ssh.PTYSes
 	}
 	connID := t.connIDs[terminalID]
 	delete(t.connIDs, terminalID)
+	delete(t.outputSequences, terminalID)
 	closeHandler := t.closeHandler
 	expirePending := !t.attached[terminalID] && len(t.pendingOutput[terminalID]) > 0
 	t.mu.Unlock()
@@ -206,6 +209,7 @@ func (t *TerminalService) Close(terminalID string) error {
 			t.outputMu.Lock()
 			delete(t.pendingOutput, terminalID)
 			delete(t.attached, terminalID)
+			delete(t.outputSequences, terminalID)
 			t.mu.Unlock()
 			t.eventBus.Emit(event.TerminalClosed, event.ConnectionStatePayload{TerminalID: terminalID, State: "closed"})
 			t.outputMu.Unlock()
@@ -220,6 +224,7 @@ func (t *TerminalService) Close(terminalID string) error {
 	delete(t.lastUsed, terminalID)
 	delete(t.attached, terminalID)
 	delete(t.pendingOutput, terminalID)
+	delete(t.outputSequences, terminalID)
 	connID := t.connIDs[terminalID]
 	delete(t.connIDs, terminalID)
 	closeHandler := t.closeHandler

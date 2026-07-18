@@ -15,6 +15,7 @@ const (
 
 type TerminalOutputPayload struct {
 	TerminalID string `json:"terminal_id"`
+	Sequence   uint64 `json:"sequence"`
 	Data       []byte `json:"data"`
 }
 

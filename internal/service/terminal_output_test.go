@@ -58,6 +58,27 @@ func TestTerminalService_AttachOrdersPendingBeforeLiveOutput(t *testing.T) {
 	require.Len(t, events, 2)
 	assert.Equal(t, []byte("old"), events[0].Payload.(event.TerminalOutputPayload).Data)
 	assert.Equal(t, []byte("new"), events[1].Payload.(event.TerminalOutputPayload).Data)
+	assert.Equal(t, uint64(1), events[0].Payload.(event.TerminalOutputPayload).Sequence)
+	assert.Equal(t, uint64(2), events[1].Payload.(event.TerminalOutputPayload).Sequence)
+}
+
+func TestTerminalService_OutputSequenceIsPerTerminal(t *testing.T) {
+	bus := newMockEventBus()
+	service := NewTerminalService(nil, bus, 32, testutil.NewTestLogger())
+	service.ptys["term-1"] = (*ssh.PTYSession)(nil)
+	service.ptys["term-2"] = (*ssh.PTYSession)(nil)
+	service.attached["term-1"] = true
+	service.attached["term-2"] = true
+
+	service.handlePTYOutput("term-1", []byte("one"))
+	service.handlePTYOutput("term-2", []byte("two"))
+	service.handlePTYOutput("term-1", []byte("three"))
+
+	events := bus.Events()
+	require.Len(t, events, 3)
+	assert.Equal(t, uint64(1), events[0].Payload.(event.TerminalOutputPayload).Sequence)
+	assert.Equal(t, uint64(1), events[1].Payload.(event.TerminalOutputPayload).Sequence)
+	assert.Equal(t, uint64(2), events[2].Payload.(event.TerminalOutputPayload).Sequence)
 }
 
 func TestTerminalService_CloseWaitsForPendingOutputDrain(t *testing.T) {

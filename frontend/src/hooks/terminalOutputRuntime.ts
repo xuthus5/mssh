@@ -2,12 +2,14 @@ import type { RefObject } from 'react'
 import type { Terminal } from '@xterm/xterm'
 import { Events } from '@wailsio/runtime'
 import type { TerminalRuntimeErrorReporter } from '@/components/terminal/TerminalErrorBoundary'
+import { TerminalOutputSequencer } from '@/components/terminal/terminalOutputSequencer'
 import { runTerminalRuntime } from '@/components/terminal/terminalRuntime'
 import { SynchronizedOutputWriter } from '@/components/terminal/terminalSynchronizedOutput'
 import { logger } from '@/lib/logger'
 
 interface TerminalOutputEvent {
   terminal_id?: string
+  sequence?: number
   data?: string
 }
 
@@ -53,6 +55,7 @@ export function subscribeToTerminalOutput({ term, terminalIDRef, reportRuntimeEr
       ...diagnostics,
     }),
   })
+  let sequencer = new TerminalOutputSequencer((data) => output.push(data))
   const unsubscribe = Events.On('terminal:output', (event: { data?: TerminalOutputEvent }) => {
     const payload = event.data
     const encodedData = payload?.data
@@ -60,8 +63,16 @@ export function subscribeToTerminalOutput({ term, terminalIDRef, reportRuntimeEr
     if (outputTerminalID !== payload.terminal_id) {
       output.flush()
       outputTerminalID = payload.terminal_id
+      sequencer = new TerminalOutputSequencer((data) => output.push(data))
     }
-    runTerminalRuntime(reportRuntimeError, 'terminal output decode', () => output.push(decodeTerminalOutput(encodedData)))
+    runTerminalRuntime(reportRuntimeError, 'terminal output decode', () => {
+      const decoded = decodeTerminalOutput(encodedData)
+      if (payload.sequence === undefined) {
+        output.push(decoded)
+        return
+      }
+      sequencer.push(payload.sequence, decoded)
+    })
   })
   return () => {
     unsubscribe()
