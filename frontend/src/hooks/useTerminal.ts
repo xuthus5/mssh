@@ -125,6 +125,14 @@ function subscribeToData(term: Terminal, refs: TerminalLifecycleRefs) {
   })
 }
 
+function subscribeToSynchronizedOutputQuery(term: Terminal) {
+  return term.parser.registerCsiHandler({ prefix: '?', intermediates: '$', final: 'p' }, (params) => {
+    if (params[0] !== 2026) return false
+    term.input('\u001b[?2026;2$y', false)
+    return true
+  })
+}
+
 function subscribeToOutput(term: Terminal, refs: TerminalLifecycleRefs, reportRuntimeError: TerminalRuntimeErrorReporter) {
   let outputTerminalID = refs.terminalIDRef.current
   const output = new SynchronizedOutputWriter((data) => {
@@ -240,6 +248,7 @@ function initializeTerminal(containerRef: RefObject<HTMLDivElement | null>, refs
   container?.addEventListener('focusin', focusHandler)
   container?.addEventListener('pointerdown', focusHandler)
   const dataDispose = subscribeToData(term, refs)
+  const synchronizedOutputQueryDispose = subscribeToSynchronizedOutputQuery(term)
   const unsubOutput = subscribeToOutput(term, refs, reportRuntimeError)
   const unsubscribeTheme = subscribeToTheme({ term, fitAddon, containerRef, refs, reportRuntimeError })
   const resizeObserver = observeResize({ term, fitAddon, containerRef, refs, reportRuntimeError })
@@ -253,6 +262,7 @@ function initializeTerminal(containerRef: RefObject<HTMLDivElement | null>, refs
     container?.removeEventListener('focusin', focusHandler)
     container?.removeEventListener('pointerdown', focusHandler)
     safelyDispose('data subscription', () => dataDispose.dispose())
+    safelyDispose('synchronized output query', () => synchronizedOutputQueryDispose.dispose())
     safelyDispose('output subscription', unsubOutput)
     safelyDispose('theme subscription', unsubscribeTheme)
     safelyDispose('resize observer', () => resizeObserver.disconnect())
