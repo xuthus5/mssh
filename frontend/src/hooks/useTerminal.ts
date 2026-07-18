@@ -17,6 +17,7 @@ import { TerminalCommandCapture } from '@/lib/terminalCommandCapture'
 import { registerTerminalSearch, unregisterTerminalSearch } from '@/lib/terminalSearchRegistry'
 import { useTerminalActivation, useTerminalAttachment, useTerminalIdentity } from '@/hooks/terminalLifecycleRuntime'
 import { fitAndRefresh } from '@/hooks/terminalFitRuntime'
+import { SynchronizedOutputWriter } from '@/components/terminal/terminalSynchronizedOutput'
 
 const TERMINAL_SCROLLBACK = 10000
 const RESIZE_DEBOUNCE_MS = 80
@@ -125,12 +126,24 @@ function subscribeToData(term: Terminal, refs: TerminalLifecycleRefs) {
 }
 
 function subscribeToOutput(term: Terminal, refs: TerminalLifecycleRefs, reportRuntimeError: TerminalRuntimeErrorReporter) {
-  return Events.On('terminal:output', (event: { data?: TerminalOutputEvent }) => {
+  let outputTerminalID = refs.terminalIDRef.current
+  const output = new SynchronizedOutputWriter((data) => {
+    runTerminalRuntime(reportRuntimeError, 'terminal output write', () => term.write(data))
+  })
+  const unsubscribe = Events.On('terminal:output', (event: { data?: TerminalOutputEvent }) => {
     const payload = event.data
     if (payload?.terminal_id === refs.terminalIDRef.current && payload.data) {
-      runTerminalRuntime(reportRuntimeError, 'terminal output write', () => term.write(payload.data!))
+      if (outputTerminalID !== payload.terminal_id) {
+        output.flush()
+        outputTerminalID = payload.terminal_id
+      }
+      output.push(payload.data)
     }
   })
+  return () => {
+    unsubscribe()
+    output.dispose()
+  }
 }
 
 function subscribeToTheme({ term, fitAddon, containerRef, refs, reportRuntimeError }: {
