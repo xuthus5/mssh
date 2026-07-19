@@ -2,6 +2,9 @@ import type { RefObject } from 'react'
 import type { IDisposable, Terminal } from '@xterm/xterm'
 import { useTerminalDirectoryStore } from '@/store/terminalDirectoryStore'
 
+export const MANUAL_TERMINAL_DIRECTORY_REPORT = "printf '\\033]7;file://%s%s\\007' \"$HOSTNAME\" \"$PWD\"\r"
+export const TERMINAL_DIRECTORY_REPORT_TIMEOUT_MS = 3000
+
 export function parseTerminalWorkingDirectory(payload: string): string | null {
   const value = payload.trim()
   if (!value) return null
@@ -38,4 +41,25 @@ export function subscribeToTerminalWorkingDirectory(term: Terminal, terminalIDRe
       useTerminalDirectoryStore.getState().clearDirectory(trackedTerminalID)
     },
   }
+}
+
+export function waitForTerminalWorkingDirectory(terminalID: string, previousRevision: number, timeoutMs = TERMINAL_DIRECTORY_REPORT_TIMEOUT_MS): Promise<string> {
+  const current = useTerminalDirectoryStore.getState()
+  const currentRevision = current.revisions[terminalID] ?? 0
+  if (currentRevision > previousRevision && current.directories[terminalID]) return Promise.resolve(current.directories[terminalID])
+  return new Promise((resolve, reject) => {
+    let unsubscribe = () => {}
+    const timeout = window.setTimeout(() => {
+      unsubscribe()
+      reject(new Error('终端未返回 OSC 7 工作目录信息'))
+    }, timeoutMs)
+    unsubscribe = useTerminalDirectoryStore.subscribe((state) => {
+      const revision = state.revisions[terminalID] ?? 0
+      const path = state.directories[terminalID]
+      if (revision <= previousRevision || !path) return
+      window.clearTimeout(timeout)
+      unsubscribe()
+      resolve(path)
+    })
+  })
 }
