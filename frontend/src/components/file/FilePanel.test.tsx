@@ -7,6 +7,7 @@ const handlers = {
   onClose: vi.fn(), onNavigateTo: vi.fn(), onNavigateUp: vi.fn(), onDelete: vi.fn(),
   onRename: vi.fn(), onMakeDir: vi.fn(), onUpload: vi.fn(), onDownload: vi.fn(),
   onLoadDirectory: vi.fn(async () => []),
+  onSyncCurrentDirectory: vi.fn(), syncingCurrentDirectory: false,
 }
 
 describe('FilePanel SFTP views', () => {
@@ -19,6 +20,8 @@ describe('FilePanel SFTP views', () => {
 
     expect(screen.queryByText('.env')).not.toBeInTheDocument()
     expect(screen.getByRole('table')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: '同步当前目录' }))
+    expect(handlers.onSyncCurrentDirectory).toHaveBeenCalledOnce()
     await user.click(screen.getByRole('button', { name: '树状视图' }))
     expect(screen.getByRole('tree', { name: '远程文件树' })).toBeInTheDocument()
     expect(screen.queryByText('.env')).not.toBeInTheDocument()

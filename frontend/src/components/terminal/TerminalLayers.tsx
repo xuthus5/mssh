@@ -4,10 +4,13 @@ import { Spinner } from '@/components/ui/spinner'
 import { TerminalErrorBoundary } from '@/components/terminal/TerminalErrorBoundary'
 import { useFileTransfer } from '@/hooks/useFileTransfer'
 import { useSFTPSettings } from '@/hooks/useSFTPSettings'
+import { MANUAL_TERMINAL_DIRECTORY_REPORT, waitForTerminalWorkingDirectory } from '@/hooks/terminalDirectoryRuntime'
 import type { TerminalFocusRequest } from '@/hooks/useTerminal'
 import { useAppStore, type AppState, type Tab } from '@/store/appStore'
 import { useSFTPSettingsStore } from '@/store/sftpSettingsStore'
 import { useTerminalDirectoryStore } from '@/store/terminalDirectoryStore'
+import { TerminalService } from '@/lib/wails'
+import { toast } from '@/components/ui/toast'
 import { dynamicPanelID, dynamicTabID } from '@/store/tabNavigation'
 import { TabCloseConfirmation, useTabCloseCoordinator } from '@/hooks/useTabCloseCoordinator'
 
@@ -32,7 +35,7 @@ function useLayerFocusRequest(tab: Tab, active: boolean, focusRequest: AppState[
   return resolvedRequestRef.current
 }
 
-function FilePanelView({ transfer, onClose, onUpload, onDownload, dropTargetID, showHiddenFiles, defaultView, onLoadDirectory }: {
+function FilePanelView({ transfer, onClose, onUpload, onDownload, dropTargetID, showHiddenFiles, defaultView, onLoadDirectory, onSyncCurrentDirectory, syncingCurrentDirectory }: {
   transfer: FileTransfer
   onClose: () => void
   onUpload: () => void
@@ -41,6 +44,8 @@ function FilePanelView({ transfer, onClose, onUpload, onDownload, dropTargetID, 
   showHiddenFiles: boolean
   defaultView: 'list' | 'tree'
   onLoadDirectory: (path: string) => Promise<import('@/hooks/useFileTransfer').FileInfo[]>
+  onSyncCurrentDirectory: () => void
+  syncingCurrentDirectory: boolean
 }) {
   return (
     <Suspense fallback={<div className="grid w-[340px] place-items-center border-l"><Spinner /></div>}>
@@ -48,7 +53,8 @@ function FilePanelView({ transfer, onClose, onUpload, onDownload, dropTargetID, 
         loading={transfer.loading} error={transfer.error} onNavigateTo={transfer.navigateTo}
         onNavigateUp={transfer.navigateUp} onDelete={transfer.deleteFile} onRename={transfer.renameFile}
         onMakeDir={transfer.makeDir} onUpload={onUpload} onDownload={onDownload} dropTargetId={dropTargetID}
-        showHiddenFiles={showHiddenFiles} defaultView={defaultView} onLoadDirectory={onLoadDirectory} />
+        showHiddenFiles={showHiddenFiles} defaultView={defaultView} onLoadDirectory={onLoadDirectory}
+        onSyncCurrentDirectory={onSyncCurrentDirectory} syncingCurrentDirectory={syncingCurrentDirectory} />
     </Suspense>
   )
 }
@@ -61,6 +67,7 @@ function FilePanelContainer({ sessionID, terminalID, onClose }: { sessionID: num
   const terminalDirectory = useTerminalDirectoryStore((state) => state.directories[terminalID])
   const dropTargetID = `sftp-drop-zone-${terminalID}`
   const loadedInitialPath = useRef(false)
+  const [syncingCurrentDirectory, setSyncingCurrentDirectory] = useState(false)
 
   useEffect(() => {
     if (!loadedInitialPath.current) {
@@ -70,6 +77,22 @@ function FilePanelContainer({ sessionID, terminalID, onClose }: { sessionID: num
     }
     if (followTerminalDirectory && terminalDirectory) void transfer.listFiles(terminalDirectory)
   }, [followTerminalDirectory, terminalDirectory, transfer.listFiles])
+
+  const syncCurrentDirectory = useCallback(async () => {
+    if (syncingCurrentDirectory) return
+    setSyncingCurrentDirectory(true)
+    const previousRevision = useTerminalDirectoryStore.getState().revisions[terminalID] ?? 0
+    try {
+      await TerminalService.Write(terminalID, MANUAL_TERMINAL_DIRECTORY_REPORT)
+      const path = await waitForTerminalWorkingDirectory(terminalID, previousRevision)
+      if (!followTerminalDirectory || path === transfer.currentPath) await transfer.listFiles(path)
+      toast(`已同步当前目录: ${path}`, 'success')
+    } catch (error) {
+      toast(`同步当前目录失败: ${error instanceof Error ? error.message : String(error)}`, 'error')
+    } finally {
+      setSyncingCurrentDirectory(false)
+    }
+  }, [followTerminalDirectory, syncingCurrentDirectory, terminalID, transfer.currentPath, transfer.listFiles])
   useEffect(() => Events.On('sftp:files-dropped', (event: { data?: { files?: string[]; details?: { id?: string } } }) => {
     const files = event.data?.files ?? []
     const targetID = event.data?.details?.id
@@ -90,7 +113,8 @@ function FilePanelContainer({ sessionID, terminalID, onClose }: { sessionID: num
 
   return <FilePanelView transfer={transfer} onClose={onClose} onUpload={() => { void handleUpload() }}
     onDownload={(path) => { void handleDownload(path) }} dropTargetID={dropTargetID} showHiddenFiles={showHiddenFiles}
-    defaultView={defaultView} onLoadDirectory={transfer.loadDirectory} />
+    defaultView={defaultView} onLoadDirectory={transfer.loadDirectory} onSyncCurrentDirectory={() => { void syncCurrentDirectory() }}
+    syncingCurrentDirectory={syncingCurrentDirectory} />
 }
 
 function DynamicLayer({ tab, active, activePaneID, fileTargetID, lastActiveTerminalTabID, filePanelOpen, onToggleFiles, onPaneClosed, onPaneReplaced, onCloseFiles, focusRequest, onClose }: {

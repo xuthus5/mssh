@@ -1,7 +1,7 @@
 import { useState, useEffect, type FormEvent } from 'react'
 import { Button } from '@/components/ui/button'
 import type { FileInfo } from '@/hooks/useFileTransfer'
-import { ArrowUp, FolderTree, List } from 'lucide-react'
+import { ArrowUp, FolderTree, List, RefreshCw } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
@@ -28,6 +28,8 @@ interface Props {
   showHiddenFiles: boolean
   defaultView: SFTPDefaultView
   onLoadDirectory: (path: string) => Promise<FileInfo[]>
+  onSyncCurrentDirectory: () => void
+  syncingCurrentDirectory: boolean
 }
 
 export default function FilePanel({
@@ -48,6 +50,8 @@ export default function FilePanel({
   showHiddenFiles,
   defaultView,
   onLoadDirectory,
+  onSyncCurrentDirectory,
+  syncingCurrentDirectory,
 }: Props) {
   const state = useFilePanelState(defaultView, currentPath, onMakeDir)
   if (!open) return null
@@ -58,7 +62,8 @@ export default function FilePanel({
       <PathBar currentPath={currentPath} onNavigateUp={onNavigateUp} onNavigateTo={onNavigateTo} />
       <FileActions selected={state.selected} currentPath={currentPath} view={state.view} showMkdir={state.showMkdir}
         onUpload={onUpload} onDownload={onDownload} onNavigateTo={onNavigateTo} onSetView={state.setView}
-        onToggleMkdir={state.toggleMkdir} onRename={state.openRename} onDelete={state.openDelete} />
+        onToggleMkdir={state.toggleMkdir} onRename={state.openRename} onDelete={state.openDelete}
+        onSyncCurrentDirectory={onSyncCurrentDirectory} syncingCurrentDirectory={syncingCurrentDirectory} />
       {error && <Alert variant="destructive" className="m-2"><AlertTitle>目录加载失败</AlertTitle><AlertDescription>{error}<Button size="xs" variant="outline" className="ml-2" onClick={() => onNavigateTo(currentPath)}>重试</Button></AlertDescription></Alert>}
       {state.showMkdir && <MkdirForm name={state.mkdirName} onChange={state.setMkdirName} onSubmit={state.submitMkdir} />}
       <FileContent view={state.view} files={files} loading={loading} currentPath={currentPath} showHiddenFiles={showHiddenFiles}
@@ -102,8 +107,8 @@ function PathBar({ currentPath, onNavigateUp, onNavigateTo }: { currentPath: str
   return <div className="flex items-center gap-1 overflow-x-auto border-b border-border px-3 py-1.5"><button type="button" aria-label="上级目录" className="flex-shrink-0 rounded p-0.5 hover:bg-muted" onClick={onNavigateUp}><ArrowUp className="size-3.5" /></button>{currentPath === '/' ? <span className="text-sm text-muted-foreground">/</span> : breadcrumbs.map((crumb) => <span key={crumb.path} className="flex items-center text-sm"><span className="text-muted-foreground">/</span><button type="button" className="text-muted-foreground hover:text-foreground hover:underline" onClick={() => onNavigateTo(crumb.path)}>{crumb.name}</button></span>)}</div>
 }
 
-function FileActions({ selected, currentPath, view, showMkdir, onUpload, onDownload, onNavigateTo, onSetView, onToggleMkdir, onRename, onDelete }: { selected: FileInfo | null; currentPath: string; view: SFTPDefaultView; showMkdir: boolean; onUpload: () => void; onDownload: (path: string) => void; onNavigateTo: (path: string) => void; onSetView: (view: SFTPDefaultView) => void; onToggleMkdir: () => void; onRename: () => void; onDelete: () => void }) {
-  return <div className="flex items-center gap-1 border-b border-border px-3 py-1.5"><Button size="xs" variant="outline" onClick={onUpload}>上传</Button><Button size="xs" variant="outline" aria-pressed={showMkdir} onClick={onToggleMkdir}>新建文件夹</Button><Button size="xs" variant="outline" disabled={!selected} onClick={() => { if (selected) onDownload(selected.path) }}>下载</Button><Button size="xs" variant="outline" disabled={!selected} onClick={onRename}>重命名</Button><Button size="xs" variant="destructive" disabled={!selected} onClick={onDelete}>删除</Button><Button size="xs" variant="ghost" onClick={() => onNavigateTo(currentPath)}>刷新</Button><div className="ml-auto flex items-center rounded-md border border-border p-0.5" role="group" aria-label="文件视图"><Button size="icon-xs" variant={view === 'list' ? 'secondary' : 'ghost'} aria-label="列表视图" onClick={() => onSetView('list')}><List /></Button><Button size="icon-xs" variant={view === 'tree' ? 'secondary' : 'ghost'} aria-label="树状视图" onClick={() => onSetView('tree')}><FolderTree /></Button></div></div>
+function FileActions({ selected, currentPath, view, showMkdir, onUpload, onDownload, onNavigateTo, onSetView, onToggleMkdir, onRename, onDelete, onSyncCurrentDirectory, syncingCurrentDirectory }: { selected: FileInfo | null; currentPath: string; view: SFTPDefaultView; showMkdir: boolean; onUpload: () => void; onDownload: (path: string) => void; onNavigateTo: (path: string) => void; onSetView: (view: SFTPDefaultView) => void; onToggleMkdir: () => void; onRename: () => void; onDelete: () => void; onSyncCurrentDirectory: () => void; syncingCurrentDirectory: boolean }) {
+  return <div className="flex items-center gap-1 border-b border-border px-3 py-1.5"><Button size="xs" variant="outline" onClick={onUpload}>上传</Button><Button size="xs" variant="outline" aria-pressed={showMkdir} onClick={onToggleMkdir}>新建文件夹</Button><Button size="xs" variant="outline" disabled={!selected} onClick={() => { if (selected) onDownload(selected.path) }}>下载</Button><Button size="xs" variant="outline" disabled={!selected} onClick={onRename}>重命名</Button><Button size="xs" variant="destructive" disabled={!selected} onClick={onDelete}>删除</Button><Button size="xs" variant="ghost" onClick={() => onNavigateTo(currentPath)}>刷新</Button><Button size="icon-xs" variant="ghost" aria-label="同步当前目录" title="同步当前终端的 Shell 工作目录（需要处于 Shell 提示符）" disabled={syncingCurrentDirectory} onClick={onSyncCurrentDirectory}>{syncingCurrentDirectory ? <RefreshCw className="animate-spin" /> : <RefreshCw />}</Button><div className="ml-auto flex items-center rounded-md border border-border p-0.5" role="group" aria-label="文件视图"><Button size="icon-xs" variant={view === 'list' ? 'secondary' : 'ghost'} aria-label="列表视图" onClick={() => onSetView('list')}><List /></Button><Button size="icon-xs" variant={view === 'tree' ? 'secondary' : 'ghost'} aria-label="树状视图" onClick={() => onSetView('tree')}><FolderTree /></Button></div></div>
 }
 
 function FileDialogs({ selected, renameOpen, renameName, deleteOpen, onRenameOpenChange, onRenameNameChange, onDeleteOpenChange, onRename, onDelete, onClearSelection }: { selected: FileInfo | null; renameOpen: boolean; renameName: string; deleteOpen: boolean; onRenameOpenChange: (open: boolean) => void; onRenameNameChange: (name: string) => void; onDeleteOpenChange: (open: boolean) => void; onRename: (path: string, name: string) => void; onDelete: (path: string) => void; onClearSelection: () => void }) {
