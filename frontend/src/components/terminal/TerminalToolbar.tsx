@@ -9,6 +9,7 @@ import { LogService } from '@/lib/wails'
 import { useAppStore } from '@/store/appStore'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import type { SplitDirection } from '@/components/terminal/splitTree'
+import { getClipboard } from '@/lib/clipboard'
 
 interface TerminalToolbarProps {
   terminalID: string
@@ -56,13 +57,13 @@ function useClipboardActions(getTerminal: () => ToolbarTerminal | null, restoreF
     if (!terminal) return
     const selection = terminal.getSelection()
     logger.debug('TerminalToolbar: copy:', selection ? selection.length : 0, 'chars')
-    if (selection) await navigator.clipboard.writeText(selection)
+    if (selection) await getClipboard().writeText(selection)
     restoreFocus()
   }, [getTerminal, restoreFocus])
   const paste = useCallback(async () => {
     const terminal = getTerminal()
     if (!terminal) return
-    const text = await navigator.clipboard.readText()
+    const text = await getClipboard().readText()
     logger.debug('TerminalToolbar: paste:', text.length, 'chars')
     terminal.paste(text)
     restoreFocus()

@@ -1,23 +1,24 @@
 import type { Terminal } from '@xterm/xterm'
+import { getClipboard, type ClipboardPort } from '@/lib/clipboard'
 
 export interface CopyOnSelectController {
   setEnabled: (enabled: boolean) => void
   dispose: () => void
 }
 
-async function writeTerminalSelection(term: Terminal, clipboard: Pick<Clipboard, 'writeText'>): Promise<boolean> {
+async function writeTerminalSelection(term: Terminal, clipboard: Pick<ClipboardPort, 'writeText'>): Promise<boolean> {
   const selection = term.getSelection()
   if (!selection) return false
   await clipboard.writeText(selection)
   return true
 }
 
-export async function copyTerminalSelection(term: Terminal, clipboard: Pick<Clipboard, 'writeText'>): Promise<boolean> {
+export async function copyTerminalSelection(term: Terminal, clipboard: Pick<ClipboardPort, 'writeText'> = getClipboard()): Promise<boolean> {
   term.focus()
   return writeTerminalSelection(term, clipboard)
 }
 
-export async function pasteClipboardIntoTerminal(term: Terminal, clipboard: Pick<Clipboard, 'readText'>): Promise<void> {
+export async function pasteClipboardIntoTerminal(term: Terminal, clipboard: Pick<ClipboardPort, 'readText'> = getClipboard()): Promise<void> {
   term.focus()
   term.paste(await clipboard.readText())
 }
@@ -36,7 +37,7 @@ function reportCopyError(onError: ((error: unknown) => void) | undefined, error:
 }
 
 export function createCopyOnSelectController(term: Terminal, options: {
-  clipboard?: Pick<Clipboard, 'writeText'>
+  clipboard?: Pick<ClipboardPort, 'writeText'>
   delay?: number
   onError?: (error: unknown) => void
 }): CopyOnSelectController {
@@ -50,7 +51,7 @@ export function createCopyOnSelectController(term: Terminal, options: {
   }
   const copy = () => {
     timer = undefined
-    const clipboard = options.clipboard ?? navigator.clipboard
+    const clipboard = options.clipboard ?? getClipboard()
     void writeTerminalSelection(term, clipboard).catch((error: unknown) => reportCopyError(options.onError, error))
   }
   const schedule = () => {

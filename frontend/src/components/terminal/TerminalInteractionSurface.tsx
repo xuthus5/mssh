@@ -50,7 +50,7 @@ function useTerminalClipboardActions(terminalRef: RefObject<Terminal | null>): T
     const term = terminalRef.current
     if (!term) return
     try {
-      await copyTerminalSelection(term, navigator.clipboard)
+      await copyTerminalSelection(term)
     } finally {
       restoreTerminalFocus(term)
     }
@@ -59,7 +59,7 @@ function useTerminalClipboardActions(terminalRef: RefObject<Terminal | null>): T
     const term = terminalRef.current
     if (!term) return
     try {
-      await pasteClipboardIntoTerminal(term, navigator.clipboard)
+      await pasteClipboardIntoTerminal(term)
     } finally {
       restoreTerminalFocus(term)
     }

@@ -89,8 +89,8 @@ describe('TerminalInteractionSurface', () => {
     fireEvent.click(screen.getByRole('button', { name: '全选' }))
 
     await waitFor(() => expect(terminal.focus).toHaveBeenCalledTimes(3))
-    expect(interactions.copyTerminalSelection).toHaveBeenCalledWith(terminal, navigator.clipboard)
-    expect(interactions.pasteClipboardIntoTerminal).toHaveBeenCalledWith(terminal, navigator.clipboard)
+    expect(interactions.copyTerminalSelection).toHaveBeenCalledWith(terminal)
+    expect(interactions.pasteClipboardIntoTerminal).toHaveBeenCalledWith(terminal)
     expect(interactions.selectAllTerminal).toHaveBeenCalledWith(terminal)
   })
 
@@ -106,7 +106,7 @@ describe('TerminalInteractionSurface', () => {
     expect(event.defaultPrevented).toBe(true)
     expect(screen.getByTestId('context-menu')).toHaveAttribute('data-disabled', 'true')
     expect(screen.queryByRole('button', { name: '复制' })).not.toBeInTheDocument()
-    await waitFor(() => expect(interactions.pasteClipboardIntoTerminal).toHaveBeenCalledWith(terminal, navigator.clipboard))
+    await waitFor(() => expect(interactions.pasteClipboardIntoTerminal).toHaveBeenCalledWith(terminal))
     expect(terminal.focus).toHaveBeenCalledOnce()
   })
 
