@@ -1,10 +1,10 @@
 import type { RefObject } from 'react'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
-import { parseTerminalWorkingDirectory, subscribeToTerminalWorkingDirectory } from '@/hooks/terminalDirectoryRuntime'
+import { parseTerminalWorkingDirectory, subscribeToTerminalWorkingDirectory, waitForTerminalWorkingDirectory } from '@/hooks/terminalDirectoryRuntime'
 import { useTerminalDirectoryStore } from '@/store/terminalDirectoryStore'
 
 describe('terminalDirectoryRuntime', () => {
-  beforeEach(() => useTerminalDirectoryStore.setState({ directories: {} }))
+  beforeEach(() => useTerminalDirectoryStore.setState({ directories: {}, revisions: {} }))
 
   it('parses OSC 7 file URLs and URL encoded paths', () => {
     expect(parseTerminalWorkingDirectory('file://server/home/user')).toBe('/home/user')
@@ -37,5 +37,14 @@ describe('terminalDirectoryRuntime', () => {
     subscription.dispose()
     expect(handlerDispose).toHaveBeenCalledOnce()
     expect(useTerminalDirectoryStore.getState().directories['term-2']).toBeUndefined()
+  })
+
+  it('waits for a new directory report and times out without one', async () => {
+    const pending = waitForTerminalWorkingDirectory('term-1', 0, 100)
+    useTerminalDirectoryStore.getState().setDirectory('term-1', '/root')
+    await expect(pending).resolves.toBe('/root')
+
+    const timedOut = waitForTerminalWorkingDirectory('term-2', 0, 1)
+    await expect(timedOut).rejects.toThrow('未返回 OSC 7')
   })
 })

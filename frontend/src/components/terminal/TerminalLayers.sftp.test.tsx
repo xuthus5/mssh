@@ -7,6 +7,7 @@ const transfer = vi.hoisted(() => ({
   renameFile: vi.fn(), makeDir: vi.fn(), upload: vi.fn(async () => {}), uploadMany: vi.fn(async () => {}),
   download: vi.fn(async () => {}),
 }))
+const terminalService = vi.hoisted(() => ({ write: vi.fn(async (_terminalID: string, _data: string) => 0) }))
 
 vi.mock('@/components/terminal/TerminalTab', () => ({
   TerminalTab: ({ terminalID, onOpenFiles, onPaneClosed, onPaneReplaced }: {
@@ -25,8 +26,10 @@ vi.mock('@/components/terminal/TerminalTab', () => ({
 }))
 vi.mock('@/components/terminal/PlaybackTab', () => ({ PlaybackTab: () => null }))
 vi.mock('@/components/file/FilePanel', () => ({
-  default: ({ dropTargetId, showHiddenFiles, defaultView }: { dropTargetId: string; showHiddenFiles: boolean; defaultView: string }) => (
-    <div data-testid="file-panel" data-drop-target-id={dropTargetId} data-show-hidden={String(showHiddenFiles)} data-default-view={defaultView} />
+  default: ({ dropTargetId, showHiddenFiles, defaultView, onSyncCurrentDirectory }: { dropTargetId: string; showHiddenFiles: boolean; defaultView: string; onSyncCurrentDirectory: () => void }) => (
+    <div data-testid="file-panel" data-drop-target-id={dropTargetId} data-show-hidden={String(showHiddenFiles)} data-default-view={defaultView}>
+      <button type="button" onClick={onSyncCurrentDirectory}>同步当前目录</button>
+    </div>
   ),
 }))
 vi.mock('@/hooks/useFileTransfer', () => ({
@@ -34,17 +37,23 @@ vi.mock('@/hooks/useFileTransfer', () => ({
 }))
 vi.mock('@/hooks/useSFTPSettings', () => ({ useSFTPSettings: vi.fn() }))
 vi.mock('@/hooks/SessionWorkspaceContext', () => ({ useSessionWorkspace: () => ({ reconnect: vi.fn(async () => {}) }) }))
+vi.mock('@/lib/wails', () => ({ TerminalService: { Write: terminalService.write } }))
 
 import { TerminalLayers } from '@/components/terminal/TerminalLayers'
 import { useAppStore } from '@/store/appStore'
 import { useSFTPSettingsStore } from '@/store/sftpSettingsStore'
 import { useTerminalDirectoryStore } from '@/store/terminalDirectoryStore'
+import { MANUAL_TERMINAL_DIRECTORY_REPORT } from '@/hooks/terminalDirectoryRuntime'
 
 describe('TerminalLayers SFTP isolation', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     useSFTPSettingsStore.setState({ showHiddenFiles: false, followTerminalDirectory: false, defaultView: 'list' })
-    useTerminalDirectoryStore.setState({ directories: {} })
+    useTerminalDirectoryStore.setState({ directories: {}, revisions: {} })
+    terminalService.write.mockImplementation(async (terminalID: string, _data: string) => {
+      useTerminalDirectoryStore.getState().setDirectory(terminalID, '/manual-sync')
+      return 0
+    })
     useAppStore.setState({
       tabs: [
         { id: 'terminal-a', title: 'Terminal', type: 'terminal', terminalId: 'term-a', sessionId: 1 },
@@ -60,7 +69,7 @@ describe('TerminalLayers SFTP isolation', () => {
 
   it('follows the selected terminal directory and applies view settings', async () => {
     useSFTPSettingsStore.setState({ showHiddenFiles: true, followTerminalDirectory: true, defaultView: 'tree' })
-    useTerminalDirectoryStore.setState({ directories: { 'split-term-a': '/srv/app' } })
+    useTerminalDirectoryStore.setState({ directories: { 'split-term-a': '/srv/app' }, revisions: { 'split-term-a': 1 } })
     render(<TerminalLayers />)
     const terminalA = (await screen.findByTestId('terminal-term-a')).closest('[data-layer-id="terminal-a"]') as HTMLElement
 
@@ -69,6 +78,18 @@ describe('TerminalLayers SFTP isolation', () => {
     await waitFor(() => expect(transfer.listFiles).toHaveBeenCalledWith('/srv/app'))
     expect(await within(terminalA).findByTestId('file-panel')).toHaveAttribute('data-show-hidden', 'true')
     expect(within(terminalA).getByTestId('file-panel')).toHaveAttribute('data-default-view', 'tree')
+  })
+
+  it('requests a manual OSC 7 report from the selected terminal', async () => {
+    render(<TerminalLayers />)
+    const terminalA = (await screen.findByTestId('terminal-term-a')).closest('[data-layer-id="terminal-a"]') as HTMLElement
+    fireEvent.click(within(terminalA).getByRole('button', { name: 'files' }))
+
+    await waitFor(() => expect(within(terminalA).getByRole('button', { name: '同步当前目录' })).toBeInTheDocument())
+    fireEvent.click(within(terminalA).getByRole('button', { name: '同步当前目录' }))
+
+    await waitFor(() => expect(terminalService.write).toHaveBeenCalledWith('term-a', MANUAL_TERMINAL_DIRECTORY_REPORT))
+    await waitFor(() => expect(transfer.listFiles).toHaveBeenCalledWith('/manual-sync'))
   })
 
   it('retains independent panels and drop targets for terminals from the same session', async () => {

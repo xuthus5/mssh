@@ -16,7 +16,7 @@ A cross-platform SSH client built with Go + Wails v3 + React + xterm.js.
 - Optional local audit log for connections, synchronization, deletion, key access, and batch actions
 - Unified asynchronous loading, retry, empty-state, duplicate-submit, and stale-response handling
 - Commercial folder management with one configurable default group and safe reassignment on deletion
-- SFTP file transfer with native dialogs, hidden-file filtering, terminal-directory following, list/tree views, and a global progress, retry, history, ETA, and cancellation center
+- SFTP file transfer with native dialogs, hidden-file filtering, OSC 7 terminal-directory following, explicit manual directory synchronization, list/tree views, and a global progress, retry, history, ETA, and cancellation center
 - Port forwarding (local/remote/dynamic)
 - SSH key generation and management
 - Session recording and playback
