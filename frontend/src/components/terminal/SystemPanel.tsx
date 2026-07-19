@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { logger } from '@/lib/logger'
+import { useToolPanelResize } from '@/hooks/useToolPanelResize'
 import { TerminalService } from '@/lib/wails'
 
 type Info = {
@@ -153,11 +154,13 @@ function useProcesses(terminalID: string, active: boolean) {
 }
 
 export function SystemPanel({ terminalID, onClose }: { terminalID: string; onClose: () => void }) {
+  const panel = useToolPanelResize('system')
   const [tab, setTab] = useState('overview')
   const [query, setQuery] = useState('')
   const system = useSystemInfo(terminalID)
   const processState = useProcesses(terminalID, tab === 'processes')
-  return <aside className="absolute inset-y-0 right-0 z-20 flex w-[min(440px,100%)] flex-col border-l border-border bg-card shadow-xl" data-testid="system-panel">
+  return <aside style={panel.panelStyle} className="absolute inset-y-0 right-0 z-20 flex flex-col border-l border-border bg-card shadow-xl" data-testid="system-panel">
+    <div {...panel.resizeHandleProps} className="absolute inset-y-0 -left-1 z-30 w-2 cursor-col-resize touch-none outline-none after:absolute after:inset-y-0 after:left-1/2 after:w-px after:-translate-x-1/2 after:bg-transparent hover:after:bg-primary/60 focus-visible:after:bg-primary active:after:bg-primary" />
     <header className="flex items-center justify-between border-b border-border px-4 py-3">
       <span className="flex items-center gap-2 text-sm font-semibold"><Server className="size-4" />系统监控</span>
       <Button size="icon-xs" variant="ghost" aria-label="关闭系统监控" onClick={onClose}><X /></Button>
