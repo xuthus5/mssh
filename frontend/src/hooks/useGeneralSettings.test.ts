@@ -22,6 +22,7 @@ describe('useGeneralSettings cross-window sync', () => {
     document.documentElement.style.removeProperty('--app-font-family')
     document.documentElement.style.removeProperty('--app-font-size')
     document.documentElement.style.removeProperty('--app-opacity')
+    document.documentElement.style.removeProperty('--app-background-alpha')
     __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.GetMany', async () => ({
       'terminal.max_pool_size': setting('terminal.max_pool_size', maxPoolSize),
     }))
@@ -37,6 +38,7 @@ describe('useGeneralSettings cross-window sync', () => {
     } }))
     expect(document.documentElement.style.getPropertyValue('--app-font-size')).toBe('20px')
     expect(document.documentElement.style.getPropertyValue('--app-opacity')).toBe('0.72')
+    expect(document.documentElement.style.getPropertyValue('--app-background-alpha')).toBe('0.72')
   })
 
   it('broadcasts local font and opacity previews', async () => {
