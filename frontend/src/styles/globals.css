@@ -159,6 +159,18 @@ body {
   background-clip: padding-box;
 }
 
+.mssh-tab-strip-scroll {
+  scrollbar-width: none !important;
+  scrollbar-color: transparent transparent !important;
+  -ms-overflow-style: none;
+}
+
+.mssh-tab-strip-scroll::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
 .asset-color-badge {
   color: var(--asset-color);
   border-color: color-mix(in oklch, var(--asset-color) 35%, var(--border));
