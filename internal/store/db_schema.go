@@ -173,6 +173,56 @@ const syncEventsTableSQL = `CREATE TABLE IF NOT EXISTS sync_events (
 	created_at TEXT NOT NULL
 )`
 
+const aiProviderProfilesTableSQL = `CREATE TABLE IF NOT EXISTS ai_provider_profiles (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	name TEXT NOT NULL,
+	provider TEXT NOT NULL CHECK(provider IN ('openai_compatible','anthropic','gemini','ollama')),
+	base_url TEXT NOT NULL,
+	default_model TEXT NOT NULL,
+	enabled INTEGER NOT NULL DEFAULT 1,
+	created_at TEXT NOT NULL DEFAULT (datetime('now')),
+	updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+)`
+
+const aiSettingsTableSQL = `CREATE TABLE IF NOT EXISTS ai_settings (
+	id INTEGER PRIMARY KEY CHECK(id = 1),
+	default_provider_id INTEGER REFERENCES ai_provider_profiles(id) ON DELETE SET NULL,
+	fallback_provider_id INTEGER REFERENCES ai_provider_profiles(id) ON DELETE SET NULL,
+	interaction_json TEXT NOT NULL,
+	search_json TEXT NOT NULL,
+	security_json TEXT NOT NULL,
+	updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+)`
+
+const aiConversationsTableSQL = `CREATE TABLE IF NOT EXISTS ai_conversations (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	session_id INTEGER NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+	title TEXT NOT NULL,
+	created_at TEXT NOT NULL DEFAULT (datetime('now')),
+	updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+)`
+
+const aiMessagesTableSQL = `CREATE TABLE IF NOT EXISTS ai_messages (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	conversation_id INTEGER NOT NULL REFERENCES ai_conversations(id) ON DELETE CASCADE,
+	role TEXT NOT NULL CHECK(role IN ('user','assistant','system')),
+	content TEXT NOT NULL,
+	created_at TEXT NOT NULL DEFAULT (datetime('now'))
+)`
+
+const aiCommandExecutionsTableSQL = `CREATE TABLE IF NOT EXISTS ai_command_executions (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	conversation_id INTEGER REFERENCES ai_conversations(id) ON DELETE SET NULL,
+	session_id INTEGER NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+	terminal_id TEXT NOT NULL,
+	command TEXT NOT NULL,
+	risk TEXT NOT NULL CHECK(risk IN ('read_only','modify','high','blocked')),
+	approved INTEGER NOT NULL DEFAULT 0,
+	outcome TEXT NOT NULL CHECK(outcome IN ('success','failed','blocked')),
+	error TEXT NOT NULL DEFAULT '',
+	created_at TEXT NOT NULL DEFAULT (datetime('now'))
+)`
+
 type schemaStatement struct {
 	name string
 	sql  string
@@ -192,10 +242,15 @@ var finalSchemaStatements = []schemaStatement{
 	{name: "sync_versions_created_idx", sql: "CREATE INDEX IF NOT EXISTS sync_versions_created_idx ON sync_versions(created_at DESC)"},
 	{name: "sync_events", sql: syncEventsTableSQL},
 	{name: "sync_events_created_idx", sql: "CREATE INDEX IF NOT EXISTS sync_events_created_idx ON sync_events(created_at DESC)"},
+	{name: "ai_provider_profiles", sql: aiProviderProfilesTableSQL}, {name: "ai_settings", sql: aiSettingsTableSQL},
+	{name: "ai_conversations", sql: aiConversationsTableSQL}, {name: "ai_messages", sql: aiMessagesTableSQL},
+	{name: "ai_messages_conversation_idx", sql: "CREATE INDEX IF NOT EXISTS ai_messages_conversation_idx ON ai_messages(conversation_id, id)"},
+	{name: "ai_command_executions", sql: aiCommandExecutionsTableSQL},
 	{name: "settings", sql: settingsTableSQL}, {name: "themes", sql: themeDefinitionsSchema}, {name: "terminal_theme_profiles", sql: themeProfilesSchema},
 }
 
 var applicationTablesInDropOrder = []string{
+	"ai_command_executions", "ai_messages", "ai_conversations", "ai_settings", "ai_provider_profiles",
 	"terminal_theme_profiles", "themes", "sync_events", "sync_versions", "session_logs", "transfer_jobs", "audit_events", "tunnels", "session_tags", "sessions",
 	"asset_tags", "asset_projects", "asset_environments", "ssh_keys", "session_folders", "settings", "macros", "command_history",
 }

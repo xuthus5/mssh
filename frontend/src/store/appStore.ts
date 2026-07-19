@@ -9,7 +9,7 @@ export interface TerminalTab {
   terminalId: string
   sessionId: number
   terminalInstance?: number
-  toolPanel?: 'files' | 'history' | 'system' | null
+  toolPanel?: 'files' | 'history' | 'system' | 'ai' | null
 }
 
 export interface PlaybackTab {

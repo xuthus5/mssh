@@ -66,7 +66,7 @@ function isTabIntent(value: unknown): value is TabIntent {
   if (value.type === 'playback') return typeof value.recordingPath === 'string' && value.recordingPath.length > 0
   return value.type === 'terminal' && Number.isSafeInteger(value.sessionId) && Number(value.sessionId) > 0
     && (value.terminalInstance === undefined || Number.isSafeInteger(value.terminalInstance))
-    && (value.toolPanel === undefined || value.toolPanel === null || value.toolPanel === 'files' || value.toolPanel === 'history' || value.toolPanel === 'system')
+    && (value.toolPanel === undefined || value.toolPanel === null || value.toolPanel === 'files' || value.toolPanel === 'history' || value.toolPanel === 'system' || value.toolPanel === 'ai')
 }
 
 function isActive(value: unknown, tabCount: number): value is WorkspaceSnapshot['active'] {

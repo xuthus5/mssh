@@ -70,6 +70,7 @@ func newWailsApplication(appInstance *app.App, logger *slog.Logger) *application
 			application.NewService(appInstance.Font),
 			application.NewService(appInstance.Audit),
 			application.NewService(appInstance.AssetCatalog),
+			application.NewService(appInstance.AI),
 		},
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(os.DirFS("./frontend/dist")),

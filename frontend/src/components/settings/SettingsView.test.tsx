@@ -65,6 +65,7 @@ describe('SettingsView', () => {
     render(<SettingsView {...settingsProps()} />)
 
     expect(screen.getByRole('tab', { name: '终端' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'AI' })).toBeInTheDocument()
     expect(screen.queryByRole('tab', { name: '外观' })).not.toBeInTheDocument()
     expect(screen.queryByRole('tab', { name: '分组' })).not.toBeInTheDocument()
     expect(screen.queryByRole('tab', { name: '密钥' })).not.toBeInTheDocument()
