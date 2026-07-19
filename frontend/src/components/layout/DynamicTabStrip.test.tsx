@@ -231,7 +231,7 @@ describe('DynamicTabStrip', () => {
     render(<DynamicTabStrip />)
 
     const tabList = screen.getByRole('tablist', { name: '动态标签' })
-    expect(tabList).toHaveClass('gap-1', 'overflow-x-auto', 'overflow-y-hidden', '[scrollbar-width:none]', '[&::-webkit-scrollbar]:hidden')
+    expect(tabList).toHaveClass('mssh-tab-strip-scroll', 'gap-1', 'overflow-x-auto', 'overflow-y-hidden')
   })
 
   it('converts the mouse wheel into horizontal tab scrolling', () => {
