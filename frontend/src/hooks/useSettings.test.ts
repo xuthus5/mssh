@@ -22,6 +22,7 @@ describe('useSettings', () => {
     document.documentElement.style.removeProperty('--app-font-family')
     document.documentElement.style.removeProperty('--app-font-size')
     document.documentElement.style.removeProperty('--app-opacity')
+    document.documentElement.style.removeProperty('--app-background-alpha')
 
     __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.Get', async (key: string) => _settings[key] === undefined ? null : ({ key, namespace: key.split('.')[0], value: _settings[key], value_type: 'string', version: 1, updated_at: '' }))
     __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.GetMany', async (keys: string[]) => Object.fromEntries(keys.filter((key) => _settings[key] !== undefined).map((key) => [key, { key, namespace: key.split('.')[0], value: _settings[key], value_type: 'string', version: 1, updated_at: '' }])))
@@ -73,6 +74,7 @@ describe('useSettings', () => {
     expect(useTerminalBehaviorStore.getState()).toMatchObject({ rightClickAction: 'paste', copyOnSelect: true })
     expect(document.documentElement.style.getPropertyValue('--app-font-family')).toBe('"Segoe UI", "Microsoft YaHei", sans-serif')
     expect(document.documentElement.style.getPropertyValue('--app-opacity')).toBe('0.82')
+    expect(document.documentElement.style.getPropertyValue('--app-background-alpha')).toBe('0.82')
     expect(writtenSettings).not.toContainEqual(expect.objectContaining({ updated_at: expect.anything() }))
   })
 
@@ -99,6 +101,7 @@ describe('useSettings', () => {
     expect(document.documentElement.style.getPropertyValue('--app-font-family')).toBe('"Arial", "Segoe UI", sans-serif')
     expect(document.documentElement.style.getPropertyValue('--app-font-size')).toBe('18px')
     expect(document.documentElement.style.getPropertyValue('--app-opacity')).toBe('0.76')
+    expect(document.documentElement.style.getPropertyValue('--app-background-alpha')).toBe('0.76')
   })
 
   it('does not publish a partial load when an existing value has invalid JSON', async () => {

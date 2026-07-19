@@ -180,7 +180,14 @@ describe('SettingsView', () => {
     await userEvent.type(opacityInput, '72')
 
     expect(props.onPreviewWindowOpacity).toHaveBeenLastCalledWith(72)
-    await userEvent.hover(screen.getByRole('button', { name: '透明度兼容性说明' }))
-    expect(await screen.findByText('部分桌面环境不支持窗口透明度合成显示。')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '透明度兼容性说明' })).toBeInTheDocument()
+    // Linux 测试环境展示降级提示；其他平台则依赖 tooltip 文案。
+    const status = screen.queryByRole('status')
+    if (status) {
+      expect(status).toHaveTextContent(/Linux 桌面/)
+    } else {
+      await userEvent.hover(screen.getByRole('button', { name: '透明度兼容性说明' }))
+      expect((await screen.findAllByText(/原生半透明窗口/)).length).toBeGreaterThan(0)
+    }
   })
 })
