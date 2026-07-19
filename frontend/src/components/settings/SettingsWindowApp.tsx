@@ -19,6 +19,7 @@ function settingsViewProps(
     onDeleteThemeProfile: catalog.deleteProfile, onDeleteThemeDefinition: catalog.deleteDefinition,
     onResetBuiltinThemes: catalog.resetBuiltinStyles,
     onExportConfig: settings.exportConfig, onImportConfig: settings.importConfig,
+    sftpSettings: settings.sftpSettings, onSaveSFTPSettings: settings.saveSFTPSettings,
   }
 }
 

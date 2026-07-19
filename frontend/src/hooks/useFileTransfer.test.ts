@@ -34,6 +34,19 @@ describe('useFileTransfer', () => {
     expect(result.current.currentPath).toBe('/')
   })
 
+  it('loads a tree directory without changing the active path', async () => {
+    __registerHandler('github.com/xuthus5/mssh/internal/service.FileService.ListDir', async (_sessionID: number, path: string) => [
+      { name: 'main.go', path: `${path}/main.go`, size: 100, is_dir: false, mod_time: '2026-07-19' },
+    ])
+    const { result } = renderHook(() => useFileTransfer(SESSION_ID))
+
+    let files: Awaited<ReturnType<typeof result.current.loadDirectory>> = []
+    await act(async () => { files = await result.current.loadDirectory('/src') })
+
+    expect(files).toEqual([{ name: 'main.go', path: '/src/main.go', size: 100, isDir: false, modified: '2026-07-19' }])
+    expect(result.current.currentPath).toBe('/')
+  })
+
   it('upload creates a transfer job', async () => {
     __registerHandler('github.com/xuthus5/mssh/internal/service.FileService.Upload', async () => 'task-1')
 
