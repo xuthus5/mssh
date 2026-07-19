@@ -3,8 +3,11 @@ import { Dialogs, Events } from '@wailsio/runtime'
 import { Spinner } from '@/components/ui/spinner'
 import { TerminalErrorBoundary } from '@/components/terminal/TerminalErrorBoundary'
 import { useFileTransfer } from '@/hooks/useFileTransfer'
+import { useSFTPSettings } from '@/hooks/useSFTPSettings'
 import type { TerminalFocusRequest } from '@/hooks/useTerminal'
 import { useAppStore, type AppState, type Tab } from '@/store/appStore'
+import { useSFTPSettingsStore } from '@/store/sftpSettingsStore'
+import { useTerminalDirectoryStore } from '@/store/terminalDirectoryStore'
 import { dynamicPanelID, dynamicTabID } from '@/store/tabNavigation'
 import { TabCloseConfirmation, useTabCloseCoordinator } from '@/hooks/useTabCloseCoordinator'
 
@@ -29,28 +32,44 @@ function useLayerFocusRequest(tab: Tab, active: boolean, focusRequest: AppState[
   return resolvedRequestRef.current
 }
 
-function FilePanelView({ transfer, onClose, onUpload, onDownload, dropTargetID }: {
+function FilePanelView({ transfer, onClose, onUpload, onDownload, dropTargetID, showHiddenFiles, defaultView, onLoadDirectory }: {
   transfer: FileTransfer
   onClose: () => void
   onUpload: () => void
   onDownload: (path: string) => void
   dropTargetID: string
+  showHiddenFiles: boolean
+  defaultView: 'list' | 'tree'
+  onLoadDirectory: (path: string) => Promise<import('@/hooks/useFileTransfer').FileInfo[]>
 }) {
   return (
     <Suspense fallback={<div className="grid w-[340px] place-items-center border-l"><Spinner /></div>}>
       <FilePanel open onClose={onClose} files={transfer.files} currentPath={transfer.currentPath}
         loading={transfer.loading} error={transfer.error} onNavigateTo={transfer.navigateTo}
         onNavigateUp={transfer.navigateUp} onDelete={transfer.deleteFile} onRename={transfer.renameFile}
-        onMakeDir={transfer.makeDir} onUpload={onUpload} onDownload={onDownload} dropTargetId={dropTargetID} />
+        onMakeDir={transfer.makeDir} onUpload={onUpload} onDownload={onDownload} dropTargetId={dropTargetID}
+        showHiddenFiles={showHiddenFiles} defaultView={defaultView} onLoadDirectory={onLoadDirectory} />
     </Suspense>
   )
 }
 
 function FilePanelContainer({ sessionID, terminalID, onClose }: { sessionID: number; terminalID: string; onClose: () => void }) {
   const transfer = useFileTransfer(sessionID)
+  const showHiddenFiles = useSFTPSettingsStore((state) => state.showHiddenFiles)
+  const followTerminalDirectory = useSFTPSettingsStore((state) => state.followTerminalDirectory)
+  const defaultView = useSFTPSettingsStore((state) => state.defaultView)
+  const terminalDirectory = useTerminalDirectoryStore((state) => state.directories[terminalID])
   const dropTargetID = `sftp-drop-zone-${terminalID}`
+  const loadedInitialPath = useRef(false)
 
-  useEffect(() => { void transfer.listFiles('/') }, [transfer.listFiles])
+  useEffect(() => {
+    if (!loadedInitialPath.current) {
+      loadedInitialPath.current = true
+      void transfer.listFiles(followTerminalDirectory && terminalDirectory ? terminalDirectory : '/')
+      return
+    }
+    if (followTerminalDirectory && terminalDirectory) void transfer.listFiles(terminalDirectory)
+  }, [followTerminalDirectory, terminalDirectory, transfer.listFiles])
   useEffect(() => Events.On('sftp:files-dropped', (event: { data?: { files?: string[]; details?: { id?: string } } }) => {
     const files = event.data?.files ?? []
     const targetID = event.data?.details?.id
@@ -70,7 +89,8 @@ function FilePanelContainer({ sessionID, terminalID, onClose }: { sessionID: num
   }, [transfer.download])
 
   return <FilePanelView transfer={transfer} onClose={onClose} onUpload={() => { void handleUpload() }}
-    onDownload={(path) => { void handleDownload(path) }} dropTargetID={dropTargetID} />
+    onDownload={(path) => { void handleDownload(path) }} dropTargetID={dropTargetID} showHiddenFiles={showHiddenFiles}
+    defaultView={defaultView} onLoadDirectory={transfer.loadDirectory} />
 }
 
 function DynamicLayer({ tab, active, activePaneID, fileTargetID, lastActiveTerminalTabID, filePanelOpen, onToggleFiles, onPaneClosed, onPaneReplaced, onCloseFiles, focusRequest, onClose }: {
@@ -108,6 +128,7 @@ function DynamicLayer({ tab, active, activePaneID, fileTargetID, lastActiveTermi
 }
 
 export function TerminalLayers() {
+  useSFTPSettings()
   const tabs = useAppStore((state) => state.tabs)
   const activeSurface = useAppStore((state) => state.activeSurface)
   const focusRequest = useAppStore((state) => state.focusRequest)

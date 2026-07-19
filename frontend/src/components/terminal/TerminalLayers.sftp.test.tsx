@@ -1,5 +1,12 @@
-import { act, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+const transfer = vi.hoisted(() => ({
+  files: [], currentPath: '/', loading: false, error: '', listFiles: vi.fn(async () => {}),
+  loadDirectory: vi.fn(async () => []), navigateTo: vi.fn(), navigateUp: vi.fn(), deleteFile: vi.fn(),
+  renameFile: vi.fn(), makeDir: vi.fn(), upload: vi.fn(async () => {}), uploadMany: vi.fn(async () => {}),
+  download: vi.fn(async () => {}),
+}))
 
 vi.mock('@/components/terminal/TerminalTab', () => ({
   TerminalTab: ({ terminalID, onOpenFiles, onPaneClosed, onPaneReplaced }: {
@@ -18,34 +25,26 @@ vi.mock('@/components/terminal/TerminalTab', () => ({
 }))
 vi.mock('@/components/terminal/PlaybackTab', () => ({ PlaybackTab: () => null }))
 vi.mock('@/components/file/FilePanel', () => ({
-  default: ({ dropTargetId }: { dropTargetId: string }) => (
-    <div data-testid="file-panel" data-drop-target-id={dropTargetId} />
+  default: ({ dropTargetId, showHiddenFiles, defaultView }: { dropTargetId: string; showHiddenFiles: boolean; defaultView: string }) => (
+    <div data-testid="file-panel" data-drop-target-id={dropTargetId} data-show-hidden={String(showHiddenFiles)} data-default-view={defaultView} />
   ),
 }))
 vi.mock('@/hooks/useFileTransfer', () => ({
-  useFileTransfer: () => ({
-    files: [],
-    currentPath: '/',
-    loading: false,
-    error: '',
-    listFiles: vi.fn(async () => {}),
-    navigateTo: vi.fn(),
-    navigateUp: vi.fn(),
-    deleteFile: vi.fn(),
-    renameFile: vi.fn(),
-    makeDir: vi.fn(),
-    upload: vi.fn(async () => {}),
-    uploadMany: vi.fn(async () => {}),
-    download: vi.fn(async () => {}),
-  }),
+  useFileTransfer: () => transfer,
 }))
+vi.mock('@/hooks/useSFTPSettings', () => ({ useSFTPSettings: vi.fn() }))
 vi.mock('@/hooks/SessionWorkspaceContext', () => ({ useSessionWorkspace: () => ({ reconnect: vi.fn(async () => {}) }) }))
 
 import { TerminalLayers } from '@/components/terminal/TerminalLayers'
 import { useAppStore } from '@/store/appStore'
+import { useSFTPSettingsStore } from '@/store/sftpSettingsStore'
+import { useTerminalDirectoryStore } from '@/store/terminalDirectoryStore'
 
 describe('TerminalLayers SFTP isolation', () => {
   beforeEach(() => {
+    vi.clearAllMocks()
+    useSFTPSettingsStore.setState({ showHiddenFiles: false, followTerminalDirectory: false, defaultView: 'list' })
+    useTerminalDirectoryStore.setState({ directories: {} })
     useAppStore.setState({
       tabs: [
         { id: 'terminal-a', title: 'Terminal', type: 'terminal', terminalId: 'term-a', sessionId: 1 },
@@ -57,6 +56,19 @@ describe('TerminalLayers SFTP isolation', () => {
       connectionStatus: {},
       recordingState: {},
     })
+  })
+
+  it('follows the selected terminal directory and applies view settings', async () => {
+    useSFTPSettingsStore.setState({ showHiddenFiles: true, followTerminalDirectory: true, defaultView: 'tree' })
+    useTerminalDirectoryStore.setState({ directories: { 'split-term-a': '/srv/app' } })
+    render(<TerminalLayers />)
+    const terminalA = (await screen.findByTestId('terminal-term-a')).closest('[data-layer-id="terminal-a"]') as HTMLElement
+
+    fireEvent.click(within(terminalA).getByRole('button', { name: 'split files' }))
+
+    await waitFor(() => expect(transfer.listFiles).toHaveBeenCalledWith('/srv/app'))
+    expect(await within(terminalA).findByTestId('file-panel')).toHaveAttribute('data-show-hidden', 'true')
+    expect(within(terminalA).getByTestId('file-panel')).toHaveAttribute('data-default-view', 'tree')
   })
 
   it('retains independent panels and drop targets for terminals from the same session', async () => {

@@ -18,6 +18,7 @@ import { useTerminalActivation, useTerminalAttachment, useTerminalIdentity } fro
 import { fitAndRefresh } from '@/hooks/terminalFitRuntime'
 import { createTerminalInstance, loadCanvasRenderer, safelyDisposeTerminalResource } from '@/hooks/terminalInstanceRuntime'
 import { subscribeToSynchronizedOutputQuery, subscribeToTerminalOutput, subscribeToTerminalVersionQuery } from '@/hooks/terminalOutputRuntime'
+import { subscribeToTerminalWorkingDirectory } from '@/hooks/terminalDirectoryRuntime'
 
 const RESIZE_DEBOUNCE_MS = 80
 
@@ -195,6 +196,7 @@ function initializeTerminal(containerRef: RefObject<HTMLDivElement | null>, refs
   const dataDispose = subscribeToData(term, refs)
   const synchronizedOutputQueryDispose = subscribeToSynchronizedOutputQuery(term)
   const terminalVersionQueryDispose = subscribeToTerminalVersionQuery(term)
+  const terminalDirectoryDispose = subscribeToTerminalWorkingDirectory(term, refs.terminalIDRef)
   const unsubOutput = subscribeToTerminalOutput({ term, terminalIDRef: refs.terminalIDRef, reportRuntimeError })
   const unsubscribeTheme = subscribeToTheme({ term, fitAddon, containerRef, refs, reportRuntimeError })
   const resizeObserver = observeResize({ term, fitAddon, containerRef, refs, reportRuntimeError })
@@ -210,6 +212,7 @@ function initializeTerminal(containerRef: RefObject<HTMLDivElement | null>, refs
     safelyDisposeTerminalResource('data subscription', () => dataDispose.dispose())
     safelyDisposeTerminalResource('synchronized output query', () => synchronizedOutputQueryDispose.dispose())
     safelyDisposeTerminalResource('terminal version query', () => terminalVersionQueryDispose.dispose())
+    safelyDisposeTerminalResource('terminal working directory', () => terminalDirectoryDispose.dispose())
     safelyDisposeTerminalResource('output subscription', unsubOutput)
     safelyDisposeTerminalResource('theme subscription', unsubscribeTheme)
     safelyDisposeTerminalResource('resize observer', () => resizeObserver.disconnect())

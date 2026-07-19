@@ -26,6 +26,10 @@ function mapFileEntry(file: FileEntry): FileInfo {
   }
 }
 
+async function loadRemoteDirectory(sessionId: number, path: string): Promise<FileInfo[]> {
+  return (await FileService.ListDir(sessionId, path) ?? []).map(mapFileEntry)
+}
+
 function useFileListing(sessionId: number) {
   const [files, setFiles] = useState<FileInfo[]>([])
   const [currentPath, setCurrentPath] = useState('/')
@@ -37,9 +41,9 @@ function useFileListing(sessionId: number) {
     setError('')
     const currentRequest = ++requestID.current
     try {
-      const result = await FileService.ListDir(sessionId, path)
+      const result = await loadRemoteDirectory(sessionId, path)
       if (currentRequest !== requestID.current) return
-      setFiles((result ?? []).map(mapFileEntry))
+      setFiles(result)
       setCurrentPath(path)
     } catch (listError) {
       logger.error('listFiles error', listError)
@@ -144,9 +148,11 @@ export function useFileTransfer(sessionId: number) {
     sessionId, currentPath: listing.currentPath, listFiles: listing.listFiles, setFiles: listing.setFiles,
   })
   const cancelTransfer = useCancelTransfer()
+  const loadDirectory = useCallback((path: string) => loadRemoteDirectory(sessionId, path), [sessionId])
   return {
     files: listing.files, currentPath: listing.currentPath, transfers, loading: listing.loading, error: listing.error,
     listFiles: listing.listFiles, navigateTo: listing.navigateTo, navigateUp: listing.navigateUp,
+    loadDirectory,
     ...commands, ...mutations, cancelTransfer,
   }
 }
