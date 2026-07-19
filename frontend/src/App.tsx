@@ -15,6 +15,7 @@ import { SESSION_QUICK_SEARCH_EVENT } from '@/lib/sessionQuickSearch'
 import { GeneralSettingsRuntime } from '@/components/layout/GeneralSettingsRuntime'
 import { WorkspacePersistence } from '@/components/layout/WorkspacePersistence'
 import { registerSyncDataReload } from '@/lib/syncDataReload'
+import { getClipboard } from '@/lib/clipboard'
 
 function activeTab(state: AppState): Tab | undefined {
   const surface = state.activeSurface
@@ -32,7 +33,7 @@ function activeTerminalEntry(state: AppState) {
 function copySelection(state: AppState) {
   const selection = activeTerminalEntry(state)?.terminal.getSelection()
   if (!selection) return
-  navigator.clipboard.writeText(selection)
+  getClipboard().writeText(selection)
     .then(() => logger.debug('Shortcut: Ctrl+Shift+C: copied selection'))
     .catch((error: unknown) => toast(`复制失败: ${error instanceof Error ? error.message : String(error)}`, 'error'))
 }
@@ -40,7 +41,7 @@ function copySelection(state: AppState) {
 function pasteClipboard(state: AppState) {
   const entry = activeTerminalEntry(state)
   if (!entry) return
-  navigator.clipboard.readText()
+  getClipboard().readText()
     .then((text) => { entry.terminal.paste(text); logger.debug('Shortcut: Ctrl+Shift+V: pasted') })
     .catch((error: unknown) => toast(`粘贴失败: ${error instanceof Error ? error.message : String(error)}`, 'error'))
 }
