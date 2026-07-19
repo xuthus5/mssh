@@ -10,6 +10,7 @@ import { CommandHistoryPanel } from '@/components/terminal/CommandHistoryPanel'
 import { SystemPanel } from '@/components/terminal/SystemPanel'
 import { TerminalSearchBar } from '@/components/terminal/TerminalSearchBar'
 import { TerminalComposePanel } from '@/components/terminal/TerminalComposePanel'
+import { AITerminalPanel } from '@/components/terminal/AITerminalPanel'
 
 interface Props {
   terminalID: string
@@ -88,6 +89,7 @@ export function TerminalTab({ terminalID, sessionId, onOpenFiles, active, focusR
         onToggleCompose={() => setComposeOpen((value) => !value)}
         onOpenHistory={() => updateWorkspace({ toolPanel: toolPanel === 'history' ? null : 'history' })}
         onOpenSystem={() => updateWorkspace({ toolPanel: toolPanel === 'system' ? null : 'system' })}
+        onOpenAI={() => updateWorkspace({ toolPanel: toolPanel === 'ai' ? null : 'ai' })}
       />
       <div className="relative min-h-0 flex-1">
         {currentTab ? <TerminalSplit ref={splitRef} tabID={currentTab.id} primaryID={terminalID} sessionId={sessionId}
@@ -96,6 +98,7 @@ export function TerminalTab({ terminalID, sessionId, onOpenFiles, active, focusR
         <TerminalSearchBar terminalID={activeTerminalID} open={searchOpen} onOpenChange={setSearchOpen} />
         {toolPanel === 'history' && <CommandHistoryPanel sessionID={sessionId} onClose={() => updateWorkspace({ toolPanel: null })} onFill={(command) => { const terminal = useAppStore.getState().terminalPool.get(activeTerminalID)?.terminal; terminal?.paste(command); terminal?.focus() }} />}
         {toolPanel === 'system' && <SystemPanel terminalID={activeTerminalID} onClose={() => updateWorkspace({ toolPanel: null })} />}
+        {toolPanel === 'ai' && <AITerminalPanel terminalID={activeTerminalID} sessionID={sessionId} onClose={() => updateWorkspace({ toolPanel: null })} />}
       </div>
       <TerminalComposePanel open={composeOpen} terminalID={activeTerminalID} sessionID={sessionId} onClose={() => setComposeOpen(false)} />
     </div>

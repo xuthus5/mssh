@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react'
 
-export type ToolPanelKind = 'history' | 'files' | 'system'
+export type ToolPanelKind = 'history' | 'files' | 'system' | 'ai'
 
 const MIN_WIDTH = 280
 const MAX_WIDTH = 720
 const KEYBOARD_STEP = 24
-const DEFAULT_WIDTHS: Record<ToolPanelKind, number> = { history: 340, files: 340, system: 440 }
+const DEFAULT_WIDTHS: Record<ToolPanelKind, number> = { history: 340, files: 340, system: 440, ai: 420 }
 
 function clampWidth(width: number): number {
   if (!Number.isFinite(width)) return MIN_WIDTH

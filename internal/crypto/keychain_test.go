@@ -4,38 +4,30 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	keyring "github.com/zalando/go-keyring"
 )
 
-func TestDefaultKeychainNotAvailable(t *testing.T) {
+func TestDefaultKeychainRoundTrip(t *testing.T) {
+	keyring.MockInit()
 	kc := NewKeychainAdapter()
-	assert.False(t, kc.IsAvailable())
+	assert.True(t, kc.IsAvailable())
+	require.NoError(t, kc.Set("svc", "acct", []byte("data")))
+	value, err := kc.Get("svc", "acct")
+	require.NoError(t, err)
+	assert.Equal(t, []byte("data"), value)
+	require.NoError(t, kc.Delete("svc", "acct"))
+	require.NoError(t, kc.Delete("svc", "acct"))
+	value, err = kc.Get("svc", "acct")
+	require.NoError(t, err)
+	assert.Nil(t, value)
 }
 
-func TestDefaultKeychainGetSet(t *testing.T) {
+func TestDefaultKeychainPropagatesProviderErrors(t *testing.T) {
+	keyring.MockInitWithError(assert.AnError)
 	kc := NewKeychainAdapter()
-	err := kc.Set("svc", "acct", []byte("data"))
-	assert.NoError(t, err)
-	v, err := kc.Get("svc", "acct")
-	assert.NoError(t, err)
-	assert.Nil(t, v)
-}
-
-func TestDefaultKeychainAllOps(t *testing.T) {
-	kc := NewKeychainAdapter()
-
-	// Default keychain is unavailable
-	assert.False(t, kc.IsAvailable())
-
-	// Get returns nil, nil
-	data, err := kc.Get("service", "account")
-	assert.NoError(t, err)
-	assert.Nil(t, data)
-
-	// Set is a no-op
-	err = kc.Set("service", "account", []byte("data"))
-	assert.NoError(t, err)
-
-	// Delete is a no-op
-	err = kc.Delete("service", "account")
-	assert.NoError(t, err)
+	_, err := kc.Get("service", "account")
+	assert.ErrorIs(t, err, assert.AnError)
+	assert.ErrorIs(t, kc.Set("service", "account", []byte("data")), assert.AnError)
+	assert.ErrorIs(t, kc.Delete("service", "account"), assert.AnError)
 }

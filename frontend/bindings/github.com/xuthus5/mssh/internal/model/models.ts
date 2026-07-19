@@ -5,6 +5,810 @@
 // @ts-ignore: Unused imports
 import { Create as $Create } from "@wailsio/runtime";
 
+export class AIAgentCLIStatus {
+    "name": string;
+    "command": string;
+    "installed": boolean;
+    "path": string;
+    "version": string;
+    "error": string;
+    "detected_at": string;
+
+    /** Creates a new AIAgentCLIStatus instance. */
+    constructor($$source: Partial<AIAgentCLIStatus> = {}) {
+        if (!("name" in $$source)) {
+            this["name"] = "";
+        }
+        if (!("command" in $$source)) {
+            this["command"] = "";
+        }
+        if (!("installed" in $$source)) {
+            this["installed"] = false;
+        }
+        if (!("path" in $$source)) {
+            this["path"] = "";
+        }
+        if (!("version" in $$source)) {
+            this["version"] = "";
+        }
+        if (!("error" in $$source)) {
+            this["error"] = "";
+        }
+        if (!("detected_at" in $$source)) {
+            this["detected_at"] = "0001-01-01T00:00:00.000Z";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new AIAgentCLIStatus instance from a string or object.
+     */
+    static createFrom($$source: any = {}): AIAgentCLIStatus {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new AIAgentCLIStatus($$parsedSource as Partial<AIAgentCLIStatus>);
+    }
+}
+
+export class AIChatRequest {
+    "conversation_id": number;
+    "session_id": number;
+    "terminal_id": string;
+    "prompt": string;
+    "terminal_context": string;
+    "use_search": boolean;
+
+    /** Creates a new AIChatRequest instance. */
+    constructor($$source: Partial<AIChatRequest> = {}) {
+        if (!("conversation_id" in $$source)) {
+            this["conversation_id"] = 0;
+        }
+        if (!("session_id" in $$source)) {
+            this["session_id"] = 0;
+        }
+        if (!("terminal_id" in $$source)) {
+            this["terminal_id"] = "";
+        }
+        if (!("prompt" in $$source)) {
+            this["prompt"] = "";
+        }
+        if (!("terminal_context" in $$source)) {
+            this["terminal_context"] = "";
+        }
+        if (!("use_search" in $$source)) {
+            this["use_search"] = false;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new AIChatRequest instance from a string or object.
+     */
+    static createFrom($$source: any = {}): AIChatRequest {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new AIChatRequest($$parsedSource as Partial<AIChatRequest>);
+    }
+}
+
+export class AIChatResponse {
+    "conversation_id": number;
+    "answer": string;
+    "commands": AICommandProposal[];
+    "citations": AICitation[];
+    "provider_id": number;
+
+    /** Creates a new AIChatResponse instance. */
+    constructor($$source: Partial<AIChatResponse> = {}) {
+        if (!("conversation_id" in $$source)) {
+            this["conversation_id"] = 0;
+        }
+        if (!("answer" in $$source)) {
+            this["answer"] = "";
+        }
+        if (!("commands" in $$source)) {
+            this["commands"] = [];
+        }
+        if (!("citations" in $$source)) {
+            this["citations"] = [];
+        }
+        if (!("provider_id" in $$source)) {
+            this["provider_id"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new AIChatResponse instance from a string or object.
+     */
+    static createFrom($$source: any = {}): AIChatResponse {
+        const $$createField2_0 = $$createType1;
+        const $$createField3_0 = $$createType3;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("commands" in $$parsedSource) {
+            $$parsedSource["commands"] = $$createField2_0($$parsedSource["commands"]);
+        }
+        if ("citations" in $$parsedSource) {
+            $$parsedSource["citations"] = $$createField3_0($$parsedSource["citations"]);
+        }
+        return new AIChatResponse($$parsedSource as Partial<AIChatResponse>);
+    }
+}
+
+export class AICitation {
+    "title": string;
+    "url": string;
+    "snippet": string;
+
+    /** Creates a new AICitation instance. */
+    constructor($$source: Partial<AICitation> = {}) {
+        if (!("title" in $$source)) {
+            this["title"] = "";
+        }
+        if (!("url" in $$source)) {
+            this["url"] = "";
+        }
+        if (!("snippet" in $$source)) {
+            this["snippet"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new AICitation instance from a string or object.
+     */
+    static createFrom($$source: any = {}): AICitation {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new AICitation($$parsedSource as Partial<AICitation>);
+    }
+}
+
+export class AICommandExecutionInput {
+    "conversation_id": number;
+    "session_id": number;
+    "terminal_id": string;
+    "command": string;
+    "approved": boolean;
+
+    /** Creates a new AICommandExecutionInput instance. */
+    constructor($$source: Partial<AICommandExecutionInput> = {}) {
+        if (!("conversation_id" in $$source)) {
+            this["conversation_id"] = 0;
+        }
+        if (!("session_id" in $$source)) {
+            this["session_id"] = 0;
+        }
+        if (!("terminal_id" in $$source)) {
+            this["terminal_id"] = "";
+        }
+        if (!("command" in $$source)) {
+            this["command"] = "";
+        }
+        if (!("approved" in $$source)) {
+            this["approved"] = false;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new AICommandExecutionInput instance from a string or object.
+     */
+    static createFrom($$source: any = {}): AICommandExecutionInput {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new AICommandExecutionInput($$parsedSource as Partial<AICommandExecutionInput>);
+    }
+}
+
+export class AICommandProposal {
+    "command": string;
+    "purpose": string;
+    "risk": AICommandRisk;
+    "blocked": boolean;
+    "blocked_reason": string;
+    "can_auto_execute": boolean;
+    "requires_confirmation": boolean;
+
+    /** Creates a new AICommandProposal instance. */
+    constructor($$source: Partial<AICommandProposal> = {}) {
+        if (!("command" in $$source)) {
+            this["command"] = "";
+        }
+        if (!("purpose" in $$source)) {
+            this["purpose"] = "";
+        }
+        if (!("risk" in $$source)) {
+            this["risk"] = AICommandRisk.$zero;
+        }
+        if (!("blocked" in $$source)) {
+            this["blocked"] = false;
+        }
+        if (!("blocked_reason" in $$source)) {
+            this["blocked_reason"] = "";
+        }
+        if (!("can_auto_execute" in $$source)) {
+            this["can_auto_execute"] = false;
+        }
+        if (!("requires_confirmation" in $$source)) {
+            this["requires_confirmation"] = false;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new AICommandProposal instance from a string or object.
+     */
+    static createFrom($$source: any = {}): AICommandProposal {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new AICommandProposal($$parsedSource as Partial<AICommandProposal>);
+    }
+}
+
+export enum AICommandRisk {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    AICommandRiskReadOnly = "read_only",
+    AICommandRiskModify = "modify",
+    AICommandRiskHigh = "high",
+    AICommandRiskBlocked = "blocked",
+};
+
+export class AIConversation {
+    "id": number;
+    "session_id": number;
+    "title": string;
+    "created_at": string;
+    "updated_at": string;
+
+    /** Creates a new AIConversation instance. */
+    constructor($$source: Partial<AIConversation> = {}) {
+        if (!("id" in $$source)) {
+            this["id"] = 0;
+        }
+        if (!("session_id" in $$source)) {
+            this["session_id"] = 0;
+        }
+        if (!("title" in $$source)) {
+            this["title"] = "";
+        }
+        if (!("created_at" in $$source)) {
+            this["created_at"] = "0001-01-01T00:00:00.000Z";
+        }
+        if (!("updated_at" in $$source)) {
+            this["updated_at"] = "0001-01-01T00:00:00.000Z";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new AIConversation instance from a string or object.
+     */
+    static createFrom($$source: any = {}): AIConversation {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new AIConversation($$parsedSource as Partial<AIConversation>);
+    }
+}
+
+export class AIInteractionSettings {
+    "panel_width": number;
+    "context_lines": number;
+    "include_session_metadata": boolean;
+    "include_system_summary": boolean;
+    "stream_responses": boolean;
+    "auto_scroll": boolean;
+    "render_markdown": boolean;
+    "history_retention_days": number;
+    "max_conversations": number;
+
+    /** Creates a new AIInteractionSettings instance. */
+    constructor($$source: Partial<AIInteractionSettings> = {}) {
+        if (!("panel_width" in $$source)) {
+            this["panel_width"] = 0;
+        }
+        if (!("context_lines" in $$source)) {
+            this["context_lines"] = 0;
+        }
+        if (!("include_session_metadata" in $$source)) {
+            this["include_session_metadata"] = false;
+        }
+        if (!("include_system_summary" in $$source)) {
+            this["include_system_summary"] = false;
+        }
+        if (!("stream_responses" in $$source)) {
+            this["stream_responses"] = false;
+        }
+        if (!("auto_scroll" in $$source)) {
+            this["auto_scroll"] = false;
+        }
+        if (!("render_markdown" in $$source)) {
+            this["render_markdown"] = false;
+        }
+        if (!("history_retention_days" in $$source)) {
+            this["history_retention_days"] = 0;
+        }
+        if (!("max_conversations" in $$source)) {
+            this["max_conversations"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new AIInteractionSettings instance from a string or object.
+     */
+    static createFrom($$source: any = {}): AIInteractionSettings {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new AIInteractionSettings($$parsedSource as Partial<AIInteractionSettings>);
+    }
+}
+
+export class AIMessage {
+    "id": number;
+    "conversation_id": number;
+    "role": string;
+    "content": string;
+    "created_at": string;
+
+    /** Creates a new AIMessage instance. */
+    constructor($$source: Partial<AIMessage> = {}) {
+        if (!("id" in $$source)) {
+            this["id"] = 0;
+        }
+        if (!("conversation_id" in $$source)) {
+            this["conversation_id"] = 0;
+        }
+        if (!("role" in $$source)) {
+            this["role"] = "";
+        }
+        if (!("content" in $$source)) {
+            this["content"] = "";
+        }
+        if (!("created_at" in $$source)) {
+            this["created_at"] = "0001-01-01T00:00:00.000Z";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new AIMessage instance from a string or object.
+     */
+    static createFrom($$source: any = {}): AIMessage {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new AIMessage($$parsedSource as Partial<AIMessage>);
+    }
+}
+
+export class AIProviderProfile {
+    "id": number;
+    "name": string;
+    "provider": AIProviderType;
+    "base_url": string;
+    "default_model": string;
+    "enabled": boolean;
+    "credential_saved": boolean;
+    "credential_session_only": boolean;
+    "created_at": string;
+    "updated_at": string;
+
+    /** Creates a new AIProviderProfile instance. */
+    constructor($$source: Partial<AIProviderProfile> = {}) {
+        if (!("id" in $$source)) {
+            this["id"] = 0;
+        }
+        if (!("name" in $$source)) {
+            this["name"] = "";
+        }
+        if (!("provider" in $$source)) {
+            this["provider"] = AIProviderType.$zero;
+        }
+        if (!("base_url" in $$source)) {
+            this["base_url"] = "";
+        }
+        if (!("default_model" in $$source)) {
+            this["default_model"] = "";
+        }
+        if (!("enabled" in $$source)) {
+            this["enabled"] = false;
+        }
+        if (!("credential_saved" in $$source)) {
+            this["credential_saved"] = false;
+        }
+        if (!("credential_session_only" in $$source)) {
+            this["credential_session_only"] = false;
+        }
+        if (!("created_at" in $$source)) {
+            this["created_at"] = "0001-01-01T00:00:00.000Z";
+        }
+        if (!("updated_at" in $$source)) {
+            this["updated_at"] = "0001-01-01T00:00:00.000Z";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new AIProviderProfile instance from a string or object.
+     */
+    static createFrom($$source: any = {}): AIProviderProfile {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new AIProviderProfile($$parsedSource as Partial<AIProviderProfile>);
+    }
+}
+
+export class AIProviderProfileInput {
+    "id": number;
+    "name": string;
+    "provider": AIProviderType;
+    "base_url": string;
+    "default_model": string;
+    "enabled": boolean;
+    "api_key": string;
+
+    /** Creates a new AIProviderProfileInput instance. */
+    constructor($$source: Partial<AIProviderProfileInput> = {}) {
+        if (!("id" in $$source)) {
+            this["id"] = 0;
+        }
+        if (!("name" in $$source)) {
+            this["name"] = "";
+        }
+        if (!("provider" in $$source)) {
+            this["provider"] = AIProviderType.$zero;
+        }
+        if (!("base_url" in $$source)) {
+            this["base_url"] = "";
+        }
+        if (!("default_model" in $$source)) {
+            this["default_model"] = "";
+        }
+        if (!("enabled" in $$source)) {
+            this["enabled"] = false;
+        }
+        if (!("api_key" in $$source)) {
+            this["api_key"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new AIProviderProfileInput instance from a string or object.
+     */
+    static createFrom($$source: any = {}): AIProviderProfileInput {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new AIProviderProfileInput($$parsedSource as Partial<AIProviderProfileInput>);
+    }
+}
+
+export enum AIProviderType {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    AIProviderOpenAICompatible = "openai_compatible",
+    AIProviderAnthropic = "anthropic",
+    AIProviderGemini = "gemini",
+    AIProviderOllama = "ollama",
+};
+
+export enum AISearchMode {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    AISearchDisabled = "disabled",
+    AISearchAuto = "auto",
+    AISearchNative = "native",
+    AISearchIndependent = "independent",
+};
+
+export enum AISearchProvider {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    AISearchProviderBrave = "brave",
+    AISearchProviderTavily = "tavily",
+    AISearchProviderSerper = "serper",
+};
+
+export class AISearchSettings {
+    "enabled": boolean;
+    "mode": AISearchMode;
+    "provider": AISearchProvider;
+    "timeout_seconds": number;
+    "max_results": number;
+    "require_citations": boolean;
+    "credential_saved": boolean;
+    "credential_session_only": boolean;
+
+    /** Creates a new AISearchSettings instance. */
+    constructor($$source: Partial<AISearchSettings> = {}) {
+        if (!("enabled" in $$source)) {
+            this["enabled"] = false;
+        }
+        if (!("mode" in $$source)) {
+            this["mode"] = AISearchMode.$zero;
+        }
+        if (!("provider" in $$source)) {
+            this["provider"] = AISearchProvider.$zero;
+        }
+        if (!("timeout_seconds" in $$source)) {
+            this["timeout_seconds"] = 0;
+        }
+        if (!("max_results" in $$source)) {
+            this["max_results"] = 0;
+        }
+        if (!("require_citations" in $$source)) {
+            this["require_citations"] = false;
+        }
+        if (!("credential_saved" in $$source)) {
+            this["credential_saved"] = false;
+        }
+        if (!("credential_session_only" in $$source)) {
+            this["credential_session_only"] = false;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new AISearchSettings instance from a string or object.
+     */
+    static createFrom($$source: any = {}): AISearchSettings {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new AISearchSettings($$parsedSource as Partial<AISearchSettings>);
+    }
+}
+
+export class AISearchSettingsInput {
+    "enabled": boolean;
+    "mode": AISearchMode;
+    "provider": AISearchProvider;
+    "timeout_seconds": number;
+    "max_results": number;
+    "require_citations": boolean;
+    "api_key": string;
+
+    /** Creates a new AISearchSettingsInput instance. */
+    constructor($$source: Partial<AISearchSettingsInput> = {}) {
+        if (!("enabled" in $$source)) {
+            this["enabled"] = false;
+        }
+        if (!("mode" in $$source)) {
+            this["mode"] = AISearchMode.$zero;
+        }
+        if (!("provider" in $$source)) {
+            this["provider"] = AISearchProvider.$zero;
+        }
+        if (!("timeout_seconds" in $$source)) {
+            this["timeout_seconds"] = 0;
+        }
+        if (!("max_results" in $$source)) {
+            this["max_results"] = 0;
+        }
+        if (!("require_citations" in $$source)) {
+            this["require_citations"] = false;
+        }
+        if (!("api_key" in $$source)) {
+            this["api_key"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new AISearchSettingsInput instance from a string or object.
+     */
+    static createFrom($$source: any = {}): AISearchSettingsInput {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new AISearchSettingsInput($$parsedSource as Partial<AISearchSettingsInput>);
+    }
+}
+
+export class AISecuritySettings {
+    "auto_execute_read_only": boolean;
+    "command_timeout_seconds": number;
+    "max_output_bytes": number;
+    "max_plan_steps": number;
+    "allow_patterns": string[];
+    "deny_patterns": string[];
+    "redaction_patterns": string[];
+
+    /** Creates a new AISecuritySettings instance. */
+    constructor($$source: Partial<AISecuritySettings> = {}) {
+        if (!("auto_execute_read_only" in $$source)) {
+            this["auto_execute_read_only"] = false;
+        }
+        if (!("command_timeout_seconds" in $$source)) {
+            this["command_timeout_seconds"] = 0;
+        }
+        if (!("max_output_bytes" in $$source)) {
+            this["max_output_bytes"] = 0;
+        }
+        if (!("max_plan_steps" in $$source)) {
+            this["max_plan_steps"] = 0;
+        }
+        if (!("allow_patterns" in $$source)) {
+            this["allow_patterns"] = [];
+        }
+        if (!("deny_patterns" in $$source)) {
+            this["deny_patterns"] = [];
+        }
+        if (!("redaction_patterns" in $$source)) {
+            this["redaction_patterns"] = [];
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new AISecuritySettings instance from a string or object.
+     */
+    static createFrom($$source: any = {}): AISecuritySettings {
+        const $$createField4_0 = $$createType4;
+        const $$createField5_0 = $$createType4;
+        const $$createField6_0 = $$createType4;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("allow_patterns" in $$parsedSource) {
+            $$parsedSource["allow_patterns"] = $$createField4_0($$parsedSource["allow_patterns"]);
+        }
+        if ("deny_patterns" in $$parsedSource) {
+            $$parsedSource["deny_patterns"] = $$createField5_0($$parsedSource["deny_patterns"]);
+        }
+        if ("redaction_patterns" in $$parsedSource) {
+            $$parsedSource["redaction_patterns"] = $$createField6_0($$parsedSource["redaction_patterns"]);
+        }
+        return new AISecuritySettings($$parsedSource as Partial<AISecuritySettings>);
+    }
+}
+
+export class AISettings {
+    "default_provider_id": number | null;
+    "fallback_provider_id": number | null;
+    "interaction": AIInteractionSettings;
+    "search": AISearchSettings;
+    "security": AISecuritySettings;
+
+    /** Creates a new AISettings instance. */
+    constructor($$source: Partial<AISettings> = {}) {
+        if (!("default_provider_id" in $$source)) {
+            this["default_provider_id"] = null;
+        }
+        if (!("fallback_provider_id" in $$source)) {
+            this["fallback_provider_id"] = null;
+        }
+        if (!("interaction" in $$source)) {
+            this["interaction"] = (new AIInteractionSettings());
+        }
+        if (!("search" in $$source)) {
+            this["search"] = (new AISearchSettings());
+        }
+        if (!("security" in $$source)) {
+            this["security"] = (new AISecuritySettings());
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new AISettings instance from a string or object.
+     */
+    static createFrom($$source: any = {}): AISettings {
+        const $$createField2_0 = $$createType5;
+        const $$createField3_0 = $$createType6;
+        const $$createField4_0 = $$createType7;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("interaction" in $$parsedSource) {
+            $$parsedSource["interaction"] = $$createField2_0($$parsedSource["interaction"]);
+        }
+        if ("search" in $$parsedSource) {
+            $$parsedSource["search"] = $$createField3_0($$parsedSource["search"]);
+        }
+        if ("security" in $$parsedSource) {
+            $$parsedSource["security"] = $$createField4_0($$parsedSource["security"]);
+        }
+        return new AISettings($$parsedSource as Partial<AISettings>);
+    }
+}
+
+export class AISettingsDashboard {
+    "settings": AISettings;
+    "providers": AIProviderProfile[];
+    "keychain_available": boolean;
+
+    /** Creates a new AISettingsDashboard instance. */
+    constructor($$source: Partial<AISettingsDashboard> = {}) {
+        if (!("settings" in $$source)) {
+            this["settings"] = (new AISettings());
+        }
+        if (!("providers" in $$source)) {
+            this["providers"] = [];
+        }
+        if (!("keychain_available" in $$source)) {
+            this["keychain_available"] = false;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new AISettingsDashboard instance from a string or object.
+     */
+    static createFrom($$source: any = {}): AISettingsDashboard {
+        const $$createField0_0 = $$createType8;
+        const $$createField1_0 = $$createType10;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("settings" in $$parsedSource) {
+            $$parsedSource["settings"] = $$createField0_0($$parsedSource["settings"]);
+        }
+        if ("providers" in $$parsedSource) {
+            $$parsedSource["providers"] = $$createField1_0($$parsedSource["providers"]);
+        }
+        return new AISettingsDashboard($$parsedSource as Partial<AISettingsDashboard>);
+    }
+}
+
+export class AISettingsInput {
+    "default_provider_id": number | null;
+    "fallback_provider_id": number | null;
+    "interaction": AIInteractionSettings;
+    "search": AISearchSettingsInput;
+    "security": AISecuritySettings;
+
+    /** Creates a new AISettingsInput instance. */
+    constructor($$source: Partial<AISettingsInput> = {}) {
+        if (!("default_provider_id" in $$source)) {
+            this["default_provider_id"] = null;
+        }
+        if (!("fallback_provider_id" in $$source)) {
+            this["fallback_provider_id"] = null;
+        }
+        if (!("interaction" in $$source)) {
+            this["interaction"] = (new AIInteractionSettings());
+        }
+        if (!("search" in $$source)) {
+            this["search"] = (new AISearchSettingsInput());
+        }
+        if (!("security" in $$source)) {
+            this["security"] = (new AISecuritySettings());
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new AISettingsInput instance from a string or object.
+     */
+    static createFrom($$source: any = {}): AISettingsInput {
+        const $$createField2_0 = $$createType5;
+        const $$createField3_0 = $$createType11;
+        const $$createField4_0 = $$createType7;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("interaction" in $$parsedSource) {
+            $$parsedSource["interaction"] = $$createField2_0($$parsedSource["interaction"]);
+        }
+        if ("search" in $$parsedSource) {
+            $$parsedSource["search"] = $$createField3_0($$parsedSource["search"]);
+        }
+        if ("security" in $$parsedSource) {
+            $$parsedSource["security"] = $$createField4_0($$parsedSource["security"]);
+        }
+        return new AISettingsInput($$parsedSource as Partial<AISettingsInput>);
+    }
+}
+
 export class AboutInfo {
     "current_version": string;
     "repository_url": string;
@@ -489,7 +1293,7 @@ export class BulkAssetAssignmentInput {
      * Creates a new BulkAssetAssignmentInput instance from a string or object.
      */
     static createFrom($$source: any = {}): BulkAssetAssignmentInput {
-        const $$createField0_0 = $$createType0;
+        const $$createField0_0 = $$createType12;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("session_ids" in $$parsedSource) {
             $$parsedSource["session_ids"] = $$createField0_0($$parsedSource["session_ids"]);
@@ -522,8 +1326,8 @@ export class BulkTagUpdateInput {
      * Creates a new BulkTagUpdateInput instance from a string or object.
      */
     static createFrom($$source: any = {}): BulkTagUpdateInput {
-        const $$createField0_0 = $$createType0;
-        const $$createField1_0 = $$createType0;
+        const $$createField0_0 = $$createType12;
+        const $$createField1_0 = $$createType12;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("session_ids" in $$parsedSource) {
             $$parsedSource["session_ids"] = $$createField0_0($$parsedSource["session_ids"]);
@@ -1205,9 +2009,9 @@ export class Session {
      * Creates a new Session instance from a string or object.
      */
     static createFrom($$source: any = {}): Session {
-        const $$createField9_0 = $$createType2;
-        const $$createField10_0 = $$createType4;
-        const $$createField11_0 = $$createType6;
+        const $$createField9_0 = $$createType14;
+        const $$createField10_0 = $$createType16;
+        const $$createField11_0 = $$createType18;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("environment" in $$parsedSource) {
             $$parsedSource["environment"] = $$createField9_0($$parsedSource["environment"]);
@@ -1252,7 +2056,7 @@ export class SessionCSVExportOptions {
      * Creates a new SessionCSVExportOptions instance from a string or object.
      */
     static createFrom($$source: any = {}): SessionCSVExportOptions {
-        const $$createField0_0 = $$createType0;
+        const $$createField0_0 = $$createType12;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("session_ids" in $$parsedSource) {
             $$parsedSource["session_ids"] = $$createField0_0($$parsedSource["session_ids"]);
@@ -1304,8 +2108,8 @@ export class SessionCSVImportOptions {
      * Creates a new SessionCSVImportOptions instance from a string or object.
      */
     static createFrom($$source: any = {}): SessionCSVImportOptions {
-        const $$createField1_0 = $$createType7;
-        const $$createField2_0 = $$createType7;
+        const $$createField1_0 = $$createType19;
+        const $$createField2_0 = $$createType19;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("header_mapping" in $$parsedSource) {
             $$parsedSource["header_mapping"] = $$createField1_0($$parsedSource["header_mapping"]);
@@ -1388,7 +2192,7 @@ export class SessionCSVImportSummary {
      * Creates a new SessionCSVImportSummary instance from a string or object.
      */
     static createFrom($$source: any = {}): SessionCSVImportSummary {
-        const $$createField5_0 = $$createType9;
+        const $$createField5_0 = $$createType21;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("results" in $$parsedSource) {
             $$parsedSource["results"] = $$createField5_0($$parsedSource["results"]);
@@ -1421,8 +2225,8 @@ export class SessionCSVPreview {
      * Creates a new SessionCSVPreview instance from a string or object.
      */
     static createFrom($$source: any = {}): SessionCSVPreview {
-        const $$createField0_0 = $$createType10;
-        const $$createField1_0 = $$createType11;
+        const $$createField0_0 = $$createType4;
+        const $$createField1_0 = $$createType22;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("headers" in $$parsedSource) {
             $$parsedSource["headers"] = $$createField0_0($$parsedSource["headers"]);
@@ -1572,7 +2376,7 @@ export class SessionInput {
      * Creates a new SessionInput instance from a string or object.
      */
     static createFrom($$source: any = {}): SessionInput {
-        const $$createField9_0 = $$createType0;
+        const $$createField9_0 = $$createType12;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("tag_ids" in $$parsedSource) {
             $$parsedSource["tag_ids"] = $$createField9_0($$parsedSource["tag_ids"]);
@@ -1745,9 +2549,9 @@ export class SyncConfig {
      * Creates a new SyncConfig instance from a string or object.
      */
     static createFrom($$source: any = {}): SyncConfig {
-        const $$createField7_0 = $$createType12;
-        const $$createField8_0 = $$createType13;
-        const $$createField9_0 = $$createType14;
+        const $$createField7_0 = $$createType23;
+        const $$createField8_0 = $$createType24;
+        const $$createField9_0 = $$createType25;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("gist" in $$parsedSource) {
             $$parsedSource["gist"] = $$createField7_0($$parsedSource["gist"]);
@@ -1814,9 +2618,9 @@ export class SyncConfigInput {
      * Creates a new SyncConfigInput instance from a string or object.
      */
     static createFrom($$source: any = {}): SyncConfigInput {
-        const $$createField7_0 = $$createType15;
-        const $$createField8_0 = $$createType16;
-        const $$createField9_0 = $$createType17;
+        const $$createField7_0 = $$createType26;
+        const $$createField8_0 = $$createType27;
+        const $$createField9_0 = $$createType28;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("gist" in $$parsedSource) {
             $$parsedSource["gist"] = $$createField7_0($$parsedSource["gist"]);
@@ -1851,8 +2655,8 @@ export class SyncConflict {
      * Creates a new SyncConflict instance from a string or object.
      */
     static createFrom($$source: any = {}): SyncConflict {
-        const $$createField0_0 = $$createType18;
-        const $$createField1_0 = $$createType18;
+        const $$createField0_0 = $$createType29;
+        const $$createField1_0 = $$createType29;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("local" in $$parsedSource) {
             $$parsedSource["local"] = $$createField0_0($$parsedSource["local"]);
@@ -1914,12 +2718,12 @@ export class SyncDashboard {
      * Creates a new SyncDashboard instance from a string or object.
      */
     static createFrom($$source: any = {}): SyncDashboard {
-        const $$createField0_0 = $$createType19;
-        const $$createField4_0 = $$createType21;
-        const $$createField5_0 = $$createType22;
-        const $$createField6_0 = $$createType24;
-        const $$createField7_0 = $$createType25;
-        const $$createField8_0 = $$createType27;
+        const $$createField0_0 = $$createType30;
+        const $$createField4_0 = $$createType32;
+        const $$createField5_0 = $$createType33;
+        const $$createField6_0 = $$createType35;
+        const $$createField7_0 = $$createType36;
+        const $$createField8_0 = $$createType38;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("config" in $$parsedSource) {
             $$parsedSource["config"] = $$createField0_0($$parsedSource["config"]);
@@ -2077,7 +2881,7 @@ export class SyncResult {
      * Creates a new SyncResult instance from a string or object.
      */
     static createFrom($$source: any = {}): SyncResult {
-        const $$createField2_0 = $$createType24;
+        const $$createField2_0 = $$createType35;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("conflict" in $$parsedSource) {
             $$parsedSource["conflict"] = $$createField2_0($$parsedSource["conflict"]);
@@ -2257,7 +3061,7 @@ export class SystemInfo {
      * Creates a new SystemInfo instance from a string or object.
      */
     static createFrom($$source: any = {}): SystemInfo {
-        const $$createField17_0 = $$createType29;
+        const $$createField17_0 = $$createType40;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("interfaces" in $$parsedSource) {
             $$parsedSource["interfaces"] = $$createField17_0($$parsedSource["interfaces"]);
@@ -2422,9 +3226,9 @@ export class ThemeConfigurationInput {
      * Creates a new ThemeConfigurationInput instance from a string or object.
      */
     static createFrom($$source: any = {}): ThemeConfigurationInput {
-        const $$createField0_0 = $$createType30;
-        const $$createField1_0 = $$createType32;
-        const $$createField2_0 = $$createType33;
+        const $$createField0_0 = $$createType41;
+        const $$createField1_0 = $$createType43;
+        const $$createField2_0 = $$createType44;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("global_style" in $$parsedSource) {
             $$parsedSource["global_style"] = $$createField0_0($$parsedSource["global_style"]);
@@ -2584,7 +3388,7 @@ export class ThemeImportSummary {
      * Creates a new ThemeImportSummary instance from a string or object.
      */
     static createFrom($$source: any = {}): ThemeImportSummary {
-        const $$createField0_0 = $$createType35;
+        const $$createField0_0 = $$createType46;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("results" in $$parsedSource) {
             $$parsedSource["results"] = $$createField0_0($$parsedSource["results"]);
@@ -2657,7 +3461,7 @@ export class ThemeProfile {
      * Creates a new ThemeProfile instance from a string or object.
      */
     static createFrom($$source: any = {}): ThemeProfile {
-        const $$createField3_0 = $$createType37;
+        const $$createField3_0 = $$createType48;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("definition" in $$parsedSource) {
             $$parsedSource["definition"] = $$createField3_0($$parsedSource["definition"]);
@@ -2991,41 +3795,52 @@ export class WebDAVSyncConfigInput {
 }
 
 // Private type creation functions
-const $$createType0 = $Create.Array($Create.Any);
-const $$createType1 = AssetEnvironment.createFrom;
-const $$createType2 = $Create.Nullable($$createType1);
-const $$createType3 = AssetProject.createFrom;
-const $$createType4 = $Create.Nullable($$createType3);
-const $$createType5 = AssetTag.createFrom;
-const $$createType6 = $Create.Array($$createType5);
-const $$createType7 = $Create.Map($Create.Any, $Create.Any);
-const $$createType8 = SessionCSVImportResult.createFrom;
-const $$createType9 = $Create.Array($$createType8);
-const $$createType10 = $Create.Array($Create.Any);
-const $$createType11 = $Create.Array($$createType10);
-const $$createType12 = GistSyncConfig.createFrom;
-const $$createType13 = WebDAVSyncConfig.createFrom;
-const $$createType14 = S3SyncConfig.createFrom;
-const $$createType15 = GistSyncConfigInput.createFrom;
-const $$createType16 = WebDAVSyncConfigInput.createFrom;
-const $$createType17 = S3SyncConfigInput.createFrom;
-const $$createType18 = SyncRemoteVersion.createFrom;
-const $$createType19 = SyncConfig.createFrom;
-const $$createType20 = SyncVersion.createFrom;
-const $$createType21 = $Create.Nullable($$createType20);
-const $$createType22 = $Create.Nullable($$createType18);
-const $$createType23 = SyncConflict.createFrom;
-const $$createType24 = $Create.Nullable($$createType23);
-const $$createType25 = $Create.Array($$createType20);
-const $$createType26 = SyncEvent.createFrom;
-const $$createType27 = $Create.Array($$createType26);
-const $$createType28 = NetworkInterface.createFrom;
-const $$createType29 = $Create.Array($$createType28);
-const $$createType30 = TerminalGlobalStyleInput.createFrom;
-const $$createType31 = ThemeProfileInput.createFrom;
-const $$createType32 = $Create.Array($$createType31);
-const $$createType33 = ThemeAssignmentsInput.createFrom;
-const $$createType34 = ThemeImportResult.createFrom;
-const $$createType35 = $Create.Array($$createType34);
-const $$createType36 = ThemeDefinition.createFrom;
-const $$createType37 = $Create.Nullable($$createType36);
+const $$createType0 = AICommandProposal.createFrom;
+const $$createType1 = $Create.Array($$createType0);
+const $$createType2 = AICitation.createFrom;
+const $$createType3 = $Create.Array($$createType2);
+const $$createType4 = $Create.Array($Create.Any);
+const $$createType5 = AIInteractionSettings.createFrom;
+const $$createType6 = AISearchSettings.createFrom;
+const $$createType7 = AISecuritySettings.createFrom;
+const $$createType8 = AISettings.createFrom;
+const $$createType9 = AIProviderProfile.createFrom;
+const $$createType10 = $Create.Array($$createType9);
+const $$createType11 = AISearchSettingsInput.createFrom;
+const $$createType12 = $Create.Array($Create.Any);
+const $$createType13 = AssetEnvironment.createFrom;
+const $$createType14 = $Create.Nullable($$createType13);
+const $$createType15 = AssetProject.createFrom;
+const $$createType16 = $Create.Nullable($$createType15);
+const $$createType17 = AssetTag.createFrom;
+const $$createType18 = $Create.Array($$createType17);
+const $$createType19 = $Create.Map($Create.Any, $Create.Any);
+const $$createType20 = SessionCSVImportResult.createFrom;
+const $$createType21 = $Create.Array($$createType20);
+const $$createType22 = $Create.Array($$createType4);
+const $$createType23 = GistSyncConfig.createFrom;
+const $$createType24 = WebDAVSyncConfig.createFrom;
+const $$createType25 = S3SyncConfig.createFrom;
+const $$createType26 = GistSyncConfigInput.createFrom;
+const $$createType27 = WebDAVSyncConfigInput.createFrom;
+const $$createType28 = S3SyncConfigInput.createFrom;
+const $$createType29 = SyncRemoteVersion.createFrom;
+const $$createType30 = SyncConfig.createFrom;
+const $$createType31 = SyncVersion.createFrom;
+const $$createType32 = $Create.Nullable($$createType31);
+const $$createType33 = $Create.Nullable($$createType29);
+const $$createType34 = SyncConflict.createFrom;
+const $$createType35 = $Create.Nullable($$createType34);
+const $$createType36 = $Create.Array($$createType31);
+const $$createType37 = SyncEvent.createFrom;
+const $$createType38 = $Create.Array($$createType37);
+const $$createType39 = NetworkInterface.createFrom;
+const $$createType40 = $Create.Array($$createType39);
+const $$createType41 = TerminalGlobalStyleInput.createFrom;
+const $$createType42 = ThemeProfileInput.createFrom;
+const $$createType43 = $Create.Array($$createType42);
+const $$createType44 = ThemeAssignmentsInput.createFrom;
+const $$createType45 = ThemeImportResult.createFrom;
+const $$createType46 = $Create.Array($$createType45);
+const $$createType47 = ThemeDefinition.createFrom;
+const $$createType48 = $Create.Nullable($$createType47);

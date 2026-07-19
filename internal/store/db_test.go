@@ -78,6 +78,22 @@ func TestInitializeSchemaPreservesCurrentDatabaseFormat(t *testing.T) {
 	assertTableRowCount(t, rowCountExpectation{db: db, table: "session_folders", condition: "is_default = 1", expected: 1})
 }
 
+func TestInitializeSchemaAddsAITablesWithoutReset(t *testing.T) {
+	db, err := OpenDB(t.TempDir())
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, db.Close()) })
+	require.NoError(t, InitializeSchema(db))
+	_, err = db.Exec(`INSERT INTO sessions (folder_id, name, host, username, auth_method) SELECT id, 'sentinel', '127.0.0.1', 'root', 'agent' FROM session_folders WHERE is_default = 1`)
+	require.NoError(t, err)
+	for _, table := range []string{"ai_command_executions", "ai_messages", "ai_conversations", "ai_settings", "ai_provider_profiles"} {
+		_, err = db.Exec("DROP TABLE " + table)
+		require.NoError(t, err)
+	}
+	require.NoError(t, InitializeSchema(db))
+	assertTableRowCount(t, rowCountExpectation{db: db, table: "sessions", condition: "name = 'sentinel'", expected: 1})
+	assertSQLiteObjectCount(t, sqliteObjectCountExpectation{db: db, objectType: "table", name: "ai_provider_profiles", expected: 1})
+}
+
 func TestDatabaseFormatResetRollsBackOnFailure(t *testing.T) {
 	db, err := OpenDB(t.TempDir())
 	require.NoError(t, err)
