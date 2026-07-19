@@ -47,6 +47,11 @@ export const Dialogs = {
   OpenFile: async () => '' as string | string[],
 }
 
+export const Clipboard = {
+  SetText: async () => { throw new Error('native clipboard unavailable') },
+  Text: async () => { throw new Error('native clipboard unavailable') },
+}
+
 export function __registerHandler(name: string, fn: (...args: any[]) => Promise<any>) {
   handlers.set(name, fn)
 }
