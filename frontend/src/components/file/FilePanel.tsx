@@ -9,6 +9,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { FileListView } from '@/components/file/FileListView'
 import { FileTreeView, filterHiddenFiles } from '@/components/file/FileTreeView'
 import type { SFTPDefaultView } from '@/lib/sftpSettings'
+import { useToolPanelResize } from '@/hooks/useToolPanelResize'
 
 interface Props {
   open: boolean
@@ -54,9 +55,11 @@ export default function FilePanel({
   syncingCurrentDirectory,
 }: Props) {
   const state = useFilePanelState(defaultView, currentPath, onMakeDir)
+  const panel = useToolPanelResize('files')
   if (!open) return null
   return (
-    <aside id={dropTargetId} data-file-drop-target className="group/drop relative w-[340px] flex-shrink-0 flex flex-col border-l border-border bg-card file-drop-target-active:ring-2 file-drop-target-active:ring-inset file-drop-target-active:ring-primary">
+    <aside id={dropTargetId} data-file-drop-target style={panel.panelStyle} className="group/drop relative flex-shrink-0 flex flex-col border-l border-border bg-card file-drop-target-active:ring-2 file-drop-target-active:ring-inset file-drop-target-active:ring-primary">
+      <ToolPanelResizeHandle {...panel.resizeHandleProps} />
       <div className="pointer-events-none absolute inset-3 z-40 hidden place-items-center rounded-xl border-2 border-dashed border-primary bg-background/90 text-sm font-medium text-primary shadow-sm group-[.file-drop-target-active]/drop:grid">释放文件以上传到当前目录</div>
       <PanelHeader onClose={onClose} onSyncCurrentDirectory={onSyncCurrentDirectory} syncingCurrentDirectory={syncingCurrentDirectory} />
       <PathBar currentPath={currentPath} onNavigateUp={onNavigateUp} onNavigateTo={onNavigateTo} />
@@ -72,6 +75,10 @@ export default function FilePanel({
         onRename={onRename} onDelete={onDelete} onClearSelection={() => state.setSelected(null)} />
     </aside>
   )
+}
+
+function ToolPanelResizeHandle(props: ReturnType<typeof useToolPanelResize>['resizeHandleProps']) {
+  return <div {...props} className="absolute inset-y-0 -left-1 z-30 w-2 cursor-col-resize touch-none outline-none after:absolute after:inset-y-0 after:left-1/2 after:w-px after:-translate-x-1/2 after:bg-transparent hover:after:bg-primary/60 focus-visible:after:bg-primary active:after:bg-primary" />
 }
 
 function useFilePanelState(defaultView: SFTPDefaultView, currentPath: string, onMakeDir: (name: string) => void) {
