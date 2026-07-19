@@ -9,6 +9,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { TerminalBehaviorSettingsSection } from '@/components/settings/TerminalBehaviorSettings'
 import { ApplicationBehaviorSettingsSection } from '@/components/settings/ApplicationBehaviorSettings'
 import type { GeneralSettings } from '@/hooks/useSettings'
+import { isNativeWindowOpacitySupported, windowOpacitySupportMessage } from '@/lib/uiOpacity'
 
 const TERMINAL_TYPE_OPTIONS = ['xterm-256color', 'xterm', 'vt100', 'linux'].map((value) => ({ value, label: value }))
 
@@ -94,15 +95,29 @@ function UIFontSettings({ draft, systemFonts, onChange }: {
 
 function WindowOpacitySettings({ value, onChange }: { value: string; onChange: (value: string) => void }) {
   const opacity = parseInt(value, 10) || 100
+  const supported = isNativeWindowOpacitySupported()
+  const supportMessage = windowOpacitySupportMessage()
   return <section className="rounded-xl border border-border bg-card p-3 shadow-sm">
     <div className="mb-3 flex items-center gap-1.5">
-      <div><h3 className="text-sm font-medium text-foreground">应用透明度</h3><p className="mt-1 text-xs text-muted-foreground">调整整个应用窗口的显示透明度。</p></div>
-      <Tooltip><TooltipTrigger render={<button type="button" aria-label="透明度兼容性说明" className="grid size-6 place-items-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground" />}><CircleHelp className="size-3.5" /></TooltipTrigger><TooltipContent>部分桌面环境不支持窗口透明度合成显示。</TooltipContent></Tooltip>
+      <div>
+        <h3 className="text-sm font-medium text-foreground">窗口背景透明度</h3>
+        <p className="mt-1 text-xs text-muted-foreground">调整主窗口背景的不透明度，配合原生半透明窗口透出桌面。</p>
+      </div>
+      <Tooltip>
+        <TooltipTrigger render={<button type="button" aria-label="透明度兼容性说明" className="grid size-6 place-items-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground" />}>
+          <CircleHelp className="size-3.5" />
+        </TooltipTrigger>
+        <TooltipContent>{supportMessage}</TooltipContent>
+      </Tooltip>
     </div>
     <div className="grid grid-cols-[minmax(0,1fr)_6rem] items-center gap-3">
       <Slider aria-label="应用透明度" min={50} max={100} step={1} value={[opacity]} onValueChange={(next) => onChange(String(Array.isArray(next) ? next[0] : next))} />
-      <div className="relative"><Input aria-label="应用透明度百分比" type="number" min={50} max={100} value={value} className="pr-7" onChange={(event) => onChange(event.target.value)} /><span className="pointer-events-none absolute inset-y-0 right-2 flex items-center text-xs text-muted-foreground">%</span></div>
+      <div className="relative">
+        <Input aria-label="应用透明度百分比" type="number" min={50} max={100} value={value} className="pr-7" onChange={(event) => onChange(event.target.value)} />
+        <span className="pointer-events-none absolute inset-y-0 right-2 flex items-center text-xs text-muted-foreground">%</span>
+      </div>
     </div>
+    {!supported && <p role="status" className="mt-2 text-xs text-amber-600 dark:text-amber-400">{supportMessage}</p>}
   </section>
 }
 

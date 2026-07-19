@@ -205,7 +205,10 @@ func mainWindowOptions() application.WebviewWindowOptions {
 			Alpha: 0,
 		},
 		Mac: application.MacWindow{
-			Backdrop: application.MacBackdropTransparent,
+			Backdrop: application.MacBackdropTranslucent,
+		},
+		Windows: application.WindowsWindow{
+			BackdropType: application.Acrylic,
 		},
 		Linux: application.LinuxWindow{
 			WindowIsTranslucent: true,

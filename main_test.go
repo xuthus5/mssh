@@ -23,7 +23,8 @@ func TestMainWindowOptionsUseStableLinuxRendering(t *testing.T) {
 	assert.Equal(t, application.BackgroundTypeTranslucent, options.BackgroundType)
 	assert.Equal(t, uint8(0), options.BackgroundColour.Alpha)
 	assert.True(t, options.Linux.WindowIsTranslucent)
-	assert.Equal(t, application.MacBackdropTransparent, options.Mac.Backdrop)
+	assert.Equal(t, application.MacBackdropTranslucent, options.Mac.Backdrop)
+	assert.Equal(t, application.Acrylic, options.Windows.BackdropType)
 	assert.Equal(t, application.WebviewGpuPolicyNever, options.Linux.WebviewGpuPolicy)
 }
 

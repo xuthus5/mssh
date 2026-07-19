@@ -5,7 +5,7 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  --background: oklch(0.145 0 0);
+  --background: oklch(0.145 0 0 / var(--app-background-alpha));
   --foreground: oklch(0.985 0 0);
   --card: oklch(0.205 0 0);
   --card-foreground: oklch(0.985 0 0);
@@ -43,10 +43,11 @@
   --app-font-family: 'Geist Variable', sans-serif;
   --app-font-size: 14px;
   --app-opacity: 1;
+  --app-background-alpha: 1;
 }
 
 .light {
-  --background: oklch(0.985 0 0);
+  --background: oklch(0.985 0 0 / var(--app-background-alpha));
   --foreground: oklch(0.205 0 0);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.205 0 0);
@@ -113,10 +114,16 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-body {
+html,
+body,
+#root {
   margin: 0;
+  height: 100%;
+  background: transparent;
+}
+
+body {
   overflow: hidden;
-  opacity: var(--app-opacity);
 }
 
 @layer base {
