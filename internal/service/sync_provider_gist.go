@@ -57,7 +57,7 @@ func (g *gistSyncProvider) Test(ctx context.Context) error {
 	if g.gistID != "" {
 		path = "/gists/" + url.PathEscape(g.gistID)
 	}
-	response, err := g.do(ctx, http.MethodGet, path, nil, "")
+	response, err := g.do(ctx, http.MethodGet, path, nil)
 	if err != nil {
 		return err
 	}
@@ -69,7 +69,7 @@ func (g *gistSyncProvider) Fetch(ctx context.Context) (syncRemoteObject, error) 
 	if g.gistID == "" {
 		return syncRemoteObject{}, errSyncRemoteNotFound
 	}
-	response, err := g.do(ctx, http.MethodGet, "/gists/"+url.PathEscape(g.gistID), nil, "")
+	response, err := g.do(ctx, http.MethodGet, "/gists/"+url.PathEscape(g.gistID), nil)
 	if err != nil {
 		return syncRemoteObject{}, err
 	}
@@ -96,8 +96,18 @@ func (g *gistSyncProvider) Fetch(ctx context.Context) (syncRemoteObject, error) 
 }
 
 func (g *gistSyncProvider) Put(ctx context.Context, content []byte, etag string) (syncRemoteObject, error) {
-	body := map[string]any{"description": "MSSH encrypted backup", "public": false,
-		"files": map[string]any{syncBackupFileName: map[string]string{"content": string(content)}}}
+	if g.gistID != "" {
+		if err := g.ensureGistETag(ctx, etag); err != nil {
+			return syncRemoteObject{}, err
+		}
+	}
+	body := map[string]any{
+		"description": "MSSH encrypted backup",
+		"files":       map[string]any{syncBackupFileName: map[string]string{"content": string(content)}},
+	}
+	if g.gistID == "" {
+		body["public"] = false
+	}
 	encoded, err := json.Marshal(body)
 	if err != nil {
 		return syncRemoteObject{}, fmt.Errorf("encode GitHub Gist: %w", err)
@@ -106,7 +116,7 @@ func (g *gistSyncProvider) Put(ctx context.Context, content []byte, etag string)
 	if g.gistID != "" {
 		method, path = http.MethodPatch, "/gists/"+url.PathEscape(g.gistID)
 	}
-	response, err := g.do(ctx, method, path, bytes.NewReader(encoded), etag)
+	response, err := g.do(ctx, method, path, bytes.NewReader(encoded))
 	if err != nil {
 		return syncRemoteObject{}, err
 	}
@@ -115,7 +125,7 @@ func (g *gistSyncProvider) Put(ctx context.Context, content []byte, etag string)
 		return syncRemoteObject{}, errSyncConflict
 	}
 	if response.StatusCode != http.StatusOK && response.StatusCode != http.StatusCreated {
-		return syncRemoteObject{}, fmt.Errorf("update GitHub Gist returned %s", response.Status)
+		return syncRemoteObject{}, gistAPIError(response, "update GitHub Gist")
 	}
 	var gist gistResponse
 	if err := json.NewDecoder(io.LimitReader(response.Body, 1<<20)).Decode(&gist); err != nil {
@@ -123,6 +133,52 @@ func (g *gistSyncProvider) Put(ctx context.Context, content []byte, etag string)
 	}
 	g.gistID = gist.ID
 	return syncRemoteObject{Content: content, ETag: response.Header.Get("ETag"), ProviderID: gist.ID}, nil
+}
+
+func (g *gistSyncProvider) ensureGistETag(ctx context.Context, etag string) error {
+	if etag == "" {
+		return nil
+	}
+	response, err := g.do(ctx, http.MethodGet, "/gists/"+url.PathEscape(g.gistID), nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = response.Body.Close() }()
+	if response.StatusCode == http.StatusNotFound {
+		return errSyncRemoteNotFound
+	}
+	if err := expectHTTPStatus(response, http.StatusOK, "fetch GitHub Gist"); err != nil {
+		return err
+	}
+	current := response.Header.Get("ETag")
+	if current != "" && !etagEqual(current, etag) {
+		return errSyncConflict
+	}
+	return nil
+}
+
+func etagEqual(left, right string) bool {
+	return normalizeETag(left) == normalizeETag(right)
+}
+
+func normalizeETag(value string) string {
+	value = strings.TrimSpace(value)
+	if strings.HasPrefix(value, "W/") {
+		value = strings.TrimSpace(value[2:])
+	}
+	return strings.Trim(value, `"`)
+}
+
+func gistAPIError(response *http.Response, action string) error {
+	body, err := io.ReadAll(io.LimitReader(response.Body, 4<<10))
+	if err != nil {
+		return fmt.Errorf("%s returned %s", action, response.Status)
+	}
+	message := strings.TrimSpace(string(body))
+	if message == "" {
+		return fmt.Errorf("%s returned %s", action, response.Status)
+	}
+	return fmt.Errorf("%s returned %s: %s", action, response.Status, message)
 }
 
 func (g *gistSyncProvider) readGistFile(ctx context.Context, file gistFile) ([]byte, error) {
@@ -148,7 +204,7 @@ func (g *gistSyncProvider) readGistFile(ctx context.Context, file gistFile) ([]b
 	return readCloudBackup(response.Body)
 }
 
-func (g *gistSyncProvider) do(ctx context.Context, method, path string, body io.Reader, etag string) (*http.Response, error) {
+func (g *gistSyncProvider) do(ctx context.Context, method, path string, body io.Reader) (*http.Response, error) {
 	request, err := http.NewRequestWithContext(ctx, method, g.apiBase+path, body)
 	if err != nil {
 		return nil, err
@@ -158,9 +214,6 @@ func (g *gistSyncProvider) do(ctx context.Context, method, path string, body io.
 	request.Header.Set("X-GitHub-Api-Version", "2022-11-28")
 	if body != nil {
 		request.Header.Set("Content-Type", "application/json")
-	}
-	if etag != "" {
-		request.Header.Set("If-Match", etag)
 	}
 	response, err := g.client.Do(request)
 	if err != nil {
