@@ -20,6 +20,7 @@ const state = {
   batchConnect: vi.fn(async (ids: string[]) => ids.map((id) => ({ sessionId: id, name: id === '1' ? '生产服务器' : '测试服务器', success: id === '1' }))),
   batchExecuteMacro: vi.fn(async () => []),
   exportSessionsCSV: vi.fn(async () => ({ count: 0, included_passwords: false })),
+  previewSessionsCSV: vi.fn(async () => ({ headers: [], sample_rows: [], total_rows: 0 })),
   importSessionsCSV: vi.fn(async () => ({ total: 0, imported: 0, updated: 0, skipped: 0, failed: 0, results: [] })),
 }
 

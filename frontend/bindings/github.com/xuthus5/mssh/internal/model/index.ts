@@ -43,6 +43,7 @@ export {
     SessionCSVImportOptions,
     SessionCSVImportResult,
     SessionCSVImportSummary,
+    SessionCSVPreview,
     SessionDeleteImpact,
     SessionFolder,
     SessionInput,
