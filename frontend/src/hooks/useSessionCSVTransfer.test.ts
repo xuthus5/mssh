@@ -33,11 +33,35 @@ describe('useSessionCSVTransfer', () => {
     const { result } = renderHook(() => useSessionCSVTransfer({ refreshFolders, refreshAssets }))
 
     await act(async () => {
-      expect(await result.current.importSessionsCSV('/tmp/sessions.csv', SessionCSVConflictPolicy.SessionCSVConflictOverwrite)).toEqual(expect.objectContaining({ imported: 1 }))
+      expect(await result.current.importSessionsCSV({
+        path: '/tmp/sessions.csv',
+        conflictPolicy: SessionCSVConflictPolicy.SessionCSVConflictOverwrite,
+        headerMapping: { name: 'Session' },
+        defaultValues: { port: '22' },
+      })).toEqual(expect.objectContaining({ imported: 1 }))
     })
 
-    expect(handler).toHaveBeenCalledWith('/tmp/sessions.csv', { conflict_policy: 'overwrite' })
+    expect(handler).toHaveBeenCalledWith('/tmp/sessions.csv', {
+      conflict_policy: 'overwrite', header_mapping: { name: 'Session' }, default_values: { port: '22' },
+    })
     expect(refreshFolders).toHaveBeenCalledOnce()
     expect(refreshAssets).toHaveBeenCalledOnce()
+  })
+
+  it('previews external csv headers without refreshing workspace data', async () => {
+    const preview = { headers: ['Session', 'Host'], sample_rows: [['server', '10.0.0.1']], total_rows: 1 }
+    const handler = vi.fn(async () => preview)
+    __registerHandler(service + 'PreviewCSV', handler)
+    const refreshFolders = vi.fn(async () => {})
+    const refreshAssets = vi.fn(async () => {})
+    const { result } = renderHook(() => useSessionCSVTransfer({ refreshFolders, refreshAssets }))
+
+    await act(async () => {
+      expect(await result.current.previewSessionsCSV('/tmp/external.csv')).toEqual(expect.objectContaining({ total_rows: 1 }))
+    })
+
+    expect(handler).toHaveBeenCalledWith('/tmp/external.csv')
+    expect(refreshFolders).not.toHaveBeenCalled()
+    expect(refreshAssets).not.toHaveBeenCalled()
   })
 })

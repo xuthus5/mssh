@@ -1,6 +1,6 @@
 import { useCallback } from 'react'
 import { SessionService } from '@/lib/wails'
-import type { SessionCSVConflictPolicy, SessionCSVExportResult, SessionCSVImportSummary } from '../../bindings/github.com/xuthus5/mssh/internal/model/models'
+import type { SessionCSVConflictPolicy, SessionCSVExportResult, SessionCSVImportSummary, SessionCSVPreview } from '../../bindings/github.com/xuthus5/mssh/internal/model/models'
 
 interface Refreshers {
   refreshFolders: () => Promise<unknown>
@@ -13,6 +13,13 @@ export interface SessionCSVExportRequest {
   includePasswords: boolean
 }
 
+export interface SessionCSVImportRequest {
+  path: string
+  conflictPolicy: SessionCSVConflictPolicy
+  headerMapping: Record<string, string>
+  defaultValues: Record<string, string>
+}
+
 export function useSessionCSVTransfer(refreshers: Refreshers) {
   const exportSessionsCSV = useCallback(async (request: SessionCSVExportRequest): Promise<SessionCSVExportResult> => {
     return SessionService.ExportCSV(request.path, {
@@ -21,11 +28,19 @@ export function useSessionCSVTransfer(refreshers: Refreshers) {
     })
   }, [])
 
-  const importSessionsCSV = useCallback(async (path: string, conflictPolicy: SessionCSVConflictPolicy): Promise<SessionCSVImportSummary> => {
-    const summary = await SessionService.ImportCSV(path, { conflict_policy: conflictPolicy })
+  const previewSessionsCSV = useCallback(async (path: string): Promise<SessionCSVPreview> => {
+    return SessionService.PreviewCSV(path)
+  }, [])
+
+  const importSessionsCSV = useCallback(async (request: SessionCSVImportRequest): Promise<SessionCSVImportSummary> => {
+    const summary = await SessionService.ImportCSV(request.path, {
+      conflict_policy: request.conflictPolicy,
+      header_mapping: request.headerMapping,
+      default_values: request.defaultValues,
+    })
     await Promise.all([refreshers.refreshFolders(), refreshers.refreshAssets()])
     return summary
   }, [refreshers.refreshAssets, refreshers.refreshFolders])
 
-  return { exportSessionsCSV, importSessionsCSV }
+  return { exportSessionsCSV, previewSessionsCSV, importSessionsCSV }
 }

@@ -108,9 +108,15 @@ export function MoveSession(id: number, newFolderID: number | null): $Cancellabl
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.SessionService.MoveSession", id, newFolderID);
 }
 
+export function PreviewCSV(path: string): $CancellablePromise<model$0.SessionCSVPreview> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.SessionService.PreviewCSV", path).then(($result: any) => {
+        return $$createType12($result);
+    });
+}
+
 export function SessionDeleteImpact(id: number): $CancellablePromise<model$0.SessionDeleteImpact | null> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.SessionService.SessionDeleteImpact", id).then(($result: any) => {
-        return $$createType13($result);
+        return $$createType14($result);
     });
 }
 
@@ -139,5 +145,6 @@ const $$createType8 = $Create.Array($$createType0);
 const $$createType9 = model$0.HostKeyEntry.createFrom;
 const $$createType10 = $Create.Array($$createType9);
 const $$createType11 = $Create.Array($$createType2);
-const $$createType12 = model$0.SessionDeleteImpact.createFrom;
-const $$createType13 = $Create.Nullable($$createType12);
+const $$createType12 = model$0.SessionCSVPreview.createFrom;
+const $$createType13 = model$0.SessionDeleteImpact.createFrom;
+const $$createType14 = $Create.Nullable($$createType13);

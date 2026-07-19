@@ -19,6 +19,14 @@ type SessionCSVExportResult struct {
 
 type SessionCSVImportOptions struct {
 	ConflictPolicy SessionCSVConflictPolicy `json:"conflict_policy"`
+	HeaderMapping  map[string]string        `json:"header_mapping,omitempty"`
+	DefaultValues  map[string]string        `json:"default_values,omitempty"`
+}
+
+type SessionCSVPreview struct {
+	Headers    []string   `json:"headers"`
+	SampleRows [][]string `json:"sample_rows"`
+	TotalRows  int        `json:"total_rows"`
 }
 
 type SessionCSVImportResult struct {

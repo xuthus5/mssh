@@ -1,12 +1,9 @@
 package service
 
 import (
-	"encoding/csv"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
-	"os"
 	"strconv"
 	"strings"
 	"unicode/utf8"
@@ -32,7 +29,7 @@ func (s *SessionService) ImportCSV(path string, options model.SessionCSVImportOp
 	if err := validateSessionCSVConflictPolicy(options.ConflictPolicy); err != nil {
 		return summary, fmt.Errorf("import session csv: %w", err)
 	}
-	rows, err := readSessionCSV(path)
+	rows, err := readSessionCSV(path, options)
 	if err != nil {
 		return summary, fmt.Errorf("import session csv: %w", err)
 	}
@@ -86,36 +83,20 @@ func validateSessionCSVConflictPolicy(policy model.SessionCSVConflictPolicy) err
 	return nil
 }
 
-func readSessionCSV(path string) ([]parsedSessionCSVRow, error) {
-	file, err := os.Open(path)
+func readSessionCSV(path string, options model.SessionCSVImportOptions) ([]parsedSessionCSVRow, error) {
+	records, err := readSessionCSVRecords(path)
 	if err != nil {
 		return nil, err
 	}
-	defer func() { _ = file.Close() }()
-	content, err := io.ReadAll(io.LimitReader(file, maxSessionCSVBytes+1))
-	if err != nil {
-		return nil, err
-	}
-	if len(content) > maxSessionCSVBytes {
-		return nil, fmt.Errorf("session csv exceeds %d bytes", maxSessionCSVBytes)
-	}
-	if !utf8.Valid(content) {
-		return nil, errors.New("session csv is not valid UTF-8")
-	}
-	reader := csv.NewReader(strings.NewReader(strings.TrimPrefix(string(content), "\ufeff")))
-	records, err := reader.ReadAll()
-	if err != nil {
-		return nil, fmt.Errorf("parse csv: %w", err)
-	}
-	if len(records) == 0 {
-		return nil, errors.New("csv is empty")
+	if len(options.HeaderMapping) > 0 || len(options.DefaultValues) > 0 {
+		records, err = mapSessionCSVRecords(records, options.HeaderMapping, options.DefaultValues)
+		if err != nil {
+			return nil, err
+		}
 	}
 	columns, err := sessionCSVColumns(records[0])
 	if err != nil {
 		return nil, err
-	}
-	if len(records)-1 > maxSessionCSVRows {
-		return nil, fmt.Errorf("session csv exceeds %d rows", maxSessionCSVRows)
 	}
 	rows := make([]parsedSessionCSVRow, 0, len(records)-1)
 	for index, values := range records[1:] {
@@ -157,7 +138,7 @@ func parseSessionCSVRecord(row int, columns map[string]int, values []string) (se
 	record.Name = strings.TrimSpace(value("name"))
 	record.Host = strings.TrimSpace(value("host"))
 	record.Username = strings.TrimSpace(value("username"))
-	record.AuthMethod = model.AuthMethod(strings.TrimSpace(value("auth_method")))
+	record.AuthMethod = normalizeSessionCSVAuthMethod(value("auth_method"))
 	record.Password = value("password")
 	record.KeyName = strings.TrimSpace(value("key_name"))
 	record.KeyPublicKey = strings.TrimSpace(value("key_public_key"))
@@ -174,16 +155,51 @@ func parseSessionCSVRecord(row int, columns map[string]int, values []string) (se
 	if err != nil {
 		return record, fmt.Errorf("row %d: %w", row, err)
 	}
-	if err := json.Unmarshal([]byte(value("folder_path")), &record.FolderPath); err != nil {
+	if record.FolderPath, err = parseSessionCSVList(value("folder_path"), "/\\"); err != nil {
 		return record, fmt.Errorf("row %d: invalid folder_path: %w", row, err)
 	}
-	if err := json.Unmarshal([]byte(value("tags")), &record.Tags); err != nil {
+	if record.Tags, err = parseSessionCSVList(value("tags"), ",;|"); err != nil {
 		return record, fmt.Errorf("row %d: invalid tags: %w", row, err)
 	}
 	if err := validateSessionCSVRecord(record); err != nil {
 		return record, fmt.Errorf("row %d: %w", row, err)
 	}
 	return record, nil
+}
+
+func parseSessionCSVList(value, separators string) ([]string, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return []string{}, nil
+	}
+	var result []string
+	if strings.HasPrefix(value, "[") {
+		if err := json.Unmarshal([]byte(value), &result); err != nil {
+			return nil, err
+		}
+		return result, nil
+	}
+	result = strings.FieldsFunc(value, func(char rune) bool { return strings.ContainsRune(separators, char) })
+	for index := range result {
+		result[index] = strings.TrimSpace(result[index])
+	}
+	return result, nil
+}
+
+func normalizeSessionCSVAuthMethod(value string) model.AuthMethod {
+	normalized := strings.ToLower(strings.NewReplacer("_", " ", "-", " ").Replace(strings.TrimSpace(value)))
+	switch normalized {
+	case "password", "pass", "pwd":
+		return model.AuthPassword
+	case "key", "public key", "private key", "publickey":
+		return model.AuthKey
+	case "agent", "ssh agent":
+		return model.AuthAgent
+	case "keyboard interactive", "keyboardinteractive":
+		return model.AuthKeyboardInteractive
+	default:
+		return model.AuthMethod(strings.TrimSpace(value))
+	}
 }
 
 func parseSessionCSVInteger(name, value string, minimum, maximum int) (int, error) {
