@@ -5,6 +5,7 @@ import { logger } from '@/lib/logger'
 import { toast } from '@/components/ui/toast'
 import { KeyType } from '../../bindings/github.com/xuthus5/mssh/internal/model/models'
 import { settingEntry, useGeneralSettings } from '@/hooks/useGeneralSettings'
+import { useSFTPSettings } from '@/hooks/useSFTPSettings'
 
 export type { GeneralSettings } from '@/hooks/useGeneralSettings'
 
@@ -196,12 +197,14 @@ export function useSettings() {
   const keys = useKeySettings()
   const sync = useSyncSettings()
   const config = useConfigTransfer()
+  const sftp = useSFTPSettings()
   const systemFonts = useSystemFonts()
   return {
     ...general,
     ...keys,
     ...sync,
     ...config,
+    sftpSettings: sftp.settings, saveSFTPSettings: sftp.save,
     systemFonts,
   }
 }

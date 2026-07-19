@@ -51,6 +51,8 @@ function settingsProps() {
     onSelectKeyImportFile: vi.fn(async () => undefined),
     onExportConfig: vi.fn(),
     onImportConfig: vi.fn(),
+    sftpSettings: { showHiddenFiles: false, followTerminalDirectory: false, defaultView: 'list' as const },
+    onSaveSFTPSettings: vi.fn(async () => {}),
   }
 }
 
@@ -66,6 +68,24 @@ describe('SettingsView', () => {
     expect(screen.queryByRole('tab', { name: '外观' })).not.toBeInTheDocument()
     expect(screen.queryByRole('tab', { name: '分组' })).not.toBeInTheDocument()
     expect(screen.queryByRole('tab', { name: '密钥' })).not.toBeInTheDocument()
+  })
+
+  it('exposes the SFTP file management settings', async () => {
+    const props = settingsProps()
+    const user = userEvent.setup()
+    render(<SettingsView {...props} />)
+
+    await user.click(screen.getByRole('tab', { name: 'SFTP' }))
+    await user.click(screen.getByRole('switch', { name: '显示隐藏文件' }))
+    await user.click(screen.getByRole('switch', { name: '追随终端目录' }))
+    await user.click(screen.getByRole('button', { name: '树状视图' }))
+    await user.click(screen.getByRole('button', { name: '保存 SFTP 设置' }))
+
+    expect(props.onSaveSFTPSettings).toHaveBeenCalledWith({
+      showHiddenFiles: true,
+      followTerminalDirectory: true,
+      defaultView: 'tree',
+    })
   })
 
   it('passes the built-in theme reset action to the terminal editor', async () => {

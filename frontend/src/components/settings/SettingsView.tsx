@@ -6,6 +6,8 @@ import { ThemeManager } from '@/components/settings/ThemeManager'
 import { SyncPanel } from '@/components/settings/SyncPanel'
 import { AboutPanel } from '@/components/settings/AboutPanel'
 import { SecurityPanel } from '@/components/settings/SecurityPanel'
+import { SFTPSettingsPanel } from '@/components/settings/SFTPSettingsPanel'
+import type { SFTPSettings } from '@/hooks/useSFTPSettings'
 import type { GeneralSettings } from '@/hooks/useSettings'
 import type { CloudSyncController } from '@/hooks/useCloudSyncCenter'
 import type { ColorMode } from '@/lib/effectiveTerminalTheme'
@@ -31,6 +33,8 @@ export interface SettingsViewProps {
   onResetBuiltinThemes: () => Promise<BuiltinThemeResetResult>
   onExportConfig: () => void
   onImportConfig: () => void
+  sftpSettings: SFTPSettings
+  onSaveSFTPSettings: (settings: SFTPSettings) => Promise<void>
 }
 
 function SettingsTabPanels(props: SettingsViewProps) {
@@ -39,6 +43,7 @@ function SettingsTabPanels(props: SettingsViewProps) {
     <TabsContent value="terminal" className="min-h-0 min-w-0 overflow-y-auto overscroll-contain pr-2"><div className="flex flex-col gap-5"><ThemeEditor profiles={props.themeProfiles} assignments={props.themeAssignments} globalStyle={props.terminalGlobalStyle} colorMode={props.colorMode} onSave={props.onSaveThemeConfiguration} onResetBuiltins={props.onResetBuiltinThemes} /><ThemeManager profiles={props.themeProfiles} onImport={props.onImportThemes} onCreateProfile={props.onCreateThemeProfile} onUpdateProfile={props.onUpdateThemeProfile} onDeleteProfile={props.onDeleteThemeProfile} onDeleteDefinition={props.onDeleteThemeDefinition} /></div></TabsContent>
     <TabsContent value="sync" className="min-h-0 min-w-0 overflow-y-auto overscroll-contain pr-2"><SyncPanel controller={props.cloudSync} onExport={props.onExportConfig} onImport={props.onImportConfig} /></TabsContent>
     <TabsContent value="security" className="min-h-0 min-w-0 overflow-y-auto overscroll-contain pr-2"><SecurityPanel /></TabsContent>
+    <TabsContent value="sftp" className="min-h-0 min-w-0 overflow-y-auto overscroll-contain pr-2"><SFTPSettingsPanel settings={props.sftpSettings} onSave={props.onSaveSFTPSettings} /></TabsContent>
     <TabsContent value="about" className="min-h-0 min-w-0 overflow-y-auto overscroll-contain pr-2"><AboutPanel /></TabsContent>
   </>
 }
@@ -52,6 +57,7 @@ export function SettingsView(props: SettingsViewProps) {
       <TabsTrigger value="terminal">终端</TabsTrigger>
       <TabsTrigger value="sync">同步</TabsTrigger>
       <TabsTrigger value="security">安全</TabsTrigger>
+      <TabsTrigger value="sftp">SFTP</TabsTrigger>
       <TabsTrigger value="about">关于</TabsTrigger>
     </TabsList>
     <SettingsTabPanels {...props} />

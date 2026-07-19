@@ -13,6 +13,7 @@ const observerDisconnects: Array<ReturnType<typeof vi.fn>> = []
 const outputUnsubscribes: Array<ReturnType<typeof vi.fn>> = []
 const parserHandlers: Array<(params: Array<number | number[]>) => boolean> = []
 const parserDisposes: Array<ReturnType<typeof vi.fn>> = []
+const oscDisposes: Array<ReturnType<typeof vi.fn>> = []
 const themeUnsubscribes: Array<ReturnType<typeof vi.fn>> = []
 const selectionDisposes: Array<ReturnType<typeof vi.fn>> = []
 const animationFrames: FrameRequestCallback[] = []
@@ -66,6 +67,11 @@ vi.mock('@xterm/xterm', () => ({
         parserHandlers.push(handler)
         const dispose = vi.fn()
         parserDisposes.push(dispose)
+        return { dispose }
+      }),
+      registerOscHandler: vi.fn(() => {
+        const dispose = vi.fn()
+        oscDisposes.push(dispose)
         return { dispose }
       }),
     }
@@ -156,6 +162,7 @@ describe('useTerminal', () => {
     outputUnsubscribes.length = 0
     parserHandlers.length = 0
     parserDisposes.length = 0
+    oscDisposes.length = 0
     themeUnsubscribes.length = 0
     selectionDisposes.length = 0
     animationFrames.length = 0
@@ -206,6 +213,7 @@ describe('useTerminal', () => {
     expect(selectionDisposes[0]).toHaveBeenCalledOnce()
     expect(parserDisposes[0]).toHaveBeenCalledOnce()
     expect(parserDisposes[1]).toHaveBeenCalledOnce()
+    expect(oscDisposes[0]).toHaveBeenCalledOnce()
     expect(calls.at(-1)).toBe('dispose')
   })
 
