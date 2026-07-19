@@ -14,29 +14,47 @@ import (
 func TestGistProviderCreatesFetchesAndProtectsUpdates(t *testing.T) {
 	var content string
 	etag := `"v1"`
+	var lastPatchBody map[string]any
+	var lastPatchHadIfMatch bool
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		assert.Equal(t, "Bearer token", request.Header.Get("Authorization"))
 		switch {
 		case request.Method == http.MethodGet && request.URL.Path == "/user":
 			writer.WriteHeader(http.StatusOK)
 		case request.Method == http.MethodPost && request.URL.Path == "/gists":
-			var body struct {
-				Files map[string]struct {
-					Content string `json:"content"`
-				} `json:"files"`
-			}
+			var body map[string]any
 			require.NoError(t, json.NewDecoder(request.Body).Decode(&body))
-			content = body.Files[syncBackupFileName].Content
+			assert.Equal(t, false, body["public"])
+			files, ok := body["files"].(map[string]any)
+			require.True(t, ok)
+			file, ok := files[syncBackupFileName].(map[string]any)
+			require.True(t, ok)
+			content, _ = file["content"].(string)
 			writer.Header().Set("ETag", etag)
 			_ = json.NewEncoder(writer).Encode(gistResponse{ID: "gist-1"})
 		case request.Method == http.MethodGet && request.URL.Path == "/gists/gist-1":
 			writer.Header().Set("ETag", etag)
 			_ = json.NewEncoder(writer).Encode(gistResponse{ID: "gist-1", Files: map[string]gistFile{syncBackupFileName: {Content: content}}})
 		case request.Method == http.MethodPatch && request.URL.Path == "/gists/gist-1":
-			if request.Header.Get("If-Match") != etag {
-				writer.WriteHeader(http.StatusPreconditionFailed)
+			lastPatchHadIfMatch = request.Header.Get("If-Match") != ""
+			require.NoError(t, json.NewDecoder(request.Body).Decode(&lastPatchBody))
+			// 模拟真实 GitHub：PATCH 不支持 If-Match / public，否则 400。
+			if lastPatchHadIfMatch {
+				writer.WriteHeader(http.StatusBadRequest)
+				_, _ = writer.Write([]byte(`{"message":"Invalid request"}`))
 				return
 			}
+			if _, hasPublic := lastPatchBody["public"]; hasPublic {
+				writer.WriteHeader(http.StatusBadRequest)
+				_, _ = writer.Write([]byte(`{"message":"Invalid request"}`))
+				return
+			}
+			files, ok := lastPatchBody["files"].(map[string]any)
+			require.True(t, ok)
+			file, ok := files[syncBackupFileName].(map[string]any)
+			require.True(t, ok)
+			content, _ = file["content"].(string)
+			writer.Header().Set("ETag", `"v2"`)
 			_ = json.NewEncoder(writer).Encode(gistResponse{ID: "gist-1"})
 		default:
 			writer.WriteHeader(http.StatusNotFound)
@@ -53,8 +71,34 @@ func TestGistProviderCreatesFetchesAndProtectsUpdates(t *testing.T) {
 	fetched, err := provider.Fetch(t.Context())
 	require.NoError(t, err)
 	assert.Equal(t, []byte("backup"), fetched.Content)
-	_, err = provider.Put(t.Context(), []byte("next"), `"stale"`)
+
+	updated, err := provider.Put(t.Context(), []byte("next"), etag)
+	require.NoError(t, err)
+	assert.Equal(t, `"v2"`, updated.ETag)
+	assert.False(t, lastPatchHadIfMatch)
+	_, hasPublic := lastPatchBody["public"]
+	assert.False(t, hasPublic)
+	assert.Equal(t, "next", content)
+
+	_, err = provider.Put(t.Context(), []byte("stale"), `"stale"`)
 	assert.ErrorIs(t, err, errSyncConflict)
+}
+
+func TestNormalizeETagAndGistAPIError(t *testing.T) {
+	assert.True(t, etagEqual(`"abc"`, `W/"abc"`))
+	assert.Equal(t, "abc", normalizeETag(` W/"abc" `))
+
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.WriteHeader(http.StatusBadRequest)
+		_, _ = writer.Write([]byte(`{"message":"Invalid request"}`))
+	}))
+	defer server.Close()
+	provider, err := newGistSyncProvider(server.Client(), server.URL, "gist-1", "token")
+	require.NoError(t, err)
+	_, err = provider.Put(t.Context(), []byte("backup"), "")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "400")
+	assert.Contains(t, err.Error(), "Invalid request")
 }
 
 func TestWebDAVProviderUsesFixedBackupFile(t *testing.T) {
