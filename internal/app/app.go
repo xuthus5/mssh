@@ -33,6 +33,7 @@ type App struct {
 	Font           *service.FontService
 	Audit          *service.AuditService
 	AssetCatalog   *service.AssetCatalogService
+	AI             *service.AIService
 	logger         *slog.Logger
 	shutdownOnce   sync.Once
 }
@@ -187,6 +188,7 @@ func initializeServices(input serviceInitialization) (*App, error) {
 		Font:           service.NewFontService(input.logger),
 		Audit:          service.NewAuditService(input.db, input.logger),
 		AssetCatalog:   service.NewAssetCatalogService(input.db, input.logger),
+		AI:             service.NewAIService(input.db, terminalSvc, input.keychain, input.logger),
 		logger:         input.logger,
 	}, nil
 }

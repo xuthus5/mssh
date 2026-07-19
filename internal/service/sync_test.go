@@ -97,6 +97,16 @@ func TestSyncServiceStrictlyRejectsOldOrIncompleteFormats(t *testing.T) {
 	assert.ErrorContains(t, decodeSnapshot(content, &decoded), "snapshot table session_tags is required")
 }
 
+func TestSyncSnapshotExcludesAIData(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	data, err := NewSyncService(db, testutil.NewTestLogger()).snapshot()
+	require.NoError(t, err)
+	for _, table := range []string{"ai_provider_profiles", "ai_settings", "ai_conversations", "ai_messages", "ai_command_executions"} {
+		_, included := data.Tables[table]
+		assert.False(t, included, "AI table %s must stay local", table)
+	}
+}
+
 func TestSyncServiceRequiresMasterKey(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	path := filepath.Join(t.TempDir(), "backup.msshbackup")
