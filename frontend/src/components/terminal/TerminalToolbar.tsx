@@ -1,5 +1,5 @@
 import { useCallback, useState, type Dispatch, type SetStateAction } from 'react'
-import { Activity, ChevronDown, Circle, ClipboardPaste, Columns2, Copy, FolderOpen, History, Network, PenLine, Rows2, Search, Split, Square, Trash2 } from 'lucide-react'
+import { Activity, Bot, ChevronDown, Circle, ClipboardPaste, Columns2, Copy, FolderOpen, History, Network, PenLine, Rows2, Search, Split, Square, Trash2 } from 'lucide-react'
 import SessionLog from '@/components/terminal/SessionLog'
 import TunnelDialog from '@/components/session/TunnelDialog'
 import { useTunnelManager } from '@/hooks/useTunnelManager'
@@ -28,6 +28,7 @@ interface TerminalToolbarProps {
   onToggleCompose?: () => void
   onOpenHistory?: () => void
   onOpenSystem?: () => void
+  onOpenAI?: () => void
 }
 
 interface ToolbarTerminal {
@@ -163,6 +164,7 @@ interface ToolbarActionsProps extends Pick<TerminalToolbarProps, 'sessionId' | '
   onOpenTunnels: () => void
   onOpenHistory: () => void
   onOpenSystem: () => void
+  onOpenAI: () => void
 }
 
 function ToolbarActions(props: ToolbarActionsProps) {
@@ -181,6 +183,7 @@ function ToolbarActions(props: ToolbarActionsProps) {
       onClick={props.onToggleCompose} title={props.composeOpen ? '关闭撰写面板' : '撰写终端内容'}>
       <PenLine className="h-3 w-3" /><span className="hidden sm:inline">撰写</span>
     </button>
+    <button type="button" className={actionClass} onClick={props.onOpenAI} title="AI 运维"><Bot className="h-3 w-3" /><span className="hidden sm:inline">AI</span></button>
     <button type="button" className={actionClass} onClick={props.onOpenTunnels} title="隧道管理">
       <Network className="h-3 w-3" /><span className="hidden sm:inline">隧道</span>
     </button>
@@ -207,7 +210,7 @@ export function TerminalToolbar(props: TerminalToolbarProps) {
   }, [sessionLogBlocked])
   return <div className="relative flex h-8 flex-shrink-0 items-center gap-1 bg-muted/30 px-2">
     <span className="text-xs text-muted-foreground truncate mr-2">{props.hostname ?? 'Terminal'}</span>
-    <ToolbarActions {...props} onOpenSystem={props.onOpenSystem ?? (() => {})} onOpenHistory={props.onOpenHistory ?? (() => {})} onOpenTunnels={() => { setTunnelOpen(true); void tunnels.load() }} clipboard={clipboard} logOpen={showSessionLog} setLogOpen={setShowSessionLog}
+    <ToolbarActions {...props} onOpenSystem={props.onOpenSystem ?? (() => {})} onOpenHistory={props.onOpenHistory ?? (() => {})} onOpenAI={props.onOpenAI ?? (() => {})} onOpenTunnels={() => { setTunnelOpen(true); void tunnels.load() }} clipboard={clipboard} logOpen={showSessionLog} setLogOpen={setShowSessionLog}
       setLogBlocked={setSessionLogBlocked} onLogOpenChange={handleSessionLogOpenChange} />
     <TunnelDialog open={tunnelOpen} onOpenChange={setTunnelOpen} tunnels={tunnels.tunnels}
       onStart={tunnels.start} onStop={tunnels.stop} sessionId={String(props.sessionId)} />

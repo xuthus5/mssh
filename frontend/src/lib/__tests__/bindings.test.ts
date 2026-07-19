@@ -6,6 +6,7 @@ import {
   KeyService,
   SettingService,
   AuditService,
+  AIService,
   TunnelService,
   MacroService,
   ThemeService,
@@ -54,6 +55,12 @@ describe('Generated Bindings Barrel', () => {
     expect(AuditService).toBeDefined()
     expect(typeof AuditService.List).toBe('function')
     expect(typeof AuditService.SetEnabled).toBe('function')
+  })
+
+  it('exports AIService', () => {
+    expect(AIService).toBeDefined()
+    expect(typeof AIService.Dashboard).toBe('function')
+    expect(typeof AIService.Chat).toBe('function')
   })
 
   it('exports TunnelService', () => {
