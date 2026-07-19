@@ -29,6 +29,7 @@ describe('ThemeEditor dual mode profiles', () => {
     const tabs = screen.getByRole('tablist', { name: '预览模式' })
     expect(tabs.closest('[data-slot="card-header"]')).toHaveTextContent('实时终端预览')
     expect(tabs).toHaveAttribute('data-orientation', 'horizontal')
+    expect(tabs).toHaveClass('flex-row')
     expect(screen.getByRole('tab', { name: 'Dark Mode' })).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: 'Light Mode' })).toBeInTheDocument()
   })

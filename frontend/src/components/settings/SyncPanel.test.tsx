@@ -18,6 +18,8 @@ describe('SyncPanel', () => {
     render(<SyncPanel controller={sync} onExport={vi.fn()} onImport={vi.fn()} />)
     expect(screen.queryByRole('tab', { name: '云同步提供商' })).not.toBeInTheDocument()
     await userEvent.click(screen.getByRole('switch', { name: '启用云同步' }))
+    expect(screen.getByRole('tablist')).toHaveAttribute('data-orientation', 'horizontal')
+    expect(screen.getByRole('tablist')).toHaveClass('flex-row')
     expect(screen.getByRole('tab', { name: '云同步提供商' })).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: '同步状态与配置' })).toBeInTheDocument()
   })
