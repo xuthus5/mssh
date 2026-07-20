@@ -1567,43 +1567,6 @@ export class MacroInput {
     }
 }
 
-export class NativeTransparencyStatus {
-    "supported": boolean;
-    "active": boolean;
-    "platform": string;
-    "reason": string;
-    "requires_restart": boolean;
-
-    /** Creates a new NativeTransparencyStatus instance. */
-    constructor($$source: Partial<NativeTransparencyStatus> = {}) {
-        if (!("supported" in $$source)) {
-            this["supported"] = false;
-        }
-        if (!("active" in $$source)) {
-            this["active"] = false;
-        }
-        if (!("platform" in $$source)) {
-            this["platform"] = "";
-        }
-        if (!("reason" in $$source)) {
-            this["reason"] = "";
-        }
-        if (!("requires_restart" in $$source)) {
-            this["requires_restart"] = false;
-        }
-
-        Object.assign(this, $$source);
-    }
-
-    /**
-     * Creates a new NativeTransparencyStatus instance from a string or object.
-     */
-    static createFrom($$source: any = {}): NativeTransparencyStatus {
-        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
-        return new NativeTransparencyStatus($$parsedSource as Partial<NativeTransparencyStatus>);
-    }
-}
-
 export class NetworkInterface {
     "name": string;
     "received_bytes": number;

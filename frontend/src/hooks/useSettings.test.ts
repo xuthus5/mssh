@@ -21,7 +21,6 @@ describe('useSettings', () => {
     useTerminalBehaviorStore.setState(DEFAULT_TERMINAL_BEHAVIOR)
     document.documentElement.style.removeProperty('--app-font-family')
     document.documentElement.style.removeProperty('--app-font-size')
-    delete document.documentElement.dataset.nativeTransparency
 
     __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.Get', async (key: string) => _settings[key] === undefined ? null : ({ key, namespace: key.split('.')[0], value: _settings[key], value_type: 'string', version: 1, updated_at: '' }))
     __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.GetMany', async (keys: string[]) => Object.fromEntries(keys.filter((key) => _settings[key] !== undefined).map((key) => [key, { key, namespace: key.split('.')[0], value: _settings[key], value_type: 'string', version: 1, updated_at: '' }])))
@@ -30,7 +29,6 @@ describe('useSettings', () => {
     __registerHandler('github.com/xuthus5/mssh/internal/service.KeyService.List', async () => [])
     __registerHandler('github.com/xuthus5/mssh/internal/service.TerminalService.SetMaxSize', async () => {})
     __registerHandler('github.com/xuthus5/mssh/internal/service.FontService.List', async () => ['Arial', 'Segoe UI'])
-    __registerHandler('github.com/xuthus5/mssh/internal/service.WindowAppearanceService.GetStatus', async () => ({ supported: false, active: false, platform: 'linux', reason: '不支持', requires_restart: true }))
   })
 
   it('loads default general settings', async () => {
@@ -42,7 +40,6 @@ describe('useSettings', () => {
     expect(result.current.general.uiFontFamily).toBe('Geist Variable')
     expect(result.current.general.uiFontFallbackFamily).toBe('sans-serif')
     expect(result.current.general.uiFontSize).toBe(14)
-    expect(result.current.general.nativeTransparency).toBe(false)
     expect(result.current.general.rightClickAction).toBe('menu')
     expect(result.current.general.copyOnSelect).toBe(false)
     expect(result.current.general.closeButtonAction).toBe('tray')
@@ -52,7 +49,7 @@ describe('useSettings', () => {
   it('saves general settings and updates state', async () => {
     const { result } = renderHook(() => useSettings())
     await act(async () => {
-      await result.current.saveGeneral({ maxPoolSize: 32, defaultKeepAlive: 120, defaultTermType: 'xterm', uiFontFamily: 'Segoe UI', uiFontFallbackFamily: 'Microsoft YaHei', uiFontSize: 16, nativeTransparency: true, rightClickAction: 'paste', copyOnSelect: true, closeButtonAction: 'exit' })
+      await result.current.saveGeneral({ maxPoolSize: 32, defaultKeepAlive: 120, defaultTermType: 'xterm', uiFontFamily: 'Segoe UI', uiFontFallbackFamily: 'Microsoft YaHei', uiFontSize: 16, rightClickAction: 'paste', copyOnSelect: true, closeButtonAction: 'exit' })
     })
     expect(result.current.general.maxPoolSize).toBe(32)
     expect(result.current.general.defaultKeepAlive).toBe(120)
@@ -60,14 +57,12 @@ describe('useSettings', () => {
     expect(result.current.general.uiFontFamily).toBe('Segoe UI')
     expect(result.current.general.uiFontFallbackFamily).toBe('Microsoft YaHei')
     expect(result.current.general.uiFontSize).toBe(16)
-    expect(result.current.general.nativeTransparency).toBe(true)
     expect(result.current.general.rightClickAction).toBe('paste')
     expect(result.current.general.copyOnSelect).toBe(true)
     expect(result.current.general.closeButtonAction).toBe('exit')
     expect(writtenSettings).toContainEqual(expect.objectContaining({ key: 'appearance.ui_font_family', value: '"Segoe UI"' }))
     expect(writtenSettings).toContainEqual(expect.objectContaining({ key: 'appearance.ui_font_fallback_family', value: '"Microsoft YaHei"' }))
     expect(writtenSettings).toContainEqual(expect.objectContaining({ key: 'appearance.ui_font_size', value: '16' }))
-    expect(writtenSettings).toContainEqual(expect.objectContaining({ key: 'appearance.native_transparency', value: 'true' }))
     expect(writtenSettings).toContainEqual(expect.objectContaining({ key: 'terminal.right_click_action', value: '"paste"' }))
     expect(writtenSettings).toContainEqual(expect.objectContaining({ key: 'terminal.copy_on_select', value: 'true' }))
     expect(writtenSettings).toContainEqual(expect.objectContaining({ key: 'application.close_button_action', value: '"exit"' }))
@@ -80,7 +75,6 @@ describe('useSettings', () => {
     _settings['appearance.ui_font_family'] = '"Arial"'
     _settings['appearance.ui_font_fallback_family'] = '"Segoe UI"'
     _settings['appearance.ui_font_size'] = '18'
-    _settings['appearance.native_transparency'] = 'true'
     _settings['terminal.right_click_action'] = '"paste"'
     _settings['terminal.copy_on_select'] = 'true'
     _settings['application.close_button_action'] = '"exit"'
@@ -91,7 +85,6 @@ describe('useSettings', () => {
     expect(result.current.general.uiFontFamily).toBe('Arial')
     expect(result.current.general.uiFontFallbackFamily).toBe('Segoe UI')
     expect(result.current.general.uiFontSize).toBe(18)
-    expect(result.current.general.nativeTransparency).toBe(true)
     expect(result.current.general.rightClickAction).toBe('paste')
     expect(result.current.general.copyOnSelect).toBe(true)
     expect(result.current.general.closeButtonAction).toBe('exit')

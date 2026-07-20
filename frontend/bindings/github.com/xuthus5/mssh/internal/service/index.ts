@@ -17,7 +17,6 @@ import * as SyncService from "./syncservice.js";
 import * as TerminalService from "./terminalservice.js";
 import * as ThemeService from "./themeservice.js";
 import * as TunnelService from "./tunnelservice.js";
-import * as WindowAppearanceService from "./windowappearanceservice.js";
 export {
     AIService,
     AboutService,
@@ -34,6 +33,5 @@ export {
     SyncService,
     TerminalService,
     ThemeService,
-    TunnelService,
-    WindowAppearanceService
+    TunnelService
 };

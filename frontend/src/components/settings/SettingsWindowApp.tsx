@@ -14,7 +14,6 @@ function settingsViewProps(
 ): SettingsViewProps {
   return {
     general: settings.general, systemFonts: settings.systemFonts, cloudSync,
-    transparencyStatus: settings.transparencyStatus,
     themeProfiles: catalog.profiles, themeAssignments: catalog.assignments, terminalGlobalStyle: catalog.globalStyle,
     colorMode: catalog.colorMode, onSaveGeneral: settings.saveGeneral, onPreviewUIFont: settings.previewUIFont,
     onSaveThemeConfiguration: catalog.saveConfiguration,
