@@ -142,8 +142,16 @@ jobs:
           if-no-files-found: error
 
   darwin:
-    name: macOS universal
-    runs-on: macos-latest
+    name: macOS (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm64
+            runner: macos-14
+          - arch: amd64
+            runner: macos-15-intel
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -167,23 +175,25 @@ jobs:
             sed -i.bak "s/0\.1\.0/${VERSION}/g" "$f"
             rm -f "${f}.bak"
           done
-      - name: Build universal app
+      - name: Build macOS app
         env:
           APP_VERSION: ${{ steps.version.outputs.version }}
           CGO_ENABLED: 1
         run: |
-          wails3 task darwin:package:universal APP_VERSION=${APP_VERSION}
+          # Build natively for the runner architecture to avoid brittle CGO cross-compile.
+          wails3 task darwin:package ARCH=${{ matrix.arch }} PRODUCTION=true APP_VERSION=${APP_VERSION}
       - name: Collect artifacts
         run: |
           VERSION="${{ steps.version.outputs.version }}"
+          ARCH="${{ matrix.arch }}"
           mkdir -p dist
           if [ -d "bin/mssh.app" ]; then
-            ditto -c -k --sequesterRsrc --keepParent "bin/mssh.app" "dist/mssh-${VERSION}-darwin-universal.app.zip"
+            ditto -c -k --sequesterRsrc --keepParent "bin/mssh.app" "dist/mssh-${VERSION}-darwin-${ARCH}.app.zip"
           fi
           ls -la bin dist || true
       - uses: actions/upload-artifact@v4
         with:
-          name: darwin-universal
+          name: darwin-${{ matrix.arch }}
           path: dist/*
           if-no-files-found: error
 
@@ -205,6 +215,10 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
           files: upload/*
           generate_release_notes: true
           fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
