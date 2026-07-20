@@ -8,9 +8,11 @@ import {
 
 describe('uiOpacity', () => {
   beforeEach(() => {
+    window.history.replaceState({}, '', '/')
     document.documentElement.style.removeProperty('--app-opacity')
     document.documentElement.style.removeProperty('--app-background-alpha')
     delete document.documentElement.dataset.windowOpacity
+    delete document.documentElement.dataset.windowRole
   })
 
   it('clamps opacity to the supported range', () => {
@@ -25,6 +27,18 @@ describe('uiOpacity', () => {
     expect(document.documentElement.style.getPropertyValue('--app-opacity')).toBe('0.82')
     expect(document.documentElement.style.getPropertyValue('--app-background-alpha')).toBe('0.82')
     expect(document.documentElement.dataset.windowOpacity).toBe('82')
+    expect(document.documentElement.dataset.windowRole).toBe('main')
+  })
+
+  it('keeps the settings window background opaque while previewing the main window', () => {
+    window.history.replaceState({}, '', '/?window=settings')
+
+    applyWindowOpacity(64)
+
+    expect(document.documentElement.style.getPropertyValue('--app-opacity')).toBe('0.64')
+    expect(document.documentElement.style.getPropertyValue('--app-background-alpha')).toBe('1')
+    expect(document.documentElement.dataset.windowOpacity).toBe('64')
+    expect(document.documentElement.dataset.windowRole).toBe('settings')
   })
 
   it('reports native support only for windows and mac', () => {

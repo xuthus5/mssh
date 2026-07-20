@@ -3,6 +3,7 @@ export const MIN_WINDOW_OPACITY = 50
 export const MAX_WINDOW_OPACITY = 100
 
 export type WindowOpacityPlatform = 'windows' | 'mac' | 'linux' | 'other'
+type ApplicationWindowRole = 'main' | 'settings'
 
 export function clampWindowOpacity(opacity: number): number {
   if (!Number.isFinite(opacity)) return DEFAULT_WINDOW_OPACITY
@@ -13,9 +14,15 @@ export function applyWindowOpacity(opacity: number) {
   const clamped = clampWindowOpacity(opacity)
   const alpha = (clamped / 100).toString()
   const root = document.documentElement
+  const windowRole = detectApplicationWindowRole()
   root.style.setProperty('--app-opacity', alpha)
-  root.style.setProperty('--app-background-alpha', alpha)
+  root.style.setProperty('--app-background-alpha', windowRole === 'settings' ? '1' : alpha)
   root.dataset.windowOpacity = String(clamped)
+  root.dataset.windowRole = windowRole
+}
+
+function detectApplicationWindowRole(): ApplicationWindowRole {
+  return new URLSearchParams(window.location.search).get('window') === 'settings' ? 'settings' : 'main'
 }
 
 export function detectWindowOpacityPlatform(): WindowOpacityPlatform {
