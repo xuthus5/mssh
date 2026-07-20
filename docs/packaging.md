@@ -8,7 +8,7 @@ Release packaging is driven by Wails v3 Taskfiles under `build/` and GitHub Acti
 
 - Linux amd64/arm64: binary, deb, rpm, AppImage
 - Windows amd64/arm64: exe, NSIS installer
-- macOS: universal `.app` zip
+- macOS: arm64 + amd64 `.app` zip (native runners)
 
 Flatpak is intentionally out of scope for the first packaging pass.
 

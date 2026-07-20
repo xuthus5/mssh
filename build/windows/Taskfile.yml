@@ -3,6 +3,11 @@ version: '3'
 includes:
   common: ../Taskfile.yml
 
+vars:
+  APP_NAME: '{{.APP_NAME | default "mssh"}}'
+  BIN_DIR: '{{.BIN_DIR | default "bin"}}'
+  ROOT_DIR: '{{.ROOT_DIR | default "."}}'
+
 tasks:
   build:
     summary: Builds the application for Windows
