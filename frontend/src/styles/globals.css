@@ -5,11 +5,11 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  --background: oklch(0.145 0 0 / var(--app-background-alpha));
+  --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0 / var(--app-background-alpha));
+  --card: oklch(0.205 0 0);
   --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0 / var(--app-background-alpha));
+  --popover: oklch(0.205 0 0);
   --popover-foreground: oklch(0.985 0 0);
   --primary: oklch(0.922 0 0);
   --primary-foreground: oklch(0.205 0 0);
@@ -29,7 +29,7 @@
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
   --radius: 0.625rem;
-  --sidebar: oklch(0.205 0 0 / var(--app-background-alpha));
+  --sidebar: oklch(0.205 0 0);
   --sidebar-foreground: oklch(0.985 0 0);
   --sidebar-primary: oklch(0.488 0.243 264.376);
   --sidebar-primary-foreground: oklch(0.985 0 0);
@@ -42,16 +42,14 @@
   --scrollbar-thumb-hover: color-mix(in oklch, var(--muted-foreground) 68%, transparent);
   --app-font-family: 'Geist Variable', sans-serif;
   --app-font-size: 14px;
-  --app-opacity: 1;
-  --app-background-alpha: 1;
 }
 
 .light {
-  --background: oklch(0.985 0 0 / var(--app-background-alpha));
+  --background: oklch(0.985 0 0);
   --foreground: oklch(0.205 0 0);
-  --card: oklch(1 0 0 / var(--app-background-alpha));
+  --card: oklch(1 0 0);
   --card-foreground: oklch(0.205 0 0);
-  --popover: oklch(1 0 0 / var(--app-background-alpha));
+  --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.205 0 0);
   --primary: oklch(0.269 0 0);
   --primary-foreground: oklch(0.985 0 0);
@@ -64,7 +62,7 @@
   --border: oklch(0.85 0 0);
   --input: oklch(0.82 0 0);
   --ring: oklch(0.556 0 0);
-  --sidebar: oklch(0.97 0 0 / var(--app-background-alpha));
+  --sidebar: oklch(0.97 0 0);
   --sidebar-foreground: oklch(0.205 0 0);
   --sidebar-accent: oklch(0.92 0 0);
   --sidebar-accent-foreground: oklch(0.205 0 0);
@@ -114,15 +112,8 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-html,
-body,
-#root {
-  margin: 0;
-  height: 100%;
-  background: transparent;
-}
-
 body {
+  margin: 0;
   overflow: hidden;
 }
 
@@ -131,12 +122,30 @@ body {
     @apply border-border outline-ring/50;
   }
   body {
-    @apply text-foreground;
+    @apply bg-background text-foreground;
   }
   html {
     @apply font-sans;
     font-size: var(--app-font-size);
   }
+}
+
+html[data-native-transparency='active'] {
+  --background: oklch(0.145 0 0 / 68%);
+  --card: oklch(0.205 0 0 / 78%);
+  --sidebar: oklch(0.205 0 0 / 76%);
+}
+
+html.light[data-native-transparency='active'] {
+  --background: oklch(0.985 0 0 / 72%);
+  --card: oklch(1 0 0 / 82%);
+  --sidebar: oklch(0.97 0 0 / 80%);
+}
+
+html[data-native-transparency='active'] body,
+html[data-native-transparency='active'] #root,
+html[data-native-transparency='active'] .mssh-main-window {
+  background: transparent;
 }
 
 * {
