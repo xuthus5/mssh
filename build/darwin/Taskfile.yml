@@ -3,6 +3,10 @@ version: '3'
 includes:
   common: ../Taskfile.yml
 
+vars:
+  APP_NAME: '{{.APP_NAME | default "mssh"}}'
+  BIN_DIR: '{{.BIN_DIR | default "bin"}}'
+
 tasks:
   build:
     summary: Creates a production build of the application
@@ -39,13 +43,17 @@ tasks:
         vars:
           ARCH: amd64
           OUTPUT: "{{.BIN_DIR}}/{{.APP_NAME}}-amd64"
+          PRODUCTION: '{{.PRODUCTION | default "true"}}'
+          APP_VERSION: '{{.APP_VERSION | default "0.1.0"}}'
       - task: build
         vars:
           ARCH: arm64
           OUTPUT: "{{.BIN_DIR}}/{{.APP_NAME}}-arm64"
+          PRODUCTION: '{{.PRODUCTION | default "true"}}'
+          APP_VERSION: '{{.APP_VERSION | default "0.1.0"}}'
     cmds:
       - lipo -create -output "{{.BIN_DIR}}/{{.APP_NAME}}" "{{.BIN_DIR}}/{{.APP_NAME}}-amd64" "{{.BIN_DIR}}/{{.APP_NAME}}-arm64"
-      - rm "{{.BIN_DIR}}/{{.APP_NAME}}-amd64" "{{.BIN_DIR}}/{{.APP_NAME}}-arm64"
+      - rm -f "{{.BIN_DIR}}/{{.APP_NAME}}-amd64" "{{.BIN_DIR}}/{{.APP_NAME}}-arm64"
 
   package:
     summary: Packages a production build of the application into a `.app` bundle
@@ -53,6 +61,8 @@ tasks:
       - task: build
         vars:
           PRODUCTION: "true"
+          APP_VERSION: '{{.APP_VERSION | default "0.1.0"}}'
+          ARCH: '{{.ARCH | default ARCH}}'
     cmds:
       - task: create:app:bundle
 
@@ -60,6 +70,9 @@ tasks:
     summary: Packages darwin universal binary (arm64 + amd64)
     deps:
       - task: build:universal
+        vars:
+          PRODUCTION: "true"
+          APP_VERSION: '{{.APP_VERSION | default "0.1.0"}}'
     cmds:
       - task: create:app:bundle
 
@@ -70,7 +83,7 @@ tasks:
       - mkdir -p {{.BIN_DIR}}/{{.APP_NAME}}.app/Contents/{MacOS,Resources}
       - cp build/darwin/icons.icns {{.BIN_DIR}}/{{.APP_NAME}}.app/Contents/Resources
       - cp {{.BIN_DIR}}/{{.APP_NAME}} {{.BIN_DIR}}/{{.APP_NAME}}.app/Contents/MacOS
-      - cp build/darwin/Info.plist {{.BIN_DIR}}/{{.APP_NAME}}.app/Contents
+      - cp build/darwin/Info.plist {{.BIN_DIR}}/{{.APP_NAME}}.app/Contents/Info.plist
       - codesign --force --deep --sign - {{.BIN_DIR}}/{{.APP_NAME}}.app
 
   run:
