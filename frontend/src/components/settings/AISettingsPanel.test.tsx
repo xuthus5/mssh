@@ -7,7 +7,9 @@ describe('AISettingsPanel', () => {
   it('uses horizontal tabs and saves interaction changes', async () => {
     const controller = aiController()
     render(<AISettingsPanel controller={controller as never} />)
-    expect(screen.getByRole('tablist')).toHaveAttribute('data-orientation', 'horizontal')
+    const tablist = screen.getByRole('tablist')
+    expect(tablist).toHaveAttribute('data-orientation', 'horizontal')
+    expect(tablist).toHaveClass('mssh-tab-strip-scroll', 'overflow-x-auto', 'overflow-y-hidden')
     const user = userEvent.setup()
     await user.click(screen.getByRole('tab', { name: '交互配置' }))
     const width = screen.getByLabelText('面板宽度')
