@@ -6,7 +6,8 @@ coverage.html
 .superpowers/
 .worktrees/
 frontend/node_modules/
-frontend/dist/
+frontend/dist/**
+!frontend/dist/placeholder.txt
 *.msshlog
 *.log
 build/linux/appimage/build/
