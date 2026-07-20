@@ -1,19 +1,18 @@
 import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react'
 import { Events } from '@wailsio/runtime'
-import { SettingService, TerminalService, WindowAppearanceService } from '@/lib/wails'
+import { SettingService, TerminalService } from '@/lib/wails'
 import { useAppStore } from '@/store/appStore'
 import { logger } from '@/lib/logger'
 import { toast } from '@/components/ui/toast'
 import type { Setting, SettingInput } from '../../bindings/github.com/xuthus5/mssh/internal/model/models'
 import { applyUIFont, clampUIFontSize, DEFAULT_UI_FONT_FALLBACK_FAMILY, DEFAULT_UI_FONT_FAMILY, DEFAULT_UI_FONT_SIZE, normalizeUIFontFallbackFamily, normalizeUIFontFamily } from '@/lib/uiFont'
-import { applyNativeTransparencyStatus, DEFAULT_NATIVE_TRANSPARENCY_STATUS, type NativeTransparencyStatus } from '@/lib/nativeTransparency'
 import { normalizeCopyOnSelect, normalizeTerminalRightClickAction, useTerminalBehaviorStore, type TerminalRightClickAction } from '@/store/terminalBehaviorStore'
 import { SETTINGS_GENERAL_CHANGED_EVENT, SETTINGS_GENERAL_PREVIEW_EVENT, SETTINGS_PREVIEW_CANCELLED_EVENT } from '@/lib/settingsWindowEvents'
 
 const generalSettingKeys = [
   'terminal.max_pool_size', 'terminal.default_keep_alive', 'terminal.default_term_type',
   'terminal.right_click_action', 'terminal.copy_on_select', 'appearance.ui_font_family',
-  'appearance.ui_font_fallback_family', 'appearance.ui_font_size', 'appearance.native_transparency',
+  'appearance.ui_font_fallback_family', 'appearance.ui_font_size',
   'application.close_button_action',
 ]
 
@@ -26,7 +25,6 @@ export interface GeneralSettings {
   uiFontFamily: string
   uiFontFallbackFamily: string
   uiFontSize: number
-  nativeTransparency: boolean
   rightClickAction: TerminalRightClickAction
   copyOnSelect: boolean
   closeButtonAction: CloseButtonAction
@@ -43,7 +41,7 @@ interface EventEnvelope<T> { data?: T }
 const defaultGeneralSettings: GeneralSettings = {
   maxPoolSize: 10, defaultKeepAlive: 60, defaultTermType: 'xterm-256color',
   uiFontFamily: DEFAULT_UI_FONT_FAMILY, uiFontFallbackFamily: DEFAULT_UI_FONT_FALLBACK_FAMILY,
-  uiFontSize: DEFAULT_UI_FONT_SIZE, nativeTransparency: false,
+  uiFontSize: DEFAULT_UI_FONT_SIZE,
   rightClickAction: 'menu', copyOnSelect: false,
   closeButtonAction: 'tray',
 }
@@ -70,7 +68,6 @@ function normalizeGeneral(settings: GeneralSettings): GeneralSettings {
     uiFontFamily,
     uiFontFallbackFamily: normalizeUIFontFallbackFamily(settings.uiFontFallbackFamily, uiFontFamily),
     uiFontSize: clampUIFontSize(settings.uiFontSize),
-    nativeTransparency: settings.nativeTransparency === true,
     rightClickAction: normalizeTerminalRightClickAction(settings.rightClickAction),
     copyOnSelect: normalizeCopyOnSelect(settings.copyOnSelect),
     closeButtonAction: normalizeCloseButtonAction(settings.closeButtonAction),
@@ -87,7 +84,6 @@ function parseGeneral(settings: { [_ in string]?: Setting }): GeneralSettings {
     copyOnSelect: settingValue(settings, 'terminal.copy_on_select', false),
     uiFontFamily, uiFontFallbackFamily: settingValue(settings, 'appearance.ui_font_fallback_family', DEFAULT_UI_FONT_FALLBACK_FAMILY),
     uiFontSize: settingValue(settings, 'appearance.ui_font_size', DEFAULT_UI_FONT_SIZE),
-    nativeTransparency: settingValue(settings, 'appearance.native_transparency', false),
     closeButtonAction: settingValue(settings, 'application.close_button_action', 'tray'),
   })
 }
@@ -118,7 +114,6 @@ async function persistGeneral(settings: GeneralSettings) {
     settingEntry('terminal.default_term_type', settings.defaultTermType), settingEntry('terminal.right_click_action', settings.rightClickAction),
     settingEntry('terminal.copy_on_select', settings.copyOnSelect), settingEntry('appearance.ui_font_family', settings.uiFontFamily),
     settingEntry('appearance.ui_font_fallback_family', settings.uiFontFallbackFamily), settingEntry('appearance.ui_font_size', settings.uiFontSize),
-    settingEntry('appearance.native_transparency', settings.nativeTransparency),
     settingEntry('application.close_button_action', settings.closeButtonAction),
   ]), TerminalService.SetMaxSize(settings.maxPoolSize)])
 }
@@ -139,7 +134,6 @@ function useGeneralEvents(load: () => Promise<void>, setGeneral: Dispatch<SetSta
 
 export function useGeneralSettings() {
   const [general, setGeneral] = useState<GeneralSettings>(defaultGeneralSettings)
-  const [transparencyStatus, setTransparencyStatus] = useState<NativeTransparencyStatus>(DEFAULT_NATIVE_TRANSPARENCY_STATUS)
   const revision = useRef(0)
   const loadGeneral = useCallback(async () => {
     const currentRevision = revision.current
@@ -150,16 +144,6 @@ export function useGeneralSettings() {
       setGeneral(loaded)
     } catch (error) {
       logger.debug('loadGeneral error', error)
-    }
-  }, [])
-  const loadTransparencyStatus = useCallback(async () => {
-    try {
-      const status = await WindowAppearanceService.GetStatus()
-      applyNativeTransparencyStatus(status)
-      setTransparencyStatus(status)
-    } catch (error) {
-      logger.debug('load native transparency status error', error)
-      applyNativeTransparencyStatus(DEFAULT_NATIVE_TRANSPARENCY_STATUS)
     }
   }, [])
   const saveGeneral = useCallback(async (settings: GeneralSettings) => {
@@ -183,7 +167,7 @@ export function useGeneralSettings() {
     applyPreview(preview)
     emitSettingsEvent(SETTINGS_GENERAL_PREVIEW_EVENT, preview)
   }, [])
-  useEffect(() => { void Promise.all([loadGeneral(), loadTransparencyStatus()]) }, [loadGeneral, loadTransparencyStatus])
+  useEffect(() => { void loadGeneral() }, [loadGeneral])
   useGeneralEvents(loadGeneral, setGeneral)
-  return { general, transparencyStatus, saveGeneral, previewUIFont, reloadGeneral: loadGeneral }
+  return { general, saveGeneral, previewUIFont, reloadGeneral: loadGeneral }
 }

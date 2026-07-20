@@ -1,15 +1,11 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { CircleHelp } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { LabeledSelect } from '@/components/ui/labeled-select'
 import { SearchableSelect } from '@/components/ui/searchable-select'
-import { Switch } from '@/components/ui/switch'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { TerminalBehaviorSettingsSection } from '@/components/settings/TerminalBehaviorSettings'
 import { ApplicationBehaviorSettingsSection } from '@/components/settings/ApplicationBehaviorSettings'
 import type { GeneralSettings } from '@/hooks/useSettings'
-import type { NativeTransparencyStatus } from '@/lib/nativeTransparency'
 
 const TERMINAL_TYPE_OPTIONS = ['xterm-256color', 'xterm', 'vt100', 'linux'].map((value) => ({ value, label: value }))
 
@@ -20,7 +16,6 @@ interface GeneralDraft {
   uiFontFamily: string
   uiFontFallbackFamily: string
   uiFontSize: string
-  nativeTransparency: boolean
   rightClickAction: GeneralSettings['rightClickAction']
   copyOnSelect: boolean
   closeButtonAction: GeneralSettings['closeButtonAction']
@@ -31,7 +26,6 @@ interface Props {
   systemFonts: string[]
   onSave: (settings: GeneralSettings) => Promise<void>
   onPreviewUIFont: (fontFamily: string, fallbackFamily: string, fontSize: number) => void
-  transparencyStatus: NativeTransparencyStatus
 }
 
 function createDraft(general: GeneralSettings): GeneralDraft {
@@ -39,7 +33,7 @@ function createDraft(general: GeneralSettings): GeneralDraft {
     maxPoolSize: String(general.maxPoolSize), defaultKeepAlive: String(general.defaultKeepAlive),
     defaultTermType: general.defaultTermType, uiFontFamily: general.uiFontFamily,
     uiFontFallbackFamily: general.uiFontFallbackFamily, uiFontSize: String(general.uiFontSize),
-    nativeTransparency: general.nativeTransparency, rightClickAction: general.rightClickAction,
+    rightClickAction: general.rightClickAction,
     copyOnSelect: general.copyOnSelect,
     closeButtonAction: general.closeButtonAction,
   }
@@ -93,34 +87,7 @@ function UIFontSettings({ draft, systemFonts, onChange }: {
   </section>
 }
 
-function NativeTransparencySettings({ enabled, status, onChange }: { enabled: boolean; status: NativeTransparencyStatus; onChange: (enabled: boolean) => void }) {
-  const canEnable = status.supported || enabled
-  return <section className="rounded-xl border border-border bg-card p-3 shadow-sm">
-    <div className="mb-3 flex items-center gap-1.5">
-      <div>
-        <h3 className="text-sm font-medium text-foreground">原生透明背景</h3>
-        <p className="mt-1 text-xs text-muted-foreground">使用 Wails 原生窗口参数启用 Acrylic 或 macOS 半透明背景。</p>
-      </div>
-      <Tooltip>
-        <TooltipTrigger render={<button type="button" aria-label="透明度兼容性说明" className="grid size-6 place-items-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground" />}>
-          <CircleHelp className="size-3.5" />
-        </TooltipTrigger>
-        <TooltipContent>{status.reason}</TooltipContent>
-      </Tooltip>
-    </div>
-    <div className="flex items-center justify-between gap-3 rounded-lg border border-border/70 bg-background/40 px-3 py-2">
-      <div>
-        <p className="text-sm font-medium">启用原生透明窗口</p>
-        <p className="mt-1 text-xs text-muted-foreground">保存后重启应用生效，不支持百分比透明度。</p>
-      </div>
-      <Switch aria-label="启用原生透明窗口" checked={enabled} disabled={!canEnable} onCheckedChange={onChange} />
-    </div>
-    {!status.supported && <p role="status" className="mt-2 text-xs text-amber-600 dark:text-amber-400">当前环境无法启用原生透明窗口：{status.reason}</p>}
-    {status.supported && <p role="status" className="mt-2 text-xs text-muted-foreground">{status.active ? '本次启动已使用原生透明窗口。' : '当前窗口未启用透明背景，保存后重启即可应用。'}</p>}
-  </section>
-}
-
-export function GeneralSettingsPanel({ general, systemFonts, onSave, onPreviewUIFont, transparencyStatus }: Props) {
+export function GeneralSettingsPanel({ general, systemFonts, onSave, onPreviewUIFont }: Props) {
   const [draft, setDraft] = useState(() => createDraft(general))
   const [saving, setSaving] = useState(false)
   useEffect(() => { setDraft(createDraft(general)) }, [general])
@@ -131,7 +98,7 @@ export function GeneralSettingsPanel({ general, systemFonts, onSave, onPreviewUI
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault(); setSaving(true)
     try {
-      await onSave({ maxPoolSize: parseInt(draft.maxPoolSize, 10) || 10, defaultKeepAlive: parseInt(draft.defaultKeepAlive, 10) || 60, defaultTermType: draft.defaultTermType, uiFontFamily: draft.uiFontFamily, uiFontFallbackFamily: draft.uiFontFallbackFamily, uiFontSize: parseInt(draft.uiFontSize, 10) || 14, nativeTransparency: draft.nativeTransparency, rightClickAction: draft.rightClickAction, copyOnSelect: draft.copyOnSelect, closeButtonAction: draft.closeButtonAction })
+      await onSave({ maxPoolSize: parseInt(draft.maxPoolSize, 10) || 10, defaultKeepAlive: parseInt(draft.defaultKeepAlive, 10) || 60, defaultTermType: draft.defaultTermType, uiFontFamily: draft.uiFontFamily, uiFontFallbackFamily: draft.uiFontFallbackFamily, uiFontSize: parseInt(draft.uiFontSize, 10) || 14, rightClickAction: draft.rightClickAction, copyOnSelect: draft.copyOnSelect, closeButtonAction: draft.closeButtonAction })
     } finally { setSaving(false) }
   }
   return <form onSubmit={handleSubmit} className="flex flex-col gap-3 pt-2">
@@ -139,7 +106,6 @@ export function GeneralSettingsPanel({ general, systemFonts, onSave, onPreviewUI
     <ApplicationBehaviorSettingsSection closeButtonAction={draft.closeButtonAction} onCloseButtonActionChange={(value) => setDraft({ ...draft, closeButtonAction: value })} />
     <TerminalBehaviorSettingsSection rightClickAction={draft.rightClickAction} copyOnSelect={draft.copyOnSelect} onRightClickActionChange={(value) => setDraft({ ...draft, rightClickAction: value })} onCopyOnSelectChange={(value) => setDraft({ ...draft, copyOnSelect: value })} />
     <UIFontSettings draft={draft} systemFonts={systemFonts} onChange={previewDraft} />
-    <NativeTransparencySettings enabled={draft.nativeTransparency} status={transparencyStatus} onChange={(nativeTransparency) => setDraft({ ...draft, nativeTransparency })} />
     <div className="flex justify-end"><Button type="submit" size="sm" disabled={saving}>{saving ? '保存中...' : '保存'}</Button></div>
   </form>
 }

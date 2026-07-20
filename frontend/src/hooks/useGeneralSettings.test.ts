@@ -9,7 +9,7 @@ import { SETTINGS_GENERAL_CHANGED_EVENT, SETTINGS_GENERAL_PREVIEW_EVENT, SETTING
 const savedGeneral = {
   maxPoolSize: 24, defaultKeepAlive: 90, defaultTermType: 'xterm',
   uiFontFamily: 'Arial', uiFontFallbackFamily: 'Segoe UI', uiFontSize: 18,
-  nativeTransparency: true, rightClickAction: 'paste' as const, copyOnSelect: true,
+  rightClickAction: 'paste' as const, copyOnSelect: true,
   closeButtonAction: 'exit' as const,
 }
 
@@ -21,13 +21,11 @@ describe('useGeneralSettings cross-window sync', () => {
     maxPoolSize = 10
     document.documentElement.style.removeProperty('--app-font-family')
     document.documentElement.style.removeProperty('--app-font-size')
-    delete document.documentElement.dataset.nativeTransparency
     __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.GetMany', async () => ({
       'terminal.max_pool_size': setting('terminal.max_pool_size', maxPoolSize),
     }))
     __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.SetMany', async () => {})
     __registerHandler('github.com/xuthus5/mssh/internal/service.TerminalService.SetMaxSize', async () => {})
-    __registerHandler('github.com/xuthus5/mssh/internal/service.WindowAppearanceService.GetStatus', async () => ({ supported: true, active: false, platform: 'windows', reason: '支持', requires_restart: true }))
   })
 
   it('applies preview values emitted by another window', async () => {
@@ -72,8 +70,8 @@ describe('useGeneralSettings cross-window sync', () => {
     const received: unknown[] = []
     const stop = Events.On(SETTINGS_GENERAL_CHANGED_EVENT, (event) => received.push(event.data))
     const { result } = renderHook(() => useGeneralSettings())
-    await act(async () => { await result.current.saveGeneral({ ...savedGeneral, nativeTransparency: false }) })
-    expect(received).toContainEqual({ ...savedGeneral, nativeTransparency: false })
+    await act(async () => { await result.current.saveGeneral(savedGeneral) })
+    expect(received).toContainEqual(savedGeneral)
     stop()
   })
 
