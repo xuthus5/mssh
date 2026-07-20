@@ -27,7 +27,7 @@ export function AISettingsPanel({ controller }: { controller: AISettingsControll
   const update = (changes: Partial<AISettingsInput>) => setDraft({ ...draft, ...changes })
   const save = () => controller.saveSettings(draft)
   return <Tabs defaultValue="providers" className="min-h-0 flex flex-col gap-4" orientation="horizontal">
-    <TabsList className="w-full flex-row justify-start overflow-x-auto"><TabsTrigger value="providers">提供商</TabsTrigger><TabsTrigger value="agents">Agent</TabsTrigger><TabsTrigger value="interaction">交互配置</TabsTrigger><TabsTrigger value="search">网络搜索</TabsTrigger><TabsTrigger value="security">安全配置</TabsTrigger></TabsList>
+    <TabsList className="mssh-tab-strip-scroll h-auto w-full min-w-0 flex-row flex-nowrap justify-start overflow-x-auto overflow-y-hidden"><TabsTrigger value="providers">提供商</TabsTrigger><TabsTrigger value="agents">Agent</TabsTrigger><TabsTrigger value="interaction">交互配置</TabsTrigger><TabsTrigger value="search">网络搜索</TabsTrigger><TabsTrigger value="security">安全配置</TabsTrigger></TabsList>
     <TabsContent value="providers" className="min-h-0 overflow-y-auto"><AIProviderPanel controller={controller} /></TabsContent>
     <TabsContent value="agents" className="min-h-0 overflow-y-auto"><AIAgentPanel controller={controller} /></TabsContent>
     <TabsContent value="interaction" className="min-h-0 overflow-y-auto"><InteractionPanel draft={draft} update={update} onSave={save} pending={controller.pending !== null} /></TabsContent>
