@@ -235,3 +235,13 @@ func TestWailsWindowAdaptersWithoutRunningGUI(t *testing.T) {
 func testScreen() *application.Screen {
 	return &application.Screen{WorkArea: application.Rect{X: 100, Y: 50, Width: 1600, Height: 900}}
 }
+
+func TestSettingsWindowControllerDestroyAllowsClose(t *testing.T) {
+	registry := newFakeRegistry()
+	controller := newSettingsWindowController(registry, nil, nil)
+	controller.Preload()
+	window := registry.windows[SettingsWindowName]
+	controller.destroy.Store(true)
+	assert.False(t, window.emitClosing())
+	assert.Zero(t, window.hideCount)
+}
