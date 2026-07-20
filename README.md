@@ -75,8 +75,31 @@ task benchmark
 
 ### Build
 ```bash
+# Current platform production binary
+wails3 task build
+
+# Or via Wails CLI (frontend + go build)
 CGO_ENABLED=1 wails3 build
 ```
+
+### Package / Release
+Packaging follows Wails v3 platform Taskfiles under `build/`.
+
+```bash
+# Current OS packages
+wails3 task package
+
+# Linux only (binary + deb + rpm + AppImage)
+wails3 task package:linux:amd64
+```
+
+Git tags matching `v*` trigger `.github/workflows/release.yml`, which builds:
+
+- Linux amd64/arm64: binary, deb, rpm, AppImage
+- Windows amd64/arm64: exe + NSIS installer
+- macOS: universal `.app` zip
+
+Version is injected from the git tag into `internal/service.Version` and package metadata. First-release packages are unsigned.
 
 ### Lint
 ```bash
