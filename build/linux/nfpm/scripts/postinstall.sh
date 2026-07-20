@@ -1,0 +1,8 @@
+#!/bin/sh
+if command -v update-desktop-database >/dev/null 2>&1; then
+  update-desktop-database -q /usr/share/applications || true
+fi
+if command -v update-mime-database >/dev/null 2>&1; then
+  update-mime-database -n /usr/share/mime || true
+fi
+exit 0

@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=MSSH
+Comment=A cross-platform SSH client
+Exec=mssh
+Icon=mssh
+Terminal=false
+Categories=Network;Utility;
+StartupWMClass=mssh

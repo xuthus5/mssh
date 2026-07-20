@@ -1,0 +1,134 @@
+version: '3'
+
+includes:
+  common: ./build/Taskfile.yml
+  windows: ./build/windows/Taskfile.yml
+  darwin: ./build/darwin/Taskfile.yml
+  linux: ./build/linux/Taskfile.yml
+
+vars:
+  APP_NAME: mssh
+  BIN_DIR: bin
+  VITE_PORT: '{{.WAILS_VITE_PORT | default 5173}}'
+  APP_VERSION:
+    sh: |
+      if [ -n "${APP_VERSION:-}" ]; then
+        echo "$APP_VERSION"
+      elif git describe --tags --exact-match 2>/dev/null; then
+        git describe --tags --exact-match | sed 's/^v//'
+      else
+        echo "0.1.0"
+      fi
+  VERSION_LDFLAGS: '-X github.com/xuthus5/mssh/internal/service.Version={{.APP_VERSION}}'
+
+tasks:
+  build:
+    summary: Builds the application for the current platform
+    cmds:
+      - task: "{{OS}}:build"
+        vars:
+          PRODUCTION: '{{.PRODUCTION | default "true"}}'
+          ARCH: '{{.ARCH | default ARCH}}'
+          APP_VERSION: '{{.APP_VERSION}}'
+
+  package:
+    summary: Packages a production build for the current platform
+    cmds:
+      - task: "{{OS}}:package"
+        vars:
+          APP_VERSION: '{{.APP_VERSION}}'
+          ARCH: '{{.ARCH | default ARCH}}'
+
+  package:linux:amd64:
+    summary: Linux amd64 packages (binary, deb, rpm, AppImage)
+    cmds:
+      - task: linux:package
+        vars:
+          ARCH: amd64
+          APP_VERSION: '{{.APP_VERSION}}'
+
+  package:linux:arm64:
+    summary: Linux arm64 packages (binary, deb, rpm, AppImage)
+    cmds:
+      - task: linux:package
+        vars:
+          ARCH: arm64
+          APP_VERSION: '{{.APP_VERSION}}'
+
+  package:windows:amd64:
+    summary: Windows amd64 installer + exe
+    cmds:
+      - task: windows:package
+        vars:
+          ARCH: amd64
+          APP_VERSION: '{{.APP_VERSION}}'
+
+  package:windows:arm64:
+    summary: Windows arm64 installer + exe
+    cmds:
+      - task: windows:package
+        vars:
+          ARCH: arm64
+          APP_VERSION: '{{.APP_VERSION}}'
+
+  package:darwin:universal:
+    summary: macOS universal .app bundle
+    cmds:
+      - task: darwin:package:universal
+        vars:
+          APP_VERSION: '{{.APP_VERSION}}'
+
+  dev:
+    summary: Run application in development mode
+    cmds:
+      - cmd: PATH="$HOME/.govm/go/bin:$PATH" CGO_ENABLED=1 wails3 dev -config ./build/config.yml -port {{.VITE_PORT}}
+        platforms: [linux]
+      - cmd: PATH="$HOME/.govm/go/bin:$PATH" wails3 dev -config ./build/config.yml -port {{.VITE_PORT}}
+        platforms: [darwin]
+      - cmd: powershell -NoProfile -Command "$env:PATH=\"$env:USERPROFILE\.govm\go\bin;$env:PATH\"; wails3 dev -config ./build/config.yml -port {{.VITE_PORT}}"
+        platforms: [windows]
+
+  compile:
+    summary: Production build for the current platform
+    cmds:
+      - task: build
+        vars:
+          PRODUCTION: "true"
+
+  lint:
+    summary: Run golangci-lint
+    cmds:
+      - golangci-lint run --timeout 5m ./...
+
+  fmt:
+    summary: Format Go code
+    cmds:
+      - golangci-lint run --fix ./...
+      - goimports-reviser -rm-unused -format ./...
+
+  test:
+    summary: Run tests with coverage
+    cmds:
+      - go test -race -coverprofile=coverage.out -covermode=atomic ./...
+      - go tool cover -func=coverage.out
+
+  test:e2e:
+    summary: Run real SSH/tmux/SFTP integration tests
+    cmds:
+      - go test -race -tags=e2e ./e2e -run 'TestCommercialSSHWorkflow|TestConcurrentResourcesReturnToBaseline' -count=1 -timeout=2m
+
+  benchmark:
+    summary: Run commercial performance benchmarks
+    cmds:
+      - go test -run '^$' -bench 'BenchmarkCommercial' -benchmem ./internal/store ./internal/service
+
+  clean:
+    summary: Clean temporary build artifacts
+    cmds:
+      - cmd: rm -f coverage.out
+        platforms: [linux, darwin]
+      - cmd: rm -rf bin build/bin
+        platforms: [linux, darwin]
+      - cmd: powershell -NoProfile -Command "Remove-Item coverage.out,bin,build/bin -Recurse -Force -ErrorAction SilentlyContinue"
+        platforms: [windows]
+      - go clean -testcache
