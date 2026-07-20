@@ -11,7 +11,6 @@ const general = {
   uiFontFamily: 'Arial',
   uiFontFallbackFamily: 'Segoe UI',
   uiFontSize: 14,
-  nativeTransparency: false,
   rightClickAction: 'menu' as const,
   copyOnSelect: false,
   closeButtonAction: 'tray' as const,
@@ -34,7 +33,6 @@ function settingsProps() {
     },
     onSaveGeneral: vi.fn(async () => {}),
     onPreviewUIFont: vi.fn(),
-    transparencyStatus: { supported: true, active: false, platform: 'windows', reason: '支持 Wails Acrylic', requires_restart: true },
     onSaveThemeConfiguration: vi.fn(async () => {}),
     onImportThemes: vi.fn(async () => ({ results: [] })),
     onCreateThemeProfile: vi.fn(async () => null),
@@ -171,15 +169,4 @@ describe('SettingsView', () => {
     expect(props.onPreviewUIFont).toHaveBeenLastCalledWith('Segoe UI', 'sans-serif', 14)
   })
 
-  it('configures native transparency and exposes restart guidance', async () => {
-    const props = settingsProps()
-    const user = userEvent.setup()
-    render(<SettingsView {...props} />)
-
-    await user.click(screen.getByRole('switch', { name: '启用原生透明窗口' }))
-    await user.click(screen.getByRole('button', { name: '保存' }))
-    expect(props.onSaveGeneral).toHaveBeenCalledWith(expect.objectContaining({ nativeTransparency: true }))
-    expect(screen.getByRole('button', { name: '透明度兼容性说明' })).toBeInTheDocument()
-    expect(screen.getByRole('status')).toHaveTextContent(/重启/)
-  })
 })

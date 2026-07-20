@@ -130,24 +130,6 @@ body {
   }
 }
 
-html[data-native-transparency='active'] {
-  --background: oklch(0.145 0 0 / 68%);
-  --card: oklch(0.205 0 0 / 78%);
-  --sidebar: oklch(0.205 0 0 / 76%);
-}
-
-html.light[data-native-transparency='active'] {
-  --background: oklch(0.985 0 0 / 72%);
-  --card: oklch(1 0 0 / 82%);
-  --sidebar: oklch(0.97 0 0 / 80%);
-}
-
-html[data-native-transparency='active'] body,
-html[data-native-transparency='active'] #root,
-html[data-native-transparency='active'] .mssh-main-window {
-  background: transparent;
-}
-
 * {
   scrollbar-width: thin;
   scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);

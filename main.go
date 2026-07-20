@@ -13,7 +13,6 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/events"
 
 	"github.com/xuthus5/mssh/internal/app"
-	"github.com/xuthus5/mssh/internal/service"
 	"github.com/xuthus5/mssh/internal/windowing"
 )
 
@@ -39,7 +38,7 @@ func main() {
 	}
 
 	wailsApp := newWailsApplication(appInstance, logger)
-	configureWindows(wailsApp, windowConfiguration{Settings: appInstance.Setting, Logger: logger, Transparency: appInstance.WindowAppearance})
+	configureWindows(wailsApp, windowConfiguration{Settings: appInstance.Setting, Logger: logger})
 	wailsApp.OnShutdown(func() { appInstance.Shutdown() })
 
 	logger.Info("MSSH started")
@@ -72,7 +71,6 @@ func newWailsApplication(appInstance *app.App, logger *slog.Logger) *application
 			application.NewService(appInstance.Audit),
 			application.NewService(appInstance.AssetCatalog),
 			application.NewService(appInstance.AI),
-			application.NewService(appInstance.WindowAppearance),
 		},
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(os.DirFS("./frontend/dist")),
@@ -132,14 +130,12 @@ func (h *wailsSystemLogHandler) WithGroup(name string) slog.Handler {
 }
 
 type windowConfiguration struct {
-	Settings     windowing.CloseActionReader
-	Logger       *slog.Logger
-	Transparency *service.WindowAppearanceService
+	Settings windowing.CloseActionReader
+	Logger   *slog.Logger
 }
 
 func configureWindows(wailsApp *application.App, configuration windowConfiguration) {
-	transparencyActive := configuration.Transparency != nil && configuration.Transparency.NativeTransparencyActive()
-	mainWindow := wailsApp.Window.NewWithOptions(mainWindowOptions(transparencyActive))
+	mainWindow := wailsApp.Window.NewWithOptions(mainWindowOptions())
 	settingsController := windowing.NewSettingsWindowController(wailsApp.Window, mainWindow, wailsApp.Event.Emit)
 	settingsController.Preload()
 	lifecycleController := windowing.NewApplicationLifecycleController(windowing.ApplicationLifecycleOptions{
@@ -196,8 +192,8 @@ func waitForWindowsClosed(count func() int, timeout, interval time.Duration) boo
 	return true
 }
 
-func mainWindowOptions(transparencyActive bool) application.WebviewWindowOptions {
-	options := application.WebviewWindowOptions{
+func mainWindowOptions() application.WebviewWindowOptions {
+	return application.WebviewWindowOptions{
 		Name:           "main",
 		Title:          "MSSH",
 		Width:          1280,
@@ -208,17 +204,6 @@ func mainWindowOptions(transparencyActive bool) application.WebviewWindowOptions
 			WebviewGpuPolicy: application.WebviewGpuPolicyNever,
 		},
 	}
-	if !transparencyActive {
-		options.BackgroundType = application.BackgroundTypeSolid
-		options.BackgroundColour = application.NewRGB(24, 24, 27)
-		return options
-	}
-	options.BackgroundType = application.BackgroundTypeTranslucent
-	options.BackgroundColour = application.RGBA{Alpha: 0}
-	options.Mac = application.MacWindow{Backdrop: application.MacBackdropTranslucent}
-	options.Windows = application.WindowsWindow{BackdropType: application.Acrylic}
-	options.Linux.WindowIsTranslucent = true
-	return options
 }
 
 func defaultDataDir() string {

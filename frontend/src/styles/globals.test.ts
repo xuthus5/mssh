@@ -5,17 +5,16 @@ const styles = readFileSync('src/styles/globals.css', 'utf8')
 const appSource = readFileSync('src/App.tsx', 'utf8')
 
 describe('application styling', () => {
-  it('keeps normal surfaces opaque and scopes native transparency to active windows', () => {
+  it('keeps application surfaces opaque', () => {
     expect(styles).toMatch(/--card:\s*oklch\(0\.205 0 0\)/)
     expect(styles).toMatch(/--popover:\s*oklch\(0\.205 0 0\)/)
-    expect(styles).toMatch(/html\[data-native-transparency='active'\]\s*\{[^}]*--card:\s*oklch\(0\.205 0 0 \/ 78%\)/s)
-    expect(styles).toMatch(/html\.light\[data-native-transparency='active'\]/)
+    expect(styles).not.toContain('data-native-transparency')
   })
 
-  it('keeps the normal webview opaque and exposes the native backdrop only when active', () => {
+  it('keeps the webview opaque', () => {
     expect(styles).toMatch(/body\s*\{\s*@apply bg-background text-foreground;/)
-    expect(styles).toMatch(/html\[data-native-transparency='active'\] body/)
-    expect(appSource).toContain('mssh-main-window flex h-screen w-screen flex-col bg-background')
+    expect(appSource).toContain('flex h-screen w-screen flex-col bg-background')
+    expect(appSource).not.toContain('mssh-main-window')
   })
 
   it('does not override xterm theme backgrounds with the application background token', () => {
