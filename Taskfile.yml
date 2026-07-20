@@ -12,13 +12,17 @@ vars:
   VITE_PORT: '{{.WAILS_VITE_PORT | default 5173}}'
   APP_VERSION:
     sh: |
+      set -e
       if [ -n "${APP_VERSION:-}" ]; then
-        echo "$APP_VERSION"
-      elif git describe --tags --exact-match 2>/dev/null; then
-        git describe --tags --exact-match | sed 's/^v//'
-      else
-        echo "0.1.0"
+        printf '%s' "$APP_VERSION" | tr -d '\r' | head -n1 | sed 's/^v//'
+        exit 0
       fi
+      tag="$(git describe --tags --exact-match 2>/dev/null || true)"
+      if [ -n "$tag" ]; then
+        printf '%s' "$tag" | sed 's/^v//'
+        exit 0
+      fi
+      printf '%s' '0.1.0'
   VERSION_LDFLAGS: '-X github.com/xuthus5/mssh/internal/service.Version={{.APP_VERSION}}'
 
 tasks:
