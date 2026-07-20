@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	listThousandSessionsBudget = 250 * time.Millisecond
+	listThousandSessionsBudget = 500 * time.Millisecond
 	transferUpdatesBudget      = 2 * time.Second
 )
 

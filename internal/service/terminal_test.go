@@ -149,7 +149,16 @@ func TestTerminalService_RemoteExitCleansTerminalAndEmitsDisconnectedState(t *te
 	_, err = terminalSvc.Write(terminalID, "whoami\n")
 	assert.ErrorContains(t, err, "not found")
 
-	var disconnected bool
+	require.Eventually(t, func() bool {
+		for _, captured := range terminalBus.Events() {
+			payload, ok := captured.Payload.(event.ConnectionStatePayload)
+			if captured.Name == event.ConnectionState && ok && payload.TerminalID == terminalID && payload.State == "disconnected" {
+				return true
+			}
+		}
+		return false
+	}, 2*time.Second, 10*time.Millisecond)
+
 	var states []string
 	for _, captured := range terminalBus.Events() {
 		payload, ok := captured.Payload.(event.ConnectionStatePayload)
@@ -157,12 +166,8 @@ func TestTerminalService_RemoteExitCleansTerminalAndEmitsDisconnectedState(t *te
 			assert.Equal(t, terminalID, payload.TerminalID)
 			states = append(states, payload.State)
 		}
-		if captured.Name == event.ConnectionState && ok && payload.TerminalID == terminalID && payload.State == "disconnected" {
-			disconnected = true
-		}
 		assert.NotEqual(t, event.TerminalClosed, captured.Name)
 	}
-	assert.True(t, disconnected)
 	assert.Equal(t, []string{"connected", "disconnected"}, states)
 }
 
