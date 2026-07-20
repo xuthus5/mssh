@@ -18,24 +18,25 @@ type App struct {
 	Crypto   []byte
 	Keychain crypto.KeychainAdapter
 
-	Session        *service.SessionService
-	Terminal       *service.TerminalService
-	File           *service.FileService
-	Tunnel         *service.TunnelService
-	Key            *service.KeyService
-	Macro          *service.MacroService
-	CommandHistory *service.CommandHistoryService
-	Theme          *service.ThemeService
-	Log            *service.LogService
-	Sync           *service.SyncService
-	Setting        *service.SettingService
-	About          *service.AboutService
-	Font           *service.FontService
-	Audit          *service.AuditService
-	AssetCatalog   *service.AssetCatalogService
-	AI             *service.AIService
-	logger         *slog.Logger
-	shutdownOnce   sync.Once
+	Session          *service.SessionService
+	Terminal         *service.TerminalService
+	File             *service.FileService
+	Tunnel           *service.TunnelService
+	Key              *service.KeyService
+	Macro            *service.MacroService
+	CommandHistory   *service.CommandHistoryService
+	Theme            *service.ThemeService
+	Log              *service.LogService
+	Sync             *service.SyncService
+	Setting          *service.SettingService
+	About            *service.AboutService
+	Font             *service.FontService
+	Audit            *service.AuditService
+	AssetCatalog     *service.AssetCatalogService
+	AI               *service.AIService
+	WindowAppearance *service.WindowAppearanceService
+	logger           *slog.Logger
+	shutdownOnce     sync.Once
 }
 
 type Options struct {
@@ -169,27 +170,29 @@ func initializeServices(input serviceInitialization) (*App, error) {
 	syncSvc := service.NewSyncService(input.db, input.logger,
 		service.WithSyncDataDir(input.opts.DataDir), service.WithSyncCrypto(adapter), service.WithSyncEventBus(input.eventBus),
 		service.WithSyncLifecycle(syncLifecycleAdapter{terminal: terminalSvc, tunnel: tunnelSvc, session: sessionSvc}))
+	settingSvc := service.NewSettingService(input.db, input.logger)
 	return &App{
-		DB:             input.db,
-		Crypto:         input.masterKey,
-		Keychain:       input.keychain,
-		Session:        sessionSvc,
-		Terminal:       terminalSvc,
-		File:           service.NewFileService(sessionSvc, input.eventBus, input.logger, service.WithTransferDB(input.db)),
-		Tunnel:         tunnelSvc,
-		Key:            service.NewKeyService(input.db, adapter, input.logger),
-		Macro:          service.NewMacroService(input.db, terminalSvc, input.logger),
-		CommandHistory: service.NewCommandHistoryService(input.db, input.logger),
-		Theme:          themeSvc,
-		Log:            logSvc,
-		Sync:           syncSvc,
-		Setting:        service.NewSettingService(input.db, input.logger),
-		About:          service.NewAboutService(),
-		Font:           service.NewFontService(input.logger),
-		Audit:          service.NewAuditService(input.db, input.logger),
-		AssetCatalog:   service.NewAssetCatalogService(input.db, input.logger),
-		AI:             service.NewAIService(input.db, terminalSvc, input.keychain, input.logger),
-		logger:         input.logger,
+		DB:               input.db,
+		Crypto:           input.masterKey,
+		Keychain:         input.keychain,
+		Session:          sessionSvc,
+		Terminal:         terminalSvc,
+		File:             service.NewFileService(sessionSvc, input.eventBus, input.logger, service.WithTransferDB(input.db)),
+		Tunnel:           tunnelSvc,
+		Key:              service.NewKeyService(input.db, adapter, input.logger),
+		Macro:            service.NewMacroService(input.db, terminalSvc, input.logger),
+		CommandHistory:   service.NewCommandHistoryService(input.db, input.logger),
+		Theme:            themeSvc,
+		Log:              logSvc,
+		Sync:             syncSvc,
+		Setting:          settingSvc,
+		WindowAppearance: service.NewWindowAppearanceService(settingSvc, input.logger),
+		About:            service.NewAboutService(),
+		Font:             service.NewFontService(input.logger),
+		Audit:            service.NewAuditService(input.db, input.logger),
+		AssetCatalog:     service.NewAssetCatalogService(input.db, input.logger),
+		AI:               service.NewAIService(input.db, terminalSvc, input.keychain, input.logger),
+		logger:           input.logger,
 	}, nil
 }
 

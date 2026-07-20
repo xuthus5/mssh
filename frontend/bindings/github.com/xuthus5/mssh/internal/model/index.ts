@@ -47,6 +47,7 @@ export {
     KeyType,
     Macro,
     MacroInput,
+    NativeTransparencyStatus,
     NetworkInterface,
     ProcessInfo,
     RecordType,
