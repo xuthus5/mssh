@@ -13,6 +13,7 @@ import type { SFTPSettings } from '@/hooks/useSFTPSettings'
 import type { GeneralSettings } from '@/hooks/useSettings'
 import type { CloudSyncController } from '@/hooks/useCloudSyncCenter'
 import type { ColorMode } from '@/lib/effectiveTerminalTheme'
+import type { NativeTransparencyStatus } from '@/lib/nativeTransparency'
 import type { BuiltinThemeResetResult, TerminalGlobalStyle, ThemeAssignments, ThemeConfigurationInput, ThemeImportSummary, ThemeProfile, ThemeProfileInput } from '../../../bindings/github.com/xuthus5/mssh/internal/model/models'
 
 export interface SettingsViewProps {
@@ -25,7 +26,7 @@ export interface SettingsViewProps {
   cloudSync: CloudSyncController
   onSaveGeneral: (settings: GeneralSettings) => Promise<void>
   onPreviewUIFont: (fontFamily: string, fallbackFamily: string, fontSize: number) => void
-  onPreviewWindowOpacity: (opacity: number) => void
+  transparencyStatus: NativeTransparencyStatus
   onSaveThemeConfiguration: (configuration: ThemeConfigurationInput) => Promise<void>
   onImportThemes: (paths: string[]) => Promise<ThemeImportSummary>
   onCreateThemeProfile: (profile: ThemeProfileInput) => Promise<ThemeProfile | null>
@@ -42,7 +43,7 @@ export interface SettingsViewProps {
 
 function SettingsTabPanels(props: SettingsViewProps) {
   return <>
-    <TabsContent value="general" className="min-h-0 min-w-0 overflow-y-auto overscroll-contain pr-2"><GeneralSettingsPanel general={props.general} systemFonts={props.systemFonts} onSave={props.onSaveGeneral} onPreviewUIFont={props.onPreviewUIFont} onPreviewWindowOpacity={props.onPreviewWindowOpacity} /></TabsContent>
+    <TabsContent value="general" className="min-h-0 min-w-0 overflow-y-auto overscroll-contain pr-2"><GeneralSettingsPanel general={props.general} systemFonts={props.systemFonts} onSave={props.onSaveGeneral} onPreviewUIFont={props.onPreviewUIFont} transparencyStatus={props.transparencyStatus} /></TabsContent>
     <TabsContent value="terminal" className="min-h-0 min-w-0 overflow-y-auto overscroll-contain pr-2"><div className="flex flex-col gap-5"><ThemeEditor profiles={props.themeProfiles} assignments={props.themeAssignments} globalStyle={props.terminalGlobalStyle} colorMode={props.colorMode} onSave={props.onSaveThemeConfiguration} onResetBuiltins={props.onResetBuiltinThemes} /><ThemeManager profiles={props.themeProfiles} onImport={props.onImportThemes} onCreateProfile={props.onCreateThemeProfile} onUpdateProfile={props.onUpdateThemeProfile} onDeleteProfile={props.onDeleteThemeProfile} onDeleteDefinition={props.onDeleteThemeDefinition} /></div></TabsContent>
     <TabsContent value="ai" className="min-h-0 min-w-0 overflow-y-auto overscroll-contain pr-2">{props.ai && <AISettingsPanel controller={props.ai} />}</TabsContent>
     <TabsContent value="sync" className="min-h-0 min-w-0 overflow-y-auto overscroll-contain pr-2"><SyncPanel controller={props.cloudSync} onExport={props.onExportConfig} onImport={props.onImportConfig} /></TabsContent>

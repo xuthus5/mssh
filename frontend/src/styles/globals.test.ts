@@ -4,19 +4,18 @@ import { readFileSync } from 'node:fs'
 const styles = readFileSync('src/styles/globals.css', 'utf8')
 const appSource = readFileSync('src/App.tsx', 'utf8')
 
-describe('terminal viewport styling', () => {
-  it('applies the main-window alpha token to application surfaces', () => {
-    expect(styles).toMatch(/--card:\s*oklch\(0\.205 0 0 \/ var\(--app-background-alpha\)\)/)
-    expect(styles).toMatch(/--popover:\s*oklch\(0\.205 0 0 \/ var\(--app-background-alpha\)\)/)
-    expect(styles).toMatch(/--sidebar:\s*oklch\(0\.205 0 0 \/ var\(--app-background-alpha\)\)/)
-    expect(styles).toMatch(/\.light\s*\{[^}]*--card:\s*oklch\(1 0 0 \/ var\(--app-background-alpha\)\)/s)
-    expect(styles).toMatch(/\.light\s*\{[^}]*--sidebar:\s*oklch\(0\.97 0 0 \/ var\(--app-background-alpha\)\)/s)
+describe('application styling', () => {
+  it('keeps normal surfaces opaque and scopes native transparency to active windows', () => {
+    expect(styles).toMatch(/--card:\s*oklch\(0\.205 0 0\)/)
+    expect(styles).toMatch(/--popover:\s*oklch\(0\.205 0 0\)/)
+    expect(styles).toMatch(/html\[data-native-transparency='active'\]\s*\{[^}]*--card:\s*oklch\(0\.205 0 0 \/ 78%\)/s)
+    expect(styles).toMatch(/html\.light\[data-native-transparency='active'\]/)
   })
 
-  it('keeps the webview root transparent to avoid stacked background opacity', () => {
-    expect(styles).toMatch(/body\s*\{\s*@apply text-foreground;/)
-    expect(styles).not.toMatch(/body\s*\{\s*@apply bg-background text-foreground;/)
-    expect(appSource).toContain('flex h-screen w-screen flex-col bg-transparent')
+  it('keeps the normal webview opaque and exposes the native backdrop only when active', () => {
+    expect(styles).toMatch(/body\s*\{\s*@apply bg-background text-foreground;/)
+    expect(styles).toMatch(/html\[data-native-transparency='active'\] body/)
+    expect(appSource).toContain('mssh-main-window flex h-screen w-screen flex-col bg-background')
   })
 
   it('does not override xterm theme backgrounds with the application background token', () => {

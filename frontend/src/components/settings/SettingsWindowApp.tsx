@@ -14,9 +14,10 @@ function settingsViewProps(
 ): SettingsViewProps {
   return {
     general: settings.general, systemFonts: settings.systemFonts, cloudSync,
+    transparencyStatus: settings.transparencyStatus,
     themeProfiles: catalog.profiles, themeAssignments: catalog.assignments, terminalGlobalStyle: catalog.globalStyle,
     colorMode: catalog.colorMode, onSaveGeneral: settings.saveGeneral, onPreviewUIFont: settings.previewUIFont,
-    onPreviewWindowOpacity: settings.previewWindowOpacity, onSaveThemeConfiguration: catalog.saveConfiguration,
+    onSaveThemeConfiguration: catalog.saveConfiguration,
     onImportThemes: catalog.importThemes, onCreateThemeProfile: catalog.createProfile, onUpdateThemeProfile: catalog.saveProfile,
     onDeleteThemeProfile: catalog.deleteProfile, onDeleteThemeDefinition: catalog.deleteDefinition,
     onResetBuiltinThemes: catalog.resetBuiltinStyles,
