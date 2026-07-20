@@ -1,0 +1,15 @@
+{
+	"fixed": {
+		"file_version": "0.1.0"
+	},
+	"info": {
+		"0000": {
+			"ProductVersion": "0.1.0",
+			"CompanyName": "MSSH",
+			"FileDescription": "A cross-platform SSH client",
+			"LegalCopyright": "(c) 2026, MSSH",
+			"ProductName": "MSSH",
+			"Comments": "SSH Client"
+		}
+	}
+}

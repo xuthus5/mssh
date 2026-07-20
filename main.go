@@ -2,8 +2,9 @@ package main
 
 import (
 	"context"
-	_ "embed"
+	"embed"
 	"fmt"
+	"io/fs"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -18,6 +19,9 @@ import (
 
 //go:embed build/appicon.png
 var appIcon []byte
+
+//go:embed all:frontend/dist
+var frontendDist embed.FS
 
 const (
 	windowCloseTimeout      = 2 * time.Second
@@ -73,7 +77,7 @@ func newWailsApplication(appInstance *app.App, logger *slog.Logger) *application
 			application.NewService(appInstance.AI),
 		},
 		Assets: application.AssetOptions{
-			Handler: application.AssetFileServerFS(os.DirFS("./frontend/dist")),
+			Handler: application.AssetFileServerFS(frontendAssets()),
 		},
 		Mac: application.MacOptions{
 			ApplicationShouldTerminateAfterLastWindowClosed: false,
@@ -204,6 +208,14 @@ func mainWindowOptions() application.WebviewWindowOptions {
 			WebviewGpuPolicy: application.WebviewGpuPolicyNever,
 		},
 	}
+}
+
+func frontendAssets() fs.FS {
+	sub, err := fs.Sub(frontendDist, "frontend/dist")
+	if err != nil {
+		return frontendDist
+	}
+	return sub
 }
 
 func defaultDataDir() string {

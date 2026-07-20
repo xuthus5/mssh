@@ -1,0 +1,208 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+env:
+  GO_VERSION: '1.26.x'
+  NODE_VERSION: '20'
+  WAILS_VERSION: 'v3.0.0-alpha2.117'
+
+jobs:
+  linux:
+    name: Linux (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            goarch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            goarch: arm64
+            runner: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Install Linux package tooling
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential pkg-config libgtk-4-dev libwebkitgtk-6.0-dev rpm file libfuse2
+      - name: Install Wails CLI
+        run: go install github.com/wailsapp/wails/v3/cmd/wails3@${{ env.WAILS_VERSION }}
+      - name: Resolve version
+        id: version
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="${TAG#v}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+      - name: Stamp package metadata
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          sed -i "s/^version: .*/version: \"${VERSION}\"/" build/config.yml
+          sed -i "s/^version: \".*\"/version: \"${VERSION}\"/" build/linux/nfpm/nfpm.yaml
+      - name: Build and package
+        env:
+          APP_VERSION: ${{ steps.version.outputs.version }}
+          CGO_ENABLED: 1
+        run: |
+          wails3 task linux:build ARCH=${{ matrix.goarch }} PRODUCTION=true APP_VERSION=${APP_VERSION}
+          wails3 task linux:generate:dotdesktop
+          wails3 task linux:generate:deb
+          wails3 task linux:generate:rpm
+          wails3 task linux:create:appimage || echo "AppImage packaging skipped/failed"
+      - name: Collect artifacts
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          ARCH="${{ matrix.arch }}"
+          mkdir -p dist
+          cp "bin/mssh" "dist/mssh-${VERSION}-linux-${ARCH}"
+          # nfpm outputs vary; collect known patterns
+          find bin -maxdepth 1 -type f \( -name '*.deb' -o -name '*.rpm' -o -name '*.AppImage' -o -name '*.appimage' \) -print -exec cp {} dist/ \;
+          ls -la bin dist || true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-${{ matrix.arch }}
+          path: dist/*
+          if-no-files-found: error
+
+  windows:
+    name: Windows (${{ matrix.arch }})
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            goarch: amd64
+          - arch: arm64
+            goarch: arm64
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Install NSIS
+        run: choco install nsis -y
+      - name: Install Wails CLI
+        shell: bash
+        run: go install github.com/wailsapp/wails/v3/cmd/wails3@${{ env.WAILS_VERSION }}
+      - name: Resolve version
+        id: version
+        shell: bash
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="${TAG#v}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+      - name: Stamp package metadata
+        shell: bash
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          sed -i "s/\"0.1.0\"/\"${VERSION}\"/g" build/windows/info.json
+          sed -i "s/version=\"0.1.0\"/version=\"${VERSION}\"/" build/windows/wails.exe.manifest
+          sed -i "s/!define INFO_PRODUCTVERSION \"0.1.0\"/!define INFO_PRODUCTVERSION \"${VERSION}\"/" build/windows/nsis/wails_tools.nsh || true
+      - name: Build and package
+        shell: bash
+        env:
+          APP_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          wails3 task windows:build ARCH=${{ matrix.goarch }} PRODUCTION=true APP_VERSION=${APP_VERSION}
+          # NSIS installer if makensis is available
+          if command -v makensis >/dev/null 2>&1; then
+            wails3 task windows:create:nsis:installer ARCH=${{ matrix.goarch }} APP_VERSION=${APP_VERSION} || true
+          fi
+      - name: Collect artifacts
+        shell: bash
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          ARCH="${{ matrix.arch }}"
+          mkdir -p dist
+          if [ -f "bin/mssh.exe" ]; then cp "bin/mssh.exe" "dist/mssh-${VERSION}-windows-${ARCH}.exe"; fi
+          find bin -maxdepth 1 -type f -name '*installer*.exe' -exec cp {} dist/ \; || true
+          ls -la bin dist || true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-${{ matrix.arch }}
+          path: dist/*
+          if-no-files-found: error
+
+  darwin:
+    name: macOS universal
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Install Wails CLI
+        run: go install github.com/wailsapp/wails/v3/cmd/wails3@${{ env.WAILS_VERSION }}
+      - name: Resolve version
+        id: version
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="${TAG#v}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+      - name: Stamp package metadata
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          python3 -c "from pathlib import Path; v='$VERSION';
+[Path(p).write_text(Path(p).read_text().replace('0.1.0', v)) for p in ['build/darwin/Info.plist','build/darwin/Info.dev.plist']]"
+      - name: Build universal app
+        env:
+          APP_VERSION: ${{ steps.version.outputs.version }}
+          CGO_ENABLED: 1
+        run: |
+          wails3 task darwin:package:universal APP_VERSION=${APP_VERSION}
+      - name: Collect artifacts
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          mkdir -p dist
+          if [ -d "bin/mssh.app" ]; then
+            ditto -c -k --sequesterRsrc --keepParent "bin/mssh.app" "dist/mssh-${VERSION}-darwin-universal.app.zip"
+          fi
+          ls -la bin dist || true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: darwin-universal
+          path: dist/*
+          if-no-files-found: error
+
+  publish:
+    name: GitHub Release
+    needs: [linux, windows, darwin]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+      - name: Flatten artifacts
+        run: |
+          mkdir -p upload
+          find release-assets -type f -print -exec cp {} upload/ \;
+          ls -la upload
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: upload/*
+          generate_release_notes: true
+          fail_on_unmatched_files: true
