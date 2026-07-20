@@ -103,7 +103,7 @@ export default function App() {
   useEffect(() => registerSyncDataReload(() => window.location.reload()), [])
 
   return (
-    <div className="mssh-main-window flex h-screen w-screen flex-col bg-background">
+    <div className="flex h-screen w-screen flex-col bg-background">
       <SessionWorkspaceProvider>
         <GeneralSettingsRuntime />
         <WorkspacePersistence />

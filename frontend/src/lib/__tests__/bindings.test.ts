@@ -14,7 +14,6 @@ import {
   SyncService,
   AboutService,
   FontService,
-  WindowAppearanceService,
 } from '@/lib/wails'
 
 describe('Generated Bindings Barrel', () => {
@@ -103,8 +102,4 @@ describe('Generated Bindings Barrel', () => {
     expect(typeof FontService.List).toBe('function')
   })
 
-  it('exports WindowAppearanceService', () => {
-    expect(WindowAppearanceService).toBeDefined()
-    expect(typeof WindowAppearanceService.GetStatus).toBe('function')
-  })
 })
