@@ -103,7 +103,7 @@ export default function App() {
   useEffect(() => registerSyncDataReload(() => window.location.reload()), [])
 
   return (
-    <div className="flex h-screen w-screen flex-col bg-background">
+    <div className="flex h-screen w-screen flex-col bg-transparent">
       <SessionWorkspaceProvider>
         <GeneralSettingsRuntime />
         <WorkspacePersistence />
