@@ -163,8 +163,10 @@ jobs:
       - name: Stamp package metadata
         run: |
           VERSION="${{ steps.version.outputs.version }}"
-          python3 -c "from pathlib import Path; v='$VERSION';
-[Path(p).write_text(Path(p).read_text().replace('0.1.0', v)) for p in ['build/darwin/Info.plist','build/darwin/Info.dev.plist']]"
+          for f in build/darwin/Info.plist build/darwin/Info.dev.plist; do
+            sed -i.bak "s/0\.1\.0/${VERSION}/g" "$f"
+            rm -f "${f}.bak"
+          done
       - name: Build universal app
         env:
           APP_VERSION: ${{ steps.version.outputs.version }}
