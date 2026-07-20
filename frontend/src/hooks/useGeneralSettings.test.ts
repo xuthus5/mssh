@@ -9,7 +9,7 @@ import { SETTINGS_GENERAL_CHANGED_EVENT, SETTINGS_GENERAL_PREVIEW_EVENT, SETTING
 const savedGeneral = {
   maxPoolSize: 24, defaultKeepAlive: 90, defaultTermType: 'xterm',
   uiFontFamily: 'Arial', uiFontFallbackFamily: 'Segoe UI', uiFontSize: 18,
-  windowOpacity: 78, rightClickAction: 'paste' as const, copyOnSelect: true,
+  nativeTransparency: true, rightClickAction: 'paste' as const, copyOnSelect: true,
   closeButtonAction: 'exit' as const,
 }
 
@@ -21,37 +21,34 @@ describe('useGeneralSettings cross-window sync', () => {
     maxPoolSize = 10
     document.documentElement.style.removeProperty('--app-font-family')
     document.documentElement.style.removeProperty('--app-font-size')
-    document.documentElement.style.removeProperty('--app-opacity')
-    document.documentElement.style.removeProperty('--app-background-alpha')
+    delete document.documentElement.dataset.nativeTransparency
     __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.GetMany', async () => ({
       'terminal.max_pool_size': setting('terminal.max_pool_size', maxPoolSize),
     }))
     __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.SetMany', async () => {})
     __registerHandler('github.com/xuthus5/mssh/internal/service.TerminalService.SetMaxSize', async () => {})
+    __registerHandler('github.com/xuthus5/mssh/internal/service.WindowAppearanceService.GetStatus', async () => ({ supported: true, active: false, platform: 'windows', reason: '支持', requires_restart: true }))
   })
 
   it('applies preview values emitted by another window', async () => {
     renderHook(() => useGeneralSettings())
     await act(async () => {})
     act(() => __emitEvent(SETTINGS_GENERAL_PREVIEW_EVENT, { data: {
-      uiFontFamily: 'Microsoft YaHei', uiFontFallbackFamily: 'Segoe UI', uiFontSize: 20, windowOpacity: 72,
+      uiFontFamily: 'Microsoft YaHei', uiFontFallbackFamily: 'Segoe UI', uiFontSize: 20,
     } }))
     expect(document.documentElement.style.getPropertyValue('--app-font-size')).toBe('20px')
-    expect(document.documentElement.style.getPropertyValue('--app-opacity')).toBe('0.72')
-    expect(document.documentElement.style.getPropertyValue('--app-background-alpha')).toBe('0.72')
   })
 
-  it('broadcasts local font and opacity previews', async () => {
+  it('broadcasts local font previews without a transparency preview', async () => {
     const previews: unknown[] = []
     const stop = Events.On(SETTINGS_GENERAL_PREVIEW_EVENT, (event) => previews.push(event.data))
     const { result } = renderHook(() => useGeneralSettings())
     await act(async () => {})
     act(() => {
       result.current.previewUIFont('Arial', 'Segoe UI', 19)
-      result.current.previewWindowOpacity(74)
     })
     expect(previews).toContainEqual({ uiFontFamily: 'Arial', uiFontFallbackFamily: 'Segoe UI', uiFontSize: 19 })
-    expect(previews).toContainEqual({ windowOpacity: 74 })
+    expect(previews).toHaveLength(1)
     stop()
   })
 
@@ -75,8 +72,8 @@ describe('useGeneralSettings cross-window sync', () => {
     const received: unknown[] = []
     const stop = Events.On(SETTINGS_GENERAL_CHANGED_EVENT, (event) => received.push(event.data))
     const { result } = renderHook(() => useGeneralSettings())
-    await act(async () => { await result.current.saveGeneral({ ...savedGeneral, windowOpacity: 200 }) })
-    expect(received).toContainEqual({ ...savedGeneral, windowOpacity: 100 })
+    await act(async () => { await result.current.saveGeneral({ ...savedGeneral, nativeTransparency: false }) })
+    expect(received).toContainEqual({ ...savedGeneral, nativeTransparency: false })
     stop()
   })
 
