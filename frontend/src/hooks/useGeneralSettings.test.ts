@@ -11,6 +11,7 @@ const savedGeneral = {
   uiFontFamily: 'Arial', uiFontFallbackFamily: 'Segoe UI', uiFontSize: 18,
   rightClickAction: 'paste' as const, copyOnSelect: true,
   closeButtonAction: 'exit' as const,
+  language: 'zh-CN' as const,
 }
 
 describe('useGeneralSettings cross-window sync', () => {
@@ -89,7 +90,7 @@ describe('useGeneralSettings cross-window sync', () => {
     const { result } = renderHook(() => useGeneralSettings())
     await waitFor(() => expect(result.current.general.closeButtonAction).toBe('exit'))
 
-    await act(async () => { await result.current.saveGeneral({ ...savedGeneral, closeButtonAction: 'tray' }) })
+    await act(async () => { await result.current.saveGeneral({ ...savedGeneral, closeButtonAction: 'tray', language: 'zh-CN' }) })
 
     expect(savedEntries).toContainEqual(expect.objectContaining({
       key: 'application.close_button_action', value: '"tray"',

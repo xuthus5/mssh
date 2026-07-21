@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react'
+import { t } from '@/i18n'
+
 
 export type ToolPanelKind = 'history' | 'files' | 'system' | 'ai'
 
@@ -54,5 +56,5 @@ export function useToolPanelResize(kind: ToolPanelKind) {
     event.preventDefault()
   }
   const panelStyle: CSSProperties = { width, maxWidth: 'calc(100% - 120px)' }
-  return { width, panelStyle, resizeHandleProps: { onPointerDown, onDoubleClick: () => resize(DEFAULT_WIDTHS[kind]), onKeyDown, role: 'separator' as const, tabIndex: 0, 'aria-label': '调整工具面板宽度', 'aria-orientation': 'vertical' as const, 'aria-valuemin': MIN_WIDTH, 'aria-valuemax': MAX_WIDTH, 'aria-valuenow': width } }
+  return { width, panelStyle, resizeHandleProps: { onPointerDown, onDoubleClick: () => resize(DEFAULT_WIDTHS[kind]), onKeyDown, role: 'separator' as const, tabIndex: 0, 'aria-label': t('调整工具面板宽度'), 'aria-orientation': 'vertical' as const, 'aria-valuemin': MIN_WIDTH, 'aria-valuemax': MAX_WIDTH, 'aria-valuenow': width } }
 }

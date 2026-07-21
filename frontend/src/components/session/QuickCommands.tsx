@@ -10,6 +10,8 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Play, Plus, Trash2 } from 'lucide-react'
+import { t } from '@/i18n'
+
 
 export interface CommandItem {
   id: string
@@ -51,7 +53,7 @@ export default function QuickCommands({
     <div className="flex flex-col h-full p-2">
       <div className="flex items-center justify-between mb-2">
         <span className="text-xs font-medium text-muted-foreground">
-          快捷命令
+          {t('快捷命令')}
         </span>
         {showAddForm && (
           <Button size="xs" variant="ghost" onClick={() => setShowAdd(!showAdd)}>
@@ -62,36 +64,36 @@ export default function QuickCommands({
       {showAdd && (
         <div className="flex flex-col gap-1.5 mb-2 p-2 rounded-lg border border-border">
           <Input
-            placeholder="名称"
+            placeholder={t('名称')}
             value={name}
             onChange={(e) => setName(e.target.value)}
             className="text-xs h-7"
           />
           <Input
-            placeholder="快捷键 (可选)"
+            placeholder={t('快捷键 (可选)')}
             value={shortcut}
             onChange={(e) => setShortcut(e.target.value)}
             className="text-xs h-7"
           />
           <Input
-            placeholder="命令"
+            placeholder={t('命令')}
             value={command}
             onChange={(e) => setCommand(e.target.value)}
             className="text-xs h-7"
           />
           <div className="flex justify-end gap-1">
             <Button size="xs" variant="ghost" onClick={() => setShowAdd(false)}>
-              取消
+              {t('取消')}
             </Button>
             <Button size="xs" onClick={handleAdd}>
-              添加
+              {t('添加')}
             </Button>
           </div>
         </div>
       )}
       <div className="flex-1 overflow-y-auto min-h-0">
         {commands.length === 0 ? (
-          <p className="text-xs text-muted-foreground px-1">暂无快捷命令</p>
+          <p className="text-xs text-muted-foreground px-1">{t('暂无快捷命令')}</p>
         ) : (
           <div className="flex flex-col gap-0.5">
             {commands.map((item) => (

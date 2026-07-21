@@ -6,6 +6,8 @@ import { getClipboard } from '@/lib/clipboard'
 import { KeyGenerateDialog, KeyImportDialog, KeyMaterialDialog, type KeyMaterialMode } from '@/components/settings/KeyDialogs'
 import type { KeyImportFile, KeyInfo, KeyMaterial } from '@/hooks/useSettings'
 import { KeyService } from '@/lib/wails'
+import { t } from '@/i18n'
+
 
 interface Props {
   keys: KeyInfo[]
@@ -54,34 +56,34 @@ export function KeyManager(props: Props) {
     if (!publicKey) return
     try {
       await getClipboard().writeText(publicKey)
-      toast('公钥已复制', 'success')
+      toast(t('公钥已复制'), 'success')
     } catch (error) {
-      toast(`复制公钥失败: ${error instanceof Error ? error.message : String(error)}`, 'error')
+      toast(t('复制公钥失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
     }
   }
   const deleteKey = async (key: KeyInfo) => {
     try {
       const usage = await KeyService.UsageCount(Number(key.id))
-      if (!window.confirm(usage > 0 ? `该密钥被 ${usage} 个会话引用，删除后这些会话将无法使用密钥认证。仍要删除吗？` : `删除密钥“${key.name}”？`)) return
+      if (!window.confirm(usage > 0 ? t('该密钥被 ${} 个会话引用，删除后这些会话将无法使用密钥认证。仍要删除吗？', usage) : t('删除密钥“${}”？', key.name))) return
       props.onDelete(key.id)
-    } catch (error) { toast(`分析密钥影响失败: ${error instanceof Error ? error.message : String(error)}`, 'error') }
+    } catch (error) { toast(t('分析密钥影响失败: ${}', error instanceof Error ? error.message : String(error)), 'error') }
   }
 
   return <div className="flex flex-col gap-3 pt-2">
     <div className="flex items-center gap-2">
-      <Button size="sm" variant="outline" onClick={() => setGenerateOpen(true)}>生成</Button>
-      <Button size="sm" variant="outline" onClick={() => setImportOpen(true)}>导入</Button>
+      <Button size="sm" variant="outline" onClick={() => setGenerateOpen(true)}>{t('生成')}</Button>
+      <Button size="sm" variant="outline" onClick={() => setImportOpen(true)}>{t('导入')}</Button>
     </div>
     <Table>
-      <TableHeader><TableRow><TableHead>名称</TableHead><TableHead>类型</TableHead><TableHead>创建时间</TableHead><TableHead className="text-right">操作</TableHead></TableRow></TableHeader>
+      <TableHeader><TableRow><TableHead>{t('名称')}</TableHead><TableHead>{t('类型')}</TableHead><TableHead>{t('创建时间')}</TableHead><TableHead className="text-right">{t('操作')}</TableHead></TableRow></TableHeader>
       <TableBody>
-        {props.keys.length === 0 ? <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground">无密钥</TableCell></TableRow> : props.keys.map((key) => <TableRow key={key.id}>
+        {props.keys.length === 0 ? <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground">{t('无密钥')}</TableCell></TableRow> : props.keys.map((key) => <TableRow key={key.id}>
           <TableCell>{key.name}</TableCell><TableCell>{keyTypeText(key)}</TableCell><TableCell className="text-xs">{key.createdAt}</TableCell>
           <TableCell className="text-right"><div className="flex justify-end gap-1">
-            <Button size="xs" variant="ghost" aria-label={`查看 ${key.name}`} disabled={loadingID === key.id} onClick={() => { void openMaterial(key.id, 'view') }}>查看</Button>
-            <Button size="xs" variant="ghost" aria-label={`编辑 ${key.name}`} disabled={loadingID === key.id} onClick={() => { void openMaterial(key.id, 'edit') }}>编辑</Button>
-            <Button size="xs" variant="ghost" aria-label={`复制 ${key.name} 公钥`} onClick={() => { void copyPublicKey(key.id) }}>复制公钥</Button>
-            <Button size="xs" variant="ghost" className="text-destructive" aria-label={`删除 ${key.name}`} onClick={() => { void deleteKey(key) }}>删除</Button>
+            <Button size="xs" variant="ghost" aria-label={t('查看 ${}', key.name)} disabled={loadingID === key.id} onClick={() => { void openMaterial(key.id, 'view') }}>{t('查看')}</Button>
+            <Button size="xs" variant="ghost" aria-label={t('编辑 ${}', key.name)} disabled={loadingID === key.id} onClick={() => { void openMaterial(key.id, 'edit') }}>{t('编辑')}</Button>
+            <Button size="xs" variant="ghost" aria-label={t('复制 ${} 公钥', key.name)} onClick={() => { void copyPublicKey(key.id) }}>{t('复制公钥')}</Button>
+            <Button size="xs" variant="ghost" className="text-destructive" aria-label={t('删除 ${}', key.name)} onClick={() => { void deleteKey(key) }}>{t('删除')}</Button>
           </div></TableCell>
         </TableRow>)}
       </TableBody>

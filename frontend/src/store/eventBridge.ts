@@ -4,6 +4,8 @@ import { useConnectDialog } from '@/store/connectDialog'
 import { FileService } from '@/lib/wails'
 import { logger } from '@/lib/logger'
 import { mapBackendTransferJobs } from '@/lib/transferDTO'
+import { t } from '@/i18n'
+
 
 interface EventEnvelope<T> { data?: T }
 interface ConnectionPayload { terminal_id?: string; attempt_id?: string; state?: string }
@@ -82,7 +84,7 @@ function handleFileError(event: EventEnvelope<TransferErrorPayload>) {
   const payload = event.data
   if (!payload?.task_id) return
   useAppStore.getState().updateTransfer(payload.task_id, {
-    status: 'failed', error: payload.error ?? '文件传输失败', completedAt: Date.now(),
+    status: 'failed', error: payload.error ?? t('文件传输失败'), completedAt: Date.now(),
   })
 }
 

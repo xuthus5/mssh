@@ -2,6 +2,8 @@ import { Component, createContext, useContext, type ErrorInfo, type ReactNode } 
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { logger } from '@/lib/logger'
+import { t } from '@/i18n'
+
 
 interface Props {
   children: ReactNode
@@ -54,10 +56,10 @@ export class TerminalErrorBoundary extends Component<Props, State> {
     return (
       <div className="grid h-full w-full place-items-center bg-background p-6">
         <Card role="alert" className="w-full max-w-md">
-          <CardHeader><CardTitle>终端渲染失败</CardTitle></CardHeader>
+          <CardHeader><CardTitle>{t('终端渲染失败')}</CardTitle></CardHeader>
           <CardContent className="flex items-center justify-end gap-2">
-            <Button variant="outline" onClick={this.props.onClose}>关闭标签</Button>
-            <Button onClick={this.retry}>重试</Button>
+            <Button variant="outline" onClick={this.props.onClose}>{t('关闭标签')}</Button>
+            <Button onClick={this.retry}>{t('重试')}</Button>
           </CardContent>
         </Card>
       </div>

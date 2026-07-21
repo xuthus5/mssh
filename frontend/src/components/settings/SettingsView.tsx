@@ -14,6 +14,8 @@ import type { GeneralSettings } from '@/hooks/useSettings'
 import type { CloudSyncController } from '@/hooks/useCloudSyncCenter'
 import type { ColorMode } from '@/lib/effectiveTerminalTheme'
 import type { BuiltinThemeResetResult, TerminalGlobalStyle, ThemeAssignments, ThemeConfigurationInput, ThemeImportSummary, ThemeProfile, ThemeProfileInput } from '../../../bindings/github.com/xuthus5/mssh/internal/model/models'
+import { t } from '@/i18n'
+
 
 export interface SettingsViewProps {
   general: GeneralSettings
@@ -56,13 +58,13 @@ export function SettingsView(props: SettingsViewProps) {
   return <Tabs value={tab} onValueChange={setTab} orientation="vertical"
     className="min-h-0 flex-1 flex-row gap-4 overflow-hidden p-4">
     <TabsList className="w-36 shrink-0 justify-start overflow-visible rounded-xl border bg-muted/40 p-2">
-      <TabsTrigger value="general">通用</TabsTrigger>
-      <TabsTrigger value="terminal">终端</TabsTrigger>
+      <TabsTrigger value="general">{t('通用')}</TabsTrigger>
+      <TabsTrigger value="terminal">{t('终端')}</TabsTrigger>
       <TabsTrigger value="ai">AI</TabsTrigger>
-      <TabsTrigger value="sync">同步</TabsTrigger>
-      <TabsTrigger value="security">安全</TabsTrigger>
+      <TabsTrigger value="sync">{t('同步')}</TabsTrigger>
+      <TabsTrigger value="security">{t('安全')}</TabsTrigger>
       <TabsTrigger value="sftp">SFTP</TabsTrigger>
-      <TabsTrigger value="about">关于</TabsTrigger>
+      <TabsTrigger value="about">{t('关于')}</TabsTrigger>
     </TabsList>
     <SettingsTabPanels {...props} />
   </Tabs>

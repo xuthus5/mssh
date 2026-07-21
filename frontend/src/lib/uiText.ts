@@ -1,4 +1,6 @@
-/** Lightweight UI string registry to avoid new magic Chinese scatter without keys. */
+import { t as translate } from '@/i18n'
+
+/** @deprecated Prefer import { t } from '@/i18n'. Kept for compatibility. */
 export const uiText = {
   newSession: '新建会话',
   macrosEmptyTitle: '还没有宏',
@@ -27,5 +29,5 @@ export const uiText = {
 export type UITextKey = keyof typeof uiText
 
 export function t(key: UITextKey): string {
-  return uiText[key]
+  return translate(uiText[key])
 }

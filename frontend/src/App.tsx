@@ -17,6 +17,8 @@ import { GeneralSettingsRuntime } from '@/components/layout/GeneralSettingsRunti
 import { WorkspacePersistence } from '@/components/layout/WorkspacePersistence'
 import { createAppSyncDataReload, hotReloadSessionWorkspace, registerSyncDataReload } from '@/lib/syncDataReload'
 import { getClipboard } from '@/lib/clipboard'
+import { t } from '@/i18n'
+
 
 function activeTab(state: AppState): Tab | undefined {
   const surface = state.activeSurface
@@ -36,7 +38,7 @@ function copySelection(state: AppState) {
   if (!selection) return
   getClipboard().writeText(selection)
     .then(() => logger.debug('Shortcut: Ctrl+Shift+C: copied selection'))
-    .catch((error: unknown) => toast(`复制失败: ${error instanceof Error ? error.message : String(error)}`, 'error'))
+    .catch((error: unknown) => toast(t('复制失败: ${}', error instanceof Error ? error.message : String(error)), 'error'))
 }
 
 function pasteClipboard(state: AppState) {
@@ -44,7 +46,7 @@ function pasteClipboard(state: AppState) {
   if (!entry) return
   getClipboard().readText()
     .then((text) => { entry.terminal.paste(text); logger.debug('Shortcut: Ctrl+Shift+V: pasted') })
-    .catch((error: unknown) => toast(`粘贴失败: ${error instanceof Error ? error.message : String(error)}`, 'error'))
+    .catch((error: unknown) => toast(t('粘贴失败: ${}', error instanceof Error ? error.message : String(error)), 'error'))
 }
 
 function clearTerminal(state: AppState) {
@@ -58,7 +60,7 @@ function closeActiveTab(state: AppState) {
   const tab = activeTab(state)
   if (!tab) return
   if (tab.type === 'terminal' && (state.connectionStatus[tab.terminalId] === 'connected' || state.recordingState[tab.terminalId] === 'recording')) {
-    toast('请使用标签关闭按钮确认终止活动连接', 'warning')
+    toast(t('请使用标签关闭按钮确认终止活动连接'), 'warning')
     return
   }
   closeTabsWithFeedback([tab.id], state.closeTab)

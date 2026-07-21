@@ -13,6 +13,8 @@ import { TerminalService } from '@/lib/wails'
 import { toast } from '@/components/ui/toast'
 import { dynamicPanelID, dynamicTabID } from '@/store/tabNavigation'
 import { TabCloseConfirmation, useTabCloseCoordinator } from '@/hooks/useTabCloseCoordinator'
+import { t } from '@/i18n'
+
 
 const TerminalTab = lazy(() => import('@/components/terminal/TerminalTab').then((module) => ({ default: module.TerminalTab })))
 const PlaybackTab = lazy(() => import('@/components/terminal/PlaybackTab').then((module) => ({ default: module.PlaybackTab })))
@@ -86,9 +88,9 @@ function FilePanelContainer({ sessionID, terminalID, onClose }: { sessionID: num
       await TerminalService.Write(terminalID, MANUAL_TERMINAL_DIRECTORY_REPORT)
       const path = await waitForTerminalWorkingDirectory(terminalID, previousRevision)
       if (!followTerminalDirectory || path === transfer.currentPath) await transfer.listFiles(path)
-      toast(`已同步当前目录: ${path}`, 'success')
+      toast(t('已同步当前目录: ${}', path), 'success')
     } catch (error) {
-      toast(`同步当前目录失败: ${error instanceof Error ? error.message : String(error)}`, 'error')
+      toast(t('同步当前目录失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
     } finally {
       setSyncingCurrentDirectory(false)
     }
@@ -101,13 +103,13 @@ function FilePanelContainer({ sessionID, terminalID, onClose }: { sessionID: num
   }), [dropTargetID, transfer.currentPath, transfer.uploadMany])
 
   const handleUpload = useCallback(async () => {
-    const selected = await Dialogs.OpenFile({ Title: '选择要上传的文件', CanChooseFiles: true, CanChooseDirectories: false, AllowsMultipleSelection: false })
+    const selected = await Dialogs.OpenFile({ Title: t('选择要上传的文件'), CanChooseFiles: true, CanChooseDirectories: false, AllowsMultipleSelection: false })
     const localPath = typeof selected === 'string' ? selected : selected[0]
     if (localPath) await transfer.upload(localPath, transfer.currentPath)
   }, [transfer.currentPath, transfer.upload])
 
   const handleDownload = useCallback(async (remotePath: string) => {
-    const localPath = await Dialogs.SaveFile({ Title: '选择下载位置', Filename: remotePath.split('/').pop() ?? 'download', CanCreateDirectories: true })
+    const localPath = await Dialogs.SaveFile({ Title: t('选择下载位置'), Filename: remotePath.split('/').pop() ?? 'download', CanCreateDirectories: true })
     if (localPath) await transfer.download(remotePath, localPath)
   }, [transfer.download])
 

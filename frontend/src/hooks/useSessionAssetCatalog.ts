@@ -3,6 +3,8 @@ import { AssetCatalogService, SessionService } from '@/lib/wails'
 import { logger } from '@/lib/logger'
 import { mapEnvironment, mapProject, mapSession, mapTag, type AssetColorToken, type AssetEnvironment, type AssetProject, type AssetTag, type Session } from '@/lib/sessionModels'
 import type { AssetColorToken as BindingAssetColorToken, AssetDeleteInput } from '../../bindings/github.com/xuthus5/mssh/internal/model/models'
+import { t } from '@/i18n'
+
 
 interface StateSetters {
   environments: AssetEnvironment[]
@@ -44,7 +46,7 @@ export function useSessionAssetCatalog(state: StateSetters) {
 
   const createEnvironment = useCallback(async (name: string, colorToken: AssetColorToken) => {
     const result = await AssetCatalogService.CreateEnvironment({ id: 0, name, color_token: colorToken as unknown as BindingAssetColorToken, sort_order: state.environments.length })
-    if (!result) throw new Error('创建环境失败')
+    if (!result) throw new Error(t('创建环境失败'))
     const mapped = mapEnvironment(result)
     state.setEnvironments((current) => [...current, mapped])
     return mapped
@@ -52,7 +54,7 @@ export function useSessionAssetCatalog(state: StateSetters) {
 
   const createProject = useCallback(async (name: string, code = '', description = '') => {
     const result = await AssetCatalogService.CreateProject({ id: 0, name, code, description, sort_order: state.projects.length })
-    if (!result) throw new Error('创建项目失败')
+    if (!result) throw new Error(t('创建项目失败'))
     const mapped = mapProject(result)
     state.setProjects((current) => [...current, mapped])
     return mapped
@@ -60,7 +62,7 @@ export function useSessionAssetCatalog(state: StateSetters) {
 
   const createTag = useCallback(async (name: string, colorToken: AssetColorToken) => {
     const result = await AssetCatalogService.CreateTag({ id: 0, name, color_token: colorToken as unknown as BindingAssetColorToken })
-    if (!result) throw new Error('创建标签失败')
+    if (!result) throw new Error(t('创建标签失败'))
     const mapped = mapTag(result)
     state.setTags((current) => [...current, mapped])
     return mapped

@@ -15,6 +15,8 @@ import {
   selectAllTerminal,
 } from '@/lib/terminalInteractions'
 import { useTerminalBehaviorStore } from '@/store/terminalBehaviorStore'
+import { t } from '@/i18n'
+
 
 interface TerminalInteractionSurfaceProps {
   terminalRef: RefObject<Terminal | null>
@@ -34,7 +36,7 @@ interface TerminalContextMenuProps extends TerminalInteractionSurfaceProps {
 
 function reportExplicitClipboardError(error: unknown) {
   logger.error('terminal clipboard action failed', error)
-  toast(`剪贴板操作失败: ${error instanceof Error ? error.message : String(error)}`, 'error')
+  toast(t('剪贴板操作失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
 }
 
 function restoreTerminalFocus(term: Terminal) {
@@ -98,15 +100,15 @@ function TerminalContextMenu({ terminalRef, children, actions, pasteMode }: Term
         <ContextMenuContent>
           <ContextMenuItem disabled={copyDisabled} onClick={() => { void actions.copy().catch(reportExplicitClipboardError) }}>
             <Copy />
-            复制
+            {t('复制')}
           </ContextMenuItem>
           <ContextMenuItem onClick={() => { void actions.paste().catch(reportExplicitClipboardError) }}>
             <ClipboardPaste />
-            粘贴
+            {t('粘贴')}
           </ContextMenuItem>
           <ContextMenuItem onClick={actions.selectAll}>
             <TextSelect />
-            全选
+            {t('全选')}
           </ContextMenuItem>
         </ContextMenuContent>
       )}
