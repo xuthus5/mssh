@@ -1,4 +1,4 @@
-import { useMemo, useState, type KeyboardEvent, type MouseEvent } from 'react'
+import { useEffect, useMemo, useState, type KeyboardEvent, type MouseEvent } from 'react'
 import {
   ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuItem,
   ContextMenuSeparator, ContextMenuSub, ContextMenuSubTrigger, ContextMenuSubContent,
@@ -47,6 +47,14 @@ export default function SessionTree(props: Props) {
     [folders, sessions, expanded, revealAll],
   )
   const activeId = nodes[Math.min(Math.max(activeIndex, 0), Math.max(nodes.length - 1, 0))]?.id
+
+  useEffect(() => {
+    if (!activeId) return
+    const element = document.getElementById(activeId)
+    if (element && typeof element.scrollIntoView === 'function') {
+      element.scrollIntoView({ block: 'nearest' })
+    }
+  }, [activeId])
 
   const handleNodeKey = (event: KeyboardEvent, index: number, node: SessionTreeNode) => {
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp' || event.key === 'Home' || event.key === 'End') {

@@ -35,6 +35,9 @@ jobs:
           go tool cover -func=coverage.out | grep total | awk '{if ($3+0 < 90) exit 1}'
       - name: Frontend test
         run: |
-          cd frontend && npm install && npm test
+          cd frontend && npm install
+          npm run check:source-limits
+          npm run check:bundle-budget
+          npm test
       - name: Build
         run: wails3 build

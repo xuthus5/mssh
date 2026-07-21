@@ -17,7 +17,7 @@
 - 终端体验有工程投入：连接状态机、`resize` 去抖、输出 sequencer、ErrorBoundary、Canvas renderer、分屏与懒加载 Tab。
 - 部分 a11y 到位：动态标签 `role="tablist/tab"`、会话树/文件树 `role="tree"`、工具面板 resize `role="separator"` + 键盘调节、隐藏层 `inert`。
 - 异步防重：`useAsyncAction` 支持 `dedupe` / `latest`，覆盖 UX-002 的部分路径。
-- 测试意识强：大量 `*.test.tsx` / `*.behavior.test.tsx`，覆盖率阈值 90%（但 include 列表偏窄）。
+- 测试意识强：大量 `*.test.tsx` / `*.behavior.test.tsx`，覆盖率阈值 90%，include 已覆盖主路径；CI 运行 source-limits + vitest。
 
 ### 0.2 主要风险（按严重度）
 
@@ -30,11 +30,11 @@
 | P1 | 状态栏每秒 + 系统信息 3s 轮询导致底部区域高频重渲染 | **已闭环**：子组件隔离 + visibility 停轮询 |
 | P1 | 类型安全缺口与空 catch | **已闭环**：typed transferDTO + logger 错误 |
 | P1 | 代码规模门禁局部突破 | **已闭环**：check-source-limits.mjs 门禁 |
-| P2 | 宏工作区空壳 | `WorkspaceContent` 仅空白 `aria-label="宏工作区"` |
-| P2 | 会话树键盘导航不完整 | 有 Enter/左右展开，无上下兄弟节点移动 / Home/End |
-| P2 | 命令历史悬停才显示操作 | `opacity-0 group-hover:opacity-100`，键盘与触控差 |
-| P2 | 快捷键发现不一致 | Welcome 未列出 Ctrl+F 快速搜索等 |
-| P2 | 覆盖率 include 与真实模块漂移 | `vite.config.ts` 仍引用不存在的 `SettingsDialog.tsx` 等，大量 settings/file 未纳入门槛 |
+| P2 | 宏工作区空壳 | **已闭环**：MacrosWorkspace 列表/空态/错误重试；后续可增强「对活动终端执行宏」主路径 |
+| P2 | 会话树键盘导航不完整 | **已闭环**：ArrowUp/Down/Home/End + aria-activedescendant；后续可补滚动到活动节点 |
+| P2 | 命令历史悬停才显示操作 | **已闭环**：focus-within 可见 + 键盘按钮；快捷命令面板仍可再统一 |
+| P2 | 快捷键发现不一致 | **已闭环**：Welcome 含 Ctrl/Cmd+F 与平台说明 |
+| P2 | 覆盖率 include 与真实模块漂移 | **已闭环**：include 对齐主路径；CI 增加 source-limits 门禁 |
 
 ---
 
@@ -169,3 +169,20 @@
 - 对照规范：`frontend/src/AGENTS.md`（50/300 行）、根 `AGENTS.md` shadcn 约定、既有商业化 EARS 文档格式。
 
 **技能使用声明**：`frontend-design`（布局/视觉与体验原则校准）、项目既有 EARS 文档体例。
+
+
+---
+
+## 11. 残留增强 backlog（非阻塞）
+
+以下不是缺陷清单，而是产品增强方向（随本轮持续收敛）：
+
+1. ~~终端海量输出：非活动 Tab 有界合并写~~ **已做**：`TerminalOutputCoalescer` + 激活 flush + metrics；更完整活动 Tab 背压 UI 仍可选。
+2. ~~文件树大数据集虚拟化~~ **已做**（>80 `VirtualList`）；真机 FPS/long-task 抽样可选。
+3. ~~宏工作区：对当前活动终端一键执行~~ **已做**；多宏批量执行仍可选。
+4. ~~主包体积预算 CI~~ **已做轻量门禁**（`check:bundle-budget`：禁止 App 静态 xterm、保持 lazy 重模块）。
+5. ~~i18n 高频文案~~ **已推进**（宏/欢迎页迁入 `uiText`）；其余页面可继续渐进迁移。
+6. ~~会话树键盘导航 scroll-into-view~~ **已做**。
+7. ~~敏感命令过滤矩阵扩展~~ **已做**（可继续按产品场景补模式）。
+
+**停止条件（本目标）**：P0/P1 缺陷已闭环；前端测试/source-limits/bundle-budget/`wails3 build` 通过；残留仅增强项。

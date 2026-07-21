@@ -71,3 +71,15 @@ describe('QuickCommands', () => {
     expect(screen.queryByText('Ctrl+P')).not.toBeInTheDocument()
   })
 })
+
+  it('keeps delete actions keyboard-discoverable via focus-within styles', () => {
+    render(<QuickCommands commands={commands} onExecute={vi.fn()} onAdd={vi.fn()} onDelete={vi.fn()} />)
+    const deleteButton = screen.getAllByRole('button')[0]
+    // In the list row, delete is the only nested button.
+    const row = screen.getByText('List files').closest<HTMLElement>('[draggable="true"]')
+    const button = within(row!).getByRole('button')
+    expect(button.className).toContain('group-focus-within:opacity-100')
+    expect(button.className).toContain('sm:opacity-0')
+    void deleteButton
+  })
+
