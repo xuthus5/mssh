@@ -3,6 +3,7 @@ import { logger } from '@/lib/logger'
 import { useConnectDialog } from '@/store/connectDialog'
 import { useAppStore } from '@/store/appStore'
 import { toast } from '@/components/ui/toast'
+import { openTerminalWithPoolCapacity } from '@/lib/openTerminal'
 
 interface ReconnectSession {
   id: string
@@ -66,7 +67,7 @@ export async function reconnectSessionTab(tabId: string, sessions: ReconnectSess
   try {
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
-        const nextTerminalId = await TerminalService.Open(Number(session.id), terminal?.cols ?? 80, terminal?.rows ?? 24)
+        const nextTerminalId = await openTerminalWithPoolCapacity(() => TerminalService.Open(Number(session.id), terminal?.cols ?? 80, terminal?.rows ?? 24))
         if (controller.signal.aborted || !useAppStore.getState().replaceTerminalConnection(tabId, terminalId, nextTerminalId)) { await closeStaleTerminal(nextTerminalId); dialog.closeDialog(); return }
         dialog.setState('connected')
         logger.info('reconnected', { previousTerminalId: terminalId, terminalId: nextTerminalId, host: session.host })

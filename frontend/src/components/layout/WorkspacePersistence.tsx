@@ -5,6 +5,7 @@ import { useAppStore } from '@/store/appStore'
 import { logger } from '@/lib/logger'
 import { toast } from '@/components/ui/toast'
 import { createWorkspaceSnapshot, parseWorkspaceSnapshot, restoreWorkspaceSnapshot, WORKSPACE_LAYOUT_SETTING } from '@/store/workspacePersistence'
+import { openTerminalWithPoolCapacity } from '@/lib/openTerminal'
 
 const SAVE_DELAY_MS = 300
 
@@ -24,7 +25,7 @@ export function WorkspacePersistence() {
         const setting = await SettingService.Get(WORKSPACE_LAYOUT_SETTING)
         if (!setting || cancelled) return
         const snapshot = parseWorkspaceSnapshot(setting.value)
-        const result = await restoreWorkspaceSnapshot(snapshot, new Set(sessions.map((session) => Number(session.id))), (sessionID) => TerminalService.Open(sessionID, 80, 24))
+        const result = await restoreWorkspaceSnapshot(snapshot, new Set(sessions.map((session) => Number(session.id))), (sessionID) => openTerminalWithPoolCapacity(() => TerminalService.Open(sessionID, 80, 24)))
         if (cancelled) return
         const { failures, ...workspace } = result
         useAppStore.setState({ ...workspace, overviewReturnSurface: null, focusRequest: { id: '', terminalId: null, sequence: 0 } })

@@ -338,16 +338,20 @@ describe('appStore', () => {
 
   it('evicts orphan pool entries before closing terminals still bound to open tabs', () => {
     __registerHandler('github.com/xuthus5/mssh/internal/service.TerminalService.Close', async () => {})
-    const makeTerm = () => ({ dispose: () => {} }) as unknown as import('@xterm/xterm').Terminal
+    const orphanDispose = vi.fn()
+    const openDispose = vi.fn()
+    const make = (dispose: () => void) => ({ dispose }) as unknown as import('@xterm/xterm').Terminal
     useAppStore.setState({ maxPoolSize: 2, terminalPool: new Map(), tabs: [], activePaneId: null })
     const store = useAppStore.getState()
     store.openTab({ id: 'tab-open', title: 'Open', type: 'terminal', terminalId: 'term-open', sessionId: 1 })
-    store.registerTerminal('term-open', makeTerm())
-    store.registerTerminal('term-orphan', makeTerm())
+    store.registerTerminal('term-open', make(openDispose))
+    store.registerTerminal('term-orphan', make(orphanDispose))
     store.updateLastUsed('term-open')
-    store.registerTerminal('term-new', makeTerm())
+    store.registerTerminal('term-new', make(() => {}))
     const state = useAppStore.getState()
     expect(state.terminalPool.has('term-orphan')).toBe(false)
+    expect(orphanDispose).toHaveBeenCalledOnce()
+    expect(openDispose).not.toHaveBeenCalled()
     expect(state.terminalPool.has('term-open')).toBe(true)
     expect(state.tabs.some((tab) => tab.id === 'tab-open')).toBe(true)
     expect(state.terminalPool.has('term-new')).toBe(true)
