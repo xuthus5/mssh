@@ -5,6 +5,7 @@ import { useSettings } from '@/hooks/useSettings'
 import { useCloudSyncCenter } from '@/hooks/useCloudSyncCenter'
 import { useThemeCatalog } from '@/hooks/useThemeCatalog'
 import { useAISettings } from '@/hooks/useAISettings'
+import { VaultGate } from '@/components/security/VaultGate'
 
 function settingsViewProps(
   settings: ReturnType<typeof useSettings>,
@@ -26,14 +27,24 @@ function settingsViewProps(
   }
 }
 
-export function SettingsWindowApp() {
+function SettingsWindowContent() {
   const settings = useSettings()
   const catalog = useThemeCatalog()
   const cloudSync = useCloudSyncCenter()
   const ai = useAISettings()
-  return <div className="flex h-screen w-screen flex-col overflow-hidden bg-background text-foreground">
-    <SettingsWindowTitleBar />
-    <SettingsView {...settingsViewProps(settings, catalog, cloudSync, ai)} />
-    <ToastContainer />
-  </div>
+  return (
+    <div className="flex h-screen w-screen flex-col overflow-hidden bg-background text-foreground">
+      <SettingsWindowTitleBar />
+      <SettingsView {...settingsViewProps(settings, catalog, cloudSync, ai)} />
+      <ToastContainer />
+    </div>
+  )
+}
+
+export function SettingsWindowApp() {
+  return (
+    <VaultGate>
+      <SettingsWindowContent />
+    </VaultGate>
+  )
 }

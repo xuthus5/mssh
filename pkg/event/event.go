@@ -11,6 +11,7 @@ const (
 	ConnectionAttempt  = "session:attempt"
 	TunnelState        = "tunnel:state"
 	HostKeyFingerprint = "session:fingerprint"
+	VaultLocked        = "security:vault-locked"
 )
 
 type TerminalOutputPayload struct {

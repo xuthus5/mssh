@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	backupcrypto "github.com/xuthus5/mssh/internal/crypto"
 )
@@ -57,7 +58,15 @@ func (s *SyncService) writeRecoveryPoint(masterKey string) error {
 	if err != nil {
 		return err
 	}
-	content, err := encodeEncryptedSnapshot(data, masterKey)
+	fingerprint, err := snapshotFingerprint(data)
+	if err != nil {
+		return err
+	}
+	vault, err := s.artifactVault()
+	if err != nil {
+		return err
+	}
+	content, err := encodeSyncArtifact(data, masterKey, syncArtifactMetadata{SnapshotFingerprint: fingerprint, CreatedAt: time.Now().UTC()}, vault)
 	if err != nil {
 		return err
 	}

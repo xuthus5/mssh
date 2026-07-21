@@ -20,7 +20,7 @@ func (s *SessionService) connect(ctx context.Context, sessionID int64, emitState
 	attemptID := s.registerConnectAttempt(cancel)
 	defer s.finishConnectAttempt(attemptID)
 	s.eventBus.Emit(event.ConnectionAttempt, event.ConnectionStatePayload{AttemptID: attemptID, State: "connecting"})
-	sess, err := store.GetSession(s.db, sessionID)
+	sess, err := s.sessionForConnect(sessionID)
 	if err != nil {
 		return "", fmt.Errorf("connect: %w", err)
 	}

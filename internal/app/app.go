@@ -15,7 +15,6 @@ import (
 
 type App struct {
 	DB       *sql.DB
-	Crypto   []byte
 	Keychain crypto.KeychainAdapter
 
 	Session        *service.SessionService
@@ -34,6 +33,7 @@ type App struct {
 	Audit          *service.AuditService
 	AssetCatalog   *service.AssetCatalogService
 	AI             *service.AIService
+	Security       *service.SecurityService
 	logger         *slog.Logger
 	shutdownOnce   sync.Once
 }
@@ -52,31 +52,28 @@ func newApp(opts Options, openDB func(string) (*sql.DB, error)) (*App, error) {
 }
 
 type serviceInitialization struct {
-	db        *sql.DB
-	masterKey []byte
-	keychain  crypto.KeychainAdapter
-	opts      Options
-	eventBus  service.EventBus
-	logger    *slog.Logger
+	db       *sql.DB
+	keychain crypto.KeychainAdapter
+	opts     Options
+	eventBus service.EventBus
+	logger   *slog.Logger
 }
 
 type appDependencies struct {
-	openDB              func(string) (*sql.DB, error)
-	initializeSchema    func(*sql.DB) error
-	initializeMasterKey func(string, crypto.KeychainAdapter, *slog.Logger) ([]byte, error)
-	initializeServices  func(serviceInitialization) (*App, error)
-	closeDB             func(*sql.DB) error
-	keychain            crypto.KeychainAdapter
+	openDB             func(string) (*sql.DB, error)
+	initializeSchema   func(*sql.DB) error
+	initializeServices func(serviceInitialization) (*App, error)
+	closeDB            func(*sql.DB) error
+	keychain           crypto.KeychainAdapter
 }
 
 func defaultAppDependencies(openDB func(string) (*sql.DB, error)) appDependencies {
 	return appDependencies{
-		openDB:              openDB,
-		initializeSchema:    store.InitializeSchema,
-		initializeMasterKey: initializeMasterKey,
-		initializeServices:  initializeServices,
-		closeDB:             func(db *sql.DB) error { return db.Close() },
-		keychain:            crypto.NewKeychainAdapter(),
+		openDB:             openDB,
+		initializeSchema:   store.InitializeSchema,
+		initializeServices: initializeServices,
+		closeDB:            func(db *sql.DB) error { return db.Close() },
+		keychain:           crypto.NewKeychainAdapter(),
 	}
 }
 
@@ -114,15 +111,10 @@ func startApp(opts Options, logger *slog.Logger, dependencies appDependencies) (
 		return nil, fmt.Errorf("initialize database schema: %w", err)
 	}
 
-	masterKey, err := dependencies.initializeMasterKey(opts.DataDir, dependencies.keychain, logger)
-	if err != nil {
-		return nil, err
-	}
-
 	eventBus := event.NewWailsEventBus(logger)
 	logger.Info("initializing services")
 	appInstance, err = dependencies.initializeServices(serviceInitialization{
-		db: db, masterKey: masterKey, keychain: dependencies.keychain,
+		db: db, keychain: dependencies.keychain,
 		opts: opts, eventBus: eventBus, logger: logger,
 	})
 	if err != nil {
@@ -135,29 +127,14 @@ func startApp(opts Options, logger *slog.Logger, dependencies appDependencies) (
 	return appInstance, nil
 }
 
-func initializeMasterKey(dataDir string, keychain crypto.KeychainAdapter, logger *slog.Logger) ([]byte, error) {
-	logger.Info("loading master key")
-	masterKey, err := loadMasterKey(dataDir, keychain, logger)
-	if err != nil {
-		logger.Error("load master key failed", "error", err)
-		return nil, fmt.Errorf("load master key: %w", err)
-	}
-	if masterKey != nil {
-		return masterKey, nil
-	}
-	logger.Info("generating new master key")
-	masterKey, err = crypto.GenerateRandomBytes(32)
-	if err != nil {
-		logger.Error("generate master key failed", "error", err)
-		return nil, fmt.Errorf("generate master key: %w", err)
-	}
-	persistMasterKey(masterKeyPersistence{dataDir: dataDir, key: masterKey, keychain: keychain, logger: logger})
-	return masterKey, nil
-}
-
 func initializeServices(input serviceInitialization) (*App, error) {
-	adapter := &cryptoAdapter{key: input.masterKey}
-	sessionSvc := service.NewSessionService(input.db, input.eventBus, service.DefaultKeepAliveSeconds, input.opts.DataDir, adapter, input.logger)
+	runtime := service.NewCryptoRuntime()
+	securitySvc := service.NewSecurityService(input.db, input.opts.DataDir, runtime, input.keychain, input.logger)
+	securitySvc.SetEventBus(input.eventBus)
+	if err := securitySvc.TryAutoUnlock(); err != nil {
+		input.logger.Warn("auto unlock vault failed", "error", err)
+	}
+	sessionSvc := service.NewSessionService(input.db, input.eventBus, service.DefaultKeepAliveSeconds, input.opts.DataDir, runtime, input.logger)
 	terminalSvc := service.NewTerminalService(sessionSvc, input.eventBus, 32, input.logger)
 	tunnelSvc := service.NewTunnelService(input.db, sessionSvc, input.eventBus, input.logger)
 	logSvc := service.NewLogService(input.db, input.opts.DataDir, input.logger)
@@ -167,17 +144,27 @@ func initializeServices(input serviceInitialization) (*App, error) {
 	}
 	configureTerminalLogging(terminalSvc, logSvc, input.logger)
 	syncSvc := service.NewSyncService(input.db, input.logger,
-		service.WithSyncDataDir(input.opts.DataDir), service.WithSyncCrypto(adapter), service.WithSyncEventBus(input.eventBus),
+		service.WithSyncDataDir(input.opts.DataDir),
+		service.WithSyncCrypto(runtime),
+		service.WithSyncSecretSource(securitySvc.SyncSecret),
+		service.WithVaultSource(func() (*crypto.VaultFile, error) {
+			vault, err := securitySvc.ExportVaultFile()
+			if err != nil {
+				return nil, err
+			}
+			return &vault, nil
+		}),
+		service.WithVaultInstaller(securitySvc.InstallVaultFromExport),
+		service.WithSyncEventBus(input.eventBus),
 		service.WithSyncLifecycle(syncLifecycleAdapter{terminal: terminalSvc, tunnel: tunnelSvc, session: sessionSvc}))
 	return &App{
 		DB:             input.db,
-		Crypto:         input.masterKey,
 		Keychain:       input.keychain,
 		Session:        sessionSvc,
 		Terminal:       terminalSvc,
 		File:           service.NewFileService(sessionSvc, input.eventBus, input.logger, service.WithTransferDB(input.db)),
 		Tunnel:         tunnelSvc,
-		Key:            service.NewKeyService(input.db, adapter, input.logger),
+		Key:            service.NewKeyService(input.db, runtime, input.logger),
 		Macro:          service.NewMacroService(input.db, terminalSvc, input.logger),
 		CommandHistory: service.NewCommandHistoryService(input.db, input.logger),
 		Theme:          themeSvc,
@@ -189,6 +176,7 @@ func initializeServices(input serviceInitialization) (*App, error) {
 		Audit:          service.NewAuditService(input.db, input.logger),
 		AssetCatalog:   service.NewAssetCatalogService(input.db, input.logger),
 		AI:             service.NewAIService(input.db, terminalSvc, input.keychain, input.logger),
+		Security:       securitySvc,
 		logger:         input.logger,
 	}, nil
 }
@@ -232,6 +220,10 @@ func (a *App) Shutdown() {
 }
 
 func (a *App) shutdown() {
+	if a.Security != nil {
+		a.Security.ClearMemory()
+	}
+
 	logger := a.logger
 	if logger == nil {
 		logger = slog.Default()

@@ -26,6 +26,7 @@ vi.mock('@wailsio/runtime', async (importOriginal) => {
 })
 vi.mock('@/components/session/SessionAssetCenter', () => ({ SessionAssetCenter: () => <div>会话资产工作区</div> }))
 vi.mock('@/components/layout/Sidebar', () => ({ default: () => null }))
+vi.mock('@/components/security/VaultGate', () => ({ VaultGate: ({ children }: { children: React.ReactNode }) => children }))
 vi.mock('@/components/layout/StatusBar', () => ({ default: () => null }))
 vi.mock('@/components/layout/WindowTitleBar', () => ({ WindowTitleBar: () => null }))
 vi.mock('@/components/layout/ConnectDialog', () => ({ ConnectDialog: () => null }))

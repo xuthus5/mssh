@@ -21,7 +21,7 @@ func (s syncTestCrypto) Decrypt(value []byte) ([]byte, error) { return appcrypto
 func TestSyncConfigEncryptsProviderSecretsAndExcludesSyncSettings(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	crypto := syncTestCrypto{key: []byte("01234567890123456789012345678901")}
-	service := NewSyncService(db, testutil.NewTestLogger(), WithSyncDataDir(t.TempDir()), WithSyncCrypto(crypto))
+	service := newTestSyncService(db, syncTestMasterKey, WithSyncDataDir(t.TempDir()), WithSyncCrypto(crypto))
 	input := model.SyncConfigInput{
 		Enabled: true, Provider: model.SyncProviderGist, Strategy: model.SyncStrategySmart,
 		IntervalMinutes: 15, RetentionCount: 30, RetentionDays: 90, MasterKey: syncTestMasterKey,
@@ -63,7 +63,7 @@ func TestValidateSyncConfigRejectsUnsupportedValues(t *testing.T) {
 func TestSyncConfigLoadsAndClearsEncryptedSecrets(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	crypto := syncTestCrypto{key: []byte("01234567890123456789012345678901")}
-	service := NewSyncService(db, testutil.NewTestLogger(), WithSyncCrypto(crypto))
+	service := newTestSyncService(db, syncTestMasterKey, WithSyncCrypto(crypto))
 	input := model.SyncConfigInput{
 		Provider: model.SyncProviderS3, Strategy: model.SyncStrategySmart, IntervalMinutes: 0,
 		RetentionCount: 30, RetentionDays: 90, MasterKey: syncTestMasterKey,

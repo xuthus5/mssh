@@ -27,6 +27,18 @@ export function Import(path: string): $CancellablePromise<void> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.SyncService.Import", path);
 }
 
+export function ImportWithPassword(path: string, password: string): $CancellablePromise<void> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.SyncService.ImportWithPassword", path, password);
+}
+
+export function JoinWithPassword(input: model$0.SyncConfigInput, password: string): $CancellablePromise<model$0.SyncResult> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.SyncService.JoinWithPassword", input, password).then(($result: any) => {
+        return $$createType6($result);
+    });
+}
+
+
+
 export function ListEvents(): $CancellablePromise<model$0.SyncEvent[]> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.SyncService.ListEvents").then(($result: any) => {
         return $$createType2($result);

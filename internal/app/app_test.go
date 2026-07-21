@@ -28,7 +28,7 @@ func TestNew(t *testing.T) {
 	t.Cleanup(func() { _ = appInstance.DB.Close() })
 
 	assert.NotNil(t, appInstance.DB)
-	assert.NotNil(t, appInstance.Crypto)
+	assert.NotNil(t, appInstance.Security)
 	assert.NotNil(t, appInstance.Session)
 	assert.NotNil(t, appInstance.Terminal)
 	assert.NotNil(t, appInstance.File)
@@ -41,7 +41,7 @@ func TestNew(t *testing.T) {
 	assert.NotNil(t, appInstance.Setting)
 	assert.NotNil(t, appInstance.Font)
 
-	assert.Len(t, appInstance.Crypto, 32)
+	assert.False(t, appInstance.Security == nil)
 	assert.NotNil(t, appInstance.Keychain)
 }
 
@@ -75,40 +75,6 @@ func (stopper *stubRecordingStopper) StopTerminalRecordingIfActive(terminalID st
 	return stopper.err
 }
 
-func TestCryptoAdapterEncrypt(t *testing.T) {
-	key := []byte("0123456789abcdef0123456789abcdef")
-	ca := &cryptoAdapter{key: key}
-
-	ciphertext, err := ca.Encrypt([]byte("hello"))
-	require.NoError(t, err)
-	assert.NotEqual(t, "hello", string(ciphertext))
-
-	plaintext, err := ca.Decrypt(ciphertext)
-	require.NoError(t, err)
-	assert.Equal(t, "hello", string(plaintext))
-}
-
-func TestCryptoAdapterEncryptEmpty(t *testing.T) {
-	key := []byte("0123456789abcdef0123456789abcdef")
-	ca := &cryptoAdapter{key: key}
-
-	ciphertext, err := ca.Encrypt([]byte{})
-	require.NoError(t, err)
-	assert.NotNil(t, ciphertext)
-
-	plaintext, err := ca.Decrypt(ciphertext)
-	require.NoError(t, err)
-	assert.Empty(t, plaintext)
-}
-
-func TestCryptoAdapterDecryptCorrupted(t *testing.T) {
-	key := []byte("0123456789abcdef0123456789abcdef")
-	ca := &cryptoAdapter{key: key}
-
-	_, err := ca.Decrypt([]byte("corrupted-data"))
-	assert.Error(t, err)
-}
-
 func TestNewDataDirIsFile(t *testing.T) {
 	dataDir := filepath.Join(t.TempDir(), "file.txt")
 	require.NoError(t, os.WriteFile(dataDir, []byte("data"), 0o600))
@@ -122,21 +88,17 @@ func TestNewDataDirContainsNullByte(t *testing.T) {
 	assert.Error(t, err)
 }
 
-func TestMasterKeyPersistence(t *testing.T) {
+func TestNewWiresSecurityService(t *testing.T) {
 	dataDir := filepath.Join(t.TempDir(), ".mssh")
-	err := os.MkdirAll(dataDir, 0o700)
+	require.NoError(t, os.MkdirAll(dataDir, 0o700))
+	appInstance, err := New(Options{DataDir: dataDir})
 	require.NoError(t, err)
-
-	app1, err := New(Options{DataDir: dataDir})
+	t.Cleanup(func() { appInstance.Shutdown() })
+	require.NotNil(t, appInstance.Security)
+	status, err := appInstance.Security.Status()
 	require.NoError(t, err)
-	t.Cleanup(func() { _ = app1.DB.Close() })
-	key1 := string(app1.Crypto)
-
-	app2, err := New(Options{DataDir: dataDir})
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = app2.DB.Close() })
-
-	assert.Equal(t, key1, string(app2.Crypto), "master key should persist between sessions")
+	assert.False(t, status.Configured)
+	assert.False(t, status.Unlocked)
 }
 
 func TestApp_Shutdown(t *testing.T) {

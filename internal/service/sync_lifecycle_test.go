@@ -19,7 +19,7 @@ func TestResetLocalDataPreservesSettingsAndCreatesRecoveryPoint(t *testing.T) {
 	require.NoError(t, store.SetSettings(db, []model.Setting{{Key: "appearance.mode", Namespace: "appearance", Value: `"dark"`, ValueType: "string", Version: 1}}))
 	lifecycle := &fakeSyncLifecycle{}
 	eventBus := &fakeSyncEventBus{}
-	service := NewSyncService(db, testutil.NewTestLogger(), WithSyncDataDir(t.TempDir()), WithSyncLifecycle(lifecycle), WithSyncEventBus(eventBus))
+	service := newTestSyncService(db, syncTestMasterKey, WithSyncDataDir(t.TempDir()), WithSyncLifecycle(lifecycle), WithSyncEventBus(eventBus))
 	require.NoError(t, service.ResetLocalData())
 
 	assert.Equal(t, 1, lifecycle.calls)
