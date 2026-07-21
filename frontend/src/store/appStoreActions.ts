@@ -1,5 +1,4 @@
 import type { StoreApi } from 'zustand'
-import type { Terminal } from '@xterm/xterm'
 import { TerminalService } from '@/lib/wails'
 import { logger } from '@/lib/logger'
 import {
@@ -13,7 +12,8 @@ import {
   type WorkspaceID,
 } from '@/store/tabNavigation'
 import type { AppState, Tab } from '@/store/appStore'
-import { clearTerminalRuntimeFields, findTabByTerminalID, selectTerminalPoolEvictionID } from '@/store/terminalPool'
+import { selectTerminalPoolEvictionID } from '@/store/terminalPool'
+import { applyTerminalPoolEviction, ensureTerminalPoolCapacity } from '@/store/terminalPoolReclaim'
 import { canTransitionConnection } from '@/store/connectionStatus'
 
 type StoreSet = StoreApi<AppState>['setState']
@@ -217,39 +217,30 @@ function leaveOverviewState(state: AppState): Partial<AppState> {
   return { activeSurface: target?.type === 'workspace' && target.id === 'overview' ? null : target, overviewReturnSurface: null }
 }
 
-function registerTerminalState(state: AppState, get: StoreGet, id: string, terminal: Terminal): Partial<AppState> {
-  const terminalPool = new Map(state.terminalPool)
-  if (terminalPool.size >= state.maxPoolSize) {
-    get().evictLRU()
-    const current = new Map(get().terminalPool)
-    current.set(id, { terminal, lastUsed: Date.now() })
-    return { terminalPool: current }
-  }
-  terminalPool.set(id, { terminal, lastUsed: Date.now() })
-  return { terminalPool }
-}
-
 function evictLRUState(state: AppState): Partial<AppState> {
   const victimID = selectTerminalPoolEvictionID(state)
   if (!victimID) return {}
-  const terminalPool = new Map(state.terminalPool)
-  terminalPool.delete(victimID)
-  void TerminalService.Close(victimID).catch((error: unknown) => {
-    logger.error('evictLRU: close terminal error', error)
-  })
-  const runtime = clearTerminalRuntimeFields(state, victimID)
-  const owningTab = findTabByTerminalID(state.tabs, victimID)
-  if (!owningTab) {
-    return { terminalPool, ...runtime }
-  }
-  // Keep tab strip / surface consistent when a visible terminal must be reclaimed.
-  const withoutTab = removeTabState({ ...state, terminalPool, ...runtime }, owningTab.id)
-  return { ...withoutTab, terminalPool, ...runtime, activePaneId: runtime.activePaneId }
+  return applyTerminalPoolEviction(state, victimID)
 }
 
 export function createPoolActions(set: StoreSet, get: StoreGet): PoolActions {
   return {
-    registerTerminal: (id, terminal) => set((state) => registerTerminalState(state, get, id, terminal)),
+    registerTerminal: (id, terminal) => {
+      const current = get()
+      if (!current.terminalPool.has(id) && current.terminalPool.size >= current.maxPoolSize) {
+        // Defensive only: Open path already reserved capacity. Force reclaim if races left the pool full.
+        if (!ensureTerminalPoolCapacity({
+          getState: get,
+          setState: (partial) => set(partial),
+          confirmProtected: () => true,
+        })) return
+      }
+      set((state) => {
+        const terminalPool = new Map(state.terminalPool)
+        terminalPool.set(id, { terminal, lastUsed: Date.now() })
+        return { terminalPool }
+      })
+    },
     unregisterTerminal: (id) => set((state) => {
       const terminalPool = new Map(state.terminalPool)
       terminalPool.delete(id)

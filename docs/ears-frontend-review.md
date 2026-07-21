@@ -23,8 +23,8 @@
 
 | 级别 | 主题 | 证据摘要 |
 |---|---|---|
-| P0 | 终端池 LRU 驱逐可能静默关闭仍在 Tab 中的终端 | `registerTerminalState` → `evictLRU` 调 `TerminalService.Close`，未同步 Tab UI / 用户确认 |
-| P0 | 云同步成功后 `window.location.reload()` 硬刷新 | `App.tsx` + `syncDataReload`，丢失内存态与未落盘交互 |
+| P0 | 终端池 LRU 驱逐可能静默关闭仍在 Tab 中的终端 | **已闭环**：Open 前 `ensureTerminalPoolCapacity`；orphan 优先；保护 Tab 需 confirm；toast 提示可从会话列表重连；见 `terminalPoolReclaim.ts` |
+| P0 | 云同步成功后 `window.location.reload()` 硬刷新 | **已闭环**：热更新 workspace；失败 confirm 后才 hard reload |
 | P1 | 大列表无虚拟化（会话树 / 文件列表 / 命令历史） | 全量 `.map` 渲染；无 `@tanstack/react-virtual` 等依赖 |
 | P1 | 终端层保留全部不可见 Tab DOM | `TerminalLayers` 用 `invisible` 隐藏，内存与 GPU 随 Tab 数线性增长 |
 | P1 | 状态栏每秒 + 系统信息 3s 轮询导致底部区域高频重渲染 | `StatusBar` `useClock` 1s、`SystemInfo` 3s |
@@ -61,7 +61,7 @@
 |---|---|---|---|
 | FE-UX-001 | 当用户打开宏工作区时，系统必须展示可操作的宏列表/空状态引导，而不是空白背景。 | todo | `WorkspaceContent` 宏分支仅空 `div` |
 | FE-UX-002 | 当云同步数据变更需要前端重载时，系统必须优先热更新 store/会话列表；仅在无法热更新时提示用户确认后刷新，禁止静默 `location.reload()`。 | done | `createAppSyncDataReload` 热更新 workspace；失败后 confirm 才 hard reload；见 `syncDataReload.test.ts` |
-| FE-UX-003 | 当终端池达到 `maxPoolSize` 需要驱逐时，系统必须避免关闭当前活动/可见 Tab 对应终端；若必须关闭，必须先提示并给出可恢复路径。 | partial | 优先驱逐 orphan，必要时关闭并移除绑定 Tab 保持 UI 一致；尚未弹窗确认/可恢复路径（见 `terminalPool.ts` / `appStore.test.ts`） |
+| FE-UX-003 | 当终端池达到 `maxPoolSize` 需要驱逐时，系统必须避免关闭当前活动/可见 Tab 对应终端；若必须关闭，必须先提示并给出可恢复路径。 | done | `ensureTerminalPoolCapacity`：orphan 无感释放；保护 Tab 需 confirm；toast 可恢复路径；所有 Open 入口经 `openTerminalWithPoolCapacity` |
 | FE-UX-004 | 当用户浏览会话树时，系统必须支持键盘在可见节点间上下移动焦点（ArrowUp/Down/Home/End），并保持 `aria-activedescendant` 或 roving tabindex 一致。 | partial | 仅有展开/Enter；缺兄弟导航 |
 | FE-UX-005 | 当用户浏览远程文件树时，系统必须提供与会话树同级的键盘导航与选中态可见反馈。 | partial | `FileTreeView` 有 treeitem，缺完整键盘模型 |
 | FE-UX-006 | 当命令历史项可复制/填入时，操作按钮必须在焦点可见（不仅 `group-hover`），并可用键盘触发。 | todo | `CommandHistoryPanel` hover-only 操作条 |
@@ -85,7 +85,7 @@
 | FE-PERF-002 | 当远程目录文件数 ≥ 1000 时，文件列表/树滚动必须保持可交互（建议虚拟列表），不得主线程长任务 > 50ms 连续阻塞。 | todo | `FileListView`/`FileTreeView` 全量 map |
 | FE-PERF-003 | 当命令历史条目增多时，面板打开与过滤必须在 O(可见窗口) 渲染；禁止一次挂载上万 DOM 节点。 | todo | localStorage limit 10000 + 全量 filter/map |
 | FE-PERF-004 | 当存在 N 个终端 Tab 时，非活动终端不得持续占用完整渲染管线；允许保活连接，但应暂停 fit/cursor/不必要的 rAF，并评估 detach xterm 元素。 | partial | 层隐藏 `invisible` 且隐藏 cursor-layer；实例仍驻留 |
-| FE-PERF-005 | 当终端池驱逐发生时，被驱逐终端的 xterm 实例必须 dispose，事件订阅必须解除，且对应 Tab 状态与 UI 一致。 | partial | Close 后端；前端 dispose 路径需与 forget/unregister 对齐验收 |
+| FE-PERF-005 | 当终端池驱逐发生时，被驱逐终端的 xterm 实例必须 dispose，事件订阅必须解除，且对应 Tab 状态与 UI 一致。 | done | orphan 驱逐 `disposePooledTerminal` + `unregisterTerminalSearch`；Tab 绑定由 unmount dispose；Tab/状态同步 `applyTerminalPoolEviction` |
 | FE-PERF-006 | 当状态栏时钟与系统信息轮询运行时，不得导致整个 App 树重渲染；时钟与系统信息必须隔离到子组件订阅。 | partial | 已拆 `useClock`/`SystemInfoBar`，但 StatusBar 仍订阅 tabs/surface 并 debug |
 | FE-PERF-007 | 当活动终端未连接或窗口不可见时，系统必须停止 SystemInfo 轮询；页面重新可见后再恢复。 | todo | 3s `setInterval` 仅看 connected，无视 `document.visibilityState` |
 | FE-PERF-008 | 当用户调整面板宽度时，拖拽过程必须仅更新必要样式（transform/width），避免每次 pointermove 触发重型子树协调。 | partial | `useResizablePanel`/`useToolPanelResize` 已有；需性能抽样 |
@@ -128,7 +128,7 @@
 
 ## 7. 建议执行顺序（本轮）
 
-1. **P0 行为正确性**：FE-UX-003（LRU 与 Tab 一致，partial：尚无确认/恢复路径）、FE-UX-002（热更新，done）、FE-CQ-005（deleteFolder 快照，done）。
+1. **P0 行为正确性**：FE-UX-003 / FE-UX-002 / FE-CQ-005 / FE-PERF-005 均已 done。
 2. **P0/P1 类型与可观测性**：FE-CQ-003、FE-CQ-009、FE-CQ-001 拆分超限文件。
 3. **P1 性能底座**：FE-PERF-001/002/003 虚拟化；FE-PERF-004/007 终端与轮询降载。
 4. **P1/P2 体验完整度**：FE-UX-001 宏工作区、FE-UX-006/007、FE-UX-012 标签溢出。

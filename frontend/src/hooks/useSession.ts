@@ -12,12 +12,15 @@ import { mapFolder, mapSession, mapTunnel, type AssetEnvironment, type AssetProj
 import { useSessionAssetCatalog } from '@/hooks/useSessionAssetCatalog'
 import { useSessionCSVTransfer } from '@/hooks/useSessionCSVTransfer'
 import { remapAfterFolderDelete } from '@/lib/sessionFolderDelete'
+import { openTerminalWithPoolCapacity } from '@/lib/openTerminal'
 
 export type { BatchSessionResult } from '@/lib/sessionBatch'
 export type { AssetColorToken, AssetEnvironment, AssetProject, AssetTag, Folder, Session, Tunnel } from '@/lib/sessionModels'
 
 async function openSessionTab(session: Session): Promise<string> {
-  const terminalId = await TerminalService.Open(Number(session.id), 80, 24)
+  const terminalId = await openTerminalWithPoolCapacity(
+    () => TerminalService.Open(Number(session.id), 80, 24),
+  )
   const store = useAppStore.getState()
   const tab = createTerminalTab({ sessionID: Number(session.id), sessionName: session.name, terminalID: terminalId, tabs: store.tabs })
   store.setConnectionStatus(terminalId, 'connected')
