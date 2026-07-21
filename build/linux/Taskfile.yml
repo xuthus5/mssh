@@ -56,8 +56,20 @@ tasks:
     cmds:
       - |
         set -euo pipefail
+        # appimagetool requires AppDir/<Icon>.{png,svg,xpm} to match desktop Icon=.
+        # Wails copies -icon using its basename, so feed it as mssh.png (matches Icon=mssh).
         mkdir -p bin build/linux/appimage/build
-        wails3 generate appimage           -binary "bin/{{.APP_NAME}}"           -icon "build/appicon.png"           -desktopfile "build/linux/{{.APP_NAME}}.desktop"           -outputdir "bin"           -builddir "build/linux/appimage/build"
+        cp -f build/appicon.png "build/linux/appimage/{{.APP_NAME}}.png"
+        # Keep Categories valid for appimagetool (one main category).
+        sed -i 's/^Categories=.*/Categories=Network;/' "build/linux/{{.APP_NAME}}.desktop" || true
+        APPIMAGE_EXTRACT_AND_RUN=1 NO_STRIP=1 wails3 generate appimage           -binary "bin/{{.APP_NAME}}"           -icon "build/linux/appimage/{{.APP_NAME}}.png"           -desktopfile "build/linux/{{.APP_NAME}}.desktop"           -outputdir "bin"           -builddir "build/linux/appimage/build"
+        # Prefer versioned release-friendly names when present.
+        shopt -s nullglob
+        for f in bin/{{.APP_NAME}}-*.AppImage bin/{{.APP_NAME}}.AppImage; do
+          [[ -f "$f" ]] || continue
+          chmod 0755 "$f"
+          ls -la "$f"
+        done
     env:
       APPIMAGE_EXTRACT_AND_RUN: "1"
       NO_STRIP: "1"
@@ -117,7 +129,7 @@ tasks:
       APP_NAME: '{{.APP_NAME}}'
       EXEC: '{{.APP_NAME}}'
       ICON: 'mssh'
-      CATEGORIES: 'Network;Utility;'
+      CATEGORIES: 'Network;'
       OUTPUTFILE: '{{.ROOT_DIR}}/build/linux/{{.APP_NAME}}.desktop'
 
   run:
