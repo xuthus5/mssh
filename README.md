@@ -56,21 +56,22 @@ Wails requires CGO on Linux. If running the CLI directly, use
 `CGO_ENABLED=1 wails3 dev`. An `undefined: pointer` error from Wails indicates
 that CGO was disabled in the current shell or persisted Go environment.
 
-### Test
+### Test / CI Gate
 ```bash
-# Backend (race detection and project coverage gate)
-go test -race -coverprofile=coverage.out -covermode=atomic \
-  -coverpkg=./internal/...,./pkg/... ./internal/... ./pkg/...
-go tool cover -func=coverage.out | tail -1
+# Full local gate (mirrors GitHub Actions CI; required before commit/push)
+wails3 task ci
 
-# Frontend
-cd frontend && npx vitest run && npx tsc -b --noEmit
+# Individual stages
+wails3 task lint
+wails3 task test            # backend race + coverage >= 90%
+wails3 task test:frontend   # source limits + bundle budget + vitest
+wails3 task build           # production build
 
 # Isolated local sshd + tmux + SFTP integration
-task test:e2e
+wails3 task test:e2e
 
 # Performance budgets and allocation benchmarks
-task benchmark
+wails3 task benchmark
 ```
 
 ### Build
@@ -106,6 +107,11 @@ Version is injected from the git tag into `internal/service.Version` and package
 
 ### Lint
 ```bash
-goimports-reviser -rm-unused -format ./...
-golangci-lint run ./...
+# Format
+wails3 task fmt
+
+# Same golangci-lint invocation as CI (timeout 5m, .golangci.yml)
+wails3 task lint
+# Install matching CI version when missing:
+# go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.12.2
 ```

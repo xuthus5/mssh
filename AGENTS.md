@@ -17,7 +17,12 @@
 - 编写代码需要注意安全性，创建的目录权限为0700，创建文件的权限为0600，如果确定需要给予可执行权限的时候才能给文件0700权限
 - 执行测试过程中产生的临时构建产物，比如二进制文件，测试数据等要进行清理
 - 代码编写完毕后，如果项目有README.md文件，需要做必要的修改，注意确保README.md文件的简洁性，不要啰嗦
-- 提交代码前必须执行 `wails3 build` 确保项目可正常构建，若构建失败严禁提交代码，必须修复所有构建错误后才能提交
+- **提交 / 推送前必须跑通与 CI 对齐的本地门禁**：`wails3 task ci`（或 `wails3 task check`）。该命令依次执行：
+  1. `golangci-lint run --timeout 5m ./...`（与 CI 同命令；工具版本与 CI 保持一致，当前为 v2.12.2）
+  2. 后端：`go test -race -coverprofile=coverage.out -covermode=atomic -coverpkg=./internal/...,./pkg/... ./internal/... ./pkg/...`，且 total coverage ≥ 90%
+  3. 前端：`npm run check:source-limits`、`npm run check:bundle-budget`、`npm test`（在 `frontend/`）
+  4. 生产构建：`wails3 task build`（等同 CI 的生产构建）
+  任一步失败严禁提交或推送。仅跑部分测试/构建不算完成门禁。
 
 # Agent 规则
 
@@ -101,7 +106,7 @@
 在声明完成、准备 `commit`、准备 `push`、准备发起 PR 之前，应满足：
 
 1. 已完成与本次改动直接相关的验证，并如实报告结果
-2. 已完成对应质量门禁
+2. 已完成对应质量门禁；提交/推送前默认执行 `wails3 task ci`（与 `.github/workflows/ci.yml` 对齐）
 3. 若仓库要求更重验证，优先遵循仓库规则
 4. 若关键验证无法执行，明确说明原因，并降低完成度表述
 
