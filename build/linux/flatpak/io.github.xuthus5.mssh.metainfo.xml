@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Copyright 2026 MSSH contributors -->
+<component type="desktop-application">
+  <id>io.github.xuthus5.mssh</id>
+  <name>MSSH</name>
+  <summary>Cross-platform SSH client</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <developer id="io.github.xuthus5">
+    <name>xuthus5</name>
+  </developer>
+  <description>
+    <p>
+      MSSH is a modern cross-platform SSH client with session management,
+      terminal multiplexing, SFTP, theming, and optional cloud sync.
+    </p>
+    <p>Features:</p>
+    <ul>
+      <li>SSH session management with encrypted credentials</li>
+      <li>Integrated terminal experience</li>
+      <li>SFTP file transfer</li>
+      <li>Theme customization</li>
+      <li>Optional GitHub Gist cloud sync</li>
+    </ul>
+  </description>
+  <launchable type="desktop-id">io.github.xuthus5.mssh.desktop</launchable>
+  <provides>
+    <binary>mssh</binary>
+    <id>com.mssh.app</id>
+  </provides>
+  <url type="homepage">https://github.com/xuthus5/mssh</url>
+  <url type="bugtracker">https://github.com/xuthus5/mssh/issues</url>
+  <url type="vcs-browser">https://github.com/xuthus5/mssh</url>
+  <content_rating type="oars-1.1"/>
+  <supports>
+    <control>pointing</control>
+    <control>keyboard</control>
+  </supports>
+  <requires>
+    <display_length compare="ge">768</display_length>
+  </requires>
+  <recommends>
+    <control>touch</control>
+  </recommends>
+  <categories>
+    <category>Network</category>
+    <category>Utility</category>
+  </categories>
+  <releases>
+    <release version="0.0.1" date="2026-07-20">
+      <description>
+        <p>Initial public packaging release with Linux deb/rpm/AppImage and Flatpak support.</p>
+      </description>
+      <url>https://github.com/xuthus5/mssh/releases/tag/v0.0.1</url>
+    </release>
+  </releases>
+</component>
