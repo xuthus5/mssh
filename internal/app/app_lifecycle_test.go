@@ -9,25 +9,25 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/xuthus5/mssh/internal/crypto"
 	"github.com/xuthus5/mssh/internal/store"
 )
 
-func TestNewAppClosesDatabaseWhenMasterKeyInitializationFails(t *testing.T) {
+func TestNewAppClosesDatabaseWhenSchemaInitializationFails(t *testing.T) {
 	dependencies, state := newLifecycleDependencies(t)
-	masterKeyErr := errors.New("master key failed")
-	dependencies.initializeMasterKey = func(string, crypto.KeychainAdapter, *slog.Logger) ([]byte, error) {
-		return nil, masterKeyErr
+	schemaErr := errors.New("schema failed")
+	dependencies.initializeSchema = func(*sql.DB) error {
+		state.schemaInitialized = true
+		return schemaErr
 	}
 	dependencies.initializeServices = func(serviceInitialization) (*App, error) {
-		t.Fatal("services initialized after master key failure")
+		t.Fatal("services initialized after schema failure")
 		return nil, nil
 	}
 
 	appInstance, err := newAppWithDependencies(lifecycleOptions(t), dependencies)
 
 	assert.Nil(t, appInstance)
-	require.ErrorIs(t, err, masterKeyErr)
+	require.ErrorIs(t, err, schemaErr)
 	assert.True(t, state.schemaInitialized)
 	assert.True(t, state.closed)
 	assert.Error(t, state.db.Ping())
@@ -40,9 +40,6 @@ func TestNewAppClosesDatabaseWhenThemeInitializationFails(t *testing.T) {
 	state := &lifecycleState{db: db}
 	dependencies := defaultAppDependencies(func(string) (*sql.DB, error) { return db, nil })
 	dependencies.keychain = &lifecycleKeychain{}
-	dependencies.initializeMasterKey = func(string, crypto.KeychainAdapter, *slog.Logger) ([]byte, error) {
-		return make([]byte, 32), nil
-	}
 	dependencies.initializeSchema = func(db *sql.DB) error {
 		if schemaErr := store.InitializeSchema(db); schemaErr != nil {
 			return schemaErr
@@ -67,8 +64,9 @@ func TestNewAppJoinsStartupAndCloseErrors(t *testing.T) {
 	dependencies, state := newLifecycleDependencies(t)
 	startupErr := errors.New("startup failed")
 	closeErr := errors.New("close failed")
-	dependencies.initializeMasterKey = func(string, crypto.KeychainAdapter, *slog.Logger) ([]byte, error) {
-		return nil, startupErr
+	dependencies.initializeSchema = func(*sql.DB) error {
+		state.schemaInitialized = true
+		return startupErr
 	}
 	dependencies.closeDB = func(db *sql.DB) error {
 		state.closed = true
@@ -113,9 +111,6 @@ func newLifecycleDependencies(t *testing.T) (appDependencies, *lifecycleState) {
 		initializeSchema: func(*sql.DB) error {
 			state.schemaInitialized = true
 			return nil
-		},
-		initializeMasterKey: func(string, crypto.KeychainAdapter, *slog.Logger) ([]byte, error) {
-			return make([]byte, 32), nil
 		},
 		initializeServices: func(input serviceInitialization) (*App, error) {
 			return &App{DB: input.db}, nil

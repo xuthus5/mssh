@@ -11,7 +11,7 @@ import (
 
 func TestSyncSchedulerStartsAndStopsForEnabledInterval(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	service := NewSyncService(db, testutil.NewTestLogger())
+	service := newTestSyncService(db, syncTestMasterKey)
 	config := defaultSyncConfig()
 	config.Enabled = true
 	config.IntervalMinutes = 5
@@ -30,7 +30,7 @@ func TestSyncSchedulerStartsAndStopsForEnabledInterval(t *testing.T) {
 }
 
 func TestSyncSchedulerRemainsStoppedWhenDisabled(t *testing.T) {
-	service := NewSyncService(testutil.NewTestDB(t), testutil.NewTestLogger())
+	service := newTestSyncService(testutil.NewTestDB(t), syncTestMasterKey)
 	service.StartScheduler()
 	service.schedulerMu.Lock()
 	assert.Nil(t, service.schedulerCancel)

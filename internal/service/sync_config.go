@@ -12,6 +12,7 @@ import (
 
 	"github.com/google/uuid"
 
+	backupcrypto "github.com/xuthus5/mssh/internal/crypto"
 	"github.com/xuthus5/mssh/internal/model"
 	"github.com/xuthus5/mssh/internal/store"
 )
@@ -28,6 +29,18 @@ var allowedSyncIntervals = []int{0, 5, 15, 30, 60}
 
 func WithSyncDataDir(dataDir string) SyncOption {
 	return func(service *SyncService) { service.dataDir = dataDir }
+}
+
+func WithSyncSecretSource(source func() (string, error)) SyncOption {
+	return func(service *SyncService) { service.secretSource = source }
+}
+
+func WithVaultSource(source func() (*backupcrypto.VaultFile, error)) SyncOption {
+	return func(service *SyncService) { service.vaultSource = source }
+}
+
+func WithVaultInstaller(installer func(password string, vault backupcrypto.VaultFile) error) SyncOption {
+	return func(service *SyncService) { service.vaultInstaller = installer }
 }
 
 func WithSyncCrypto(crypto KeyCrypto) SyncOption {
@@ -61,7 +74,12 @@ func (s *SyncService) LoadConfig() (model.SyncConfig, error) {
 	config.Gist.TokenSaved = s.secretSaved(syncGistTokenSetting)
 	config.WebDAV.PasswordSaved = s.secretSaved(syncWebDAVPasswordSetting)
 	config.S3.SecretKeySaved = s.secretSaved(syncS3SecretSetting)
-	config.MasterKeySaved = s.secretSaved(SyncMasterKeySetting)
+	config.MasterKeySaved = false
+	if s.secretSource != nil {
+		if _, err := s.secretSource(); err == nil {
+			config.MasterKeySaved = true
+		}
+	}
 	return config, nil
 }
 
@@ -73,14 +91,6 @@ func (s *SyncService) SaveConfig(input model.SyncConfigInput) (model.SyncDashboa
 	previous, err := s.LoadConfig()
 	if err != nil {
 		return model.SyncDashboard{}, err
-	}
-	if input.MasterKey != "" {
-		if len(input.MasterKey) < 12 {
-			return model.SyncDashboard{}, errors.New("backup master key must contain at least 12 characters")
-		}
-		if err := writeSyncSetting(s.db, SyncMasterKeySetting, input.MasterKey); err != nil {
-			return model.SyncDashboard{}, err
-		}
 	}
 	if err := s.saveInputSecrets(input); err != nil {
 		return model.SyncDashboard{}, err

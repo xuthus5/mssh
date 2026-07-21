@@ -25,6 +25,9 @@ func (k *KeyService) GetMaterial(id int64) (*model.SSHKeyMaterial, error) {
 	if err != nil {
 		return nil, fmt.Errorf("get key material: %w", err)
 	}
+	if err := k.requireCrypto(); err != nil {
+		return nil, fmt.Errorf("get key material: %w", err)
+	}
 	privateKey, err := k.crypto.Decrypt([]byte(key.PrivateKey))
 	if err != nil {
 		return nil, fmt.Errorf("get key material: decrypt private key: %w", err)
@@ -48,6 +51,9 @@ func (k *KeyService) Update(input model.SSHKeyUpdateInput) (*model.SSHKeyMateria
 	}
 	existing, err := store.GetKey(k.db, input.ID)
 	if err != nil {
+		return nil, fmt.Errorf("update key: %w", err)
+	}
+	if err := k.requireCrypto(); err != nil {
 		return nil, fmt.Errorf("update key: %w", err)
 	}
 	encrypted, err := k.crypto.Encrypt([]byte(input.PrivateKey))

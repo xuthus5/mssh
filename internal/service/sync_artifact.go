@@ -18,6 +18,8 @@ const (
 	syncNetworkTimeout  = 20 * time.Second
 )
 
+var errSyncVaultMissing = errors.New("backup does not include application vault metadata")
+
 type syncArtifactMetadata struct {
 	VersionID           string    `json:"version_id"`
 	VersionNumber       int64     `json:"version_number"`
@@ -30,16 +32,18 @@ type syncArtifactMetadata struct {
 type syncArtifact struct {
 	ArtifactVersion int                         `json:"artifact_version"`
 	Metadata        syncArtifactMetadata        `json:"metadata"`
+	Vault           *backupcrypto.VaultFile     `json:"vault,omitempty"`
 	Backup          backupcrypto.BackupEnvelope `json:"backup"`
 }
 
 type decodedSyncArtifact struct {
 	Data     ExportData
 	Metadata syncArtifactMetadata
+	Vault    *backupcrypto.VaultFile
 	Content  []byte
 }
 
-func encodeSyncArtifact(data ExportData, masterKey string, metadata syncArtifactMetadata) ([]byte, error) {
+func encodeSyncArtifact(data ExportData, masterKey string, metadata syncArtifactMetadata, vault *backupcrypto.VaultFile) ([]byte, error) {
 	plaintext, err := json.Marshal(data)
 	if err != nil {
 		return nil, fmt.Errorf("encode sync snapshot: %w", err)
@@ -48,7 +52,8 @@ func encodeSyncArtifact(data ExportData, masterKey string, metadata syncArtifact
 	if err != nil {
 		return nil, fmt.Errorf("encrypt sync snapshot: %w", err)
 	}
-	content, err := json.MarshalIndent(syncArtifact{ArtifactVersion: syncArtifactVersion, Metadata: metadata, Backup: backup}, "", "  ")
+	payload := syncArtifact{ArtifactVersion: syncArtifactVersion, Metadata: metadata, Backup: backup, Vault: vault}
+	content, err := json.MarshalIndent(payload, "", "  ")
 	if err != nil {
 		return nil, fmt.Errorf("encode sync artifact: %w", err)
 	}
@@ -77,7 +82,22 @@ func decodeSyncArtifact(content []byte, masterKey string) (decodedSyncArtifact, 
 	if artifact.Metadata.SnapshotFingerprint == "" || artifact.Metadata.SnapshotFingerprint != fingerprint {
 		return decodedSyncArtifact{}, errors.New("sync artifact fingerprint mismatch")
 	}
-	return decodedSyncArtifact{Data: data, Metadata: artifact.Metadata, Content: content}, nil
+	return decodedSyncArtifact{Data: data, Metadata: artifact.Metadata, Vault: artifact.Vault, Content: content}, nil
+}
+
+// peekSyncArtifactVault extracts the vault envelope without decrypting the backup payload.
+func peekSyncArtifactVault(content []byte) (*backupcrypto.VaultFile, error) {
+	var artifact syncArtifact
+	if err := json.Unmarshal(content, &artifact); err != nil {
+		return nil, fmt.Errorf("decode sync artifact: %w", err)
+	}
+	if artifact.ArtifactVersion == 0 {
+		return nil, errSyncVaultMissing
+	}
+	if artifact.Vault == nil {
+		return nil, errSyncVaultMissing
+	}
+	return artifact.Vault, nil
 }
 
 func decodeLegacySyncArtifact(content []byte, masterKey string) (decodedSyncArtifact, error) {

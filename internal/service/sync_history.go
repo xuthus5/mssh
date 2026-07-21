@@ -77,7 +77,11 @@ func (s *SyncService) saveCurrentVersion(provider model.SyncProvider, source str
 		return nil, err
 	}
 	metadata := syncArtifactMetadata{VersionID: uuid.NewString(), SnapshotFingerprint: fingerprint, DeviceID: deviceID, CreatedAt: time.Now().UTC()}
-	content, err := encodeSyncArtifact(data, masterKey, metadata)
+	vault, vaultErr := s.artifactVault()
+	if vaultErr != nil {
+		return nil, vaultErr
+	}
+	content, err := encodeSyncArtifact(data, masterKey, metadata, vault)
 	if err != nil {
 		return nil, err
 	}
