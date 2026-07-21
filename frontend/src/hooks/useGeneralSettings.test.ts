@@ -9,7 +9,7 @@ import { SETTINGS_GENERAL_CHANGED_EVENT, SETTINGS_GENERAL_PREVIEW_EVENT, SETTING
 const savedGeneral = {
   maxPoolSize: 24, defaultKeepAlive: 90, defaultTermType: 'xterm',
   uiFontFamily: 'Arial', uiFontFallbackFamily: 'Segoe UI', uiFontSize: 18,
-  rightClickAction: 'paste' as const, copyOnSelect: true,
+  rightClickAction: 'paste' as const, copyOnSelect: true, scrollbackLines: 10000,
   closeButtonAction: 'exit' as const,
   language: 'zh-CN' as const,
 }
@@ -95,6 +95,24 @@ describe('useGeneralSettings cross-window sync', () => {
     expect(savedEntries).toContainEqual(expect.objectContaining({
       key: 'application.close_button_action', value: '"tray"',
     }))
+  })
+
+  it('loads and persists terminal scrollback lines with clamping', async () => {
+    let savedEntries: Array<{ key: string; value: string }> = []
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.GetMany', async () => ({
+      'terminal.scrollback_lines': setting('terminal.scrollback_lines', 2500),
+    }))
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.SetMany', async (entries) => { savedEntries = entries })
+    const { result } = renderHook(() => useGeneralSettings())
+    await waitFor(() => expect(result.current.general.scrollbackLines).toBe(2500))
+
+    await act(async () => {
+      await result.current.saveGeneral({ ...savedGeneral, scrollbackLines: 999999 })
+    })
+    expect(savedEntries).toContainEqual(expect.objectContaining({
+      key: 'terminal.scrollback_lines', value: '100000',
+    }))
+    expect(result.current.general.scrollbackLines).toBe(100000)
   })
 })
 

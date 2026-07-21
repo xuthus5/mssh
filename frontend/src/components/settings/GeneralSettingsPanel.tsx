@@ -20,6 +20,7 @@ interface GeneralDraft {
   uiFontSize: string
   rightClickAction: GeneralSettings['rightClickAction']
   copyOnSelect: boolean
+  scrollbackLines: string
   closeButtonAction: GeneralSettings['closeButtonAction']
   language: GeneralSettings['language']
 }
@@ -38,6 +39,7 @@ function createDraft(general: GeneralSettings): GeneralDraft {
     uiFontFallbackFamily: general.uiFontFallbackFamily, uiFontSize: String(general.uiFontSize),
     rightClickAction: general.rightClickAction,
     copyOnSelect: general.copyOnSelect,
+    scrollbackLines: String(general.scrollbackLines),
     closeButtonAction: general.closeButtonAction,
     language: general.language,
   }
@@ -126,14 +128,14 @@ export function GeneralSettingsPanel({ general, systemFonts, onSave, onPreviewUI
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault(); setSaving(true)
     try {
-      await onSave({ maxPoolSize: parseInt(draft.maxPoolSize, 10) || 10, defaultKeepAlive: parseInt(draft.defaultKeepAlive, 10) || 60, defaultTermType: draft.defaultTermType, uiFontFamily: draft.uiFontFamily, uiFontFallbackFamily: draft.uiFontFallbackFamily, uiFontSize: parseInt(draft.uiFontSize, 10) || 14, rightClickAction: draft.rightClickAction, copyOnSelect: draft.copyOnSelect, closeButtonAction: draft.closeButtonAction, language: draft.language })
+      await onSave({ maxPoolSize: parseInt(draft.maxPoolSize, 10) || 10, defaultKeepAlive: parseInt(draft.defaultKeepAlive, 10) || 60, defaultTermType: draft.defaultTermType, uiFontFamily: draft.uiFontFamily, uiFontFallbackFamily: draft.uiFontFallbackFamily, uiFontSize: parseInt(draft.uiFontSize, 10) || 14, rightClickAction: draft.rightClickAction, copyOnSelect: draft.copyOnSelect, scrollbackLines: parseInt(draft.scrollbackLines, 10) || 10000, closeButtonAction: draft.closeButtonAction, language: draft.language })
     } finally { setSaving(false) }
   }
   return <form onSubmit={handleSubmit} className="flex flex-col gap-3 pt-2">
     <ConnectionDefaults draft={draft} setDraft={setDraft} />
     <LanguageSettings draft={draft} setDraft={setDraft} />
     <ApplicationBehaviorSettingsSection closeButtonAction={draft.closeButtonAction} onCloseButtonActionChange={(value) => setDraft({ ...draft, closeButtonAction: value })} />
-    <TerminalBehaviorSettingsSection rightClickAction={draft.rightClickAction} copyOnSelect={draft.copyOnSelect} onRightClickActionChange={(value) => setDraft({ ...draft, rightClickAction: value })} onCopyOnSelectChange={(value) => setDraft({ ...draft, copyOnSelect: value })} />
+    <TerminalBehaviorSettingsSection rightClickAction={draft.rightClickAction} copyOnSelect={draft.copyOnSelect} scrollbackLines={draft.scrollbackLines} onRightClickActionChange={(value) => setDraft({ ...draft, rightClickAction: value })} onCopyOnSelectChange={(value) => setDraft({ ...draft, copyOnSelect: value })} onScrollbackLinesChange={(value) => setDraft({ ...draft, scrollbackLines: value > 0 ? String(value) : '' })} />
     <UIFontSettings draft={draft} systemFonts={systemFonts} onChange={previewDraft} />
     <div className="flex justify-end"><Button type="submit" size="sm" disabled={saving}>{saving ? t('保存中...') : t('保存')}</Button></div>
   </form>

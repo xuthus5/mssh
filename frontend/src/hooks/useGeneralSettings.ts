@@ -6,14 +6,14 @@ import { logger } from '@/lib/logger'
 import { toast } from '@/components/ui/toast'
 import type { Setting, SettingInput } from '../../bindings/github.com/xuthus5/mssh/internal/model/models'
 import { applyUIFont, clampUIFontSize, DEFAULT_UI_FONT_FALLBACK_FAMILY, DEFAULT_UI_FONT_FAMILY, DEFAULT_UI_FONT_SIZE, normalizeUIFontFallbackFamily, normalizeUIFontFamily } from '@/lib/uiFont'
-import { normalizeCopyOnSelect, normalizeTerminalRightClickAction, useTerminalBehaviorStore, type TerminalRightClickAction } from '@/store/terminalBehaviorStore'
+import { DEFAULT_TERMINAL_SCROLLBACK_LINES, normalizeCopyOnSelect, normalizeScrollbackLines, normalizeTerminalRightClickAction, useTerminalBehaviorStore, type TerminalRightClickAction } from '@/store/terminalBehaviorStore'
 import { SETTINGS_GENERAL_CHANGED_EVENT, SETTINGS_GENERAL_PREVIEW_EVENT, SETTINGS_PREVIEW_CANCELLED_EVENT } from '@/lib/settingsWindowEvents'
 import { LANGUAGE_SETTING_KEY, t, type AppLanguage, useLanguageStore } from '@/i18n'
 
 
 const generalSettingKeys = [
   'terminal.max_pool_size', 'terminal.default_keep_alive', 'terminal.default_term_type',
-  'terminal.right_click_action', 'terminal.copy_on_select', 'appearance.ui_font_family',
+  'terminal.right_click_action', 'terminal.copy_on_select', 'terminal.scrollback_lines', 'appearance.ui_font_family',
   'appearance.ui_font_fallback_family', 'appearance.ui_font_size',
   'application.close_button_action',
   LANGUAGE_SETTING_KEY,
@@ -30,6 +30,7 @@ export interface GeneralSettings {
   uiFontSize: number
   rightClickAction: TerminalRightClickAction
   copyOnSelect: boolean
+  scrollbackLines: number
   closeButtonAction: CloseButtonAction
   language: AppLanguage
 }
@@ -46,7 +47,7 @@ const defaultGeneralSettings: GeneralSettings = {
   maxPoolSize: 10, defaultKeepAlive: 60, defaultTermType: 'xterm-256color',
   uiFontFamily: DEFAULT_UI_FONT_FAMILY, uiFontFallbackFamily: DEFAULT_UI_FONT_FALLBACK_FAMILY,
   uiFontSize: DEFAULT_UI_FONT_SIZE,
-  rightClickAction: 'menu', copyOnSelect: false,
+  rightClickAction: 'menu', copyOnSelect: false, scrollbackLines: DEFAULT_TERMINAL_SCROLLBACK_LINES,
   closeButtonAction: 'tray',
   language: 'zh-CN',
 }
@@ -75,6 +76,7 @@ function normalizeGeneral(settings: GeneralSettings): GeneralSettings {
     uiFontSize: clampUIFontSize(settings.uiFontSize),
     rightClickAction: normalizeTerminalRightClickAction(settings.rightClickAction),
     copyOnSelect: normalizeCopyOnSelect(settings.copyOnSelect),
+    scrollbackLines: normalizeScrollbackLines(settings.scrollbackLines),
     closeButtonAction: normalizeCloseButtonAction(settings.closeButtonAction),
     language: settings.language === 'en' ? 'en' : 'zh-CN',
   }
@@ -88,6 +90,7 @@ function parseGeneral(settings: { [_ in string]?: Setting }): GeneralSettings {
     defaultTermType: settingValue(settings, 'terminal.default_term_type', 'xterm-256color'),
     rightClickAction: settingValue(settings, 'terminal.right_click_action', 'menu'),
     copyOnSelect: settingValue(settings, 'terminal.copy_on_select', false),
+    scrollbackLines: settingValue(settings, 'terminal.scrollback_lines', DEFAULT_TERMINAL_SCROLLBACK_LINES),
     uiFontFamily, uiFontFallbackFamily: settingValue(settings, 'appearance.ui_font_fallback_family', DEFAULT_UI_FONT_FALLBACK_FAMILY),
     uiFontSize: settingValue(settings, 'appearance.ui_font_size', DEFAULT_UI_FONT_SIZE),
     closeButtonAction: settingValue(settings, 'application.close_button_action', 'tray'),
@@ -97,7 +100,7 @@ function parseGeneral(settings: { [_ in string]?: Setting }): GeneralSettings {
 
 function applyGeneral(settings: GeneralSettings) {
   applyUIFont({ family: settings.uiFontFamily, fallbackFamily: settings.uiFontFallbackFamily, size: settings.uiFontSize })
-  useTerminalBehaviorStore.getState().setSettings({ rightClickAction: settings.rightClickAction, copyOnSelect: settings.copyOnSelect })
+  useTerminalBehaviorStore.getState().setSettings({ rightClickAction: settings.rightClickAction, copyOnSelect: settings.copyOnSelect, scrollbackLines: settings.scrollbackLines })
   useAppStore.getState().setMaxPoolSize(settings.maxPoolSize)
   useLanguageStore.getState().hydrateLanguage(settings.language)
 }
@@ -120,7 +123,7 @@ async function persistGeneral(settings: GeneralSettings) {
   await Promise.all([SettingService.SetMany([
     settingEntry('terminal.max_pool_size', settings.maxPoolSize), settingEntry('terminal.default_keep_alive', settings.defaultKeepAlive),
     settingEntry('terminal.default_term_type', settings.defaultTermType), settingEntry('terminal.right_click_action', settings.rightClickAction),
-    settingEntry('terminal.copy_on_select', settings.copyOnSelect), settingEntry('appearance.ui_font_family', settings.uiFontFamily),
+    settingEntry('terminal.copy_on_select', settings.copyOnSelect), settingEntry('terminal.scrollback_lines', settings.scrollbackLines), settingEntry('appearance.ui_font_family', settings.uiFontFamily),
     settingEntry('appearance.ui_font_fallback_family', settings.uiFontFallbackFamily), settingEntry('appearance.ui_font_size', settings.uiFontSize),
     settingEntry('application.close_button_action', settings.closeButtonAction), settingEntry(LANGUAGE_SETTING_KEY, settings.language),
   ]), TerminalService.SetMaxSize(settings.maxPoolSize)])

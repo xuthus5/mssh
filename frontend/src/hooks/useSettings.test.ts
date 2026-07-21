@@ -42,6 +42,7 @@ describe('useSettings', () => {
     expect(result.current.general.uiFontSize).toBe(14)
     expect(result.current.general.rightClickAction).toBe('menu')
     expect(result.current.general.copyOnSelect).toBe(false)
+    expect(result.current.general.scrollbackLines).toBe(10000)
     expect(result.current.general.closeButtonAction).toBe('tray')
     expect(result.current.systemFonts).toEqual(['Arial', 'Segoe UI'])
   })
@@ -49,7 +50,7 @@ describe('useSettings', () => {
   it('saves general settings and updates state', async () => {
     const { result } = renderHook(() => useSettings())
     await act(async () => {
-      await result.current.saveGeneral({ maxPoolSize: 32, defaultKeepAlive: 120, defaultTermType: 'xterm', uiFontFamily: 'Segoe UI', uiFontFallbackFamily: 'Microsoft YaHei', uiFontSize: 16, rightClickAction: 'paste', copyOnSelect: true, closeButtonAction: 'exit', language: 'zh-CN' })
+      await result.current.saveGeneral({ maxPoolSize: 32, defaultKeepAlive: 120, defaultTermType: 'xterm', uiFontFamily: 'Segoe UI', uiFontFallbackFamily: 'Microsoft YaHei', uiFontSize: 16, rightClickAction: 'paste', copyOnSelect: true, scrollbackLines: 5000, closeButtonAction: 'exit', language: 'zh-CN' })
     })
     expect(result.current.general.maxPoolSize).toBe(32)
     expect(result.current.general.defaultKeepAlive).toBe(120)
@@ -59,14 +60,16 @@ describe('useSettings', () => {
     expect(result.current.general.uiFontSize).toBe(16)
     expect(result.current.general.rightClickAction).toBe('paste')
     expect(result.current.general.copyOnSelect).toBe(true)
+    expect(result.current.general.scrollbackLines).toBe(5000)
     expect(result.current.general.closeButtonAction).toBe('exit')
     expect(writtenSettings).toContainEqual(expect.objectContaining({ key: 'appearance.ui_font_family', value: '"Segoe UI"' }))
     expect(writtenSettings).toContainEqual(expect.objectContaining({ key: 'appearance.ui_font_fallback_family', value: '"Microsoft YaHei"' }))
     expect(writtenSettings).toContainEqual(expect.objectContaining({ key: 'appearance.ui_font_size', value: '16' }))
     expect(writtenSettings).toContainEqual(expect.objectContaining({ key: 'terminal.right_click_action', value: '"paste"' }))
     expect(writtenSettings).toContainEqual(expect.objectContaining({ key: 'terminal.copy_on_select', value: 'true' }))
+    expect(writtenSettings).toContainEqual(expect.objectContaining({ key: 'terminal.scrollback_lines', value: '5000' }))
     expect(writtenSettings).toContainEqual(expect.objectContaining({ key: 'application.close_button_action', value: '"exit"' }))
-    expect(useTerminalBehaviorStore.getState()).toMatchObject({ rightClickAction: 'paste', copyOnSelect: true })
+    expect(useTerminalBehaviorStore.getState()).toMatchObject({ rightClickAction: 'paste', copyOnSelect: true, scrollbackLines: 5000 })
     expect(document.documentElement.style.getPropertyValue('--app-font-family')).toBe('"Segoe UI", "Microsoft YaHei", sans-serif')
     expect(writtenSettings).not.toContainEqual(expect.objectContaining({ updated_at: expect.anything() }))
   })
@@ -138,7 +141,7 @@ describe('useSettings', () => {
   })
 
   it('does not publish terminal behavior when persistence fails', async () => {
-    useTerminalBehaviorStore.getState().setSettings({ rightClickAction: 'menu', copyOnSelect: false })
+    useTerminalBehaviorStore.getState().setSettings({ rightClickAction: 'menu', copyOnSelect: false, scrollbackLines: 10000 })
     __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.SetMany', async () => { throw new Error('db failed') })
     const { result } = renderHook(() => useSettings())
     await act(async () => {})

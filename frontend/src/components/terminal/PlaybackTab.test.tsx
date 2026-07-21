@@ -121,7 +121,7 @@ describe('PlaybackTab terminal theme', () => {
     vi.useFakeTimers()
     const writeText = vi.fn().mockResolvedValue(undefined)
     vi.stubGlobal('navigator', { clipboard: { writeText } })
-    useTerminalBehaviorStore.getState().setSettings({ rightClickAction: 'menu', copyOnSelect: true })
+    useTerminalBehaviorStore.getState().setSettings({ rightClickAction: 'menu', copyOnSelect: true, scrollbackLines: 10000 })
     render(<PlaybackTab recordingId="1" title="demo" active />)
     await act(async () => { await Promise.resolve(); await Promise.resolve() })
     terminalInstances[0].getSelection.mockReturnValue('selected playback text')
@@ -135,19 +135,19 @@ describe('PlaybackTab terminal theme', () => {
     vi.useFakeTimers()
     const writeText = vi.fn().mockResolvedValue(undefined)
     vi.stubGlobal('navigator', { clipboard: { writeText } })
-    useTerminalBehaviorStore.getState().setSettings({ rightClickAction: 'menu', copyOnSelect: false })
+    useTerminalBehaviorStore.getState().setSettings({ rightClickAction: 'menu', copyOnSelect: false, scrollbackLines: 10000 })
     const view = render(<PlaybackTab recordingId="1" title="demo" active />)
     await act(async () => { await Promise.resolve(); await Promise.resolve() })
     const terminal = terminalInstances[0]
     terminal.getSelection.mockReturnValue('selected playback text')
 
-    act(() => useTerminalBehaviorStore.getState().setSettings({ rightClickAction: 'menu', copyOnSelect: true }))
+    act(() => useTerminalBehaviorStore.getState().setSettings({ rightClickAction: 'menu', copyOnSelect: true, scrollbackLines: 10000 }))
     terminal.triggerSelectionChange()
     await act(async () => { vi.advanceTimersByTime(120) })
     expect(writeText).toHaveBeenCalledOnce()
 
     terminal.triggerSelectionChange()
-    act(() => useTerminalBehaviorStore.getState().setSettings({ rightClickAction: 'menu', copyOnSelect: false }))
+    act(() => useTerminalBehaviorStore.getState().setSettings({ rightClickAction: 'menu', copyOnSelect: false, scrollbackLines: 10000 }))
     await act(async () => { vi.advanceTimersByTime(120) })
 
     expect(writeText).toHaveBeenCalledOnce()
@@ -157,7 +157,7 @@ describe('PlaybackTab terminal theme', () => {
     vi.useFakeTimers()
     const writeText = vi.fn().mockResolvedValue(undefined)
     vi.stubGlobal('navigator', { clipboard: { writeText } })
-    useTerminalBehaviorStore.getState().setSettings({ rightClickAction: 'menu', copyOnSelect: true })
+    useTerminalBehaviorStore.getState().setSettings({ rightClickAction: 'menu', copyOnSelect: true, scrollbackLines: 10000 })
     const view = render(<PlaybackTab recordingId="1" title="demo" active />)
     await act(async () => { await Promise.resolve(); await Promise.resolve() })
     const terminal = terminalInstances[0]

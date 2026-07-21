@@ -21,11 +21,11 @@ describe('terminal behavior runtime', () => {
     createCopyOnSelectController.mockReturnValue(controller)
 
     const cleanup = installTerminalCopyOnSelect(terminal, 'primary')
-    useTerminalBehaviorStore.getState().setSettings({ rightClickAction: 'menu', copyOnSelect: true })
-    useTerminalBehaviorStore.getState().setSettings({ rightClickAction: 'paste', copyOnSelect: true })
+    useTerminalBehaviorStore.getState().setSettings({ rightClickAction: 'menu', copyOnSelect: true, scrollbackLines: 10000 })
+    useTerminalBehaviorStore.getState().setSettings({ rightClickAction: 'paste', copyOnSelect: true, scrollbackLines: 10000 })
     cleanup()
     cleanup()
-    useTerminalBehaviorStore.getState().setSettings({ rightClickAction: 'menu', copyOnSelect: false })
+    useTerminalBehaviorStore.getState().setSettings({ rightClickAction: 'menu', copyOnSelect: false, scrollbackLines: 10000 })
 
     expect(controller.setEnabled).toHaveBeenNthCalledWith(1, false)
     expect(controller.setEnabled).toHaveBeenNthCalledWith(2, true)
