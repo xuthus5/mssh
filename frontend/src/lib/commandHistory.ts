@@ -38,10 +38,20 @@ export function readCommandHistory(sessionID: number): CommandHistoryEntry[] {
   }
 }
 
+const sensitiveCommandPatterns: RegExp[] = [
+  /(^|\s)(password|passwd|token|secret|--password|--passwd|-p)(=|\s|$)/i,
+  /(curl|wget).*\s(-H|--header)\s+['"]?authorization/i,
+  /export\s+\w*(KEY|TOKEN|SECRET|PASSWORD|PASSWD)\w*=/i,
+  /(^|\s)(mysql|psql|mongo|redis-cli)\b.*\s(-p|--password)(=|\S|$)/i,
+  /(^|\s)sshpass\s+-p\s+/i,
+  /(^|\s)(AWS_|GITHUB_|GH_|OPENAI_|ANTHROPIC_)[A-Z0-9_]*(=|\s)/i,
+  /Bearer\s+[A-Za-z0-9._~+/=-]+/i,
+]
+
 export function isSensitiveCommand(command: string): boolean {
-  return /(^|\s)(password|passwd|token|secret|--password|-p)(=|\s|$)/i.test(command)
-    || /(curl|wget).*\s(-H|--header)\s+['\"]?authorization/i.test(command)
-    || /export\s+\w*(KEY|TOKEN|SECRET|PASSWORD)\w*=/i.test(command)
+  const value = command.trim()
+  if (!value) return false
+  return sensitiveCommandPatterns.some((pattern) => pattern.test(value))
 }
 
 export function recordCommand(sessionID: number, command: string, limits: CommandHistoryLimits = defaultLimits): void {

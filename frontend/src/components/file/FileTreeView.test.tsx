@@ -35,3 +35,32 @@ describe('FileTreeView', () => {
     expect(screen.getByRole('button', { name: '展开 src' })).toBeInTheDocument()
   })
 })
+
+  it('virtualizes large flattened trees above the threshold', () => {
+    const files = Array.from({ length: 90 }, (_, index) => ({
+      name: `file-${index}.txt`,
+      path: `/file-${index}.txt`,
+      size: 1,
+      modified: '',
+      isDir: false,
+    }))
+    const { container } = render(
+      <FileTreeView
+        currentPath="/"
+        files={files}
+        loading={false}
+        showHiddenFiles
+        selected={null}
+        onSelect={vi.fn()}
+        onNavigate={vi.fn()}
+        onDownload={vi.fn()}
+        onLoadDirectory={vi.fn(async () => [])}
+      />,
+    )
+    const treeItems = container.querySelectorAll('[role="treeitem"]')
+    // VirtualList only mounts viewport + overscan, not all 90 nodes.
+    expect(treeItems.length).toBeGreaterThan(0)
+    expect(treeItems.length).toBeLessThan(90)
+    expect(screen.getByRole('tree')).toBeInTheDocument()
+  })
+

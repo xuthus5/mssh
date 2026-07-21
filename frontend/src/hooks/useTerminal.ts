@@ -46,6 +46,7 @@ interface TerminalLifecycleRefs {
   writeFailureReportedRef: RefObject<boolean>
   lastResizeRef: RefObject<{ terminalID: string; cols: number; rows: number } | null>
   resizeTimerRef: RefObject<number | null>
+  outputFlushRef: RefObject<(() => void) | null>
 }
 
 function reportResize(terminalID: string, term: Terminal, context: string, lastResizeRef: RefObject<{ terminalID: string; cols: number; rows: number } | null>) {
@@ -197,7 +198,13 @@ function initializeTerminal(containerRef: RefObject<HTMLDivElement | null>, refs
   const synchronizedOutputQueryDispose = subscribeToSynchronizedOutputQuery(term)
   const terminalVersionQueryDispose = subscribeToTerminalVersionQuery(term)
   const terminalDirectoryDispose = subscribeToTerminalWorkingDirectory(term, refs.terminalIDRef)
-  const unsubOutput = subscribeToTerminalOutput({ term, terminalIDRef: refs.terminalIDRef, reportRuntimeError })
+  const outputSubscription = subscribeToTerminalOutput({
+    term,
+    terminalIDRef: refs.terminalIDRef,
+    reportRuntimeError,
+    shouldCoalesce: () => !refs.activeRef.current,
+  })
+  refs.outputFlushRef.current = () => outputSubscription.flush()
   const unsubscribeTheme = subscribeToTheme({ term, fitAddon, containerRef, refs, reportRuntimeError })
   const resizeObserver = observeResize({ term, fitAddon, containerRef, refs, reportRuntimeError })
   if (container) resizeObserver.observe(container)
@@ -205,6 +212,7 @@ function initializeTerminal(containerRef: RefObject<HTMLDivElement | null>, refs
   return () => {
     if (disposed) return
     disposed = true
+    refs.outputFlushRef.current = null
     cancelActivationFrame(refs.activationFrameRef)
     if (refs.resizeTimerRef.current !== null) window.clearTimeout(refs.resizeTimerRef.current)
     container?.removeEventListener('focusin', focusHandler)
@@ -213,7 +221,7 @@ function initializeTerminal(containerRef: RefObject<HTMLDivElement | null>, refs
     safelyDisposeTerminalResource('synchronized output query', () => synchronizedOutputQueryDispose.dispose())
     safelyDisposeTerminalResource('terminal version query', () => terminalVersionQueryDispose.dispose())
     safelyDisposeTerminalResource('terminal working directory', () => terminalDirectoryDispose.dispose())
-    safelyDisposeTerminalResource('output subscription', unsubOutput)
+    safelyDisposeTerminalResource('output subscription', outputSubscription.dispose)
     safelyDisposeTerminalResource('theme subscription', unsubscribeTheme)
     safelyDisposeTerminalResource('resize observer', () => resizeObserver.disconnect())
     if (cleanupCopyOnSelect) safelyDisposeTerminalResource('copy-on-select subscription', cleanupCopyOnSelect)
@@ -248,6 +256,7 @@ export function useTerminal(terminalID: string, containerRef: RefObject<HTMLDivE
     writeFailureReportedRef: useRef(false),
     lastResizeRef: useRef<{ terminalID: string; cols: number; rows: number } | null>(null),
     resizeTimerRef: useRef<number | null>(null),
+    outputFlushRef: useRef<(() => void) | null>(null),
   }
   if (refs.terminalIDRef.current !== terminalID) {
     refs.terminalIDRef.current = terminalID
@@ -259,6 +268,10 @@ export function useTerminal(terminalID: string, containerRef: RefObject<HTMLDivE
   useTerminalLifecycle(containerRef, refs, reportRuntimeError)
   useTerminalIdentity(terminalID, refs.registeredTerminalIDRef)
   useTerminalAttachment(terminalID)
+  useEffect(() => {
+    if (!active) return
+    refs.outputFlushRef.current?.()
+  }, [active])
   useTerminalActivation({ refs, active, sequence: focusRequest.sequence, reportRuntimeError,
     recover: (term, fitAddon) => recoverTerminal({ term, fitAddon, container: containerRef.current, refs }) })
   return refs.termRef

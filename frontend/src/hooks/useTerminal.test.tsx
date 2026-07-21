@@ -493,7 +493,7 @@ describe('useTerminal', () => {
     const containerRef = createRef<HTMLDivElement>()
     containerRef.current = document.createElement('div')
     const wrapper = ({ children }: { children: ReactNode }) => <TerminalErrorBoundary onClose={vi.fn()}>{children}</TerminalErrorBoundary>
-    renderHook(() => useTerminal('term-output', containerRef, { active: false, focusRequest: { sequence: 0 } }), { wrapper })
+    renderHook(() => useTerminal('term-output', containerRef, { active: true, focusRequest: { sequence: 0 } }), { wrapper })
 
     runtimeFailure = 'write'
     act(() => outputHandlers[0]({ data: { terminal_id: 'term-output', data: encodedOutput('hello') } }))
@@ -504,7 +504,7 @@ describe('useTerminal', () => {
   it('passes split UTF-8 output to xterm as lossless bytes', () => {
     const containerRef = createRef<HTMLDivElement>()
     containerRef.current = document.createElement('div')
-    renderHook(() => useTerminal('term-bytes', containerRef, { active: false, focusRequest: { sequence: 0 } }))
+    renderHook(() => useTerminal('term-bytes', containerRef, { active: true, focusRequest: { sequence: 0 } }))
 
     act(() => outputHandlers[0]({ data: { terminal_id: 'term-bytes', data: '5A==' } }))
     act(() => outputHandlers[0]({ data: { terminal_id: 'term-bytes', data: 'uK0=' } }))
@@ -518,7 +518,7 @@ describe('useTerminal', () => {
   it('reorders asynchronously delivered terminal output before writing to xterm', () => {
     const containerRef = createRef<HTMLDivElement>()
     containerRef.current = document.createElement('div')
-    renderHook(() => useTerminal('term-ordered', containerRef, { active: false, focusRequest: { sequence: 0 } }))
+    renderHook(() => useTerminal('term-ordered', containerRef, { active: true, focusRequest: { sequence: 0 } }))
 
     const encodedBytes = (value: string) => btoa(String.fromCharCode(...outputBytes(value)))
     act(() => outputHandlers[0]({ data: { terminal_id: 'term-ordered', sequence: 2, data: encodedBytes('2m─') } }))
@@ -545,7 +545,7 @@ describe('useTerminal', () => {
   it('renders synchronized TUI output only after the complete frame arrives', () => {
     const containerRef = createRef<HTMLDivElement>()
     containerRef.current = document.createElement('div')
-    renderHook(() => useTerminal('term-sync', containerRef, { active: false, focusRequest: { sequence: 0 } }))
+    renderHook(() => useTerminal('term-sync', containerRef, { active: true, focusRequest: { sequence: 0 } }))
 
     act(() => outputHandlers[0]({ data: { terminal_id: 'other', data: encodedOutput('ignored') } }))
     act(() => outputHandlers[0]({ data: { terminal_id: 'term-sync', data: encodedOutput('\u001b[?2026h\u001b[3;1H\u001b[J') } }))
@@ -563,7 +563,7 @@ describe('useTerminal', () => {
     const containerRef = createRef<HTMLDivElement>()
     containerRef.current = document.createElement('div')
     const hook = renderHook(({ terminalID }) => useTerminal(terminalID, containerRef, {
-      active: false,
+      active: true,
       focusRequest: { sequence: 0 },
     }), { initialProps: { terminalID: 'term-old' } })
 
@@ -575,6 +575,35 @@ describe('useTerminal', () => {
       Array.from(outputBytes('old frame')),
       Array.from(outputBytes('new prompt')),
     ])
+  })
+
+  it('coalesces inactive terminal output until activation flushes', () => {
+    vi.useFakeTimers()
+    const containerRef = createRef<HTMLDivElement>()
+    containerRef.current = document.createElement('div')
+    const hook = renderHook(({ active }) => useTerminal('term-coalesce', containerRef, {
+      active,
+      focusRequest: { sequence: 0 },
+    }), { initialProps: { active: false } })
+
+    act(() => outputHandlers[0]({ data: { terminal_id: 'term-coalesce', data: encodedOutput('a') } }))
+    act(() => outputHandlers[0]({ data: { terminal_id: 'term-coalesce', data: encodedOutput('b') } }))
+    expect(terminalWrites).toEqual([])
+
+    act(() => { vi.advanceTimersByTime(32) })
+    expect(terminalWrites.map((data) => Array.from(data as Uint8Array))).toEqual([
+      Array.from(outputBytes('ab')),
+    ])
+
+    terminalWrites.length = 0
+    act(() => outputHandlers[0]({ data: { terminal_id: 'term-coalesce', data: encodedOutput('c') } }))
+    expect(terminalWrites).toEqual([])
+    act(() => hook.rerender({ active: true }))
+    expect(terminalWrites.map((data) => Array.from(data as Uint8Array))).toEqual([
+      Array.from(outputBytes('c')),
+    ])
+    act(() => hook.unmount())
+    vi.useRealTimers()
   })
 
   it('reports fit failures from the resize observer callback', () => {
