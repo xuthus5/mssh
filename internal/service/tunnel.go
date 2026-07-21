@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"fmt"
 	"log/slog"
+	"net"
+	"strings"
 	"sync"
 
 	"github.com/xuthus5/mssh/internal/model"
@@ -43,12 +45,18 @@ func (t *TunnelService) List() ([]model.Tunnel, error) {
 
 func (t *TunnelService) Create(input model.TunnelInput) (*model.Tunnel, error) {
 	tunnel := input.Tunnel()
+	if err := validateTunnelBind(tunnel); err != nil {
+		return nil, err
+	}
 	t.logger.Info("creating tunnel", "name", tunnel.Name, "type", tunnel.Type)
 	return store.CreateTunnel(t.db, tunnel)
 }
 
 func (t *TunnelService) Update(input model.TunnelInput) error {
 	tunnel := input.Tunnel()
+	if err := validateTunnelBind(tunnel); err != nil {
+		return err
+	}
 	t.logger.Info("updating tunnel", "id", tunnel.ID, "name", tunnel.Name)
 	return store.UpdateTunnel(t.db, tunnel)
 }
@@ -113,4 +121,33 @@ func (t *TunnelService) StopAll() {
 			_ = t.sessions.disconnect(state.connID, false)
 		}
 	}
+}
+
+func validateTunnelBind(tunnel model.Tunnel) error {
+	if tunnel.LocalPort < 0 || tunnel.LocalPort > 65535 {
+		return fmt.Errorf("local port out of range")
+	}
+	if tunnel.Type != model.TunnelDynamic && (tunnel.RemotePort < 0 || tunnel.RemotePort > 65535) {
+		return fmt.Errorf("remote port out of range")
+	}
+	switch tunnel.Type {
+	case model.TunnelLocal, model.TunnelDynamic:
+		host := strings.TrimSpace(tunnel.LocalHost)
+		if host == "" {
+			return nil
+		}
+		if !isLoopbackHost(host) {
+			return fmt.Errorf("local/dynamic tunnels must bind loopback (127.0.0.1, ::1, localhost); got %q", host)
+		}
+	}
+	return nil
+}
+
+func isLoopbackHost(host string) bool {
+	normalized := strings.Trim(strings.ToLower(host), "[]")
+	if normalized == "localhost" || normalized == "127.0.0.1" || normalized == "::1" {
+		return true
+	}
+	ip := net.ParseIP(normalized)
+	return ip != nil && ip.IsLoopback()
 }

@@ -81,58 +81,82 @@ func (s *SyncService) JoinWithPassword(input model.SyncConfigInput, password str
 		return model.SyncResult{}, errors.New("sync operation is already running")
 	}
 	defer s.operationMu.Unlock()
-
-	config := configFromInput(input)
-	if err := validateSyncConfig(config); err != nil {
-		return model.SyncResult{}, err
-	}
-	secrets, err := s.providerSecrets(config, &input)
+	config, remote, err := s.fetchJoinRemote(input)
 	if err != nil {
 		return model.SyncResult{}, err
 	}
-	if err := validateProviderReady(config, secrets); err != nil {
+	if err := s.installJoinVaultAndConfig(input, password, remote.Content); err != nil {
 		return model.SyncResult{}, err
 	}
+	if err := s.restoreJoinSnapshot(remote.Content); err != nil {
+		return model.SyncResult{}, err
+	}
+	return s.finishJoinSuccess(config), nil
+}
 
+func (s *SyncService) fetchJoinRemote(input model.SyncConfigInput) (model.SyncConfig, syncRemoteObject, error) {
+	config := configFromInput(input)
+	if err := validateSyncConfig(config); err != nil {
+		return model.SyncConfig{}, syncRemoteObject{}, err
+	}
+	secrets, err := s.providerSecrets(config, &input)
+	if err != nil {
+		return model.SyncConfig{}, syncRemoteObject{}, err
+	}
+	if err := validateProviderReady(config, secrets); err != nil {
+		return model.SyncConfig{}, syncRemoteObject{}, err
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), syncNetworkTimeout)
 	defer cancel()
 	provider, err := s.providerFactory.Create(ctx, config, secrets)
 	if err != nil {
-		return model.SyncResult{}, err
+		return model.SyncConfig{}, syncRemoteObject{}, err
 	}
 	remote, err := provider.Fetch(ctx)
 	if err != nil {
-		return model.SyncResult{}, err
+		return model.SyncConfig{}, syncRemoteObject{}, err
 	}
-	if err := s.AdoptVaultFromContent(password, remote.Content); err != nil {
-		return model.SyncResult{}, fmt.Errorf("join: %w", err)
+	return config, remote, nil
+}
+
+func (s *SyncService) installJoinVaultAndConfig(input model.SyncConfigInput, password string, content []byte) error {
+	if err := s.AdoptVaultFromContent(password, content); err != nil {
+		return fmt.Errorf("join: %w", err)
 	}
 	if _, err := s.SaveConfig(input); err != nil {
-		return model.SyncResult{}, fmt.Errorf("join: save config: %w", err)
+		return fmt.Errorf("join: save config: %w", err)
 	}
+	return nil
+}
+
+func (s *SyncService) restoreJoinSnapshot(content []byte) error {
 	masterKey, err := s.masterKey()
 	if err != nil {
-		return model.SyncResult{}, err
+		return err
 	}
-	artifact, err := decodeSyncArtifact(remote.Content, masterKey)
+	artifact, err := decodeSyncArtifact(content, masterKey)
 	if err != nil {
-		return model.SyncResult{}, fmt.Errorf("join: decrypt: %w", err)
+		return fmt.Errorf("join: decrypt: %w", err)
 	}
 	if err := validateSnapshot(s.db, artifact.Data); err != nil {
-		return model.SyncResult{}, fmt.Errorf("join: validate: %w", err)
+		return fmt.Errorf("join: validate: %w", err)
 	}
 	if s.lifecycle != nil {
 		if err := s.lifecycle.PrepareDestructiveSync(); err != nil {
-			return model.SyncResult{}, fmt.Errorf("join: prepare: %w", err)
+			return fmt.Errorf("join: prepare: %w", err)
 		}
 	}
 	if err := s.restore(artifact.Data); err != nil {
-		return model.SyncResult{}, fmt.Errorf("join: restore: %w", err)
+		return fmt.Errorf("join: restore: %w", err)
 	}
+	return nil
+}
+
+func (s *SyncService) finishJoinSuccess(config model.SyncConfig) model.SyncResult {
 	s.markPending("已从云端加入，等待同步")
 	s.notifyDataChanged()
 	result := model.SyncResult{State: model.SyncStateSynced, Message: "已从云端恢复"}
 	s.setRuntimeState(syncRuntimeState{State: model.SyncStateSynced, Message: result.Message})
 	s.recordSyncEvent("join", config, model.SyncEventSuccess, 0, 0, result.Message)
-	return result, nil
+	return result
 }

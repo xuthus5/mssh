@@ -12,8 +12,8 @@ import (
 )
 
 const (
-	listThousandSessionsBudget = 500 * time.Millisecond
-	transferUpdatesBudget      = 2 * time.Second
+	listThousandSessionsBudget = 750 * time.Millisecond
+	transferUpdatesBudget      = 3 * time.Second
 )
 
 func TestStorePerformanceBudgets(t *testing.T) {

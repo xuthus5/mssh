@@ -8,6 +8,8 @@ import (
 	gossh "golang.org/x/crypto/ssh"
 )
 
+const maxPendingRead = 1 << 20 // 1 MiB pre-callback buffer
+
 type PTYSession struct {
 	session      *gossh.Session
 	stdin        io.WriteCloser
@@ -44,21 +46,21 @@ func PreparePTY(c *ClientWrapper, termType string, cols, rows int) (*PTYSession,
 		gossh.TTY_OP_OSPEED: 14400,
 	}
 	if err := session.RequestPty(termType, rows, cols, modes); err != nil {
-		session.Close()
+		_ = session.Close()
 		return nil, fmt.Errorf("request pty: %w", err)
 	}
 	stdin, err := session.StdinPipe()
 	if err != nil {
-		session.Close()
+		_ = session.Close()
 		return nil, fmt.Errorf("stdin pipe: %w", err)
 	}
 	stdout, err := session.StdoutPipe()
 	if err != nil {
-		session.Close()
+		_ = session.Close()
 		return nil, fmt.Errorf("stdout pipe: %w", err)
 	}
 	if err := session.Shell(); err != nil {
-		session.Close()
+		_ = session.Close()
 		return nil, fmt.Errorf("start shell: %w", err)
 	}
 	return &PTYSession{session: session, stdin: stdin, stdout: stdout}, nil
@@ -103,7 +105,13 @@ func (p *PTYSession) deliverRead(data []byte) {
 	p.mu.Lock()
 	callback := p.readCb
 	if callback == nil {
-		p.pendingRead = append(p.pendingRead, data...)
+		remaining := maxPendingRead - len(p.pendingRead)
+		if remaining > 0 {
+			if len(data) > remaining {
+				data = data[:remaining]
+			}
+			p.pendingRead = append(p.pendingRead, data...)
+		}
 	}
 	p.mu.Unlock()
 	if callback != nil {

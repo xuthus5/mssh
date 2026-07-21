@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"regexp"
 	"strings"
 	"time"
 
@@ -125,7 +124,7 @@ func validateAIRegexSettings(settings model.AISecuritySettings) error {
 	all := append(append([]string{}, settings.AllowPatterns...), settings.DenyPatterns...)
 	all = append(all, settings.RedactionPatterns...)
 	for _, expression := range all {
-		if _, err := regexp.Compile(expression); err != nil {
+		if err := validateUserRegexp(expression); err != nil {
 			return fmt.Errorf("invalid AI regular expression %q: %w", expression, err)
 		}
 	}

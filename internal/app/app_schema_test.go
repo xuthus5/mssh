@@ -16,6 +16,23 @@ import (
 func TestNewInitializesFinalDatabaseFormat(t *testing.T) {
 	dataDir := filepath.Join(t.TempDir(), ".mssh")
 	require.NoError(t, os.MkdirAll(dataDir, 0o700))
+
+	appInstance, err := New(Options{DataDir: dataDir})
+	require.NoError(t, err)
+	t.Cleanup(appInstance.Shutdown)
+
+	var version int
+	require.NoError(t, appInstance.DB.QueryRow("PRAGMA user_version").Scan(&version))
+	assert.Equal(t, store.DatabaseFormatVersion(), version)
+
+	var defaultFolders int
+	require.NoError(t, appInstance.DB.QueryRow("SELECT count(*) FROM session_folders WHERE is_default = 1").Scan(&defaultFolders))
+	assert.Equal(t, 1, defaultFolders)
+}
+
+func TestNewRejectsLegacyDatabaseWithoutFormatVersion(t *testing.T) {
+	dataDir := filepath.Join(t.TempDir(), ".mssh")
+	require.NoError(t, os.MkdirAll(dataDir, 0o700))
 	db, err := store.OpenDB(dataDir)
 	require.NoError(t, err)
 	_, err = db.Exec("CREATE TABLE sessions (name TEXT NOT NULL)")
@@ -24,15 +41,8 @@ func TestNewInitializesFinalDatabaseFormat(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, db.Close())
 
-	appInstance, err := New(Options{DataDir: dataDir})
-	require.NoError(t, err)
-	t.Cleanup(appInstance.Shutdown)
-
-	var version, sentinelCount int
-	require.NoError(t, appInstance.DB.QueryRow("PRAGMA user_version").Scan(&version))
-	require.NoError(t, appInstance.DB.QueryRow("SELECT count(*) FROM sessions WHERE name = 'legacy-sentinel'").Scan(&sentinelCount))
-	assert.Equal(t, 5, version)
-	assert.Zero(t, sentinelCount)
+	_, err = New(Options{DataDir: dataDir})
+	require.ErrorContains(t, err, "legacy database")
 }
 
 func TestNewClosesDatabaseWhenSchemaInitializationFails(t *testing.T) {

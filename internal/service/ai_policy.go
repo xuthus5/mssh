@@ -38,10 +38,11 @@ func redactAIText(value string, custom []string) string {
 		})
 	}
 	for _, expression := range custom {
-		pattern, err := regexp.Compile(expression)
-		if err == nil {
-			redacted = pattern.ReplaceAllString(redacted, "[REDACTED]")
+		if err := validateUserRegexp(expression); err != nil {
+			continue
 		}
+		pattern := regexp.MustCompile(expression)
+		redacted = pattern.ReplaceAllString(redacted, "[REDACTED]")
 	}
 	return redacted
 }
@@ -50,47 +51,54 @@ func classifyAICommand(command string, security model.AISecuritySettings) model.
 	command = strings.TrimSpace(command)
 	proposal := model.AICommandProposal{Command: command, RequiresConfirmation: true}
 	if command == "" {
-		proposal.Risk = model.AICommandRiskBlocked
-		proposal.Blocked = true
-		proposal.BlockedReason = "命令不能为空"
-		return proposal
+		return blockedAICommand(proposal, model.AICommandRiskBlocked, "命令不能为空")
 	}
-	for _, pattern := range aiBlockedPatterns {
-		if pattern.MatchString(command) {
-			proposal.Risk = model.AICommandRiskBlocked
-			proposal.Blocked = true
-			proposal.BlockedReason = "命令触及不可禁用的高风险规则"
-			return proposal
-		}
+	if matchedBuiltinPattern(command, aiBlockedPatterns) {
+		return blockedAICommand(proposal, model.AICommandRiskBlocked, "命令触及不可禁用的高风险规则")
 	}
-	for _, expression := range security.DenyPatterns {
-		pattern, err := regexp.Compile(expression)
-		if err == nil && pattern.MatchString(command) {
-			proposal.Risk = model.AICommandRiskHigh
-			proposal.Blocked = true
-			proposal.BlockedReason = "命令命中自定义禁止规则"
-			return proposal
-		}
+	if matchedUserPattern(command, security.DenyPatterns) {
+		return blockedAICommand(proposal, model.AICommandRiskHigh, "命令命中自定义禁止规则")
 	}
-	for _, expression := range security.AllowPatterns {
-		pattern, err := regexp.Compile(expression)
-		if err == nil && pattern.MatchString(command) {
-			proposal.Risk = model.AICommandRiskReadOnly
-			proposal.CanAutoExecute = security.AutoExecuteReadOnly
-			proposal.RequiresConfirmation = !proposal.CanAutoExecute
-			return proposal
-		}
-	}
-	for _, pattern := range aiReadOnlyPatterns {
-		if pattern.MatchString(command) {
-			proposal.Risk = model.AICommandRiskReadOnly
-			proposal.CanAutoExecute = security.AutoExecuteReadOnly
-			proposal.RequiresConfirmation = !proposal.CanAutoExecute
-			return proposal
-		}
+	if matchedUserPattern(command, security.AllowPatterns) || matchedBuiltinPattern(command, aiReadOnlyPatterns) {
+		return autoReadOnlyAICommand(proposal, security.AutoExecuteReadOnly)
 	}
 	proposal.Risk = model.AICommandRiskModify
 	return proposal
+}
+
+func blockedAICommand(proposal model.AICommandProposal, risk model.AICommandRisk, reason string) model.AICommandProposal {
+	proposal.Risk = risk
+	proposal.Blocked = true
+	proposal.BlockedReason = reason
+	return proposal
+}
+
+func autoReadOnlyAICommand(proposal model.AICommandProposal, autoExecute bool) model.AICommandProposal {
+	proposal.Risk = model.AICommandRiskReadOnly
+	proposal.CanAutoExecute = autoExecute
+	proposal.RequiresConfirmation = !autoExecute
+	return proposal
+}
+
+func matchedBuiltinPattern(command string, patterns []*regexp.Regexp) bool {
+	for _, pattern := range patterns {
+		if pattern.MatchString(command) {
+			return true
+		}
+	}
+	return false
+}
+
+func matchedUserPattern(command string, expressions []string) bool {
+	for _, expression := range expressions {
+		if err := validateUserRegexp(expression); err != nil {
+			continue
+		}
+		if regexp.MustCompile(expression).MatchString(command) {
+			return true
+		}
+	}
+	return false
 }
 
 func validateAISettings(settings model.AISettings) error {
