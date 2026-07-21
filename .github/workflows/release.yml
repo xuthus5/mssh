@@ -38,7 +38,7 @@ jobs:
       - name: Install Linux package tooling
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential pkg-config libgtk-4-dev libwebkitgtk-6.0-dev rpm file libfuse2
+          sudo apt-get install -y build-essential pkg-config libgtk-4-dev libwebkitgtk-6.0-dev libwebkitgtk-6.0-4 rpm file libfuse2 fuse3 desktop-file-utils wget
       - name: Install Wails CLI
         run: go install github.com/wailsapp/wails/v3/cmd/wails3@${{ env.WAILS_VERSION }}
       - name: Resolve version
@@ -57,21 +57,61 @@ jobs:
         env:
           APP_VERSION: ${{ steps.version.outputs.version }}
           CGO_ENABLED: 1
+          GOARCH: ${{ matrix.goarch }}
+          APPIMAGE_EXTRACT_AND_RUN: "1"
+          NO_STRIP: "1"
         run: |
+          set -euo pipefail
           wails3 task linux:build ARCH=${{ matrix.goarch }} PRODUCTION=true APP_VERSION=${APP_VERSION}
           wails3 task linux:generate:dotdesktop
-          wails3 task linux:generate:deb
-          wails3 task linux:generate:rpm
-          wails3 task linux:create:appimage || echo "AppImage packaging skipped/failed"
+          wails3 task linux:generate:deb ARCH=${{ matrix.goarch }} APP_VERSION=${APP_VERSION}
+          wails3 task linux:generate:rpm ARCH=${{ matrix.goarch }} APP_VERSION=${APP_VERSION}
+          # AppImage is required for Linux release assets.
+          wails3 task linux:create:appimage ARCH=${{ matrix.goarch }} APP_VERSION=${APP_VERSION}
       - name: Collect artifacts
         run: |
+          set -euo pipefail
           VERSION="${{ steps.version.outputs.version }}"
           ARCH="${{ matrix.arch }}"
           mkdir -p dist
           cp "bin/mssh" "dist/mssh-${VERSION}-linux-${ARCH}"
-          # nfpm outputs vary; collect known patterns
-          find bin -maxdepth 1 -type f \( -name '*.deb' -o -name '*.rpm' -o -name '*.AppImage' -o -name '*.appimage' \) -print -exec cp {} dist/ \;
-          ls -la bin dist || true
+
+          # Normalize package filenames so release assets include version + arch.
+          mapfile -t debs < <(find bin -maxdepth 1 -type f -name '*.deb' | sort)
+          mapfile -t rpms < <(find bin -maxdepth 1 -type f -name '*.rpm' | sort)
+          mapfile -t appimages < <(find bin -maxdepth 1 -type f \( -name '*.AppImage' -o -name '*.appimage' \) | sort)
+
+          if [[ ${#debs[@]} -eq 0 || ${#rpms[@]} -eq 0 ]]; then
+            echo "Missing deb/rpm packages in bin/" >&2
+            ls -la bin || true
+            exit 1
+          fi
+
+          cp "${debs[0]}" "dist/mssh-${VERSION}-linux-${ARCH}.deb"
+          cp "${rpms[0]}" "dist/mssh-${VERSION}-linux-${ARCH}.rpm"
+
+          # Prefer versioned AppImage if present; otherwise rename any generated AppImage.
+          appimage_src=""
+          if [[ ${#appimages[@]} -gt 0 ]]; then
+            for f in "${appimages[@]}"; do
+              base="$(basename "$f")"
+              case "$base" in
+                linuxdeploy*) continue ;;
+                mssh-*.AppImage|mssh-*.appimage) appimage_src="$f"; break ;;
+                mssh.AppImage|mssh.appimage) appimage_src="$f" ;;
+                *.AppImage|*.appimage) appimage_src="${appimage_src:-$f}" ;;
+              esac
+            done
+          fi
+          if [[ -z "${appimage_src}" ]]; then
+            echo "Missing AppImage in bin/" >&2
+            ls -la bin || true
+            exit 1
+          fi
+          cp "${appimage_src}" "dist/mssh-${VERSION}-linux-${ARCH}.AppImage"
+          chmod 0755 "dist/mssh-${VERSION}-linux-${ARCH}.AppImage"
+
+          ls -la bin dist
       - uses: actions/upload-artifact@v4
         with:
           name: linux-${{ matrix.arch }}
@@ -212,6 +252,13 @@ jobs:
           mkdir -p upload
           find release-assets -type f -print -exec cp {} upload/ \;
           ls -la upload
+      - name: Recreate GitHub Release shell
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if gh release view "${{ github.ref_name }}" >/dev/null 2>&1; then
+            gh release delete "${{ github.ref_name }}" --yes
+          fi
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
