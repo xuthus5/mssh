@@ -26,10 +26,15 @@ type EventBus interface {
 
 const DefaultKeepAliveSeconds = 60
 
+type managedConn struct {
+	wrapper *ssh.ClientWrapper
+	cleanup func()
+}
+
 type SessionService struct {
 	db        *sql.DB
 	mu        sync.RWMutex
-	conns     map[string]*ssh.ClientWrapper
+	conns     map[string]*managedConn
 	attempts  map[string]*connectAttempt
 	eventBus  EventBus
 	keepAlive int
@@ -49,7 +54,7 @@ func NewSessionService(db *sql.DB, eventBus EventBus, keepAlive int, dataDir str
 	}
 	return &SessionService{
 		db:        db,
-		conns:     make(map[string]*ssh.ClientWrapper),
+		conns:     make(map[string]*managedConn),
 		attempts:  make(map[string]*connectAttempt),
 		eventBus:  eventBus,
 		keepAlive: keepAlive,
@@ -62,7 +67,7 @@ func NewSessionService(db *sql.DB, eventBus EventBus, keepAlive int, dataDir str
 func (s *SessionService) disconnect(terminalID string, emitState bool) error {
 	s.logger.Info("disconnecting terminal", "terminalID", terminalID)
 	s.mu.Lock()
-	wrapper, ok := s.conns[terminalID]
+	conn, ok := s.conns[terminalID]
 	if !ok {
 		s.mu.Unlock()
 		s.logger.Error("disconnect failed", "terminalID", terminalID, "error", "terminal not found")
@@ -71,7 +76,12 @@ func (s *SessionService) disconnect(terminalID string, emitState bool) error {
 	delete(s.conns, terminalID)
 	s.mu.Unlock()
 
-	_ = wrapper.Close()
+	if conn.cleanup != nil {
+		conn.cleanup()
+	}
+	if conn.wrapper != nil {
+		_ = conn.wrapper.Close()
+	}
 
 	if emitState {
 		s.eventBus.Emit(event.ConnectionState, event.ConnectionStatePayload{
@@ -87,11 +97,11 @@ func (s *SessionService) disconnect(terminalID string, emitState bool) error {
 func (s *SessionService) GetClientWrapper(connID string) (*ssh.ClientWrapper, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	wrapper, ok := s.conns[connID]
-	if !ok {
+	conn, ok := s.conns[connID]
+	if !ok || conn.wrapper == nil {
 		return nil, fmt.Errorf("connection %s not found", connID)
 	}
-	return wrapper, nil
+	return conn.wrapper, nil
 }
 
 func (s *SessionService) ConnectionCount() int {
@@ -102,34 +112,24 @@ func (s *SessionService) ConnectionCount() int {
 
 func (s *SessionService) CloseAll() error {
 	s.mu.Lock()
-	connections := make(map[string]*ssh.ClientWrapper, len(s.conns))
-	for id, wrapper := range s.conns {
-		connections[id] = wrapper
+	connections := make(map[string]*managedConn, len(s.conns))
+	for id, conn := range s.conns {
+		connections[id] = conn
 	}
-	s.conns = make(map[string]*ssh.ClientWrapper)
+	s.conns = make(map[string]*managedConn)
 	s.mu.Unlock()
 	var closeErr error
-	for id, wrapper := range connections {
-		if err := wrapper.Close(); err != nil {
-			closeErr = errors.Join(closeErr, fmt.Errorf("close connection %s: %w", id, err))
+	for id, conn := range connections {
+		if conn.cleanup != nil {
+			conn.cleanup()
+		}
+		if conn.wrapper != nil {
+			if err := conn.wrapper.Close(); err != nil {
+				closeErr = errors.Join(closeErr, fmt.Errorf("close connection %s: %w", id, err))
+			}
 		}
 	}
 	return closeErr
-}
-
-func (s *SessionService) buildAuthMethods(sess *model.Session) ([]gossh.AuthMethod, error) {
-	switch sess.AuthMethod {
-	case model.AuthPassword:
-		return s.buildPasswordAuth(sess)
-	case model.AuthKey:
-		return s.buildKeyAuth(sess)
-	case model.AuthKeyboardInteractive:
-		return s.buildKeyboardInteractiveAuth(sess), nil
-	case model.AuthAgent:
-		return s.buildAgentAuth()
-	default:
-		return nil, nil
-	}
 }
 
 func (s *SessionService) buildPasswordAuth(sess *model.Session) ([]gossh.AuthMethod, error) {
@@ -183,7 +183,22 @@ func (s *SessionService) buildKeyboardInteractiveAuth(sess *model.Session) []gos
 	)}
 }
 
-func (s *SessionService) buildAgentAuth() ([]gossh.AuthMethod, error) {
+// agentAuth holds an open SSH agent socket for the full authentication handshake.
+// The socket must remain open until SSH public-key signatures complete.
+type agentAuth struct {
+	sock    net.Conn
+	signers []gossh.Signer
+}
+
+func (a *agentAuth) Close() {
+	if a == nil || a.sock == nil {
+		return
+	}
+	_ = a.sock.Close()
+	a.sock = nil
+}
+
+func openAgentAuth() (*agentAuth, error) {
 	socketPath := os.Getenv("SSH_AUTH_SOCK")
 	if socketPath == "" {
 		return nil, fmt.Errorf("SSH_AUTH_SOCK not set")
@@ -193,12 +208,49 @@ func (s *SessionService) buildAgentAuth() ([]gossh.AuthMethod, error) {
 		return nil, fmt.Errorf("ssh agent: %w", err)
 	}
 	agentClient := agent.NewClient(sock)
-	defer func() { _ = sock.Close() }()
 	signers, err := agentClient.Signers()
 	if err != nil {
+		_ = sock.Close()
 		return nil, fmt.Errorf("ssh agent signers: %w", err)
 	}
-	return []gossh.AuthMethod{gossh.PublicKeys(signers...)}, nil
+	if len(signers) == 0 {
+		_ = sock.Close()
+		return nil, fmt.Errorf("ssh agent: no signers available")
+	}
+	return &agentAuth{sock: sock, signers: signers}, nil
+}
+
+// buildAgentAuth is for tests/simple callers; the agent socket stays open for signer use.
+// Prefer buildAuthBundle in production so disconnect can close the socket.
+func (s *SessionService) buildAgentAuth() ([]gossh.AuthMethod, error) {
+	methods, _, err := s.buildAuthBundle(&model.Session{AuthMethod: model.AuthAgent})
+	return methods, err
+}
+
+func (s *SessionService) buildAuthBundle(sess *model.Session) ([]gossh.AuthMethod, func(), error) {
+	switch sess.AuthMethod {
+	case model.AuthPassword:
+		methods, err := s.buildPasswordAuth(sess)
+		return methods, nil, err
+	case model.AuthKey:
+		methods, err := s.buildKeyAuth(sess)
+		return methods, nil, err
+	case model.AuthKeyboardInteractive:
+		return s.buildKeyboardInteractiveAuth(sess), nil, nil
+	case model.AuthAgent:
+		auth, err := openAgentAuth()
+		if err != nil {
+			return nil, nil, err
+		}
+		return []gossh.AuthMethod{gossh.PublicKeys(auth.signers...)}, auth.Close, nil
+	default:
+		return nil, nil, nil
+	}
+}
+
+func (s *SessionService) buildAuthMethods(sess *model.Session) ([]gossh.AuthMethod, error) {
+	methods, _, err := s.buildAuthBundle(sess)
+	return methods, err
 }
 
 func generateTerminalID() string {

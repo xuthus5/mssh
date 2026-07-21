@@ -27,7 +27,7 @@ func (s *SessionService) connect(ctx context.Context, sessionID int64, emitState
 	if err := s.resolveKeepAlive(sess); err != nil {
 		return "", fmt.Errorf("connect: %w", err)
 	}
-	authMethods, err := s.buildAuthMethods(sess)
+	authMethods, cleanup, err := s.buildAuthBundle(sess)
 	if err != nil {
 		return "", fmt.Errorf("connect: %w", err)
 	}
@@ -40,11 +40,14 @@ func (s *SessionService) connect(ctx context.Context, sessionID int64, emitState
 	}
 	wrapper, err := ssh.ConnectWithVerifier(connectCtx, *sess, authMethods, knownHostsPath, onNewHostKey, s.logger)
 	if err != nil {
+		if cleanup != nil {
+			cleanup()
+		}
 		return "", fmt.Errorf("connect: %w", err)
 	}
 	terminalID := generateTerminalID()
 	s.mu.Lock()
-	s.conns[terminalID] = wrapper
+	s.conns[terminalID] = &managedConn{wrapper: wrapper, cleanup: cleanup}
 	s.mu.Unlock()
 	if err := store.MarkSessionConnected(s.db, sessionID); err != nil {
 		s.logger.Error("mark session connected failed", "sessionID", sessionID, "error", err)

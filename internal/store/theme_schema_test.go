@@ -224,14 +224,16 @@ func TestDatabaseFormatVersionFailureRollsBack(t *testing.T) {
 	db, err := OpenDB(t.TempDir())
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, db.Close()) })
-	createLegacySentinels(t, db)
+	// Fresh database: schema create succeeds, version write fails, entire init rolls back.
 	setVersion := func(*sql.Tx, int) error { return assert.AnError }
 
 	err = initializeSchema(db, databaseFormatVersion, setVersion)
 	require.ErrorContains(t, err, "set format version")
 
-	assertTableRowCount(t, rowCountExpectation{db: db, table: "themes", condition: "legacy_sentinel = 'themes-sentinel'", expected: 1})
 	assertDatabaseFormatVersion(t, db, 0)
+	var tables int
+	require.NoError(t, db.QueryRow("SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'").Scan(&tables))
+	assert.Equal(t, 0, tables)
 }
 
 func TestInitializeSchemaCreateStageRollsBack(t *testing.T) {

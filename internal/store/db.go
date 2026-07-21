@@ -103,9 +103,21 @@ func initializeSchema(db *sql.DB, targetVersion int, setVersion func(*sql.Tx, in
 	if err != nil {
 		return fmt.Errorf("initialize schema: read format version: %w", err)
 	}
-	if currentVersion != targetVersion {
-		if err = dropApplicationTables(tx); err != nil {
-			return err
+	if currentVersion > targetVersion {
+		return fmt.Errorf("initialize schema: database format %d is newer than supported %d; upgrade the application", currentVersion, targetVersion)
+	}
+	// Existing databases with an older format must not be silently wiped.
+	if currentVersion != 0 && currentVersion < targetVersion {
+		return fmt.Errorf("initialize schema: database format %d requires unsupported migration to %d; restore a matching backup or export data before recreating the database", currentVersion, targetVersion)
+	}
+	// Fresh install only (version 0). Refuse half-migrated/legacy tables without a format version.
+	if currentVersion == 0 {
+		exists, checkErr := hasApplicationTables(tx)
+		if checkErr != nil {
+			return fmt.Errorf("initialize schema: inspect tables: %w", checkErr)
+		}
+		if exists {
+			return fmt.Errorf("initialize schema: legacy database without supported format version detected; export data and recreate the database")
 		}
 	}
 	if err = createFinalSchema(tx); err != nil {
@@ -133,13 +145,13 @@ func databaseVersion(tx *sql.Tx) (int, error) {
 	return version, nil
 }
 
-func dropApplicationTables(tx *sql.Tx) error {
-	for _, table := range applicationTablesInDropOrder {
-		if _, err := tx.Exec("DROP TABLE IF EXISTS " + table); err != nil {
-			return fmt.Errorf("initialize schema: drop %s: %w", table, err)
-		}
+func hasApplicationTables(tx *sql.Tx) (bool, error) {
+	var count int
+	err := tx.QueryRow(`SELECT count(*) FROM sqlite_master WHERE type IN ('table', 'view') AND name NOT LIKE 'sqlite_%'`).Scan(&count)
+	if err != nil {
+		return false, err
 	}
-	return nil
+	return count > 0, nil
 }
 
 func createFinalSchema(tx *sql.Tx) error {
@@ -159,10 +171,10 @@ func setDatabaseVersion(tx *sql.Tx, version int) error {
 func initializeDefaultFolder(tx *sql.Tx) error {
 	var defaultID int64
 	err := tx.QueryRow("SELECT id FROM session_folders ORDER BY is_default DESC, id LIMIT 1").Scan(&defaultID)
-	if err != nil && err != sql.ErrNoRows {
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return fmt.Errorf("initialize schema: find default folder: %w", err)
 	}
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		result, insertErr := tx.Exec("INSERT INTO session_folders (name, is_default) VALUES ('默认分组', 1)")
 		if insertErr != nil {
 			return fmt.Errorf("initialize schema: create default folder: %w", insertErr)

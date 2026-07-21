@@ -62,6 +62,12 @@ func (s *SessionService) ExportCSV(path string, options model.SessionCSVExportOp
 	if err != nil {
 		return result, fmt.Errorf("export session csv: %w", err)
 	}
+	if options.IncludePasswords {
+		sessions, err = s.decryptSessionPasswordsForExport(sessions)
+		if err != nil {
+			return result, fmt.Errorf("export session csv: %w", err)
+		}
+	}
 	folderPaths, err := loadSessionCSVFolderPaths(s.db)
 	if err != nil {
 		return result, fmt.Errorf("export session csv: %w", err)
@@ -251,4 +257,23 @@ func assetProjectName(value *model.AssetProject) string {
 		return ""
 	}
 	return protectCSVCell(value.Name)
+}
+
+func (s *SessionService) decryptSessionPasswordsForExport(sessions []model.Session) ([]model.Session, error) {
+	if s.crypto == nil {
+		return sessions, nil
+	}
+	out := make([]model.Session, len(sessions))
+	copy(out, sessions)
+	for i := range out {
+		if out[i].Password == "" {
+			continue
+		}
+		plain, err := openSessionPassword(s.crypto, out[i].Password)
+		if err != nil {
+			return nil, fmt.Errorf("decrypt session %d password: %w", out[i].ID, err)
+		}
+		out[i].Password = plain
+	}
+	return out, nil
 }

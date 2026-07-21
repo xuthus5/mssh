@@ -11,7 +11,6 @@ import (
 	"encoding/pem"
 	"fmt"
 	"log/slog"
-	"strings"
 
 	gossh "golang.org/x/crypto/ssh"
 
@@ -227,52 +226,13 @@ func (k *KeyService) extractPublicKeyWithType(privateKeyPEM []byte) (model.KeyTy
 	if block == nil {
 		return "", "", fmt.Errorf("invalid PEM data")
 	}
-	var pk interface{}
-	var err error
-	var keyType model.KeyType
-	switch block.Type {
-	case "RSA PRIVATE KEY":
-		pk, err = x509.ParsePKCS1PrivateKey(block.Bytes)
-		keyType = model.KeyTypeRSA
-	case "EC PRIVATE KEY":
-		pk, err = x509.ParseECPrivateKey(block.Bytes)
-		keyType = model.KeyTypeECDSA
-	case "PRIVATE KEY":
-		pk, err = x509.ParsePKCS8PrivateKey(block.Bytes)
-		switch pk.(type) {
-		case *rsa.PrivateKey:
-			keyType = model.KeyTypeRSA
-		case ed25519.PrivateKey:
-			keyType = model.KeyTypeED25519
-		case *ecdsa.PrivateKey:
-			keyType = model.KeyTypeECDSA
-		default:
-			return "", "", fmt.Errorf("unsupported key type in PKCS#8")
-		}
-	case "OPENSSH PRIVATE KEY":
-		signer, err := gossh.ParsePrivateKey(privateKeyPEM)
-		if err != nil {
-			return "", "", fmt.Errorf("parse OpenSSH key: %w", err)
-		}
-		pubStr := signer.PublicKey().Type()
-		switch {
-		case strings.HasPrefix(pubStr, "ssh-rsa"):
-			keyType = model.KeyTypeRSA
-		case strings.HasPrefix(pubStr, "ssh-ed25519"):
-			keyType = model.KeyTypeED25519
-		case strings.HasPrefix(pubStr, "ecdsa-"):
-			keyType = model.KeyTypeECDSA
-		default:
-			return "", "", fmt.Errorf("unsupported key type: %s", pubStr)
-		}
-		return keyType, string(gossh.MarshalAuthorizedKey(signer.PublicKey())), nil
-	default:
-		return "", "", fmt.Errorf("unsupported key type: %s", block.Type)
+	if block.Type == "OPENSSH PRIVATE KEY" {
+		return publicKeyFromOpenSSH(privateKeyPEM)
 	}
+	pk, keyType, err := parsePEMPrivateKey(block)
 	if err != nil {
-		return "", "", fmt.Errorf("parse private key: %w", err)
+		return "", "", err
 	}
-
 	signer, err := gossh.NewSignerFromKey(pk)
 	if err != nil {
 		return "", "", fmt.Errorf("create signer: %w", err)

@@ -138,8 +138,11 @@ func decodeEncryptedSnapshot(content []byte, masterKey string) (ExportData, erro
 
 func cloudRequest(method, endpoint, username, password string, body io.Reader) (*http.Request, error) {
 	parsed, err := url.ParseRequestURI(strings.TrimSpace(endpoint))
-	if err != nil || (parsed.Scheme != "https" && parsed.Scheme != "http") {
-		return nil, errors.New("cloud sync URL must use http or https")
+	if err != nil {
+		return nil, errors.New("cloud sync URL is invalid")
+	}
+	if err := requireHTTPSUnlessLoopback(parsed); err != nil {
+		return nil, err
 	}
 	request, err := http.NewRequest(method, parsed.String(), body)
 	if err != nil {

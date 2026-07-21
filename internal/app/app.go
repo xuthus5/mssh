@@ -129,21 +129,39 @@ func startApp(opts Options, logger *slog.Logger, dependencies appDependencies) (
 
 func initializeServices(input serviceInitialization) (*App, error) {
 	runtime := service.NewCryptoRuntime()
+	securitySvc := newSecurityService(input, runtime)
+	sessionSvc := service.NewSessionService(input.db, input.eventBus, service.DefaultKeepAliveSeconds, input.opts.DataDir, runtime, input.logger)
+	terminalSvc := service.NewTerminalService(sessionSvc, input.eventBus, 32, input.logger)
+	tunnelSvc := service.NewTunnelService(input.db, sessionSvc, input.eventBus, input.logger)
+	logSvc := service.NewLogService(input.db, input.opts.DataDir, input.logger)
+	themeSvc, err := newThemeService(input)
+	if err != nil {
+		return nil, err
+	}
+	configureTerminalLogging(terminalSvc, logSvc, input.logger)
+	syncSvc := newSyncService(input, runtime, securitySvc, terminalSvc, tunnelSvc, sessionSvc)
+	return assembleApp(input, runtime, securitySvc, sessionSvc, terminalSvc, tunnelSvc, logSvc, themeSvc, syncSvc), nil
+}
+
+func newSecurityService(input serviceInitialization, runtime *service.CryptoRuntime) *service.SecurityService {
 	securitySvc := service.NewSecurityService(input.db, input.opts.DataDir, runtime, input.keychain, input.logger)
 	securitySvc.SetEventBus(input.eventBus)
 	if err := securitySvc.TryAutoUnlock(); err != nil {
 		input.logger.Warn("auto unlock vault failed", "error", err)
 	}
-	sessionSvc := service.NewSessionService(input.db, input.eventBus, service.DefaultKeepAliveSeconds, input.opts.DataDir, runtime, input.logger)
-	terminalSvc := service.NewTerminalService(sessionSvc, input.eventBus, 32, input.logger)
-	tunnelSvc := service.NewTunnelService(input.db, sessionSvc, input.eventBus, input.logger)
-	logSvc := service.NewLogService(input.db, input.opts.DataDir, input.logger)
+	return securitySvc
+}
+
+func newThemeService(input serviceInitialization) (*service.ThemeService, error) {
 	themeSvc := service.NewThemeService(input.db, input.logger)
 	if err := themeSvc.InitializeDefaults(); err != nil {
 		return nil, fmt.Errorf("initialize terminal themes: %w", err)
 	}
-	configureTerminalLogging(terminalSvc, logSvc, input.logger)
-	syncSvc := service.NewSyncService(input.db, input.logger,
+	return themeSvc, nil
+}
+
+func newSyncService(input serviceInitialization, runtime *service.CryptoRuntime, securitySvc *service.SecurityService, terminalSvc *service.TerminalService, tunnelSvc *service.TunnelService, sessionSvc *service.SessionService) *service.SyncService {
+	return service.NewSyncService(input.db, input.logger,
 		service.WithSyncDataDir(input.opts.DataDir),
 		service.WithSyncCrypto(runtime),
 		service.WithSyncSecretSource(securitySvc.SyncSecret),
@@ -157,6 +175,9 @@ func initializeServices(input serviceInitialization) (*App, error) {
 		service.WithVaultInstaller(securitySvc.InstallVaultFromExport),
 		service.WithSyncEventBus(input.eventBus),
 		service.WithSyncLifecycle(syncLifecycleAdapter{terminal: terminalSvc, tunnel: tunnelSvc, session: sessionSvc}))
+}
+
+func assembleApp(input serviceInitialization, runtime *service.CryptoRuntime, securitySvc *service.SecurityService, sessionSvc *service.SessionService, terminalSvc *service.TerminalService, tunnelSvc *service.TunnelService, logSvc *service.LogService, themeSvc *service.ThemeService, syncSvc *service.SyncService) *App {
 	return &App{
 		DB:             input.db,
 		Keychain:       input.keychain,
@@ -178,7 +199,7 @@ func initializeServices(input serviceInitialization) (*App, error) {
 		AI:             service.NewAIService(input.db, terminalSvc, input.keychain, input.logger),
 		Security:       securitySvc,
 		logger:         input.logger,
-	}, nil
+	}
 }
 
 type terminalRecordingStopper interface {
