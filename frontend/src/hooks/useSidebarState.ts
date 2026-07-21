@@ -1,3 +1,4 @@
+import { APP_NEW_SESSION_EVENT, onAppEvent } from '@/lib/appEvents'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { CommandItem } from '@/components/session/QuickCommands'
 import type { Folder, Session } from '@/hooks/useSession'
@@ -25,12 +26,12 @@ function useSidebarDialogEvents(options: {
     window.addEventListener('mssh:new-folder', openFolder)
     window.addEventListener('mssh:edit-session', editSession)
     window.addEventListener('mssh:edit-folder', editFolder)
-    window.addEventListener('mssh:new-session', newSession)
+    const stop = onAppEvent(APP_NEW_SESSION_EVENT, newSession)
     return () => {
       window.removeEventListener('mssh:new-folder', openFolder)
       window.removeEventListener('mssh:edit-session', editSession)
       window.removeEventListener('mssh:edit-folder', editFolder)
-      window.removeEventListener('mssh:new-session', newSession)
+      stop()
     }
   }, [options])
 }
