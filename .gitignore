@@ -17,3 +17,5 @@ wails_windows_*.syso
 build/linux/appimage/mssh
 build/linux/appimage/appicon.png
 bin/
+build/linux/appimage/mssh.png
+*.AppImage
