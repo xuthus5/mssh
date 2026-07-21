@@ -4,6 +4,8 @@ import { useConnectDialog } from '@/store/connectDialog'
 import { useAppStore } from '@/store/appStore'
 import { toast } from '@/components/ui/toast'
 import { openTerminalWithPoolCapacity } from '@/lib/openTerminal'
+import { t } from '@/i18n'
+
 
 interface ReconnectSession {
   id: string
@@ -56,7 +58,7 @@ export async function reconnectSessionTab(tabId: string, sessions: ReconnectSess
   const { state, terminalId, session } = target
   const dialog = useConnectDialog.getState()
   if (dialog.open) {
-    toast('已有 SSH 连接正在处理，请先完成或关闭当前连接窗口', 'info')
+    toast(t('已有 SSH 连接正在处理，请先完成或关闭当前连接窗口'), 'info')
     return
   }
   const terminal = state.terminalPool.get(terminalId)?.terminal

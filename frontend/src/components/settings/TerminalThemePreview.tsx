@@ -1,5 +1,7 @@
 import { Badge } from '@/components/ui/badge'
 import type { TerminalTheme } from '@/hooks/useSettings'
+import { t } from '@/i18n'
+
 
 interface Props {
   theme: TerminalTheme
@@ -33,8 +35,8 @@ export function TerminalThemePreview({ theme }: Props) {
     <div className="flex flex-wrap gap-2">
       <Badge variant="secondary">{theme.fontFamily}</Badge>
       <Badge variant="secondary">{theme.fontSize}px</Badge>
-      <Badge variant="outline">光标：{theme.cursorStyle}</Badge>
-      <Badge variant="outline">选区：{theme.selectionBackground}</Badge>
+      <Badge variant="outline">{t('光标：')}{theme.cursorStyle}</Badge>
+      <Badge variant="outline">{t('选区：')}{theme.selectionBackground}</Badge>
     </div>
   </div>
 }

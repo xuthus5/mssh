@@ -8,6 +8,8 @@ import { SETTINGS_SFTP_CHANGED_EVENT } from '@/lib/settingsWindowEvents'
 import { useSFTPSettingsStore } from '@/store/sftpSettingsStore'
 import { DEFAULT_SFTP_SETTINGS, type SFTPSettings } from '@/lib/sftpSettings'
 import type { Setting } from '../../bindings/github.com/xuthus5/mssh/internal/model/models'
+import { t } from '@/i18n'
+
 
 const sftpSettingKeys = ['sftp.show_hidden_files', 'sftp.follow_terminal_directory', 'sftp.default_view']
 
@@ -63,10 +65,10 @@ export function useSFTPSettings() {
       setSettings(normalized)
       useSFTPSettingsStore.getState().setSettings(normalized)
       emitSFTPSettings(normalized)
-      toast('SFTP 设置已保存', 'success')
+      toast(t('SFTP 设置已保存'), 'success')
     } catch (error) {
       logger.debug('saveSFTPSettings error', error)
-      toast(`保存 SFTP 设置失败: ${error instanceof Error ? error.message : String(error)}`, 'error')
+      toast(t('保存 SFTP 设置失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
       throw error
     }
   }, [])

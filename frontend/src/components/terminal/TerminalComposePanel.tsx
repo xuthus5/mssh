@@ -11,6 +11,8 @@ import { toast } from '@/components/ui/toast'
 import { recordCommand } from '@/lib/commandHistory'
 import { MacroService, TerminalService } from '@/lib/wails'
 import { useAppStore } from '@/store/appStore'
+import { t } from '@/i18n'
+
 
 interface Props { open: boolean; terminalID: string; sessionID: number; onClose: () => void }
 interface MacroItem { id: number; name: string; command: string; shortcut: string }
@@ -72,17 +74,17 @@ function MacroList({ state, busy, onExecute, onRetry }: {
   state: MacroState; busy: boolean; onExecute: (macro: MacroItem) => void; onRetry: () => void
 }) {
   if (state.status === 'idle' || state.status === 'loading') {
-    return <div aria-label="宏加载中" className="flex flex-1 gap-2"><Skeleton className="h-6 w-20" /><Skeleton className="h-6 w-24" /></div>
+    return <div aria-label={t('宏加载中')} className="flex flex-1 gap-2"><Skeleton className="h-6 w-20" /><Skeleton className="h-6 w-24" /></div>
   }
   if (state.status === 'error') {
     return <Alert variant="destructive" className="flex-1 py-1.5"><AlertDescription className="flex items-center justify-between gap-2 text-xs">
-      <span>宏加载失败: {state.error}</span><Button size="xs" variant="outline" onClick={onRetry}><RotateCw data-icon="inline-start" />重试</Button>
+      <span>{t('宏加载失败:')} {state.error}</span><Button size="xs" variant="outline" onClick={onRetry}><RotateCw data-icon="inline-start" />{t('重试')}</Button>
     </AlertDescription></Alert>
   }
-  if (state.items.length === 0) return <span className="text-xs text-muted-foreground">暂无可用宏</span>
+  if (state.items.length === 0) return <span className="text-xs text-muted-foreground">{t('暂无可用宏')}</span>
   return <div className="flex max-h-16 flex-1 flex-wrap gap-1.5 overflow-y-auto pr-1">
     {state.items.map((macro) => <Button key={macro.id} type="button" size="xs" variant="secondary" disabled={busy}
-      aria-label={`执行宏 ${macro.name}`} title={macro.command} onClick={() => onExecute(macro)}>
+      aria-label={t('执行宏 ${}', macro.name)} title={macro.command} onClick={() => onExecute(macro)}>
       {macro.name}{macro.shortcut && <Badge variant="outline" className="h-4 px-1 text-[10px]">{macro.shortcut}</Badge>}
     </Button>)}
   </div>
@@ -97,27 +99,27 @@ interface PanelViewProps {
 
 function ComposePanelView(props: PanelViewProps) {
   const hasContent = props.content.trim().length > 0
-  return <section aria-label="终端撰写面板" className="mx-2 mb-2 flex max-h-72 flex-shrink-0 flex-col gap-3 rounded-xl border border-border bg-background p-3 shadow-sm">
+  return <section aria-label={t('终端撰写面板')} className="mx-2 mb-2 flex max-h-72 flex-shrink-0 flex-col gap-3 rounded-xl border border-border bg-background p-3 shadow-sm">
     <header className="flex items-start justify-between gap-3">
       <div className="flex min-w-0 items-center gap-2"><PenLine className="size-4 text-primary" />
-        <div><h2 className="text-sm font-medium">撰写终端内容</h2><p className="text-xs text-muted-foreground">组织多行命令，执行或仅粘贴到当前终端</p></div>
+        <div><h2 className="text-sm font-medium">{t('撰写终端内容')}</h2><p className="text-xs text-muted-foreground">{t('组织多行命令，执行或仅粘贴到当前终端')}</p></div>
       </div>
-      <Button type="button" size="icon-xs" variant="ghost" aria-label="关闭撰写面板" onClick={props.onClose}><X /></Button>
+      <Button type="button" size="icon-xs" variant="ghost" aria-label={t('关闭撰写面板')} onClick={props.onClose}><X /></Button>
     </header>
-    <div className="flex min-h-6 items-start gap-2"><span className="pt-1 text-xs font-medium text-muted-foreground">宏</span>
+    <div className="flex min-h-6 items-start gap-2"><span className="pt-1 text-xs font-medium text-muted-foreground">{t('宏')}</span>
       <MacroList state={props.macros} busy={props.busy} onExecute={props.onExecuteMacro} onRetry={props.onRetry} />
     </div>
     <Field>
-      <FieldLabel htmlFor="terminal-compose-input" className="sr-only">撰写终端内容</FieldLabel>
+      <FieldLabel htmlFor="terminal-compose-input" className="sr-only">{t('撰写终端内容')}</FieldLabel>
       <Textarea id="terminal-compose-input" ref={props.inputRef} autoFocus value={props.content} disabled={props.busy}
-        aria-label="撰写终端内容" placeholder="输入要发送到终端的内容…" className="min-h-20 max-h-36 resize-y font-mono text-sm"
+        aria-label={t('撰写终端内容')} placeholder={t('输入要发送到终端的内容…')} className="min-h-20 max-h-36 resize-y font-mono text-sm"
         onChange={(event) => props.onChange(event.target.value)} onKeyDown={props.onKeyDown} />
       <div className="flex items-center justify-between gap-3">
-        <span className="text-xs text-muted-foreground">Ctrl/⌘ + Enter 执行</span>
+        <span className="text-xs text-muted-foreground">{t('Ctrl/⌘ + Enter 执行')}</span>
         <div className="flex items-center gap-2">
-          <Button type="button" size="sm" variant="outline" disabled={!hasContent || props.busy} onClick={props.onPaste}><ClipboardPaste data-icon="inline-start" />粘贴</Button>
+          <Button type="button" size="sm" variant="outline" disabled={!hasContent || props.busy} onClick={props.onPaste}><ClipboardPaste data-icon="inline-start" />{t('粘贴')}</Button>
           <Button type="button" size="sm" disabled={!hasContent || props.busy} onClick={props.onExecute}>
-            {props.busy ? <Spinner data-icon="inline-start" /> : <Play data-icon="inline-start" />}执行
+            {props.busy ? <Spinner data-icon="inline-start" /> : <Play data-icon="inline-start" />}{t('执行')}
           </Button>
         </div>
       </div>
@@ -137,11 +139,11 @@ export function TerminalComposePanel({ open, terminalID, sessionID, onClose }: P
       recordCommand(sessionID, content)
       setContent('')
       window.setTimeout(() => inputRef.current?.focus(), 0)
-    }, '执行失败')
+    }, t('执行失败'))
   }, [content, run, sessionID, terminalID])
   const paste = useCallback(() => {
     const terminal = useAppStore.getState().terminalPool.get(terminalID)?.terminal
-    if (!terminal) return toast('当前终端不可用', 'error')
+    if (!terminal) return toast(t('当前终端不可用'), 'error')
     terminal.paste(content)
     terminal.focus()
   }, [content, terminalID])
@@ -149,7 +151,7 @@ export function TerminalComposePanel({ open, terminalID, sessionID, onClose }: P
     await MacroService.Execute(terminalID, commandWithEnter(macro.command))
     recordCommand(sessionID, macro.command)
     useAppStore.getState().terminalPool.get(terminalID)?.terminal.focus()
-  }, '宏执行失败'), [run, sessionID, terminalID])
+  }, t('宏执行失败')), [run, sessionID, terminalID])
   const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     event.stopPropagation()
     if (!(event.ctrlKey || event.metaKey) || event.key !== 'Enter') return

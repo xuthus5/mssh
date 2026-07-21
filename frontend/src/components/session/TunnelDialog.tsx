@@ -18,6 +18,8 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import type { Tunnel } from '@/hooks/useSession'
+import { t } from '@/i18n'
+
 
 interface Props {
   open: boolean
@@ -29,9 +31,9 @@ interface Props {
 }
 
 const TUNNEL_TYPE_OPTIONS = [
-  { value: 'local', label: '本地转发' },
-  { value: 'remote', label: '远程转发' },
-  { value: 'dynamic', label: '动态转发' },
+  { value: 'local', label: t('本地转发') },
+  { value: 'remote', label: t('远程转发') },
+  { value: 'dynamic', label: t('动态转发') },
 ]
 
 export default function TunnelDialog({
@@ -66,12 +68,12 @@ export default function TunnelDialog({
     setShowAdd(false)
   }
 
-  const typeLabel = (t: string) => {
-    switch (t) {
-      case 'local': return '本地转发'
-      case 'remote': return '远程转发'
-      case 'dynamic': return '动态转发'
-      default: return t
+  const typeLabel = (type: string) => {
+    switch (type) {
+      case 'local': return t('本地转发')
+      case 'remote': return t('远程转发')
+      case 'dynamic': return t('动态转发')
+      default: return type
     }
   }
 
@@ -79,7 +81,7 @@ export default function TunnelDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>隧道管理</DialogTitle>
+          <DialogTitle>{t('隧道管理')}</DialogTitle>
         </DialogHeader>
         <div className="flex flex-col gap-3">
           <div className="flex items-center">
@@ -88,14 +90,14 @@ export default function TunnelDialog({
               variant="outline"
               onClick={() => setShowAdd(!showAdd)}
             >
-              {showAdd ? '取消' : '新建隧道'}
+              {showAdd ? t('取消') : t('新建隧道')}
             </Button>
           </div>
           {showAdd && (
             <form onSubmit={handleSubmit} className="flex flex-col gap-3 p-3 rounded-lg border border-border">
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-medium text-muted-foreground">
-                  类型
+                  {t('类型')}
                 </label>
                 <LabeledSelect value={type} options={TUNNEL_TYPE_OPTIONS} onValueChange={setType} />
               </div>
@@ -104,7 +106,7 @@ export default function TunnelDialog({
                   <div className="grid grid-cols-2 gap-3">
                     <div className="flex flex-col gap-1.5">
                       <label className="text-xs font-medium text-muted-foreground">
-                        本地地址
+                        {t('本地地址')}
                       </label>
                       <Input
                         value={localAddress}
@@ -114,7 +116,7 @@ export default function TunnelDialog({
                     </div>
                     <div className="flex flex-col gap-1.5">
                       <label className="text-xs font-medium text-muted-foreground">
-                        本地端口
+                        {t('本地端口')}
                       </label>
                       <Input
                         type="number"
@@ -127,7 +129,7 @@ export default function TunnelDialog({
                   <div className="grid grid-cols-2 gap-3">
                     <div className="flex flex-col gap-1.5">
                       <label className="text-xs font-medium text-muted-foreground">
-                        远程地址
+                        {t('远程地址')}
                       </label>
                       <Input
                         value={remoteAddress}
@@ -137,7 +139,7 @@ export default function TunnelDialog({
                     </div>
                     <div className="flex flex-col gap-1.5">
                       <label className="text-xs font-medium text-muted-foreground">
-                        远程端口
+                        {t('远程端口')}
                       </label>
                       <Input
                         type="number"
@@ -153,7 +155,7 @@ export default function TunnelDialog({
                 <div className="grid grid-cols-2 gap-3">
                   <div className="flex flex-col gap-1.5">
                     <label className="text-xs font-medium text-muted-foreground">
-                      本地地址
+                      {t('本地地址')}
                     </label>
                     <Input
                       value={localAddress}
@@ -163,7 +165,7 @@ export default function TunnelDialog({
                   </div>
                   <div className="flex flex-col gap-1.5">
                     <label className="text-xs font-medium text-muted-foreground">
-                      本地端口
+                      {t('本地端口')}
                     </label>
                     <Input
                       type="number"
@@ -175,55 +177,55 @@ export default function TunnelDialog({
                 </div>
               )}
               <DialogFooter showCloseButton>
-                <Button type="submit">启动</Button>
+                <Button type="submit">{t('启动')}</Button>
               </DialogFooter>
             </form>
           )}
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>类型</TableHead>
-                <TableHead>本地</TableHead>
-                <TableHead>远程</TableHead>
-                <TableHead>状态</TableHead>
-                <TableHead className="text-right">操作</TableHead>
+                <TableHead>{t('类型')}</TableHead>
+                <TableHead>{t('本地')}</TableHead>
+                <TableHead>{t('远程')}</TableHead>
+                <TableHead>{t('状态')}</TableHead>
+                <TableHead className="text-right">{t('操作')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {tunnels.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={5} className="text-center text-muted-foreground">
-                    无隧道
+                    {t('无隧道')}
                   </TableCell>
                 </TableRow>
               ) : (
-                tunnels.map((t) => (
-                  <TableRow key={t.id}>
-                    <TableCell>{typeLabel(t.type)}</TableCell>
+                tunnels.map((tunnel) => (
+                  <TableRow key={tunnel.id}>
+                    <TableCell>{typeLabel(tunnel.type)}</TableCell>
                     <TableCell>
-                      {t.localAddress}:{t.localPort}
+                      {tunnel.localAddress}:{tunnel.localPort}
                     </TableCell>
                     <TableCell>
-                      {t.type !== 'dynamic'
-                        ? `${t.remoteAddress}:${t.remotePort}`
+                      {tunnel.type !== 'dynamic'
+                        ? `${tunnel.remoteAddress}:${tunnel.remotePort}`
                         : '-'}
                     </TableCell>
                     <TableCell>
                       <span
-                        className={`text-xs ${t.running ? 'text-green-400' : 'text-muted-foreground'}`}
+                        className={`text-xs ${tunnel.running ? 'text-green-400' : 'text-muted-foreground'}`}
                       >
-                        {t.running ? '运行中' : '已停止'}
+                        {tunnel.running ? t('运行中') : t('已停止')}
                       </span>
                     </TableCell>
                     <TableCell className="text-right">
-                      {t.running ? (
+                      {tunnel.running ? (
                         <Button
                           size="xs"
                           variant="ghost"
                           className="text-destructive"
-                          onClick={() => onStop(t.id)}
+                          onClick={() => onStop(tunnel.id)}
                         >
-                          停止
+                          {t('停止')}
                         </Button>
                       ) : (
                         <Button
@@ -231,16 +233,16 @@ export default function TunnelDialog({
                           variant="ghost"
                           onClick={() =>
                             onStart({
-                              sessionId: t.sessionId,
-                              type: t.type,
-                              localAddress: t.localAddress,
-                              localPort: t.localPort,
-                              remoteAddress: t.remoteAddress,
-                              remotePort: t.remotePort,
+                              sessionId: tunnel.sessionId,
+                              type: tunnel.type,
+                              localAddress: tunnel.localAddress,
+                              localPort: tunnel.localPort,
+                              remoteAddress: tunnel.remoteAddress,
+                              remotePort: tunnel.remotePort,
                             })
                           }
                         >
-                          启动
+                          {t('启动')}
                         </Button>
                       )}
                     </TableCell>

@@ -5,6 +5,8 @@ import { cancelTransfer as cancelTransferAction, startDownload, startUpload } fr
 import { FileService } from '@/lib/wails'
 import { useAppStore } from '@/store/appStore'
 import type { FileEntry } from '../../bindings/github.com/xuthus5/mssh/internal/ssh/models'
+import { t } from '@/i18n'
+
 
 export type { TransferJob } from '@/store/appStore'
 
@@ -75,7 +77,7 @@ function useTransferCommands({ sessionId, sessionName }: TransferCommandOptions)
       await startUpload({ sessionId, sessionName, sourcePath: localPath, targetPath })
     } catch (error) {
       logger.error('upload error', error)
-      toast(`上传失败: ${error instanceof Error ? error.message : String(error)}`, 'error')
+      toast(t('上传失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
     }
   }, [sessionId, sessionName])
   const uploadMany = useCallback(async (localPaths: string[], remotePath: string) => {
@@ -86,7 +88,7 @@ function useTransferCommands({ sessionId, sessionName }: TransferCommandOptions)
       await startDownload({ sessionId, sessionName, sourcePath: remotePath, targetPath: localPath })
     } catch (error) {
       logger.error('download error', error)
-      toast(`下载失败: ${error instanceof Error ? error.message : String(error)}`, 'error')
+      toast(t('下载失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
     }
   }, [sessionId, sessionName])
   return { upload, uploadMany, download }
@@ -141,7 +143,7 @@ function useCancelTransfer() {
 export function useFileTransfer(sessionId: number) {
   const transfers = useAppStore((state) => state.transfers)
   const sessionName = useAppStore((state) => state.tabs
-    .find((tab) => tab.type === 'terminal' && tab.sessionId === sessionId)?.title ?? `会话 #${sessionId}`)
+    .find((tab) => tab.type === 'terminal' && tab.sessionId === sessionId)?.title ?? t('会话 #${}', sessionId))
   const listing = useFileListing(sessionId)
   const commands = useTransferCommands({ sessionId, sessionName })
   const mutations = useFileMutations({

@@ -1,6 +1,7 @@
 import ReactDOM from 'react-dom/client'
 import './styles/globals.css'
 import { TooltipProvider } from '@/components/ui/tooltip'
+import { LanguageProvider } from '@/i18n/LanguageProvider'
 import { logger } from '@/lib/logger'
 
 async function selectedRoot() {
@@ -13,7 +14,7 @@ async function selectedRoot() {
 
 async function mount() {
   const Root = await selectedRoot()
-  ReactDOM.createRoot(document.getElementById('root')!).render(<TooltipProvider><Root /></TooltipProvider>)
+  ReactDOM.createRoot(document.getElementById('root')!).render(<LanguageProvider><TooltipProvider><Root /></TooltipProvider></LanguageProvider>)
 }
 
 void mount().catch((error: unknown) => logger.error('mount application failed', error))

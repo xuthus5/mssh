@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { VirtualList } from '@/components/ui/virtual-list'
 import { buildVisibleSessionTreeNodes, type SessionTreeNode } from '@/lib/sessionTreeModel'
 import { isTreeNavigationKey, nextTreeIndex } from '@/lib/treeKeyboard'
+import { t } from '@/i18n'
 
 interface Props {
   folders: Folder[]
@@ -102,7 +103,7 @@ export default function SessionTree(props: Props) {
   return (
     <div
       role="tree"
-      aria-label="会话列表"
+      aria-label={t('会话列表')}
       aria-activedescendant={activeId}
       tabIndex={0}
       className="flex h-full flex-col p-2 outline-none"
@@ -111,10 +112,10 @@ export default function SessionTree(props: Props) {
         if (node) handleNodeKey(event, activeIndex, node)
       }}
     >
-      <div className="mb-2 px-1 text-xs font-medium text-muted-foreground">会话列表</div>
+      <div className="mb-2 px-1 text-xs font-medium text-muted-foreground">{t('会话列表')}</div>
       <div className="min-h-0 flex-1 overflow-y-auto">
         {nodes.length === 0 ? (
-          <p className="px-1 text-xs text-muted-foreground">暂无会话</p>
+          <p className="px-1 text-xs text-muted-foreground">{t('暂无会话')}</p>
         ) : nodes.length > VIRTUALIZE_AFTER ? (
           <VirtualList items={nodes} estimateSize={ROW} getKey={(node) => node.id} renderItem={(node, index) => renderNode(node, index)} />
         ) : (
@@ -158,7 +159,7 @@ function TreeRow(props: {
         <span className="shrink-0">{props.node.expanded ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}</span>
         <FolderIcon className="size-3.5 shrink-0 text-muted-foreground" />
         <span className="truncate">{folder.name}</span>
-        {folder.isDefault ? <Badge className="ml-auto">默认</Badge> : null}
+        {folder.isDefault ? <Badge className="ml-auto">{t('默认')}</Badge> : null}
       </div>
     )
     if (props.navigationOnly) return row
@@ -166,15 +167,15 @@ function TreeRow(props: {
       <ContextMenu>
         <ContextMenuTrigger>{row}</ContextMenuTrigger>
         <ContextMenuContent>
-          <ContextMenuItem onClick={() => props.onEditFolder?.(folder)}>编辑</ContextMenuItem>
-          <ContextMenuItem variant="destructive" onClick={() => props.onDeleteFolder?.(folder.id)}>删除</ContextMenuItem>
+          <ContextMenuItem onClick={() => props.onEditFolder?.(folder)}>{t('编辑')}</ContextMenuItem>
+          <ContextMenuItem variant="destructive" onClick={() => props.onDeleteFolder?.(folder.id)}>{t('删除')}</ContextMenuItem>
         </ContextMenuContent>
       </ContextMenu>
     )
   }
 
   const session = props.node.session
-  const detail = `主机：${session.host}\n端口：${session.port}\n用户：${session.username}`
+  const detail = t('主机：${}\n端口：${}\n用户：${}', session.host, session.port, session.username)
   const row = (
     <div
       id={props.node.id}
@@ -200,15 +201,15 @@ function TreeRow(props: {
     <ContextMenu>
       <ContextMenuTrigger>{row}</ContextMenuTrigger>
       <ContextMenuContent>
-        <ContextMenuItem onClick={() => props.onConnect(session.id)}>连接</ContextMenuItem>
-        <ContextMenuItem onClick={() => props.onEditSession?.(session)}>编辑</ContextMenuItem>
+        <ContextMenuItem onClick={() => props.onConnect(session.id)}>{t('连接')}</ContextMenuItem>
+        <ContextMenuItem onClick={() => props.onEditSession?.(session)}>{t('编辑')}</ContextMenuItem>
         {props.onMoveToFolder ? (
           <>
             <ContextMenuSeparator />
             <ContextMenuSub>
-              <ContextMenuSubTrigger>移动到</ContextMenuSubTrigger>
+              <ContextMenuSubTrigger>{t('移动到')}</ContextMenuSubTrigger>
               <ContextMenuSubContent>
-                <ContextMenuItem onClick={() => props.onMoveToFolder?.(session.id, null)}>根目录</ContextMenuItem>
+                <ContextMenuItem onClick={() => props.onMoveToFolder?.(session.id, null)}>{t('根目录')}</ContextMenuItem>
                 {props.folders.map((folder) => (
                   <ContextMenuItem key={folder.id} onClick={() => props.onMoveToFolder?.(session.id, folder.id)}>{folder.name}</ContextMenuItem>
                 ))}
@@ -217,7 +218,7 @@ function TreeRow(props: {
           </>
         ) : null}
         <ContextMenuSeparator />
-        <ContextMenuItem variant="destructive" onClick={() => props.onDeleteSession?.(session.id)}>删除</ContextMenuItem>
+        <ContextMenuItem variant="destructive" onClick={() => props.onDeleteSession?.(session.id)}>{t('删除')}</ContextMenuItem>
       </ContextMenuContent>
     </ContextMenu>
   )

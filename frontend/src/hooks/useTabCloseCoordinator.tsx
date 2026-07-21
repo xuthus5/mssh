@@ -11,6 +11,8 @@ import {
 } from '@/components/ui/alert-dialog'
 import { closeTabsWithFeedback } from '@/lib/closeTabsWithFeedback'
 import { useAppStore, type AppState, type Tab } from '@/store/appStore'
+import { t } from '@/i18n'
+
 
 function requiresCloseConfirmation(
   tab: Tab,
@@ -62,12 +64,12 @@ export function TabCloseConfirmation({ pendingTabID, onCancel, onConfirm }: {
     <AlertDialog open={pendingTabID !== null} onOpenChange={(open) => { if (!open) onCancel() }}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>关闭活动连接？</AlertDialogTitle>
-          <AlertDialogDescription>所选标签仍有活动 SSH 连接或录制任务。关闭将终止远程会话且无法恢复。</AlertDialogDescription>
+          <AlertDialogTitle>{t('关闭活动连接？')}</AlertDialogTitle>
+          <AlertDialogDescription>{t('所选标签仍有活动 SSH 连接或录制任务。关闭将终止远程会话且无法恢复。')}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>取消</AlertDialogCancel>
-          <AlertDialogAction variant="destructive" onClick={onConfirm}>关闭连接</AlertDialogAction>
+          <AlertDialogCancel>{t('取消')}</AlertDialogCancel>
+          <AlertDialogAction variant="destructive" onClick={onConfirm}>{t('关闭连接')}</AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

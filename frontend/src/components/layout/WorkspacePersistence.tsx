@@ -6,6 +6,8 @@ import { logger } from '@/lib/logger'
 import { toast } from '@/components/ui/toast'
 import { createWorkspaceSnapshot, parseWorkspaceSnapshot, restoreWorkspaceSnapshot, WORKSPACE_LAYOUT_SETTING } from '@/store/workspacePersistence'
 import { openTerminalWithPoolCapacity } from '@/lib/openTerminal'
+import { t } from '@/i18n'
+
 
 const SAVE_DELAY_MS = 300
 
@@ -29,7 +31,7 @@ export function WorkspacePersistence() {
         if (cancelled) return
         const { failures, ...workspace } = result
         useAppStore.setState({ ...workspace, overviewReturnSurface: null, focusRequest: { id: '', terminalId: null, sequence: 0 } })
-        if (failures > 0) toast(`${failures} 个工作区标签恢复失败`, 'warning')
+        if (failures > 0) toast(t('${} 个工作区标签恢复失败', failures), 'warning')
       } catch (error) {
         logger.error('restore workspace failed', error)
       } finally {

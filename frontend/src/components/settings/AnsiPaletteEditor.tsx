@@ -3,8 +3,10 @@ import { Input } from '@/components/ui/input'
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { cn } from '@/lib/utils'
 import { isHexColor, safeHexColor } from '@/components/settings/terminalThemeValidation'
+import { t } from '@/i18n'
 
-const ANSI_NAMES = ['黑色', '红色', '绿色', '黄色', '蓝色', '洋红', '青色', '白色', '亮黑', '亮红', '亮绿', '亮黄', '亮蓝', '亮洋红', '亮青', '亮白']
+
+const ANSI_NAMES = [t('黑色'), t('红色'), t('绿色'), t('黄色'), t('蓝色'), t('洋红'), t('青色'), t('白色'), t('亮黑'), t('亮红'), t('亮绿'), t('亮黄'), t('亮蓝'), t('亮洋红'), t('亮青'), t('亮白')]
 
 interface Props {
   colors: string[]
@@ -33,9 +35,9 @@ export function AnsiPaletteEditor({ colors, onChange }: Props) {
   }
   return <FieldGroup className="gap-4">
     <Field>
-      <FieldLabel>ANSI 16 色</FieldLabel>
-      <FieldDescription>选择一个色块后，在下方进行精确编辑。</FieldDescription>
-      <div role="radiogroup" aria-label="ANSI 16 色" className="grid grid-cols-4 gap-2 sm:grid-cols-8">
+      <FieldLabel>{t('ANSI 16 色')}</FieldLabel>
+      <FieldDescription>{t('选择一个色块后，在下方进行精确编辑。')}</FieldDescription>
+      <div role="radiogroup" aria-label={t('ANSI 16 色')} className="grid grid-cols-4 gap-2 sm:grid-cols-8">
         {colors.map((color, index) => <button
           key={index}
           type="button"
@@ -53,10 +55,10 @@ export function AnsiPaletteEditor({ colors, onChange }: Props) {
     <Field data-invalid={!valid}>
       <FieldLabel htmlFor="ansi-color-hex">{selectedName} HEX</FieldLabel>
       <div className="grid grid-cols-[3rem_minmax(0,1fr)] gap-2">
-        <input aria-label={`${selectedName} 颜色`} type="color" value={safeHexColor(selectedColor)} onChange={(event) => onChange(selectedIndex, event.target.value)} className="size-8 self-center rounded-lg border border-input bg-transparent p-0.5" />
+        <input aria-label={t('${} 颜色', selectedName)} type="color" value={safeHexColor(selectedColor)} onChange={(event) => onChange(selectedIndex, event.target.value)} className="size-8 self-center rounded-lg border border-input bg-transparent p-0.5" />
         <Input id="ansi-color-hex" aria-label={`${selectedName} HEX`} aria-invalid={!valid} value={selectedColor} onChange={(event) => onChange(selectedIndex, event.target.value)} />
       </div>
-      {!valid && <FieldError>请输入 #RRGGBB 格式的颜色值。</FieldError>}
+      {!valid && <FieldError>{t('请输入 #RRGGBB 格式的颜色值。')}</FieldError>}
     </Field>
   </FieldGroup>
 }

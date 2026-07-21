@@ -12,7 +12,11 @@ import { useAppStore } from '@/store/appStore'
 import {
   createPlaybackResizeObserver,
   recoverPlaybackView,
+  decodeRecordingData,
 } from '@/components/terminal/playbackTerminalRuntime'
+// decodeRecordingData re-exported from runtime
+import { t } from '@/i18n'
+
 const PLAYBACK_INTERVAL_MS = 16
 const PLAYBACK_SCROLLBACK = 10000
 const MAX_PROGRESS = 100
@@ -279,21 +283,16 @@ export function PlaybackTab({ recordingId, title, active }: Props) {
   return (
     <div
       role="region"
-      aria-label={`回放: ${title}`}
+      aria-label={t('回放: ${}', title)}
       className="flex h-full min-h-0 min-w-0 w-full flex-1 flex-col overflow-hidden"
     >
       <PlaybackHeader title={title} playing={controls.playing} disabled={entries.length === 0} speed={controls.speed} onToggle={controls.togglePlay} />
       <div
         ref={containerRef}
-        aria-label="回放终端"
+        aria-label={t('回放终端')}
         className="min-h-0 min-w-0 w-full flex-1 overflow-hidden"
       />
       <PlaybackTimeline progress={controls.progress} speed={controls.speed} onSeek={controls.seek} onSpeed={controls.changeSpeed} />
     </div>
   )
-}
-
-export function decodeRecordingData(encoded: string) {
-  const binary = atob(encoded)
-  return Uint8Array.from(binary, (character) => character.charCodeAt(0))
 }

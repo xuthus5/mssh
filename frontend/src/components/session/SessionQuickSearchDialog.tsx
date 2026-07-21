@@ -14,6 +14,8 @@ import type { Folder, Session } from '@/hooks/useSession'
 import { SESSION_QUICK_SEARCH_EVENT } from '@/lib/sessionQuickSearch'
 import { sessionAssetSearchText } from '@/lib/sessionAssetSearch'
 import { Badge } from '@/components/ui/badge'
+import { t } from '@/i18n'
+
 
 interface Props {
   open: boolean
@@ -49,9 +51,9 @@ function nextSelection(current: number, direction: number, total: number) {
 function EmptyResults({ hasSessions }: { hasSessions: boolean }) {
   return <div className="flex min-h-36 flex-col items-center justify-center gap-2 px-6 text-center">
     <Server className="size-8 text-muted-foreground/50" />
-    <p className="text-sm font-medium">{hasSessions ? '未找到匹配会话' : '暂无会话'}</p>
+    <p className="text-sm font-medium">{hasSessions ? t('未找到匹配会话') : t('暂无会话')}</p>
     <p className="text-xs text-muted-foreground">
-      {hasSessions ? '尝试搜索名称、主机、用户、分组、环境、项目或标签' : '请先创建会话，再使用快速连接'}
+      {hasSessions ? t('尝试搜索名称、主机、用户、分组、环境、项目或标签') : t('请先创建会话，再使用快速连接')}
     </p>
   </div>
 }
@@ -102,12 +104,12 @@ interface SearchFieldProps {
 function SearchHeader() {
   return <DialogHeader className="border-b border-border px-4 pb-3 pt-4">
     <div className="flex items-center justify-between gap-4 pr-8">
-      <DialogTitle>快速连接会话</DialogTitle>
+      <DialogTitle>{t('快速连接会话')}</DialogTitle>
       <span className="rounded-md border border-border bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
         Ctrl F
       </span>
     </div>
-    <DialogDescription>搜索名称、主机、用户、分组、环境、项目或标签</DialogDescription>
+    <DialogDescription>{t('搜索名称、主机、用户、分组、环境、项目或标签')}</DialogDescription>
   </DialogHeader>
 }
 
@@ -115,10 +117,10 @@ function SearchField({ query, listboxId, activeOptionId, inputRef, onQueryChange
   return <div className="px-4">
     <div className="relative">
       <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-      <Input ref={inputRef} autoFocus data-session-search-input type="search" role="searchbox" aria-label="搜索会话"
+      <Input ref={inputRef} autoFocus data-session-search-input type="search" role="searchbox" aria-label={t('搜索会话')}
         aria-controls={listboxId} aria-activedescendant={activeOptionId} value={query}
         onChange={(event) => onQueryChange(event.target.value)} onKeyDown={onKeyDown}
-        placeholder="输入关键词快速连接..." className="h-10 pl-9 pr-10" />
+        placeholder={t('输入关键词快速连接...')} className="h-10 pl-9 pr-10" />
       <CornerDownLeft className="absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
     </div>
   </div>
@@ -139,9 +141,9 @@ function SearchResults({ listboxId, sessions, names, selectedIndex, hasSessions,
     <EmptyResults hasSessions={hasSessions} />
   </ScrollArea>
   return <ScrollArea className="max-h-80 min-h-36 px-2 pb-3">
-    <div id={listboxId} role="listbox" aria-label="会话搜索结果" className="flex flex-col gap-1 px-2">
+    <div id={listboxId} role="listbox" aria-label={t('会话搜索结果')} className="flex flex-col gap-1 px-2">
       {sessions.map((session, index) => <SessionResult key={session.id} session={session}
-        optionId={`${listboxId}-${session.id}`} folderName={names.get(session.folderId ?? '') ?? '未分组'}
+        optionId={`${listboxId}-${session.id}`} folderName={names.get(session.folderId ?? '') ?? t('未分组')}
         selected={index === selectedIndex} onSelect={() => onSelect(index)} onActivate={() => onActivate(session)} />)}
     </div>
   </ScrollArea>

@@ -7,6 +7,8 @@ import { LabeledSelect } from '@/components/ui/labeled-select'
 import { TerminalSelectionBackgroundField } from '@/components/settings/TerminalSelectionBackgroundField'
 import { validTerminalFontFamily, validTerminalFontSize } from '@/components/settings/themeEditorState'
 import type { TerminalGlobalStyle } from '../../../bindings/github.com/xuthus5/mssh/internal/model/models'
+import { t } from '@/i18n'
+
 
 const CURSOR_STYLE_OPTIONS = [
   { value: 'block', label: '块状' },
@@ -35,29 +37,29 @@ export function TerminalGlobalStyleEditor({ style, disabled = false, onChange }:
 
   return <Card>
     <CardHeader>
-      <CardTitle className="flex items-center gap-2 text-sm"><TextCursorInput className="size-4" />全局字体与光标</CardTitle>
-      <p className="mt-1 text-sm text-muted-foreground">作为所有终端主题的默认字体、光标样式和选区高亮配置。</p>
+      <CardTitle className="flex items-center gap-2 text-sm"><TextCursorInput className="size-4" />{t('全局字体与光标')}</CardTitle>
+      <p className="mt-1 text-sm text-muted-foreground">{t('作为所有终端主题的默认字体、光标样式和选区高亮配置。')}</p>
     </CardHeader>
     <CardContent>
       <FieldGroup>
         <Field data-disabled={disabled || undefined} data-invalid={!fontFamilyValid}>
-          <FieldLabel htmlFor="terminal-global-font-family">终端字体</FieldLabel>
-          <Input id="terminal-global-font-family" aria-label="全局终端字体" aria-invalid={!fontFamilyValid} value={style.font_family} disabled={disabled} onChange={(event) => onChange('font_family', event.target.value)} />
-          <FieldDescription>支持 CSS 字体族列表，缺失字形会依次使用后续字体。</FieldDescription>
-          {!fontFamilyValid && <FieldError>字体不能为空，且最多包含 256 个字符。</FieldError>}
+          <FieldLabel htmlFor="terminal-global-font-family">{t('终端字体')}</FieldLabel>
+          <Input id="terminal-global-font-family" aria-label={t('全局终端字体')} aria-invalid={!fontFamilyValid} value={style.font_family} disabled={disabled} onChange={(event) => onChange('font_family', event.target.value)} />
+          <FieldDescription>{t('支持 CSS 字体族列表，缺失字形会依次使用后续字体。')}</FieldDescription>
+          {!fontFamilyValid && <FieldError>{t('字体不能为空，且最多包含 256 个字符。')}</FieldError>}
         </Field>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field data-disabled={disabled || undefined} data-invalid={!fontSizeValid}>
-            <FieldLabel htmlFor="terminal-global-font-size">终端字号</FieldLabel>
-            <Input id="terminal-global-font-size" aria-label="全局终端字号" aria-invalid={!fontSizeValid} type="number" min={8} max={48} value={fontSize} disabled={disabled} onChange={(event) => changeFontSize(event.target.value)} />
-            {!fontSizeValid && <FieldError>字号必须是 8 到 48 的整数。</FieldError>}
+            <FieldLabel htmlFor="terminal-global-font-size">{t('终端字号')}</FieldLabel>
+            <Input id="terminal-global-font-size" aria-label={t('全局终端字号')} aria-invalid={!fontSizeValid} type="number" min={8} max={48} value={fontSize} disabled={disabled} onChange={(event) => changeFontSize(event.target.value)} />
+            {!fontSizeValid && <FieldError>{t('字号必须是 8 到 48 的整数。')}</FieldError>}
           </Field>
           <Field data-disabled={disabled || undefined}>
-            <FieldLabel>光标样式</FieldLabel>
-            <LabeledSelect ariaLabel="全局光标样式" value={style.cursor_style} options={CURSOR_STYLE_OPTIONS} disabled={disabled} onValueChange={(value) => onChange('cursor_style', value as TerminalGlobalStyle['cursor_style'])} />
+            <FieldLabel>{t('光标样式')}</FieldLabel>
+            <LabeledSelect ariaLabel={t('全局光标样式')} value={style.cursor_style} options={CURSOR_STYLE_OPTIONS.map((item) => ({ ...item, label: t(item.label) }))} disabled={disabled} onValueChange={(value) => onChange('cursor_style', value as TerminalGlobalStyle['cursor_style'])} />
           </Field>
         </div>
-        <TerminalSelectionBackgroundField id="terminal-global-selection-background" ariaPrefix="全局" value={style.selection_background} disabled={disabled} onChange={(value) => onChange('selection_background', value)} />
+        <TerminalSelectionBackgroundField id="terminal-global-selection-background" ariaPrefix={t('全局')} value={style.selection_background} disabled={disabled} onChange={(value) => onChange('selection_background', value)} />
       </FieldGroup>
     </CardContent>
   </Card>

@@ -1,3 +1,4 @@
+import { t } from '@/i18n'
 export type SessionCSVProvider = 'mssh' | 'putty' | 'securecrt' | 'mobaxterm' | 'custom'
 
 export interface SessionCSVField {
@@ -17,22 +18,22 @@ export interface SessionCSVTemplate {
 export type SessionCSVValues = Record<string, string>
 
 export const SESSION_CSV_FIELDS: SessionCSVField[] = [
-  { key: 'name', label: '会话名称', required: true },
-  { key: 'host', label: '主机地址', required: true },
-  { key: 'port', label: '端口', placeholder: '22' },
-  { key: 'username', label: '用户名', required: true },
-  { key: 'auth_method', label: '认证方式', placeholder: 'password' },
-  { key: 'password', label: '密码' },
-  { key: 'key_name', label: '密钥名称' },
-  { key: 'key_public_key', label: '密钥公钥' },
-  { key: 'folder_path', label: '分组路径', placeholder: '[]' },
-  { key: 'environment', label: '环境' },
-  { key: 'project', label: '项目' },
-  { key: 'tags', label: '标签', placeholder: '[]' },
-  { key: 'notes', label: '备注' },
-  { key: 'keep_alive', label: '保活间隔', placeholder: '60' },
-  { key: 'term_type', label: '终端类型', placeholder: 'xterm-256color' },
-  { key: 'format_version', label: '格式版本', placeholder: '1' },
+  { key: 'name', label: t('会话名称'), required: true },
+  { key: 'host', label: t('主机地址'), required: true },
+  { key: 'port', label: t('端口'), placeholder: '22' },
+  { key: 'username', label: t('用户名'), required: true },
+  { key: 'auth_method', label: t('认证方式'), placeholder: 'password' },
+  { key: 'password', label: t('密码') },
+  { key: 'key_name', label: t('密钥名称') },
+  { key: 'key_public_key', label: t('密钥公钥') },
+  { key: 'folder_path', label: t('分组路径'), placeholder: '[]' },
+  { key: 'environment', label: t('环境') },
+  { key: 'project', label: t('项目') },
+  { key: 'tags', label: t('标签'), placeholder: '[]' },
+  { key: 'notes', label: t('备注') },
+  { key: 'keep_alive', label: t('保活间隔'), placeholder: '60' },
+  { key: 'term_type', label: t('终端类型'), placeholder: 'xterm-256color' },
+  { key: 'format_version', label: t('格式版本'), placeholder: '1' },
 ]
 
 const commonAliases: Record<string, string[]> = {
@@ -56,29 +57,29 @@ const commonAliases: Record<string, string[]> = {
 
 export const SESSION_CSV_TEMPLATES: SessionCSVTemplate[] = [
   {
-    id: 'mssh', label: 'MSSH', description: 'MSSH 原生 CSV，字段可直接对应。',
+    id: 'mssh', label: 'MSSH', description: t('MSSH 原生 CSV，字段可直接对应。'),
     aliases: Object.fromEntries(SESSION_CSV_FIELDS.map((field) => [field.key, [field.key]])),
   },
   {
-    id: 'putty', label: 'PuTTY', description: '匹配 PuTTY 常见 CSV 转换字段。',
+    id: 'putty', label: 'PuTTY', description: t('匹配 PuTTY 常见 CSV 转换字段。'),
     aliases: mergeAliases(commonAliases, {
       name: ['saved session', 'sessionname'], host: ['hostname'], port: ['portnumber'],
       username: ['auto login username', 'autologinusername'],
     }),
   },
   {
-    id: 'securecrt', label: 'SecureCRT', description: '匹配 SecureCRT 常见会话清单字段。',
+    id: 'securecrt', label: 'SecureCRT', description: t('匹配 SecureCRT 常见会话清单字段。'),
     aliases: mergeAliases(commonAliases, {
       name: ['session'], folder_path: ['session path', 'session folder'], term_type: ['terminal emulation'],
     }),
   },
   {
-    id: 'mobaxterm', label: 'MobaXterm', description: '匹配 MobaXterm 常见书签 CSV 字段。',
+    id: 'mobaxterm', label: 'MobaXterm', description: t('匹配 MobaXterm 常见书签 CSV 字段。'),
     aliases: mergeAliases(commonAliases, {
       name: ['bookmark', 'bookmark name'], host: ['remote host', 'remotehost'], folder_path: ['bookmark group'],
     }),
   },
-  { id: 'custom', label: '自定义', description: '按通用别名预匹配，再逐项调整。', aliases: commonAliases },
+  { id: 'custom', label: t('自定义'), description: t('按通用别名预匹配，再逐项调整。'), aliases: commonAliases },
 ]
 
 export function sessionCSVDefaults(): SessionCSVValues {

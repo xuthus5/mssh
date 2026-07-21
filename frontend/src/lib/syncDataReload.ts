@@ -1,6 +1,8 @@
 import { Events } from '@wailsio/runtime'
 import { logger } from '@/lib/logger'
 import { toast } from '@/components/ui/toast'
+import { t } from '@/i18n'
+
 
 export const syncDataChangedEvent = 'sync:data-changed'
 
@@ -28,7 +30,7 @@ export function registerSyncDataReload(reload: SyncDataReloadHandler): () => voi
   return Events.On(syncDataChangedEvent, () => {
     void Promise.resolve(reload()).catch((error: unknown) => {
       logger.error('sync data reload failed', error)
-      toast(`同步后刷新失败: ${error instanceof Error ? error.message : String(error)}`, 'error')
+      toast(t('同步后刷新失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
     })
   })
 }
@@ -42,14 +44,14 @@ export function createAppSyncDataReload(options: {
   confirmHardReload?: () => boolean
 }): SyncDataReloadHandler {
   const hardReload = options.hardReload ?? (() => { window.location.reload() })
-  const confirmHardReload = options.confirmHardReload ?? (() => window.confirm('同步数据已变更，热更新失败。是否重新加载应用？'))
+  const confirmHardReload = options.confirmHardReload ?? (() => window.confirm(t('同步数据已变更，热更新失败。是否重新加载应用？')))
   return async () => {
     try {
       await options.hotReload()
-      toast('同步数据已刷新', 'success')
+      toast(t('同步数据已刷新'), 'success')
     } catch (error: unknown) {
       logger.error('hot reload after sync failed', error)
-      toast(`同步后热更新失败: ${error instanceof Error ? error.message : String(error)}`, 'error')
+      toast(t('同步后热更新失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
       if (confirmHardReload()) hardReload()
     }
   }

@@ -19,6 +19,8 @@ import { fitAndRefresh } from '@/hooks/terminalFitRuntime'
 import { createTerminalInstance, loadCanvasRenderer, safelyDisposeTerminalResource } from '@/hooks/terminalInstanceRuntime'
 import { subscribeToSynchronizedOutputQuery, subscribeToTerminalOutput, subscribeToTerminalVersionQuery } from '@/hooks/terminalOutputRuntime'
 import { subscribeToTerminalWorkingDirectory } from '@/hooks/terminalDirectoryRuntime'
+import { t } from '@/i18n'
+
 
 const RESIZE_DEBOUNCE_MS = 80
 
@@ -72,7 +74,7 @@ function reportWriteFailure(terminalID: string, error: unknown, refs: TerminalLi
   if (refs.writeFailureReportedRef.current) return
   refs.writeFailureReportedRef.current = true
   logger.error('terminal write failed', { terminalID, error })
-  toast(`终端写入失败: ${error instanceof Error ? error.message : String(error)}`, 'error')
+  toast(t('终端写入失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
 }
 
 function writeTerminalInput(data: string, refs: TerminalLifecycleRefs) {

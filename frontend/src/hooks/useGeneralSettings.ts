@@ -8,12 +8,15 @@ import type { Setting, SettingInput } from '../../bindings/github.com/xuthus5/ms
 import { applyUIFont, clampUIFontSize, DEFAULT_UI_FONT_FALLBACK_FAMILY, DEFAULT_UI_FONT_FAMILY, DEFAULT_UI_FONT_SIZE, normalizeUIFontFallbackFamily, normalizeUIFontFamily } from '@/lib/uiFont'
 import { normalizeCopyOnSelect, normalizeTerminalRightClickAction, useTerminalBehaviorStore, type TerminalRightClickAction } from '@/store/terminalBehaviorStore'
 import { SETTINGS_GENERAL_CHANGED_EVENT, SETTINGS_GENERAL_PREVIEW_EVENT, SETTINGS_PREVIEW_CANCELLED_EVENT } from '@/lib/settingsWindowEvents'
+import { LANGUAGE_SETTING_KEY, t, type AppLanguage, useLanguageStore } from '@/i18n'
+
 
 const generalSettingKeys = [
   'terminal.max_pool_size', 'terminal.default_keep_alive', 'terminal.default_term_type',
   'terminal.right_click_action', 'terminal.copy_on_select', 'appearance.ui_font_family',
   'appearance.ui_font_fallback_family', 'appearance.ui_font_size',
   'application.close_button_action',
+  LANGUAGE_SETTING_KEY,
 ]
 
 export type CloseButtonAction = 'tray' | 'exit'
@@ -28,6 +31,7 @@ export interface GeneralSettings {
   rightClickAction: TerminalRightClickAction
   copyOnSelect: boolean
   closeButtonAction: CloseButtonAction
+  language: AppLanguage
 }
 
 interface GeneralPreview {
@@ -44,6 +48,7 @@ const defaultGeneralSettings: GeneralSettings = {
   uiFontSize: DEFAULT_UI_FONT_SIZE,
   rightClickAction: 'menu', copyOnSelect: false,
   closeButtonAction: 'tray',
+  language: 'zh-CN',
 }
 
 export function normalizeCloseButtonAction(value: unknown): CloseButtonAction {
@@ -71,6 +76,7 @@ function normalizeGeneral(settings: GeneralSettings): GeneralSettings {
     rightClickAction: normalizeTerminalRightClickAction(settings.rightClickAction),
     copyOnSelect: normalizeCopyOnSelect(settings.copyOnSelect),
     closeButtonAction: normalizeCloseButtonAction(settings.closeButtonAction),
+    language: settings.language === 'en' ? 'en' : 'zh-CN',
   }
 }
 
@@ -85,6 +91,7 @@ function parseGeneral(settings: { [_ in string]?: Setting }): GeneralSettings {
     uiFontFamily, uiFontFallbackFamily: settingValue(settings, 'appearance.ui_font_fallback_family', DEFAULT_UI_FONT_FALLBACK_FAMILY),
     uiFontSize: settingValue(settings, 'appearance.ui_font_size', DEFAULT_UI_FONT_SIZE),
     closeButtonAction: settingValue(settings, 'application.close_button_action', 'tray'),
+    language: (settingValue<string>(settings, LANGUAGE_SETTING_KEY, 'zh-CN') === 'en' ? 'en' : 'zh-CN'),
   })
 }
 
@@ -92,6 +99,7 @@ function applyGeneral(settings: GeneralSettings) {
   applyUIFont({ family: settings.uiFontFamily, fallbackFamily: settings.uiFontFallbackFamily, size: settings.uiFontSize })
   useTerminalBehaviorStore.getState().setSettings({ rightClickAction: settings.rightClickAction, copyOnSelect: settings.copyOnSelect })
   useAppStore.getState().setMaxPoolSize(settings.maxPoolSize)
+  useLanguageStore.getState().hydrateLanguage(settings.language)
 }
 
 function applyPreview(preview: GeneralPreview) {
@@ -114,7 +122,7 @@ async function persistGeneral(settings: GeneralSettings) {
     settingEntry('terminal.default_term_type', settings.defaultTermType), settingEntry('terminal.right_click_action', settings.rightClickAction),
     settingEntry('terminal.copy_on_select', settings.copyOnSelect), settingEntry('appearance.ui_font_family', settings.uiFontFamily),
     settingEntry('appearance.ui_font_fallback_family', settings.uiFontFallbackFamily), settingEntry('appearance.ui_font_size', settings.uiFontSize),
-    settingEntry('application.close_button_action', settings.closeButtonAction),
+    settingEntry('application.close_button_action', settings.closeButtonAction), settingEntry(LANGUAGE_SETTING_KEY, settings.language),
   ]), TerminalService.SetMaxSize(settings.maxPoolSize)])
 }
 
@@ -154,11 +162,11 @@ export function useGeneralSettings() {
       applyGeneral(normalized)
       setGeneral(normalized)
       emitSettingsEvent(SETTINGS_GENERAL_CHANGED_EVENT, normalized)
-      toast('通用设置已保存', 'success')
+      toast(t('通用设置已保存'), 'success')
     } catch (error) {
       applyGeneral(general)
       logger.debug('saveGeneral error', error)
-      toast(`保存设置失败: ${error instanceof Error ? error.message : String(error)}`, 'error')
+      toast(t('保存设置失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
       throw error
     }
   }, [general])

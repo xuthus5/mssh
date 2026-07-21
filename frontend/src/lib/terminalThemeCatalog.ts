@@ -1,5 +1,7 @@
 import type { TerminalGlobalStyle, ThemeProfile } from '../../bindings/github.com/xuthus5/mssh/internal/model/models'
 import type { TerminalTheme } from '@/store/appStore'
+import { t } from '@/i18n'
+
 
 const FALLBACK_ANSI = ['#000000', '#cd0000', '#00cd00', '#cdcd00', '#0000ee', '#cd00cd', '#00cdcd', '#e5e5e5', '#7f7f7f', '#ff0000', '#00ff00', '#ffff00', '#5c5cff', '#ff00ff', '#00ffff', '#ffffff']
 
@@ -12,7 +14,7 @@ interface ColorPayload {
 }
 
 export function profileToTerminalTheme(profile: ThemeProfile, globalStyle: TerminalGlobalStyle): TerminalTheme {
-  if (!profile.definition) throw new Error('主题 Profile 缺少颜色定义')
+  if (!profile.definition) throw new Error(t('主题 Profile 缺少颜色定义'))
   const colors = parseColors(profile.definition.color_payload)
   const overrides = parseOverrides(profile.color_overrides)
   const merged = { ...colors, ...overrides }

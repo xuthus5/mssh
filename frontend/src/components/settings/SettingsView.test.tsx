@@ -14,6 +14,7 @@ const general = {
   rightClickAction: 'menu' as const,
   copyOnSelect: false,
   closeButtonAction: 'tray' as const,
+  language: 'zh-CN' as const,
 }
 
 function settingsProps() {
@@ -140,7 +141,7 @@ describe('SettingsView', () => {
     await user.click(await screen.findByRole('option', { name: '关闭应用' }))
     await user.click(screen.getByRole('button', { name: '保存' }))
 
-    expect(props.onSaveGeneral).toHaveBeenCalledWith(expect.objectContaining({ closeButtonAction: 'exit' }))
+    expect(props.onSaveGeneral).toHaveBeenCalledWith(expect.objectContaining({ closeButtonAction: 'exit' as const, language: 'zh-CN' as const }))
   })
 
   it('previews and saves a distinct fallback font', async () => {

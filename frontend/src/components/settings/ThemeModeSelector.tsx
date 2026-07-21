@@ -2,6 +2,8 @@ import { useMemo } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Combobox, ComboboxContent, ComboboxEmpty, ComboboxInput, ComboboxItem, ComboboxList } from '@/components/ui/combobox'
 import type { ThemeProfile } from '../../../bindings/github.com/xuthus5/mssh/internal/model/models'
+import { t } from '@/i18n'
+
 
 interface Props {
   mode: 'dark' | 'light' | 'fixed'
@@ -18,7 +20,7 @@ export function ThemeModeSelector({ mode, profiles, value, disabled = false, onV
   const names = useMemo(() => labels.map(({ label }) => label), [labels])
   const selected = compatibleProfiles.find((profile) => profile.id === value)
   const selectedLabel = labels.find((item) => item.profile.id === selected?.id)?.label
-  const label = mode === 'dark' ? 'Dark Mode 终端主题' : mode === 'light' ? 'Light Mode 终端主题' : '固定终端主题'
+  const label = mode === 'dark' ? t('Dark Mode 终端主题') : mode === 'light' ? t('Light Mode 终端主题') : t('固定终端主题')
   return <div className="flex min-w-0 flex-col gap-2">
     <label className="text-xs font-medium text-muted-foreground">{label}</label>
     <Combobox items={names} value={selectedLabel ?? ''} disabled={disabled} onValueChange={(name) => {
@@ -26,8 +28,8 @@ export function ThemeModeSelector({ mode, profiles, value, disabled = false, onV
       if (!profile) return
       onValueChange(profile.id)
     }}>
-      <ComboboxInput aria-label={label} placeholder="搜索终端主题" className="w-full" />
-      <ComboboxContent><ComboboxEmpty>未找到终端主题</ComboboxEmpty><ComboboxList>{(name) => {
+      <ComboboxInput aria-label={label} placeholder={t('搜索终端主题')} className="w-full" />
+      <ComboboxContent><ComboboxEmpty>{t('未找到终端主题')}</ComboboxEmpty><ComboboxList>{(name) => {
         const profile = profileByName.get(name)
         if (!profile) return null
         return <ComboboxItem key={profile.id} value={name}>

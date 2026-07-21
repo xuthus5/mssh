@@ -9,6 +9,8 @@ import { dynamicPanelID, dynamicTabID } from '@/store/tabNavigation'
 import { TabCloseConfirmation, useTabCloseCoordinator } from '@/hooks/useTabCloseCoordinator'
 import { useSessionWorkspace } from '@/hooks/SessionWorkspaceContext'
 import { SESSION_QUICK_SEARCH_EVENT } from '@/lib/sessionQuickSearch'
+import { t } from '@/i18n'
+
 
 interface TabNavigation {
   onKeyDown: (event: KeyboardEvent<HTMLButtonElement>, tabID: string) => void
@@ -75,7 +77,7 @@ function useTabOverflow(tabs: Tab[], onOverflowChange?: (overflow: boolean) => v
 }
 
 function tabStatusLabel(tab: Tab, connectionStatus: AppState['connectionStatus']): string {
-  if (tab.type === 'playback') return '回放'
+  if (tab.type === 'playback') return t('回放')
   return connectionStatusVisual(connectionStatus[tab.terminalId]).label
 }
 
@@ -120,12 +122,12 @@ function DynamicTab({ tab, active, connectionStatus, navigation, onActivate, onC
     <div
       className={`group flex h-8 shrink-0 items-center gap-1 border px-1.5 text-sm transition-colors duration-150 ${active ? 'rounded-t-md rounded-b-none border-transparent bg-muted/30 text-foreground' : 'rounded-md border-transparent bg-transparent text-muted-foreground hover:bg-muted/60 hover:text-foreground'}`}
     >
-      <button ref={(element) => navigation.registerTab(tab.id, element)} id={dynamicTabID(tab.id)} type="button" role="tab" tabIndex={active ? 0 : -1} aria-controls={dynamicPanelID(tab.id)} aria-label={`${tab.title}，状态：${statusLabel}`} aria-selected={active} className="flex h-full min-w-0 flex-1 items-center gap-1.5 rounded-sm px-1 focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={() => onActivate(tab.id)} onKeyDown={(event) => navigation.onKeyDown(event, tab.id)}>
+      <button ref={(element) => navigation.registerTab(tab.id, element)} id={dynamicTabID(tab.id)} type="button" role="tab" tabIndex={active ? 0 : -1} aria-controls={dynamicPanelID(tab.id)} aria-label={t('${}，状态：${}', tab.title, statusLabel)} aria-selected={active} className="flex h-full min-w-0 flex-1 items-center gap-1.5 rounded-sm px-1 focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={() => onActivate(tab.id)} onKeyDown={(event) => navigation.onKeyDown(event, tab.id)}>
         <TabLeadingIcon tab={tab} />
         <span className="min-w-0 max-w-40 truncate">{tab.title}</span>
         <TabStatusIcon tab={tab} connectionStatus={connectionStatus} />
       </button>
-      <button type="button" aria-label={`关闭 ${tab.title}`} className="grid size-5 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-destructive/15 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={(event) => { event.stopPropagation(); onClose(tab.id) }} onKeyDown={(event) => requestCloseFromKeyboard(event, tab.id, onClose)}>
+      <button type="button" aria-label={t('关闭 ${}', tab.title)} className="grid size-5 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-destructive/15 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={(event) => { event.stopPropagation(); onClose(tab.id) }} onKeyDown={(event) => requestCloseFromKeyboard(event, tab.id, onClose)}>
         <X aria-hidden="true" className="size-3.5" />
       </button>
     </div>
@@ -139,7 +141,7 @@ function DynamicTab({ tab, active, connectionStatus, navigation, onActivate, onC
         <ContextMenuGroup>
           <ContextMenuItem onClick={() => onDuplicate(tab.sessionId)}>
             <Copy aria-hidden="true" />
-            复制终端
+            {t('复制终端')}
           </ContextMenuItem>
         </ContextMenuGroup>
       </ContextMenuContent>
@@ -152,7 +154,7 @@ function TabListMenu({ tabs, activeID, onActivate }: { tabs: Tab[]; activeID: st
 
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
-      <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" aria-label="打开标签列表" className="h-full w-9 shrink-0 rounded-none" onClick={() => setOpen(true)} />}>
+      <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" aria-label={t('打开标签列表')} className="h-full w-9 shrink-0 rounded-none" onClick={() => setOpen(true)} />}>
         <List aria-hidden="true" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
@@ -170,7 +172,7 @@ function lastTerminalTabIndex(tabs: Tab[]) {
 
 function QuickConnectButton() {
   const openSearch = () => window.dispatchEvent(new CustomEvent(SESSION_QUICK_SEARCH_EVENT))
-  return <Button type="button" variant="ghost" size="icon-sm" aria-label="快速连接会话" title="快速连接会话"
+  return <Button type="button" variant="ghost" size="icon-sm" aria-label={t('快速连接会话')} title={t('快速连接会话')}
     className="h-8 w-8 shrink-0 rounded-t-md rounded-b-none border-0 text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground" onClick={openSearch}>
     <Plus aria-hidden="true" />
   </Button>
@@ -226,10 +228,10 @@ export function DynamicTabStrip({ onOverflowChange }: { onOverflowChange?: (over
   return (
     <div className="flex min-w-0 shrink overflow-hidden [--wails-draggable:no-drag]">
       {overflow ? (
-        <Button type="button" variant="ghost" size="icon-sm" aria-label="向左滚动标签" className="h-9 w-7 shrink-0 rounded-none" disabled={!canScrollLeft} onClick={() => scrollByTabs(-1)}>‹</Button>
+        <Button type="button" variant="ghost" size="icon-sm" aria-label={t('向左滚动标签')} className="h-9 w-7 shrink-0 rounded-none" disabled={!canScrollLeft} onClick={() => scrollByTabs(-1)}>‹</Button>
       ) : null}
       <div className={`relative min-w-0 ${overflow ? 'flex-1' : ''} ${canScrollLeft ? 'shadow-[inset_12px_0_8px_-12px_rgba(0,0,0,0.45)]' : ''} ${canScrollRight ? 'shadow-[inset_-12px_0_8px_-12px_rgba(0,0,0,0.45)]' : ''}`}>
-        <div ref={tabListRef} role="tablist" aria-label="动态标签" className="mssh-tab-strip-scroll flex h-9 min-w-0 items-end gap-1 overflow-x-auto overflow-y-hidden" onWheel={scrollTabsWithWheel} onScroll={syncScrollAffordances}>
+        <div ref={tabListRef} role="tablist" aria-label={t('动态标签')} className="mssh-tab-strip-scroll flex h-9 min-w-0 items-end gap-1 overflow-x-auto overflow-y-hidden" onWheel={scrollTabsWithWheel} onScroll={syncScrollAffordances}>
           {tabs.map((tab, index) => <Fragment key={tab.id}>
             <DynamicTab tab={tab} active={activeSurface?.id === tab.id} connectionStatus={connectionStatus} navigation={navigation} onActivate={activateWithFocus} onClose={closeCoordinator.requestClose} onDuplicate={duplicateTerminal} />
             {index === quickConnectAfter && <QuickConnectButton />}
@@ -237,7 +239,7 @@ export function DynamicTabStrip({ onOverflowChange }: { onOverflowChange?: (over
         </div>
       </div>
       {overflow ? (
-        <Button type="button" variant="ghost" size="icon-sm" aria-label="向右滚动标签" className="h-9 w-7 shrink-0 rounded-none" disabled={!canScrollRight} onClick={() => scrollByTabs(1)}>›</Button>
+        <Button type="button" variant="ghost" size="icon-sm" aria-label={t('向右滚动标签')} className="h-9 w-7 shrink-0 rounded-none" disabled={!canScrollRight} onClick={() => scrollByTabs(1)}>›</Button>
       ) : null}
       <TabCloseConfirmation {...closeCoordinator.confirmation} />
     </div>
