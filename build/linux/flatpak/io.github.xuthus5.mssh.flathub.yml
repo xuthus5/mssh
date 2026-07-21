@@ -1,0 +1,78 @@
+# Flathub submission manifest (build from a release git tag).
+# See docs/packaging.md for offline dependency preparation.
+app-id: io.github.xuthus5.mssh
+runtime: org.gnome.Platform
+runtime-version: '49'
+sdk: org.gnome.Sdk
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.golang
+  - org.freedesktop.Sdk.Extension.node20
+command: mssh
+finish-args:
+  - --share=ipc
+  - --socket=fallback-x11
+  - --socket=wayland
+  - --device=dri
+  - --share=network
+  - --talk-name=org.freedesktop.secrets
+  - --socket=ssh-auth
+  - --filesystem=home
+  - --filesystem=xdg-run/gnupg:ro
+build-options:
+  append-path: /usr/lib/sdk/golang/bin:/usr/lib/sdk/node20/bin
+  build-args:
+    - --share=network
+  env:
+    GOROOT: /usr/lib/sdk/golang
+modules:
+  - name: mssh
+    buildsystem: simple
+    build-commands:
+      - |
+        set -euo pipefail
+        . /usr/lib/sdk/golang/enable.sh
+        . /usr/lib/sdk/node20/enable.sh
+        export PATH="/usr/lib/sdk/golang/bin:/usr/lib/sdk/node20/bin:${PATH}"
+        export GOROOT=/usr/lib/sdk/golang
+        export GOPATH=/run/build/mssh/go-path
+        export GOCACHE=/run/build/mssh/gocache
+        export npm_config_cache=/run/build/mssh/npm-cache
+        mkdir -p "$GOPATH" "$GOCACHE" "$npm_config_cache"
+
+        VERSION="${FLATPAK_BUILD_VERSION:-0.0.1}"
+        VERSION="${VERSION#v}"
+
+        (
+          cd frontend
+          if [ -f package-lock.json ]; then
+            npm ci || npm install
+          else
+            npm install
+          fi
+          npm run build
+        )
+
+        export CGO_ENABLED=1
+        if [ -d vendor ]; then
+          go build -mod=vendor -tags production -trimpath -buildvcs=false \
+            -ldflags="-w -s -X github.com/xuthus5/mssh/internal/service.Version=${VERSION}" \
+            -o mssh .
+        else
+          go build -tags production -trimpath -buildvcs=false \
+            -ldflags="-w -s -X github.com/xuthus5/mssh/internal/service.Version=${VERSION}" \
+            -o mssh .
+        fi
+
+        install -Dm755 mssh /app/bin/mssh
+        install -Dm644 build/linux/flatpak/io.github.xuthus5.mssh.desktop \
+          /app/share/applications/io.github.xuthus5.mssh.desktop
+        install -Dm644 build/linux/flatpak/io.github.xuthus5.mssh.metainfo.xml \
+          /app/share/metainfo/io.github.xuthus5.mssh.metainfo.xml
+        for size in 64 128 256 512; do
+          install -Dm644 "build/linux/flatpak/icons/${size}x${size}/apps/io.github.xuthus5.mssh.png" \
+            "/app/share/icons/hicolor/${size}x${size}/apps/io.github.xuthus5.mssh.png"
+        done
+    sources:
+      - type: git
+        url: https://github.com/xuthus5/mssh.git
+        tag: v0.0.1

@@ -1,0 +1,12 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=MSSH
+GenericName=SSH Client
+Comment=Cross-platform SSH client
+Exec=mssh
+Icon=io.github.xuthus5.mssh
+Terminal=false
+Categories=Network;Utility;
+StartupWMClass=mssh
+Keywords=ssh;terminal;sftp;remote;

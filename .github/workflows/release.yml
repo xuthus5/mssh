@@ -38,7 +38,7 @@ jobs:
       - name: Install Linux package tooling
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential pkg-config libgtk-4-dev libwebkitgtk-6.0-dev libwebkitgtk-6.0-4 rpm file libfuse2 fuse3 desktop-file-utils wget
+          sudo apt-get install -y build-essential pkg-config libgtk-4-dev libwebkitgtk-6.0-dev libwebkitgtk-6.0-4 rpm file libfuse2 fuse3 desktop-file-utils wget flatpak flatpak-builder ostree appstream
       - name: Install Wails CLI
         run: go install github.com/wailsapp/wails/v3/cmd/wails3@${{ env.WAILS_VERSION }}
       - name: Resolve version
@@ -69,6 +69,11 @@ jobs:
 
           # AppImage is a required Linux release asset.
           wails3 task linux:create:appimage ARCH=${{ matrix.goarch }} APP_VERSION=${APP_VERSION}
+
+          # Flatpak bundle (GNOME Platform). Soft-fail if runtime pull/build is unavailable in the runner.
+          wails3 task linux:create:flatpak ARCH=${{ matrix.goarch }} APP_VERSION=${APP_VERSION} || {
+            echo "WARNING: Flatpak packaging failed; continuing release without .flatpak" >&2
+          }
       - name: Collect artifacts
         run: |
           set -euo pipefail
@@ -111,6 +116,25 @@ jobs:
           fi
           cp "${appimage_src}" "dist/mssh-${VERSION}-linux-${ARCH}.AppImage"
           chmod 0755 "dist/mssh-${VERSION}-linux-${ARCH}.AppImage"
+
+          mapfile -t flatpaks < <(find bin -maxdepth 1 -type f -name '*.flatpak' | sort)
+          flatpak_src=""
+          if [[ ${#flatpaks[@]} -gt 0 ]]; then
+            for f in "${flatpaks[@]}"; do
+              base="$(basename "$f")"
+              case "$base" in
+                mssh-*.flatpak) flatpak_src="$f"; break ;;
+                mssh.flatpak) flatpak_src="$f" ;;
+                *.flatpak) flatpak_src="${flatpak_src:-$f}" ;;
+              esac
+            done
+          fi
+          if [[ -n "${flatpak_src}" ]]; then
+            cp "${flatpak_src}" "dist/mssh-${VERSION}-linux-${ARCH}.flatpak"
+          else
+            echo "WARNING: Flatpak bundle missing in bin/" >&2
+            ls -la bin || true
+          fi
 
           ls -la bin dist
       - uses: actions/upload-artifact@v4
