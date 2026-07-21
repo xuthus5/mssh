@@ -13,7 +13,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	backupcrypto "github.com/xuthus5/mssh/internal/crypto"
 	"github.com/xuthus5/mssh/internal/model"
 	"github.com/xuthus5/mssh/internal/service/testutil"
 	"github.com/xuthus5/mssh/internal/store"
@@ -40,7 +39,7 @@ func TestSyncServiceExportImportRestoresEncryptedFullSnapshot(t *testing.T) {
 	require.NoError(t, err)
 
 	path := filepath.Join(t.TempDir(), "backup.msshbackup")
-	require.NoError(t, NewSyncService(db, testutil.NewTestLogger()).Export(path))
+	require.NoError(t, newTestSyncService(db, syncTestMasterKey).Export(path))
 	content, err := os.ReadFile(path)
 	require.NoError(t, err)
 	assert.NotContains(t, string(content), "secret")
@@ -50,17 +49,17 @@ func TestSyncServiceExportImportRestoresEncryptedFullSnapshot(t *testing.T) {
 	setSyncMasterKey(t, db2, syncTestMasterKey)
 	local, err := store.CreateSession(db2, model.Session{Name: "local-before-import", Host: "127.0.0.1", Port: 22, Username: "local", AuthMethod: model.AuthPassword, KeepAlive: 30, TermType: "xterm"})
 	require.NoError(t, err)
-	syncService := NewSyncService(db2, testutil.NewTestLogger())
+	syncService := newTestSyncService(db2, syncTestMasterKey)
 	require.NoError(t, syncService.Import(path))
 	recoveryPath, err := syncService.recoveryPath()
 	require.NoError(t, err)
 	recoveryContent, err := os.ReadFile(recoveryPath)
 	require.NoError(t, err)
-	var recoveryEnvelope backupcrypto.BackupEnvelope
-	require.NoError(t, json.Unmarshal(recoveryContent, &recoveryEnvelope))
-	recoveryPlaintext, err := backupcrypto.DecryptBackup(recoveryEnvelope, []byte(syncTestMasterKey))
+	recoveryArtifact, err := decodeSyncArtifact(recoveryContent, syncTestMasterKey)
 	require.NoError(t, err)
-	assert.Contains(t, string(recoveryPlaintext), local.Name)
+	encoded, err := json.Marshal(recoveryArtifact.Data)
+	require.NoError(t, err)
+	assert.Contains(t, string(encoded), local.Name)
 	folders, err := store.ListFolders(db2)
 	require.NoError(t, err)
 	assert.Equal(t, "生产环境", folders[1].Name)
@@ -82,7 +81,7 @@ func TestSyncServiceExportImportRestoresEncryptedFullSnapshot(t *testing.T) {
 
 func TestSyncServiceStrictlyRejectsOldOrIncompleteFormats(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	data, err := NewSyncService(db, testutil.NewTestLogger()).snapshot()
+	data, err := newTestSyncService(db, syncTestMasterKey).snapshot()
 	require.NoError(t, err)
 	data.FormatVersion = syncFormatVersion - 1
 	content, err := json.Marshal(data)
@@ -99,7 +98,7 @@ func TestSyncServiceStrictlyRejectsOldOrIncompleteFormats(t *testing.T) {
 
 func TestSyncSnapshotExcludesAIData(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	data, err := NewSyncService(db, testutil.NewTestLogger()).snapshot()
+	data, err := newTestSyncService(db, syncTestMasterKey).snapshot()
 	require.NoError(t, err)
 	for _, table := range []string{"ai_provider_profiles", "ai_settings", "ai_conversations", "ai_messages", "ai_command_executions"} {
 		_, included := data.Tables[table]
@@ -111,7 +110,7 @@ func TestSyncServiceRequiresMasterKey(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	path := filepath.Join(t.TempDir(), "backup.msshbackup")
 	err := NewSyncService(db, testutil.NewTestLogger()).Export(path)
-	assert.ErrorContains(t, err, "master key is not configured")
+	assert.ErrorContains(t, err, "application vault is locked or not configured")
 }
 
 func TestSyncServiceImportRejectsWrongMasterKey(t *testing.T) {
@@ -119,10 +118,9 @@ func TestSyncServiceImportRejectsWrongMasterKey(t *testing.T) {
 	require.NoError(t, store.SetAuditEnabled(db, true))
 	setSyncMasterKey(t, db, syncTestMasterKey)
 	path := filepath.Join(t.TempDir(), "backup.msshbackup")
-	require.NoError(t, NewSyncService(db, testutil.NewTestLogger()).Export(path))
+	require.NoError(t, newTestSyncService(db, syncTestMasterKey).Export(path))
 	db2 := testutil.NewTestDB(t)
-	setSyncMasterKey(t, db2, "another master key")
-	err := NewSyncService(db2, testutil.NewTestLogger()).Import(path)
+	err := newTestSyncService(db2, "another master key").Import(path)
 	assert.ErrorContains(t, err, "invalid master key")
 }
 
@@ -130,10 +128,10 @@ func TestSyncServiceImportPreparesLifecycleAndNotifies(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	setSyncMasterKey(t, db, syncTestMasterKey)
 	path := filepath.Join(t.TempDir(), "backup.msshbackup")
-	require.NoError(t, NewSyncService(db, testutil.NewTestLogger()).Export(path))
+	require.NoError(t, newTestSyncService(db, syncTestMasterKey).Export(path))
 	lifecycle := &fakeSyncLifecycle{}
 	emitter := &fakeSyncEventBus{}
-	service := NewSyncService(db, testutil.NewTestLogger(), WithSyncDataDir(t.TempDir()), WithSyncLifecycle(lifecycle), WithSyncEventBus(emitter))
+	service := newTestSyncService(db, syncTestMasterKey, WithSyncDataDir(t.TempDir()), WithSyncLifecycle(lifecycle), WithSyncEventBus(emitter))
 	setSyncMasterKey(t, db, syncTestMasterKey)
 	require.NoError(t, service.Import(path))
 	assert.Equal(t, 1, lifecycle.calls)
@@ -143,7 +141,7 @@ func TestSyncServiceImportPreparesLifecycleAndNotifies(t *testing.T) {
 func TestSyncServiceRejectsInvalidPathAndClosedDatabase(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	setSyncMasterKey(t, db, syncTestMasterKey)
-	svc := NewSyncService(db, testutil.NewTestLogger())
+	svc := newTestSyncService(db, syncTestMasterKey)
 	assert.Error(t, svc.Export("/missing/backup.msshbackup"))
 	require.NoError(t, db.Close())
 	assert.Error(t, svc.Export(filepath.Join(t.TempDir(), "backup.msshbackup")))
@@ -151,7 +149,7 @@ func TestSyncServiceRejectsInvalidPathAndClosedDatabase(t *testing.T) {
 
 func TestValidateSnapshotRejectsUnknownColumnsBeforeRestore(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	data, err := NewSyncService(db, testutil.NewTestLogger()).snapshot()
+	data, err := newTestSyncService(db, syncTestMasterKey).snapshot()
 	require.NoError(t, err)
 	data.Tables["sessions"] = append(data.Tables["sessions"], map[string]any{"unknown_column": "bad"})
 	err = validateSnapshot(db, data)
@@ -187,7 +185,7 @@ func TestCloudSyncUploadDownloadAndConflict(t *testing.T) {
 	setSyncMasterKey(t, db, syncTestMasterKey)
 	_, err := store.CreateSession(db, model.Session{Name: "cloud", Host: "10.0.0.1", Port: 22, Username: "root", AuthMethod: model.AuthPassword, KeepAlive: 30, TermType: "xterm"})
 	require.NoError(t, err)
-	syncService := NewSyncService(db, testutil.NewTestLogger())
+	syncService := newTestSyncService(db, syncTestMasterKey)
 	require.NoError(t, syncService.SyncToCloud(server.URL, "", ""))
 	require.NoError(t, syncService.TestCloudConnection(server.URL, "", ""))
 	assert.Equal(t, `"upload"`, settingValue(t, db, syncDirectionSetting))
@@ -199,7 +197,7 @@ func TestCloudSyncUploadDownloadAndConflict(t *testing.T) {
 
 	db2 := testutil.NewTestDB(t)
 	setSyncMasterKey(t, db2, syncTestMasterKey)
-	syncService2 := NewSyncService(db2, testutil.NewTestLogger())
+	syncService2 := newTestSyncService(db2, syncTestMasterKey)
 	require.NoError(t, syncService2.SyncFromCloud(server.URL, "", ""))
 	assert.Equal(t, `"download"`, settingValue(t, db2, syncDirectionSetting))
 	sessions, err := store.ListSessions(db2, nil)
@@ -231,13 +229,13 @@ func TestSyncCodecAndCloudErrorPaths(t *testing.T) {
 		memoryDB, err := sql.Open("sqlite", ":memory:")
 		require.NoError(t, err)
 		defer func() { _ = memoryDB.Close() }()
-		memoryService := NewSyncService(memoryDB, testutil.NewTestLogger())
+		memoryService := newTestSyncService(memoryDB, syncTestMasterKey)
 		_, err = memoryService.recoveryPath()
 		require.ErrorContains(t, err, "database path is unavailable")
 
 		db := testutil.NewTestDB(t)
 		setSyncMasterKey(t, db, syncTestMasterKey)
-		service := NewSyncService(db, testutil.NewTestLogger())
+		service := newTestSyncService(db, syncTestMasterKey)
 		require.NoError(t, db.Close())
 		_, err = tableColumns(db, "sessions")
 		require.Error(t, err)
@@ -260,7 +258,7 @@ func TestSyncCodecAndCloudErrorPaths(t *testing.T) {
 		defer failureServer.Close()
 		db := testutil.NewTestDB(t)
 		setSyncMasterKey(t, db, syncTestMasterKey)
-		service := NewSyncService(db, testutil.NewTestLogger())
+		service := newTestSyncService(db, syncTestMasterKey)
 		require.ErrorContains(t, service.TestCloudConnection(failureServer.URL, "", ""), "500")
 		require.Error(t, service.SyncToCloud(failureServer.URL, "", ""))
 		require.ErrorContains(t, service.SyncFromCloud(failureServer.URL, "", ""), "500")
@@ -300,7 +298,17 @@ func settingValue(t *testing.T, db *sql.DB, key string) string {
 
 func setSyncMasterKey(t *testing.T, db *sql.DB, key string) {
 	t.Helper()
+	// Kept for snapshot of settings tables in some tests; sync crypto now uses secretSource.
 	require.NoError(t, store.SetSettings(db, []model.Setting{{Key: SyncMasterKeySetting, Namespace: "sync", Value: `"` + key + `"`, ValueType: "string", Version: 1}}))
+}
+
+func withTestSyncSecret(key string) SyncOption {
+	return WithSyncSecretSource(func() (string, error) { return key, nil })
+}
+
+func newTestSyncService(db *sql.DB, key string, options ...SyncOption) *SyncService {
+	opts := append([]SyncOption{withTestSyncSecret(key)}, options...)
+	return NewSyncService(db, testutil.NewTestLogger(), opts...)
 }
 
 type fakeSyncEventBus struct{ name string }

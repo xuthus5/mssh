@@ -61,12 +61,20 @@ func (s *SessionService) MoveFolder(id int64, newParentID *int64) error {
 
 func (s *SessionService) ListSessions(folderID *int64) ([]model.Session, error) {
 	s.logger.Info("listing sessions", "folderID", folderID)
-	return store.ListSessions(s.db, folderID)
+	sessions, err := store.ListSessions(s.db, folderID)
+	if err != nil {
+		return nil, err
+	}
+	return redactSessionPasswords(sessions), nil
 }
 
 func (s *SessionService) ListRecentSessions(limit int) ([]model.Session, error) {
 	s.logger.Info("listing recent sessions", "limit", limit)
-	return store.ListRecentSessions(s.db, limit)
+	sessions, err := store.ListRecentSessions(s.db, limit)
+	if err != nil {
+		return nil, err
+	}
+	return redactSessionPasswords(sessions), nil
 }
 
 func (s *SessionService) CreateSession(input model.SessionInput) (*model.Session, error) {
@@ -74,12 +82,20 @@ func (s *SessionService) CreateSession(input model.SessionInput) (*model.Session
 		return nil, err
 	}
 	session := input.Session()
+	if s.crypto != nil && session.Password != "" {
+		sealed, err := sealSessionPassword(s.crypto, session.Password)
+		if err != nil {
+			return nil, fmt.Errorf("create session: encrypt password: %w", err)
+		}
+		session.Password = sealed
+	}
 	s.logger.Info("creating session", "name", session.Name, "authMethod", session.AuthMethod)
 	result, err := store.CreateSessionWithTags(s.db, session, input.TagIDs)
 	if err != nil {
 		s.logger.Error("create session failed", "error", err)
+		return nil, err
 	}
-	return result, err
+	return redactSessionPassword(result), nil
 }
 
 func (s *SessionService) UpdateSession(input model.SessionInput) error {
@@ -87,8 +103,21 @@ func (s *SessionService) UpdateSession(input model.SessionInput) error {
 		return err
 	}
 	session := input.Session()
+	existing, err := store.GetSession(s.db, session.ID)
+	if err != nil {
+		return fmt.Errorf("update session: %w", err)
+	}
+	if session.Password == "" {
+		session.Password = existing.Password
+	} else if s.crypto != nil {
+		sealed, sealErr := sealSessionPassword(s.crypto, session.Password)
+		if sealErr != nil {
+			return fmt.Errorf("update session: encrypt password: %w", sealErr)
+		}
+		session.Password = sealed
+	}
 	s.logger.Info("updating session", "id", session.ID, "name", session.Name)
-	err := store.UpdateSessionWithTags(s.db, session, input.TagIDs)
+	err = store.UpdateSessionWithTags(s.db, session, input.TagIDs)
 	if err != nil {
 		s.logger.Error("update session failed", "error", err)
 	}
@@ -139,5 +168,44 @@ func (s *SessionService) MoveSession(id int64, newFolderID *int64) error {
 
 func (s *SessionService) GetSession(id int64) (*model.Session, error) {
 	s.logger.Info("getting session", "id", id)
-	return store.GetSession(s.db, id)
+	session, err := store.GetSession(s.db, id)
+	if err != nil {
+		return nil, err
+	}
+	return redactSessionPassword(session), nil
+}
+
+func (s *SessionService) sessionForConnect(id int64) (*model.Session, error) {
+	session, err := store.GetSession(s.db, id)
+	if err != nil {
+		return nil, err
+	}
+	if s.crypto != nil && session.Password != "" {
+		plain, openErr := openSessionPassword(s.crypto, session.Password)
+		if openErr != nil {
+			return nil, fmt.Errorf("decrypt session password: %w", openErr)
+		}
+		session.Password = plain
+	}
+	return session, nil
+}
+
+func redactSessionPassword(session *model.Session) *model.Session {
+	if session == nil {
+		return nil
+	}
+	copy := *session
+	if copy.Password != "" {
+		copy.Password = ""
+	}
+	return &copy
+}
+
+func redactSessionPasswords(sessions []model.Session) []model.Session {
+	for i := range sessions {
+		if sessions[i].Password != "" {
+			sessions[i].Password = ""
+		}
+	}
+	return sessions
 }

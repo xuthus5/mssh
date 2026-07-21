@@ -31,8 +31,8 @@ export function SyncProviderTab(props: Props) {
   const [showSecrets, setShowSecrets] = useState(false)
   const update = (patch: Partial<SyncConfigInput>) => props.onChange({ ...props.input, ...patch })
   return <div className="flex flex-col gap-5">
+    <Alert><AlertDescription>{t('云同步使用“设置 → 安全”中的应用密码加密备份。请先配置应用密码，并在各设备保持一致。')}</AlertDescription></Alert>
     <ProviderSelector input={props.input} onChange={(provider) => update({ provider })} />
-    <MasterKeyFields input={props.input} saved={props.saved} show={showSecrets} onToggle={() => setShowSecrets((value) => !value)} onChange={(master_key) => update({ master_key })} />
     <div className="border-t border-border pt-5">
       {props.input.provider === SyncProvider.SyncProviderGist && <GistFields {...props} showSecrets={showSecrets} />}
       {props.input.provider === SyncProvider.SyncProviderWebDAV && <WebDAVFields {...props} showSecrets={showSecrets} />}
@@ -55,12 +55,6 @@ function ProviderSelector({ input, onChange }: { input: SyncConfigInput; onChang
         <Icon className="size-5 shrink-0" /><span className="min-w-0"><span className="block text-sm font-medium">{provider.label}</span><span className="block truncate text-xs text-muted-foreground">{provider.detail}</span></span>
       </button>
     })}</div>
-  </div>
-}
-
-function MasterKeyFields(props: { input: SyncConfigInput; saved?: SyncConfig; show: boolean; onToggle: () => void; onChange: (value: string) => void }) {
-  return <div><SectionTitle title={t('备份主密钥')} detail={t('至少 12 个字符，用于加密 .msshbackup；留空会保留已保存密钥。')} />
-    <div className="flex items-end gap-2"><Field label={t('主密钥')} className="flex-1"><div className="relative"><Input aria-label={t('备份主密钥')} type={props.show ? 'text' : 'password'} value={props.input.master_key} placeholder={props.saved?.master_key_saved ? t('已安全保存，留空保持不变') : t('输入至少 12 个字符')} onChange={(event) => props.onChange(event.target.value)} className="pr-10" /><Button type="button" size="icon-xs" variant="ghost" aria-label={props.show ? t('隐藏密钥') : t('显示密钥')} className="absolute right-1 top-1/2 -translate-y-1/2" onClick={props.onToggle}>{props.show ? <EyeOff /> : <Eye />}</Button></div></Field>{props.saved?.master_key_saved && <Badge variant="secondary" className="mb-1">{t('已保存')}</Badge>}</div>
   </div>
 }
 

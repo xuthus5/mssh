@@ -18,6 +18,7 @@ vi.mock('@/hooks/useCloudSyncCenter', () => ({ useCloudSyncCenter: () => ({ dash
 vi.mock('@/hooks/useThemeCatalog', () => ({ useThemeCatalog: () => catalog }))
 vi.mock('@/components/settings/SettingsView', () => ({ SettingsView: () => <main>settings-content</main> }))
 vi.mock('@/components/settings/SettingsWindowTitleBar', () => ({ SettingsWindowTitleBar: () => <header>设置</header> }))
+vi.mock('@/components/security/VaultGate', () => ({ VaultGate: ({ children }: { children: React.ReactNode }) => children }))
 
 import { SettingsWindowApp } from '@/components/settings/SettingsWindowApp'
 

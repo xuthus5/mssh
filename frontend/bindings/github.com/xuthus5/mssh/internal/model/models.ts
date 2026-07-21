@@ -1930,6 +1930,150 @@ export class SSHKeyUpdateInput {
     }
 }
 
+export class SecurityPreferenceInput {
+    "require_password_on_launch": boolean;
+    "remember_unlock": boolean;
+
+    /** Creates a new SecurityPreferenceInput instance. */
+    constructor($$source: Partial<SecurityPreferenceInput> = {}) {
+        if (!("require_password_on_launch" in $$source)) {
+            this["require_password_on_launch"] = false;
+        }
+        if (!("remember_unlock" in $$source)) {
+            this["remember_unlock"] = false;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new SecurityPreferenceInput instance from a string or object.
+     */
+    static createFrom($$source: any = {}): SecurityPreferenceInput {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new SecurityPreferenceInput($$parsedSource as Partial<SecurityPreferenceInput>);
+    }
+}
+
+export class SecurityRotateInput {
+    "current_password": string;
+    "new_password": string;
+
+    /** Creates a new SecurityRotateInput instance. */
+    constructor($$source: Partial<SecurityRotateInput> = {}) {
+        if (!("current_password" in $$source)) {
+            this["current_password"] = "";
+        }
+        if (!("new_password" in $$source)) {
+            this["new_password"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new SecurityRotateInput instance from a string or object.
+     */
+    static createFrom($$source: any = {}): SecurityRotateInput {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new SecurityRotateInput($$parsedSource as Partial<SecurityRotateInput>);
+    }
+}
+
+export class SecuritySetupInput {
+    "password": string;
+    "require_password_on_launch": boolean;
+    "remember_unlock": boolean;
+
+    /** Creates a new SecuritySetupInput instance. */
+    constructor($$source: Partial<SecuritySetupInput> = {}) {
+        if (!("password" in $$source)) {
+            this["password"] = "";
+        }
+        if (!("require_password_on_launch" in $$source)) {
+            this["require_password_on_launch"] = false;
+        }
+        if (!("remember_unlock" in $$source)) {
+            this["remember_unlock"] = false;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new SecuritySetupInput instance from a string or object.
+     */
+    static createFrom($$source: any = {}): SecuritySetupInput {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new SecuritySetupInput($$parsedSource as Partial<SecuritySetupInput>);
+    }
+}
+
+/**
+ * SecurityStatus describes the application password / vault state for the UI.
+ */
+export class SecurityStatus {
+    "configured": boolean;
+    "unlocked": boolean;
+    "require_password_on_launch": boolean;
+    "remember_unlock": boolean;
+    "updated_at": string;
+
+    /** Creates a new SecurityStatus instance. */
+    constructor($$source: Partial<SecurityStatus> = {}) {
+        if (!("configured" in $$source)) {
+            this["configured"] = false;
+        }
+        if (!("unlocked" in $$source)) {
+            this["unlocked"] = false;
+        }
+        if (!("require_password_on_launch" in $$source)) {
+            this["require_password_on_launch"] = false;
+        }
+        if (!("remember_unlock" in $$source)) {
+            this["remember_unlock"] = false;
+        }
+        if (!("updated_at" in $$source)) {
+            this["updated_at"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new SecurityStatus instance from a string or object.
+     */
+    static createFrom($$source: any = {}): SecurityStatus {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new SecurityStatus($$parsedSource as Partial<SecurityStatus>);
+    }
+}
+
+export class SecurityUnlockInput {
+    "password": string;
+    "remember_unlock": boolean;
+
+    /** Creates a new SecurityUnlockInput instance. */
+    constructor($$source: Partial<SecurityUnlockInput> = {}) {
+        if (!("password" in $$source)) {
+            this["password"] = "";
+        }
+        if (!("remember_unlock" in $$source)) {
+            this["remember_unlock"] = false;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new SecurityUnlockInput instance from a string or object.
+     */
+    static createFrom($$source: any = {}): SecurityUnlockInput {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new SecurityUnlockInput($$parsedSource as Partial<SecurityUnlockInput>);
+    }
+}
+
 export class Session {
     "id": number;
     "folder_id": number | null;

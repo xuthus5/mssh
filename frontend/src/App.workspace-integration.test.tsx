@@ -24,6 +24,7 @@ vi.mock('@wailsio/runtime', async (importOriginal) => {
     },
   }
 })
+vi.mock('@/components/security/VaultGate', () => ({ VaultGate: ({ children }: { children: React.ReactNode }) => children }))
 vi.mock('@/components/layout/Sidebar', () => ({ default: () => null }))
 vi.mock('@/components/layout/StatusBar', () => ({ default: () => null }))
 vi.mock('@/components/layout/ConnectDialog', () => ({ ConnectDialog: () => null }))
