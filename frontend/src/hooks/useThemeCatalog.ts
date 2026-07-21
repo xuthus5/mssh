@@ -9,6 +9,8 @@ import { profileToTerminalTheme } from '@/lib/terminalThemeCatalog'
 import { useAppStore } from '@/store/appStore'
 import type { TerminalGlobalStyle, ThemeAssignments, ThemeConfigurationInput, ThemeDefinition, ThemeImportSummary, ThemeProfile, ThemeProfileInput } from '../../bindings/github.com/xuthus5/mssh/internal/model/models'
 import { COLOR_MODE_CHANGED_EVENT, THEME_CATALOG_CHANGED_EVENT } from '@/lib/settingsWindowEvents'
+import { t } from '@/i18n'
+
 
 export type { ColorMode } from '@/lib/effectiveTerminalTheme'
 
@@ -92,7 +94,7 @@ export async function changeColorMode(nextMode: ColorMode) {
   } catch (error) {
     applyInterfaceColorMode(previousMode)
     if (followsInterfaceMode) applyEffectiveTerminalTheme()
-    toast('主题设置保存失败，已恢复原主题', 'error')
+    toast(t('主题设置保存失败，已恢复原主题'), 'error')
     logger.error('save colour mode failed', error)
   }
 }

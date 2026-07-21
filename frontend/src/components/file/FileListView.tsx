@@ -3,6 +3,8 @@ import { File, FolderOpen } from 'lucide-react'
 import type { FileInfo } from '@/hooks/useFileTransfer'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { computeVirtualWindow } from '@/lib/virtualWindow'
+import { t } from '@/i18n'
+
 
 interface Props {
   files: FileInfo[]
@@ -18,8 +20,8 @@ const ROW_HEIGHT = 36
 export function FileListView(props: Props) {
   const [scrollTop, setScrollTop] = useState(0)
   const [viewportHeight, setViewportHeight] = useState(360)
-  if (props.loading) return <EmptyRow text="加载中..." />
-  if (props.files.length === 0) return <EmptyRow text="空目录" />
+  if (props.loading) return <EmptyRow text={t('加载中...')} />
+  if (props.files.length === 0) return <EmptyRow text={t('空目录')} />
   const windowed = computeVirtualWindow({
     count: props.files.length,
     estimateSize: ROW_HEIGHT,
@@ -36,9 +38,9 @@ export function FileListView(props: Props) {
         <TableHeader>
           <TableRow>
             <TableHead className="w-8" />
-            <TableHead>名称</TableHead>
-            <TableHead className="text-right">大小</TableHead>
-            <TableHead className="text-right">修改时间</TableHead>
+            <TableHead>{t('名称')}</TableHead>
+            <TableHead className="text-right">{t('大小')}</TableHead>
+            <TableHead className="text-right">{t('修改时间')}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>

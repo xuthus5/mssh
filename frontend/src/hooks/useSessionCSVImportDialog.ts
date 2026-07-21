@@ -11,6 +11,8 @@ import {
 } from '@/lib/sessionCSVMapping'
 import { toast } from '@/components/ui/toast'
 import { SessionCSVConflictPolicy, type SessionCSVImportSummary, type SessionCSVPreview } from '../../bindings/github.com/xuthus5/mssh/internal/model/models'
+import { t } from '@/i18n'
+
 
 export function useSessionCSVImportDialog(
   onPreview: (path: string) => Promise<SessionCSVPreview>,
@@ -30,7 +32,7 @@ export function useSessionCSVImportDialog(
   const selectFile = async () => {
     setPending(true); setError(''); setSummary(null)
     try {
-      const selected = await Dialogs.OpenFile({ Title: '选择 SSH 会话 CSV', CanChooseFiles: true, CanChooseDirectories: false, AllowsMultipleSelection: false, Filters: [{ DisplayName: 'CSV', Pattern: '*.csv' }] })
+      const selected = await Dialogs.OpenFile({ Title: t('选择 SSH 会话 CSV'), CanChooseFiles: true, CanChooseDirectories: false, AllowsMultipleSelection: false, Filters: [{ DisplayName: 'CSV', Pattern: '*.csv' }] })
       const selectedPath = typeof selected === 'string' ? selected : Array.isArray(selected) ? selected[0] : ''
       if (!selectedPath) return
       const nextPreview = await onPreview(selectedPath)
@@ -48,7 +50,7 @@ export function useSessionCSVImportDialog(
     setPending(true); setError('')
     try {
       const result = await onImport({ path, conflictPolicy: policy, headerMapping: mapping, defaultValues: defaults })
-      setSummary(result); toast(`会话导入完成：新增 ${result.imported}，更新 ${result.updated}`, result.failed > 0 ? 'info' : 'success')
+      setSummary(result); toast(t('会话导入完成：新增 ${}，更新 ${}', result.imported, result.updated), result.failed > 0 ? 'info' : 'success')
     } catch (reason) { setError(errorMessage(reason)) } finally { setPending(false) }
   }
   const reset = () => {

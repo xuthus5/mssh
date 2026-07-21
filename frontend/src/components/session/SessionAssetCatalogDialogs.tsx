@@ -10,6 +10,8 @@ import { Textarea } from '@/components/ui/textarea'
 import type { AssetColorToken, AssetEnvironment, AssetProject, AssetTag } from '@/hooks/useSession'
 import { ASSET_COLOR_OPTIONS } from '@/lib/assetColors'
 import { AssetCatalogService } from '@/lib/wails'
+import { t } from '@/i18n'
+
 
 export type CatalogKind = 'environment' | 'project' | 'tag'
 export type CatalogItem = AssetEnvironment | AssetProject | AssetTag
@@ -51,12 +53,12 @@ export function SessionAssetCatalogEditor(props: EditorProps) {
     } catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)) }
     finally { setPending(false) }
   }
-  const noun = target?.kind === 'environment' ? '环境' : target?.kind === 'project' ? '项目' : '标签'
-  return <Dialog open={Boolean(target)} onOpenChange={props.onOpenChange}><DialogContent><DialogHeader><DialogTitle>{target?.item ? '编辑' : '新建'}{noun}</DialogTitle><DialogDescription>名称会在会话列表、搜索和详情中即时生效。</DialogDescription></DialogHeader>
+  const noun = target?.kind === 'environment' ? t('环境') : target?.kind === 'project' ? t('项目') : t('标签')
+  return <Dialog open={Boolean(target)} onOpenChange={props.onOpenChange}><DialogContent><DialogHeader><DialogTitle>{target?.item ? t('编辑') : t('新建')}{noun}</DialogTitle><DialogDescription>{t('名称会在会话列表、搜索和详情中即时生效。')}</DialogDescription></DialogHeader>
     {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
-    <label className="flex flex-col gap-1.5 text-xs font-medium text-muted-foreground">名称<Input autoFocus value={name} maxLength={target?.kind === 'tag' ? 32 : 64} onChange={(event) => setName(event.target.value)} /></label>
-    {target?.kind === 'project' ? <><label className="flex flex-col gap-1.5 text-xs font-medium text-muted-foreground">项目代号<Input value={code} maxLength={24} onChange={(event) => setCode(event.target.value)} /></label><label className="flex flex-col gap-1.5 text-xs font-medium text-muted-foreground">项目描述<Textarea value={description} maxLength={500} rows={4} onChange={(event) => setDescription(event.target.value)} /></label></> : <label className="flex flex-col gap-1.5 text-xs font-medium text-muted-foreground">颜色<LabeledSelect value={color} options={ASSET_COLOR_OPTIONS} onValueChange={(value) => setColor(value as AssetColorToken)} /></label>}
-    <DialogFooter><Button type="button" variant="outline" disabled={pending} onClick={() => props.onOpenChange(false)}>取消</Button><Button type="button" disabled={pending || !name.trim()} onClick={() => { void submit() }}>{pending ? '保存中…' : '保存'}</Button></DialogFooter>
+    <label className="flex flex-col gap-1.5 text-xs font-medium text-muted-foreground">{t('名称')}<Input autoFocus value={name} maxLength={target?.kind === 'tag' ? 32 : 64} onChange={(event) => setName(event.target.value)} /></label>
+    {target?.kind === 'project' ? <><label className="flex flex-col gap-1.5 text-xs font-medium text-muted-foreground">{t('项目代号')}<Input value={code} maxLength={24} onChange={(event) => setCode(event.target.value)} /></label><label className="flex flex-col gap-1.5 text-xs font-medium text-muted-foreground">{t('项目描述')}<Textarea value={description} maxLength={500} rows={4} onChange={(event) => setDescription(event.target.value)} /></label></> : <label className="flex flex-col gap-1.5 text-xs font-medium text-muted-foreground">{t('颜色')}<LabeledSelect value={color} options={ASSET_COLOR_OPTIONS} onValueChange={(value) => setColor(value as AssetColorToken)} /></label>}
+    <DialogFooter><Button type="button" variant="outline" disabled={pending} onClick={() => props.onOpenChange(false)}>{t('取消')}</Button><Button type="button" disabled={pending || !name.trim()} onClick={() => { void submit() }}>{pending ? t('保存中…') : t('保存')}</Button></DialogFooter>
   </DialogContent></Dialog>
 }
 
@@ -111,9 +113,9 @@ export function SessionAssetCatalogDeleteDialog(props: DeleteProps) {
   }
   const isTag = props.target?.kind === 'tag'
   const canSubmit = Boolean(impact) && (isTag || mode === 'clear' || Boolean(replacementID))
-  return <AlertDialog open={Boolean(props.target)} onOpenChange={props.onOpenChange}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>删除“{props.target?.item.name}”？</AlertDialogTitle><AlertDialogDescription>{impact ? `当前关联 ${impact.session_count} 个会话。` : '正在分析关联会话。'}</AlertDialogDescription></AlertDialogHeader>
+  return <AlertDialog open={Boolean(props.target)} onOpenChange={props.onOpenChange}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>{t('删除“')}{props.target?.item.name}”？</AlertDialogTitle><AlertDialogDescription>{impact ? t('当前关联 ${} 个会话。', impact.session_count) : t('正在分析关联会话。')}</AlertDialogDescription></AlertDialogHeader>
     {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
-    {isTag ? <div className="flex items-center gap-2 text-sm"><Badge variant="outline" data-asset-color={(props.target?.item as AssetTag | undefined)?.colorToken} className="asset-color-badge">{props.target?.item.name}</Badge><span>确认后将从所有关联会话移除此标签。</span></div> : <div className="flex flex-col gap-3"><LabeledSelect ariaLabel="删除关联处理方式" value={mode} options={alternatives.length > 0 ? [{ value: 'migrate', label: '迁移到其他项' }, { value: 'clear', label: '清空关联' }] : [{ value: 'clear', label: '清空关联（无可迁移项）' }]} onValueChange={(value) => setMode(value as 'migrate' | 'clear')} />{mode === 'migrate' && <LabeledSelect ariaLabel="迁移目标" value={replacementID} placeholder="选择迁移目标" options={alternatives.map((item) => ({ value: item.id, label: item.name }))} onValueChange={setReplacementID} />}</div>}
-    <AlertDialogFooter><AlertDialogCancel disabled={pending}>取消</AlertDialogCancel><AlertDialogAction variant="destructive" disabled={pending || !canSubmit} onClick={() => { void submit() }}>{pending ? '删除中…' : `确认处理 ${impact?.session_count ?? 0} 个会话并删除`}</AlertDialogAction></AlertDialogFooter>
+    {isTag ? <div className="flex items-center gap-2 text-sm"><Badge variant="outline" data-asset-color={(props.target?.item as AssetTag | undefined)?.colorToken} className="asset-color-badge">{props.target?.item.name}</Badge><span>{t('确认后将从所有关联会话移除此标签。')}</span></div> : <div className="flex flex-col gap-3"><LabeledSelect ariaLabel={t('删除关联处理方式')} value={mode} options={alternatives.length > 0 ? [{ value: 'migrate', label: t('迁移到其他项') }, { value: 'clear', label: t('清空关联') }] : [{ value: 'clear', label: t('清空关联（无可迁移项）') }]} onValueChange={(value) => setMode(value as 'migrate' | 'clear')} />{mode === 'migrate' && <LabeledSelect ariaLabel={t('迁移目标')} value={replacementID} placeholder={t('选择迁移目标')} options={alternatives.map((item) => ({ value: item.id, label: item.name }))} onValueChange={setReplacementID} />}</div>}
+    <AlertDialogFooter><AlertDialogCancel disabled={pending}>{t('取消')}</AlertDialogCancel><AlertDialogAction variant="destructive" disabled={pending || !canSubmit} onClick={() => { void submit() }}>{pending ? t('删除中…') : t('确认处理 ${} 个会话并删除', impact?.session_count ?? 0)}</AlertDialogAction></AlertDialogFooter>
   </AlertDialogContent></AlertDialog>
 }

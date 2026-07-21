@@ -1,4 +1,6 @@
 import type { AppState, Tab, TerminalTab } from '@/store/appStore'
+import { t } from '@/i18n'
+
 
 export type TerminalPoolEvictionMode = 'orphan-only' | 'include-protected'
 
@@ -98,6 +100,6 @@ export function confirmProtectedTerminalReclaim(
 ): boolean {
   const title = victim.owningTab?.title ?? victim.terminalID
   return confirm(
-    `终端池已满。继续将关闭标签「${title}」并断开对应连接，之后可从会话列表重新连接。是否继续？`,
+    t('终端池已满。继续将关闭标签「${}」并断开对应连接，之后可从会话列表重新连接。是否继续？', title),
   )
 }

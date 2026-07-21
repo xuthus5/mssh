@@ -11,6 +11,8 @@ import { SystemPanel } from '@/components/terminal/SystemPanel'
 import { TerminalSearchBar } from '@/components/terminal/TerminalSearchBar'
 import { TerminalComposePanel } from '@/components/terminal/TerminalComposePanel'
 import { AITerminalPanel } from '@/components/terminal/AITerminalPanel'
+import { t } from '@/i18n'
+
 
 interface Props {
   terminalID: string
@@ -36,7 +38,7 @@ function useRecordingControl(terminalID: string, sessionId: number) {
       } catch (error: unknown) {
         logger.error('TerminalTab: stop recording failed:', error)
         setRecordingState(terminalID, 'error')
-        toast(`停止录制失败: ${error instanceof Error ? error.message : String(error)}`, 'error')
+        toast(t('停止录制失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
       }
       return
     }
@@ -48,7 +50,7 @@ function useRecordingControl(terminalID: string, sessionId: number) {
     } catch (error: unknown) {
       logger.error('TerminalTab: start recording failed:', error)
       setRecordingState(terminalID, 'error')
-      toast(`开始录制失败: ${error instanceof Error ? error.message : String(error)}`, 'error')
+      toast(t('开始录制失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
     }
   }, [isRecording, sessionId, setRecordingState, terminalID])
   return { isRecording, toggle }

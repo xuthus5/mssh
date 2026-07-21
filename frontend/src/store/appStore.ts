@@ -2,6 +2,8 @@ import { create } from 'zustand'
 import { Terminal } from '@xterm/xterm'
 import { initialNavigationState, type ActiveSurface, type OverviewSection, type WorkspaceID } from '@/store/tabNavigation'
 import { createNavigationActions, createPoolActions, createStatusActions, createTabActions, createTransferActions } from '@/store/appStoreActions'
+import { t } from '@/i18n'
+
 export interface TerminalTab {
   id: string
   title: string
@@ -159,7 +161,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   terminalPool: new Map(),
   maxPoolSize: DEFAULT_MAX_POOL_SIZE,
   connectionStatus: {},
-  appStatus: '就绪',
+  appStatus: t('就绪'),
   terminalTheme: DEFAULT_THEME,
   transfers: [],
   transferCenterOpen: false,

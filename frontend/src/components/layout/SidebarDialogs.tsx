@@ -5,6 +5,8 @@ import SessionDialog from '@/components/session/SessionDialog'
 import type { Folder, Session } from '@/hooks/useSession'
 import type { AssetEnvironment, AssetProject, AssetTag } from '@/hooks/useSession'
 import type { AssetColorToken } from '@/lib/sessionModels'
+import { t } from '@/i18n'
+
 
 interface Props {
   sessionDialogOpen: boolean
@@ -30,7 +32,7 @@ export function SidebarDialogs(props: Props) {
   return <>
     <SessionDialog key={props.sessionDialogOpen ? 'open' : 'closed'} open={props.sessionDialogOpen} onOpenChange={props.onSessionOpenChange} session={props.editingSession} folders={props.folders} environments={props.environments} projects={props.projects} assetTags={props.assetTags} onCreateEnvironment={props.onCreateEnvironment} onCreateProject={props.onCreateProject} onCreateTag={props.onCreateTag} onSave={props.onSaveSession} />
     <Dialog open={props.folderDialogOpen} onOpenChange={props.onFolderOpenChange}>
-      <DialogContent className="sm:max-w-sm"><DialogHeader><DialogTitle>{props.editingFolder ? '编辑分组' : '新建分组'}</DialogTitle></DialogHeader><div className="flex flex-col gap-3"><label className="text-xs font-medium text-muted-foreground" htmlFor="sidebar-folder-name">分组名称</label><Input id="sidebar-folder-name" value={props.folderName} onChange={(event) => props.setFolderName(event.target.value)} placeholder="例如：生产环境" onKeyDown={(event) => { if (event.key === 'Enter') props.onCreateOrUpdateFolder() }} /></div><DialogFooter><Button variant="outline" onClick={() => props.onFolderOpenChange(false)}>取消</Button><Button onClick={props.onCreateOrUpdateFolder}>{props.editingFolder ? '保存' : '创建'}</Button></DialogFooter></DialogContent>
+      <DialogContent className="sm:max-w-sm"><DialogHeader><DialogTitle>{props.editingFolder ? t('编辑分组') : t('新建分组')}</DialogTitle></DialogHeader><div className="flex flex-col gap-3"><label className="text-xs font-medium text-muted-foreground" htmlFor="sidebar-folder-name">{t('分组名称')}</label><Input id="sidebar-folder-name" value={props.folderName} onChange={(event) => props.setFolderName(event.target.value)} placeholder={t('例如：生产环境')} onKeyDown={(event) => { if (event.key === 'Enter') props.onCreateOrUpdateFolder() }} /></div><DialogFooter><Button variant="outline" onClick={() => props.onFolderOpenChange(false)}>{t('取消')}</Button><Button onClick={props.onCreateOrUpdateFolder}>{props.editingFolder ? t('保存') : t('创建')}</Button></DialogFooter></DialogContent>
     </Dialog>
   </>
 }

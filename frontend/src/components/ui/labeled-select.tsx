@@ -1,5 +1,7 @@
 import { cn } from '@/lib/utils'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { t } from '@/i18n'
+
 
 export interface LabeledSelectOption {
   value: string
@@ -21,7 +23,7 @@ export function LabeledSelect({
   value,
   options,
   onValueChange,
-  placeholder = '请选择',
+  placeholder = t('请选择'),
   className,
   disabled,
   ariaLabel,

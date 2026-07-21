@@ -7,6 +7,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { useConnectDialog } from '@/store/connectDialog'
+import { t } from '@/i18n'
+
 
 export function ConnectDialog() {
   const { open, state, host, port, user, error, fingerprint, algorithm, retry, closeDialog, acceptHostKey, rejectHostKey, cancelConnection } =
@@ -16,7 +18,7 @@ export function ConnectDialog() {
     <Dialog open={open} onOpenChange={(v) => { if (!v && state === 'failed') closeDialog() }}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>SSH 连接</DialogTitle>
+          <DialogTitle>{t('SSH 连接')}</DialogTitle>
         </DialogHeader>
 
         <div className="flex flex-col items-center gap-3 py-6">
@@ -31,14 +33,14 @@ export function ConnectDialog() {
               </div>
               <div className="text-sm text-center">
                 <p className="font-medium text-foreground">
-                  正在连接到 {user}@{host}:{port}
+                  {t('正在连接到')} {user}@{host}:{port}
                 </p>
                 <p className="text-xs text-muted-foreground mt-2">
-                  {state === 'cancelling' ? '正在取消连接...' : 'SSH 握手进行中...'}
+                  {state === 'cancelling' ? t('正在取消连接...') : t('SSH 握手进行中...')}
                 </p>
               </div>
               <Button variant="outline" size="sm" disabled={state === 'cancelling'} onClick={() => { void cancelConnection() }}>
-                取消连接
+                {t('取消连接')}
               </Button>
             </>
           )}
@@ -48,21 +50,21 @@ export function ConnectDialog() {
             <>
               <Fingerprint className="h-10 w-10 text-yellow-500" />
               <div className="text-sm text-center">
-                <p className="font-medium">主机指纹确认</p>
+                <p className="font-medium">{t('主机指纹确认')}</p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  首次连接到 {host}:{port}
+                  {t('首次连接到')} {host}:{port}
                 </p>
                 <div className="mt-3 p-2 bg-muted rounded text-xs font-mono break-all">
                   {fingerprint}
                 </div>
-                {algorithm && <p className="mt-2 text-xs text-muted-foreground">算法：{algorithm}</p>}
+                {algorithm && <p className="mt-2 text-xs text-muted-foreground">{t('算法：')}{algorithm}</p>}
               </div>
               <div className="flex gap-2 mt-2">
                 <Button variant="outline" size="sm" onClick={() => { void rejectHostKey() }}>
-                  拒绝
+                  {t('拒绝')}
                 </Button>
                 <Button size="sm" onClick={() => { void acceptHostKey() }}>
-                  信任并连接
+                  {t('信任并连接')}
                 </Button>
               </div>
             </>
@@ -73,9 +75,9 @@ export function ConnectDialog() {
             <>
               <CheckCircle className="h-10 w-10 text-green-500" />
               <div className="text-sm text-center">
-                <p className="font-medium text-green-600">连接成功</p>
+                <p className="font-medium text-green-600">{t('连接成功')}</p>
                 <p className="text-xs text-muted-foreground mt-2">
-                  已连接到 {user}@{host}:{port}
+                  {t('已连接到')} {user}@{host}:{port}
                 </p>
               </div>
             </>
@@ -86,7 +88,7 @@ export function ConnectDialog() {
             <>
               <XCircle className="h-10 w-10 text-destructive" />
               <div className="text-sm text-center max-w-xs">
-                <p className="font-medium text-destructive">连接失败</p>
+                <p className="font-medium text-destructive">{t('连接失败')}</p>
                 <p className="text-xs text-muted-foreground mt-2 break-all">
                   {error}
                 </p>
@@ -97,11 +99,11 @@ export function ConnectDialog() {
                 className="mt-2"
                 onClick={closeDialog}
               >
-                关闭
+                {t('关闭')}
               </Button>
               {retry && (
                 <Button size="sm" onClick={() => { closeDialog(); retry() }}>
-                  重试
+                  {t('重试')}
                 </Button>
               )}
             </>
