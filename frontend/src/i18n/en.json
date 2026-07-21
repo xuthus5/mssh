@@ -1101,5 +1101,8 @@
   "默认视图": "Default view",
   "鼠标右键行为": "Right-click behavior",
   "（空）": "( empty )",
-  "（默认）": "（默认）"
+  "（默认）": "（默认）",
+  "控制终端中的鼠标、剪贴板与历史缓冲。": "Control mouse, clipboard, and history buffer behavior in the terminal.",
+  "滚动历史行数": "Scrollback lines",
+  "限制每个终端保留的输出历史行数，超出后丢弃最旧内容（${}-${}）。": "Limit retained output history lines per terminal; oldest lines are dropped beyond the limit (${}-${})."
 }
