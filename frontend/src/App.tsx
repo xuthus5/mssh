@@ -12,6 +12,7 @@ import { WorkspaceContent } from '@/components/layout/WorkspaceContent'
 import { TerminalLayers } from '@/components/terminal/TerminalLayers'
 import { SessionQuickSearchHost } from '@/components/session/SessionQuickSearchHost'
 import { SESSION_QUICK_SEARCH_EVENT } from '@/lib/sessionQuickSearch'
+import { APP_NEW_SESSION_EVENT, emitAppEvent } from '@/lib/appEvents'
 import { GeneralSettingsRuntime } from '@/components/layout/GeneralSettingsRuntime'
 import { WorkspacePersistence } from '@/components/layout/WorkspacePersistence'
 import { createAppSyncDataReload, hotReloadSessionWorkspace, registerSyncDataReload } from '@/lib/syncDataReload'
@@ -76,14 +77,14 @@ function handleShortcut(event: KeyboardEvent) {
   const key = event.key.toLowerCase()
   if (!event.shiftKey && key === 'f') {
     if (isOrdinaryEditable(target)) return
-    window.dispatchEvent(new CustomEvent(SESSION_QUICK_SEARCH_EVENT))
+    emitAppEvent(SESSION_QUICK_SEARCH_EVENT)
     event.preventDefault()
     return
   }
   if (isOrdinaryEditable(target)) return
   const state = useAppStore.getState()
 
-  if (!event.shiftKey && key === 'n') window.dispatchEvent(new CustomEvent('mssh:new-session'))
+  if (!event.shiftKey && key === 'n') emitAppEvent(APP_NEW_SESSION_EVENT)
   else if (!event.shiftKey && key === 'w') closeActiveTab(state)
   else if (event.shiftKey && key === 'c') copySelection(state)
   else if (event.shiftKey && key === 'v') pasteClipboard(state)

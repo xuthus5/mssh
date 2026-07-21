@@ -13,7 +13,6 @@ import {
   createPlaybackResizeObserver,
   recoverPlaybackView,
 } from '@/components/terminal/playbackTerminalRuntime'
-
 const PLAYBACK_INTERVAL_MS = 16
 const PLAYBACK_SCROLLBACK = 10000
 const MAX_PROGRESS = 100

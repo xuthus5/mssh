@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { Copy, FileKey } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { LabeledSelect } from '@/components/ui/labeled-select'
 import { Textarea } from '@/components/ui/textarea'
 import { toast } from '@/components/ui/toast'
+import { getClipboard } from '@/lib/clipboard'
 import type { KeyImportFile, KeyInfo, KeyMaterial } from '@/hooks/useSettings'
 
 const bitsOptions: Record<KeyInfo['type'], { value: string; label: string }[]> = {
@@ -59,14 +60,16 @@ export function KeyImportDialog({ open, onOpenChange, onImport, onSelectFile }: 
   const [name, setName] = useState('')
   const [privateKey, setPrivateKey] = useState('')
   const [saving, setSaving] = useState(false)
+  const onSelectFileRef = useRef(onSelectFile)
+  onSelectFileRef.current = onSelectFile
   const browse = async () => {
-    const file = await onSelectFile()
+    const file = await onSelectFileRef.current()
     if (file) { setName(file.name); setPrivateKey(file.privateKey) }
   }
   useEffect(() => {
     if (!open) { setName(''); setPrivateKey(''); return }
     void browse()
-  }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [open])
   const submit = async (event: FormEvent) => {
     event.preventDefault(); setSaving(true)
     try { if (await onImport(name, privateKey)) onOpenChange(false) } finally { setSaving(false) }
@@ -86,7 +89,7 @@ export type KeyMaterialMode = 'generated' | 'view' | 'edit'
 
 function MaterialField({ label, value, editable, onChange }: { label: string; value: string; editable: boolean; onChange: (value: string) => void }) {
   const copy = async () => {
-    try { await navigator.clipboard.writeText(value); toast(`${label}已复制`, 'success') }
+    try { await getClipboard().writeText(value); toast(`${label}已复制`, 'success') }
     catch (error) { toast(`复制${label}失败: ${error instanceof Error ? error.message : String(error)}`, 'error') }
   }
   return <Field><div className="flex items-center justify-between gap-2"><FieldLabel>{label}内容</FieldLabel><Button type="button" size="xs" variant="outline" aria-label={`复制${label}`} onClick={() => { void copy() }}><Copy data-icon="inline-start" />复制</Button></div>

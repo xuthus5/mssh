@@ -35,9 +35,15 @@ export function useTerminalActivation({ refs, active, sequence, reportRuntimeErr
     cancelFrame(refs.activationFrameRef)
     if (!active) {
       refs.recoveryPendingRef.current = false
-      runTerminalRuntime(reportRuntimeError, 'terminal blur', () => term.blur())
+      runTerminalRuntime(reportRuntimeError, 'terminal soft throttle', () => {
+        term.options.cursorBlink = false
+        term.blur()
+      })
       return
     }
+    runTerminalRuntime(reportRuntimeError, 'terminal resume cursor', () => {
+      term.options.cursorBlink = true
+    })
     refs.recoveryPendingRef.current = true
     let cancelled = false
     let attempts = 0
