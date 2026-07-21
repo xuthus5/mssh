@@ -51,6 +51,8 @@ tasks:
       - task: build
         vars:
           PRODUCTION: "true"
+          ARCH: '{{.ARCH | default ARCH}}'
+          APP_VERSION: '{{.APP_VERSION | default "0.1.0"}}'
       - task: generate:dotdesktop
     cmds:
       - cp {{.APP_BINARY}} {{.APP_NAME}}
@@ -62,6 +64,12 @@ tasks:
       ICON: '../../appicon.png'
       DESKTOP_FILE: '../{{.APP_NAME}}.desktop'
       OUTPUT_DIR: '../../../bin'
+    env:
+      APP_NAME: '{{.APP_NAME}}'
+      VERSION: '{{.APP_VERSION | default "0.1.0"}}'
+      ARCH: '{{.ARCH | default ARCH}}'
+      OUTPUT_DIR: '../../../bin'
+      APPIMAGE_EXTRACT_AND_RUN: "1"
 
   create:deb:
     summary: Creates a deb package
