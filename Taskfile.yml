@@ -164,6 +164,7 @@ tasks:
     cmds:
       - task: lint
       - task: test
+      - node scripts/check-go-source-limits.mjs
       - task: test:frontend
       - task: build
         vars:

@@ -37,8 +37,11 @@ func newGistSyncProvider(client *http.Client, apiBase, gistID, token string) (*g
 		return nil, errors.New("GitHub token is required")
 	}
 	parsed, err := url.ParseRequestURI(strings.TrimRight(apiBase, "/"))
-	if err != nil || parsed.Scheme != "https" && parsed.Scheme != "http" {
-		return nil, errors.New("GitHub API URL must use http or https")
+	if err != nil {
+		return nil, errors.New("GitHub API URL is invalid")
+	}
+	if err := requireHTTPSUnlessLoopback(parsed); err != nil {
+		return nil, err
 	}
 	return &gistSyncProvider{client: client, apiBase: parsed.String(), gistID: normalizeGistID(gistID), token: token}, nil
 }

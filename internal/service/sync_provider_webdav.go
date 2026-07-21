@@ -21,8 +21,11 @@ type webDAVSyncProvider struct {
 
 func newWebDAVSyncProvider(client *http.Client, endpoint, username, password string) (*webDAVSyncProvider, error) {
 	parsed, err := url.ParseRequestURI(strings.TrimSpace(endpoint))
-	if err != nil || parsed.Scheme != "https" && parsed.Scheme != "http" {
-		return nil, errors.New("WebDAV URL must use http or https")
+	if err != nil {
+		return nil, errors.New("WebDAV URL is invalid")
+	}
+	if err := requireHTTPSUnlessLoopback(parsed); err != nil {
+		return nil, err
 	}
 	fileURL, err := url.JoinPath(parsed.String(), syncBackupFileName)
 	if err != nil {

@@ -41,11 +41,27 @@ func (m *MacroService) Delete(id int64) error {
 }
 
 func (m *MacroService) Execute(terminalID, command string) error {
+	proposal := classifyAICommand(command, model.AISecuritySettings{})
+	if proposal.Blocked {
+		recordAudit(m.db, m.logger, model.AuditEvent{
+			Action: "macro_execute", TargetType: "terminal", TargetID: terminalID,
+			Summary: "宏执行被策略阻断", Outcome: "blocked",
+		})
+		return fmt.Errorf("macro blocked: %s", proposal.BlockedReason)
+	}
 	m.logger.Info("executing macro", "terminalID", terminalID)
 	if m.terminals == nil {
 		return fmt.Errorf("execute macro: no terminal service available")
 	}
 	_, err := m.terminals.Write(terminalID, command)
+	outcome := "success"
+	if err != nil {
+		outcome = "failed"
+	}
+	recordAudit(m.db, m.logger, model.AuditEvent{
+		Action: "macro_execute", TargetType: "terminal", TargetID: terminalID,
+		Summary: "宏执行", Outcome: outcome,
+	})
 	if err != nil {
 		return fmt.Errorf("execute macro: %w", err)
 	}

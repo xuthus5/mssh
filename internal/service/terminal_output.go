@@ -69,15 +69,29 @@ func (t *TerminalService) dispatchTerminalOutput(terminalID string, data []byte,
 		t.outputSequences = make(map[string]uint64)
 	}
 	// Wails dispatches each event asynchronously, so the frontend restores PTY byte order with this sequence.
+	// Clone once for the async bus; source buffers (PTY read/pending) are reused or truncated and must not be shared.
 	t.outputSequences[terminalID]++
 	t.eventBus.Emit(event.TerminalOutput, event.TerminalOutputPayload{
 		TerminalID: terminalID,
 		Sequence:   t.outputSequences[terminalID],
-		Data:       append([]byte(nil), data...),
+		Data:       cloneTerminalOutput(data),
 	})
 	if handler != nil {
 		handler(terminalID, data)
 	}
+}
+
+func cloneTerminalOutput(data []byte) []byte {
+	if len(data) == 0 {
+		return nil
+	}
+	// Cap pathological payloads so emit cannot amplify beyond the pending budget.
+	if len(data) > maxPendingTerminalOutput {
+		data = data[:maxPendingTerminalOutput]
+	}
+	out := make([]byte, len(data))
+	copy(out, data)
+	return out
 }
 
 func (t *TerminalService) expirePendingOutput(terminalID string) {

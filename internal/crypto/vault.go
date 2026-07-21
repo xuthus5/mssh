@@ -250,4 +250,3 @@ func validateVaultFile(vault VaultFile) error {
 func SyncSecretFromDEK(dek []byte) string {
 	return base64.RawStdEncoding.EncodeToString(dek)
 }
-

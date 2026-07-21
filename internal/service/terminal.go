@@ -72,39 +72,54 @@ func (t *TerminalService) Open(ctx context.Context, sessionID int64, cols, rows 
 		recordAudit(t.sessionSvc.db, t.logger, model.AuditEvent{Action: "connect", TargetType: "session", TargetID: fmt.Sprint(sessionID), SessionID: &sessionID, Summary: "SSH 连接", Outcome: outcome})
 	}()
 	t.logger.Info("opening terminal", "sessionID", sessionID, "cols", cols, "rows", rows)
-	connID, err := t.sessionSvc.connect(ctx, sessionID, false)
+	terminalID, err := t.openTerminalSession(ctx, sessionID, cols, rows)
 	if err != nil {
 		t.logger.Error("terminal open failed", "sessionID", sessionID, "error", err)
 		return "", fmt.Errorf("terminal open: %w", err)
 	}
+	t.logger.Info("terminal opened", "terminalID", terminalID)
+	outcome = "success"
+	return terminalID, nil
+}
 
-	wrapper, err := t.sessionSvc.GetClientWrapper(connID)
+func (t *TerminalService) openTerminalSession(ctx context.Context, sessionID int64, cols, rows int) (string, error) {
+	connID, wrapper, termType, err := t.prepareTerminalConnection(ctx, sessionID)
 	if err != nil {
-		_ = t.sessionSvc.disconnect(connID, false)
-		t.logger.Error("terminal open failed", "sessionID", sessionID, "error", err)
-		return "", fmt.Errorf("terminal open: %w", err)
+		return "", err
 	}
-
-	sess, err := t.sessionSvc.GetSession(sessionID)
-	if err != nil {
-		_ = t.sessionSvc.disconnect(connID, false)
-		t.logger.Error("terminal open failed", "sessionID", sessionID, "error", err)
-		return "", fmt.Errorf("terminal open: %w", err)
-	}
-
-	termType := sess.TermType
-	if termType == "" {
-		termType = "xterm-256color"
-	}
-
 	terminalID := uuid.New().String()
 	pty, err := _openPTY(wrapper, termType, cols, rows)
 	if err != nil {
 		_ = t.sessionSvc.disconnect(connID, false)
-		t.logger.Error("terminal open failed", "sessionID", sessionID, "error", err)
-		return "", fmt.Errorf("terminal open: %w", err)
+		return "", err
 	}
+	t.registerTerminal(terminalID, connID, pty)
+	return terminalID, nil
+}
 
+func (t *TerminalService) prepareTerminalConnection(ctx context.Context, sessionID int64) (string, *ssh.ClientWrapper, string, error) {
+	connID, err := t.sessionSvc.connect(ctx, sessionID, false)
+	if err != nil {
+		return "", nil, "", err
+	}
+	wrapper, err := t.sessionSvc.GetClientWrapper(connID)
+	if err != nil {
+		_ = t.sessionSvc.disconnect(connID, false)
+		return "", nil, "", err
+	}
+	sess, err := t.sessionSvc.GetSession(sessionID)
+	if err != nil {
+		_ = t.sessionSvc.disconnect(connID, false)
+		return "", nil, "", err
+	}
+	termType := sess.TermType
+	if termType == "" {
+		termType = "xterm-256color"
+	}
+	return connID, wrapper, termType, nil
+}
+
+func (t *TerminalService) registerTerminal(terminalID, connID string, pty *ssh.PTYSession) {
 	t.mu.Lock()
 	if len(t.ptys) >= t.maxSize {
 		t.evictLRU()
@@ -122,10 +137,6 @@ func (t *TerminalService) Open(ctx context.Context, sessionID int64, cols, rows 
 	pty.Start()
 	t.eventBus.Emit(event.ConnectionState, event.ConnectionStatePayload{TerminalID: terminalID, State: "connected"})
 	close(exitReady)
-
-	t.logger.Info("terminal opened", "terminalID", terminalID)
-	outcome = "success"
-	return terminalID, nil
 }
 
 func (t *TerminalService) handlePTYExit(terminalID string, exitedPTY *ssh.PTYSession, exitErr error) {
@@ -145,8 +156,10 @@ func (t *TerminalService) handlePTYExit(terminalID string, exitedPTY *ssh.PTYSes
 	connID := t.connIDs[terminalID]
 	delete(t.connIDs, terminalID)
 	delete(t.outputSequences, terminalID)
+	delete(t.systemSamples, terminalID)
 	closeHandler := t.closeHandler
 	expirePending := !t.attached[terminalID] && len(t.pendingOutput[terminalID]) > 0
+	t.outputMu.Unlock()
 	t.mu.Unlock()
 
 	if closeHandler != nil {
@@ -161,7 +174,6 @@ func (t *TerminalService) handlePTYExit(terminalID string, exitedPTY *ssh.PTYSes
 		TerminalID: terminalID,
 		State:      "disconnected",
 	})
-	t.outputMu.Unlock()
 	if expirePending {
 		time.AfterFunc(pendingOutputTTL, func() { t.expirePendingOutput(terminalID) })
 	}
@@ -202,56 +214,66 @@ func (t *TerminalService) Resize(terminalID string, cols, rows int) error {
 
 func (t *TerminalService) Close(terminalID string) error {
 	t.logger.Info("closing terminal", "terminalID", terminalID)
+	if t.clearBufferedTerminal(terminalID) {
+		return nil
+	}
+	pty, connID, closeHandler, ok := t.detachTerminal(terminalID)
+	if !ok {
+		t.logger.Error("close terminal failed", "terminalID", terminalID, "error", "terminal not found")
+		return fmt.Errorf("terminal %s not found", terminalID)
+	}
+	if pty != nil {
+		_ = pty.Close()
+	}
+	if closeHandler != nil {
+		closeHandler(terminalID)
+	}
+	if t.sessionSvc != nil && connID != "" {
+		_ = t.sessionSvc.disconnect(connID, false)
+	}
+	t.eventBus.Emit(event.TerminalClosed, event.ConnectionStatePayload{TerminalID: terminalID, State: "closed"})
+	return nil
+}
+
+func (t *TerminalService) clearBufferedTerminal(terminalID string) bool {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if _, active := t.ptys[terminalID]; active {
+		return false
+	}
+	if _, buffered := t.pendingOutput[terminalID]; !buffered {
+		return false
+	}
+	t.outputMu.Lock()
+	delete(t.pendingOutput, terminalID)
+	delete(t.attached, terminalID)
+	delete(t.outputSequences, terminalID)
+	delete(t.systemSamples, terminalID)
+	t.outputMu.Unlock()
+	t.eventBus.Emit(event.TerminalClosed, event.ConnectionStatePayload{TerminalID: terminalID, State: "closed"})
+	return true
+}
+
+func (t *TerminalService) detachTerminal(terminalID string) (*ssh.PTYSession, string, func(string), bool) {
 	t.mu.Lock()
 	pty, ok := t.ptys[terminalID]
 	if !ok {
-		if _, buffered := t.pendingOutput[terminalID]; buffered {
-			t.outputMu.Lock()
-			delete(t.pendingOutput, terminalID)
-			delete(t.attached, terminalID)
-			delete(t.outputSequences, terminalID)
-			t.mu.Unlock()
-			t.eventBus.Emit(event.TerminalClosed, event.ConnectionStatePayload{TerminalID: terminalID, State: "closed"})
-			t.outputMu.Unlock()
-			return nil
-		}
 		t.mu.Unlock()
-		t.logger.Error("close terminal failed", "terminalID", terminalID, "error", "terminal not found")
-		return fmt.Errorf("terminal %s not found", terminalID)
+		return nil, "", nil, false
 	}
 	t.outputMu.Lock()
 	delete(t.ptys, terminalID)
 	delete(t.lastUsed, terminalID)
 	delete(t.attached, terminalID)
 	delete(t.pendingOutput, terminalID)
-	delete(t.outputSequences, terminalID)
 	connID := t.connIDs[terminalID]
 	delete(t.connIDs, terminalID)
+	delete(t.outputSequences, terminalID)
+	delete(t.systemSamples, terminalID)
 	closeHandler := t.closeHandler
-	t.mu.Unlock()
-
-	if pty != nil {
-		_ = pty.Close()
-	}
-
-	if closeHandler != nil {
-		closeHandler(terminalID)
-	}
-	if t.sessionSvc != nil {
-		if connID == "" {
-			connID = terminalID
-		}
-		_ = t.sessionSvc.disconnect(connID, false)
-	}
-
-	t.eventBus.Emit(event.TerminalClosed, event.ConnectionStatePayload{
-		TerminalID: terminalID,
-		State:      "closed",
-	})
 	t.outputMu.Unlock()
-
-	t.logger.Info("terminal closed", "terminalID", terminalID)
-	return nil
+	t.mu.Unlock()
+	return pty, connID, closeHandler, true
 }
 
 func (t *TerminalService) Count() int {

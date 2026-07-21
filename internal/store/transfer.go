@@ -17,6 +17,12 @@ func CreateTransferJob(db *sql.DB, job model.TransferJob) error {
 }
 
 func UpdateTransferProgress(db *sql.DB, id string, transferred, total, speed, eta int64) error {
+	return withBusyRetry(func() error {
+		return updateTransferProgressOnce(db, id, transferred, total, speed, eta)
+	})
+}
+
+func updateTransferProgressOnce(db *sql.DB, id string, transferred, total, speed, eta int64) error {
 	_, err := db.Exec(`UPDATE transfer_jobs SET status='running', transferred_bytes=?, total_bytes=?, speed=?, eta=? WHERE id=?`, transferred, total, speed, eta, id)
 	if err != nil {
 		return fmt.Errorf("update transfer job: %w", err)
@@ -25,11 +31,13 @@ func UpdateTransferProgress(db *sql.DB, id string, transferred, total, speed, et
 }
 
 func FinishTransferJob(db *sql.DB, id, status, errorMessage string) error {
-	_, err := db.Exec(`UPDATE transfer_jobs SET status=?, error=?, completed_at=? WHERE id=?`, status, errorMessage, time.Now().UTC().Format(time.RFC3339Nano), id)
-	if err != nil {
-		return fmt.Errorf("finish transfer job: %w", err)
-	}
-	return nil
+	return withBusyRetry(func() error {
+		_, err := db.Exec(`UPDATE transfer_jobs SET status=?, error=?, completed_at=? WHERE id=?`, status, errorMessage, time.Now().UTC().Format(time.RFC3339Nano), id)
+		if err != nil {
+			return fmt.Errorf("finish transfer job: %w", err)
+		}
+		return nil
+	})
 }
 
 func MarkInterruptedTransfers(db *sql.DB) error {

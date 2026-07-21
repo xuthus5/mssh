@@ -2,6 +2,9 @@ package store
 
 const databaseFormatVersion = 5
 
+// DatabaseFormatVersion exposes the supported on-disk format version.
+func DatabaseFormatVersion() int { return databaseFormatVersion }
+
 const foldersTableSQL = `CREATE TABLE IF NOT EXISTS session_folders (
 	id INTEGER PRIMARY KEY AUTOINCREMENT,
 	name TEXT NOT NULL,
@@ -247,10 +250,4 @@ var finalSchemaStatements = []schemaStatement{
 	{name: "ai_messages_conversation_idx", sql: "CREATE INDEX IF NOT EXISTS ai_messages_conversation_idx ON ai_messages(conversation_id, id)"},
 	{name: "ai_command_executions", sql: aiCommandExecutionsTableSQL},
 	{name: "settings", sql: settingsTableSQL}, {name: "themes", sql: themeDefinitionsSchema}, {name: "terminal_theme_profiles", sql: themeProfilesSchema},
-}
-
-var applicationTablesInDropOrder = []string{
-	"ai_command_executions", "ai_messages", "ai_conversations", "ai_settings", "ai_provider_profiles",
-	"terminal_theme_profiles", "themes", "sync_events", "sync_versions", "session_logs", "transfer_jobs", "audit_events", "tunnels", "session_tags", "sessions",
-	"asset_tags", "asset_projects", "asset_environments", "ssh_keys", "session_folders", "settings", "macros", "command_history",
 }

@@ -47,8 +47,10 @@ func AppendAuditEvent(db *sql.DB, event model.AuditEvent) error {
 	if createdAt.IsZero() {
 		createdAt = time.Now().UTC()
 	}
-	_, err = db.Exec(`INSERT INTO audit_events (action, target_type, target_id, session_id, summary, outcome, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`, event.Action, event.TargetType, event.TargetID, event.SessionID, event.Summary, event.Outcome, createdAt.Format(time.RFC3339Nano))
-	return err
+	return withBusyRetry(func() error {
+		_, err := db.Exec(`INSERT INTO audit_events (action, target_type, target_id, session_id, summary, outcome, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`, event.Action, event.TargetType, event.TargetID, event.SessionID, event.Summary, event.Outcome, createdAt.Format(time.RFC3339Nano))
+		return err
+	})
 }
 
 func ListAuditEvents(db *sql.DB, filter model.AuditFilter) ([]model.AuditEvent, error) {

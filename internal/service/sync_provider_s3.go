@@ -11,7 +11,7 @@ import (
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/aws/smithy-go"
+	smithy "github.com/aws/smithy-go"
 
 	"github.com/xuthus5/mssh/internal/model"
 )

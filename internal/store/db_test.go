@@ -2,6 +2,7 @@ package store
 
 import (
 	"database/sql"
+	"fmt"
 	"os"
 	"testing"
 
@@ -44,24 +45,35 @@ func TestListSessionsAcceptsNullPassword(t *testing.T) {
 	assert.Empty(t, sessions[0].Password)
 }
 
-func TestInitializeSchemaResetsMismatchedDatabaseFormat(t *testing.T) {
+func TestInitializeSchemaRejectsUnsupportedOlderFormat(t *testing.T) {
 	db, err := OpenDB(t.TempDir())
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, db.Close()) })
-	createLegacySentinels(t, db)
+	// Simulate an older format with user data present (no full modern schema).
+	_, err = db.Exec("CREATE TABLE sessions (id INTEGER PRIMARY KEY, name TEXT NOT NULL)")
+	require.NoError(t, err)
+	_, err = db.Exec("INSERT INTO sessions (name) VALUES ('keep-me')")
+	require.NoError(t, err)
+	_, err = db.Exec("PRAGMA user_version = 1")
+	require.NoError(t, err)
 
+	err = InitializeSchema(db)
+	require.ErrorContains(t, err, "unsupported migration")
+
+	// Data must remain intact; no drop-all wipe.
+	assertTableRowCount(t, rowCountExpectation{db: db, table: "sessions", condition: "name = 'keep-me'", expected: 1})
+	assertDatabaseFormatVersion(t, db, 1)
+}
+
+func TestInitializeSchemaRejectsNewerFormat(t *testing.T) {
+	db, err := OpenDB(t.TempDir())
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, db.Close()) })
 	require.NoError(t, InitializeSchema(db))
-
-	assertFinalSchema(t, db)
-	for table := range expectedFinalSchemaSQL {
-		expectedRows := 0
-		if table == "session_folders" {
-			expectedRows = 1
-		}
-		assertTableRowCount(t, rowCountExpectation{db: db, table: table, expected: expectedRows})
-	}
-	assertTableRowCount(t, rowCountExpectation{db: db, table: "session_folders", condition: "is_default = 1", expected: 1})
-	assertDatabaseFormatVersion(t, db, databaseFormatVersion)
+	_, err = db.Exec(fmt.Sprintf("PRAGMA user_version = %d", databaseFormatVersion+1))
+	require.NoError(t, err)
+	err = InitializeSchema(db)
+	require.ErrorContains(t, err, "newer than supported")
 }
 
 func TestInitializeSchemaPreservesCurrentDatabaseFormat(t *testing.T) {
@@ -287,4 +299,18 @@ func assertClosedThemeOperations(t *testing.T, db *sql.DB) {
 
 func ptrInt64(v int64) *int64 {
 	return &v
+}
+
+func TestInitializeSchemaRejectsLegacyTablesWithoutVersion(t *testing.T) {
+	db, err := OpenDB(t.TempDir())
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, db.Close()) })
+	_, err = db.Exec("CREATE TABLE sessions (name TEXT NOT NULL)")
+	require.NoError(t, err)
+	_, err = db.Exec("INSERT INTO sessions (name) VALUES ('legacy')")
+	require.NoError(t, err)
+	err = InitializeSchema(db)
+	require.ErrorContains(t, err, "legacy database")
+	assertTableRowCount(t, rowCountExpectation{db: db, table: "sessions", condition: "name = 'legacy'", expected: 1})
+	assertDatabaseFormatVersion(t, db, 0)
 }
