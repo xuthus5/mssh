@@ -128,12 +128,12 @@ describe('TerminalInteractionSurface', () => {
     render(<TerminalInteractionSurface terminalRef={terminalRef}><div>terminal</div></TerminalInteractionSurface>)
     expect(screen.getByRole('button', { name: '复制' })).toBeInTheDocument()
 
-    act(() => useTerminalBehaviorStore.getState().setSettings({ rightClickAction: 'paste', copyOnSelect: false }))
+    act(() => useTerminalBehaviorStore.getState().setSettings({ rightClickAction: 'paste', copyOnSelect: false, scrollbackLines: 10000 }))
 
     expect(screen.queryByRole('button', { name: '复制' })).not.toBeInTheDocument()
     expect(screen.getByText('terminal').parentElement).toHaveClass('bg-background', 'text-foreground')
 
-    act(() => useTerminalBehaviorStore.getState().setSettings({ rightClickAction: 'menu', copyOnSelect: false }))
+    act(() => useTerminalBehaviorStore.getState().setSettings({ rightClickAction: 'menu', copyOnSelect: false, scrollbackLines: 10000 }))
 
     expect(screen.getByRole('button', { name: '复制' })).toBeInTheDocument()
     expect(screen.getByTestId('context-menu-trigger')).toHaveClass('select-text')
@@ -148,10 +148,10 @@ describe('TerminalInteractionSurface', () => {
     )
     const terminalContainer = screen.getByTestId('terminal-container')
 
-    act(() => useTerminalBehaviorStore.getState().setSettings({ rightClickAction: 'paste', copyOnSelect: false }))
+    act(() => useTerminalBehaviorStore.getState().setSettings({ rightClickAction: 'paste', copyOnSelect: false, scrollbackLines: 10000 }))
     expect(screen.getByTestId('terminal-container')).toBe(terminalContainer)
 
-    act(() => useTerminalBehaviorStore.getState().setSettings({ rightClickAction: 'menu', copyOnSelect: false }))
+    act(() => useTerminalBehaviorStore.getState().setSettings({ rightClickAction: 'menu', copyOnSelect: false, scrollbackLines: 10000 }))
     expect(screen.getByTestId('terminal-container')).toBe(terminalContainer)
   })
 })

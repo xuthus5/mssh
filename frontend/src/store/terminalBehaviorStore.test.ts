@@ -1,7 +1,11 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import {
   DEFAULT_TERMINAL_BEHAVIOR,
+  DEFAULT_TERMINAL_SCROLLBACK_LINES,
+  MAX_TERMINAL_SCROLLBACK_LINES,
+  MIN_TERMINAL_SCROLLBACK_LINES,
   normalizeCopyOnSelect,
+  normalizeScrollbackLines,
   normalizeTerminalRightClickAction,
   useTerminalBehaviorStore,
 } from '@/store/terminalBehaviorStore'
@@ -22,8 +26,39 @@ describe('terminal behavior store', () => {
     expect(normalizeCopyOnSelect(value)).toBe(expected)
   })
 
+  it.each([
+    [DEFAULT_TERMINAL_SCROLLBACK_LINES, DEFAULT_TERMINAL_SCROLLBACK_LINES],
+    [5000, 5000],
+    [MIN_TERMINAL_SCROLLBACK_LINES - 1, MIN_TERMINAL_SCROLLBACK_LINES],
+    [MAX_TERMINAL_SCROLLBACK_LINES + 1, MAX_TERMINAL_SCROLLBACK_LINES],
+    ['20000', 20000],
+    [12.6, MIN_TERMINAL_SCROLLBACK_LINES],
+    [Number.NaN, DEFAULT_TERMINAL_SCROLLBACK_LINES],
+    [null, DEFAULT_TERMINAL_SCROLLBACK_LINES],
+    ['nope', DEFAULT_TERMINAL_SCROLLBACK_LINES],
+  ])('normalizes scrollback lines %o', (value, expected) => {
+    expect(normalizeScrollbackLines(value)).toBe(expected)
+  })
+
   it('publishes complete settings atomically', () => {
-    useTerminalBehaviorStore.getState().setSettings({ rightClickAction: 'paste', copyOnSelect: true })
-    expect(useTerminalBehaviorStore.getState()).toMatchObject({ rightClickAction: 'paste', copyOnSelect: true })
+    useTerminalBehaviorStore.getState().setSettings({
+      rightClickAction: 'paste',
+      copyOnSelect: true,
+      scrollbackLines: 5000,
+    })
+    expect(useTerminalBehaviorStore.getState()).toMatchObject({
+      rightClickAction: 'paste',
+      copyOnSelect: true,
+      scrollbackLines: 5000,
+    })
+  })
+
+  it('clamps scrollback when publishing settings', () => {
+    useTerminalBehaviorStore.getState().setSettings({
+      rightClickAction: 'menu',
+      copyOnSelect: false,
+      scrollbackLines: 999999,
+    })
+    expect(useTerminalBehaviorStore.getState().scrollbackLines).toBe(MAX_TERMINAL_SCROLLBACK_LINES)
   })
 })

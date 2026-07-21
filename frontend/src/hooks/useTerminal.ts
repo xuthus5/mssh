@@ -11,12 +11,13 @@ import { toast } from '@/components/ui/toast'
 import { applyTerminalTheme } from '@/lib/terminalTheme'
 import { TerminalService } from '@/lib/wails'
 import { useAppStore, type AppState } from '@/store/appStore'
+import { useTerminalBehaviorStore } from '@/store/terminalBehaviorStore'
 import { recordCommand } from '@/lib/commandHistory'
 import { TerminalCommandCapture } from '@/lib/terminalCommandCapture'
 import { registerTerminalSearch, unregisterTerminalSearch } from '@/lib/terminalSearchRegistry'
 import { useTerminalActivation, useTerminalAttachment, useTerminalIdentity } from '@/hooks/terminalLifecycleRuntime'
 import { fitAndRefresh } from '@/hooks/terminalFitRuntime'
-import { createTerminalInstance, loadCanvasRenderer, safelyDisposeTerminalResource } from '@/hooks/terminalInstanceRuntime'
+import { applyTerminalScrollback, createTerminalInstance, loadCanvasRenderer, safelyDisposeTerminalResource } from '@/hooks/terminalInstanceRuntime'
 import { subscribeToSynchronizedOutputQuery, subscribeToTerminalOutput, subscribeToTerminalVersionQuery } from '@/hooks/terminalOutputRuntime'
 import { subscribeToTerminalWorkingDirectory } from '@/hooks/terminalDirectoryRuntime'
 import { t } from '@/i18n'
@@ -124,6 +125,15 @@ function subscribeToTheme({ term, fitAddon, containerRef, refs, reportRuntimeErr
   })
 }
 
+function subscribeToScrollback(term: Terminal, reportRuntimeError: TerminalRuntimeErrorReporter) {
+  return useTerminalBehaviorStore.subscribe((state, previous) => {
+    if (state.scrollbackLines === previous.scrollbackLines) return
+    runTerminalRuntime(reportRuntimeError, 'terminal scrollback update', () => {
+      applyTerminalScrollback(term, state.scrollbackLines)
+    })
+  })
+}
+
 function recoverTerminal({ term, fitAddon, container, refs }: {
   term: Terminal
   fitAddon: FitAddon
@@ -208,6 +218,7 @@ function initializeTerminal(containerRef: RefObject<HTMLDivElement | null>, refs
   })
   refs.outputFlushRef.current = () => outputSubscription.flush()
   const unsubscribeTheme = subscribeToTheme({ term, fitAddon, containerRef, refs, reportRuntimeError })
+  const unsubscribeScrollback = subscribeToScrollback(term, reportRuntimeError)
   const resizeObserver = observeResize({ term, fitAddon, containerRef, refs, reportRuntimeError })
   if (container) resizeObserver.observe(container)
 
@@ -225,6 +236,7 @@ function initializeTerminal(containerRef: RefObject<HTMLDivElement | null>, refs
     safelyDisposeTerminalResource('terminal working directory', () => terminalDirectoryDispose.dispose())
     safelyDisposeTerminalResource('output subscription', outputSubscription.dispose)
     safelyDisposeTerminalResource('theme subscription', unsubscribeTheme)
+    safelyDisposeTerminalResource('scrollback subscription', unsubscribeScrollback)
     safelyDisposeTerminalResource('resize observer', () => resizeObserver.disconnect())
     if (cleanupCopyOnSelect) safelyDisposeTerminalResource('copy-on-select subscription', cleanupCopyOnSelect)
     unregisterTerminalSearch(refs.registeredTerminalIDRef.current)
