@@ -109,21 +109,42 @@ tasks:
           PRODUCTION: "true"
 
   lint:
-    summary: Run golangci-lint
+    summary: Run golangci-lint with the same version and flags as CI
+    vars:
+      GOLANGCI_LINT_VERSION: '{{.GOLANGCI_LINT_VERSION | default "v2.12.2"}}'
     cmds:
-      - golangci-lint run --timeout 5m ./...
+      - |
+        set -euo pipefail
+        if ! command -v golangci-lint >/dev/null 2>&1; then
+          echo "golangci-lint not found; install with: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@{{.GOLANGCI_LINT_VERSION}}"
+          exit 1
+        fi
+        golangci-lint version
+        golangci-lint run --timeout 5m ./...
 
   fmt:
-    summary: Format Go code
+    summary: Format Go code (golangci formatters + goimports-reviser)
     cmds:
       - golangci-lint run --fix ./...
       - goimports-reviser -rm-unused -format ./...
 
   test:
-    summary: Run tests with coverage
+    summary: Backend tests with race + CI coverage gate (>=90%)
     cmds:
-      - go test -race -coverprofile=coverage.out -covermode=atomic ./...
-      - go tool cover -func=coverage.out
+      - |
+        set -euo pipefail
+        go test -race -coverprofile=coverage.out -covermode=atomic \
+          -coverpkg=./internal/...,./pkg/... ./internal/... ./pkg/...
+        go tool cover -func=coverage.out | tee coverage.func.txt
+        go tool cover -func=coverage.out | grep total | awk '{if ($3+0 < 90) { print "coverage below 90%:", $3; exit 1 }}'
+
+  test:frontend:
+    summary: Frontend checks matching CI (source limits, bundle budget, vitest)
+    dir: frontend
+    cmds:
+      - npm run check:source-limits
+      - npm run check:bundle-budget
+      - npm test
 
   test:e2e:
     summary: Run real SSH/tmux/SFTP integration tests
@@ -135,13 +156,31 @@ tasks:
     cmds:
       - go test -run '^$' -bench 'BenchmarkCommercial' -benchmem ./internal/store ./internal/service
 
+  ci:
+    summary: Full local gate aligned with .github/workflows/ci.yml
+    desc: |
+      Mirrors CI: golangci-lint, backend race+coverage, frontend checks, production build.
+      Run before every commit/push. Fails fast on the first failing stage.
+    cmds:
+      - task: lint
+      - task: test
+      - task: test:frontend
+      - task: build
+        vars:
+          PRODUCTION: "true"
+
+  check:
+    summary: Alias for task ci (pre-commit / pre-push gate)
+    cmds:
+      - task: ci
+
   clean:
     summary: Clean temporary build artifacts
     cmds:
-      - cmd: rm -f coverage.out
+      - cmd: rm -f coverage.out coverage.func.txt
         platforms: [linux, darwin]
       - cmd: rm -rf bin build/bin
         platforms: [linux, darwin]
-      - cmd: powershell -NoProfile -Command "Remove-Item coverage.out,bin,build/bin -Recurse -Force -ErrorAction SilentlyContinue"
+      - cmd: powershell -NoProfile -Command "Remove-Item coverage.out,coverage.func.txt,bin,build/bin -Recurse -Force -ErrorAction SilentlyContinue"
         platforms: [windows]
       - go clean -testcache
