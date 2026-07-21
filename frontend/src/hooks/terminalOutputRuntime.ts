@@ -5,6 +5,7 @@ import type { TerminalRuntimeErrorReporter } from '@/components/terminal/Termina
 import { TerminalOutputSequencer } from '@/components/terminal/terminalOutputSequencer'
 import { runTerminalRuntime } from '@/components/terminal/terminalRuntime'
 import { SynchronizedOutputWriter } from '@/components/terminal/terminalSynchronizedOutput'
+import { TerminalOutputCoalescer } from '@/components/terminal/terminalOutputCoalescer'
 import { logger } from '@/lib/logger'
 
 interface TerminalOutputEvent {
@@ -41,14 +42,30 @@ export function subscribeToTerminalVersionQuery(term: Terminal) {
   })
 }
 
-export function subscribeToTerminalOutput({ term, terminalIDRef, reportRuntimeError }: {
+export interface TerminalOutputSubscription {
+  dispose: () => void
+  /** Flush synchronized buffer + coalescer so inactive batches become visible immediately. */
+  flush: () => void
+}
+
+export function subscribeToTerminalOutput({ term, terminalIDRef, reportRuntimeError, shouldCoalesce }: {
   term: Terminal
   terminalIDRef: RefObject<string>
   reportRuntimeError: TerminalRuntimeErrorReporter
-}) {
+  /** When true, batch writes to reduce inactive-tab write storms (still keeps buffer in sync). */
+  shouldCoalesce?: () => boolean
+}): TerminalOutputSubscription {
   let outputTerminalID = terminalIDRef.current
-  const output = new SynchronizedOutputWriter((data) => {
+  const coalescer = new TerminalOutputCoalescer((data) => {
     runTerminalRuntime(reportRuntimeError, 'terminal output write', () => term.write(data))
+  }, {
+    shouldCoalesce: shouldCoalesce ?? (() => false),
+  })
+  const output = new SynchronizedOutputWriter((data) => {
+    const bytes = typeof data === 'string'
+      ? Uint8Array.from(data, (character) => character.charCodeAt(0))
+      : data
+    coalescer.push(bytes)
   }, {
     onDiagnostics: (diagnostics) => logger.info('terminal synchronized output diagnostics', {
       terminalID: terminalIDRef.current,
@@ -56,12 +73,16 @@ export function subscribeToTerminalOutput({ term, terminalIDRef, reportRuntimeEr
     }),
   })
   let sequencer = new TerminalOutputSequencer((data) => output.push(data))
+  const flush = () => {
+    output.flush()
+    coalescer.flush()
+  }
   const unsubscribe = Events.On('terminal:output', (event: { data?: TerminalOutputEvent }) => {
     const payload = event.data
     const encodedData = payload?.data
     if (payload?.terminal_id !== terminalIDRef.current || !encodedData) return
     if (outputTerminalID !== payload.terminal_id) {
-      output.flush()
+      flush()
       outputTerminalID = payload.terminal_id
       sequencer = new TerminalOutputSequencer((data) => output.push(data))
     }
@@ -74,8 +95,12 @@ export function subscribeToTerminalOutput({ term, terminalIDRef, reportRuntimeEr
       sequencer.push(payload.sequence, decoded)
     })
   })
-  return () => {
-    unsubscribe()
-    output.dispose()
+  return {
+    dispose: () => {
+      unsubscribe()
+      output.dispose()
+      coalescer.dispose()
+    },
+    flush,
   }
 }

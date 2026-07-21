@@ -77,4 +77,19 @@ describe('SessionTree behavior', () => {
     expect(onDeleteFolder).toHaveBeenCalledWith('f1')
     expect(onDeleteSession).toHaveBeenCalledWith('s1')
   })
+
+  it('scrolls the active treeitem into view on keyboard navigation', () => {
+    const scrollIntoView = vi.fn()
+    const original = Element.prototype.scrollIntoView
+    Element.prototype.scrollIntoView = scrollIntoView
+    try {
+      render(<SessionTree folders={[]} sessions={[sessions[0], { ...sessions[0], id: 's9', name: 'web-09' }]} onConnect={vi.fn()} navigationOnly />)
+      const tree = screen.getByRole('tree')
+      fireEvent.keyDown(tree, { key: 'ArrowDown' })
+      expect(scrollIntoView).toHaveBeenCalled()
+    } finally {
+      Element.prototype.scrollIntoView = original
+    }
+  })
+
 })

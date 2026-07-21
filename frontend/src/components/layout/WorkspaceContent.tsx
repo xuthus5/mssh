@@ -11,6 +11,7 @@ import { useEffect, useState } from 'react'
 import { MacroService } from '@/lib/wails'
 import { logger } from '@/lib/logger'
 import { toast } from '@/components/ui/toast'
+import { t } from '@/lib/uiText'
 
 function platformModKey(): string {
   if (typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform)) return '⌘'
@@ -26,19 +27,19 @@ function WelcomeScreen() {
           <Terminal className="h-10 w-10 text-primary" />
           <span className="text-4xl font-bold tracking-tight text-foreground">MSSH</span>
         </div>
-        <span className="text-sm text-muted-foreground">Secure Shell Client & Session Manager</span>
+        <span className="text-sm text-muted-foreground">{t('welcomeTagline')}</span>
       </div>
       <div className="flex flex-col items-center gap-3">
         <Button size="lg" onClick={() => emitAppEvent(APP_NEW_SESSION_EVENT)}>
-          <Plus />新建会话
+          <Plus />{t('newSession')}
         </Button>
-        <span className="text-xs text-muted-foreground">也可双击侧边栏会话列表中的主机开始连接</span>
+        <span className="text-xs text-muted-foreground">{t('welcomeHint')}</span>
       </div>
       <ShortcutCard mod={mod} />
       <div className="mt-2 flex gap-8">
-        <Feature icon={Terminal} label="多标签终端" />
-        <Feature icon={FileText} label="会话录制" />
-        <Feature icon={Shield} label="密钥管理" />
+        <Feature icon={Terminal} label={t('featureMultiTab')} />
+        <Feature icon={FileText} label={t('featureRecording')} />
+        <Feature icon={Shield} label={t('featureKeys')} />
       </div>
     </div>
   )
@@ -46,7 +47,7 @@ function WelcomeScreen() {
 
 function ShortcutCard({ mod }: { mod: string }) {
   const rows = [
-    [`${mod}+N`, '新建会话'],
+    [`${mod}+N`, t('newSession')],
     [`${mod}+W`, '关闭标签页'],
     [`${mod}+F`, '快速搜索会话'],
     [`${mod}+Shift+C`, '复制'],
@@ -56,9 +57,9 @@ function ShortcutCard({ mod }: { mod: string }) {
   return (
     <div className="mt-4 flex flex-col items-center gap-2 rounded-xl border border-border bg-card/50 px-6 py-4">
       <div className="flex items-center gap-1.5 rounded-xl text-xs text-muted-foreground">
-        <Keyboard className="h-3 w-3" />快捷键
+        <Keyboard className="h-3 w-3" />{t('shortcuts')}
       </div>
-      <span className="text-[10px] text-muted-foreground/70">macOS 使用 ⌘，Windows/Linux 使用 Ctrl</span>
+      <span className="text-[10px] text-muted-foreground/70">{t('shortcutsPlatformHint')}</span>
       <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-xs">
         {rows.flatMap(([key, label]) => [
           <span key={`${key}-k`} className="text-muted-foreground">{key}</span>,
@@ -66,7 +67,7 @@ function ShortcutCard({ mod }: { mod: string }) {
         ])}
       </div>
       <button type="button" className="text-xs text-primary hover:underline" onClick={() => window.dispatchEvent(new CustomEvent(SESSION_QUICK_SEARCH_EVENT))}>
-        打开快速搜索
+        {t('openQuickSearch')}
       </button>
     </div>
   )
@@ -79,6 +80,29 @@ function Feature({ icon: Icon, label }: { icon: typeof Terminal; label: string }
       <span className="text-[11px] text-muted-foreground/50">{label}</span>
     </div>
   )
+}
+
+
+export async function executeMacroOnActiveTerminal(command: string) {
+  const state = useAppStore.getState()
+  const surface = state.activeSurface
+  const tab = surface && surface.type === 'terminal'
+    ? state.tabs.find((item) => item.id === surface.id)
+    : state.tabs.find((item) => item.type === 'terminal')
+  if (!tab || tab.type !== 'terminal') {
+    toast(t('macrosNeedTerminal'), 'info')
+    return
+  }
+  if (state.connectionStatus[tab.terminalId] !== 'connected') {
+    toast(t('macrosTerminalDisconnected'), 'warning')
+    return
+  }
+  try {
+    await MacroService.Execute(tab.terminalId, command)
+    toast(t('macrosSent'), 'success')
+  } catch (error: unknown) {
+    toast(`${t('macrosExecuteFailed')}: ${error instanceof Error ? error.message : String(error)}`, 'error')
+  }
 }
 
 function MacrosWorkspace() {
@@ -105,18 +129,18 @@ function MacrosWorkspace() {
     }
   }
   useEffect(() => { void reload() }, [])
-  if (loading) return <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">加载宏...</div>
+  if (loading) return <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">{t('macrosLoading')}</div>
   if (error) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6">
         <Empty>
           <EmptyHeader>
             <EmptyMedia variant="icon"><Workflow /></EmptyMedia>
-            <EmptyTitle>宏加载失败</EmptyTitle>
+            <EmptyTitle>{t('macrosLoadFailed')}</EmptyTitle>
             <EmptyDescription>{error}</EmptyDescription>
           </EmptyHeader>
         </Empty>
-        <Button onClick={() => { void reload() }}>重试</Button>
+        <Button onClick={() => { void reload() }}>{t('retry')}</Button>
       </div>
     )
   }
@@ -126,28 +150,25 @@ function MacrosWorkspace() {
         <Empty>
           <EmptyHeader>
             <EmptyMedia variant="icon"><Workflow /></EmptyMedia>
-            <EmptyTitle>还没有宏</EmptyTitle>
-            <EmptyDescription>在侧边栏「宏」中新增命令，或在此管理快捷命令模板。</EmptyDescription>
+            <EmptyTitle>{t('macrosEmptyTitle')}</EmptyTitle>
+            <EmptyDescription>{t('macrosEmptyDescription')}</EmptyDescription>
           </EmptyHeader>
         </Empty>
-        <Button variant="outline" onClick={() => useAppStore.getState().activateWorkspace('macros')}>打开侧边栏宏面板</Button>
+        <Button variant="outline" onClick={() => useAppStore.getState().activateWorkspace('macros')}>{t('macrosOpenSidebar')}</Button>
       </div>
     )
   }
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-background p-4" aria-label="宏工作区">
       <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-sm font-medium">宏工作区</h2>
-        <Button size="sm" variant="outline" onClick={() => { void reload() }}>刷新</Button>
+        <h2 className="text-sm font-medium">{t('macrosWorkspaceTitle')}</h2>
+        <Button size="sm" variant="outline" onClick={() => { void reload() }}>{t('macrosRefresh')}</Button>
       </div>
       <div className="min-h-0 flex-1 overflow-hidden rounded-xl border border-border">
         <QuickCommands
           commands={macros}
           showAddForm={false}
-          onExecute={(command) => {
-            toast('请先连接终端后再执行宏，或在侧边栏对活动会话执行', 'info')
-            void command
-          }}
+          onExecute={(command) => { void executeMacroOnActiveTerminal(command) }}
           onAdd={() => {}}
           onDelete={(id) => {
             void MacroService.Delete(Number(id)).then(reload).catch((error: unknown) => {

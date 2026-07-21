@@ -118,7 +118,7 @@ export default function QuickCommands({
                 <Button
                   size="xs"
                   variant="ghost"
-                  className="opacity-0 group-hover:opacity-100 transition-opacity"
+                  className="opacity-100 transition-opacity focus-within:opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100"
                   onClick={(e) => {
                     e.stopPropagation()
                     onDelete(item.id)
