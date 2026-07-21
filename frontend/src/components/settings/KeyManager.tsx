@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { toast } from '@/components/ui/toast'
+import { getClipboard } from '@/lib/clipboard'
 import { KeyGenerateDialog, KeyImportDialog, KeyMaterialDialog, type KeyMaterialMode } from '@/components/settings/KeyDialogs'
 import type { KeyImportFile, KeyInfo, KeyMaterial } from '@/hooks/useSettings'
 import { KeyService } from '@/lib/wails'
@@ -52,7 +53,7 @@ export function KeyManager(props: Props) {
     const publicKey = await props.onExport(id)
     if (!publicKey) return
     try {
-      await navigator.clipboard.writeText(publicKey)
+      await getClipboard().writeText(publicKey)
       toast('公钥已复制', 'success')
     } catch (error) {
       toast(`复制公钥失败: ${error instanceof Error ? error.message : String(error)}`, 'error')

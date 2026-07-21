@@ -1,9 +1,24 @@
-import { FileText, Keyboard, Shield, Terminal } from 'lucide-react'
+import { FileText, Keyboard, Plus, Shield, Terminal, Workflow } from 'lucide-react'
 import { OverviewContent } from '@/components/layout/OverviewContent'
+import { Button } from '@/components/ui/button'
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
 import { useAppStore } from '@/store/appStore'
 import { WORKSPACE_PANEL_ID, workspaceTabID } from '@/store/tabNavigation'
+import { APP_NEW_SESSION_EVENT, emitAppEvent } from '@/lib/appEvents'
+import { SESSION_QUICK_SEARCH_EVENT } from '@/lib/sessionQuickSearch'
+import QuickCommands from '@/components/session/QuickCommands'
+import { useEffect, useState } from 'react'
+import { MacroService } from '@/lib/wails'
+import { logger } from '@/lib/logger'
+import { toast } from '@/components/ui/toast'
+
+function platformModKey(): string {
+  if (typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform)) return '⌘'
+  return 'Ctrl'
+}
 
 function WelcomeScreen() {
+  const mod = platformModKey()
   return (
     <div className="flex min-h-0 flex-1 select-none flex-col items-center justify-center gap-6 bg-background">
       <div className="flex flex-col items-center gap-3">
@@ -13,11 +28,13 @@ function WelcomeScreen() {
         </div>
         <span className="text-sm text-muted-foreground">Secure Shell Client & Session Manager</span>
       </div>
-      <div className="flex flex-col items-center gap-1">
-        <span className="text-sm text-muted-foreground">双击会话列表中的主机开始连接</span>
-        <span className="text-xs text-muted-foreground/60">或使用侧边栏新建会话</span>
+      <div className="flex flex-col items-center gap-3">
+        <Button size="lg" onClick={() => emitAppEvent(APP_NEW_SESSION_EVENT)}>
+          <Plus />新建会话
+        </Button>
+        <span className="text-xs text-muted-foreground">也可双击侧边栏会话列表中的主机开始连接</span>
       </div>
-      <ShortcutCard />
+      <ShortcutCard mod={mod} />
       <div className="mt-2 flex gap-8">
         <Feature icon={Terminal} label="多标签终端" />
         <Feature icon={FileText} label="会话录制" />
@@ -27,19 +44,30 @@ function WelcomeScreen() {
   )
 }
 
-function ShortcutCard() {
+function ShortcutCard({ mod }: { mod: string }) {
+  const rows = [
+    [`${mod}+N`, '新建会话'],
+    [`${mod}+W`, '关闭标签页'],
+    [`${mod}+F`, '快速搜索会话'],
+    [`${mod}+Shift+C`, '复制'],
+    [`${mod}+Shift+V`, '粘贴'],
+    [`${mod}+Shift+L`, '清屏'],
+  ]
   return (
     <div className="mt-4 flex flex-col items-center gap-2 rounded-xl border border-border bg-card/50 px-6 py-4">
-      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+      <div className="flex items-center gap-1.5 rounded-xl text-xs text-muted-foreground">
         <Keyboard className="h-3 w-3" />快捷键
       </div>
+      <span className="text-[10px] text-muted-foreground/70">macOS 使用 ⌘，Windows/Linux 使用 Ctrl</span>
       <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-xs">
-        <span className="text-muted-foreground">Ctrl+N</span><span className="text-foreground/70">新建会话</span>
-        <span className="text-muted-foreground">Ctrl+W</span><span className="text-foreground/70">关闭标签页</span>
-        <span className="text-muted-foreground">Ctrl+Shift+C</span><span className="text-foreground/70">复制</span>
-        <span className="text-muted-foreground">Ctrl+Shift+V</span><span className="text-foreground/70">粘贴</span>
-        <span className="text-muted-foreground">Ctrl+Shift+L</span><span className="text-foreground/70">清屏</span>
+        {rows.flatMap(([key, label]) => [
+          <span key={`${key}-k`} className="text-muted-foreground">{key}</span>,
+          <span key={`${key}-l`} className="text-foreground/70">{label}</span>,
+        ])}
       </div>
+      <button type="button" className="text-xs text-primary hover:underline" onClick={() => window.dispatchEvent(new CustomEvent(SESSION_QUICK_SEARCH_EVENT))}>
+        打开快速搜索
+      </button>
     </div>
   )
 }
@@ -49,6 +77,86 @@ function Feature({ icon: Icon, label }: { icon: typeof Terminal; label: string }
     <div className="flex flex-col items-center gap-1">
       <Icon className="h-5 w-5 text-muted-foreground/50" />
       <span className="text-[11px] text-muted-foreground/50">{label}</span>
+    </div>
+  )
+}
+
+function MacrosWorkspace() {
+  const [macros, setMacros] = useState<Array<{ id: string; name: string; shortcut: string; command: string }>>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const reload = async () => {
+    setLoading(true)
+    setError('')
+    try {
+      const items = await MacroService.List()
+      setMacros((items ?? []).map((item: { id: number | string; name: string; shortcut?: string; command: string }) => ({
+        id: String(item.id),
+        name: item.name,
+        shortcut: item.shortcut ?? '',
+        command: item.command,
+      })))
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err)
+      setError(message)
+      logger.error('macros workspace load failed', err)
+    } finally {
+      setLoading(false)
+    }
+  }
+  useEffect(() => { void reload() }, [])
+  if (loading) return <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">加载宏...</div>
+  if (error) {
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6">
+        <Empty>
+          <EmptyHeader>
+            <EmptyMedia variant="icon"><Workflow /></EmptyMedia>
+            <EmptyTitle>宏加载失败</EmptyTitle>
+            <EmptyDescription>{error}</EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+        <Button onClick={() => { void reload() }}>重试</Button>
+      </div>
+    )
+  }
+  if (macros.length === 0) {
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6" aria-label="宏工作区">
+        <Empty>
+          <EmptyHeader>
+            <EmptyMedia variant="icon"><Workflow /></EmptyMedia>
+            <EmptyTitle>还没有宏</EmptyTitle>
+            <EmptyDescription>在侧边栏「宏」中新增命令，或在此管理快捷命令模板。</EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+        <Button variant="outline" onClick={() => useAppStore.getState().activateWorkspace('macros')}>打开侧边栏宏面板</Button>
+      </div>
+    )
+  }
+  return (
+    <div className="flex min-h-0 flex-1 flex-col bg-background p-4" aria-label="宏工作区">
+      <div className="mb-3 flex items-center justify-between">
+        <h2 className="text-sm font-medium">宏工作区</h2>
+        <Button size="sm" variant="outline" onClick={() => { void reload() }}>刷新</Button>
+      </div>
+      <div className="min-h-0 flex-1 overflow-hidden rounded-xl border border-border">
+        <QuickCommands
+          commands={macros}
+          showAddForm={false}
+          onExecute={(command) => {
+            toast('请先连接终端后再执行宏，或在侧边栏对活动会话执行', 'info')
+            void command
+          }}
+          onAdd={() => {}}
+          onDelete={(id) => {
+            void MacroService.Delete(Number(id)).then(reload).catch((error: unknown) => {
+              toast(`删除宏失败: ${error instanceof Error ? error.message : String(error)}`, 'error')
+            })
+          }}
+        />
+      </div>
+      {/* keep workspace connect available for empty states elsewhere */}
     </div>
   )
 }
@@ -74,7 +182,7 @@ export function WorkspaceContent() {
           ? <OverviewContent />
           : workspaceTab === 'sessions'
             ? <WelcomeScreen />
-          : <div aria-label="宏工作区" className="flex-1 bg-background" />}
+            : <MacrosWorkspace />}
     </div>
   )
 }

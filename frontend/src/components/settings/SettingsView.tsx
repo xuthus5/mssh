@@ -55,7 +55,7 @@ export function SettingsView(props: SettingsViewProps) {
   const [tab, setTab] = useState('general')
   return <Tabs value={tab} onValueChange={setTab} orientation="vertical"
     className="min-h-0 flex-1 flex-row gap-4 overflow-hidden p-4">
-    <TabsList className="w-36 shrink-0 self-stretch justify-start rounded-xl border bg-muted/40 p-2">
+    <TabsList className="w-36 shrink-0 justify-start overflow-visible rounded-xl border bg-muted/40 p-2">
       <TabsTrigger value="general">通用</TabsTrigger>
       <TabsTrigger value="terminal">终端</TabsTrigger>
       <TabsTrigger value="ai">AI</TabsTrigger>
