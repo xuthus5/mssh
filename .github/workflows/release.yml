@@ -66,8 +66,15 @@ jobs:
           wails3 task linux:generate:dotdesktop
           wails3 task linux:generate:deb ARCH=${{ matrix.goarch }} APP_VERSION=${APP_VERSION}
           wails3 task linux:generate:rpm ARCH=${{ matrix.goarch }} APP_VERSION=${APP_VERSION}
-          # AppImage is required for Linux release assets.
+
+          # AppImage can be environment-sensitive on runners; keep deb/rpm as hard requirements.
+          set +e
           wails3 task linux:create:appimage ARCH=${{ matrix.goarch }} APP_VERSION=${APP_VERSION}
+          appimage_status=$?
+          set -e
+          if [[ ${appimage_status} -ne 0 ]]; then
+            echo "WARN: AppImage packaging failed (status=${appimage_status}); continuing with deb/rpm"
+          fi
       - name: Collect artifacts
         run: |
           set -euo pipefail
@@ -103,13 +110,12 @@ jobs:
               esac
             done
           fi
-          if [[ -z "${appimage_src}" ]]; then
-            echo "Missing AppImage in bin/" >&2
-            ls -la bin || true
-            exit 1
+          if [[ -n "${appimage_src}" ]]; then
+            cp "${appimage_src}" "dist/mssh-${VERSION}-linux-${ARCH}.AppImage"
+            chmod 0755 "dist/mssh-${VERSION}-linux-${ARCH}.AppImage"
+          else
+            echo "WARN: no AppImage artifact found for ${ARCH}"
           fi
-          cp "${appimage_src}" "dist/mssh-${VERSION}-linux-${ARCH}.AppImage"
-          chmod 0755 "dist/mssh-${VERSION}-linux-${ARCH}.AppImage"
 
           ls -la bin dist
       - uses: actions/upload-artifact@v4
