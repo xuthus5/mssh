@@ -336,6 +336,43 @@ describe('appStore', () => {
     )
   })
 
+  it('evicts orphan pool entries before closing terminals still bound to open tabs', () => {
+    __registerHandler('github.com/xuthus5/mssh/internal/service.TerminalService.Close', async () => {})
+    const makeTerm = () => ({ dispose: () => {} }) as unknown as import('@xterm/xterm').Terminal
+    useAppStore.setState({ maxPoolSize: 2, terminalPool: new Map(), tabs: [], activePaneId: null })
+    const store = useAppStore.getState()
+    store.openTab({ id: 'tab-open', title: 'Open', type: 'terminal', terminalId: 'term-open', sessionId: 1 })
+    store.registerTerminal('term-open', makeTerm())
+    store.registerTerminal('term-orphan', makeTerm())
+    store.updateLastUsed('term-open')
+    store.registerTerminal('term-new', makeTerm())
+    const state = useAppStore.getState()
+    expect(state.terminalPool.has('term-orphan')).toBe(false)
+    expect(state.terminalPool.has('term-open')).toBe(true)
+    expect(state.tabs.some((tab) => tab.id === 'tab-open')).toBe(true)
+    expect(state.terminalPool.has('term-new')).toBe(true)
+  })
+
+  it('removes the owning tab when a protected terminal must be reclaimed', () => {
+    __registerHandler('github.com/xuthus5/mssh/internal/service.TerminalService.Close', async () => {})
+    const makeTerm = () => ({ dispose: () => {} }) as unknown as import('@xterm/xterm').Terminal
+    useAppStore.setState({ maxPoolSize: 2, terminalPool: new Map(), tabs: [], activePaneId: null, activeSurface: null })
+    const store = useAppStore.getState()
+    store.openTab({ id: 'tab-old', title: 'Old', type: 'terminal', terminalId: 'term-old', sessionId: 1 })
+    store.openTab({ id: 'tab-active', title: 'Active', type: 'terminal', terminalId: 'term-active', sessionId: 2 })
+    store.registerTerminal('term-old', makeTerm())
+    store.registerTerminal('term-active', makeTerm())
+    store.setActivePane('term-active')
+    store.updateLastUsed('term-active')
+    store.registerTerminal('term-new', makeTerm())
+    const state = useAppStore.getState()
+    expect(state.terminalPool.has('term-old')).toBe(false)
+    expect(state.tabs.some((tab) => tab.id === 'tab-old')).toBe(false)
+    expect(state.terminalPool.has('term-active')).toBe(true)
+    expect(state.tabs.some((tab) => tab.id === 'tab-active')).toBe(true)
+    expect(state.terminalPool.has('term-new')).toBe(true)
+  })
+
   it('manages transfers', () => {
     const { addTransfer, updateTransfer, removeTransfer } = useAppStore.getState()
     addTransfer({
