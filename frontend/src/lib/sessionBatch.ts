@@ -2,6 +2,7 @@ import { AuditService, MacroService, TerminalService } from '@/lib/wails'
 import { logger } from '@/lib/logger'
 import { createTerminalTab } from '@/lib/terminalTabs'
 import { useAppStore } from '@/store/appStore'
+import { openTerminalWithPoolCapacity } from '@/lib/openTerminal'
 
 interface BatchSession {
   id: string
@@ -17,7 +18,7 @@ export interface BatchSessionResult {
 }
 
 async function openSessionTab(session: BatchSession, command?: string): Promise<string> {
-  const terminalId = await TerminalService.Open(Number(session.id), 80, 24)
+  const terminalId = await openTerminalWithPoolCapacity(() => TerminalService.Open(Number(session.id), 80, 24))
   try {
     if (command) await MacroService.Execute(terminalId, command)
   } catch (error) {

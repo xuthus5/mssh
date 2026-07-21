@@ -7,6 +7,7 @@ import type { TerminalFocusRequest } from '@/hooks/useTerminal'
 import { logger } from '@/lib/logger'
 import { TerminalService } from '@/lib/wails'
 import { useAppStore } from '@/store/appStore'
+import { openTerminalWithPoolCapacity } from '@/lib/openTerminal'
 import { isTerminalNotFoundError } from '@/store/tabNavigation'
 import {
   hasTerminal,
@@ -174,7 +175,7 @@ export const TerminalSplit = forwardRef<TerminalSplitHandle, Props>(function Ter
     operationRef.current = true
     setBusy(true)
     try {
-      const terminalID = await TerminalService.Open(sessionId, 80, 24)
+      const terminalID = await openTerminalWithPoolCapacity(() => TerminalService.Open(sessionId, 80, 24))
       if (!mountedRef.current) return closeInBackground(terminalID, 'TerminalSplit: cancelled split cleanup failed')
       setTree((current) => insertSplit(current, targetID, terminalID, direction, crypto.randomUUID()))
       useAppStore.getState().setConnectionStatus(terminalID, 'connected')
@@ -223,7 +224,7 @@ export const TerminalSplit = forwardRef<TerminalSplitHandle, Props>(function Ter
     useAppStore.getState().setConnectionStatus(terminalID, 'reconnecting')
     setBusy(true)
     try {
-      const nextID = await TerminalService.Open(sessionId, 80, 24)
+      const nextID = await openTerminalWithPoolCapacity(() => TerminalService.Open(sessionId, 80, 24))
       if (!mountedRef.current) return closeInBackground(nextID, 'TerminalSplit: cancelled reconnect cleanup failed')
       setTree((current) => replaceTerminal(current, terminalID, nextID))
       if (terminalID === primaryID) {

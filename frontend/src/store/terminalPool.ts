@@ -1,4 +1,12 @@
-import type { AppState, Tab } from '@/store/appStore'
+import type { AppState, Tab, TerminalTab } from '@/store/appStore'
+
+export type TerminalPoolEvictionMode = 'orphan-only' | 'include-protected'
+
+export interface TerminalPoolVictim {
+  terminalID: string
+  protected: boolean
+  owningTab?: TerminalTab
+}
 
 /** Terminals currently bound to open tabs or the active pane. */
 export function protectedTerminalIDs(state: Pick<AppState, 'tabs' | 'activePaneId' | 'activeSurface'>): Set<string> {
@@ -14,38 +22,54 @@ export function protectedTerminalIDs(state: Pick<AppState, 'tabs' | 'activePaneI
   return protectedIDs
 }
 
+function pickOldest(ids: Iterable<string>, pool: AppState['terminalPool'], skip?: string): string {
+  let chosen = ''
+  let oldest = Infinity
+  for (const id of ids) {
+    if (id === skip) continue
+    const entry = pool.get(id)
+    if (!entry) continue
+    if (entry.lastUsed < oldest) {
+      oldest = entry.lastUsed
+      chosen = id
+    }
+  }
+  return chosen
+}
+
 /**
  * Pick a pool victim for LRU eviction.
- * Prefer orphans (not referenced by open terminal tabs), then LRU among non-active-pane terminals.
+ * Prefer orphans (not on open tabs). Optionally allow protected tab-bound terminals.
+ * Never prefers the active pane while any other candidate exists.
  */
-export function selectTerminalPoolEvictionID(state: AppState): string | null {
+export function selectTerminalPoolEvictionID(
+  state: AppState,
+  mode: TerminalPoolEvictionMode = 'include-protected',
+): string | null {
   if (state.terminalPool.size === 0) return null
   const protectedIDs = protectedTerminalIDs(state)
-  let orphanID = ''
-  let orphanTime = Infinity
-  let fallbackID = ''
-  let fallbackTime = Infinity
-  for (const [id, entry] of state.terminalPool) {
+  const orphanIDs: string[] = []
+  const protectedCandidates: string[] = []
+  for (const id of state.terminalPool.keys()) {
     if (id === state.activePaneId) continue
-    if (!protectedIDs.has(id) && entry.lastUsed < orphanTime) {
-      orphanTime = entry.lastUsed
-      orphanID = id
-      continue
-    }
-    if (protectedIDs.has(id) && entry.lastUsed < fallbackTime) {
-      fallbackTime = entry.lastUsed
-      fallbackID = id
-    }
+    if (protectedIDs.has(id)) protectedCandidates.push(id)
+    else orphanIDs.push(id)
   }
-  if (orphanID) return orphanID
-  if (fallbackID) return fallbackID
-  for (const [id, entry] of state.terminalPool) {
-    if (fallbackID === '' || entry.lastUsed < fallbackTime) {
-      fallbackTime = entry.lastUsed
-      fallbackID = id
-    }
+  const orphan = pickOldest(orphanIDs, state.terminalPool)
+  if (orphan) return orphan
+  if (mode === 'orphan-only') return null
+  const protectedVictim = pickOldest(protectedCandidates, state.terminalPool)
+  if (protectedVictim) return protectedVictim
+  return pickOldest(state.terminalPool.keys(), state.terminalPool) || null
+}
+
+export function describeTerminalPoolVictim(state: AppState, terminalID: string): TerminalPoolVictim {
+  const owningTab = findTabByTerminalID(state.tabs, terminalID)
+  return {
+    terminalID,
+    protected: protectedTerminalIDs(state).has(terminalID),
+    owningTab: owningTab?.type === 'terminal' ? owningTab : undefined,
   }
-  return fallbackID || null
 }
 
 export function clearTerminalRuntimeFields(state: AppState, terminalID: string): {
@@ -66,4 +90,14 @@ export function clearTerminalRuntimeFields(state: AppState, terminalID: string):
 
 export function findTabByTerminalID(tabs: Tab[], terminalID: string): Tab | undefined {
   return tabs.find((tab) => tab.type === 'terminal' && tab.terminalId === terminalID)
+}
+
+export function confirmProtectedTerminalReclaim(
+  victim: TerminalPoolVictim,
+  confirm: (message: string) => boolean = (message) => window.confirm(message),
+): boolean {
+  const title = victim.owningTab?.title ?? victim.terminalID
+  return confirm(
+    `终端池已满。继续将关闭标签「${title}」并断开对应连接，之后可从会话列表重新连接。是否继续？`,
+  )
 }
