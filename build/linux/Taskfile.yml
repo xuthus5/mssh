@@ -43,6 +43,7 @@ tasks:
       - task: create:deb
       - task: create:rpm
       - task: create:aur
+      - task: create:flatpak
 
   create:appimage:
     summary: Creates an AppImage
@@ -73,6 +74,17 @@ tasks:
     env:
       APPIMAGE_EXTRACT_AND_RUN: "1"
       NO_STRIP: "1"
+
+
+  create:flatpak:
+    summary: Creates a Flatpak bundle (.flatpak) via GNOME SDK source build
+    cmds:
+      - |
+        set -euo pipefail
+        bash build/linux/flatpak/build.sh
+    env:
+      APP_VERSION: '{{.APP_VERSION | default "0.1.0"}}'
+      ARCH: '{{.ARCH | default ARCH}}'
 
   create:deb:
     summary: Creates a deb package

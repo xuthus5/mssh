@@ -89,13 +89,16 @@ Packaging follows Wails v3 platform Taskfiles under `build/`.
 # Current OS packages
 wails3 task package
 
-# Linux only (binary + deb + rpm + AppImage)
+# Linux only (binary + deb + rpm + AppImage + Flatpak)
 wails3 task package:linux:amd64
+
+# Flatpak bundle only (requires flatpak-builder + GNOME SDK)
+wails3 task package:linux:flatpak
 ```
 
 Git tags matching `v*` trigger `.github/workflows/release.yml`, which builds:
 
-- Linux amd64/arm64: binary, deb, rpm, AppImage
+- Linux amd64/arm64: binary, deb, rpm, AppImage, Flatpak
 - Windows amd64/arm64: exe + NSIS installer
 - macOS: universal `.app` zip
 
