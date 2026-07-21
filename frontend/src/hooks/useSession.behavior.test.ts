@@ -41,6 +41,32 @@ describe('useSession behavior', () => {
     await expect(act(async () => result.current.createFolder('Nope', null))).rejects.toThrow('create failed')
   })
 
+  it('remaps deleteFolder ownership from a single ref snapshot without dropping concurrent folders', async () => {
+    registerInitial({
+      folders: [folder(1, 'Default', null, true), folder(2, 'Doomed', null, false), folder(3, 'Child', 2, false)],
+      sessions: [bindingSession(7, 'Node', 2), bindingSession(8, 'Keep', 1)],
+    })
+    let releaseDelete: (() => void) | undefined
+    const deleteGate = new Promise<void>((resolve) => { releaseDelete = resolve })
+    __registerHandler(service + 'SessionService.DeleteFolder', async () => { await deleteGate })
+    __registerHandler(service + 'SessionService.CreateFolder', async () => folder(4, 'New', null, false))
+    const { result } = renderHook(() => useSession())
+    await waitFor(() => expect(result.current.folders).toHaveLength(3))
+
+    let deletePromise: Promise<void> | undefined
+    act(() => { deletePromise = result.current.deleteFolder('2') })
+    await act(async () => { await result.current.createFolder('New', null) })
+    await waitFor(() => expect(result.current.folders.some((item) => item.id === '4')).toBe(true))
+    releaseDelete?.()
+    await act(async () => { await deletePromise })
+
+    expect(result.current.folders.find((item) => item.id === '2')).toBeUndefined()
+    expect(result.current.folders.find((item) => item.id === '3')?.parentId).toBe('1')
+    expect(result.current.folders.find((item) => item.id === '4')).toBeTruthy()
+    expect(result.current.sessions.find((item) => item.id === '7')?.folderId).toBe('1')
+    expect(result.current.sessions.find((item) => item.id === '8')?.folderId).toBe('1')
+  })
+
   it('loads recent sessions and tunnels, including fallback values', async () => {
     registerInitial({ recent: [bindingSession(8, 'Recent', null)] })
     __registerHandler(service + 'TunnelService.List', async () => [{ id: 9, session_id: 8, type: 'dynamic', local_host: null, local_port: 1080, remote_host: null, remote_port: 0 }])
