@@ -1,7 +1,10 @@
 import { Field, FieldContent, FieldDescription, FieldLabel } from '@/components/ui/field'
+import { Input } from '@/components/ui/input'
 import { LabeledSelect } from '@/components/ui/labeled-select'
 import { Switch } from '@/components/ui/switch'
 import {
+  MAX_TERMINAL_SCROLLBACK_LINES,
+  MIN_TERMINAL_SCROLLBACK_LINES,
   normalizeTerminalRightClickAction,
   type TerminalBehaviorSettings,
   type TerminalRightClickAction,
@@ -14,22 +17,28 @@ const RIGHT_CLICK_OPTIONS = [
   { value: 'paste', label: '粘贴' },
 ] as const
 
-interface Props extends TerminalBehaviorSettings {
+interface Props {
+  rightClickAction: TerminalBehaviorSettings['rightClickAction']
+  copyOnSelect: boolean
+  scrollbackLines: number | string
   onRightClickActionChange: (value: TerminalRightClickAction) => void
   onCopyOnSelectChange: (value: boolean) => void
+  onScrollbackLinesChange: (value: number) => void
 }
 
 export function TerminalBehaviorSettingsSection({
   rightClickAction,
   copyOnSelect,
+  scrollbackLines,
   onRightClickActionChange,
   onCopyOnSelectChange,
+  onScrollbackLinesChange,
 }: Props) {
   return (
     <section className="rounded-xl border border-border bg-card p-3 shadow-sm">
       <div className="mb-3">
         <h3 className="text-sm font-medium text-foreground">{t('行为')}</h3>
-        <p className="mt-1 text-xs text-muted-foreground">{t('控制终端中的鼠标和剪贴板交互。')}</p>
+        <p className="mt-1 text-xs text-muted-foreground">{t('控制终端中的鼠标、剪贴板与历史缓冲。')}</p>
       </div>
       <div className="flex flex-col gap-3">
         <Field orientation="horizontal">
@@ -54,6 +63,33 @@ export function TerminalBehaviorSettingsSection({
             id="terminal-copy-on-select"
             checked={copyOnSelect}
             onCheckedChange={(value) => onCopyOnSelectChange(value)}
+          />
+        </Field>
+        <Field orientation="horizontal">
+          <FieldContent>
+            <FieldLabel htmlFor="terminal-scrollback-lines">{t('滚动历史行数')}</FieldLabel>
+            <FieldDescription>
+              {t('限制每个终端保留的输出历史行数，超出后丢弃最旧内容（${}-${}）。', MIN_TERMINAL_SCROLLBACK_LINES, MAX_TERMINAL_SCROLLBACK_LINES)}
+            </FieldDescription>
+          </FieldContent>
+          <Input
+            id="terminal-scrollback-lines"
+            type="number"
+            min={MIN_TERMINAL_SCROLLBACK_LINES}
+            max={MAX_TERMINAL_SCROLLBACK_LINES}
+            step={1000}
+            className="w-32"
+            value={scrollbackLines === 0 || scrollbackLines === '0' ? '' : scrollbackLines}
+            onChange={(event) => {
+              const raw = event.target.value
+              if (raw.trim() === '') {
+                onScrollbackLinesChange(0)
+                return
+              }
+              const parsed = Number.parseInt(raw, 10)
+              if (Number.isFinite(parsed)) onScrollbackLinesChange(parsed)
+            }}
+            aria-label={t('滚动历史行数')}
           />
         </Field>
       </div>

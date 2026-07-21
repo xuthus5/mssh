@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { SettingsView } from '@/components/settings/SettingsView'
@@ -13,6 +13,7 @@ const general = {
   uiFontSize: 14,
   rightClickAction: 'menu' as const,
   copyOnSelect: false,
+  scrollbackLines: 10000,
   closeButtonAction: 'tray' as const,
   language: 'zh-CN' as const,
 }
@@ -127,9 +128,10 @@ describe('SettingsView', () => {
     await user.click(screen.getByRole('combobox', { name: '鼠标右键行为' }))
     await user.click(await screen.findByRole('option', { name: '粘贴' }))
     await user.click(screen.getByRole('switch', { name: '选择即复制' }))
+    fireEvent.change(screen.getByRole('spinbutton', { name: '滚动历史行数' }), { target: { value: '8000' } })
     await user.click(screen.getByRole('button', { name: '保存' }))
 
-    expect(props.onSaveGeneral).toHaveBeenCalledWith(expect.objectContaining({ rightClickAction: 'paste', copyOnSelect: true }))
+    expect(props.onSaveGeneral).toHaveBeenCalledWith(expect.objectContaining({ rightClickAction: 'paste', copyOnSelect: true, scrollbackLines: 8000 }))
   })
 
   it('saves the selected close button behavior', async () => {
