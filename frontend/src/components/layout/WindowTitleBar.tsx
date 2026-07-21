@@ -8,6 +8,8 @@ import { useThemeCatalog } from '@/hooks/useThemeCatalog'
 import { DynamicTabOverflowMenu, DynamicTabStrip } from '@/components/layout/DynamicTabStrip'
 import { WINDOW_OPEN_SETTINGS_EVENT } from '@/lib/settingsWindowEvents'
 import { cn } from '@/lib/utils'
+import { t } from '@/i18n'
+
 
 const COLLAPSED_NAVIGATION_WIDTH = 36
 
@@ -41,19 +43,19 @@ export function WindowTitleBar() {
 
   return <header className={cn('flex h-9 shrink-0 select-none items-stretch bg-card', !terminalSurfaceActive && 'border-b border-border')}>
     <div data-testid="title-navigation-region" style={{ width: navigationCollapsed ? COLLAPSED_NAVIGATION_WIDTH : sidebarWidth }} className="flex shrink-0 items-center gap-1 overflow-hidden px-1 transition-[width] duration-200 ease-out [--wails-draggable:no-drag]">
-      <button type="button" aria-label={navigationCollapsed ? '展开导航' : '收起导航'} aria-controls="sidebar-navigation" aria-expanded={!navigationCollapsed} className="grid size-7 place-items-center rounded-md text-muted-foreground transition-colors duration-150 hover:bg-muted/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70" onClick={toggleNavigation}><Menu className="size-3.5" /></button>
-      {!navigationCollapsed && <nav aria-label="侧边栏导航" className="flex h-7 items-center gap-0.5 rounded-lg border border-border/60 bg-muted/40 p-0.5">{navigationButton('overview', '总览')}{!overviewActive && <>{navigationButton('sessions', '会话')}{navigationButton('macros', '宏')}</>}</nav>}
+      <button type="button" aria-label={navigationCollapsed ? t('展开导航') : t('收起导航')} aria-controls="sidebar-navigation" aria-expanded={!navigationCollapsed} className="grid size-7 place-items-center rounded-md text-muted-foreground transition-colors duration-150 hover:bg-muted/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70" onClick={toggleNavigation}><Menu className="size-3.5" /></button>
+      {!navigationCollapsed && <nav aria-label={t('侧边栏导航')} className="flex h-7 items-center gap-0.5 rounded-lg border border-border/60 bg-muted/40 p-0.5">{navigationButton('overview', t('总览'))}{!overviewActive && <>{navigationButton('sessions', t('会话'))}{navigationButton('macros', t('宏'))}</>}</nav>}
     </div>
     <DynamicTabStrip onOverflowChange={setTabsOverflow} />
     <div data-testid="window-drag-region" className="min-w-20 flex-1 [--wails-draggable:drag]" onDoubleClick={() => runWindowAction('toggle maximise', Window.ToggleMaximise)} />
     <div className="relative flex [--wails-draggable:no-drag]">
       {tabsOverflow && <div className="absolute right-full top-0 h-full"><DynamicTabOverflowMenu /></div>}
-      <button type="button" aria-label={colorMode === 'dark' ? '切换到浅色模式' : '切换到深色模式'} className="grid w-10 place-items-center text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" onClick={toggleColorMode}>{colorMode === 'dark' ? <Sun className="size-4" /> : <Moon className="size-4" />}</button>
-      <button type="button" aria-label="打开设置" className="grid w-10 place-items-center text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" onClick={() => runWindowAction('open settings', () => Events.Emit(WINDOW_OPEN_SETTINGS_EVENT))}><Settings className="size-4" /></button>
+      <button type="button" aria-label={colorMode === 'dark' ? t('切换到浅色模式') : t('切换到深色模式')} className="grid w-10 place-items-center text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" onClick={toggleColorMode}>{colorMode === 'dark' ? <Sun className="size-4" /> : <Moon className="size-4" />}</button>
+      <button type="button" aria-label={t('打开设置')} className="grid w-10 place-items-center text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" onClick={() => runWindowAction('open settings', () => Events.Emit(WINDOW_OPEN_SETTINGS_EVENT))}><Settings className="size-4" /></button>
       <span className="my-2 w-px bg-border" />
-      <button type="button" aria-label="最小化窗口" className="grid w-11 place-items-center text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" onClick={() => runWindowAction('minimise', Window.Minimise)}><Minus className="size-4" /></button>
-      <button type="button" aria-label="最大化或还原窗口" className="grid w-11 place-items-center text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" onClick={() => runWindowAction('toggle maximise', Window.ToggleMaximise)}><Square className="size-3.5" /></button>
-      <button type="button" aria-label="关闭窗口" className="grid w-11 place-items-center text-muted-foreground transition-colors hover:bg-destructive hover:text-white" onClick={() => runWindowAction('close', Window.Close)}><X className="size-4" /></button>
+      <button type="button" aria-label={t('最小化窗口')} className="grid w-11 place-items-center text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" onClick={() => runWindowAction('minimise', Window.Minimise)}><Minus className="size-4" /></button>
+      <button type="button" aria-label={t('最大化或还原窗口')} className="grid w-11 place-items-center text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" onClick={() => runWindowAction('toggle maximise', Window.ToggleMaximise)}><Square className="size-3.5" /></button>
+      <button type="button" aria-label={t('关闭窗口')} className="grid w-11 place-items-center text-muted-foreground transition-colors hover:bg-destructive hover:text-white" onClick={() => runWindowAction('close', Window.Close)}><X className="size-4" /></button>
     </div>
   </header>
 }

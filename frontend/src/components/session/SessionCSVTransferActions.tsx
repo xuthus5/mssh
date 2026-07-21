@@ -11,6 +11,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Spinner } from '@/components/ui/spinner'
 import { toast } from '@/components/ui/toast'
 import type { SessionCSVExportResult } from '../../../bindings/github.com/xuthus5/mssh/internal/model/models'
+import { t } from '@/i18n'
+
 
 type ExportSessions = (request: SessionCSVExportRequest) => Promise<SessionCSVExportResult>
 
@@ -19,8 +21,8 @@ export function SessionCSVTransferActions({ selectedIDs }: { selectedIDs: string
   const [exportOpen, setExportOpen] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
   return <>
-    <Button type="button" variant="outline" onClick={() => setImportOpen(true)}><FileUp data-icon="inline-start" />导入</Button>
-    <Button type="button" variant="outline" onClick={() => setExportOpen(true)}><FileDown data-icon="inline-start" />导出</Button>
+    <Button type="button" variant="outline" onClick={() => setImportOpen(true)}><FileUp data-icon="inline-start" />{t('导入')}</Button>
+    <Button type="button" variant="outline" onClick={() => setExportOpen(true)}><FileDown data-icon="inline-start" />{t('导出')}</Button>
     <SessionCSVExportDialog open={exportOpen} selectedIDs={selectedIDs} onOpenChange={setExportOpen} onExport={exportSessionsCSV} />
     <SessionCSVImportDialog open={importOpen} onOpenChange={setImportOpen} onPreview={previewSessionsCSV} onImport={importSessionsCSV} />
   </>
@@ -50,19 +52,19 @@ function SessionCSVExportDialog(props: ExportDialogProps) {
   const runExport = async () => {
     setPending(true); setError('')
     try {
-      const path = await Dialogs.SaveFile({ Title: '导出 SSH 会话 CSV', Filename: sessionCSVFileName(), CanCreateDirectories: true, Filters: [{ DisplayName: 'CSV', Pattern: '*.csv' }] })
+      const path = await Dialogs.SaveFile({ Title: t('导出 SSH 会话 CSV'), Filename: sessionCSVFileName(), CanCreateDirectories: true, Filters: [{ DisplayName: 'CSV', Pattern: '*.csv' }] })
       if (!path) return
       const result = await props.onExport({ path: ensureCSVExtension(path), sessionIDs: effectiveScope === 'selected' ? props.selectedIDs : [], includePasswords })
-      toast(`已导出 ${result.count} 个会话`, 'success'); changeOpen(false)
+      toast(t('已导出 ${} 个会话', result.count), 'success'); changeOpen(false)
     } catch (reason) { setError(errorMessage(reason)) } finally { setPending(false) }
   }
 
-  return <Dialog open={props.open} onOpenChange={changeOpen}><DialogContent className="sm:max-w-lg"><DialogHeader><DialogTitle>导出会话 CSV</DialogTitle><DialogDescription>仅导出 SSH 会话、分组和资产归属，不包含 MSSH 应用设置。</DialogDescription></DialogHeader>
-    <div className="flex flex-col gap-4"><SegmentedControl label="导出范围" options={[{ value: 'all', label: '全部会话' }, ...(selectedAvailable ? [{ value: 'selected', label: `已选 ${props.selectedIDs.length} 项` } as const] : [])]} value={effectiveScope} onChange={(value) => setScope(value as 'all' | 'selected')} />
-      <label className="flex items-start gap-3 rounded-xl border border-border p-3 text-sm"><Checkbox checked={includePasswords} onCheckedChange={(checked) => setIncludePasswords(checked === true)} /><span><span className="block font-medium">包含已保存密码</span><span className="mt-0.5 block text-xs text-muted-foreground">默认关闭。密钥认证仅导出公钥标识，不导出私钥。</span></span></label>
-      {includePasswords && <Alert variant="destructive"><TriangleAlert /><AlertDescription>密码将以明文写入 CSV。请仅保存到可信位置，并在使用后妥善删除。</AlertDescription></Alert>}
+  return <Dialog open={props.open} onOpenChange={changeOpen}><DialogContent className="sm:max-w-lg"><DialogHeader><DialogTitle>{t('导出会话 CSV')}</DialogTitle><DialogDescription>{t('仅导出 SSH 会话、分组和资产归属，不包含 MSSH 应用设置。')}</DialogDescription></DialogHeader>
+    <div className="flex flex-col gap-4"><SegmentedControl label={t('导出范围')} options={[{ value: 'all', label: t('全部会话') }, ...(selectedAvailable ? [{ value: 'selected', label: `已选 ${props.selectedIDs.length} 项` } as const] : [])]} value={effectiveScope} onChange={(value) => setScope(value as 'all' | 'selected')} />
+      <label className="flex items-start gap-3 rounded-xl border border-border p-3 text-sm"><Checkbox checked={includePasswords} onCheckedChange={(checked) => setIncludePasswords(checked === true)} /><span><span className="block font-medium">{t('包含已保存密码')}</span><span className="mt-0.5 block text-xs text-muted-foreground">{t('默认关闭。密钥认证仅导出公钥标识，不导出私钥。')}</span></span></label>
+      {includePasswords && <Alert variant="destructive"><TriangleAlert /><AlertDescription>{t('密码将以明文写入 CSV。请仅保存到可信位置，并在使用后妥善删除。')}</AlertDescription></Alert>}
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-    </div><DialogFooter><Button type="button" variant="outline" disabled={pending} onClick={() => changeOpen(false)}>取消</Button><Button type="button" disabled={pending} onClick={() => { void runExport() }}>{pending ? <><Spinner data-icon="inline-start" />导出中...</> : <><FileDown data-icon="inline-start" />选择位置并导出</>}</Button></DialogFooter>
+    </div><DialogFooter><Button type="button" variant="outline" disabled={pending} onClick={() => changeOpen(false)}>{t('取消')}</Button><Button type="button" disabled={pending} onClick={() => { void runExport() }}>{pending ? <><Spinner data-icon="inline-start" />{t('导出中...')}</> : <><FileDown data-icon="inline-start" />{t('选择位置并导出')}</>}</Button></DialogFooter>
   </DialogContent></Dialog>
 }
 

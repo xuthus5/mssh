@@ -41,3 +41,8 @@ export function createPlaybackResizeObserver({
     })
   })
 }
+
+export function decodeRecordingData(encoded: string) {
+  const binary = atob(encoded)
+  return Uint8Array.from(binary, (character) => character.charCodeAt(0))
+}

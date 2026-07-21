@@ -5,6 +5,8 @@ import { formatFileSize } from '@/components/file/FileListView'
 import { logger } from '@/lib/logger'
 import { isTreeNavigationKey, nextTreeIndex } from '@/lib/treeKeyboard'
 import { VirtualList } from '@/components/ui/virtual-list'
+import { t } from '@/i18n'
+
 
 /** Flattened visible nodes above this count use VirtualList. */
 export const FILE_TREE_VIRTUALIZE_THRESHOLD = 80
@@ -86,7 +88,7 @@ export function FileTreeView(props: Props) {
         onDoubleClick={() => { if (node.file.isDir) props.onNavigate(node.file.path); else props.onDownload(node.file.path) }}
       >
         {node.file.isDir ? (
-          <button type="button" className="shrink-0" aria-label={expanded.has(node.file.path) ? `收起 ${node.file.name}` : `展开 ${node.file.name}`} onClick={(event) => { event.stopPropagation(); void toggle(node.file) }}>
+          <button type="button" className="shrink-0" aria-label={expanded.has(node.file.path) ? t('收起 ${}', node.file.name) : t('展开 ${}', node.file.name)} onClick={(event) => { event.stopPropagation(); void toggle(node.file) }}>
             {expanded.has(node.file.path) ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}
           </button>
         ) : <span className="w-3.5" />}
@@ -99,8 +101,8 @@ export function FileTreeView(props: Props) {
   }
 
   return (
-    <div role="tree" aria-label="远程文件树" aria-activedescendant={active ? `file-${active.file.path}` : undefined} tabIndex={0} className="min-h-0 min-w-0 py-1 outline-none" onKeyDown={onKeyDown}>
-      {props.loading ? <TreeEmpty text="加载中..." /> : flat.length === 0 ? <TreeEmpty text="空目录" /> : flat.length > FILE_TREE_VIRTUALIZE_THRESHOLD ? (
+    <div role="tree" aria-label={t('远程文件树')} aria-activedescendant={active ? `file-${active.file.path}` : undefined} tabIndex={0} className="min-h-0 min-w-0 py-1 outline-none" onKeyDown={onKeyDown}>
+      {props.loading ? <TreeEmpty text={t('加载中...')} /> : flat.length === 0 ? <TreeEmpty text={t('空目录')} /> : flat.length > FILE_TREE_VIRTUALIZE_THRESHOLD ? (
         <div className="h-full min-h-[12rem]">
           <VirtualList items={flat} estimateSize={32} getKey={(node) => node.file.path} renderItem={(node, index) => renderNode(node, index)} />
         </div>

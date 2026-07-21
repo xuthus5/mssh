@@ -5,6 +5,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Button } from '@/components/ui/button'
 import { logger } from '@/lib/logger'
 import { LogService } from '@/lib/wails'
+import { t } from '@/i18n'
+
 
 interface SessionLogEntry {
   id: number
@@ -24,7 +26,7 @@ interface Props {
 
 export function formatRecordingTime(timestamp: string): string {
   const date = new Date(timestamp)
-  if (Number.isNaN(date.getTime())) return '时间未知'
+  if (Number.isNaN(date.getTime())) return t('时间未知')
   return date.toLocaleString()
 }
 
@@ -91,9 +93,9 @@ function useRecordingDeletion(
 function SessionLogHeader({ count }: { count: number }) {
   return <div className="flex items-center justify-between border-b border-border px-3 py-2">
     <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-      <History className="size-4" aria-hidden="true" />录制记录
+      <History className="size-4" aria-hidden="true" />{t('录制记录')}
     </div>
-    <span className="text-xs text-muted-foreground">{count} 条</span>
+    <span className="text-xs text-muted-foreground">{count} {t('条')}</span>
   </div>
 }
 
@@ -107,19 +109,19 @@ interface RecordingRowProps {
 
 function RecordingRow({ recording, deleteDisabled, onPlayback, onClose, onDelete }: RecordingRowProps) {
   const play = () => {
-    onPlayback(recording.data_path, `回放 #${recording.id}`)
+    onPlayback(recording.data_path, t('回放 #${}', recording.id))
     onClose()
   }
   return <div className="flex items-center justify-between rounded-lg px-2 py-1.5 hover:bg-muted/50">
     <div className="mr-1 flex min-w-0 flex-1 flex-col">
-      <span className="truncate text-xs">录制 #{recording.id}</span>
+      <span className="truncate text-xs">{t('录制 #')}{recording.id}</span>
       <span className="text-[10px] text-muted-foreground">{formatRecordingTime(recording.started_at)}</span>
     </div>
     <div className="flex shrink-0 items-center gap-0.5">
-      <Button size="xs" variant="ghost" aria-label={`播放录制 #${recording.id}`} onClick={play}>
+      <Button size="xs" variant="ghost" aria-label={t('播放录制 #${}', recording.id)} onClick={play}>
         <Play aria-hidden="true" />
       </Button>
-      <Button size="xs" variant="ghost" className="text-destructive" aria-label={`删除录制 #${recording.id}`}
+      <Button size="xs" variant="ghost" className="text-destructive" aria-label={t('删除录制 #${}', recording.id)}
         disabled={deleteDisabled} onClick={() => onDelete(recording.id)}>
         <Trash2 aria-hidden="true" />
       </Button>
@@ -139,12 +141,12 @@ interface RecordingListProps {
 }
 
 function RecordingList(props: RecordingListProps) {
-  if (props.loading) return <p className="p-2 text-xs text-muted-foreground">加载中...</p>
+  if (props.loading) return <p className="p-2 text-xs text-muted-foreground">{t('加载中...')}</p>
   if (props.error) return <Alert variant="destructive"><AlertDescription>
     {props.error}
-    <Button size="xs" variant="outline" className="ml-2" onClick={props.onRetry}>重试</Button>
+    <Button size="xs" variant="outline" className="ml-2" onClick={props.onRetry}>{t('重试')}</Button>
   </AlertDescription></Alert>
-  if (props.recordings.length === 0) return <p className="p-2 text-xs text-muted-foreground">暂无录制记录</p>
+  if (props.recordings.length === 0) return <p className="p-2 text-xs text-muted-foreground">{t('暂无录制记录')}</p>
   return props.recordings.map((recording) => <RecordingRow key={recording.id} recording={recording}
     deleteDisabled={props.deleting} onPlayback={props.onPlayback} onClose={props.onClose} onDelete={props.onDelete} />)
 }
@@ -161,15 +163,15 @@ function DeleteRecordingDialog({ deleteID, deletingID, error, onOpenChange, onDe
   return <AlertDialog open={deleteID !== null} onOpenChange={onOpenChange}>
     <AlertDialogContent>
       <AlertDialogHeader>
-        <AlertDialogTitle>删除录制记录？</AlertDialogTitle>
-        <AlertDialogDescription>录制文件将被永久删除。</AlertDialogDescription>
+        <AlertDialogTitle>{t('删除录制记录？')}</AlertDialogTitle>
+        <AlertDialogDescription>{t('录制文件将被永久删除。')}</AlertDialogDescription>
       </AlertDialogHeader>
       {error ? <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert> : null}
       <AlertDialogFooter>
-        <AlertDialogCancel disabled={deletingID !== null}>取消</AlertDialogCancel>
+        <AlertDialogCancel disabled={deletingID !== null}>{t('取消')}</AlertDialogCancel>
         <AlertDialogAction variant="destructive" disabled={deletingID !== null}
           onClick={() => { if (deleteID !== null) void onDelete(deleteID) }}>
-          {deletingID !== null ? '删除中...' : '删除'}
+          {deletingID !== null ? t('删除中...') : t('删除')}
         </AlertDialogAction>
       </AlertDialogFooter>
     </AlertDialogContent>

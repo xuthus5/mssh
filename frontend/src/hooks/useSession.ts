@@ -13,6 +13,8 @@ import { useSessionAssetCatalog } from '@/hooks/useSessionAssetCatalog'
 import { useSessionCSVTransfer } from '@/hooks/useSessionCSVTransfer'
 import { remapAfterFolderDelete } from '@/lib/sessionFolderDelete'
 import { openTerminalWithPoolCapacity } from '@/lib/openTerminal'
+import { t } from '@/i18n'
+
 
 export type { BatchSessionResult } from '@/lib/sessionBatch'
 export type { AssetColorToken, AssetEnvironment, AssetProject, AssetTag, Folder, Session, Tunnel } from '@/lib/sessionModels'
@@ -151,7 +153,7 @@ export function useSession() {
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       logger.error('createSession error', err)
-      toast(`创建会话失败: ${msg}`, 'error')
+      toast(t('创建会话失败: ${}', msg), 'error')
       throw err
     }
   }, [listAssetCatalogs])
@@ -180,7 +182,7 @@ export function useSession() {
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       logger.error('updateSession error', err)
-      toast(`更新会话失败: ${msg}`, 'error')
+      toast(t('更新会话失败: ${}', msg), 'error')
       throw err
     }
   }, [listAssetCatalogs])
@@ -207,7 +209,7 @@ export function useSession() {
     const session = sessions.find((s) => s.id === sessionId)
     if (!session) return
     const dialog = useConnectDialog.getState()
-    if (dialog.open) return void toast('已有 SSH 连接正在处理，请先完成或关闭当前连接窗口', 'info')
+    if (dialog.open) return void toast(t('已有 SSH 连接正在处理，请先完成或关闭当前连接窗口'), 'info')
     dialog.openDialog(session.host, session.port, session.username, () => { void connect(sessionId) })
     try {
       const terminalId = await openSessionTab(session)

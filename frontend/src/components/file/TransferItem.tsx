@@ -5,6 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import type { TransferJob } from '@/store/appStore'
 import { isActiveTransfer } from '@/lib/transferMetrics'
+import { t } from '@/i18n'
+
 
 interface TransferItemProps {
   transfer: TransferJob
@@ -14,11 +16,11 @@ interface TransferItemProps {
 }
 
 const statusLabels: Record<TransferJob['status'], string> = {
-  queued: '排队中',
-  running: '传输中',
-  completed: '已完成',
-  failed: '失败',
-  cancelled: '已取消',
+  queued: t('排队中'),
+  running: t('传输中'),
+  completed: t('已完成'),
+  failed: t('失败'),
+  cancelled: t('已取消'),
 }
 
 function statusVariant(status: TransferJob['status']): 'default' | 'secondary' | 'destructive' | 'outline' {
@@ -29,20 +31,20 @@ function statusVariant(status: TransferJob['status']): 'default' | 'secondary' |
 }
 
 function formatBytes(bytes: number): string {
-  if (bytes <= 0) return '大小未知'
+  if (bytes <= 0) return t('大小未知')
   const units = ['B', 'KB', 'MB', 'GB', 'TB']
   const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1)
   return `${(bytes / 1024 ** index).toFixed(index === 0 ? 0 : 1)} ${units[index]}`
 }
 
 function formatSpeed(bytesPerSecond: number): string {
-  return bytesPerSecond > 0 ? `${formatBytes(bytesPerSecond)}/s` : '等待速度数据'
+  return bytesPerSecond > 0 ? `${formatBytes(bytesPerSecond)}/s` : t('等待速度数据')
 }
 
 function formatETA(seconds: number): string {
-  if (seconds <= 0) return '计算剩余时间'
-  if (seconds < 60) return `剩余 ${seconds} 秒`
-  return `剩余 ${Math.ceil(seconds / 60)} 分钟`
+  if (seconds <= 0) return t('计算剩余时间')
+  if (seconds < 60) return t('剩余 ${} 秒', seconds)
+  return t('剩余 ${} 分钟', Math.ceil(seconds / 60))
 }
 
 function progressValue(transfer: TransferJob): number | null {
@@ -65,14 +67,14 @@ export function TransferItem({ transfer, onCancel, onRetry, onRemove }: Transfer
           <Badge variant={statusVariant(transfer.status)}>{statusLabels[transfer.status]}</Badge>
         </div>
       </div>
-      {active && <Button size="icon-xs" variant="ghost" aria-label={`取消 ${transfer.fileName}`} onClick={() => onCancel(transfer)}><X /></Button>}
-      {transfer.status === 'failed' && <Button size="icon-xs" variant="outline" aria-label={`重试 ${transfer.fileName}`} onClick={() => onRetry(transfer)}><RotateCcw /></Button>}
-      {!active && <Button size="icon-xs" variant="ghost" aria-label={`移除 ${transfer.fileName}`} onClick={() => onRemove(transfer)}><Trash2 /></Button>}
+      {active && <Button size="icon-xs" variant="ghost" aria-label={t('取消 ${}', transfer.fileName)} onClick={() => onCancel(transfer)}><X /></Button>}
+      {transfer.status === 'failed' && <Button size="icon-xs" variant="outline" aria-label={t('重试 ${}', transfer.fileName)} onClick={() => onRetry(transfer)}><RotateCcw /></Button>}
+      {!active && <Button size="icon-xs" variant="ghost" aria-label={t('移除 ${}', transfer.fileName)} onClick={() => onRemove(transfer)}><Trash2 /></Button>}
     </CardHeader>
     <CardContent className="flex flex-col gap-2 px-3">
       {active && <>
-        <div className="flex items-center justify-between gap-3 text-xs"><span className="text-muted-foreground">{formatBytes(transfer.transferredBytes)} / {formatBytes(transfer.totalBytes)}</span><span className="tabular-nums text-foreground">{percentage === null ? '准备中' : `${percentage}%`}</span></div>
-        <Progress value={percentage} aria-label={`${transfer.fileName} 传输进度`} />
+        <div className="flex items-center justify-between gap-3 text-xs"><span className="text-muted-foreground">{formatBytes(transfer.transferredBytes)} / {formatBytes(transfer.totalBytes)}</span><span className="tabular-nums text-foreground">{percentage === null ? t('准备中') : `${percentage}%`}</span></div>
+        <Progress value={percentage} aria-label={t('${} 传输进度', transfer.fileName)} />
         <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground"><span>{formatSpeed(transfer.speed)}</span><span>{formatETA(transfer.eta)}</span></div>
       </>}
       {!active && <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground"><span>{formatBytes(transfer.totalBytes || transfer.transferredBytes)}</span><span>{transfer.completedAt ? new Date(transfer.completedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}</span></div>}

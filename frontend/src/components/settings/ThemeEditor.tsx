@@ -22,6 +22,8 @@ import { hasValidTerminalThemeColors, isHexColor } from '@/components/settings/t
 import type { ColorMode } from '@/lib/effectiveTerminalTheme'
 import type { TerminalTheme } from '@/hooks/useSettings'
 import type { BuiltinThemeResetResult, TerminalGlobalStyle, ThemeAssignments, ThemeConfigurationInput, ThemeProfile } from '../../../bindings/github.com/xuthus5/mssh/internal/model/models'
+import { t } from '@/i18n'
+
 
 interface Props {
   profiles: ThemeProfile[]
@@ -38,7 +40,7 @@ export function ThemeEditor({ profiles, assignments, globalStyle, colorMode, onS
   const activeProfileID = profileIDForSlot(state.editorSlot, state.draftAssignments)
   const activeProfile = findProfile(profiles, activeProfileID)
   const activeTheme = state.drafts.get(activeProfileID)
-  if (!activeProfile || !activeTheme) return <p className="text-sm text-muted-foreground">终端主题配置不可用，请重新加载设置。</p>
+  if (!activeProfile || !activeTheme) return <p className="text-sm text-muted-foreground">{t('终端主题配置不可用，请重新加载设置。')}</p>
   const actions = themeEditorActions(state, activeProfileID, colorMode)
   const busy = submission.saving || state.resetting
   const effectiveTheme = effectiveDraftTheme(activeTheme, state.draftGlobalStyle)
@@ -48,13 +50,13 @@ export function ThemeEditor({ profiles, assignments, globalStyle, colorMode, onS
   const sharedLabels = !state.draftAssignments.follow_interface_mode ? fixedProfileSharing(state.draftAssignments) : []
 
   return <form onSubmit={submission.submit} className="flex flex-col gap-5 pb-2 pt-2">
-    <div className="flex items-start justify-between gap-4"><div><h2 className="text-lg font-semibold text-foreground">终端主题</h2><p className="text-sm text-muted-foreground">选择终端是否跟随应用模式，或固定使用一个独立主题。</p></div><BuiltinThemeResetControl canReset={canReset} dirty={state.dirty} saving={submission.saving} resetting={state.resetting} includesFixed={!assignments.follow_interface_mode} onResettingChange={state.setResetting} onReset={onResetBuiltins} /></div>
+    <div className="flex items-start justify-between gap-4"><div><h2 className="text-lg font-semibold text-foreground">{t('终端主题')}</h2><p className="text-sm text-muted-foreground">{t('选择终端是否跟随应用模式，或固定使用一个独立主题。')}</p></div><BuiltinThemeResetControl canReset={canReset} dirty={state.dirty} saving={submission.saving} resetting={state.resetting} includesFixed={!assignments.follow_interface_mode} onResettingChange={state.setResetting} onReset={onResetBuiltins} /></div>
     <ThemeStrategyCard assignments={state.draftAssignments} busy={busy} onFollowChange={actions.setFollowInterfaceMode} />
     <TerminalGlobalStyleEditor style={state.draftGlobalStyle} disabled={busy} onChange={actions.updateGlobalStyle} />
     <ThemeAssignmentCard profiles={profiles} assignments={state.draftAssignments} busy={busy} onSelect={actions.selectProfile} />
-    {mismatch && <Alert><AlertDescription>该终端主题为 {activeProfile.definition?.mode === 'dark' ? 'Dark' : 'Light'} 类型，当前界面为 {colorMode === 'dark' ? 'Dark' : 'Light'} Mode。终端颜色将保持固定，不受界面模式影响。</AlertDescription></Alert>}
+    {mismatch && <Alert><AlertDescription>{t('该终端主题为')} {activeProfile.definition?.mode === 'dark' ? 'Dark' : 'Light'} {t('类型，当前界面为')} {colorMode === 'dark' ? 'Dark' : 'Light'} {t('Mode。终端颜色将保持固定，不受界面模式影响。')}</AlertDescription></Alert>}
     <ThemeWorkspace profile={activeProfile} draft={activeTheme} effectiveTheme={effectiveTheme} globalStyle={state.draftGlobalStyle} editorSlot={state.editorSlot} followInterfaceMode={state.draftAssignments.follow_interface_mode} sharedLabels={sharedLabels} busy={busy} onEditorSlotChange={state.setEditorSlot} onThemeChange={actions.updateTheme} onProfileStyleChange={actions.updateProfileStyle} onAnsiChange={actions.updateAnsi} />
-    <div className="flex justify-end"><Button type="submit" disabled={!valid || busy}><Save data-icon="inline-start" />{submission.saving ? '保存中...' : '保存主题配置'}</Button></div>
+    <div className="flex justify-end"><Button type="submit" disabled={!valid || busy}><Save data-icon="inline-start" />{submission.saving ? t('保存中...') : t('保存主题配置')}</Button></div>
   </form>
 }
 
@@ -132,7 +134,7 @@ function useThemeConfigurationSubmit(state: ThemeEditorDraftState, profiles: The
       await onSave(buildThemeConfiguration({ profiles, drafts: state.drafts, assignments: state.draftAssignments, globalStyle: state.draftGlobalStyle }))
       state.setDirty(false)
     } catch (error) {
-      toast(`保存终端主题失败: ${error instanceof Error ? error.message : String(error)}`, 'error')
+      toast(t('保存终端主题失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
     } finally {
       setSaving(false)
     }
@@ -156,16 +158,16 @@ function canResetBuiltinProfiles(profiles: ThemeProfile[], assignments: ThemeAss
 }
 
 function ThemeStrategyCard({ assignments, busy, onFollowChange }: { assignments: ThemeAssignments; busy: boolean; onFollowChange: (checked: boolean) => void }) {
-  return <Card><CardHeader><CardTitle className="text-sm">终端主题应用策略</CardTitle></CardHeader><CardContent><Field orientation="horizontal"><FieldContent><FieldLabel htmlFor="terminal-follow-interface-mode">跟随界面模式</FieldLabel><FieldDescription>切换 Dark/Light 时，自动使用对应的终端主题。</FieldDescription></FieldContent><Switch id="terminal-follow-interface-mode" checked={assignments.follow_interface_mode} disabled={busy} onCheckedChange={onFollowChange} /></Field></CardContent></Card>
+  return <Card><CardHeader><CardTitle className="text-sm">{t('终端主题应用策略')}</CardTitle></CardHeader><CardContent><Field orientation="horizontal"><FieldContent><FieldLabel htmlFor="terminal-follow-interface-mode">{t('跟随界面模式')}</FieldLabel><FieldDescription>{t('切换 Dark/Light 时，自动使用对应的终端主题。')}</FieldDescription></FieldContent><Switch id="terminal-follow-interface-mode" checked={assignments.follow_interface_mode} disabled={busy} onCheckedChange={onFollowChange} /></Field></CardContent></Card>
 }
 
 function ThemeAssignmentCard({ profiles, assignments, busy, onSelect }: { profiles: ThemeProfile[]; assignments: ThemeAssignments; busy: boolean; onSelect: (slot: ThemeEditorSlot, id: number) => void }) {
-  return <Card><CardHeader><CardTitle className="text-sm">{assignments.follow_interface_mode ? '模式主题' : '固定主题'}</CardTitle></CardHeader><CardContent className={assignments.follow_interface_mode ? 'grid gap-4 md:grid-cols-2' : ''}>{assignments.follow_interface_mode ? <><ThemeModeSelector mode="dark" profiles={profiles} value={assignments.dark_profile_id} disabled={busy} onValueChange={(id) => onSelect('dark', id)} /><ThemeModeSelector mode="light" profiles={profiles} value={assignments.light_profile_id} disabled={busy} onValueChange={(id) => onSelect('light', id)} /></> : <ThemeModeSelector mode="fixed" profiles={profiles} value={assignments.fixed_profile_id} disabled={busy} onValueChange={(id) => onSelect('fixed', id)} />}</CardContent></Card>
+  return <Card><CardHeader><CardTitle className="text-sm">{assignments.follow_interface_mode ? t('模式主题') : t('固定主题')}</CardTitle></CardHeader><CardContent className={assignments.follow_interface_mode ? 'grid gap-4 md:grid-cols-2' : ''}>{assignments.follow_interface_mode ? <><ThemeModeSelector mode="dark" profiles={profiles} value={assignments.dark_profile_id} disabled={busy} onValueChange={(id) => onSelect('dark', id)} /><ThemeModeSelector mode="light" profiles={profiles} value={assignments.light_profile_id} disabled={busy} onValueChange={(id) => onSelect('light', id)} /></> : <ThemeModeSelector mode="fixed" profiles={profiles} value={assignments.fixed_profile_id} disabled={busy} onValueChange={(id) => onSelect('fixed', id)} />}</CardContent></Card>
 }
 
 function ThemeWorkspace({ profile, draft, effectiveTheme, globalStyle, editorSlot, followInterfaceMode, sharedLabels, busy, onEditorSlotChange, onThemeChange, onProfileStyleChange, onAnsiChange }: { profile: ThemeProfile; draft: ThemeDraft; effectiveTheme: TerminalTheme; globalStyle: TerminalGlobalStyle; editorSlot: ThemeEditorSlot; followInterfaceMode: boolean; sharedLabels: string[]; busy: boolean; onEditorSlotChange: (slot: ThemeEditorSlot) => void; onThemeChange: <Key extends keyof TerminalTheme>(key: Key, value: TerminalTheme[Key]) => void; onProfileStyleChange: (draft: ThemeDraft) => void; onAnsiChange: (index: number, color: string) => void }) {
   return <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(18rem,0.8fr)]">
-    <div className="flex flex-col gap-4 lg:sticky lg:top-0"><Card><CardHeader className="flex flex-wrap items-center justify-between gap-3"><CardTitle className="flex min-w-0 flex-wrap items-center gap-2 text-sm"><SquareTerminal className="size-4 shrink-0" />实时终端预览<span className="text-muted-foreground">· {profile.name}</span>{sharedLabels.map((label) => <Badge key={label} variant="secondary">{label}</Badge>)}</CardTitle>{followInterfaceMode && <Tabs orientation="horizontal" value={editorSlot} onValueChange={(value) => onEditorSlotChange(value as ThemeEditorSlot)}><TabsList aria-label="预览模式" className="flex-row shrink-0"><TabsTrigger value="dark" className="px-3">Dark Mode</TabsTrigger><TabsTrigger value="light" className="px-3">Light Mode</TabsTrigger></TabsList></Tabs>}</CardHeader><CardContent><TerminalThemePreview theme={effectiveTheme} /></CardContent></Card><Card><CardHeader><CardTitle className="text-sm">ANSI 调色板</CardTitle></CardHeader><CardContent><AnsiPaletteEditor colors={draft.ansi} onChange={onAnsiChange} /></CardContent></Card></div>
+    <div className="flex flex-col gap-4 lg:sticky lg:top-0"><Card><CardHeader className="flex flex-wrap items-center justify-between gap-3"><CardTitle className="flex min-w-0 flex-wrap items-center gap-2 text-sm"><SquareTerminal className="size-4 shrink-0" />{t('实时终端预览')}<span className="text-muted-foreground">· {profile.name}</span>{sharedLabels.map((label) => <Badge key={label} variant="secondary">{label}</Badge>)}</CardTitle>{followInterfaceMode && <Tabs orientation="horizontal" value={editorSlot} onValueChange={(value) => onEditorSlotChange(value as ThemeEditorSlot)}><TabsList aria-label={t('预览模式')} className="flex-row shrink-0"><TabsTrigger value="dark" className="px-3">Dark Mode</TabsTrigger><TabsTrigger value="light" className="px-3">Light Mode</TabsTrigger></TabsList></Tabs>}</CardHeader><CardContent><TerminalThemePreview theme={effectiveTheme} /></CardContent></Card><Card><CardHeader><CardTitle className="text-sm">{t('ANSI 调色板')}</CardTitle></CardHeader><CardContent><AnsiPaletteEditor colors={draft.ansi} onChange={onAnsiChange} /></CardContent></Card></div>
     <div className="flex flex-col gap-4"><TerminalProfileStyleEditor draft={draft} globalStyle={globalStyle} disabled={busy} onDraftChange={onProfileStyleChange} /><TerminalThemeInspector theme={draft} onThemeChange={onThemeChange} /></div>
   </div>
 }
@@ -179,29 +181,29 @@ function BuiltinThemeResetControl({ canReset, dirty, saving, resetting, includes
       toast(resetResultMessage(result), 'success')
       setOpen(false)
     } catch (error) {
-      toast(`重置内置主题失败: ${error instanceof Error ? error.message : String(error)}`, 'error')
+      toast(t('重置内置主题失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
     } finally {
       onResettingChange(false)
     }
   }
   const disabled = !canReset || dirty || saving || resetting
-  const tooltip = dirty ? '请先保存或撤销当前主题修改' : saving ? '正在保存主题配置' : canReset ? '恢复当前绑定内置主题的默认样式' : '当前绑定没有可重置的内置主题'
-  return <><Tooltip><TooltipTrigger render={<span className="inline-flex shrink-0" />}><Button type="button" variant="outline" disabled={disabled} onClick={() => setOpen(true)}><RotateCcw data-icon="inline-start" />重置内置主题</Button></TooltipTrigger><TooltipContent>{tooltip}</TooltipContent></Tooltip><AlertDialog open={open} onOpenChange={(nextOpen) => { if (!resetting) setOpen(nextOpen) }}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>重置内置终端主题？</AlertDialogTitle><AlertDialogDescription>恢复当前 Dark/Light{includesFixed ? '/固定' : ''} 内置主题的颜色和备用样式，并重新跟随全局字体与光标。全局字体与光标配置不会被修改。</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel disabled={resetting}>取消</AlertDialogCancel><AlertDialogAction type="button" onClick={() => { void reset() }} disabled={resetting}>{resetting ? <><Spinner data-icon="inline-start" />重置中...</> : '确认重置'}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog></>
+  const tooltip = dirty ? t('请先保存或撤销当前主题修改') : saving ? t('正在保存主题配置') : canReset ? t('恢复当前绑定内置主题的默认样式') : t('当前绑定没有可重置的内置主题')
+  return <><Tooltip><TooltipTrigger render={<span className="inline-flex shrink-0" />}><Button type="button" variant="outline" disabled={disabled} onClick={() => setOpen(true)}><RotateCcw data-icon="inline-start" />{t('重置内置主题')}</Button></TooltipTrigger><TooltipContent>{tooltip}</TooltipContent></Tooltip><AlertDialog open={open} onOpenChange={(nextOpen) => { if (!resetting) setOpen(nextOpen) }}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>{t('重置内置终端主题？')}</AlertDialogTitle><AlertDialogDescription>{t('恢复当前 Dark/Light')}{includesFixed ? t('/固定') : ''} {t('内置主题的颜色和备用样式，并重新跟随全局字体与光标。全局字体与光标配置不会被修改。')}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel disabled={resetting}>{t('取消')}</AlertDialogCancel><AlertDialogAction type="button" onClick={() => { void reset() }} disabled={resetting}>{resetting ? <><Spinner data-icon="inline-start" />{t('重置中...')}</> : t('确认重置')}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog></>
 }
 
 function resetResultMessage(result: BuiltinThemeResetResult): string {
-  const labels = [result.dark_reset ? 'Dark' : null, result.light_reset ? 'Light' : null, result.fixed_reset ? '固定' : null].filter((label): label is string => label !== null)
-  if (labels.length === 0) return '当前绑定没有可重置的内置主题'
-  if (labels.length === 1 && labels[0] === '固定') return '已重置固定内置主题'
-  return `已重置 ${labels.join('、')} 内置主题`
+  const labels = [result.dark_reset ? 'Dark' : null, result.light_reset ? 'Light' : null, result.fixed_reset ? t('固定') : null].filter((label): label is string => label !== null)
+  if (labels.length === 0) return t('当前绑定没有可重置的内置主题')
+  if (labels.length === 1 && labels[0] === t('固定')) return t('已重置固定内置主题')
+  return t('已重置 ${} 内置主题', labels.join('、'))
 }
 
 function findProfile(profiles: ThemeProfile[], id: number) { return profiles.find((profile) => profile.id === id) }
 
 function fixedProfileSharing(assignments: ThemeAssignments): string[] {
   const labels: string[] = []
-  if (assignments.fixed_profile_id === assignments.dark_profile_id) labels.push('同时用于 Dark Mode')
-  if (assignments.fixed_profile_id === assignments.light_profile_id) labels.push('同时用于 Light Mode')
+  if (assignments.fixed_profile_id === assignments.dark_profile_id) labels.push(t('同时用于 Dark Mode'))
+  if (assignments.fixed_profile_id === assignments.light_profile_id) labels.push(t('同时用于 Light Mode'))
   return labels
 }
 

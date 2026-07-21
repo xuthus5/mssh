@@ -1,5 +1,7 @@
 import { create } from 'zustand'
 import { SessionService } from '@/lib/wails'
+import { t } from '@/i18n'
+
 
 export type ConnectState = 'idle' | 'connecting' | 'awaiting-host-key' | 'connected' | 'failed' | 'cancelling'
 
@@ -46,7 +48,7 @@ export const useConnectDialog = create<ConnectDialogState>((set) => ({
   setFingerprint: (attemptId, fingerprint, algorithm) => set({ attemptId, fingerprint, algorithm, state: 'awaiting-host-key' }),
   acceptHostKey: async () => {
     const { attemptId } = useConnectDialog.getState()
-    if (!attemptId) throw new Error('连接尝试尚未就绪')
+    if (!attemptId) throw new Error(t('连接尝试尚未就绪'))
     await SessionService.DecideHostKey(attemptId, true)
     set({ state: 'connecting', fingerprint: '', algorithm: '' })
   },

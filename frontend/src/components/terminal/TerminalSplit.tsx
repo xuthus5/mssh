@@ -21,6 +21,8 @@ import {
   type SplitDirection,
   type SplitNode,
 } from '@/components/terminal/splitTree'
+import { t } from '@/i18n'
+
 
 const MAX_PANES = 8
 const noFocusRequest: TerminalFocusRequest = { sequence: 0, targetTerminalID: null }
@@ -54,13 +56,13 @@ function ConnectionOverlay({ terminalID, onReconnect, onClose }: { terminalID: s
   return <div role="alert" aria-live="polite" className="absolute inset-0 z-10 grid place-items-center bg-background/70 p-6 backdrop-blur-[1px]">
     <div className="flex w-full max-w-sm flex-col items-center rounded-xl border border-border bg-card/95 p-5 text-center shadow-lg">
       {connecting ? <RefreshCw aria-hidden="true" className="mb-3 size-8 animate-spin text-primary" /> : <WifiOff aria-hidden="true" className="mb-3 size-8 text-destructive" />}
-      <h3 className="text-sm font-semibold text-foreground">{connecting ? '正在重新连接' : '连接已断开'}</h3>
+      <h3 className="text-sm font-semibold text-foreground">{connecting ? t('正在重新连接') : t('连接已断开')}</h3>
       <p className="mt-1 text-xs leading-5 text-muted-foreground">
-        {connecting ? '正在为当前终端创建新的 SSH 通道。' : '远端会话可能因空闲超时或网络中断而结束，可在当前终端中重新连接。'}
+        {connecting ? t('正在为当前终端创建新的 SSH 通道。') : t('远端会话可能因空闲超时或网络中断而结束，可在当前终端中重新连接。')}
       </p>
       <div className="mt-4 flex items-center gap-2">
-        <Button type="button" size="sm" variant="outline" disabled={connecting} onClick={onClose}><X />关闭终端</Button>
-        <Button type="button" size="sm" disabled={connecting} onClick={onReconnect}><RefreshCw />{connecting ? '正在重连' : '重新连接'}</Button>
+        <Button type="button" size="sm" variant="outline" disabled={connecting} onClick={onClose}><X />{t('关闭终端')}</Button>
+        <Button type="button" size="sm" disabled={connecting} onClick={onReconnect}><RefreshCw />{connecting ? t('正在重连') : t('重新连接')}</Button>
       </div>
     </div>
   </div>
@@ -101,7 +103,7 @@ function LeafView(props: TreeViewProps & { node: Extract<SplitNode, { kind: 'lea
   const request = props.focusRequest.targetTerminalID === terminalID ? props.focusRequest : noFocusRequest
   return <div className={`group relative h-full w-full min-h-0 min-w-0 flex-1 overflow-hidden ${selected ? 'ring-1 ring-inset ring-primary/35' : ''}`}>
     <TerminalEmulator key={props.node.id} terminalID={terminalID} active={props.active && selected} focusRequest={request} />
-    {props.paneCount > 1 ? <button type="button" title="关闭当前窗格" aria-label="关闭当前窗格"
+    {props.paneCount > 1 ? <button type="button" title={t('关闭当前窗格')} aria-label={t('关闭当前窗格')}
       disabled={props.closingID !== null} onClick={() => props.onClose(terminalID)}
       className="absolute right-2 top-2 z-20 grid size-6 place-items-center rounded-md bg-background/80 text-muted-foreground opacity-0 shadow-sm ring-1 ring-border backdrop-blur transition hover:bg-destructive hover:text-destructive-foreground group-hover:opacity-100 focus-visible:opacity-100 disabled:pointer-events-none">
       <X className="size-3.5" />
@@ -170,7 +172,7 @@ export const TerminalSplit = forwardRef<TerminalSplitHandle, Props>(function Ter
 
   const split = async (direction: SplitDirection) => {
     if (operationRef.current) return
-    if (terminalIDs(treeRef.current).length >= MAX_PANES) return void toast(`单个标签最多支持 ${MAX_PANES} 个终端窗格`, 'info')
+    if (terminalIDs(treeRef.current).length >= MAX_PANES) return void toast(t('单个标签最多支持 ${} 个终端窗格', MAX_PANES), 'info')
     const targetID = activePaneID && hasTerminal(treeRef.current, activePaneID) ? activePaneID : primaryID
     operationRef.current = true
     setBusy(true)
@@ -182,7 +184,7 @@ export const TerminalSplit = forwardRef<TerminalSplitHandle, Props>(function Ter
       requestFocus(terminalID)
     } catch (error: unknown) {
       logger.error('TerminalSplit: failed to open split', error)
-      toast(`创建分屏失败: ${error instanceof Error ? error.message : String(error)}`, 'error')
+      toast(t('创建分屏失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
     } finally {
       operationRef.current = false
       if (mountedRef.current) setBusy(false)
@@ -210,7 +212,7 @@ export const TerminalSplit = forwardRef<TerminalSplitHandle, Props>(function Ter
       requestFocus(result.focusID)
     } catch (error: unknown) {
       logger.error('TerminalSplit: failed to close pane', error)
-      toast(`关闭分屏失败: ${error instanceof Error ? error.message : String(error)}`, 'error')
+      toast(t('关闭分屏失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
     } finally {
       operationRef.current = false
       if (mountedRef.current) setBusy(false)
@@ -239,7 +241,7 @@ export const TerminalSplit = forwardRef<TerminalSplitHandle, Props>(function Ter
       requestFocus(nextID)
     } catch (error: unknown) {
       useAppStore.getState().setConnectionStatus(terminalID, 'error')
-      toast(`重新连接失败: ${error instanceof Error ? error.message : String(error)}`, 'error')
+      toast(t('重新连接失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
     } finally {
       operationRef.current = false
       if (mountedRef.current) setBusy(false)

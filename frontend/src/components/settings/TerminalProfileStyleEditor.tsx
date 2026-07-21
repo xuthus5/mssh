@@ -8,6 +8,8 @@ import { Switch } from '@/components/ui/switch'
 import { TerminalSelectionBackgroundField } from '@/components/settings/TerminalSelectionBackgroundField'
 import { effectiveDraftTheme, validTerminalFontFamily, validTerminalFontSize, type ThemeDraft } from '@/components/settings/themeEditorState'
 import type { TerminalGlobalStyle } from '../../../bindings/github.com/xuthus5/mssh/internal/model/models'
+import { t } from '@/i18n'
+
 
 const CURSOR_STYLE_OPTIONS = [
   { value: 'block', label: '块状' },
@@ -40,35 +42,35 @@ export function TerminalProfileStyleEditor({ draft, globalStyle, disabled = fals
 
   return <Card>
     <CardHeader>
-      <CardTitle className="flex items-center gap-2 text-sm"><Blend className="size-4" />当前主题字体与光标</CardTitle>
-      <p className="mt-1 text-sm text-muted-foreground">字体、光标样式和选区背景色默认继承全局配置。</p>
+      <CardTitle className="flex items-center gap-2 text-sm"><Blend className="size-4" />{t('当前主题字体与光标')}</CardTitle>
+      <p className="mt-1 text-sm text-muted-foreground">{t('字体、光标样式和选区背景色默认继承全局配置。')}</p>
     </CardHeader>
     <CardContent>
       <FieldGroup>
         <Field orientation="horizontal" data-disabled={disabled || undefined}>
           <FieldContent>
-            <FieldLabel htmlFor="terminal-profile-follow-global">跟随全局字体与光标</FieldLabel>
-            <FieldDescription>关闭后可为当前主题单独设置字体、光标样式和选区背景色；光标颜色始终属于主题。</FieldDescription>
+            <FieldLabel htmlFor="terminal-profile-follow-global">{t('跟随全局字体与光标')}</FieldLabel>
+            <FieldDescription>{t('关闭后可为当前主题单独设置字体、光标样式和选区背景色；光标颜色始终属于主题。')}</FieldDescription>
           </FieldContent>
           <Switch id="terminal-profile-follow-global" checked={draft.followGlobalStyle} disabled={disabled} onCheckedChange={(checked) => update('followGlobalStyle', checked)} />
         </Field>
         <Field data-disabled={fieldsDisabled || undefined} data-invalid={!fontFamilyValid}>
-          <FieldLabel htmlFor="terminal-profile-font-family">主题字体</FieldLabel>
-          <Input id="terminal-profile-font-family" aria-label="主题字体" aria-invalid={!fontFamilyValid} value={effective.fontFamily} disabled={fieldsDisabled} onChange={(event) => update('fontFamily', event.target.value)} />
-          {!fontFamilyValid && <FieldError>字体不能为空，且最多包含 256 个字符。</FieldError>}
+          <FieldLabel htmlFor="terminal-profile-font-family">{t('主题字体')}</FieldLabel>
+          <Input id="terminal-profile-font-family" aria-label={t('主题字体')} aria-invalid={!fontFamilyValid} value={effective.fontFamily} disabled={fieldsDisabled} onChange={(event) => update('fontFamily', event.target.value)} />
+          {!fontFamilyValid && <FieldError>{t('字体不能为空，且最多包含 256 个字符。')}</FieldError>}
         </Field>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field data-disabled={fieldsDisabled || undefined} data-invalid={!fontSizeValid}>
-            <FieldLabel htmlFor="terminal-profile-font-size">主题字号</FieldLabel>
-            <Input id="terminal-profile-font-size" aria-label="主题字号" aria-invalid={!fontSizeValid} type="number" min={8} max={48} value={fontSize} disabled={fieldsDisabled} onChange={(event) => changeFontSize(event.target.value)} />
-            {!fontSizeValid && <FieldError>字号必须是 8 到 48 的整数。</FieldError>}
+            <FieldLabel htmlFor="terminal-profile-font-size">{t('主题字号')}</FieldLabel>
+            <Input id="terminal-profile-font-size" aria-label={t('主题字号')} aria-invalid={!fontSizeValid} type="number" min={8} max={48} value={fontSize} disabled={fieldsDisabled} onChange={(event) => changeFontSize(event.target.value)} />
+            {!fontSizeValid && <FieldError>{t('字号必须是 8 到 48 的整数。')}</FieldError>}
           </Field>
           <Field data-disabled={fieldsDisabled || undefined}>
-            <FieldLabel>主题光标样式</FieldLabel>
-            <LabeledSelect ariaLabel="主题光标样式" value={effective.cursorStyle} options={CURSOR_STYLE_OPTIONS} disabled={fieldsDisabled} onValueChange={(value) => update('cursorStyle', value as ThemeDraft['cursorStyle'])} />
+            <FieldLabel>{t('主题光标样式')}</FieldLabel>
+            <LabeledSelect ariaLabel={t('主题光标样式')} value={effective.cursorStyle} options={CURSOR_STYLE_OPTIONS.map((item) => ({ ...item, label: t(item.label) }))} disabled={fieldsDisabled} onValueChange={(value) => update('cursorStyle', value as ThemeDraft['cursorStyle'])} />
           </Field>
         </div>
-        <TerminalSelectionBackgroundField id="terminal-profile-selection-background" ariaPrefix="主题" value={effective.selectionBackground} disabled={fieldsDisabled} onChange={(value) => update('selectionBackground', value)} />
+        <TerminalSelectionBackgroundField id="terminal-profile-selection-background" ariaPrefix={t('主题')} value={effective.selectionBackground} disabled={fieldsDisabled} onChange={(value) => update('selectionBackground', value)} />
       </FieldGroup>
     </CardContent>
   </Card>

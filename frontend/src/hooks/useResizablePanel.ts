@@ -1,5 +1,7 @@
 import { useEffect, useRef, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react'
 import { useAppStore } from '@/store/appStore'
+import { t } from '@/i18n'
+
 
 const DEFAULT_WIDTH = 280
 const MIN_WIDTH = 220
@@ -60,7 +62,7 @@ export function useResizablePanel() {
       onKeyDown: handleKeyDown,
       role: 'separator' as const,
       tabIndex: collapsed ? -1 : 0,
-      'aria-label': '调整侧边栏宽度',
+      'aria-label': t('调整侧边栏宽度'),
       'aria-orientation': 'vertical' as const,
       'aria-valuemin': MIN_WIDTH,
       'aria-valuemax': MAX_WIDTH,

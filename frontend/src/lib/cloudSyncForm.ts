@@ -6,6 +6,8 @@ import {
   type SyncConfigInput,
   type SyncEventStatus,
 } from '../../bindings/github.com/xuthus5/mssh/internal/model/models'
+import { t } from '@/i18n'
+
 
 export function createSyncInput(config?: SyncConfig): SyncConfigInput {
   return {
@@ -33,19 +35,19 @@ export function hasUnsavedSyncChanges(input: SyncConfigInput, config?: SyncConfi
 }
 
 export function syncProviderLabel(provider: SyncProvider): string {
-  return ({ gist: 'GitHub Gist', webdav: 'WebDAV', s3: 'S3' } as Record<string, string>)[provider] ?? '未配置'
+  return ({ gist: 'GitHub Gist', webdav: 'WebDAV', s3: 'S3' } as Record<string, string>)[provider] ?? t('未配置')
 }
 
 export function syncStateLabel(state: SyncState): string {
-  return ({ disabled: '未启用', idle: '待同步', syncing: '同步中', synced: '已同步', pending: '有本地变更', conflict: '存在冲突', error: '同步失败' } as Record<string, string>)[state] ?? '未知'
+  return ({ disabled: t('未启用'), idle: t('待同步'), syncing: t('同步中'), synced: t('已同步'), pending: t('有本地变更'), conflict: t('存在冲突'), error: t('同步失败') } as Record<string, string>)[state] ?? t('未知')
 }
 
 export function syncEventStatusLabel(status: SyncEventStatus): string {
-  return ({ success: '成功', failed: '失败', conflict: '冲突', noop: '无变化' } as Record<string, string>)[status] ?? '未知'
+  return ({ success: t('成功'), failed: t('失败'), conflict: t('冲突'), noop: t('无变化') } as Record<string, string>)[status] ?? t('未知')
 }
 
 export function formatSyncDate(value?: string): string {
-  if (!value) return '尚未同步'
+  if (!value) return t('尚未同步')
   const date = new Date(value)
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString('zh-CN')
 }

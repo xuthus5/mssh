@@ -16,6 +16,8 @@ import {
   type ActiveSurface,
   type WorkspaceID,
 } from '@/store/tabNavigation'
+import { t } from '@/i18n'
+
 
 function workspaceTabForSurface(activeSurface: ActiveSurface | null, workspaceTab: WorkspaceID): WorkspaceID {
   return activeSurface?.type === 'workspace' ? activeSurface.id : workspaceTab
@@ -60,11 +62,11 @@ export function applyTerminalPoolEviction(state: AppState, victimID: string): Pa
 
 export function announceTerminalPoolReclaim(victim: TerminalPoolVictim): void {
   if (!victim.owningTab) {
-    toast('已释放空闲终端实例以腾出连接池', 'info')
+    toast(t('已释放空闲终端实例以腾出连接池'), 'info')
     return
   }
   toast(
-    `已关闭标签「${victim.owningTab.title}」以腾出终端池。可从会话列表重新连接该会话。`,
+    t('已关闭标签「${}」以腾出终端池。可从会话列表重新连接该会话。', victim.owningTab.title),
     'warning',
   )
 }
@@ -104,7 +106,7 @@ export function ensureTerminalPoolCapacity(options: EnsureTerminalPoolCapacityOp
     if (!protectedID) return false
     const victim = describeTerminalPoolVictim(state, protectedID)
     if (victim.protected && !confirmProtected(victim)) {
-      toast('已取消打开新终端：终端池已满且未释放现有标签', 'info')
+      toast(t('已取消打开新终端：终端池已满且未释放现有标签'), 'info')
       return false
     }
     options.setState(applyTerminalPoolEviction(state, protectedID))
@@ -118,7 +120,7 @@ export async function openTerminalWithPoolCapacity(
   options?: Omit<EnsureTerminalPoolCapacityOptions, keyof TerminalPoolStoreAccess>,
 ): Promise<string> {
   if (!ensureTerminalPoolCapacity({ ...store, ...options })) {
-    throw new Error('终端池已满，用户取消释放现有终端')
+    throw new Error(t('终端池已满，用户取消释放现有终端'))
   }
   return open()
 }

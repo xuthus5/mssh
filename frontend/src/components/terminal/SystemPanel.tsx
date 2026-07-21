@@ -6,6 +6,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { logger } from '@/lib/logger'
 import { useToolPanelResize } from '@/hooks/useToolPanelResize'
 import { TerminalService } from '@/lib/wails'
+import { t } from '@/i18n'
+
 
 type Info = {
   cpu_percent: number; cpu_count: number; memory_used: number; memory_total: number
@@ -59,17 +61,17 @@ function Overview({ info }: { info: Info }) {
   return <div className="space-y-4">
     <div className="grid grid-cols-2 gap-2">
       <Metric icon={<Cpu />} label="CPU" value={`${info.cpu_percent.toFixed(0)}% (${info.cpu_count}c)`} />
-      <Metric icon={<MemoryStick />} label="内存" value={`${formatBytes(info.memory_used)}/${formatBytes(info.memory_total)}`} />
-      <Metric icon={<HardDrive />} label="磁盘" value={`${formatBytes(info.disk_used)}/${formatBytes(info.disk_total)}`} />
-      <Metric icon={<Network />} label="网络" value={network} />
+      <Metric icon={<MemoryStick />} label={t('内存')} value={`${formatBytes(info.memory_used)}/${formatBytes(info.memory_total)}`} />
+      <Metric icon={<HardDrive />} label={t('磁盘')} value={`${formatBytes(info.disk_used)}/${formatBytes(info.disk_total)}`} />
+      <Metric icon={<Network />} label={t('网络')} value={network} />
     </div>
     <section className="rounded-xl border border-border bg-background/30 p-3 text-xs shadow-sm">
-      <div className="mb-3 font-medium">系统详情</div>
+      <div className="mb-3 font-medium">{t('系统详情')}</div>
       <div className="grid grid-cols-2 gap-x-4 gap-y-2.5">
-        <DetailItem label="负载" value={`${info.load_1.toFixed(2)} / ${info.load_5.toFixed(2)} / ${info.load_15.toFixed(2)}`} />
-        <DetailItem label="运行" value={formatDuration(info.uptime_seconds)} />
-        <DetailItem label="系统" value={info.os_name || 'Linux'} wide />
-        <DetailItem label="内核" value={info.kernel_version || '未知'} wide />
+        <DetailItem label={t('负载')} value={`${info.load_1.toFixed(2)} / ${info.load_5.toFixed(2)} / ${info.load_15.toFixed(2)}`} />
+        <DetailItem label={t('运行')} value={formatDuration(info.uptime_seconds)} />
+        <DetailItem label={t('系统')} value={info.os_name || 'Linux'} wide />
+        <DetailItem label={t('内核')} value={info.kernel_version || t('未知')} wide />
         <DetailItem label="Swap" value={`${formatBytes(info.swap_used)}/${formatBytes(info.swap_total)}`} wide />
       </div>
     </section>
@@ -89,7 +91,7 @@ function Rank({ title, rows, cpu = false }: { title: string; rows: Process[]; cp
 function ProcessTable({ processes }: { processes: Process[] }) {
   return <div className="overflow-hidden rounded-xl border border-border shadow-sm">
     <div className="grid grid-cols-[55px_70px_1fr_65px] gap-2 bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-      <span>PID</span><span>用户</span><span>命令</span><span>资源</span>
+      <span>PID</span><span>{t('用户')}</span><span>{t('命令')}</span><span>{t('资源')}</span>
     </div>
     {processes.map((process) => <div key={process.pid} className="grid grid-cols-[55px_70px_1fr_65px] gap-2 border-t border-border px-3 py-2 text-xs">
       <span>{process.pid}</span><span className="truncate">{process.user}</span>
@@ -104,8 +106,8 @@ function ProcessesView({ processes, query, onQueryChange }: { processes: Process
   const cpuTop = useMemo(() => processes.slice().sort((left, right) => right.cpu_percent - left.cpu_percent).slice(0, 5), [processes])
   const memoryTop = useMemo(() => processes.slice().sort((left, right) => right.memory_bytes - left.memory_bytes).slice(0, 5), [processes])
   return <div className="space-y-3">
-    <Input value={query} onChange={(event) => onQueryChange(event.target.value)} placeholder="搜索 PID、用户或命令" />
-    <div className="grid grid-cols-2 gap-3"><Rank title="CPU Top 5" rows={cpuTop} cpu /><Rank title="内存 Top 5" rows={memoryTop} /></div>
+    <Input value={query} onChange={(event) => onQueryChange(event.target.value)} placeholder={t('搜索 PID、用户或命令')} />
+    <div className="grid grid-cols-2 gap-3"><Rank title="CPU Top 5" rows={cpuTop} cpu /><Rank title={t('内存 Top 5')} rows={memoryTop} /></div>
     <ProcessTable processes={filtered} />
   </div>
 }
@@ -162,16 +164,16 @@ export function SystemPanel({ terminalID, onClose }: { terminalID: string; onClo
   return <aside style={panel.panelStyle} className="absolute inset-y-0 right-0 z-20 flex flex-col border-l border-border bg-card shadow-xl" data-testid="system-panel">
     <div {...panel.resizeHandleProps} className="absolute inset-y-0 -left-1 z-30 w-2 cursor-col-resize touch-none outline-none after:absolute after:inset-y-0 after:left-1/2 after:w-px after:-translate-x-1/2 after:bg-transparent hover:after:bg-primary/60 focus-visible:after:bg-primary active:after:bg-primary" />
     <header className="flex items-center justify-between border-b border-border px-4 py-3">
-      <span className="flex items-center gap-2 text-sm font-semibold"><Server className="size-4" />系统监控</span>
-      <Button size="icon-xs" variant="ghost" aria-label="关闭系统监控" onClick={onClose}><X /></Button>
+      <span className="flex items-center gap-2 text-sm font-semibold"><Server className="size-4" />{t('系统监控')}</span>
+      <Button size="icon-xs" variant="ghost" aria-label={t('关闭系统监控')} onClick={onClose}><X /></Button>
     </header>
     <Tabs value={tab} onValueChange={setTab} className="flex min-h-0 flex-1 flex-col">
-      <TabsList className="mx-4 mt-3"><TabsTrigger value="overview">概览</TabsTrigger><TabsTrigger value="processes">进程</TabsTrigger></TabsList>
+      <TabsList className="mx-4 mt-3"><TabsTrigger value="overview">{t('概览')}</TabsTrigger><TabsTrigger value="processes">{t('进程')}</TabsTrigger></TabsList>
       <TabsContent value="overview" className="min-h-0 flex-1 overflow-y-auto p-4">
-        {system.failed ? <p className="text-sm text-destructive">系统信息采集失败</p> : system.info ? <Overview info={system.info} /> : <p className="text-sm text-muted-foreground">正在采集系统信息...</p>}
+        {system.failed ? <p className="text-sm text-destructive">{t('系统信息采集失败')}</p> : system.info ? <Overview info={system.info} /> : <p className="text-sm text-muted-foreground">{t('正在采集系统信息...')}</p>}
       </TabsContent>
       <TabsContent value="processes" className="min-h-0 flex-1 overflow-y-auto p-4">
-        {processState.failed ? <p className="text-sm text-destructive">进程信息采集失败</p> : <ProcessesView processes={processState.processes} query={query} onQueryChange={setQuery} />}
+        {processState.failed ? <p className="text-sm text-destructive">{t('进程信息采集失败')}</p> : <ProcessesView processes={processState.processes} query={query} onQueryChange={setQuery} />}
       </TabsContent>
     </Tabs>
   </aside>

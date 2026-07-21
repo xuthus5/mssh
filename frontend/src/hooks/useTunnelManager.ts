@@ -5,6 +5,8 @@ import { logger } from '@/lib/logger'
 import { TunnelService } from '@/lib/wails'
 import { useAppStore } from '@/store/appStore'
 import { TunnelType, type TunnelInput } from '../../bindings/github.com/xuthus5/mssh/internal/model/models'
+import { t } from '@/i18n'
+
 
 type TunnelRecord = NonNullable<Awaited<ReturnType<typeof TunnelService.List>>>[number]
 
@@ -32,7 +34,7 @@ function useTunnelStart(load: () => Promise<void>, setTunnels: Dispatch<SetState
       let id = Number((tunnel as Tunnel).id)
       if (!id) {
         const created = await TunnelService.Create(tunnelInput(tunnel))
-        if (!created) throw new Error('创建隧道失败')
+        if (!created) throw new Error(t('创建隧道失败'))
         id = created.id
       }
       await TunnelService.Start(id)
@@ -40,7 +42,7 @@ function useTunnelStart(load: () => Promise<void>, setTunnels: Dispatch<SetState
       setTunnels((items) => items.map((item) => item.id === String(id) ? { ...item, running: true } : item))
     } catch (error) {
       logger.error('tunnel start failed', error)
-      toast(`启动隧道失败: ${error instanceof Error ? error.message : String(error)}`, 'error')
+      toast(t('启动隧道失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
     }
   }, [load, setTunnels])
 }
@@ -51,7 +53,7 @@ function useTunnelStop(setTunnels: Dispatch<SetStateAction<Tunnel[]>>) {
       await TunnelService.Stop(Number(id))
       setTunnels((items) => items.map((item) => item.id === id ? { ...item, running: false } : item))
     } catch (error) {
-      toast(`停止隧道失败: ${error instanceof Error ? error.message : String(error)}`, 'error')
+      toast(t('停止隧道失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
     }
   }, [setTunnels])
 }
@@ -64,7 +66,7 @@ export function useTunnelManager(sessionID?: number) {
       const result = await TunnelService.List()
       setTunnels((result ?? []).filter((item) => sessionID === undefined || item.session_id === sessionID).map((item) => mapTunnel(item, states)))
     } catch (error) {
-      toast(`加载隧道失败: ${error instanceof Error ? error.message : String(error)}`, 'error')
+      toast(t('加载隧道失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
     }
   }, [sessionID, states])
   useEffect(() => { setTunnels((items) => items.map((item) => ({ ...item, running: states[item.id] === 'running' }))) }, [states])

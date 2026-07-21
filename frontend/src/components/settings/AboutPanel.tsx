@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { logger } from '@/lib/logger'
+import { t } from '@/i18n'
+
 
 interface AboutState {
   currentVersion: string
@@ -13,8 +15,8 @@ interface AboutState {
 }
 
 export function AboutPanel() {
-  const [about, setAbout] = useState<AboutState>({ currentVersion: '加载中…', repositoryURL: 'https://github.com/xuthus5/mssh' })
-  const [latestVersion, setLatestVersion] = useState('尚未检查')
+  const [about, setAbout] = useState<AboutState>({ currentVersion: t('加载中…'), repositoryURL: 'https://github.com/xuthus5/mssh' })
+  const [latestVersion, setLatestVersion] = useState(t('尚未检查'))
   const [releaseURL, setReleaseURL] = useState('')
   const [checking, setChecking] = useState(false)
   const [message, setMessage] = useState('')
@@ -22,7 +24,7 @@ export function AboutPanel() {
   useEffect(() => {
     AboutService.Info().then((info) => setAbout({ currentVersion: info.current_version, repositoryURL: info.repository_url })).catch((error: unknown) => {
       logger.error('load about info failed', error)
-      setAbout((current) => ({ ...current, currentVersion: '未知' }))
+      setAbout((current) => ({ ...current, currentVersion: t('未知') }))
     })
   }, [])
 
@@ -31,12 +33,12 @@ export function AboutPanel() {
     setMessage('')
     try {
       const update = await AboutService.CheckUpdate()
-      if (!update) throw new Error('未获取到版本信息')
+      if (!update) throw new Error(t('未获取到版本信息'))
       setLatestVersion(update.latest_version)
       setReleaseURL(update.release_url)
-      setMessage(update.update_available ? '发现新版本，可前往发布页下载。' : '当前已是最新版本。')
+      setMessage(update.update_available ? t('发现新版本，可前往发布页下载。') : t('当前已是最新版本。'))
     } catch (error) {
-      setMessage(`检查更新失败：${error instanceof Error ? error.message : String(error)}`)
+      setMessage(t('检查更新失败：${}', error instanceof Error ? error.message : String(error)))
     } finally {
       setChecking(false)
     }
@@ -50,15 +52,15 @@ export function AboutPanel() {
     <Card className="rounded-xl border shadow-sm">
       <CardHeader><CardTitle className="text-base">MSSH</CardTitle></CardHeader>
       <CardContent className="grid gap-3 text-sm">
-        <div className="flex items-center justify-between gap-4"><span className="text-muted-foreground">当前版本</span><span className="font-mono">{about.currentVersion}</span></div>
-        <div className="flex items-center justify-between gap-4"><span className="text-muted-foreground">社区最新版本</span><span className="font-mono">{latestVersion}</span></div>
+        <div className="flex items-center justify-between gap-4"><span className="text-muted-foreground">{t('当前版本')}</span><span className="font-mono">{about.currentVersion}</span></div>
+        <div className="flex items-center justify-between gap-4"><span className="text-muted-foreground">{t('社区最新版本')}</span><span className="font-mono">{latestVersion}</span></div>
       </CardContent>
     </Card>
     {message && <Alert><AlertDescription>{message}</AlertDescription></Alert>}
     <div className="flex flex-wrap gap-2">
-      <Button onClick={() => { void checkUpdate() }} disabled={checking}><RefreshCw className={checking ? 'animate-spin' : ''} />{checking ? '检查中…' : '检查更新'}</Button>
-      {releaseURL && <Button variant="outline" onClick={() => openURL(releaseURL)}><ExternalLink />查看发布页</Button>}
-      <Button variant="outline" onClick={() => openURL(about.repositoryURL)}><Code2 />GitHub 社区</Button>
+      <Button onClick={() => { void checkUpdate() }} disabled={checking}><RefreshCw className={checking ? 'animate-spin' : ''} />{checking ? t('检查中…') : t('检查更新')}</Button>
+      {releaseURL && <Button variant="outline" onClick={() => openURL(releaseURL)}><ExternalLink />{t('查看发布页')}</Button>}
+      <Button variant="outline" onClick={() => openURL(about.repositoryURL)}><Code2 />{t('GitHub 社区')}</Button>
     </div>
     <p className="break-all text-xs text-muted-foreground">{about.repositoryURL}</p>
   </div>

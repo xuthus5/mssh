@@ -1,6 +1,8 @@
 import type { RefObject } from 'react'
 import type { IDisposable, Terminal } from '@xterm/xterm'
 import { useTerminalDirectoryStore } from '@/store/terminalDirectoryStore'
+import { t } from '@/i18n'
+
 
 export const MANUAL_TERMINAL_DIRECTORY_REPORT = "printf '\\033]7;file://%s%s\\007' \"$HOSTNAME\" \"$PWD\"\r"
 export const TERMINAL_DIRECTORY_REPORT_TIMEOUT_MS = 3000
@@ -51,7 +53,7 @@ export function waitForTerminalWorkingDirectory(terminalID: string, previousRevi
     let unsubscribe = () => {}
     const timeout = window.setTimeout(() => {
       unsubscribe()
-      reject(new Error('终端未返回 OSC 7 工作目录信息'))
+      reject(new Error(t('终端未返回 OSC 7 工作目录信息')))
     }, timeoutMs)
     unsubscribe = useTerminalDirectoryStore.subscribe((state) => {
       const revision = state.revisions[terminalID] ?? 0

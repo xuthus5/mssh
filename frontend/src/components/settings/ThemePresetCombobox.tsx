@@ -31,9 +31,9 @@ export function ThemePresetCombobox({ presets, value, onValueChange }: Props) {
       const preset = presetByName.get(name ?? '')
       if (preset) onValueChange(preset)
     }}>
-      <ComboboxInput aria-label="主题预设" placeholder="自定义主题 · 搜索预设" className="w-full" />
+      <ComboboxInput aria-label={t('主题预设')} placeholder={t('自定义主题 · 搜索预设')} className="w-full" />
       <ComboboxContent>
-        <ComboboxEmpty>未找到主题预设</ComboboxEmpty>
+        <ComboboxEmpty>{t('未找到主题预设')}</ComboboxEmpty>
         <ComboboxList>{(name) => {
           const preset = presetByName.get(name)
           if (!preset) return null
@@ -45,10 +45,12 @@ export function ThemePresetCombobox({ presets, value, onValueChange }: Props) {
       </ComboboxContent>
     </Combobox>
     <div className="flex items-center gap-2 text-xs text-muted-foreground">
-      <span>当前预设</span>
-      <span className="font-medium text-foreground">{value || '自定义'}</span>
+      <span>{t('当前预设')}</span>
+      <span className="font-medium text-foreground">{value || t('自定义')}</span>
       {selectedPreset && <PresetPalette preset={selectedPreset} />}
     </div>
   </div>
 }
 import { useMemo } from 'react'
+import { t } from '@/i18n'
+

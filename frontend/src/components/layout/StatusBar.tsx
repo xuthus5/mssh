@@ -5,6 +5,8 @@ import { connectionStatusVisual } from '@/lib/connectionStatusVisual'
 import { logger } from '@/lib/logger'
 import { useAppStore } from '@/store/appStore'
 import { TerminalService } from '@/lib/wails'
+import { t } from '@/i18n'
+
 
 type SystemInfo = {
   cpu_percent: number
@@ -75,15 +77,15 @@ function useSystemInfo(terminalID: string | undefined, connected: boolean, visib
 }
 
 function SystemInfoBar({ info, failed }: { info: SystemInfo | null; failed: boolean }) {
-  if (failed) return <span className="text-destructive">系统信息采集失败</span>
+  if (failed) return <span className="text-destructive">{t('系统信息采集失败')}</span>
   if (!info) return null
   return (
-    <div className="flex items-center gap-3 whitespace-nowrap" aria-label="系统信息">
+    <div className="flex items-center gap-3 whitespace-nowrap" aria-label={t('系统信息')}>
       <span className="flex items-center gap-1" title="CPU"><Cpu className="size-3.5" />{info.cpu_percent.toFixed(0)}% ({info.cpu_count}c)</span>
-      <span className="flex items-center gap-1" title="内存"><MemoryStick className="size-3.5" />{formatBytes(info.memory_used)}/{formatBytes(info.memory_total)}</span>
-      <span className="flex items-center gap-1" title="磁盘"><HardDrive className="size-3.5" />{formatBytes(info.disk_used)}/{formatBytes(info.disk_total)}</span>
-      <span className="flex items-center gap-1" title="下载"><ArrowDown className="size-3.5" />{formatBytes(info.download_rate)}/s</span>
-      <span className="flex items-center gap-1" title="上传"><ArrowUp className="size-3.5" />{formatBytes(info.upload_rate)}/s</span>
+      <span className="flex items-center gap-1" title={t('内存')}><MemoryStick className="size-3.5" />{formatBytes(info.memory_used)}/{formatBytes(info.memory_total)}</span>
+      <span className="flex items-center gap-1" title={t('磁盘')}><HardDrive className="size-3.5" />{formatBytes(info.disk_used)}/{formatBytes(info.disk_total)}</span>
+      <span className="flex items-center gap-1" title={t('下载')}><ArrowDown className="size-3.5" />{formatBytes(info.download_rate)}/s</span>
+      <span className="flex items-center gap-1" title={t('上传')}><ArrowUp className="size-3.5" />{formatBytes(info.upload_rate)}/s</span>
     </div>
   )
 }

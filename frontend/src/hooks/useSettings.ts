@@ -6,6 +6,8 @@ import { toast } from '@/components/ui/toast'
 import { KeyType } from '../../bindings/github.com/xuthus5/mssh/internal/model/models'
 import { settingEntry, useGeneralSettings } from '@/hooks/useGeneralSettings'
 import { useSFTPSettings } from '@/hooks/useSFTPSettings'
+import { t } from '@/i18n'
+
 
 export type { GeneralSettings } from '@/hooks/useGeneralSettings'
 
@@ -68,7 +70,7 @@ function keyMaterial(key: { id: number; name: string; type: KeyType; private_key
 
 function keyOperationFailed(action: string, error: unknown) {
   logger.error(`${action} failed`, error)
-  toast(`${action}失败: ${error instanceof Error ? error.message : String(error)}`, 'error')
+  toast(t('${}失败: ${}', action, error instanceof Error ? error.message : String(error)), 'error')
 }
 
 function useSystemFonts() {
@@ -95,7 +97,7 @@ export function useKeySettings() {
       const material = keyMaterial(result, bits)
       setKeys((current) => [...current, keyInfo(result, bits)])
       return material
-    } catch (error) { keyOperationFailed('生成密钥', error); return undefined }
+    } catch (error) { keyOperationFailed(t('生成密钥'), error); return undefined }
   }, [])
   const importKey = useCallback(async (name: string, privateKey: string) => {
     try {
@@ -104,7 +106,7 @@ export function useKeySettings() {
       const imported = keyInfo(result, 0)
       setKeys((current) => [...current, imported])
       return imported
-    } catch (error) { keyOperationFailed('导入密钥', error); return undefined }
+    } catch (error) { keyOperationFailed(t('导入密钥'), error); return undefined }
   }, [])
   const deleteKey = useCallback(async (id: string) => {
     try { await KeyService.Delete(Number(id)); setKeys((current) => current.filter((key) => key.id !== id)) }
@@ -112,11 +114,11 @@ export function useKeySettings() {
   }, [])
   const exportKey = useCallback(async (id: string) => {
     try { return await KeyService.ExportPublicKey(Number(id)) }
-    catch (error) { keyOperationFailed('复制公钥', error); return undefined }
+    catch (error) { keyOperationFailed(t('复制公钥'), error); return undefined }
   }, [])
   const loadKeyMaterial = useCallback(async (id: string) => {
     try { const result = await KeyService.GetMaterial(Number(id)); return result ? keyMaterial(result, 0) : undefined }
-    catch (error) { keyOperationFailed('读取密钥', error); return undefined }
+    catch (error) { keyOperationFailed(t('读取密钥'), error); return undefined }
   }, [])
   const updateKey = useCallback(async (material: KeyMaterial) => {
     try {
@@ -125,13 +127,13 @@ export function useKeySettings() {
       const updated = keyMaterial(result, material.bits)
       setKeys((current) => current.map((key) => key.id === updated.id ? keyInfo(result, material.bits) : key))
       return updated
-    } catch (error) { keyOperationFailed('更新密钥', error); return undefined }
+    } catch (error) { keyOperationFailed(t('更新密钥'), error); return undefined }
   }, [])
   const selectKeyImportFile = useCallback(async (): Promise<KeyImportFile | undefined> => {
     try {
       const file = await KeyService.SelectImportFile()
       return file ? { name: file.name, privateKey: file.private_key } : undefined
-    } catch (error) { keyOperationFailed('读取私钥文件', error); return undefined }
+    } catch (error) { keyOperationFailed(t('读取私钥文件'), error); return undefined }
   }, [])
   useEffect(() => { void listKeys() }, [listKeys])
   return { keys, listKeys, generateKey, importKey, deleteKey, exportKey, loadKeyMaterial, updateKey, selectKeyImportFile }
@@ -148,8 +150,8 @@ function useSyncSettings() {
       revision.current++
       await persistSync(config)
       setSync(config)
-      toast('同步配置已保存', 'success')
-    } catch (error) { keyOperationFailed('保存同步配置', error) }
+      toast(t('同步配置已保存'), 'success')
+    } catch (error) { keyOperationFailed(t('保存同步配置'), error) }
   }, [persistSync])
   const loadSync = useCallback(async () => {
     try {
@@ -169,22 +171,22 @@ function useSyncSettings() {
       toast(action, 'success')
     } catch (error) { keyOperationFailed(action, error) }
   }, [loadSync, persistSync])
-  const testCloud = useCallback(async (config: SyncConfig) => { await runCloud('云同步连接成功', config, () => SyncService.TestCloudConnection(config.url, config.username, config.password)) }, [runCloud])
-  const pushCloud = useCallback(async (config: SyncConfig) => { await runCloud('配置已上传到云端', config, () => SyncService.SyncToCloud(config.url, config.username, config.password)) }, [runCloud])
-  const pullCloud = useCallback(async (config: SyncConfig) => { await runCloud('云端配置已导入', config, () => SyncService.SyncFromCloud(config.url, config.username, config.password)) }, [runCloud])
+  const testCloud = useCallback(async (config: SyncConfig) => { await runCloud(t('云同步连接成功'), config, () => SyncService.TestCloudConnection(config.url, config.username, config.password)) }, [runCloud])
+  const pushCloud = useCallback(async (config: SyncConfig) => { await runCloud(t('配置已上传到云端'), config, () => SyncService.SyncToCloud(config.url, config.username, config.password)) }, [runCloud])
+  const pullCloud = useCallback(async (config: SyncConfig) => { await runCloud(t('云端配置已导入'), config, () => SyncService.SyncFromCloud(config.url, config.username, config.password)) }, [runCloud])
   return { sync, saveSync, testCloud, pushCloud, pullCloud }
 }
 
 function useConfigTransfer() {
   const exportConfig = useCallback(async () => {
     try {
-      const path = await Dialogs.SaveFile({ Title: '导出 MSSH 加密备份', Filename: 'mssh-backup.msshbackup', CanCreateDirectories: true, Filters: [{ DisplayName: 'MSSH Backup', Pattern: '*.msshbackup' }] })
+      const path = await Dialogs.SaveFile({ Title: t('导出 MSSH 加密备份'), Filename: 'mssh-backup.msshbackup', CanCreateDirectories: true, Filters: [{ DisplayName: 'MSSH Backup', Pattern: '*.msshbackup' }] })
       if (path) await SyncService.Export(path)
     } catch (error) { logger.debug('exportConfig error', error) }
   }, [])
   const importConfig = useCallback(async () => {
     try {
-      const selected = await Dialogs.OpenFile({ Title: '导入 MSSH 加密备份', CanChooseFiles: true, AllowsMultipleSelection: false, Filters: [{ DisplayName: 'MSSH Backup', Pattern: '*.msshbackup' }] })
+      const selected = await Dialogs.OpenFile({ Title: t('导入 MSSH 加密备份'), CanChooseFiles: true, AllowsMultipleSelection: false, Filters: [{ DisplayName: 'MSSH Backup', Pattern: '*.msshbackup' }] })
       const path = typeof selected === 'string' ? selected : selected[0]
       if (path) await SyncService.Import(path)
     } catch (error) { logger.debug('importConfig error', error) }
