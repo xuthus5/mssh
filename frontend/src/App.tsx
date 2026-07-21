@@ -18,6 +18,7 @@ import { WorkspacePersistence } from '@/components/layout/WorkspacePersistence'
 import { createAppSyncDataReload, hotReloadSessionWorkspace, registerSyncDataReload } from '@/lib/syncDataReload'
 import { getClipboard } from '@/lib/clipboard'
 import { t } from '@/i18n'
+import { VaultGate } from '@/components/security/VaultGate'
 
 
 function activeTab(state: AppState): Tab | undefined {
@@ -130,10 +131,12 @@ function AppShell() {
 
 export default function App() {
   return (
-    <div className="flex h-screen w-screen flex-col bg-background">
-      <SessionWorkspaceProvider>
-        <AppShell />
-      </SessionWorkspaceProvider>
-    </div>
+    <VaultGate>
+      <div className="flex h-screen w-screen flex-col bg-background">
+        <SessionWorkspaceProvider>
+          <AppShell />
+        </SessionWorkspaceProvider>
+      </div>
+    </VaultGate>
   )
 }

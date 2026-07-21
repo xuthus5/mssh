@@ -39,6 +39,16 @@ func NewKeyService(db *sql.DB, crypto KeyCrypto, logger *slog.Logger) *KeyServic
 	return &KeyService{db: db, crypto: crypto, logger: logger}
 }
 
+func (k *KeyService) requireCrypto() error {
+	if k.crypto == nil {
+		return ErrVaultLocked
+	}
+	if runtime, ok := k.crypto.(*CryptoRuntime); ok {
+		return runtime.RequireUnlocked()
+	}
+	return nil
+}
+
 //wails:ignore
 func (k *KeyService) SetFilePicker(picker keyFilePicker) {
 	k.picker = picker
@@ -72,6 +82,9 @@ func (k *KeyService) Generate(name string, keyType model.KeyType, bits int) (*mo
 		return nil, fmt.Errorf("generate key: %w", err)
 	}
 
+	if err := k.requireCrypto(); err != nil {
+		return nil, fmt.Errorf("generate key: %w", err)
+	}
 	encrypted, err := k.crypto.Encrypt(privPEM)
 	if err != nil {
 		return nil, fmt.Errorf("generate key: %w", err)
@@ -101,6 +114,9 @@ func (k *KeyService) Import(name, privateKeyPEM string) (*model.SSHKey, error) {
 		return nil, fmt.Errorf("import key: %w", err)
 	}
 
+	if err := k.requireCrypto(); err != nil {
+		return nil, fmt.Errorf("import key: %w", err)
+	}
 	encrypted, err := k.crypto.Encrypt([]byte(privateKeyPEM))
 	if err != nil {
 		return nil, fmt.Errorf("import key: %w", err)

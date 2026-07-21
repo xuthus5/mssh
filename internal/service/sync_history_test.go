@@ -19,7 +19,7 @@ func TestSyncHistoryDeduplicatesAndRestoresVersion(t *testing.T) {
 	created, err := store.CreateSession(db, model.Session{Name: "before", Host: "127.0.0.1", Port: 22, Username: "root", AuthMethod: model.AuthPassword, KeepAlive: 30, TermType: "xterm"})
 	require.NoError(t, err)
 	lifecycle := &fakeSyncLifecycle{}
-	service := NewSyncService(db, testutil.NewTestLogger(), WithSyncDataDir(t.TempDir()), WithSyncLifecycle(lifecycle))
+	service := newTestSyncService(db, syncTestMasterKey, WithSyncDataDir(t.TempDir()), WithSyncLifecycle(lifecycle))
 	first, err := service.saveCurrentVersion(model.SyncProviderGist, "manual", false)
 	require.NoError(t, err)
 	second, err := service.saveCurrentVersion(model.SyncProviderGist, "manual", false)
@@ -40,7 +40,7 @@ func TestSyncHistoryDeduplicatesAndRestoresVersion(t *testing.T) {
 
 func TestSyncRetentionDeletesOldUnprotectedVersions(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	service := NewSyncService(db, testutil.NewTestLogger(), WithSyncDataDir(t.TempDir()))
+	service := newTestSyncService(db, syncTestMasterKey, WithSyncDataDir(t.TempDir()))
 	require.NoError(t, service.ensureVersionDirectory())
 	for index := 0; index < 3; index++ {
 		fileName := time.Now().AddDate(0, 0, -index-2).Format("20060102") + string(rune('a'+index)) + syncBackupFileName

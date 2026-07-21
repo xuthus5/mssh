@@ -12,7 +12,9 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
+	backupcrypto "github.com/xuthus5/mssh/internal/crypto"
 	"github.com/xuthus5/mssh/internal/model"
 )
 
@@ -36,6 +38,9 @@ type SyncService struct {
 	logger          *slog.Logger
 	dataDir         string
 	crypto          KeyCrypto
+	secretSource    func() (string, error)
+	vaultSource     func() (*backupcrypto.VaultFile, error)
+	vaultInstaller  func(password string, vault backupcrypto.VaultFile) error
 	eventBus        EventBus
 	lifecycle       syncLifecycle
 	providerFactory syncProviderFactory
@@ -75,7 +80,20 @@ func (s *SyncService) Export(path string) error {
 	if err != nil {
 		return fmt.Errorf("export: %w", err)
 	}
-	content, err := encodeEncryptedSnapshot(data, masterKey)
+	fingerprint, err := snapshotFingerprint(data)
+	if err != nil {
+		return fmt.Errorf("export: %w", err)
+	}
+	deviceID, err := s.deviceID()
+	if err != nil {
+		return fmt.Errorf("export: %w", err)
+	}
+	vault, err := s.artifactVault()
+	if err != nil {
+		return fmt.Errorf("export: %w", err)
+	}
+	metadata := syncArtifactMetadata{SnapshotFingerprint: fingerprint, DeviceID: deviceID, CreatedAt: time.Now().UTC()}
+	content, err := encodeSyncArtifact(data, masterKey, metadata, vault)
 	if err != nil {
 		return fmt.Errorf("export: %w", err)
 	}
@@ -123,22 +141,6 @@ func (s *SyncService) Import(path string) error {
 	s.logger.Info("imported encrypted configuration", "path", path)
 	outcome = "success"
 	return nil
-}
-
-func (s *SyncService) masterKey() (string, error) {
-	var raw string
-	err := s.db.QueryRow("SELECT value FROM settings WHERE key = ?", SyncMasterKeySetting).Scan(&raw)
-	if errors.Is(err, sql.ErrNoRows) {
-		return "", errors.New("master key is not configured")
-	}
-	if err != nil {
-		return "", fmt.Errorf("read master key: %w", err)
-	}
-	var key string
-	if err := json.Unmarshal([]byte(raw), &key); err != nil || len(key) < 12 {
-		return "", errors.New("master key is invalid")
-	}
-	return key, nil
 }
 
 func (s *SyncService) snapshot() (ExportData, error) {

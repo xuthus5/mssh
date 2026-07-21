@@ -53,7 +53,7 @@ func TestSyncEnginePushNoopConflictAndResolveCloud(t *testing.T) {
 	require.NoError(t, err)
 	provider := &fakeSyncProvider{}
 	lifecycle := &fakeSyncLifecycle{}
-	service := NewSyncService(db, testutil.NewTestLogger(), WithSyncDataDir(t.TempDir()), WithSyncProviderFactory(fakeSyncProviderFactory{provider}), WithSyncLifecycle(lifecycle))
+	service := newTestSyncService(db, syncTestMasterKey, WithSyncDataDir(t.TempDir()), WithSyncProviderFactory(fakeSyncProviderFactory{provider}), WithSyncLifecycle(lifecycle))
 	_, err = service.SaveConfig(syncTestConfigInput())
 	require.NoError(t, err)
 
@@ -90,7 +90,7 @@ func TestSyncEnginePushNoopConflictAndResolveCloud(t *testing.T) {
 }
 
 func TestSyncEngineRejectsConcurrentOperation(t *testing.T) {
-	service := NewSyncService(testutil.NewTestDB(t), testutil.NewTestLogger())
+	service := newTestSyncService(testutil.NewTestDB(t), syncTestMasterKey)
 	service.operationMu.Lock()
 	defer service.operationMu.Unlock()
 	_, err := service.SyncNow()
@@ -104,7 +104,7 @@ func TestSyncEngineDownloadsRemoteOnlyChange(t *testing.T) {
 	require.NoError(t, err)
 	provider := &fakeSyncProvider{}
 	lifecycle := &fakeSyncLifecycle{}
-	service := NewSyncService(db, testutil.NewTestLogger(), WithSyncDataDir(t.TempDir()), WithSyncProviderFactory(fakeSyncProviderFactory{provider}), WithSyncLifecycle(lifecycle))
+	service := newTestSyncService(db, syncTestMasterKey, WithSyncDataDir(t.TempDir()), WithSyncProviderFactory(fakeSyncProviderFactory{provider}), WithSyncLifecycle(lifecycle))
 	_, err = service.SaveConfig(syncTestConfigInput())
 	require.NoError(t, err)
 	_, err = service.SyncNow()
@@ -124,7 +124,7 @@ func TestSyncEngineManualDirectionsAndLocalConflictResolution(t *testing.T) {
 	_, err := store.CreateSession(db, model.Session{Name: "initial", Host: "127.0.0.1", Port: 22, Username: "root", AuthMethod: model.AuthPassword, KeepAlive: 30, TermType: "xterm"})
 	require.NoError(t, err)
 	provider := &fakeSyncProvider{}
-	service := NewSyncService(db, testutil.NewTestLogger(), WithSyncDataDir(t.TempDir()), WithSyncProviderFactory(fakeSyncProviderFactory{provider}))
+	service := newTestSyncService(db, syncTestMasterKey, WithSyncDataDir(t.TempDir()), WithSyncProviderFactory(fakeSyncProviderFactory{provider}))
 	_, err = service.SaveConfig(syncTestConfigInput())
 	require.NoError(t, err)
 	_, err = service.PushNow()
@@ -146,14 +146,14 @@ func TestSyncEngineManualDirectionsAndLocalConflictResolution(t *testing.T) {
 	artifact, err := decodeSyncArtifact(provider.remote.Content, syncTestMasterKey)
 	require.NoError(t, err)
 	restoredDB := testutil.NewTestDB(t)
-	require.NoError(t, NewSyncService(restoredDB, testutil.NewTestLogger()).restore(artifact.Data))
+	require.NoError(t, newTestSyncService(restoredDB, syncTestMasterKey).restore(artifact.Data))
 	assert.ElementsMatch(t, []string{"pulled", "local-change"}, syncSessionNames(t, restoredDB))
 }
 
 func TestSyncServiceTestsProviderAndRecordsEvent(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	provider := &fakeSyncProvider{}
-	service := NewSyncService(db, testutil.NewTestLogger(), WithSyncProviderFactory(fakeSyncProviderFactory{provider}))
+	service := newTestSyncService(db, syncTestMasterKey, WithSyncProviderFactory(fakeSyncProviderFactory{provider}))
 	require.NoError(t, service.TestProvider(syncTestConfigInput()))
 	assert.True(t, provider.tested)
 	events, err := service.ListEvents()
@@ -172,7 +172,7 @@ func TestSyncConflictUsesLogicalLocalVersionNumber(t *testing.T) {
 	remote := remoteArtifactForTest(t, "remote")
 	artifact, err := decodeSyncArtifact(remote.Content, syncTestMasterKey)
 	require.NoError(t, err)
-	service := NewSyncService(db, testutil.NewTestLogger())
+	service := newTestSyncService(db, syncTestMasterKey)
 	result, err := service.createConflict(defaultSyncConfig(), syncCurrentSnapshot{Fingerprint: "local-fingerprint"}, artifact, remote.ETag)
 	require.NoError(t, err)
 	require.NotNil(t, result.Conflict)
@@ -184,12 +184,12 @@ func remoteArtifactForTest(t *testing.T, sessionName string) syncRemoteObject {
 	db := testutil.NewTestDB(t)
 	_, err := store.CreateSession(db, model.Session{Name: sessionName, Host: "10.0.0.1", Port: 22, Username: "root", AuthMethod: model.AuthPassword, KeepAlive: 30, TermType: "xterm"})
 	require.NoError(t, err)
-	data, err := NewSyncService(db, testutil.NewTestLogger()).snapshot()
+	data, err := newTestSyncService(db, syncTestMasterKey).snapshot()
 	require.NoError(t, err)
 	fingerprint, err := snapshotFingerprint(data)
 	require.NoError(t, err)
 	metadata := syncArtifactMetadata{VersionID: "remote-version-" + sessionName, VersionNumber: 2, SnapshotFingerprint: fingerprint, CreatedAt: time.Now().UTC()}
-	content, err := encodeSyncArtifact(data, syncTestMasterKey, metadata)
+	content, err := encodeSyncArtifact(data, syncTestMasterKey, metadata, nil)
 	require.NoError(t, err)
 	return syncRemoteObject{Content: content, ETag: `"remote"`}
 }

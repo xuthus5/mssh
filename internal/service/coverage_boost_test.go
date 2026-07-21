@@ -100,7 +100,7 @@ func TestFileServiceCreateTransferMissingSession(t *testing.T) {
 func TestSyncServiceSaveGistIDAndProviderHelpers(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	crypto := syncTestCrypto{key: []byte("01234567890123456789012345678901")}
-	service := NewSyncService(db, testutil.NewTestLogger(), WithSyncDataDir(t.TempDir()), WithSyncCrypto(crypto))
+	service := newTestSyncService(db, syncTestMasterKey, WithSyncDataDir(t.TempDir()), WithSyncCrypto(crypto))
 
 	config := defaultSyncConfig()
 	config.Provider = model.SyncProviderGist
@@ -131,7 +131,7 @@ func TestSyncServiceSaveGistIDAndProviderHelpers(t *testing.T) {
 func TestValidateProviderReadyAndProviderSecretsBranches(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	crypto := syncTestCrypto{key: []byte("01234567890123456789012345678901")}
-	service := NewSyncService(db, testutil.NewTestLogger(), WithSyncCrypto(crypto))
+	service := newTestSyncService(db, syncTestMasterKey, WithSyncCrypto(crypto))
 
 	require.ErrorContains(t, validateProviderReady(model.SyncConfig{Provider: model.SyncProviderGist}, syncProviderSecrets{}), "GitHub token")
 	require.ErrorContains(t, validateProviderReady(model.SyncConfig{Provider: model.SyncProviderWebDAV}, syncProviderSecrets{}), "WebDAV URL")
@@ -177,7 +177,7 @@ func TestValidateProviderReadyAndProviderSecretsBranches(t *testing.T) {
 func TestSyncServiceDeleteVersionGuardsAndCleanup(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	dataDir := t.TempDir()
-	service := NewSyncService(db, testutil.NewTestLogger(), WithSyncDataDir(dataDir))
+	service := newTestSyncService(db, syncTestMasterKey, WithSyncDataDir(dataDir))
 	require.NoError(t, service.ensureVersionDirectory())
 
 	err := service.DeleteVersion(999)
@@ -208,7 +208,7 @@ func TestSyncServiceDeleteVersionGuardsAndCleanup(t *testing.T) {
 }
 
 func TestEnsureVersionDirectoryRequiresDataDir(t *testing.T) {
-	service := NewSyncService(testutil.NewTestDB(t), testutil.NewTestLogger())
+	service := newTestSyncService(testutil.NewTestDB(t), syncTestMasterKey)
 	require.ErrorContains(t, service.ensureVersionDirectory(), "unavailable")
 }
 
@@ -287,7 +287,7 @@ func TestTunnelServiceStopAllCleansActiveTunnels(t *testing.T) {
 func TestResolveConflictCancelAndUnsupported(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	setSyncMasterKey(t, db, syncTestMasterKey)
-	service := NewSyncService(db, testutil.NewTestLogger(), WithSyncDataDir(t.TempDir()))
+	service := newTestSyncService(db, syncTestMasterKey, WithSyncDataDir(t.TempDir()))
 	service.setRuntimeState(syncRuntimeState{
 		State: model.SyncStateConflict,
 		Conflict: &syncConflictState{
@@ -332,7 +332,7 @@ func TestFormatOptionalTimeAndRecordSyncEvent(t *testing.T) {
 	assert.Equal(t, now.Format(time.RFC3339Nano), formatOptionalTime(now))
 
 	db := testutil.NewTestDB(t)
-	service := NewSyncService(db, testutil.NewTestLogger())
+	service := newTestSyncService(db, syncTestMasterKey)
 	service.recordSyncEvent("test-action", defaultSyncConfig(), model.SyncEventSuccess, 1, 2, "ok")
 	events, err := service.ListEvents()
 	require.NoError(t, err)
@@ -342,13 +342,13 @@ func TestFormatOptionalTimeAndRecordSyncEvent(t *testing.T) {
 
 func TestSaveAndLoadSecretCryptoGuards(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	service := NewSyncService(db, testutil.NewTestLogger())
+	service := newTestSyncService(db, syncTestMasterKey)
 	require.ErrorContains(t, service.saveSecret("k", "v"), "unavailable")
 	_, err := service.loadSecret("k")
 	require.Error(t, err)
 
 	crypto := syncTestCrypto{key: []byte("01234567890123456789012345678901")}
-	service = NewSyncService(db, testutil.NewTestLogger(), WithSyncCrypto(crypto))
+	service = newTestSyncService(db, syncTestMasterKey, WithSyncCrypto(crypto))
 	require.NoError(t, service.saveSecret(syncGistTokenSetting, "token-value"))
 	value, err := service.loadSecret(syncGistTokenSetting)
 	require.NoError(t, err)
@@ -495,7 +495,7 @@ func TestSaveVersionAndRestoreMissing(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	setSyncMasterKey(t, db, syncTestMasterKey)
 	dataDir := t.TempDir()
-	service := NewSyncService(db, testutil.NewTestLogger(), WithSyncDataDir(dataDir), WithSyncLifecycle(&fakeSyncLifecycle{}))
+	service := newTestSyncService(db, syncTestMasterKey, WithSyncDataDir(dataDir), WithSyncLifecycle(&fakeSyncLifecycle{}))
 	_, err := store.CreateSession(db, model.Session{Name: "node", Host: "1.1.1.1", Port: 22, Username: "root", AuthMethod: model.AuthPassword, KeepAlive: 30, TermType: "xterm"})
 	require.NoError(t, err)
 
@@ -511,7 +511,7 @@ func TestChooseSyncActionBranches(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	setSyncMasterKey(t, db, syncTestMasterKey)
 	provider := &fakeSyncProvider{}
-	service := NewSyncService(db, testutil.NewTestLogger(), WithSyncDataDir(t.TempDir()), WithSyncProviderFactory(fakeSyncProviderFactory{provider}))
+	service := newTestSyncService(db, syncTestMasterKey, WithSyncDataDir(t.TempDir()), WithSyncProviderFactory(fakeSyncProviderFactory{provider}))
 	local := syncCurrentSnapshot{Fingerprint: "local-fp", Data: ExportData{}}
 	artifact := decodedSyncArtifact{Metadata: syncArtifactMetadata{SnapshotFingerprint: "remote-fp", VersionID: "r", VersionNumber: 1}, Content: []byte("remote")}
 
@@ -532,7 +532,7 @@ func TestChooseSyncActionBranches(t *testing.T) {
 func TestEnrichLocalDashboardAndOptionalSecrets(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	setSyncMasterKey(t, db, syncTestMasterKey)
-	service := NewSyncService(db, testutil.NewTestLogger(), WithSyncDataDir(t.TempDir()))
+	service := newTestSyncService(db, syncTestMasterKey, WithSyncDataDir(t.TempDir()))
 	dashboard, err := service.Dashboard()
 	require.NoError(t, err)
 	assert.NotEmpty(t, dashboard.State)
@@ -544,7 +544,7 @@ func TestEnrichLocalDashboardAndOptionalSecrets(t *testing.T) {
 func TestSmartSyncDecisionMatrix(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	setSyncMasterKey(t, db, syncTestMasterKey)
-	service := NewSyncService(db, testutil.NewTestLogger(), WithSyncDataDir(t.TempDir()), WithSyncProviderFactory(fakeSyncProviderFactory{&fakeSyncProvider{}}))
+	service := newTestSyncService(db, syncTestMasterKey, WithSyncDataDir(t.TempDir()), WithSyncProviderFactory(fakeSyncProviderFactory{&fakeSyncProvider{}}))
 	config := defaultSyncConfig()
 	local := syncCurrentSnapshot{Fingerprint: "local", Data: ExportData{}}
 	remoteArtifact := decodedSyncArtifact{
@@ -629,7 +629,7 @@ func TestGistFetchMissingAndDecodePaths(t *testing.T) {
 func TestChooseSyncActionCloudAndLocalFirst(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	setSyncMasterKey(t, db, syncTestMasterKey)
-	service := NewSyncService(db, testutil.NewTestLogger(), WithSyncDataDir(t.TempDir()))
+	service := newTestSyncService(db, syncTestMasterKey, WithSyncDataDir(t.TempDir()))
 	local := syncCurrentSnapshot{Fingerprint: "local", Data: ExportData{}}
 	artifact := decodedSyncArtifact{Metadata: syncArtifactMetadata{SnapshotFingerprint: "remote", VersionID: "r", VersionNumber: 1, CreatedAt: time.Now().UTC()}, Content: []byte("remote")}
 	remote := syncRemoteObject{Content: artifact.Content, ETag: "e"}
@@ -654,7 +654,7 @@ func TestChooseSyncActionCloudAndLocalFirst(t *testing.T) {
 func TestCompleteNoopAndFinishSuccessfulSync(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	setSyncMasterKey(t, db, syncTestMasterKey)
-	service := NewSyncService(db, testutil.NewTestLogger(), WithSyncDataDir(t.TempDir()))
+	service := newTestSyncService(db, syncTestMasterKey, WithSyncDataDir(t.TempDir()))
 	cfg := defaultSyncConfig()
 	artifact := decodedSyncArtifact{Metadata: syncArtifactMetadata{VersionID: "v", VersionNumber: 2, SnapshotFingerprint: "fp", CreatedAt: time.Now().UTC()}}
 	result, err := service.completeNoop(cfg, artifact, "etag")
@@ -665,7 +665,7 @@ func TestCompleteNoopAndFinishSuccessfulSync(t *testing.T) {
 
 func TestSaveCloudMetadataAndS3ErrorCode(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	service := NewSyncService(db, testutil.NewTestLogger())
+	service := newTestSyncService(db, syncTestMasterKey)
 	require.NoError(t, service.saveCloudMetadata("etag-x", "upload"))
 	assert.Equal(t, "etag-x", service.cloudETag())
 	assert.Equal(t, "", s3ErrorCode(errors.New("plain")))
@@ -674,7 +674,7 @@ func TestSaveCloudMetadataAndS3ErrorCode(t *testing.T) {
 func TestDownloadSnapshotValidateFailure(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	setSyncMasterKey(t, db, syncTestMasterKey)
-	service := NewSyncService(db, testutil.NewTestLogger(), WithSyncDataDir(t.TempDir()), WithSyncLifecycle(&fakeSyncLifecycle{}))
+	service := newTestSyncService(db, syncTestMasterKey, WithSyncDataDir(t.TempDir()), WithSyncLifecycle(&fakeSyncLifecycle{}))
 	artifact := decodedSyncArtifact{
 		Data:     ExportData{}, // empty may still validate
 		Metadata: syncArtifactMetadata{VersionID: "v", VersionNumber: 1, SnapshotFingerprint: "fp", CreatedAt: time.Now().UTC()},
@@ -721,7 +721,7 @@ func TestTestProviderValidationAndFailure(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	setSyncMasterKey(t, db, syncTestMasterKey)
 	provider := &failingSyncProvider{testErr: errors.New("network down")}
-	service := NewSyncService(db, testutil.NewTestLogger(), WithSyncProviderFactory(failingSyncProviderFactory{provider}))
+	service := newTestSyncService(db, syncTestMasterKey, WithSyncProviderFactory(failingSyncProviderFactory{provider}))
 	input := syncTestConfigInput()
 	require.Error(t, service.TestProvider(input))
 
@@ -735,7 +735,7 @@ func TestRunSyncExecuteFailureAndDisabled(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	setSyncMasterKey(t, db, syncTestMasterKey)
 	provider := &failingSyncProvider{fetchErr: errors.New("fetch broken"), putErr: errors.New("put broken")}
-	service := NewSyncService(db, testutil.NewTestLogger(), WithSyncDataDir(t.TempDir()), WithSyncProviderFactory(failingSyncProviderFactory{provider}))
+	service := newTestSyncService(db, syncTestMasterKey, WithSyncDataDir(t.TempDir()), WithSyncProviderFactory(failingSyncProviderFactory{provider}))
 	_, err := service.SaveConfig(syncTestConfigInput())
 	require.NoError(t, err)
 
@@ -754,7 +754,7 @@ func TestRunSyncExecuteFailureAndDisabled(t *testing.T) {
 func TestPrepareDestructiveSyncLifecycleError(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	setSyncMasterKey(t, db, syncTestMasterKey)
-	service := NewSyncService(db, testutil.NewTestLogger(), WithSyncDataDir(t.TempDir()), WithSyncLifecycle(errorLifecycle{}))
+	service := newTestSyncService(db, syncTestMasterKey, WithSyncDataDir(t.TempDir()), WithSyncLifecycle(errorLifecycle{}))
 	require.ErrorContains(t, service.prepareDestructiveSync(defaultSyncConfig(), "pre"), "busy sessions")
 	require.ErrorContains(t, service.ResetLocalData(), "busy sessions")
 }
@@ -788,7 +788,7 @@ func TestUploadSnapshotGistIDPersistence(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	setSyncMasterKey(t, db, syncTestMasterKey)
 	provider := &fakeSyncProvider{}
-	service := NewSyncService(db, testutil.NewTestLogger(), WithSyncDataDir(t.TempDir()), WithSyncProviderFactory(fakeSyncProviderFactory{provider}))
+	service := newTestSyncService(db, syncTestMasterKey, WithSyncDataDir(t.TempDir()), WithSyncProviderFactory(fakeSyncProviderFactory{provider}))
 	_, err := service.SaveConfig(syncTestConfigInput())
 	require.NoError(t, err)
 	_, err = store.CreateSession(db, model.Session{Name: "local", Host: "127.0.0.1", Port: 22, Username: "root", AuthMethod: model.AuthPassword, KeepAlive: 30, TermType: "xterm"})
@@ -815,7 +815,7 @@ func TestDownloadSnapshotSuccessPath(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	setSyncMasterKey(t, db, syncTestMasterKey)
 	lifecycle := &fakeSyncLifecycle{}
-	service := NewSyncService(db, testutil.NewTestLogger(), WithSyncDataDir(t.TempDir()), WithSyncLifecycle(lifecycle), WithSyncEventBus(newMockEventBus()))
+	service := newTestSyncService(db, syncTestMasterKey, WithSyncDataDir(t.TempDir()), WithSyncLifecycle(lifecycle), WithSyncEventBus(newMockEventBus()))
 	_, err := store.CreateSession(db, model.Session{Name: "seed", Host: "10.0.0.1", Port: 22, Username: "root", AuthMethod: model.AuthPassword, KeepAlive: 30, TermType: "xterm"})
 	require.NoError(t, err)
 
@@ -824,7 +824,7 @@ func TestDownloadSnapshotSuccessPath(t *testing.T) {
 	fp, err := snapshotFingerprint(data)
 	require.NoError(t, err)
 	meta := syncArtifactMetadata{VersionID: "cloud-v1", VersionNumber: 4, SnapshotFingerprint: fp, DeviceID: "device", CreatedAt: time.Now().UTC()}
-	content, err := encodeSyncArtifact(data, syncTestMasterKey, meta)
+	content, err := encodeSyncArtifact(data, syncTestMasterKey, meta, nil)
 	require.NoError(t, err)
 	artifact, err := decodeSyncArtifact(content, syncTestMasterKey)
 	require.NoError(t, err)
@@ -843,7 +843,7 @@ func TestWriteRecoveryPointAndNotify(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	setSyncMasterKey(t, db, syncTestMasterKey)
 	bus := newMockEventBus()
-	service := NewSyncService(db, testutil.NewTestLogger(), WithSyncDataDir(t.TempDir()), WithSyncEventBus(bus))
+	service := newTestSyncService(db, syncTestMasterKey, WithSyncDataDir(t.TempDir()), WithSyncEventBus(bus))
 	require.NoError(t, service.writeRecoveryPoint(syncTestMasterKey))
 	path, err := service.recoveryPath()
 	require.NoError(t, err)
@@ -934,13 +934,13 @@ func TestGistPutCreateAndConflict(t *testing.T) {
 func TestSaveVersionProtectExistingFingerprint(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	setSyncMasterKey(t, db, syncTestMasterKey)
-	service := NewSyncService(db, testutil.NewTestLogger(), WithSyncDataDir(t.TempDir()))
+	service := newTestSyncService(db, syncTestMasterKey, WithSyncDataDir(t.TempDir()))
 	data, err := service.snapshot()
 	require.NoError(t, err)
 	fp, err := snapshotFingerprint(data)
 	require.NoError(t, err)
 	meta := syncArtifactMetadata{VersionID: "same", VersionNumber: 1, SnapshotFingerprint: fp, CreatedAt: time.Now().UTC()}
-	content, err := encodeSyncArtifact(data, syncTestMasterKey, meta)
+	content, err := encodeSyncArtifact(data, syncTestMasterKey, meta, nil)
 	require.NoError(t, err)
 	first, err := service.saveVersion(content, meta, model.SyncProviderGist, "manual", false)
 	require.NoError(t, err)
@@ -954,7 +954,7 @@ func TestPullNowAndPushNowWrappers(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	setSyncMasterKey(t, db, syncTestMasterKey)
 	provider := &fakeSyncProvider{}
-	service := NewSyncService(db, testutil.NewTestLogger(), WithSyncDataDir(t.TempDir()), WithSyncProviderFactory(fakeSyncProviderFactory{provider}))
+	service := newTestSyncService(db, syncTestMasterKey, WithSyncDataDir(t.TempDir()), WithSyncProviderFactory(fakeSyncProviderFactory{provider}))
 	_, err := service.SaveConfig(syncTestConfigInput())
 	require.NoError(t, err)
 	_, err = store.CreateSession(db, model.Session{Name: "n", Host: "1.2.3.4", Port: 22, Username: "root", AuthMethod: model.AuthPassword, KeepAlive: 30, TermType: "xterm"})
@@ -997,7 +997,7 @@ func TestAssetCatalogHelperValidation(t *testing.T) {
 func TestEncodeEncryptedSnapshotRoundTrip(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	setSyncMasterKey(t, db, syncTestMasterKey)
-	service := NewSyncService(db, testutil.NewTestLogger(), WithSyncDataDir(t.TempDir()))
+	service := newTestSyncService(db, syncTestMasterKey, WithSyncDataDir(t.TempDir()))
 	data, err := service.snapshot()
 	require.NoError(t, err)
 	content, err := encodeEncryptedSnapshot(data, syncTestMasterKey)
@@ -1064,7 +1064,7 @@ func TestClosedDBErrorBranches(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	setSyncMasterKey(t, db, syncTestMasterKey)
 	crypto := syncTestCrypto{key: []byte("01234567890123456789012345678901")}
-	service := NewSyncService(db, testutil.NewTestLogger(), WithSyncDataDir(t.TempDir()), WithSyncCrypto(crypto))
+	service := newTestSyncService(db, syncTestMasterKey, WithSyncDataDir(t.TempDir()), WithSyncCrypto(crypto))
 	keySvc := NewKeyService(db, crypto, testutil.NewTestLogger())
 	audit := NewAuditService(db, testutil.NewTestLogger())
 	catalog := NewAssetCatalogService(db, testutil.NewTestLogger())

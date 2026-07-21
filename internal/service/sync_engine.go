@@ -210,7 +210,11 @@ func (s *SyncService) uploadSnapshot(ctx context.Context, config model.SyncConfi
 	} else {
 		metadata.VersionNumber = 1
 	}
-	content, err := encodeSyncArtifact(local.Data, masterKey, metadata)
+	vault, vaultErr := s.artifactVault()
+	if vaultErr != nil {
+		return model.SyncResult{}, vaultErr
+	}
+	content, err := encodeSyncArtifact(local.Data, masterKey, metadata, vault)
 	if err != nil {
 		return model.SyncResult{}, err
 	}
