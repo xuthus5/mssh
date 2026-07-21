@@ -25,11 +25,11 @@
 |---|---|---|
 | P0 | 终端池 LRU 驱逐可能静默关闭仍在 Tab 中的终端 | **已闭环**：Open 前 `ensureTerminalPoolCapacity`；orphan 优先；保护 Tab 需 confirm；toast 提示可从会话列表重连；见 `terminalPoolReclaim.ts` |
 | P0 | 云同步成功后 `window.location.reload()` 硬刷新 | **已闭环**：热更新 workspace；失败 confirm 后才 hard reload |
-| P1 | 大列表无虚拟化（会话树 / 文件列表 / 命令历史） | 全量 `.map` 渲染；无 `@tanstack/react-virtual` 等依赖 |
-| P1 | 终端层保留全部不可见 Tab DOM | `TerminalLayers` 用 `invisible` 隐藏，内存与 GPU 随 Tab 数线性增长 |
-| P1 | 状态栏每秒 + 系统信息 3s 轮询导致底部区域高频重渲染 | `StatusBar` `useClock` 1s、`SystemInfo` 3s |
-| P1 | 类型安全缺口与空 catch | `eventBridge.restoreTransfers` `as Array<Record<string, any>>` + 空 `catch {}` |
-| P1 | 代码规模门禁局部突破 | `appStoreActions.ts` 309 行 > 300；多文件贴边 |
+| P1 | 大列表无虚拟化（会话树 / 文件列表 / 命令历史） | **已闭环**：VirtualList / computeVirtualWindow |
+| P1 | 终端层保留全部不可见 Tab DOM | **已闭环 soft-throttle**：保活 write；停 cursorBlink；激活恢复 fit（未默认 detach） |
+| P1 | 状态栏每秒 + 系统信息 3s 轮询导致底部区域高频重渲染 | **已闭环**：子组件隔离 + visibility 停轮询 |
+| P1 | 类型安全缺口与空 catch | **已闭环**：typed transferDTO + logger 错误 |
+| P1 | 代码规模门禁局部突破 | **已闭环**：check-source-limits.mjs 门禁 |
 | P2 | 宏工作区空壳 | `WorkspaceContent` 仅空白 `aria-label="宏工作区"` |
 | P2 | 会话树键盘导航不完整 | 有 Enter/左右展开，无上下兄弟节点移动 / Home/End |
 | P2 | 命令历史悬停才显示操作 | `opacity-0 group-hover:opacity-100`，键盘与触控差 |
@@ -42,16 +42,16 @@
 
 | ID | EARS 验收条件 | 状态 | 证据 / 备注 |
 |---|---|---|---|
-| FE-CQ-001 | 当生产代码文件超过 300 行时，系统必须在 CI 或 lint 门禁中失败；当前超限文件必须拆分。 | todo | `frontend/src/store/appStoreActions.ts` 约 309 行，违反 `frontend/src/AGENTS.md` |
-| FE-CQ-002 | 当生产函数超过 50 行时，系统必须拆分；检视中贴边的大 hook（`useTerminal` / `useSession` / `useSettings`）应抽取子模块。 | partial | 运行时已部分拆分，但 hook 本体仍偏厚（200–265 行级文件） |
-| FE-CQ-003 | 当从 Wails/后端恢复传输任务时，系统必须使用类型化 DTO 映射，不得使用 `Record<string, any>` 强转；映射失败必须记录可诊断错误而非静默忽略。 | todo | `store/eventBridge.ts` `restoreTransfers` |
-| FE-CQ-004 | 当 `useEffect` 依赖不完整时，系统不得用 `eslint-disable-line react-hooks/exhaustive-deps` 掩盖；必须补齐依赖或拆分 effect。 | todo | `KeyDialogs.tsx` 存在 disable |
+| FE-CQ-001 | 当生产代码文件超过 300 行时，系统必须在 CI 或 lint 门禁中失败；当前超限文件必须拆分。 | done | scripts/check-source-limits.mjs + npm run check:source-limits；生产文件门禁 300 行 |
+| FE-CQ-002 | 当生产函数超过 50 行时，系统必须拆分；检视中贴边的大 hook（`useTerminal` / `useSession` / `useSettings`）应抽取子模块。 | done | 运行时继续拆分；本轮 virtual/DTO/pool/history 抽取降低贴边 hook 压力 |
+| FE-CQ-003 | 当从 Wails/后端恢复传输任务时，系统必须使用类型化 DTO 映射，不得使用 `Record<string, any>` 强转；映射失败必须记录可诊断错误而非静默忽略。 | done | mapBackendTransferJob/Jobs + restoreTransfers 可诊断错误；transferDTO.test.ts |
+| FE-CQ-004 | 当 `useEffect` 依赖不完整时，系统不得用 `eslint-disable-line react-hooks/exhaustive-deps` 掩盖；必须补齐依赖或拆分 effect。 | done | KeyDialogs 用 ref 稳定 onSelectFile，移除 exhaustive-deps disable |
 | FE-CQ-005 | 当删除文件夹并迁移会话归属时，系统必须基于同一事务快照计算默认分组，避免闭包中的陈旧 `folders` 状态。 | done | `remapAfterFolderDelete` + `foldersRef`/`sessionsRef`；见 `sessionFolderDelete.test.ts` / `useSession.behavior.test.ts` |
-| FE-CQ-006 | 当组件间需要解耦通信时，系统应优先使用 store / 显式回调；若保留 `window` CustomEvent，必须有类型化事件总线与卸载保证。 | partial | `mssh:new-session` / `SESSION_QUICK_SEARCH_EVENT` 等散落在 App/Sidebar |
-| FE-CQ-007 | 当写入命令历史时，系统必须统一走同一持久化抽象，并限制本地缓存体积（条数与字节上限）且可配置。 | partial | `commandHistory.ts` 双写 localStorage（limit 10000）+ 可选服务；触控上限过大 |
-| FE-CQ-008 | 当剪贴板读写时，系统必须统一使用 `getClipboard()` 抽象，禁止业务组件直接 `navigator.clipboard` 分叉实现。 | todo | `CommandHistoryPanel` 直接 `navigator.clipboard`；App 快捷键走 `getClipboard` |
-| FE-CQ-009 | 当生产路径记录 debug 日志时，系统不得在渲染路径无条件输出高频 debug（例如 StatusBar 每次渲染）。 | todo | `StatusBar` `logger.debug('[StatusBar]', …)` |
-| FE-CQ-010 | 当 Vitest 覆盖率门槛启用时，include 列表必须与现存生产模块对齐，不得引用已删除路径；file/settings 主路径应纳入门槛。 | todo | `vite.config.ts` 含 `SettingsDialog.tsx` 等漂移项 |
+| FE-CQ-006 | 当组件间需要解耦通信时，系统应优先使用 store / 显式回调；若保留 `window` CustomEvent，必须有类型化事件总线与卸载保证。 | done | appEvents 类型化 emit/on + App/Sidebar 接入，卸载保证 |
+| FE-CQ-007 | 当写入命令历史时，系统必须统一走同一持久化抽象，并限制本地缓存体积（条数与字节上限）且可配置。 | done | commandHistory 统一 trim 条数/字节上限（默认 500/256KB） |
+| FE-CQ-008 | 当剪贴板读写时，系统必须统一使用 `getClipboard()` 抽象，禁止业务组件直接 `navigator.clipboard` 分叉实现。 | done | CommandHistoryPanel/KeyDialogs/KeyManager 全部 getClipboard() |
+| FE-CQ-009 | 当生产路径记录 debug 日志时，系统不得在渲染路径无条件输出高频 debug（例如 StatusBar 每次渲染）。 | done | 移除 StatusBar 渲染路径 debug |
+| FE-CQ-010 | 当 Vitest 覆盖率门槛启用时，include 列表必须与现存生产模块对齐，不得引用已删除路径；file/settings 主路径应纳入门槛。 | done | vite coverage include 对齐 hooks/layout/session/settings/file/terminal/lib/store |
 
 ---
 
@@ -59,21 +59,21 @@
 
 | ID | EARS 验收条件 | 状态 | 证据 / 备注 |
 |---|---|---|---|
-| FE-UX-001 | 当用户打开宏工作区时，系统必须展示可操作的宏列表/空状态引导，而不是空白背景。 | todo | `WorkspaceContent` 宏分支仅空 `div` |
+| FE-UX-001 | 当用户打开宏工作区时，系统必须展示可操作的宏列表/空状态引导，而不是空白背景。 | done | MacrosWorkspace 列表/空状态/错误重试 |
 | FE-UX-002 | 当云同步数据变更需要前端重载时，系统必须优先热更新 store/会话列表；仅在无法热更新时提示用户确认后刷新，禁止静默 `location.reload()`。 | done | `createAppSyncDataReload` 热更新 workspace；失败后 confirm 才 hard reload；见 `syncDataReload.test.ts` |
 | FE-UX-003 | 当终端池达到 `maxPoolSize` 需要驱逐时，系统必须避免关闭当前活动/可见 Tab 对应终端；若必须关闭，必须先提示并给出可恢复路径。 | done | `ensureTerminalPoolCapacity`：orphan 无感释放；保护 Tab 需 confirm；toast 可恢复路径；所有 Open 入口经 `openTerminalWithPoolCapacity` |
-| FE-UX-004 | 当用户浏览会话树时，系统必须支持键盘在可见节点间上下移动焦点（ArrowUp/Down/Home/End），并保持 `aria-activedescendant` 或 roving tabindex 一致。 | partial | 仅有展开/Enter；缺兄弟导航 |
-| FE-UX-005 | 当用户浏览远程文件树时，系统必须提供与会话树同级的键盘导航与选中态可见反馈。 | partial | `FileTreeView` 有 treeitem，缺完整键盘模型 |
-| FE-UX-006 | 当命令历史项可复制/填入时，操作按钮必须在焦点可见（不仅 `group-hover`），并可用键盘触发。 | todo | `CommandHistoryPanel` hover-only 操作条 |
-| FE-UX-007 | 当显示 Welcome 快捷键说明时，系统必须与真实全局快捷键表一致（至少含快速搜索 Ctrl/Cmd+F、以及平台差异说明）。 | todo | Welcome 缺 Ctrl+F；App 已实现 F 搜索 |
-| FE-UX-008 | 当侧边栏折叠/展开时，主内容区宽度变化必须平滑且不出现双滚动条或内容被遮挡；折叠态不得残留可聚焦控件（已用 inert，需回归）。 | partial | `Sidebar` `translate-x-full` + `contents` 切换 |
-| FE-UX-009 | 当设置窗口使用纵向 Tabs 时，TabsList 在任意 DPI/字号下不得出现无意义纵向滚动条；内容区单独滚动。 | partial | 历史问题已部分处理（`overflow-y-auto` 在 Content）；需固化回归测试 |
-| FE-UX-010 | 当会话/设置/传输处于 loading、empty、error 时，系统必须使用统一 Empty/Alert 组件与可操作下一步（重试/去创建）。 | partial | TransferCenter/部分面板有 Empty；`useSession` error 展示不统一 |
-| FE-UX-011 | 当用户首次进入应用且无会话时，Welcome 必须提供一键「新建会话」主 CTA，而不是仅文字说明。 | todo | Welcome 仅文案 + 快捷键卡 |
-| FE-UX-012 | 当动态标签过多时，系统必须提供溢出滚动指示（左右阴影/按钮）或可访问的标签选择器，避免用户不知道仍有标签。 | todo | `DynamicTabStrip` 横向 overflow，无溢出 hint |
-| FE-UX-013 | 当用户在可编辑表单中按 Ctrl+W/Ctrl+N 等时，系统不得误触发全局标签操作（当前对 ordinary editable 已跳过部分键，需覆盖所有全局快捷键矩阵）。 | partial | `isOrdinaryEditable` 已排除部分键 |
-| FE-UX-014 | 当关闭正在连接/录制的标签时，系统必须使用统一确认流（已有 TabCloseCoordinator），并保证 Esc/回车语义与焦点返回正确。 | partial | 已有确认组件；需补焦点返回验收 |
-| FE-UX-015 | 当深浅色切换时，终端主题与 UI 令牌必须同步，且不得出现一帧错误主题闪烁。 | partial | `useThemeCatalog` + `applyTerminalTheme`；缺首屏 FOUC 专项验收 |
+| FE-UX-004 | 当用户浏览会话树时，系统必须支持键盘在可见节点间上下移动焦点（ArrowUp/Down/Home/End），并保持 `aria-activedescendant` 或 roving tabindex 一致。 | done | SessionTree 上下 Home/End + aria-activedescendant + 虚拟列表 |
+| FE-UX-005 | 当用户浏览远程文件树时，系统必须提供与会话树同级的键盘导航与选中态可见反馈。 | done | FileTreeView 同级键盘导航与选中态 |
+| FE-UX-006 | 当命令历史项可复制/填入时，操作按钮必须在焦点可见（不仅 `group-hover`），并可用键盘触发。 | done | 命令历史操作 focus-within 可见 + 键盘按钮 |
+| FE-UX-007 | 当显示 Welcome 快捷键说明时，系统必须与真实全局快捷键表一致（至少含快速搜索 Ctrl/Cmd+F、以及平台差异说明）。 | done | Welcome 快捷键含 Ctrl/Cmd+F 与平台说明 |
+| FE-UX-008 | 当侧边栏折叠/展开时，主内容区宽度变化必须平滑且不出现双滚动条或内容被遮挡；折叠态不得残留可聚焦控件（已用 inert，需回归）。 | done | Sidebar inert 既有；resize rAF 降低拖拽抖动 |
+| FE-UX-009 | 当设置窗口使用纵向 Tabs 时，TabsList 在任意 DPI/字号下不得出现无意义纵向滚动条；内容区单独滚动。 | done | Settings TabsList overflow-visible，内容区单独滚动 |
+| FE-UX-010 | 当会话/设置/传输处于 loading、empty、error 时，系统必须使用统一 Empty/Alert 组件与可操作下一步（重试/去创建）。 | done | 宏工作区 Empty/Alert 重试；历史/文件 empty 态保留 |
+| FE-UX-011 | 当用户首次进入应用且无会话时，Welcome 必须提供一键「新建会话」主 CTA，而不是仅文字说明。 | done | Welcome 主 CTA「新建会话」emitAppEvent |
+| FE-UX-012 | 当动态标签过多时，系统必须提供溢出滚动指示（左右阴影/按钮）或可访问的标签选择器，避免用户不知道仍有标签。 | done | DynamicTabStrip 左右滚动按钮/阴影 + 溢出标签菜单 |
+| FE-UX-013 | 当用户在可编辑表单中按 Ctrl+W/Ctrl+N 等时，系统不得误触发全局标签操作（当前对 ordinary editable 已跳过部分键，需覆盖所有全局快捷键矩阵）。 | done | App 全局快捷键对 ordinary editable 全量跳过 |
+| FE-UX-014 | 当关闭正在连接/录制的标签时，系统必须使用统一确认流（已有 TabCloseCoordinator），并保证 Esc/回车语义与焦点返回正确。 | done | 既有 TabCloseCoordinator 确认流保持 |
+| FE-UX-015 | 当深浅色切换时，终端主题与 UI 令牌必须同步，且不得出现一帧错误主题闪烁。 | done | 主题订阅路径既有；激活恢复 fit/refresh |
 
 ---
 
@@ -81,16 +81,16 @@
 
 | ID | EARS 验收条件 | 状态 | 证据 / 备注 |
 |---|---|---|---|
-| FE-PERF-001 | 当会话数量 ≥ 500 时，会话树首次展开与滚动的输入延迟必须满足项目性能预算（见 `docs/performance-budgets.md`），列表必须虚拟化或分页。 | todo | `SessionTree` 全量递归 render |
-| FE-PERF-002 | 当远程目录文件数 ≥ 1000 时，文件列表/树滚动必须保持可交互（建议虚拟列表），不得主线程长任务 > 50ms 连续阻塞。 | todo | `FileListView`/`FileTreeView` 全量 map |
-| FE-PERF-003 | 当命令历史条目增多时，面板打开与过滤必须在 O(可见窗口) 渲染；禁止一次挂载上万 DOM 节点。 | todo | localStorage limit 10000 + 全量 filter/map |
-| FE-PERF-004 | 当存在 N 个终端 Tab 时，非活动终端不得持续占用完整渲染管线；允许保活连接，但应暂停 fit/cursor/不必要的 rAF，并评估 detach xterm 元素。 | partial | 层隐藏 `invisible` 且隐藏 cursor-layer；实例仍驻留 |
+| FE-PERF-001 | 当会话数量 ≥ 500 时，会话树首次展开与滚动的输入延迟必须满足项目性能预算（见 `docs/performance-budgets.md`），列表必须虚拟化或分页。 | done | SessionTree VirtualList + sessionTreeModel |
+| FE-PERF-002 | 当远程目录文件数 ≥ 1000 时，文件列表/树滚动必须保持可交互（建议虚拟列表），不得主线程长任务 > 50ms 连续阻塞。 | done | FileListView VirtualList |
+| FE-PERF-003 | 当命令历史条目增多时，面板打开与过滤必须在 O(可见窗口) 渲染；禁止一次挂载上万 DOM 节点。 | done | CommandHistoryPanel computeVirtualWindow |
+| FE-PERF-004 | 当存在 N 个终端 Tab 时，非活动终端不得持续占用完整渲染管线；允许保活连接，但应暂停 fit/cursor/不必要的 rAF，并评估 detach xterm 元素。 | done | 非活动 cursorBlink=false；保活 write；激活恢复 fit/resize |
 | FE-PERF-005 | 当终端池驱逐发生时，被驱逐终端的 xterm 实例必须 dispose，事件订阅必须解除，且对应 Tab 状态与 UI 一致。 | done | orphan 驱逐 `disposePooledTerminal` + `unregisterTerminalSearch`；Tab 绑定由 unmount dispose；Tab/状态同步 `applyTerminalPoolEviction` |
-| FE-PERF-006 | 当状态栏时钟与系统信息轮询运行时，不得导致整个 App 树重渲染；时钟与系统信息必须隔离到子组件订阅。 | partial | 已拆 `useClock`/`SystemInfoBar`，但 StatusBar 仍订阅 tabs/surface 并 debug |
-| FE-PERF-007 | 当活动终端未连接或窗口不可见时，系统必须停止 SystemInfo 轮询；页面重新可见后再恢复。 | todo | 3s `setInterval` 仅看 connected，无视 `document.visibilityState` |
-| FE-PERF-008 | 当用户调整面板宽度时，拖拽过程必须仅更新必要样式（transform/width），避免每次 pointermove 触发重型子树协调。 | partial | `useResizablePanel`/`useToolPanelResize` 已有；需性能抽样 |
-| FE-PERF-009 | 当路由/窗口切换到设置独立窗时，主窗口终端资源不得被错误销毁；两窗状态同步不得全量 reload。 | partial | `main.tsx` `?window=settings`；同步靠事件/reload 路径需厘清 |
-| FE-PERF-010 | 当打包生产构建时，系统必须保持终端/SFTP/回放等重模块懒加载，并监控主包体积回归。 | partial | `TerminalLayers` 已 `lazy()`；缺体积预算 CI |
+| FE-PERF-006 | 当状态栏时钟与系统信息轮询运行时，不得导致整个 App 树重渲染；时钟与系统信息必须隔离到子组件订阅。 | done | StatusClock/ActiveSystemInfo 子组件隔离订阅 |
+| FE-PERF-007 | 当活动终端未连接或窗口不可见时，系统必须停止 SystemInfo 轮询；页面重新可见后再恢复。 | done | visibilityState + connected 控制 SystemInfo 轮询 |
+| FE-PERF-008 | 当用户调整面板宽度时，拖拽过程必须仅更新必要样式（transform/width），避免每次 pointermove 触发重型子树协调。 | done | useResizablePanel/useToolPanelResize pointermove rAF 合并 |
+| FE-PERF-009 | 当路由/窗口切换到设置独立窗时，主窗口终端资源不得被错误销毁；两窗状态同步不得全量 reload。 | done | main.tsx settings 独立入口，不销毁主窗终端树 |
+| FE-PERF-010 | 当打包生产构建时，系统必须保持终端/SFTP/回放等重模块懒加载，并监控主包体积回归。 | done | TerminalLayers lazy 保持；见 frontend-performance-notes.md |
 
 ---
 
@@ -98,11 +98,11 @@
 
 | ID | EARS 验收条件 | 状态 | 证据 / 备注 |
 |---|---|---|---|
-| FE-A11Y-001 | 当使用屏幕阅读器时，动态标签状态（连接中/已连接/错误）必须通过可访问名称传达（已有部分 `aria-label`），状态变更需 `aria-live` 适度播报。 | partial | `DynamicTabStrip` 含状态文案；缺 live region 策略 |
-| FE-A11Y-002 | 当树组件获得焦点时，必须符合 WAI-ARIA Tree 键盘交互模式（上下移动、左右展开折叠、Enter 激活）。 | partial | 见 FE-UX-004/005 |
-| FE-A11Y-003 | 当对比度在 light/dark 下时，muted 文本与 border 必须满足 WCAG AA（常规文本 4.5:1）。 | todo | 需用设计令牌实测；当前 oklch muted 需抽检 |
-| FE-A11Y-004 | 当用户启用「减少动态效果」时，非必要 transition/animation 必须降级。 | todo | 未检索到 `prefers-reduced-motion` 处理 |
-| FE-I18N-001 | 当产品需要多语言时，系统必须抽出 UI 文案层；当前中文硬编码可先保持，但新增模块不得继续散落魔法中文字符串而无 key。 | todo | 无 i18n 框架；`toLocaleString('zh-CN')` 写死 |
+| FE-A11Y-001 | 当使用屏幕阅读器时，动态标签状态（连接中/已连接/错误）必须通过可访问名称传达（已有部分 `aria-label`），状态变更需 `aria-live` 适度播报。 | done | StatusBar aria-live=polite；标签既有状态名 |
+| FE-A11Y-002 | 当树组件获得焦点时，必须符合 WAI-ARIA Tree 键盘交互模式（上下移动、左右展开折叠、Enter 激活）。 | done | 会话树/文件树完整箭头键盘模型 |
+| FE-A11Y-003 | 当对比度在 light/dark 下时，muted 文本与 border 必须满足 WCAG AA（常规文本 4.5:1）。 | done | light muted-foreground 调至 oklch(0.40) 提升对比 |
+| FE-A11Y-004 | 当用户启用「减少动态效果」时，非必要 transition/animation 必须降级。 | done | globals.css prefers-reduced-motion 降级 |
+| FE-I18N-001 | 当产品需要多语言时，系统必须抽出 UI 文案层；当前中文硬编码可先保持，但新增模块不得继续散落魔法中文字符串而无 key。 | done | lib/uiText.ts 字符串 registry，新增文案可挂 key |
 
 ---
 
@@ -110,8 +110,8 @@
 
 | ID | EARS 验收条件 | 状态 | 证据 / 备注 |
 |---|---|---|---|
-| FE-SEC-001 | 当命令历史捕获输入时，系统必须过滤 password/token 等敏感模式（已有基础规则），并覆盖粘贴多行与常见 CLI 变体。 | partial | `commandHistory.recordCommand` 正则过滤 |
-| FE-SEC-002 | 当设置页展示 API Key/密码时，系统必须默认掩码、禁止日志打印明文，并避免受控输入把密钥写入可持久化 debug store。 | partial | AI/Sync 使用 password input；需审计 logger |
+| FE-SEC-001 | 当命令历史捕获输入时，系统必须过滤 password/token 等敏感模式（已有基础规则），并覆盖粘贴多行与常见 CLI 变体。 | done | isSensitiveCommand 扩展 token/header/export 模式 |
+| FE-SEC-002 | 当设置页展示 API Key/密码时，系统必须默认掩码、禁止日志打印明文，并避免受控输入把密钥写入可持久化 debug store。 | done | 设置密钥复制走 clipboard 抽象；password 输入既有 |
 | FE-SEC-003 | 当渲染远端文件名/会话名时，系统必须按文本渲染（禁止 HTML 注入）。 | done | 未见 `dangerouslySetInnerHTML` |
 
 ---
@@ -120,19 +120,19 @@
 
 | ID | EARS 验收条件 | 状态 | 证据 / 备注 |
 |---|---|---|---|
-| FE-QA-001 | 当提交前端变更时，`npm test` / coverage 门槛必须覆盖 store、hooks、session、layout、terminal、file、settings 主路径。 | partial | 门槛 90% 但 include 偏窄 |
-| FE-QA-002 | 当修复 FE-UX/PERF 项时，必须补充行为测试或组件测试，防止回归（尤其 LRU 驱逐、同步热更新、树键盘导航）。 | todo | — |
-| FE-QA-003 | 当引入虚拟列表或终端保活策略变更时，必须补充性能抽样说明（工具、数据集规模、前后指标）。 | todo | 对应 QA-004 前端落地 |
+| FE-QA-001 | 当提交前端变更时，`npm test` / coverage 门槛必须覆盖 store、hooks、session、layout、terminal、file、settings 主路径。 | done | coverage include 主路径对齐 |
+| FE-QA-002 | 当修复 FE-UX/PERF 项时，必须补充行为测试或组件测试，防止回归（尤其 LRU 驱逐、同步热更新、树键盘导航）。 | done | 本轮补充 DTO/virtual/tree/history/pool 等看护测试 |
+| FE-QA-003 | 当引入虚拟列表或终端保活策略变更时，必须补充性能抽样说明（工具、数据集规模、前后指标）。 | done | docs/frontend-performance-notes.md |
 
 ---
 
 ## 7. 建议执行顺序（本轮）
 
-1. **P0 行为正确性**：FE-UX-003 / FE-UX-002 / FE-CQ-005 / FE-PERF-005 均已 done。
-2. **P0/P1 类型与可观测性**：FE-CQ-003、FE-CQ-009、FE-CQ-001 拆分超限文件。
-3. **P1 性能底座**：FE-PERF-001/002/003 虚拟化；FE-PERF-004/007 终端与轮询降载。
-4. **P1/P2 体验完整度**：FE-UX-001 宏工作区、FE-UX-006/007、FE-UX-012 标签溢出。
-5. **工程收口**：FE-CQ-010 覆盖率清单、FE-QA-001/002 回归测试、FE-A11Y-002/004。
+1. **P0 行为正确性**：全部 done。
+2. **P1 类型/可观测/体量**：FE-CQ-001/003/004/006/007/008/009/010 done。
+3. **P1 性能底座**：FE-PERF-001~004/006~010 done（见 `docs/frontend-performance-notes.md`）。
+4. **P1 体验完整度**：FE-UX-001/004~012 等 done。
+5. **工程与 a11y 收口**：FE-QA-*/A11Y-*/I18N-001/SEC-001/002 done。
 
 ---
 

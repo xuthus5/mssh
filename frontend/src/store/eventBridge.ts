@@ -2,6 +2,8 @@ import { Events } from '@wailsio/runtime'
 import { useAppStore } from '@/store/appStore'
 import { useConnectDialog } from '@/store/connectDialog'
 import { FileService } from '@/lib/wails'
+import { logger } from '@/lib/logger'
+import { mapBackendTransferJobs } from '@/lib/transferDTO'
 
 interface EventEnvelope<T> { data?: T }
 interface ConnectionPayload { terminal_id?: string; attempt_id?: string; state?: string }
@@ -103,14 +105,13 @@ export function startEventBridge(): () => void {
 
 export async function restoreTransfers() {
   try {
-    const jobs = await FileService.ListTransfers() as Array<Record<string, any>>
-    useAppStore.setState({ transfers: jobs.map((job) => ({
-      id: job.id, fileName: String(job.source_path).split(/[\\/]/).pop() ?? job.source_path,
-      direction: job.direction, sessionId: job.session_id, sessionName: job.session_name,
-      sourcePath: job.source_path, targetPath: job.target_path, totalBytes: job.total_bytes,
-      transferredBytes: job.transferred_bytes, speed: job.speed, eta: job.eta, status: job.status,
-      error: job.error || undefined, startedAt: Date.parse(job.started_at),
-      completedAt: job.completed_at ? Date.parse(job.completed_at) : undefined,
-    })) })
-  } catch {}
+    const raw = await FileService.ListTransfers()
+    const { jobs, errors } = mapBackendTransferJobs(raw)
+    if (errors.length > 0) {
+      logger.error('restoreTransfers mapping failures', { count: errors.length, errors: errors.slice(0, 5) })
+    }
+    useAppStore.setState({ transfers: jobs })
+  } catch (error: unknown) {
+    logger.error('restoreTransfers failed', error)
+  }
 }
