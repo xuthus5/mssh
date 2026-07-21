@@ -44,7 +44,7 @@ tasks:
           ARCH: '{{.ARCH | default ARCH}}'
 
   package:linux:amd64:
-    summary: Linux amd64 packages (binary, deb, rpm, AppImage)
+    summary: Linux amd64 packages (binary, deb, rpm, AppImage, Flatpak)
     cmds:
       - task: linux:package
         vars:
@@ -52,11 +52,20 @@ tasks:
           APP_VERSION: '{{.APP_VERSION}}'
 
   package:linux:arm64:
-    summary: Linux arm64 packages (binary, deb, rpm, AppImage)
+    summary: Linux arm64 packages (binary, deb, rpm, AppImage, Flatpak)
     cmds:
       - task: linux:package
         vars:
           ARCH: arm64
+          APP_VERSION: '{{.APP_VERSION}}'
+
+
+  package:linux:flatpak:
+    summary: Linux Flatpak bundle for current arch
+    cmds:
+      - task: linux:create:flatpak
+        vars:
+          ARCH: '{{.ARCH | default ARCH}}'
           APP_VERSION: '{{.APP_VERSION}}'
 
   package:windows:amd64:

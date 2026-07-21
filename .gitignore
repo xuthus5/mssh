@@ -19,3 +19,9 @@ build/linux/appimage/appicon.png
 bin/
 build/linux/appimage/mssh.png
 *.AppImage
+
+# Flatpak local build state
+build/linux/flatpak/.flatpak-builder/
+build/linux/flatpak/build-dir/
+build/linux/flatpak/repo/
+*.flatpak
