@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { useAppStore } from '@/store/appStore'
 import { SessionService, TerminalService, TunnelService } from '@/lib/wails'
 import { useConnectDialog } from '@/store/connectDialog'
@@ -11,6 +11,7 @@ import { runBatchSessions } from '@/lib/sessionBatch'
 import { mapFolder, mapSession, mapTunnel, type AssetEnvironment, type AssetProject, type AssetTag, type Folder, type Session, type Tunnel } from '@/lib/sessionModels'
 import { useSessionAssetCatalog } from '@/hooks/useSessionAssetCatalog'
 import { useSessionCSVTransfer } from '@/hooks/useSessionCSVTransfer'
+import { remapAfterFolderDelete } from '@/lib/sessionFolderDelete'
 
 export type { BatchSessionResult } from '@/lib/sessionBatch'
 export type { AssetColorToken, AssetEnvironment, AssetProject, AssetTag, Folder, Session, Tunnel } from '@/lib/sessionModels'
@@ -27,6 +28,10 @@ async function openSessionTab(session: Session): Promise<string> {
 export function useSession() {
   const [folders, setFolders] = useState<Folder[]>([])
   const [sessions, setSessions] = useState<Session[]>([])
+  const foldersRef = useRef(folders)
+  const sessionsRef = useRef(sessions)
+  foldersRef.current = folders
+  sessionsRef.current = sessions
   const [recentSessions, setRecentSessions] = useState<Session[]>([])
   const [tunnels, setTunnels] = useState<Tunnel[]>([])
   const [environments, setEnvironments] = useState<AssetEnvironment[]>([])
@@ -68,19 +73,14 @@ export function useSession() {
   const deleteFolder = useCallback(async (id: string) => {
     try {
       await SessionService.DeleteFolder(Number(id))
-      setFolders((prev) => {
-        const defaultID = prev.find((folder) => folder.isDefault)?.id ?? null
-        return prev.filter((folder) => folder.id !== id).map((folder) => folder.parentId === id ? { ...folder, parentId: defaultID } : folder)
-      })
-      setSessions((prev) => {
-        const defaultID = folders.find((folder) => folder.isDefault)?.id ?? null
-        return prev.map((session) => session.folderId === id ? { ...session, folderId: defaultID } : session)
-      })
+      const remapped = remapAfterFolderDelete(foldersRef.current, sessionsRef.current, id)
+      setFolders(remapped.folders)
+      setSessions(remapped.sessions)
     } catch (err) {
       logger.error('deleteFolder error', err)
       throw err
     }
-  }, [folders])
+  }, [])
 
   const updateFolder = useCallback(async (id: string, name: string) => {
     try {

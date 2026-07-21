@@ -13,6 +13,8 @@ import {
   type WorkspaceID,
 } from '@/store/tabNavigation'
 import type { AppState, Tab } from '@/store/appStore'
+import { clearTerminalRuntimeFields, findTabByTerminalID, selectTerminalPoolEvictionID } from '@/store/terminalPool'
+import { canTransitionConnection } from '@/store/connectionStatus'
 
 type StoreSet = StoreApi<AppState>['setState']
 type StoreGet = StoreApi<AppState>['getState']
@@ -228,22 +230,21 @@ function registerTerminalState(state: AppState, get: StoreGet, id: string, termi
 }
 
 function evictLRUState(state: AppState): Partial<AppState> {
-  if (state.terminalPool.size === 0) return {}
-  let oldestID = ''
-  let oldestTime = Infinity
-  for (const [id, entry] of state.terminalPool) {
-    if (entry.lastUsed < oldestTime) {
-      oldestTime = entry.lastUsed
-      oldestID = id
-    }
-  }
-  if (!oldestID) return {}
+  const victimID = selectTerminalPoolEvictionID(state)
+  if (!victimID) return {}
   const terminalPool = new Map(state.terminalPool)
-  terminalPool.delete(oldestID)
-  void TerminalService.Close(oldestID).catch((error: unknown) => {
+  terminalPool.delete(victimID)
+  void TerminalService.Close(victimID).catch((error: unknown) => {
     logger.error('evictLRU: close terminal error', error)
   })
-  return { terminalPool }
+  const runtime = clearTerminalRuntimeFields(state, victimID)
+  const owningTab = findTabByTerminalID(state.tabs, victimID)
+  if (!owningTab) {
+    return { terminalPool, ...runtime }
+  }
+  // Keep tab strip / surface consistent when a visible terminal must be reclaimed.
+  const withoutTab = removeTabState({ ...state, terminalPool, ...runtime }, owningTab.id)
+  return { ...withoutTab, terminalPool, ...runtime, activePaneId: runtime.activePaneId }
 }
 
 export function createPoolActions(set: StoreSet, get: StoreGet): PoolActions {
@@ -295,15 +296,4 @@ export function createStatusActions(set: StoreSet): StatusActions {
   }
 }
 
-export function canTransitionConnection(current: AppState['connectionStatus'][string] | undefined, next: AppState['connectionStatus'][string]) {
-  if (current === next || current === undefined) return true
-  const transitions: Record<NonNullable<typeof current>, Array<typeof next>> = {
-    connecting: ['connected', 'disconnected', 'error', 'closing'],
-    connected: ['reconnecting', 'disconnected', 'error', 'closing'],
-    reconnecting: ['connected', 'disconnected', 'error', 'closing'],
-    closing: ['disconnected', 'error'],
-    disconnected: ['connecting', 'reconnecting', 'error'],
-    error: ['connecting', 'reconnecting', 'disconnected'],
-  }
-  return transitions[current].includes(next)
-}
+export { canTransitionConnection } from '@/store/connectionStatus'

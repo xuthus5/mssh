@@ -32,7 +32,14 @@ vi.mock('@/components/layout/ConnectDialog', () => ({ ConnectDialog: () => null 
 vi.mock('@/components/session/SessionQuickSearchHost', () => ({ SessionQuickSearchHost: () => null }))
 vi.mock('@/hooks/SessionWorkspaceContext', () => ({
   SessionWorkspaceProvider: ({ children }: { children: React.ReactNode }) => children,
-  useSessionWorkspace: () => ({ reconnect: vi.fn(async () => {}) }),
+  useSessionWorkspace: () => ({
+    reconnect: vi.fn(async () => {}),
+    listFolders: vi.fn(async () => {}),
+    listSessions: vi.fn(async () => {}),
+    listRecentSessions: vi.fn(async () => {}),
+    listAssetCatalogs: vi.fn(async () => {}),
+    listTunnels: vi.fn(async () => {}),
+  }),
 }))
 vi.mock('@/components/terminal/TerminalTab', async () => {
   const { useEffect, useRef, useState } = await import('react')
