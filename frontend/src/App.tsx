@@ -6,7 +6,7 @@ import { ConnectDialog } from '@/components/layout/ConnectDialog'
 import { useAppStore, type AppState, type Tab } from '@/store/appStore'
 import { logger } from '@/lib/logger'
 import { WindowTitleBar } from '@/components/layout/WindowTitleBar'
-import { SessionWorkspaceProvider } from '@/hooks/SessionWorkspaceContext'
+import { SessionWorkspaceProvider, useSessionWorkspace } from '@/hooks/SessionWorkspaceContext'
 import { closeTabsWithFeedback } from '@/lib/closeTabsWithFeedback'
 import { WorkspaceContent } from '@/components/layout/WorkspaceContent'
 import { TerminalLayers } from '@/components/terminal/TerminalLayers'
@@ -14,7 +14,7 @@ import { SessionQuickSearchHost } from '@/components/session/SessionQuickSearchH
 import { SESSION_QUICK_SEARCH_EVENT } from '@/lib/sessionQuickSearch'
 import { GeneralSettingsRuntime } from '@/components/layout/GeneralSettingsRuntime'
 import { WorkspacePersistence } from '@/components/layout/WorkspacePersistence'
-import { registerSyncDataReload } from '@/lib/syncDataReload'
+import { createAppSyncDataReload, hotReloadSessionWorkspace, registerSyncDataReload } from '@/lib/syncDataReload'
 import { getClipboard } from '@/lib/clipboard'
 
 function activeTab(state: AppState): Tab | undefined {
@@ -92,33 +92,44 @@ function handleShortcut(event: KeyboardEvent) {
   event.preventDefault()
 }
 
-export default function App() {
+function AppShell() {
   const activeSurface = useAppStore((state) => state.activeSurface)
+  const workspace = useSessionWorkspace()
 
   useEffect(() => {
     document.addEventListener('keydown', handleShortcut)
     return () => document.removeEventListener('keydown', handleShortcut)
   }, [])
 
-  useEffect(() => registerSyncDataReload(() => window.location.reload()), [])
+  useEffect(() => registerSyncDataReload(createAppSyncDataReload({
+    hotReload: () => hotReloadSessionWorkspace(workspace),
+  })), [workspace])
 
+  return (
+    <>
+      <GeneralSettingsRuntime />
+      <WorkspacePersistence />
+      <WindowTitleBar />
+      <div className="flex min-h-0 flex-1">
+        <div className={activeSurface === null ? 'hidden' : 'contents'}><Sidebar /></div>
+        <main className="relative flex min-w-0 flex-1 flex-col">
+          <WorkspaceContent />
+          <TerminalLayers />
+        </main>
+      </div>
+      <StatusBar />
+      <ToastContainer />
+      <ConnectDialog />
+      <SessionQuickSearchHost />
+    </>
+  )
+}
+
+export default function App() {
   return (
     <div className="flex h-screen w-screen flex-col bg-background">
       <SessionWorkspaceProvider>
-        <GeneralSettingsRuntime />
-        <WorkspacePersistence />
-        <WindowTitleBar />
-        <div className="flex min-h-0 flex-1">
-          <div className={activeSurface === null ? 'hidden' : 'contents'}><Sidebar /></div>
-          <main className="relative flex min-w-0 flex-1 flex-col">
-            <WorkspaceContent />
-            <TerminalLayers />
-          </main>
-        </div>
-        <StatusBar />
-        <ToastContainer />
-        <ConnectDialog />
-        <SessionQuickSearchHost />
+        <AppShell />
       </SessionWorkspaceProvider>
     </div>
   )
