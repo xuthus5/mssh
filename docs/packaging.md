@@ -6,7 +6,7 @@ Release packaging is driven by Wails v3 Taskfiles under `build/` and GitHub Acti
 
 ## Artifacts
 
-- Linux amd64/arm64: binary (`mssh-VERSION-linux-ARCH`), deb/rpm/AppImage with the same version/arch suffix
+- Linux amd64/arm64: binary/deb/rpm always published as `mssh-VERSION-linux-ARCH[.deb|.rpm]`; AppImage is best-effort with the same naming when packaging succeeds
 - Windows amd64/arm64: exe, NSIS installer
 - macOS: arm64 + amd64 `.app` zip (native runners)
 
