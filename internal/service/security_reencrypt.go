@@ -12,28 +12,46 @@ import (
 func (s *SecurityService) reencryptProtectedData(oldDEK, newDEK []byte) error {
 	oldCrypto := &staticCrypto{key: oldDEK}
 	newCrypto := &staticCrypto{key: newDEK}
+	if err := s.reencryptSSHKeys(oldCrypto, newCrypto); err != nil {
+		return err
+	}
+	return s.reencryptSessionPasswords(oldCrypto, newCrypto)
+}
+
+func (s *SecurityService) reencryptSSHKeys(oldCrypto, newCrypto KeyCrypto) error {
 	keyIDs, err := listSSHKeyIDs(s.db)
 	if err != nil {
 		return fmt.Errorf("list keys: %w", err)
 	}
 	for _, keyID := range keyIDs {
-		key, getErr := store.GetKey(s.db, keyID)
-		if getErr != nil {
-			return fmt.Errorf("load key %d: %w", keyID, getErr)
-		}
-		plain, decErr := oldCrypto.Decrypt([]byte(key.PrivateKey))
-		if decErr != nil {
-			return fmt.Errorf("decrypt key %d: %w", keyID, decErr)
-		}
-		sealed, encErr := newCrypto.Encrypt(plain)
-		if encErr != nil {
-			return fmt.Errorf("encrypt key %d: %w", keyID, encErr)
-		}
-		key.PrivateKey = string(sealed)
-		if err := store.UpdateKey(s.db, *key); err != nil {
-			return fmt.Errorf("update key %d: %w", keyID, err)
+		if err := reencryptSSHKey(s.db, keyID, oldCrypto, newCrypto); err != nil {
+			return err
 		}
 	}
+	return nil
+}
+
+func reencryptSSHKey(db *sql.DB, keyID int64, oldCrypto, newCrypto KeyCrypto) error {
+	key, err := store.GetKey(db, keyID)
+	if err != nil {
+		return fmt.Errorf("load key %d: %w", keyID, err)
+	}
+	plain, err := oldCrypto.Decrypt([]byte(key.PrivateKey))
+	if err != nil {
+		return fmt.Errorf("decrypt key %d: %w", keyID, err)
+	}
+	sealed, err := newCrypto.Encrypt(plain)
+	if err != nil {
+		return fmt.Errorf("encrypt key %d: %w", keyID, err)
+	}
+	key.PrivateKey = string(sealed)
+	if err := store.UpdateKey(db, *key); err != nil {
+		return fmt.Errorf("update key %d: %w", keyID, err)
+	}
+	return nil
+}
+
+func (s *SecurityService) reencryptSessionPasswords(oldCrypto, newCrypto KeyCrypto) error {
 	sessions, err := store.ListSessions(s.db, nil)
 	if err != nil {
 		return fmt.Errorf("list sessions: %w", err)
@@ -42,17 +60,9 @@ func (s *SecurityService) reencryptProtectedData(oldDEK, newDEK []byte) error {
 		if session.Password == "" {
 			continue
 		}
-		plain := session.Password
-		if strings.HasPrefix(session.Password, sessionPasswordPrefix) {
-			opened, openErr := openSessionPassword(oldCrypto, session.Password)
-			if openErr != nil {
-				return fmt.Errorf("decrypt session %d password: %w", session.ID, openErr)
-			}
-			plain = opened
-		}
-		sealed, sealErr := sealSessionPassword(newCrypto, plain)
-		if sealErr != nil {
-			return fmt.Errorf("encrypt session %d password: %w", session.ID, sealErr)
+		sealed, err := reencryptSessionPassword(oldCrypto, newCrypto, session.Password)
+		if err != nil {
+			return fmt.Errorf("session %d password: %w", session.ID, err)
 		}
 		session.Password = sealed
 		if err := store.UpdateSession(s.db, session); err != nil {
@@ -60,6 +70,22 @@ func (s *SecurityService) reencryptProtectedData(oldDEK, newDEK []byte) error {
 		}
 	}
 	return nil
+}
+
+func reencryptSessionPassword(oldCrypto, newCrypto KeyCrypto, stored string) (string, error) {
+	plain := stored
+	if strings.HasPrefix(stored, sessionPasswordPrefix) {
+		opened, err := openSessionPassword(oldCrypto, stored)
+		if err != nil {
+			return "", fmt.Errorf("decrypt: %w", err)
+		}
+		plain = opened
+	}
+	sealed, err := sealSessionPassword(newCrypto, plain)
+	if err != nil {
+		return "", fmt.Errorf("encrypt: %w", err)
+	}
+	return sealed, nil
 }
 
 type staticCrypto struct{ key []byte }
