@@ -51,6 +51,8 @@ func (a *AuditService) RecordBatch(action string, sessionIDs []int64, outcomes [
 }
 
 func recordAudit(db *sql.DB, logger *slog.Logger, event model.AuditEvent) {
+	event.Summary = sanitizeLogValue(event.Summary)
+	event.TargetID = sanitizeLogValue(event.TargetID)
 	if err := store.AppendAuditEvent(db, event); err != nil {
 		logger.Error("record audit event failed", "action", event.Action, "error", err)
 	}

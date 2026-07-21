@@ -27,6 +27,7 @@ go tool cover -func=coverage.out | grep total | awk '{if ($3+0 < 90) { print "co
 (
   cd frontend
   npm run check:source-limits
+node scripts/check-go-source-limits.mjs
   npm run check:bundle-budget
   npm test
 )

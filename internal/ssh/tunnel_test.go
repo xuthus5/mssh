@@ -406,7 +406,7 @@ func TestStartLocalForward(t *testing.T) {
 
 	cw := connectToSSH(t, sshAddr)
 	remoteAddr := fmt.Sprintf("127.0.0.1:%d", parsePort(echoAddr))
-	ln, err := StartLocalForward(cw, "127.0.0.1:0", remoteAddr)
+	ln, err := StartLocalForward(cw, "127.0.0.1:0", remoteAddr, nil)
 	require.NoError(t, err)
 	defer ln.Close()
 
@@ -418,7 +418,7 @@ func TestStartLocalForward_ClosedWrapper(t *testing.T) {
 	defer sshCleanup()
 
 	cw := connectToSSH(t, sshAddr)
-	ln, err := StartLocalForward(cw, "127.0.0.1:0", "127.0.0.1:9999")
+	ln, err := StartLocalForward(cw, "127.0.0.1:0", "127.0.0.1:9999", nil)
 	require.NoError(t, err)
 	cw.Close()
 
@@ -441,7 +441,7 @@ func TestStartLocalForward_RemoteUnreachable(t *testing.T) {
 	defer sshCleanup()
 
 	cw := connectToSSH(t, sshAddr)
-	ln, err := StartLocalForward(cw, "127.0.0.1:0", "127.0.0.1:1")
+	ln, err := StartLocalForward(cw, "127.0.0.1:0", "127.0.0.1:1", nil)
 	require.NoError(t, err)
 	defer ln.Close()
 
@@ -463,7 +463,7 @@ func TestStartRemoteForward(t *testing.T) {
 
 	cw := connectToSSH(t, sshAddr)
 	localAddr := fmt.Sprintf("127.0.0.1:%d", parsePort(echoAddr))
-	ln, err := StartRemoteForward(cw, "127.0.0.1:0", localAddr)
+	ln, err := StartRemoteForward(cw, "127.0.0.1:0", localAddr, nil)
 	require.NoError(t, err)
 	defer ln.Close()
 
@@ -477,7 +477,7 @@ func TestStartRemoteForward_ClosedWrapper(t *testing.T) {
 	cw := connectToSSH(t, sshAddr)
 	cw.Close()
 
-	_, err := StartRemoteForward(cw, "127.0.0.1:0", "127.0.0.1:9999")
+	_, err := StartRemoteForward(cw, "127.0.0.1:0", "127.0.0.1:9999", nil)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "remote forward listen")
 }
@@ -487,7 +487,7 @@ func TestStartRemoteForward_LocalUnreachable(t *testing.T) {
 	defer sshCleanup()
 
 	cw := connectToSSH(t, sshAddr)
-	ln, err := StartRemoteForward(cw, "127.0.0.1:0", "127.0.0.1:1")
+	ln, err := StartRemoteForward(cw, "127.0.0.1:0", "127.0.0.1:1", nil)
 	require.NoError(t, err)
 	defer ln.Close()
 
@@ -508,7 +508,7 @@ func TestStartDynamicForward(t *testing.T) {
 	defer sshCleanup()
 
 	cw := connectToSSH(t, sshAddr)
-	ln, err := StartDynamicForward(cw, "127.0.0.1:0")
+	ln, err := StartDynamicForward(cw, "127.0.0.1:0", nil)
 	require.NoError(t, err)
 	defer ln.Close()
 
@@ -525,7 +525,7 @@ func TestStartDynamicForward_IPv6(t *testing.T) {
 	defer sshCleanup()
 
 	cw := connectToSSH(t, sshAddr)
-	ln, err := StartDynamicForward(cw, "127.0.0.1:0")
+	ln, err := StartDynamicForward(cw, "127.0.0.1:0", nil)
 	require.NoError(t, err)
 	defer ln.Close()
 
@@ -546,7 +546,7 @@ func TestStartDynamicForward_DomainName(t *testing.T) {
 	defer sshCleanup()
 
 	cw := connectToSSH(t, sshAddr)
-	ln, err := StartDynamicForward(cw, "127.0.0.1:0")
+	ln, err := StartDynamicForward(cw, "127.0.0.1:0", nil)
 	require.NoError(t, err)
 	defer ln.Close()
 
@@ -563,7 +563,7 @@ func TestStartDynamicForward_ClosedWrapper(t *testing.T) {
 	defer sshCleanup()
 
 	cw := connectToSSH(t, sshAddr)
-	ln, err := StartDynamicForward(cw, "127.0.0.1:0")
+	ln, err := StartDynamicForward(cw, "127.0.0.1:0", nil)
 	require.NoError(t, err)
 	cw.Close()
 
@@ -583,7 +583,7 @@ func TestStartDynamicForward_UnsupportedAddressType(t *testing.T) {
 	defer sshCleanup()
 
 	cw := connectToSSH(t, sshAddr)
-	ln, err := StartDynamicForward(cw, "127.0.0.1:0")
+	ln, err := StartDynamicForward(cw, "127.0.0.1:0", nil)
 	require.NoError(t, err)
 	defer ln.Close()
 
@@ -606,7 +606,7 @@ func TestStartDynamicForward_UnreachableTarget(t *testing.T) {
 	defer sshCleanup()
 
 	cw := connectToSSH(t, sshAddr)
-	ln, err := StartDynamicForward(cw, "127.0.0.1:0")
+	ln, err := StartDynamicForward(cw, "127.0.0.1:0", nil)
 	require.NoError(t, err)
 	defer ln.Close()
 
@@ -715,7 +715,7 @@ func TestSOCKS5_BadProtocolVersion(t *testing.T) {
 		sshAddr, sshCleanup := newSSHServer(t, nil)
 		defer sshCleanup()
 		cw := connectToSSH(t, sshAddr)
-		ln, err := StartDynamicForward(cw, "127.0.0.1:0")
+		ln, err := StartDynamicForward(cw, "127.0.0.1:0", nil)
 		require.NoError(t, err)
 		defer ln.Close()
 
@@ -730,7 +730,7 @@ func TestSOCKS5_BadProtocolVersion(t *testing.T) {
 		sshAddr, sshCleanup := newSSHServer(t, nil)
 		defer sshCleanup()
 		cw := connectToSSH(t, sshAddr)
-		ln, err := StartDynamicForward(cw, "127.0.0.1:0")
+		ln, err := StartDynamicForward(cw, "127.0.0.1:0", nil)
 		require.NoError(t, err)
 		defer ln.Close()
 
@@ -745,7 +745,7 @@ func TestSOCKS5_BadProtocolVersion(t *testing.T) {
 		sshAddr, sshCleanup := newSSHServer(t, nil)
 		defer sshCleanup()
 		cw := connectToSSH(t, sshAddr)
-		ln, err := StartDynamicForward(cw, "127.0.0.1:0")
+		ln, err := StartDynamicForward(cw, "127.0.0.1:0", nil)
 		require.NoError(t, err)
 		defer ln.Close()
 

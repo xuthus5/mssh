@@ -114,7 +114,7 @@ func TestTerminalService_Close(t *testing.T) {
 	}
 
 	sessionSvc.mu.Lock()
-	sessionSvc.conns["term-1"] = cw
+	sessionSvc.conns["term-1"] = &managedConn{wrapper: cw}
 	sessionSvc.mu.Unlock()
 
 	err = svc.Close("term-1")
