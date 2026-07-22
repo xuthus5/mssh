@@ -66,7 +66,12 @@ func (s *SettingService) SetMany(settings []model.SettingInput) error {
 	return store.SetSettings(s.db, entries)
 }
 
-func (s *SettingService) Delete(key string) error { return store.DeleteSetting(s.db, key) }
+func (s *SettingService) Delete(key string) error {
+	if err := rejectBlockedSettingKey(key); err != nil {
+		return err
+	}
+	return store.DeleteSetting(s.db, key)
+}
 
 func NewSettingService(db *sql.DB, _ *slog.Logger) *SettingService {
 	return &SettingService{db: db}

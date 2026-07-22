@@ -242,14 +242,6 @@ describe('useSettings', () => {
     expect(exported).toBe('mock-key')
   })
 
-  it('saves sync config', async () => {
-    const { result } = renderHook(() => useSettings())
-    await act(async () => {
-      await result.current.saveSync({ enabled: true, url: 'http://sync.local', username: 'admin', password: 'pass' })
-    })
-    expect(result.current.sync.enabled).toBe(true)
-    expect(result.current.sync.url).toBe('http://sync.local')
-  })
 
   it('loads, updates, and replaces explicit key material without storing private data in the list', async () => {
     const createdAt = new Date().toISOString()
@@ -321,13 +313,11 @@ describe('useSettings', () => {
       await result.current.importKey('bad', 'bad')
       await result.current.deleteKey('1')
       await result.current.exportKey('1')
-      await result.current.saveSync({ enabled: true, url: '', username: '', password: '' })
       await result.current.exportConfig()
       await result.current.importConfig()
     })
 
     expect(result.current.keys).toEqual([])
     expect(result.current.systemFonts).toEqual(['sans-serif'])
-    expect(result.current.sync.enabled).toBe(false)
   })
 })

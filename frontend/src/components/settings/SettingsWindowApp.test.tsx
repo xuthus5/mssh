@@ -4,8 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 const settings = vi.hoisted(() => ({
   general: {}, systemFonts: [], keys: [], sync: {}, saveGeneral: vi.fn(), previewUIFont: vi.fn(),
   generateKey: vi.fn(), importKey: vi.fn(), deleteKey: vi.fn(),
-  exportKey: vi.fn(), saveSync: vi.fn(), exportConfig: vi.fn(), importConfig: vi.fn(),
-  testCloud: vi.fn(), pushCloud: vi.fn(), pullCloud: vi.fn(),
+  exportKey: vi.fn(), exportConfig: vi.fn(), importConfig: vi.fn(),
 }))
 const catalog = vi.hoisted(() => ({
   profiles: [], assignments: {}, globalStyle: {}, colorMode: 'dark', saveConfiguration: vi.fn(),
