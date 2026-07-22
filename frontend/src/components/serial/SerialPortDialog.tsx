@@ -110,6 +110,10 @@ export function SerialPortDialog({ open, onOpenChange, port, devices, onSave }: 
       setError(t('名称和设备路径不能为空'))
       return
     }
+    if (!draft.baud_rate || draft.baud_rate < 300 || draft.baud_rate > 4_000_000) {
+      setError(t('波特率需在 300 到 4000000 之间'))
+      return
+    }
     setPending(true)
     setError('')
     try {
@@ -160,13 +164,40 @@ export function SerialPortDialog({ open, onOpenChange, port, devices, onSave }: 
           </Field>
           <div className="grid grid-cols-2 gap-3">
             <Field>
-              <FieldLabel>{t('波特率')}</FieldLabel>
-              <LabeledSelect
-                ariaLabel={t('波特率')}
-                value={String(draft.baud_rate)}
-                options={BAUD_OPTIONS.map((v) => ({ value: String(v), label: String(v) }))}
-                onValueChange={(value) => setDraft({ ...draft, baud_rate: Number(value) })}
-              />
+              <FieldContent>
+                <FieldLabel>{t('波特率')}</FieldLabel>
+                <FieldDescription>{t('常用值可点选，也支持直接输入自定义数值。')}</FieldDescription>
+              </FieldContent>
+              <div className="flex flex-col gap-2">
+                <LabeledSelect
+                  ariaLabel={t('波特率预设')}
+                  value={BAUD_OPTIONS.includes(Number(draft.baud_rate)) ? String(draft.baud_rate) : 'custom'}
+                  options={[
+                    ...BAUD_OPTIONS.map((v) => ({ value: String(v), label: String(v) })),
+                    { value: 'custom', label: t('自定义') },
+                  ]}
+                  onValueChange={(value) => {
+                    if (value === 'custom') {
+                      setDraft({ ...draft, baud_rate: Number(draft.baud_rate) > 0 && !BAUD_OPTIONS.includes(Number(draft.baud_rate)) ? Number(draft.baud_rate) : 14400 })
+                      return
+                    }
+                    setDraft({ ...draft, baud_rate: Number(value) })
+                  }}
+                />
+                <Input
+                  type="number"
+                  min={300}
+                  max={4000000}
+                  step={1}
+                  aria-label={t('波特率')}
+                  value={String(draft.baud_rate || '')}
+                  onChange={(event) => {
+                    const next = Number(event.target.value)
+                    if (!Number.isFinite(next)) return
+                    setDraft({ ...draft, baud_rate: Math.trunc(next) })
+                  }}
+                />
+              </div>
             </Field>
             <Field>
               <FieldLabel>{t('数据位')}</FieldLabel>
@@ -198,7 +229,7 @@ export function SerialPortDialog({ open, onOpenChange, port, devices, onSave }: 
             <Field>
               <FieldContent>
                 <FieldLabel>{t('流控')}</FieldLabel>
-                <FieldDescription>{t('连接时应用到底层串口：None / XON-XOFF 软件流控 / RTS-CTS 硬件流控 / DSR-DTR 硬件流控（Windows 完整，Linux 尽力）。')}</FieldDescription>
+                <FieldDescription>{t('连接时应用到底层串口。DSR/DTR 在 Windows 启用硬件握手；Linux/macOS 仅保持 DTR/RTS 电平，不提供完整 DSR 握手。')}</FieldDescription>
               </FieldContent>
               <LabeledSelect
                 ariaLabel={t('流控')}
