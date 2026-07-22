@@ -40,3 +40,16 @@ func TestSettingServiceTypedCollections(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, listed, 2)
 }
+
+func TestSettingServiceRejectsSecretKeys(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	svc := NewSettingService(db, testutil.NewTestLogger())
+	err := svc.Set(model.SettingInputFrom(model.Setting{
+		Key: "sync.master_key", Namespace: "sync", Value: `"secret"`, ValueType: "string", Version: 1,
+	}))
+	require.Error(t, err)
+	_, err = svc.Get("sync.secret.gist_token")
+	require.Error(t, err)
+	_, err = svc.GetMany([]string{"appearance.color_mode", "sync.master_key"})
+	require.Error(t, err)
+}

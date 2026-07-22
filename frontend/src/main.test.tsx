@@ -29,7 +29,8 @@ describe('application entry', () => {
     const element = render.mock.calls[0][0]
     expect(element.type.name).toBe('LanguageProvider')
     expect(element.props.children.type.name).toBe('TooltipProvider')
-    expect(element.props.children.props.children.type.name).toBe('default')
+    expect(element.props.children.props.children.type.name).toBe('AppErrorBoundary')
+    expect(element.props.children.props.children.props.children.type.name).toBe('default')
     expect(startEventBridge).toHaveBeenCalledOnce()
   })
 
@@ -43,7 +44,8 @@ describe('application entry', () => {
     const element = render.mock.calls[0][0]
     expect(element.type.name).toBe('LanguageProvider')
     expect(element.props.children.type.name).toBe('TooltipProvider')
-    expect(element.props.children.props.children.type.name).toBe('SettingsWindowApp')
+    expect(element.props.children.props.children.type.name).toBe('AppErrorBoundary')
+    expect(element.props.children.props.children.props.children.type.name).toBe('SettingsWindowApp')
     expect(startEventBridge).not.toHaveBeenCalled()
   })
 })
