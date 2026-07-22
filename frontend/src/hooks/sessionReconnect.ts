@@ -60,6 +60,15 @@ function currentReconnectTarget(tabId: string, sessions: ReconnectSession[]) {
     }
     return { state, tab, terminalId: tab.terminalId, session }
   }
+  if (tab.connectionKind === 'local') {
+    const session: ReconnectSession = {
+      id: 'local',
+      host: tab.title || 'local',
+      port: 0,
+      username: 'local',
+    }
+    return { state, tab, terminalId: tab.terminalId, session }
+  }
   const session = sessions.find((item) => Number(item.id) === tab.sessionId)
   if (!session) return null
   return { state, tab, terminalId: tab.terminalId, session }
@@ -101,8 +110,9 @@ export async function reconnectSessionTab(tabId: string, sessions: ReconnectSess
   }
   const terminal = state.terminalPool.get(terminalId)?.terminal
   const tabMeta = state.tabs.find((item) => item.id === tabId)
-  const isSerial = tabMeta?.type === 'terminal' && tabMeta.connectionKind === 'serial'
-  if (!isSerial) {
+  const kind = tabMeta?.type === 'terminal' ? (tabMeta.connectionKind ?? 'ssh') : 'ssh'
+  const skipHostDialog = kind === 'serial' || kind === 'local'
+  if (!skipHostDialog) {
     dialog.openDialog(session.host, session.port, session.username, () => {
       void reconnectSessionTab(tabId, sessions)
     })
@@ -117,6 +127,9 @@ export async function reconnectSessionTab(tabId: string, sessions: ReconnectSess
           const tab = useAppStore.getState().tabs.find((item) => item.id === tabId)
           if (tab?.type === 'terminal' && tab.connectionKind === 'serial' && tab.serialPortId) {
             return TerminalService.OpenSerial(tab.serialPortId, terminal?.cols ?? 80, terminal?.rows ?? 24)
+          }
+          if (tab?.type === 'terminal' && tab.connectionKind === 'local') {
+            return TerminalService.OpenLocal(terminal?.cols ?? 80, terminal?.rows ?? 24)
           }
           return TerminalService.Open(Number(session.id), terminal?.cols ?? 80, terminal?.rows ?? 24)
         })

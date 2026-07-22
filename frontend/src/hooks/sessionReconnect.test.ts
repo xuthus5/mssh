@@ -167,3 +167,22 @@ describe('maybeAutoReconnectTerminal', () => {
   })
 })
 
+  it('reconnects local shell tabs via OpenLocal without host dialog', async () => {
+    useAppStore.setState({
+      tabs: [{ id: 'tab-local', title: '本地终端', type: 'terminal', terminalId: 'term-local-old', sessionId: 0, connectionKind: 'local' }],
+      activeSurface: { type: 'terminal', id: 'tab-local' },
+      connectionStatus: { 'term-local-old': 'disconnected' },
+      terminalPool: new Map(),
+    })
+    const openLocal = vi.fn(async () => 'term-local-new')
+    __registerHandler(service + 'OpenLocal', openLocal)
+    __registerHandler(service + 'Open', vi.fn(async () => 'should-not-open'))
+    __registerHandler(service + 'Close', vi.fn(async () => {}))
+    await reconnectSessionTab('tab-local', sessions)
+    expect(openLocal).toHaveBeenCalled()
+    expect(useConnectDialog.getState().open).toBe(false)
+    const tab = useAppStore.getState().tabs.find((item) => item.id === 'tab-local')
+    expect(tab).toMatchObject({ terminalId: 'term-local-new', connectionKind: 'local' })
+    expect(useAppStore.getState().connectionStatus['term-local-new']).toBe('connected')
+  })
+
