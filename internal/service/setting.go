@@ -3,13 +3,15 @@ package service
 import (
 	"database/sql"
 	"log/slog"
+	"reflect"
 
 	"github.com/xuthus5/mssh/internal/model"
 	"github.com/xuthus5/mssh/internal/store"
 )
 
 type SettingService struct {
-	db *sql.DB
+	db  *sql.DB
+	log LogConfigurer
 }
 
 func (s *SettingService) Get(key string) (*model.Setting, error) {
@@ -52,7 +54,10 @@ func (s *SettingService) Set(setting model.SettingInput) error {
 	if err := rejectBlockedSettingKey(entry.Key); err != nil {
 		return err
 	}
-	return store.SetSettings(s.db, []model.Setting{entry})
+	if err := store.SetSettings(s.db, []model.Setting{entry}); err != nil {
+		return err
+	}
+	return s.applyLogSettings([]model.Setting{entry})
 }
 
 func (s *SettingService) SetMany(settings []model.SettingInput) error {
@@ -63,7 +68,10 @@ func (s *SettingService) SetMany(settings []model.SettingInput) error {
 	if err := rejectBlockedSettings(entries); err != nil {
 		return err
 	}
-	return store.SetSettings(s.db, entries)
+	if err := store.SetSettings(s.db, entries); err != nil {
+		return err
+	}
+	return s.applyLogSettings(entries)
 }
 
 func (s *SettingService) Delete(key string) error {
@@ -73,6 +81,23 @@ func (s *SettingService) Delete(key string) error {
 	return store.DeleteSetting(s.db, key)
 }
 
-func NewSettingService(db *sql.DB, _ *slog.Logger) *SettingService {
-	return &SettingService{db: db}
+func NewSettingService(db *sql.DB, _ *slog.Logger, log ...LogConfigurer) *SettingService {
+	service := &SettingService{db: db}
+	if len(log) > 0 && !isNilLogConfigurer(log[0]) {
+		service.log = log[0]
+	}
+	return service
+}
+
+func isNilLogConfigurer(log LogConfigurer) bool {
+	if log == nil {
+		return true
+	}
+	value := reflect.ValueOf(log)
+	switch value.Kind() {
+	case reflect.Pointer, reflect.Interface, reflect.Map, reflect.Slice, reflect.Func, reflect.Chan:
+		return value.IsNil()
+	default:
+		return false
+	}
 }

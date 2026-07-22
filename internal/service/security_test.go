@@ -341,3 +341,34 @@ func TestSecurityService_UnlockRateLimit(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, status.Unlocked)
 }
+
+func TestSecurityService_SavePreferencesAndAutoUnlock(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	dir := t.TempDir()
+	runtime := NewCryptoRuntime()
+	keychain := &memoryKeychain{}
+	svc := NewSecurityService(db, dir, runtime, keychain, nil)
+	_, err := svc.Setup(model.SecuritySetupInput{Password: "initial-pass-12", RememberUnlock: true})
+	require.NoError(t, err)
+
+	status, err := svc.SavePreferences(model.SecurityPreferenceInput{RequirePasswordOnLaunch: false, RememberUnlock: true})
+	require.NoError(t, err)
+	assert.True(t, status.RememberUnlock)
+	assert.False(t, status.RequirePasswordOnLaunch)
+
+	status, err = svc.SavePreferences(model.SecurityPreferenceInput{RequirePasswordOnLaunch: true, RememberUnlock: true})
+	require.NoError(t, err)
+	assert.True(t, status.RequirePasswordOnLaunch)
+	assert.Empty(t, keychain.data[securityKeychainDEKAccount])
+
+	status, err = svc.SavePreferences(model.SecurityPreferenceInput{RequirePasswordOnLaunch: false, RememberUnlock: false})
+	require.NoError(t, err)
+	assert.False(t, status.RememberUnlock)
+
+	// unlock with remember so auto unlock can restore DEK
+	_, err = svc.Unlock(model.SecurityUnlockInput{Password: "initial-pass-12", RememberUnlock: true})
+	require.NoError(t, err)
+	runtime.Clear()
+	require.NoError(t, svc.TryAutoUnlock())
+	require.NoError(t, runtime.RequireUnlocked())
+}

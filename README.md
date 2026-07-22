@@ -25,6 +25,7 @@ A cross-platform SSH client built with Go + Wails v3 + React + xterm.js.
 - Searchable system font and size settings for the application interface
 - Terminal behavior settings support right-click menus or paste and optional copy-on-select
 - System tray controls support showing, hiding, and exiting, with a configurable close-button action
+- Application logs write daily files under `~/.mssh/logs` by default, with a configurable directory and retention window
 - Lazy-loaded native settings window with a frameless application title bar and live cross-window preview
 - Quick command macros
 - Explicit host-key fingerprint trust and connection cancellation

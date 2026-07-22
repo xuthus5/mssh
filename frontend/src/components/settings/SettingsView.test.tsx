@@ -15,6 +15,8 @@ const general = {
   copyOnSelect: false,
   scrollbackLines: 10000,
   closeButtonAction: 'tray' as const,
+  logDir: '',
+  logRetentionDays: 30,
   language: 'zh-CN' as const,
 }
 
