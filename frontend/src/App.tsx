@@ -109,7 +109,7 @@ function AppShell() {
 
   useEffect(() => onAppEvent(APP_NEW_LOCAL_TERMINAL_EVENT, () => {
     void openLocalTerminal().catch((error: unknown) => {
-      toast(error instanceof Error ? error.message : String(error), 'error')
+      toast(t('打开本地终端失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
     })
   }), [])
 

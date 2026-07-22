@@ -143,10 +143,14 @@ func GetSessionLog(db *sql.DB, id int64) (*model.SessionLog, error) {
 
 // ListSessionLogsBySession lists session logs filtered by session ID at the SQL layer.
 func ListSessionLogsBySession(db *sql.DB, sessionID int64) ([]model.SessionLog, error) {
-	rows, err := db.Query(
-		"SELECT id, session_id, started_at, ended_at, data_path FROM session_logs WHERE session_id = ? ORDER BY started_at DESC",
-		sessionID,
-	)
+	query := "SELECT id, session_id, started_at, ended_at, data_path FROM session_logs WHERE session_id = ? ORDER BY started_at DESC"
+	args := []any{sessionID}
+	if sessionID == 0 {
+		// Local/serial recordings are stored without an SSH session foreign key.
+		query = "SELECT id, session_id, started_at, ended_at, data_path FROM session_logs WHERE session_id IS NULL ORDER BY started_at DESC"
+		args = nil
+	}
+	rows, err := db.Query(query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("list session logs by session: %w", err)
 	}
