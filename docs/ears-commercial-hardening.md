@@ -124,4 +124,10 @@
 | LOCAL-002 | 本地/串口命令历史非正 sessionID 不得调用后端 List。 | done |
 | SHORTCUT-001 | 快捷键冲突时暂停自动保存并提示用户消解。 | done |
 | WORKSPACE-001 | 恢复工作区时，本地/串口 tab 不得恢复 files/system/ai 远程面板。 | done |
+| SERIAL-004 | 占用中的串口配置禁止删除；Write/Break/Close 并发安全。 | done |
+| LOCAL-003 | 多本地终端命令历史按 terminalInstance 分桶。 | done |
+| LOCAL-004 | OpenLocal 优先复用当前终端尺寸。 | done |
+| LOCAL-005 | Unix 本地 Shell 使用新会话并在关闭时向进程组发信号。 | done |
+| SHORTCUT-002 | 终端工具栏复制/粘贴/清屏提示显示当前自定义快捷键。 | done |
+
 

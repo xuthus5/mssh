@@ -30,17 +30,17 @@ describe('terminalInputRuntime', () => {
     expect(resolveSessionId(refs as never)).toBe(-12)
   })
 
-  it('uses fixed bucket for local shell history', () => {
+  it('uses per-instance buckets for local shell history', () => {
     const refs = {
       terminalIDRef: { current: 'term-l' },
       storeRef: {
         current: {
-          tabs: [{ type: 'terminal', terminalId: 'term-l', sessionId: 0, connectionKind: 'local' }],
+          tabs: [{ type: 'terminal', terminalId: 'term-l', sessionId: 0, connectionKind: 'local', terminalInstance: 2 }],
           updateLastUsed: vi.fn(),
         },
       },
     }
-    expect(resolveSessionId(refs as never)).toBe(-1)
+    expect(resolveSessionId(refs as never)).toBe(-(2_000_000 + 2))
   })
 
   it('records submitted commands while writing input', () => {
