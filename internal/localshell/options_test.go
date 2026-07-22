@@ -2,6 +2,7 @@ package localshell
 
 import (
 	"os"
+	"path/filepath"
 	"runtime"
 	"testing"
 
@@ -50,4 +51,14 @@ func TestExpandPathHome(t *testing.T) {
 func TestResolveOptionsInvalidShell(t *testing.T) {
 	_, err := resolveOptions(Options{Shell: t.TempDir() + "/missing-shell"})
 	require.Error(t, err)
+}
+
+func TestResolveShellRejectsNonExecutable(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	path := filepath.Join(dir, "not-shell")
+	require.NoError(t, os.WriteFile(path, []byte("#!/bin/sh\n"), 0o600))
+	_, err := resolveShell(path)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "not executable")
 }

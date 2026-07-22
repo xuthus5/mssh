@@ -1,4 +1,14 @@
 import { useRef, useState } from 'react'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { toast } from '@/components/ui/toast'
@@ -39,6 +49,8 @@ export function KeyManager(props: Props) {
   const [importOpen, setImportOpen] = useState(false)
   const [materialState, setMaterialState] = useState<MaterialState | null>(null)
   const [loadingID, setLoadingID] = useState<string | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<{ key: KeyInfo; usage: number } | null>(null)
+  const [deleting, setDeleting] = useState(false)
   const materialRequest = useRef(0)
 
   const openMaterial = async (id: string, mode: KeyMaterialMode) => {
@@ -64,9 +76,19 @@ export function KeyManager(props: Props) {
   const deleteKey = async (key: KeyInfo) => {
     try {
       const usage = await KeyService.UsageCount(Number(key.id))
-      if (!window.confirm(usage > 0 ? t('该密钥被 ${} 个会话引用，删除后这些会话将无法使用密钥认证。仍要删除吗？', usage) : t('删除密钥“${}”？', key.name))) return
-      props.onDelete(key.id)
+      setDeleteTarget({ key, usage })
     } catch (error) { toast(t('分析密钥影响失败: ${}', error instanceof Error ? error.message : String(error)), 'error') }
+  }
+
+  const confirmDeleteKey = async () => {
+    if (!deleteTarget || deleting) return
+    setDeleting(true)
+    try {
+      props.onDelete(deleteTarget.key.id)
+      setDeleteTarget(null)
+    } finally {
+      setDeleting(false)
+    }
   }
 
   return <div className="flex flex-col gap-3 pt-2">
@@ -92,5 +114,24 @@ export function KeyManager(props: Props) {
       onGenerated={(material) => setMaterialState({ mode: 'generated', material })} />
     <KeyImportDialog open={importOpen} onOpenChange={setImportOpen} onImport={props.onImport} onSelectFile={props.onSelectImportFile} />
     <KeyMaterialDialog state={materialState} onOpenChange={(open) => { if (!open) setMaterialState(null) }} onUpdate={props.onUpdate} />
+    <AlertDialog open={deleteTarget !== null} onOpenChange={(open) => { if (!open && !deleting) setDeleteTarget(null) }}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>
+            {deleteTarget && deleteTarget.usage > 0
+              ? t('该密钥被 ${} 个会话引用，删除后这些会话将无法使用密钥认证。仍要删除吗？', deleteTarget.usage)
+              : t('删除密钥“${}”？', deleteTarget?.key.name ?? '')}
+          </AlertDialogTitle>
+          <AlertDialogDescription>{t('此操作不可撤销。')}</AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={deleting}>{t('取消')}</AlertDialogCancel>
+          <AlertDialogAction type="button" variant="destructive" disabled={deleting} onClick={() => { void confirmDeleteKey() }}>
+            {deleting ? t('删除中…') : t('确认删除')}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   </div>
 }
+

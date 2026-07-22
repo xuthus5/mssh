@@ -93,7 +93,7 @@ export function TerminalTab({ terminalID, sessionId, onOpenFiles, active, focusR
         serialControls={connectionKind === 'serial'}
         onOpenFiles={remoteFeatures ? () => onOpenFiles(activeTerminalID) : undefined}
         onSplit={(direction) => splitRef.current?.split(direction)}
-        splitDisabled={splitState.busy || splitState.paneCount >= 8}
+        splitDisabled={splitState.busy || splitState.paneCount >= 8 || connectionKind === 'serial'}
         paneCount={splitState.paneCount}
         searchOpen={searchOpen}
         onToggleSearch={() => setSearchOpen((value) => !value)}

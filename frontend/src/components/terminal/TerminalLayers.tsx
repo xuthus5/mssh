@@ -203,7 +203,7 @@ export function TerminalLayers() {
     active={activeSurface?.type === tab.type && activeSurface.id === tab.id}
     activePaneID={activePaneID} lastActiveTerminalTabID={lastActiveTerminalTabIDRef.current}
     fileTargetID={fileTargets[tab.id] ?? null}
-    filePanelOpen={tab.type === 'terminal' && tab.toolPanel === 'files'} onToggleFiles={(terminalID) => toggleFiles(tab.id, terminalID)}
+    filePanelOpen={tab.type === 'terminal' && (tab.connectionKind ?? 'ssh') === 'ssh' && tab.toolPanel === 'files'} onToggleFiles={(terminalID) => toggleFiles(tab.id, terminalID)}
     onPaneClosed={(terminalID) => handlePaneClosed(tab.id, terminalID)}
     onPaneReplaced={(previousID, nextID) => handlePaneReplaced(tab.id, previousID, nextID)}
     focusRequest={focusRequest} onCloseFiles={() => closeFiles(tab.id)}
