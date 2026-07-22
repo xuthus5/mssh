@@ -110,6 +110,12 @@ vi.mock('@xterm/addon-canvas', () => ({
   },
 }))
 
+vi.mock('@xterm/addon-webgl', () => ({
+  WebglAddon: class {
+    dispose() {}
+  },
+}))
+
 vi.mock('@xterm/addon-unicode11', () => ({
   Unicode11Addon: class {
     name = 'unicode11'
@@ -174,7 +180,7 @@ describe('useTerminal', () => {
     proposedDimensions = []
     canvasLoadFailure = false
     Object.defineProperty(document, 'fonts', { configurable: true, value: undefined })
-    useTerminalBehaviorStore.setState({ rightClickAction: 'menu', copyOnSelect: false, autoReconnect: false, restoreTabsOnStartup: true, scrollbackLines: 10000 })
+    useTerminalBehaviorStore.setState({ rightClickAction: 'menu', copyOnSelect: false, autoReconnect: false, restoreTabsOnStartup: true, scrollbackLines: 10000, renderer: 'dom' })
     vi.stubGlobal('ResizeObserver', class {
       observe() {}
       disconnect = vi.fn()
