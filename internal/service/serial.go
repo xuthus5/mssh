@@ -158,22 +158,42 @@ func normalizeSerialPort(port model.SerialPort) (model.SerialPort, error) {
 	if port.Device == "" {
 		return model.SerialPort{}, fmt.Errorf("serial device is required")
 	}
-	if port.BaudRate <= 0 {
-		port.BaudRate = 115200
+	baud, err := normalizeBaudRate(port.BaudRate)
+	if err != nil {
+		return model.SerialPort{}, err
 	}
+	port.BaudRate = baud
 	if port.DataBits == 0 {
 		port.DataBits = 8
 	}
 	if port.DataBits < 5 || port.DataBits > 8 {
 		return model.SerialPort{}, fmt.Errorf("data bits must be 5-8")
 	}
+	if err := normalizeSerialEnums(&port); err != nil {
+		return model.SerialPort{}, err
+	}
+	// DTR/RTS defaults stay as provided by SerialPortInput conversion.
+	return port, nil
+}
+
+func normalizeBaudRate(baud int) (int, error) {
+	if baud <= 0 {
+		baud = 115200
+	}
+	if baud < 300 || baud > 4_000_000 {
+		return 0, fmt.Errorf("baud rate must be between 300 and 4000000")
+	}
+	return baud, nil
+}
+
+func normalizeSerialEnums(port *model.SerialPort) error {
 	if port.Parity == "" {
 		port.Parity = model.SerialParityNone
 	}
 	switch port.Parity {
 	case model.SerialParityNone, model.SerialParityOdd, model.SerialParityEven, model.SerialParityMark, model.SerialParitySpace:
 	default:
-		return model.SerialPort{}, fmt.Errorf("unsupported parity %q", port.Parity)
+		return fmt.Errorf("unsupported parity %q", port.Parity)
 	}
 	if port.StopBits == "" {
 		port.StopBits = model.SerialStopBitsOne
@@ -181,7 +201,7 @@ func normalizeSerialPort(port model.SerialPort) (model.SerialPort, error) {
 	switch port.StopBits {
 	case model.SerialStopBitsOne, model.SerialStopBitsOnePointFive, model.SerialStopBitsTwo:
 	default:
-		return model.SerialPort{}, fmt.Errorf("unsupported stop bits %q", port.StopBits)
+		return fmt.Errorf("unsupported stop bits %q", port.StopBits)
 	}
 	if port.FlowControl == "" {
 		port.FlowControl = "none"
@@ -189,7 +209,7 @@ func normalizeSerialPort(port model.SerialPort) (model.SerialPort, error) {
 	switch port.FlowControl {
 	case "none", "xonxoff", "rtscts", "dsrdtr":
 	default:
-		return model.SerialPort{}, fmt.Errorf("unsupported flow control %q", port.FlowControl)
+		return fmt.Errorf("unsupported flow control %q", port.FlowControl)
 	}
 	if port.LineEnding == "" {
 		port.LineEnding = model.SerialLineEndingCR
@@ -197,8 +217,7 @@ func normalizeSerialPort(port model.SerialPort) (model.SerialPort, error) {
 	switch port.LineEnding {
 	case model.SerialLineEndingCR, model.SerialLineEndingLF, model.SerialLineEndingCRLF:
 	default:
-		return model.SerialPort{}, fmt.Errorf("unsupported line ending %q", port.LineEnding)
+		return fmt.Errorf("unsupported line ending %q", port.LineEnding)
 	}
-	// DTR/RTS defaults stay as provided by SerialPortInput conversion.
-	return port, nil
+	return nil
 }

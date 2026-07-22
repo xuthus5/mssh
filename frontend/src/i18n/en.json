@@ -1290,5 +1290,11 @@
   "确认": "Confirm",
   "确认删除串口配置「${}」？": "Delete serial profile “${}”?",
   "确认删除选中的 ${} 个串口配置？": "Delete ${} selected serial profiles?",
-  "存在快捷键冲突，已暂停自动保存。请先消除冲突后再继续。": "Shortcut conflicts detected; auto-save is paused until conflicts are resolved."
+  "存在快捷键冲突，已暂停自动保存。请先消除冲突后再继续。": "Shortcut conflicts detected; auto-save is paused until conflicts are resolved.",
+  "可从列表选择，也可直接输入自定义波特率。": "Pick a common value or enter a custom baud rate.",
+  "常用值可点选，也支持直接输入自定义数值。": "Pick a common value or type a custom number.",
+  "波特率预设": "Baud preset",
+  "波特率需在 300 到 4000000 之间": "Baud rate must be between 300 and 4,000,000",
+  "连接时应用到底层串口。DSR/DTR 在 Windows 启用硬件握手；Linux/macOS 仅保持 DTR/RTS 电平，不提供完整 DSR 握手。": "Applied to the native serial port. DSR/DTR enables hardware handshake on Windows; on Linux/macOS only DTR/RTS levels are kept (no full DSR handshake).",
+  "串口使用中，请先关闭终端再删除": "Serial port is in use. Close the terminal before deleting."
 }
