@@ -57,9 +57,16 @@ func OpenPort(profile model.SerialPort) (*PortSession, error) {
 		dtr:        profile.DTROnOpen,
 		rts:        profile.RTSOnOpen,
 	}
-	if err := session.applyInitialSignals(); err != nil {
+	if err := applyFlowControl(port, profile); err != nil {
 		_ = port.Close()
-		return nil, err
+		return nil, fmt.Errorf("configure serial flow control: %w", err)
+	}
+	// Manual DTR/RTS only when the flow mode is not hardware-handshake driven.
+	if shouldApplyManualSignals(profile.FlowControl) {
+		if err := session.applyInitialSignals(); err != nil {
+			_ = port.Close()
+			return nil, err
+		}
 	}
 	return session, nil
 }
