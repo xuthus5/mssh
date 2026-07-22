@@ -58,7 +58,7 @@ export function recordCommand(sessionID: number, command: string, limits: Comman
   const value = command.trim()
   if (!value || isSensitiveCommand(value)) return
   const persist = CommandHistoryService?.Add
-  if (typeof persist === 'function') {
+  if (sessionID > 0 && typeof persist === 'function') {
     void persist(sessionID, value).catch((error: unknown) => logger.error('command history persistence failed', error))
   }
   const entries = readCommandHistory(sessionID)

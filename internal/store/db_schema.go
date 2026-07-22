@@ -236,6 +236,7 @@ var finalSchemaStatements = []schemaStatement{
 	{name: "asset_environments", sql: assetEnvironmentsTableSQL}, {name: "asset_projects", sql: assetProjectsTableSQL},
 	{name: "asset_projects_code_key_idx", sql: "CREATE UNIQUE INDEX IF NOT EXISTS asset_projects_code_key_idx ON asset_projects(code_key) WHERE code_key IS NOT NULL"},
 	{name: "asset_tags", sql: assetTagsTableSQL}, {name: "sessions", sql: sessionsTableSQL}, {name: "session_tags", sql: sessionTagsTableSQL},
+	{name: "serial_ports", sql: serialPortsTableSQL},
 	{name: "session_tags_tag_idx", sql: "CREATE INDEX IF NOT EXISTS session_tags_tag_idx ON session_tags(tag_id, session_id)"},
 	{name: "tunnels", sql: tunnelsTableSQL}, {name: "macros", sql: macrosTableSQL}, {name: "command_history", sql: commandHistoryTableSQL},
 	{name: "session_logs", sql: logsTableSQL}, {name: "transfer_jobs", sql: transferJobsTableSQL}, {name: "audit_events", sql: auditEventsTableSQL},

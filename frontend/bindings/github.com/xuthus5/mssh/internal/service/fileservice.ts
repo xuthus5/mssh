@@ -29,15 +29,12 @@ export function CancelTransfer(taskID: string): $CancellablePromise<void> {
 }
 
 /**
- * Delete removes a remote file via SFTP.
+ * Upload starts an async file upload and returns a task ID.
  */
 export function Delete(sessionID: number, path: string): $CancellablePromise<void> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.FileService.Delete", sessionID, path);
 }
 
-/**
- * Download starts an async file download and returns a task ID.
- */
 export function Download(sessionID: number, remotePath: string, localPath: string): $CancellablePromise<string> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.FileService.Download", sessionID, remotePath, localPath);
 }
@@ -71,9 +68,6 @@ export function Rename(sessionID: number, oldPath: string, newPath: string): $Ca
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.FileService.Rename", sessionID, oldPath, newPath);
 }
 
-/**
- * Upload starts an async file upload and returns a task ID.
- */
 export function Upload(sessionID: number, localPath: string, remotePath: string): $CancellablePromise<string> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.FileService.Upload", sessionID, localPath, remotePath);
 }

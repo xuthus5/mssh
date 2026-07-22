@@ -7,7 +7,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/xuthus5/mssh/internal/service/testutil"
-	ssh "github.com/xuthus5/mssh/internal/ssh"
 )
 
 const (
@@ -21,7 +20,7 @@ func (discardEventBus) Emit(string, interface{}) {}
 
 func TestRuntimePerformanceBudgets(t *testing.T) {
 	service := NewTerminalService(nil, discardEventBus{}, 32, testutil.NewTestLogger())
-	service.ptys["terminal"] = (*ssh.PTYSession)(nil)
+	service.ptys["terminal"] = nil
 	service.attached["terminal"] = true
 	payload := make([]byte, 1024)
 	started := time.Now()
@@ -41,7 +40,7 @@ func TestRuntimePerformanceBudgets(t *testing.T) {
 
 func BenchmarkCommercialTerminalOutput1KiB(b *testing.B) {
 	service := NewTerminalService(nil, discardEventBus{}, 32, testutil.NewTestLogger())
-	service.ptys["terminal"] = (*ssh.PTYSession)(nil)
+	service.ptys["terminal"] = nil
 	service.attached["terminal"] = true
 	payload := make([]byte, 1024)
 	b.ResetTimer()

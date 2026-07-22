@@ -50,10 +50,19 @@ function currentReconnectTarget(tabId: string, sessions: ReconnectSession[]) {
   if (!tab || tab.type !== 'terminal' || ['connecting', 'reconnecting'].includes(state.connectionStatus[tab.terminalId] ?? '')) {
     return null
   }
+  if (tab.connectionKind === 'serial') {
+    if (!tab.serialPortId) return null
+    const session: ReconnectSession = {
+      id: `serial:${tab.serialPortId}`,
+      host: tab.title,
+      port: 0,
+      username: 'serial',
+    }
+    return { state, tab, terminalId: tab.terminalId, session }
+  }
   const session = sessions.find((item) => Number(item.id) === tab.sessionId)
   if (!session) return null
-  const terminalId = tab.terminalId
-  return { state, tab, terminalId, session }
+  return { state, tab, terminalId: tab.terminalId, session }
 }
 
 async function closeStaleTerminal(terminalId: string) {
@@ -91,18 +100,26 @@ export async function reconnectSessionTab(tabId: string, sessions: ReconnectSess
     return
   }
   const terminal = state.terminalPool.get(terminalId)?.terminal
-  dialog.openDialog(session.host, session.port, session.username, () => {
-    void reconnectSessionTab(tabId, sessions)
-  })
+  const tabMeta = state.tabs.find((item) => item.id === tabId)
+  const isSerial = tabMeta?.type === 'terminal' && tabMeta.connectionKind === 'serial'
+  if (!isSerial) {
+    dialog.openDialog(session.host, session.port, session.username, () => {
+      void reconnectSessionTab(tabId, sessions)
+    })
+  }
   const controller = new AbortController()
   reconnectControllers.set(tabId, controller)
   state.setConnectionStatus(terminalId, 'reconnecting')
   try {
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
-        const nextTerminalId = await openTerminalWithPoolCapacity(() =>
-          TerminalService.Open(Number(session.id), terminal?.cols ?? 80, terminal?.rows ?? 24),
-        )
+        const nextTerminalId = await openTerminalWithPoolCapacity(() => {
+          const tab = useAppStore.getState().tabs.find((item) => item.id === tabId)
+          if (tab?.type === 'terminal' && tab.connectionKind === 'serial' && tab.serialPortId) {
+            return TerminalService.OpenSerial(tab.serialPortId, terminal?.cols ?? 80, terminal?.rows ?? 24)
+          }
+          return TerminalService.Open(Number(session.id), terminal?.cols ?? 80, terminal?.rows ?? 24)
+        })
         if (
           controller.signal.aborted
           || !useAppStore.getState().replaceTerminalConnection(tabId, terminalId, nextTerminalId)

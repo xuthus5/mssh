@@ -17,6 +17,19 @@ describe('terminalInputRuntime', () => {
     expect(resolveSessionId(refs as never)).toBe(9)
   })
 
+  it('uses negative serial port ids for local history buckets', () => {
+    const refs = {
+      terminalIDRef: { current: 'term-s' },
+      storeRef: {
+        current: {
+          tabs: [{ type: 'terminal', terminalId: 'term-s', sessionId: 0, connectionKind: 'serial', serialPortId: 12 }],
+          updateLastUsed: vi.fn(),
+        },
+      },
+    }
+    expect(resolveSessionId(refs as never)).toBe(-12)
+  })
+
   it('records submitted commands while writing input', () => {
     localStorage.clear()
     const write = vi.fn()
