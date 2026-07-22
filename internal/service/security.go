@@ -27,13 +27,14 @@ type SecurityService struct {
 	keychain crypto.KeychainAdapter
 	eventBus EventBus
 	logger   *slog.Logger
+	unlock   *unlockLimiter
 }
 
 func NewSecurityService(db *sql.DB, dataDir string, runtime *CryptoRuntime, keychain crypto.KeychainAdapter, logger *slog.Logger) *SecurityService {
 	if logger == nil {
 		logger = slog.Default()
 	}
-	return &SecurityService{db: db, dataDir: dataDir, runtime: runtime, keychain: keychain, logger: logger}
+	return &SecurityService{db: db, dataDir: dataDir, runtime: runtime, keychain: keychain, logger: logger, unlock: newUnlockLimiter()}
 }
 
 // SetEventBus wires lock notifications for the frontend VaultGate.
@@ -104,14 +105,19 @@ func (s *SecurityService) Setup(input model.SecuritySetupInput) (model.SecurityS
 }
 
 func (s *SecurityService) Unlock(input model.SecurityUnlockInput) (model.SecurityStatus, error) {
+	if err := s.unlock.allow(); err != nil {
+		return model.SecurityStatus{}, err
+	}
 	vault, err := crypto.LoadVaultFile(crypto.VaultPath(s.dataDir))
 	if err != nil {
 		return model.SecurityStatus{}, fmt.Errorf("load vault: %w", err)
 	}
 	dek, err := crypto.UnlockVault(input.Password, vault)
 	if err != nil {
+		s.unlock.failure()
 		return model.SecurityStatus{}, err
 	}
+	s.unlock.success()
 	s.runtime.SetDEK(dek)
 	if input.RememberUnlock {
 		_ = s.setBoolSetting(securityRememberUnlockSetting, true)
