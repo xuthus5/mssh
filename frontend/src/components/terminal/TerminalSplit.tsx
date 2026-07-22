@@ -67,7 +67,7 @@ function replaceSecondaryTerminalRuntime(previousID: string, nextID: string) {
 
 function openSplitTerminal(sessionId: number, connectionKind: 'ssh' | 'serial' | 'local' | undefined, serialPortId: number | undefined) {
   if (connectionKind === 'local') return TerminalService.OpenLocal(80, 24)
-  if (connectionKind === 'serial' && serialPortId) return TerminalService.OpenSerial(serialPortId, 80, 24)
+  if (connectionKind === 'serial') throw new Error(t('串口终端为设备独占，不支持分屏'))
   return TerminalService.Open(sessionId, 80, 24)
 }
 
@@ -103,6 +103,22 @@ export const TerminalSplit = forwardRef<TerminalSplitHandle, Props>(function Ter
   const paneCount = leaves.length
 
   useEffect(() => { onStateChange?.({ paneCount, busy }) }, [busy, onStateChange, paneCount])
+  // Tab-level reconnect/promote updates primaryID without going through reconnectPane.
+  useEffect(() => {
+    if (!primaryID) return
+    setTree((current) => {
+      if (hasTerminal(current, primaryID)) return current
+      const previousPrimary = primaryRef.current
+      if (previousPrimary && previousPrimary !== primaryID && hasTerminal(current, previousPrimary)) {
+        return replaceTerminal(current, previousPrimary, primaryID)
+      }
+      // Fallback: replace the first leaf when topology lost the old primary id.
+      const leaves = collectLeaves(current)
+      if (leaves.length === 0) return splitLeaf(primaryID)
+      return replaceTerminal(current, leaves[0].terminalID, primaryID)
+    })
+    primaryRef.current = primaryID
+  }, [primaryID])
   useEffect(() => () => {
     mountedRef.current = false
     for (const terminalID of terminalIDs(treeRef.current)) {

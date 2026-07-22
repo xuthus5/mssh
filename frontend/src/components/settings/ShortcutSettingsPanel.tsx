@@ -99,7 +99,7 @@ export function ShortcutSettingsPanel() {
   const autoSave = useAutoSave({
     value: draft,
     onSave: persist,
-    enabled: !loading && recordingId === null,
+    enabled: !loading && recordingId === null && conflicts.length === 0,
     isReady: !loading,
     delayMs: 450,
   })
@@ -137,6 +137,11 @@ export function ShortcutSettingsPanel() {
         </div>
       </div>
 
+      {conflicts.length > 0 ? (
+        <div className="rounded-xl border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+          {t('存在快捷键冲突，已暂停自动保存。请先消除冲突后再继续。')}
+        </div>
+      ) : null}
       <section className="rounded-xl border border-border bg-card p-3 shadow-sm">
         <div className="flex flex-col divide-y divide-border">
           {SHORTCUT_DEFINITIONS.map((definition) => {

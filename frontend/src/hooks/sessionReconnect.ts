@@ -172,6 +172,8 @@ export function maybeAutoReconnectTerminal(terminalId: string, sessions: Reconne
     (item) => item.type === 'terminal' && item.terminalId === terminalId,
   )
   if (!tab || tab.type !== 'terminal') return
+  // Serial DTR-on-open can reset MCUs; never auto-reopen serial ports.
+  if (tab.connectionKind === 'serial') return
   void reconnectSessionTab(tab.id, sessions)
 }
 

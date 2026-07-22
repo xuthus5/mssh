@@ -28,6 +28,7 @@ func (t *TerminalService) evictLRU() {
 	if pty != nil {
 		_ = pty.Close()
 	}
+	t.releaseSerialDevice(victimID, pty)
 	if closeHandler != nil {
 		closeHandler(victimID)
 	}

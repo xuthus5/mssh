@@ -52,16 +52,32 @@ describe('SerialPortCenter', () => {
     expect(await screen.findByRole('heading', { name: '新建串口配置' })).toBeInTheDocument()
   })
 
-  it('supports bulk delete selection', async () => {
+  it('supports bulk delete selection through AlertDialog', async () => {
     const user = userEvent.setup()
-    window.confirm = vi.fn(() => true)
     render(<SerialPortCenter />)
     await waitFor(() => expect(screen.getByText('ESP32')).toBeInTheDocument())
     const checkbox = screen.getByRole('checkbox', { name: '选择 ESP32' })
     await user.click(checkbox)
     await user.click(screen.getByRole('button', { name: /批量删除/ }))
+    expect(await screen.findByRole('alertdialog')).toBeInTheDocument()
+    expect(screen.getByText(/确认删除选中的 1 个串口配置/)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: '确认删除' }))
     await waitFor(() => {
       expect(useToastStore.getState().toasts.some((item) => item.message.includes('已删除'))).toBe(true)
+    })
+  })
+
+  it('deletes a single serial profile through AlertDialog', async () => {
+    const user = userEvent.setup()
+    __registerHandler(serial + 'Delete', async () => undefined)
+    render(<SerialPortCenter />)
+    await waitFor(() => expect(screen.getByText('ESP32')).toBeInTheDocument())
+    await user.click(screen.getByRole('button', { name: /删除/ }))
+    expect(await screen.findByRole('alertdialog')).toBeInTheDocument()
+    expect(screen.getByText(/确认删除串口配置「ESP32」/)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: '确认删除' }))
+    await waitFor(() => {
+      expect(useToastStore.getState().toasts.some((item) => item.message.includes('串口配置已删除'))).toBe(true)
     })
   })
 })

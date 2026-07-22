@@ -385,7 +385,7 @@
   "处理": "处理",
   "处理 2 行，最多展示 100 条明细，失败项优先。": "处理 2 行，最多展示 100 条明细，失败项优先。",
   "处理中...": "Processing...",
-  "处理中…": "Processing…",
+  "处理中…": "Working…",
   "备份主密钥": "Backupmaster key",
   "备注": "Notes",
   "备注关键词（仅显式筛选时匹配）": "Notes keywords (matched only when filtering explicitly)",
@@ -1283,5 +1283,12 @@
   "清空当前终端可见内容。": "Clear the current terminal view.",
   "删除主题「${}」？": "Delete theme “${}”?",
   "将移除该主题配置（Profile）。内置颜色定义会保留，不会被删除。": "This removes the theme profile. Built-in color definitions are kept and will not be deleted.",
-  "将移除该主题配置（Profile）。若自定义颜色定义不再被引用，也会一并清理。此操作不可撤销。": "This removes the theme profile. Unused custom color definitions will also be cleaned up. This cannot be undone."
+  "将移除该主题配置（Profile）。若自定义颜色定义不再被引用，也会一并清理。此操作不可撤销。": "This removes the theme profile. Unused custom color definitions will also be cleaned up. This cannot be undone.",
+  "此操作不可撤销。": "This action cannot be undone.",
+  "串口终端为设备独占，不支持分屏": "Serial terminals exclusively own the device and cannot be split.",
+  "请确认已备份当前密码策略，并在所有同步设备上使用相同应用密码。": "Confirm you have backed up your password policy and use the same app password on every synced device.",
+  "确认": "Confirm",
+  "确认删除串口配置「${}」？": "Delete serial profile “${}”?",
+  "确认删除选中的 ${} 个串口配置？": "Delete ${} selected serial profiles?",
+  "存在快捷键冲突，已暂停自动保存。请先消除冲突后再继续。": "Shortcut conflicts detected; auto-save is paused until conflicts are resolved."
 }

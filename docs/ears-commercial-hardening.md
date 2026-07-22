@@ -109,3 +109,19 @@
 - SQLite 读写分离 / 多连接架构
 
 结论：在当前 EARS 清单、CI 门禁与安全锚点证据下，项目代码质量达到**可商用基线**。
+
+
+## 2026-07-23 商用硬化波次（本地 Shell / 串口 / 快捷键）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| TERM-SPLIT-001 | 当 tab 级重连替换 primary terminalID 时，分屏树必须同步映射，避免死窗格。 | done |
+| SERIAL-001 | 当 LRU 驱逐串口终端时，系统必须释放设备独占锁。 | done |
+| SERIAL-002 | 串口终端不得分屏二次 Open，也不得参与自动重连（避免 DTR 复位 MCU）。 | done |
+| SERIAL-003 | 串口删除确认必须使用 shadcn AlertDialog，而非原生 confirm。 | done |
+| SEC-UI-001 | 密钥删除与主机指纹删除、密码轮转确认使用 shadcn AlertDialog。 | done |
+| LOCAL-001 | 本地 Shell 路径必须可解析为绝对路径且（Unix）可执行。 | done |
+| LOCAL-002 | 本地/串口命令历史非正 sessionID 不得调用后端 List。 | done |
+| SHORTCUT-001 | 快捷键冲突时暂停自动保存并提示用户消解。 | done |
+| WORKSPACE-001 | 恢复工作区时，本地/串口 tab 不得恢复 files/system/ai 远程面板。 | done |
+

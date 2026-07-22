@@ -1,5 +1,15 @@
 import { useMemo, useState } from 'react'
 import { Cable, PlugZap, RefreshCw, Search, Trash2 } from 'lucide-react'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -10,6 +20,11 @@ import { SerialPortDialog } from '@/components/serial/SerialPortDialog'
 import { SerialPortTable } from '@/components/serial/SerialPortTable'
 import { toast } from '@/components/ui/toast'
 import { t } from '@/i18n'
+
+type DeleteTarget =
+  | { kind: 'single'; port: SerialPort }
+  | { kind: 'batch'; ids: number[]; count: number }
+  | null
 
 export function SerialPortCenter() {
   const {
@@ -23,6 +38,7 @@ export function SerialPortCenter() {
   const [deletingID, setDeletingID] = useState<number | null>(null)
   const [selected, setSelected] = useState<Set<number>>(new Set())
   const [batchBusy, setBatchBusy] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget>(null)
 
   const filtered = useMemo(() => {
     const keyword = query.trim().toLowerCase()
@@ -64,24 +80,6 @@ export function SerialPortCenter() {
     }
   }
 
-  const remove = async (port: SerialPort) => {
-    if (!window.confirm(t('确认删除串口配置「${}」？此操作不可撤销。', port.name))) return
-    setDeletingID(Number(port.id))
-    try {
-      await deletePort(Number(port.id))
-      setSelected((prev) => {
-        const next = new Set(prev)
-        next.delete(Number(port.id))
-        return next
-      })
-      toast(t('串口配置已删除'), 'success')
-    } catch (err) {
-      toast(err instanceof Error ? err.message : String(err), 'error')
-    } finally {
-      setDeletingID(null)
-    }
-  }
-
   const duplicate = async (port: SerialPort) => {
     try {
       await duplicatePort(port)
@@ -91,21 +89,41 @@ export function SerialPortCenter() {
     }
   }
 
-  const batchDelete = async () => {
-    const ids = [...selected]
-    if (ids.length === 0) return
-    if (!window.confirm(t('确认删除选中的 ${} 个串口配置？此操作不可撤销。', String(ids.length)))) return
+  const confirmDelete = async () => {
+    if (!deleteTarget) return
+    if (deleteTarget.kind === 'single') {
+      const id = Number(deleteTarget.port.id)
+      setDeletingID(id)
+      try {
+        await deletePort(id)
+        setSelected((prev) => {
+          const next = new Set(prev)
+          next.delete(id)
+          return next
+        })
+        setDeleteTarget(null)
+        toast(t('串口配置已删除'), 'success')
+      } catch (err) {
+        toast(err instanceof Error ? err.message : String(err), 'error')
+      } finally {
+        setDeletingID(null)
+      }
+      return
+    }
     setBatchBusy(true)
     try {
-      await deleteMany(ids)
+      await deleteMany(deleteTarget.ids)
       setSelected(new Set())
-      toast(t('已删除 ${} 个串口配置', String(ids.length)), 'success')
+      setDeleteTarget(null)
+      toast(t('已删除 ${} 个串口配置', String(deleteTarget.count)), 'success')
     } catch (err) {
       toast(err instanceof Error ? err.message : String(err), 'error')
     } finally {
       setBatchBusy(false)
     }
   }
+
+  const deletePending = deletingID !== null || batchBusy
 
   return (
     <section className="flex min-h-0 flex-1 flex-col overflow-auto bg-background p-5">
@@ -141,7 +159,13 @@ export function SerialPortCenter() {
           <CardTitle className="text-sm">{t('串口配置列表')}</CardTitle>
           <div className="flex flex-wrap items-center gap-2">
             {selected.size > 0 ? (
-              <Button type="button" size="sm" variant="destructive" disabled={batchBusy} onClick={() => void batchDelete()}>
+              <Button
+                type="button"
+                size="sm"
+                variant="destructive"
+                disabled={batchBusy}
+                onClick={() => setDeleteTarget({ kind: 'batch', ids: [...selected], count: selected.size })}
+              >
                 <Trash2 data-icon="inline-start" />
                 {t('批量删除')} ({selected.size})
               </Button>
@@ -174,12 +198,50 @@ export function SerialPortCenter() {
             onConnect={(port) => void connect(port)}
             onEdit={(port) => { setEditing(port); setDialogOpen(true) }}
             onDuplicate={(port) => void duplicate(port)}
-            onRemove={(port) => void remove(port)}
+            onRemove={(port) => setDeleteTarget({ kind: 'single', port })}
           />
         </CardContent>
       </Card>
 
       <SerialPortDialog open={dialogOpen} onOpenChange={setDialogOpen} port={editing} devices={devices} onSave={save} />
+      <SerialDeleteDialog
+        target={deleteTarget}
+        pending={deletePending}
+        onOpenChange={(open) => { if (!open && !deletePending) setDeleteTarget(null) }}
+        onConfirm={() => { void confirmDelete() }}
+      />
     </section>
+  )
+}
+
+function SerialDeleteDialog({
+  target,
+  pending,
+  onOpenChange,
+  onConfirm,
+}: {
+  target: DeleteTarget
+  pending: boolean
+  onOpenChange: (open: boolean) => void
+  onConfirm: () => void
+}) {
+  const title = target?.kind === 'single'
+    ? t('确认删除串口配置「${}」？', target.port.name)
+    : t('确认删除选中的 ${} 个串口配置？', String(target?.count ?? 0))
+  return (
+    <AlertDialog open={target !== null} onOpenChange={onOpenChange}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{title}</AlertDialogTitle>
+          <AlertDialogDescription>{t('此操作不可撤销。')}</AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={pending}>{t('取消')}</AlertDialogCancel>
+          <AlertDialogAction type="button" variant="destructive" disabled={pending} onClick={onConfirm}>
+            {pending ? t('删除中…') : t('确认删除')}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   )
 }

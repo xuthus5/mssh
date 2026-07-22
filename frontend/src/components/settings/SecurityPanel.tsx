@@ -1,5 +1,15 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { Fingerprint, KeyRound, RefreshCw, ShieldCheck, Trash2 } from 'lucide-react'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -31,6 +41,7 @@ export function SecurityPanel() {
   const [requireLaunch, setRequireLaunch] = useState(false)
   const [rememberUnlock, setRememberUnlock] = useState(true)
   const [busy, setBusy] = useState(false)
+  const [confirmAction, setConfirmAction] = useState<null | { type: 'rotate' } | { type: 'host'; entry: HostKeyEntry }>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -74,10 +85,7 @@ export function SecurityPanel() {
   const rotatePassword = () => {
     if (newPassword.length < 12) return toast(t('应用密码至少需要 12 个字符'), 'error')
     if (newPassword !== confirmNewPassword) return toast(t('两次输入的密码不一致'), 'error')
-    if (!window.confirm(t('轮转应用密码会使用新密钥重新加密本地敏感数据（私钥、会话密码等）。其他设备必须使用相同应用密码，否则同步会失败。是否继续？'))) return
-    void run(t('应用密码已轮转'), () => SecurityService.Rotate({
-      current_password: currentPassword, new_password: newPassword,
-    }))
+    setConfirmAction({ type: 'rotate' })
   }
 
   const savePreferences = (nextRequireLaunch: boolean, nextRememberUnlock: boolean) => {
@@ -89,10 +97,22 @@ export function SecurityPanel() {
     }))
   }
 
-  const remove = async (entry: HostKeyEntry) => {
-    if (!window.confirm(t('删除 ${} 的已信任主机指纹？下次连接时将重新确认。', entry.hosts))) return
+  const remove = (entry: HostKeyEntry) => {
+    setConfirmAction({ type: 'host', entry })
+  }
+
+  const confirmSecurityAction = async () => {
+    if (!confirmAction) return
+    if (confirmAction.type === 'rotate') {
+      setConfirmAction(null)
+      void run(t('应用密码已轮转'), () => SecurityService.Rotate({
+        current_password: currentPassword, new_password: newPassword,
+      }))
+      return
+    }
     try {
-      await SessionService.DeleteHostKey(entry.line)
+      await SessionService.DeleteHostKey(confirmAction.entry.line)
+      setConfirmAction(null)
       await load()
       toast(t('主机指纹已删除'), 'success')
     } catch (error) {
@@ -175,6 +195,29 @@ export function SecurityPanel() {
               ))}
         </CardContent>
       </Card>
+
+      <AlertDialog open={confirmAction !== null} onOpenChange={(open) => { if (!open && !busy) setConfirmAction(null) }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {confirmAction?.type === 'rotate'
+                ? t('轮转应用密码会使用新密钥重新加密本地敏感数据（私钥、会话密码等）。其他设备必须使用相同应用密码，否则同步会失败。是否继续？')
+                : t('删除 ${} 的已信任主机指纹？下次连接时将重新确认。', confirmAction?.type === 'host' ? confirmAction.entry.hosts : '')}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmAction?.type === 'rotate'
+                ? t('请确认已备份当前密码策略，并在所有同步设备上使用相同应用密码。')
+                : t('此操作不可撤销。')}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={busy}>{t('取消')}</AlertDialogCancel>
+            <AlertDialogAction type="button" variant="destructive" disabled={busy} onClick={() => { void confirmSecurityAction() }}>
+              {busy ? t('处理中…') : t('确认')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
