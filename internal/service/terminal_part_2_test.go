@@ -15,7 +15,7 @@ import (
 func TestSessionService_GetClientWrapperAfterDisconnect(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	bus := newMockEventBus()
-	svc := NewSessionService(db, bus, 30, "", nil, testutil.NewTestLogger())
+	svc := NewSessionService(db, bus, 30, t.TempDir(), nil, testutil.NewTestLogger())
 
 	addr, cleanup := sshtestutil.NewMockServer(t)
 	defer cleanup()

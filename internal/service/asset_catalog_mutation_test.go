@@ -15,7 +15,7 @@ func TestAssetCatalogDeleteMigrationAndClear(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	require.NoError(t, store.SetAuditEnabled(db, true))
 	catalog := NewAssetCatalogService(db, testutil.NewTestLogger())
-	sessions := NewSessionService(db, newMockEventBus(), 30, "", nil, testutil.NewTestLogger())
+	sessions := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
 	production, err := catalog.CreateEnvironment(model.AssetEnvironmentInput{Name: "生产", ColorToken: model.AssetColorRed})
 	require.NoError(t, err)
 	testEnvironment, err := catalog.CreateEnvironment(model.AssetEnvironmentInput{Name: "测试", ColorToken: model.AssetColorAmber})
@@ -49,7 +49,7 @@ func TestAssetCatalogDeleteMigrationAndClear(t *testing.T) {
 func TestAssetCatalogDeleteRollbackOnInvalidReplacement(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	catalog := NewAssetCatalogService(db, testutil.NewTestLogger())
-	sessions := NewSessionService(db, newMockEventBus(), 30, "", nil, testutil.NewTestLogger())
+	sessions := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
 	environment, err := catalog.CreateEnvironment(model.AssetEnvironmentInput{Name: "生产", ColorToken: model.AssetColorRed})
 	require.NoError(t, err)
 	created := createAssetSession(t, sessions, "server", &environment.ID, nil, nil)
@@ -68,7 +68,7 @@ func TestAssetCatalogDeleteRollbackOnInvalidReplacement(t *testing.T) {
 func TestAssetCatalogTagDeleteAndBulkOperations(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	catalog := NewAssetCatalogService(db, testutil.NewTestLogger())
-	sessions := NewSessionService(db, newMockEventBus(), 30, "", nil, testutil.NewTestLogger())
+	sessions := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
 	databaseTag, err := catalog.CreateTag(model.AssetTagInput{Name: "数据库", ColorToken: model.AssetColorBlue})
 	require.NoError(t, err)
 	coreTag, err := catalog.CreateTag(model.AssetTagInput{Name: "核心", ColorToken: model.AssetColorRed})
@@ -105,7 +105,7 @@ func TestAssetCatalogTagDeleteAndBulkOperations(t *testing.T) {
 func TestAssetCatalogBulkAssignmentAndReorder(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	catalog := NewAssetCatalogService(db, testutil.NewTestLogger())
-	sessions := NewSessionService(db, newMockEventBus(), 30, "", nil, testutil.NewTestLogger())
+	sessions := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
 	firstEnvironment, err := catalog.CreateEnvironment(model.AssetEnvironmentInput{Name: "生产", ColorToken: model.AssetColorRed})
 	require.NoError(t, err)
 	secondEnvironment, err := catalog.CreateEnvironment(model.AssetEnvironmentInput{Name: "测试", ColorToken: model.AssetColorAmber})
@@ -146,7 +146,7 @@ func TestAssetCatalogBulkAssignmentAndReorder(t *testing.T) {
 func TestAssetCatalogMutationValidationAndRollback(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	catalog := NewAssetCatalogService(db, testutil.NewTestLogger())
-	sessions := NewSessionService(db, newMockEventBus(), 30, "", nil, testutil.NewTestLogger())
+	sessions := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
 	firstEnvironment, err := catalog.CreateEnvironment(model.AssetEnvironmentInput{Name: "生产", ColorToken: model.AssetColorRed})
 	require.NoError(t, err)
 	secondEnvironment, err := catalog.CreateEnvironment(model.AssetEnvironmentInput{Name: "测试", ColorToken: model.AssetColorAmber})

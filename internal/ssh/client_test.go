@@ -30,7 +30,7 @@ func TestConnect(t *testing.T) {
 	defer cleanup()
 	s := model.Session{Host: "127.0.0.1", Port: mustParsePort(addr), Username: "test"}
 	ctx := context.Background()
-	cw, err := Connect(ctx, s, nil, "", slog.Default())
+	cw, err := Connect(ctx, s, nil, testutil.KnownHostsPath(t), slog.Default())
 	require.NoError(t, err)
 	defer cw.Close()
 	assert.NotNil(t, cw.Inner)
@@ -40,7 +40,7 @@ func TestConnectInvalidHost(t *testing.T) {
 	s := model.Session{Host: "invalid.zzz.invalid.zzz", Port: 22, Username: "test"}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*1e9)
 	defer cancel()
-	_, err := Connect(ctx, s, nil, "", slog.Default())
+	_, err := Connect(ctx, s, nil, testutil.KnownHostsPath(t), slog.Default())
 	assert.Error(t, err)
 }
 
@@ -54,7 +54,7 @@ func TestConnectHandshakeError(t *testing.T) {
 	port := mustParsePort(l.Addr().String())
 	s := model.Session{Host: "127.0.0.1", Port: port, Username: "test"}
 	ctx := context.Background()
-	_, err := Connect(ctx, s, nil, "", slog.Default())
+	_, err := Connect(ctx, s, nil, testutil.KnownHostsPath(t), slog.Default())
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "ssh handshake")
 }
@@ -73,8 +73,16 @@ func TestCreateHostKeyCallbackNewFile(t *testing.T) {
 
 func TestCreateHostKeyCallbackEmptyPath(t *testing.T) {
 	cb, err := createHostKeyCallback("", nil, slog.Default())
-	require.NoError(t, err)
-	assert.NotNil(t, cb)
+	require.ErrorIs(t, err, ErrEmptyKnownHostsPath)
+	assert.Nil(t, cb)
+}
+
+func TestConnectRejectsEmptyKnownHostsPath(t *testing.T) {
+	addr, cleanup := testutil.NewMockServer(t)
+	defer cleanup()
+	s := model.Session{Host: "127.0.0.1", Port: mustParsePort(addr), Username: "test"}
+	_, err := Connect(context.Background(), s, nil, "", slog.Default())
+	require.ErrorIs(t, err, ErrEmptyKnownHostsPath)
 }
 
 func TestClientWrapperClose(t *testing.T) {
@@ -82,7 +90,7 @@ func TestClientWrapperClose(t *testing.T) {
 	defer cleanup()
 	s := model.Session{Host: "127.0.0.1", Port: mustParsePort(addr), Username: "test"}
 	ctx := context.Background()
-	cw, err := Connect(ctx, s, nil, "", slog.Default())
+	cw, err := Connect(ctx, s, nil, testutil.KnownHostsPath(t), slog.Default())
 	require.NoError(t, err)
 	err = cw.Close()
 	assert.NoError(t, err)
@@ -91,7 +99,7 @@ func TestClientWrapperClose(t *testing.T) {
 func TestClientWrapperCloseIsConcurrentAndIdempotent(t *testing.T) {
 	addr, cleanup := testutil.NewMockServer(t)
 	defer cleanup()
-	cw, err := Connect(context.Background(), model.Session{Host: "127.0.0.1", Port: mustParsePort(addr), Username: "test"}, nil, "", slog.Default())
+	cw, err := Connect(context.Background(), model.Session{Host: "127.0.0.1", Port: mustParsePort(addr), Username: "test"}, nil, testutil.KnownHostsPath(t), slog.Default())
 	require.NoError(t, err)
 	var waitGroup sync.WaitGroup
 	errors := make(chan error, 16)
@@ -126,7 +134,7 @@ func TestConnectKeepsAliveStarted(t *testing.T) {
 	defer cleanup()
 	s := model.Session{Host: "127.0.0.1", Port: mustParsePort(addr), Username: "test", KeepAlive: 1}
 	ctx := context.Background()
-	cw, err := Connect(ctx, s, nil, "", slog.Default())
+	cw, err := Connect(ctx, s, nil, testutil.KnownHostsPath(t), slog.Default())
 	require.NoError(t, err)
 	assert.NotNil(t, cw.Inner)
 	time.Sleep(2 * time.Second)

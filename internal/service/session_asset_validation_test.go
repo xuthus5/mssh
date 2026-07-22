@@ -12,7 +12,7 @@ import (
 
 func TestSessionAssetValidation(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	service := NewSessionService(db, newMockEventBus(), 30, "", nil, testutil.NewTestLogger())
+	service := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
 	base := model.SessionInput{Name: "server", Host: "127.0.0.1", Port: 22, Username: "root", AuthMethod: model.AuthAgent}
 
 	tests := []struct {

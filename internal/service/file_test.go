@@ -97,7 +97,7 @@ func createSFTPFileService(t *testing.T, sftpCtx *mockSFTPContext) (*FileService
 	t.Helper()
 	db := testutil.NewTestDB(t)
 	bus := newMockEventBus()
-	sessionSvc := NewSessionService(db, bus, 30, "", nil, testutil.NewTestLogger())
+	sessionSvc := NewSessionService(db, bus, 30, t.TempDir(), nil, testutil.NewTestLogger())
 
 	port := parsePort(t, sftpCtx.addr)
 	sess := model.Session{
@@ -128,7 +128,7 @@ func TestFileService_IntegratedSFTP(t *testing.T) {
 
 	db := testutil.NewTestDB(t)
 	bus := newMockEventBus()
-	sessionSvc := NewSessionService(db, bus, 30, "", nil, testutil.NewTestLogger())
+	sessionSvc := NewSessionService(db, bus, 30, t.TempDir(), nil, testutil.NewTestLogger())
 
 	port := parsePort(t, sftpCtx.addr)
 	sess := model.Session{
@@ -170,7 +170,7 @@ func TestFileService_IntegratedSFTP(t *testing.T) {
 
 func TestNewFileService(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	sessionSvc := NewSessionService(db, newMockEventBus(), 30, "", nil, testutil.NewTestLogger())
+	sessionSvc := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
 	bus := newMockEventBus()
 	svc := NewFileService(sessionSvc, bus, testutil.NewTestLogger())
 
@@ -182,7 +182,7 @@ func TestNewFileService(t *testing.T) {
 func TestFileService_ListDir(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	bus := newMockEventBus()
-	sessionSvc := NewSessionService(db, bus, 30, "", nil, testutil.NewTestLogger())
+	sessionSvc := NewSessionService(db, bus, 30, t.TempDir(), nil, testutil.NewTestLogger())
 
 	addr, cleanup := sshtestutil.NewMockServer(t)
 	defer cleanup()
@@ -203,7 +203,7 @@ func TestFileService_ListDir(t *testing.T) {
 
 func TestFileService_ListDirSessionNotFound(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	sessionSvc := NewSessionService(db, newMockEventBus(), 30, "", nil, testutil.NewTestLogger())
+	sessionSvc := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
 	svc := NewFileService(sessionSvc, newMockEventBus(), testutil.NewTestLogger())
 
 	_, err := svc.ListDir(999, "/")
@@ -214,7 +214,7 @@ func TestFileService_ListDirSessionNotFound(t *testing.T) {
 func TestFileService_Delete(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	bus := newMockEventBus()
-	sessionSvc := NewSessionService(db, bus, 30, "", nil, testutil.NewTestLogger())
+	sessionSvc := NewSessionService(db, bus, 30, t.TempDir(), nil, testutil.NewTestLogger())
 
 	addr, cleanup := sshtestutil.NewMockServer(t)
 	defer cleanup()
@@ -236,7 +236,7 @@ func TestFileService_Delete(t *testing.T) {
 func TestFileService_Mkdir(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	bus := newMockEventBus()
-	sessionSvc := NewSessionService(db, bus, 30, "", nil, testutil.NewTestLogger())
+	sessionSvc := NewSessionService(db, bus, 30, t.TempDir(), nil, testutil.NewTestLogger())
 
 	addr, cleanup := sshtestutil.NewMockServer(t)
 	defer cleanup()
@@ -258,7 +258,7 @@ func TestFileService_Mkdir(t *testing.T) {
 func TestFileService_Rename(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	bus := newMockEventBus()
-	sessionSvc := NewSessionService(db, bus, 30, "", nil, testutil.NewTestLogger())
+	sessionSvc := NewSessionService(db, bus, 30, t.TempDir(), nil, testutil.NewTestLogger())
 
 	addr, cleanup := sshtestutil.NewMockServer(t)
 	defer cleanup()

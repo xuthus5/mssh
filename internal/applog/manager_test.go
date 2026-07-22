@@ -1,6 +1,7 @@
 package applog
 
 import (
+	"log/slog"
 	"os"
 	"path/filepath"
 	"testing"
@@ -64,4 +65,48 @@ func TestManagerWriteCreatesDailyFile(t *testing.T) {
 	assert.Contains(t, string(content), "via-handler-path")
 	assert.Equal(t, dir, manager.Dir())
 	assert.Equal(t, 30, manager.RetentionDays())
+}
+
+func TestManagerHandlerWritesStructuredLog(t *testing.T) {
+	dir := t.TempDir()
+	manager := New(Options{Dir: dir, RetentionDays: 7, Now: func() time.Time {
+		return time.Date(2026, 7, 15, 9, 0, 0, 0, time.Local)
+	}})
+	t.Cleanup(func() { _ = manager.Close() })
+	require.NoError(t, manager.Configure(dir, 7))
+
+	logger := slog.New(manager.Handler())
+	logger.Info("handler-path", "k", "v")
+	content, err := os.ReadFile(filepath.Join(dir, "2026-07-15.log"))
+	require.NoError(t, err)
+	assert.Contains(t, string(content), "handler-path")
+}
+
+func TestDefaultDirUsesHome(t *testing.T) {
+	dir := DefaultDir()
+	assert.NotEmpty(t, dir)
+	assert.Contains(t, dir, "logs")
+}
+
+func TestWriteReopensOnDayChange(t *testing.T) {
+	dir := t.TempDir()
+	day := time.Date(2026, 7, 15, 23, 0, 0, 0, time.Local)
+	manager := New(Options{Dir: dir, RetentionDays: 2, Now: func() time.Time { return day }})
+	t.Cleanup(func() { _ = manager.Close() })
+	require.NoError(t, manager.Configure(dir, 2))
+	_, err := manager.Write([]byte("day1\n"))
+	require.NoError(t, err)
+	day = time.Date(2026, 7, 16, 1, 0, 0, 0, time.Local)
+	_, err = manager.Write([]byte("day2\n"))
+	require.NoError(t, err)
+	_, err = os.Stat(filepath.Join(dir, "2026-07-15.log"))
+	assert.NoError(t, err)
+	_, err = os.Stat(filepath.Join(dir, "2026-07-16.log"))
+	assert.NoError(t, err)
+}
+
+func TestNewUsesDefaultsWhenOptionsEmpty(t *testing.T) {
+	manager := New(Options{})
+	assert.NotNil(t, manager)
+	assert.Equal(t, DefaultRetentionDays, manager.RetentionDays())
 }

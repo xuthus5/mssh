@@ -15,8 +15,9 @@ import (
 )
 
 type mockEventBus struct {
-	mu     sync.Mutex
-	events []CapturedEvent
+	mu                sync.Mutex
+	events            []CapturedEvent
+	autoAcceptHostKey bool
 }
 
 type CapturedEvent struct {
@@ -25,7 +26,11 @@ type CapturedEvent struct {
 }
 
 func newMockEventBus() *mockEventBus {
-	return &mockEventBus{}
+	return &mockEventBus{autoAcceptHostKey: true}
+}
+
+func newManualHostKeyEventBus() *mockEventBus {
+	return &mockEventBus{autoAcceptHostKey: false}
 }
 
 func (m *mockEventBus) Emit(name string, payload interface{}) {
@@ -33,6 +38,8 @@ func (m *mockEventBus) Emit(name string, payload interface{}) {
 	defer m.mu.Unlock()
 	m.events = append(m.events, CapturedEvent{Name: name, Payload: payload})
 }
+
+func (m *mockEventBus) AutoAcceptHostKeys() bool { return m.autoAcceptHostKey }
 
 func (m *mockEventBus) Events() []CapturedEvent {
 	m.mu.Lock()
@@ -64,7 +71,7 @@ func (m *mockEventBus) LastEvent() *CapturedEvent {
 func TestSessionService_FolderCRUD(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	bus := newMockEventBus()
-	svc := NewSessionService(db, bus, 30, "", nil, testutil.NewTestLogger())
+	svc := NewSessionService(db, bus, 30, t.TempDir(), nil, testutil.NewTestLogger())
 
 	folders, err := svc.ListFolders()
 	require.NoError(t, err)
@@ -98,7 +105,7 @@ func TestSessionService_FolderCRUD(t *testing.T) {
 
 func TestSessionService_SetDefaultFolder(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	svc := NewSessionService(db, newMockEventBus(), 30, "", nil, testutil.NewTestLogger())
+	svc := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
 	folder, err := svc.CreateFolder("生产环境", nil)
 	require.NoError(t, err)
 	require.NoError(t, svc.SetDefaultFolder(folder.ID))
@@ -111,7 +118,7 @@ func TestSessionService_SetDefaultFolder(t *testing.T) {
 
 func TestSessionService_SetDefaultFolderError(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	svc := NewSessionService(db, newMockEventBus(), 30, "", nil, testutil.NewTestLogger())
+	svc := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
 	require.NoError(t, db.Close())
 	assert.Error(t, svc.SetDefaultFolder(1))
 }
@@ -119,7 +126,7 @@ func TestSessionService_SetDefaultFolderError(t *testing.T) {
 func TestSessionService_SessionCRUD(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	bus := newMockEventBus()
-	svc := NewSessionService(db, bus, 30, "", nil, testutil.NewTestLogger())
+	svc := NewSessionService(db, bus, 30, t.TempDir(), nil, testutil.NewTestLogger())
 
 	sessions, err := svc.ListSessions(nil)
 	require.NoError(t, err)
@@ -166,7 +173,7 @@ func TestSessionService_SessionCRUD(t *testing.T) {
 func TestSessionService_InternalConnectDisconnect(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	bus := newMockEventBus()
-	svc := NewSessionService(db, bus, 30, "", nil, testutil.NewTestLogger())
+	svc := NewSessionService(db, bus, 30, t.TempDir(), nil, testutil.NewTestLogger())
 
 	addr, cleanup := sshtestutil.NewMockServer(t)
 	defer cleanup()
@@ -205,16 +212,24 @@ func TestSessionService_InternalConnectDisconnect(t *testing.T) {
 	assert.Equal(t, 0, svc.ConnectionCount())
 
 	allEvents := bus.Events()
-	assert.Len(t, allEvents, 3)
-	discPayload, ok := allEvents[2].Payload.(event.ConnectionStatePayload)
-	require.True(t, ok)
-	assert.Equal(t, "disconnected", discPayload.State)
+	// attempt + host-key fingerprint + connected + disconnected
+	require.GreaterOrEqual(t, len(allEvents), 4)
+	var states []string
+	for _, captured := range allEvents {
+		if captured.Name != event.ConnectionState {
+			continue
+		}
+		payload, ok := captured.Payload.(event.ConnectionStatePayload)
+		require.True(t, ok)
+		states = append(states, payload.State)
+	}
+	assert.Equal(t, []string{"connected", "disconnected"}, states)
 }
 
 func TestSessionService_InternalConnectSessionNotFound(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	bus := newMockEventBus()
-	svc := NewSessionService(db, bus, 30, "", nil, testutil.NewTestLogger())
+	svc := NewSessionService(db, bus, 30, t.TempDir(), nil, testutil.NewTestLogger())
 
 	ctx := context.Background()
 	_, err := svc.connect(ctx, 999, true)
@@ -224,7 +239,7 @@ func TestSessionService_InternalConnectSessionNotFound(t *testing.T) {
 func TestSessionService_InternalDisconnectUnknown(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	bus := newMockEventBus()
-	svc := NewSessionService(db, bus, 30, "", nil, testutil.NewTestLogger())
+	svc := NewSessionService(db, bus, 30, t.TempDir(), nil, testutil.NewTestLogger())
 
 	err := svc.disconnect("nonexistent", true)
 	assert.Error(t, err)
@@ -234,7 +249,7 @@ func TestSessionService_InternalDisconnectUnknown(t *testing.T) {
 func TestSessionService_NewSessionService(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	bus := newMockEventBus()
-	svc := NewSessionService(db, bus, 60, "", nil, testutil.NewTestLogger())
+	svc := NewSessionService(db, bus, 60, t.TempDir(), nil, testutil.NewTestLogger())
 	assert.Equal(t, 60, svc.keepAlive)
 	assert.NotNil(t, svc.conns)
 	assert.Equal(t, 0, len(svc.conns))
@@ -294,7 +309,7 @@ func TestSessionService_ResolveKeepAlive(t *testing.T) {
 
 func TestSessionService_ResolveKeepAliveDatabaseError(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	svc := NewSessionService(db, newMockEventBus(), 30, "", nil, testutil.NewTestLogger())
+	svc := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
 	require.NoError(t, db.Close())
 
 	err := svc.resolveKeepAlive(&model.Session{})
@@ -303,7 +318,7 @@ func TestSessionService_ResolveKeepAliveDatabaseError(t *testing.T) {
 }
 
 func TestSessionService_NewSessionServiceNormalizesKeepAlive(t *testing.T) {
-	svc := NewSessionService(testutil.NewTestDB(t), newMockEventBus(), 0, "", nil, testutil.NewTestLogger())
+	svc := NewSessionService(testutil.NewTestDB(t), newMockEventBus(), 0, t.TempDir(), nil, testutil.NewTestLogger())
 
 	assert.Equal(t, DefaultKeepAliveSeconds, svc.keepAlive)
 }

@@ -108,7 +108,7 @@ func TestAssetCatalogErrorPaths(t *testing.T) {
 	t.Run("audit failure rolls back updates deletes and bulk changes", func(t *testing.T) {
 		db := testutil.NewTestDB(t)
 		service := NewAssetCatalogService(db, testutil.NewTestLogger())
-		sessions := NewSessionService(db, newMockEventBus(), 30, "", nil, testutil.NewTestLogger())
+		sessions := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
 		require.NoError(t, store.SetAuditEnabled(db, false))
 		environment, err := service.CreateEnvironment(model.AssetEnvironmentInput{Name: "生产", ColorToken: model.AssetColorRed})
 		require.NoError(t, err)
@@ -140,7 +140,7 @@ func TestAssetCatalogErrorPaths(t *testing.T) {
 func TestAssetCatalogMutationErrorPaths(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	service := NewAssetCatalogService(db, testutil.NewTestLogger())
-	sessionService := NewSessionService(db, newMockEventBus(), 30, "", nil, testutil.NewTestLogger())
+	sessionService := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
 	environment, err := service.CreateEnvironment(model.AssetEnvironmentInput{Name: "生产", ColorToken: model.AssetColorRed})
 	require.NoError(t, err)
 	project, err := service.CreateProject(model.AssetProjectInput{Name: "支付"})

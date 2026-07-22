@@ -44,7 +44,7 @@ func TestAuditServiceEnabled(t *testing.T) {
 
 func TestFileServiceListTransfersPersistsLifecycle(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	sessionSvc := NewSessionService(db, newMockEventBus(), 30, "", nil, testutil.NewTestLogger())
+	sessionSvc := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
 	created, err := sessionSvc.CreateSession(model.SessionInputFrom(model.Session{
 		Name: "xfer", Host: "127.0.0.1", Port: 22, Username: "root",
 		AuthMethod: model.AuthPassword, KeepAlive: 30, TermType: "xterm",
@@ -90,7 +90,7 @@ func TestFileServiceListTransfersPersistsLifecycle(t *testing.T) {
 
 func TestFileServiceCreateTransferMissingSession(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	sessionSvc := NewSessionService(db, newMockEventBus(), 30, "", nil, testutil.NewTestLogger())
+	sessionSvc := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
 	svc := NewFileService(sessionSvc, newMockEventBus(), testutil.NewTestLogger(), WithTransferDB(db))
 	err := svc.createTransfer("missing", 999, "upload", "a", "b")
 	require.Error(t, err)
@@ -262,7 +262,7 @@ func TestGistAPIErrorAndExpectHTTPStatus(t *testing.T) {
 
 func TestTunnelServiceStopAllCleansActiveTunnels(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	sessionSvc := NewSessionService(db, newMockEventBus(), 30, "", nil, testutil.NewTestLogger())
+	sessionSvc := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
 	svc := NewTunnelService(db, sessionSvc, newMockEventBus(), testutil.NewTestLogger())
 
 	closed := false
@@ -443,7 +443,7 @@ func TestWebDAVProviderErrorAndSuccessPaths(t *testing.T) {
 
 func TestFileServiceSizeHelpersAndProgress(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	sessionSvc := NewSessionService(db, newMockEventBus(), 30, "", nil, testutil.NewTestLogger())
+	sessionSvc := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
 	svc := NewFileService(sessionSvc, newMockEventBus(), testutil.NewTestLogger(), WithTransferDB(db))
 
 	assert.Equal(t, int64(0), svc.getFileSize(filepath.Join(t.TempDir(), "missing.bin")))
@@ -761,7 +761,7 @@ func TestPrepareDestructiveSyncLifecycleError(t *testing.T) {
 
 func TestTerminalOpenFailureBranches(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	sessionSvc := NewSessionService(db, newMockEventBus(), 30, "", nil, testutil.NewTestLogger())
+	sessionSvc := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
 	addr, cleanup := sshtestutil.NewMockServerRejectPty(t)
 	defer cleanup()
 	created, err := sessionSvc.CreateSession(model.SessionInputFrom(model.Session{
@@ -801,7 +801,7 @@ func TestUploadSnapshotGistIDPersistence(t *testing.T) {
 
 func TestCancelAllTransfers(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	sessionSvc := NewSessionService(db, newMockEventBus(), 30, "", nil, testutil.NewTestLogger())
+	sessionSvc := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
 	svc := NewFileService(sessionSvc, newMockEventBus(), testutil.NewTestLogger(), WithTransferDB(db))
 	cancelled := false
 	svc.mu.Lock()
@@ -873,7 +873,7 @@ func TestSetTerminalHandlers(t *testing.T) {
 
 func TestFileServiceConnectDisconnectHelpers(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	sessionSvc := NewSessionService(db, newMockEventBus(), 30, "", nil, testutil.NewTestLogger())
+	sessionSvc := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
 	svc := NewFileService(sessionSvc, newMockEventBus(), testutil.NewTestLogger(), WithTransferDB(db))
 	_, _, err := svc.connect(999)
 	require.Error(t, err)
@@ -1010,7 +1010,7 @@ func TestSFTPUploadDownloadWithTransferDB(t *testing.T) {
 	defer sftpCtx.cancel()
 
 	db := testutil.NewTestDB(t)
-	sessionSvc := NewSessionService(db, newMockEventBus(), 30, "", nil, testutil.NewTestLogger())
+	sessionSvc := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
 	port := parsePort(t, sftpCtx.addr)
 	created, err := sessionSvc.CreateSession(model.SessionInputFrom(model.Session{
 		Name: "sftp-db", Host: "127.0.0.1", Port: port, Username: "test",
@@ -1068,7 +1068,7 @@ func TestClosedDBErrorBranches(t *testing.T) {
 	keySvc := NewKeyService(db, crypto, testutil.NewTestLogger())
 	audit := NewAuditService(db, testutil.NewTestLogger())
 	catalog := NewAssetCatalogService(db, testutil.NewTestLogger())
-	fileSvc := NewFileService(NewSessionService(db, newMockEventBus(), 30, "", nil, testutil.NewTestLogger()), newMockEventBus(), testutil.NewTestLogger(), WithTransferDB(db))
+	fileSvc := NewFileService(NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger()), newMockEventBus(), testutil.NewTestLogger(), WithTransferDB(db))
 
 	require.NoError(t, db.Close())
 

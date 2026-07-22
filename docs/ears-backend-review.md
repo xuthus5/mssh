@@ -248,3 +248,9 @@
 - 跨平台系统探针命令矩阵
 - Emit 零拷贝（需事件总线生命周期契约）
 - SQLite 读写队列/多连接架构
+
+## 2026-07-22 host key fail-closed / vault 硬化
+
+- SSH known_hosts 空路径 fail-closed（禁止 InsecureIgnoreHostKey）。
+- vault 非法 nonce 返回错误而非 panic。
+- coverpkg 总覆盖率约 89.1%（目标 90%，仍 partial）。
