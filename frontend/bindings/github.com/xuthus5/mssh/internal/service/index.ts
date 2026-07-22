@@ -12,6 +12,7 @@ import * as KeyService from "./keyservice.js";
 import * as LogService from "./logservice.js";
 import * as MacroService from "./macroservice.js";
 import * as SecurityService from "./securityservice.js";
+import * as SerialService from "./serialservice.js";
 import * as SessionService from "./sessionservice.js";
 import * as SettingService from "./settingservice.js";
 import * as SyncService from "./syncservice.js";
@@ -30,6 +31,7 @@ export {
     LogService,
     MacroService,
     SecurityService,
+    SerialService,
     SessionService,
     SettingService,
     SyncService,
@@ -37,3 +39,4 @@ export {
     ThemeService,
     TunnelService
 };
+

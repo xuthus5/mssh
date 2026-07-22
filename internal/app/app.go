@@ -36,6 +36,7 @@ type App struct {
 	AssetCatalog   *service.AssetCatalogService
 	AI             *service.AIService
 	Security       *service.SecurityService
+	Serial         *service.SerialService
 	logger         *slog.Logger
 	shutdownOnce   sync.Once
 }
@@ -141,6 +142,8 @@ func initializeServices(input serviceInitialization) (*App, error) {
 	securitySvc := newSecurityService(input, runtime)
 	sessionSvc := service.NewSessionService(input.db, input.eventBus, service.DefaultKeepAliveSeconds, input.opts.DataDir, runtime, input.logger)
 	terminalSvc := service.NewTerminalService(sessionSvc, input.eventBus, 32, input.logger)
+	serialSvc := service.NewSerialService(input.db, input.logger)
+	terminalSvc.SetSerialService(serialSvc)
 	tunnelSvc := service.NewTunnelService(input.db, sessionSvc, input.eventBus, input.logger)
 	logSvc := service.NewLogService(input.db, input.opts.DataDir, input.logger)
 	themeSvc, err := newThemeService(input)
@@ -149,7 +152,7 @@ func initializeServices(input serviceInitialization) (*App, error) {
 	}
 	configureTerminalLogging(terminalSvc, logSvc, input.logger)
 	syncSvc := newSyncService(input, runtime, securitySvc, terminalSvc, tunnelSvc, sessionSvc)
-	return assembleApp(input, runtime, securitySvc, sessionSvc, terminalSvc, tunnelSvc, logSvc, themeSvc, syncSvc), nil
+	return assembleApp(input, runtime, securitySvc, sessionSvc, terminalSvc, serialSvc, tunnelSvc, logSvc, themeSvc, syncSvc), nil
 }
 
 func newSecurityService(input serviceInitialization, runtime *service.CryptoRuntime) *service.SecurityService {
@@ -194,7 +197,7 @@ func newSettingService(input serviceInitialization) *service.SettingService {
 	})
 }
 
-func assembleApp(input serviceInitialization, runtime *service.CryptoRuntime, securitySvc *service.SecurityService, sessionSvc *service.SessionService, terminalSvc *service.TerminalService, tunnelSvc *service.TunnelService, logSvc *service.LogService, themeSvc *service.ThemeService, syncSvc *service.SyncService) *App {
+func assembleApp(input serviceInitialization, runtime *service.CryptoRuntime, securitySvc *service.SecurityService, sessionSvc *service.SessionService, terminalSvc *service.TerminalService, serialSvc *service.SerialService, tunnelSvc *service.TunnelService, logSvc *service.LogService, themeSvc *service.ThemeService, syncSvc *service.SyncService) *App {
 	return &App{
 		DB:             input.db,
 		Keychain:       input.keychain,
@@ -215,6 +218,7 @@ func assembleApp(input serviceInitialization, runtime *service.CryptoRuntime, se
 		AssetCatalog:   service.NewAssetCatalogService(input.db, input.logger),
 		AI:             service.NewAIService(input.db, terminalSvc, input.keychain, input.logger, input.opts.ProxyManager),
 		Security:       securitySvc,
+		Serial:         serialSvc,
 		logger:         input.logger,
 	}
 }

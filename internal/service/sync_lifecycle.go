@@ -90,7 +90,7 @@ func (s *SyncService) clearSynchronizedData() error {
 	if _, err := tx.Exec("UPDATE session_logs SET session_id = NULL"); err != nil {
 		return fmt.Errorf("detach session logs: %w", err)
 	}
-	for _, table := range []string{"tunnels", "session_tags", "sessions", "asset_tags", "asset_projects", "asset_environments", "ssh_keys", "session_folders", "macros"} {
+	for _, table := range []string{"tunnels", "session_tags", "sessions", "asset_tags", "asset_projects", "asset_environments", "ssh_keys", "session_folders", "macros", "serial_ports"} {
 		if _, err := tx.Exec("DELETE FROM " + table); err != nil {
 			return fmt.Errorf("clear %s: %w", table, err)
 		}

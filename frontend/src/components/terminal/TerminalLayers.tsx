@@ -174,7 +174,7 @@ export function TerminalLayers() {
 
   const toggleFiles = useCallback((tabID: string, terminalID: string) => {
     const tab = useAppStore.getState().tabs.find((item) => item.id === tabID)
-    if (tab?.type !== 'terminal') return
+    if (tab?.type !== 'terminal' || tab.connectionKind === 'serial') return
     const opening = tab.toolPanel !== 'files' || fileTargets[tabID] !== terminalID
     setFileTargets((current) => opening ? { ...current, [tabID]: terminalID } : current)
     updateTerminalWorkspace(tabID, { toolPanel: opening ? 'files' : null })

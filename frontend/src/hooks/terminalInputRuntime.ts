@@ -9,10 +9,15 @@ export interface TerminalInputRefs {
   storeRef: RefObject<AppState>
 }
 
+/** Resolve history bucket id: SSH sessions use real ids; serial uses negative serialPortId. */
 export function resolveSessionId(refs: TerminalInputRefs): number | null {
   const terminalID = refs.terminalIDRef.current
   const tab = refs.storeRef.current.tabs.find((item) => item.type === 'terminal' && item.terminalId === terminalID)
-  return tab?.type === 'terminal' ? tab.sessionId : null
+  if (!tab || tab.type !== 'terminal') return null
+  if (tab.connectionKind === 'serial') {
+    return tab.serialPortId && tab.serialPortId > 0 ? -tab.serialPortId : null
+  }
+  return tab.sessionId
 }
 
 export function subscribeToTerminalData(
