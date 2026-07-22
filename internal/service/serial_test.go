@@ -105,3 +105,13 @@ func TestSerialServiceDeleteBlocksInUse(t *testing.T) {
 	require.NoError(t, svc.Delete(created.ID))
 }
 
+func TestSerialServiceRejectsInvalidBaud(t *testing.T) {
+	db, err := store.OpenDB(t.TempDir())
+	require.NoError(t, err)
+	require.NoError(t, store.InitializeSchema(db))
+	t.Cleanup(func() { _ = db.Close() })
+	svc := NewSerialService(db, slog.Default())
+	_, err = svc.Create(model.SerialPortInput{Name: "bad", Device: "/dev/ttyTEST", BaudRate: 100})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "baud rate")
+}

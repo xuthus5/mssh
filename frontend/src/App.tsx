@@ -39,12 +39,13 @@ function activeTerminalEntry(state: AppState) {
   return state.terminalPool.get(state.activePaneId ?? tab.terminalId)
 }
 
-function copySelection(state: AppState) {
+function copySelection(state: AppState): boolean {
   const selection = activeTerminalEntry(state)?.terminal.getSelection()
-  if (!selection) return
+  if (!selection) return false
   getClipboard().writeText(selection)
     .then(() => logger.debug('Shortcut: Ctrl+Shift+C: copied selection'))
     .catch((error: unknown) => toast(t('复制失败: ${}', error instanceof Error ? error.message : String(error)), 'error'))
+  return true
 }
 
 function pasteClipboard(state: AppState) {
@@ -55,48 +56,46 @@ function pasteClipboard(state: AppState) {
     .catch((error: unknown) => toast(t('粘贴失败: ${}', error instanceof Error ? error.message : String(error)), 'error'))
 }
 
-function clearTerminal(state: AppState) {
+function clearTerminal(state: AppState): boolean {
   const entry = activeTerminalEntry(state)
-  if (!entry) return
+  if (!entry) return false
   entry.terminal.clear()
   logger.debug('Shortcut: Ctrl+Shift+L: cleared')
+  return true
 }
 
-function closeActiveTab(state: AppState) {
+function closeActiveTab(state: AppState): boolean {
   const tab = activeTab(state)
-  if (!tab) return
+  if (!tab) return false
   if (tab.type === 'terminal' && (state.connectionStatus[tab.terminalId] === 'connected' || state.recordingState[tab.terminalId] === 'recording')) {
     toast(t('请使用标签关闭按钮确认终止活动连接'), 'warning')
-    return
+    return true
   }
   closeTabsWithFeedback([tab.id], state.closeTab)
+  return true
 }
 
-
-function runShortcutAction(actionId: ShortcutActionId) {
+function runShortcutAction(actionId: ShortcutActionId): boolean {
   const state = useAppStore.getState()
   switch (actionId) {
     case 'new-session':
       emitAppEvent(APP_NEW_SESSION_EVENT)
-      return
+      return true
     case 'new-local-terminal':
       emitAppEvent(APP_NEW_LOCAL_TERMINAL_EVENT)
-      return
+      return true
     case 'close-tab':
-      closeActiveTab(state)
-      return
+      return closeActiveTab(state)
     case 'quick-search':
       emitAppEvent(SESSION_QUICK_SEARCH_EVENT)
-      return
+      return true
     case 'copy-selection':
-      copySelection(state)
-      return
+      return copySelection(state)
     case 'paste-clipboard':
       pasteClipboard(state)
-      return
+      return true
     case 'clear-terminal':
-      clearTerminal(state)
-      return
+      return clearTerminal(state)
   }
 }
 
@@ -104,8 +103,8 @@ function handleShortcut(event: KeyboardEvent) {
   const bindings = useShortcutStore.getState().bindings
   const actionId = resolveShortcutAction(event, bindings)
   if (!actionId) return
+  if (!runShortcutAction(actionId)) return
   event.preventDefault()
-  runShortcutAction(actionId)
 }
 
 function AppShell() {

@@ -88,7 +88,7 @@ export function SerialPortTable(props: Props) {
                     </Button>
                     <Button type="button" size="xs" variant="outline" onClick={() => onEdit(port)}>{t('编辑')}</Button>
                     <Button type="button" size="xs" variant="outline" onClick={() => onDuplicate(port)}><Copy className="size-3" /></Button>
-                    <Button type="button" size="xs" variant="ghost" disabled={deletingID === id} onClick={() => onRemove(port)}>{t('删除')}</Button>
+                    <Button type="button" size="xs" variant="ghost" disabled={deletingID === id || inUse} title={inUse ? t('串口使用中，请先关闭终端再删除') : undefined} onClick={() => onRemove(port)}>{t('删除')}</Button>
                   </div>
                 </TableCell>
               </TableRow>
