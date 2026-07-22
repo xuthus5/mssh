@@ -11,7 +11,6 @@ import {
 } from '@/store/terminalBehaviorStore'
 import { t } from '@/i18n'
 
-
 const RIGHT_CLICK_OPTIONS = [
   { value: 'menu', label: '显示菜单' },
   { value: 'paste', label: '粘贴' },
@@ -21,24 +20,34 @@ interface Props {
   rightClickAction: TerminalBehaviorSettings['rightClickAction']
   copyOnSelect: boolean
   scrollbackLines: number | string
+  autoReconnect: boolean
+  restoreTabsOnStartup: boolean
   onRightClickActionChange: (value: TerminalRightClickAction) => void
   onCopyOnSelectChange: (value: boolean) => void
   onScrollbackLinesChange: (value: number) => void
+  onAutoReconnectChange: (value: boolean) => void
+  onRestoreTabsOnStartupChange: (value: boolean) => void
 }
 
 export function TerminalBehaviorSettingsSection({
   rightClickAction,
   copyOnSelect,
   scrollbackLines,
+  autoReconnect,
+  restoreTabsOnStartup,
   onRightClickActionChange,
   onCopyOnSelectChange,
   onScrollbackLinesChange,
+  onAutoReconnectChange,
+  onRestoreTabsOnStartupChange,
 }: Props) {
   return (
     <section className="rounded-xl border border-border bg-card p-3 shadow-sm">
       <div className="mb-3">
         <h3 className="text-sm font-medium text-foreground">{t('行为')}</h3>
-        <p className="mt-1 text-xs text-muted-foreground">{t('控制终端中的鼠标、剪贴板与历史缓冲。')}</p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          {t('控制终端中的鼠标、剪贴板、历史缓冲与连接恢复策略。')}
+        </p>
       </div>
       <div className="flex flex-col gap-3">
         <Field orientation="horizontal">
@@ -69,7 +78,11 @@ export function TerminalBehaviorSettingsSection({
           <FieldContent>
             <FieldLabel htmlFor="terminal-scrollback-lines">{t('滚动历史行数')}</FieldLabel>
             <FieldDescription>
-              {t('限制每个终端保留的输出历史行数，超出后丢弃最旧内容（${}-${}）。', MIN_TERMINAL_SCROLLBACK_LINES, MAX_TERMINAL_SCROLLBACK_LINES)}
+              {t(
+                '限制每个终端保留的输出历史行数，超出后丢弃最旧内容（${}-${}）。',
+                MIN_TERMINAL_SCROLLBACK_LINES,
+                MAX_TERMINAL_SCROLLBACK_LINES,
+              )}
             </FieldDescription>
           </FieldContent>
           <Input
@@ -90,6 +103,32 @@ export function TerminalBehaviorSettingsSection({
               if (Number.isFinite(parsed)) onScrollbackLinesChange(parsed)
             }}
             aria-label={t('滚动历史行数')}
+          />
+        </Field>
+        <Field orientation="horizontal">
+          <FieldContent>
+            <FieldLabel htmlFor="terminal-auto-reconnect">{t('SSH 断线自动重连')}</FieldLabel>
+            <FieldDescription>
+              {t('意外断开后自动尝试重新连接；手动断开或关闭标签不会触发。默认关闭。')}
+            </FieldDescription>
+          </FieldContent>
+          <Switch
+            id="terminal-auto-reconnect"
+            checked={autoReconnect}
+            onCheckedChange={(value) => onAutoReconnectChange(value)}
+          />
+        </Field>
+        <Field orientation="horizontal">
+          <FieldContent>
+            <FieldLabel htmlFor="terminal-restore-tabs">{t('启动时恢复终端标签')}</FieldLabel>
+            <FieldDescription>
+              {t('重启应用后自动恢复上次未关闭的终端标签。默认开启。')}
+            </FieldDescription>
+          </FieldContent>
+          <Switch
+            id="terminal-restore-tabs"
+            checked={restoreTabsOnStartup}
+            onCheckedChange={(value) => onRestoreTabsOnStartupChange(value)}
           />
         </Field>
       </div>

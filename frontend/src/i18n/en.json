@@ -1193,5 +1193,10 @@
   "更改将自动保存": "Changes are saved automatically",
   "通用设置包含界面外观与应用级偏好。": "General settings cover interface appearance and app-level preferences.",
   "终端连接与交互偏好会自动保存。": "Terminal connection and interaction preferences are saved automatically.",
-  "当前主题配置无效，自动保存已暂停，请修正颜色或字体后继续。": "Theme configuration is invalid; auto-save is paused until colors and fonts are fixed."
+  "当前主题配置无效，自动保存已暂停，请修正颜色或字体后继续。": "Theme configuration is invalid; auto-save is paused until colors and fonts are fixed.",
+  "控制终端中的鼠标、剪贴板、历史缓冲与连接恢复策略。": "Controls mouse, clipboard, scrollback, and connection recovery behavior in terminals.",
+  "SSH 断线自动重连": "Auto-reconnect after SSH disconnect",
+  "意外断开后自动尝试重新连接；手动断开或关闭标签不会触发。默认关闭。": "Automatically retries after unexpected disconnects. Manual disconnect or closing a tab does not trigger it. Off by default.",
+  "启动时恢复终端标签": "Restore terminal tabs on startup",
+  "重启应用后自动恢复上次未关闭的终端标签。默认开启。": "Automatically restores previously open terminal tabs after restart. On by default."
 }

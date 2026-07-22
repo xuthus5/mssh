@@ -4,10 +4,10 @@ import { useConnectDialog } from '@/store/connectDialog'
 import { useAppStore } from '@/store/appStore'
 import { toast } from '@/components/ui/toast'
 import { openTerminalWithPoolCapacity } from '@/lib/openTerminal'
+import { useTerminalBehaviorStore } from '@/store/terminalBehaviorStore'
 import { t } from '@/i18n'
 
-
-interface ReconnectSession {
+export interface ReconnectSession {
   id: string
   host: string
   port: number
@@ -16,11 +16,40 @@ interface ReconnectSession {
 
 const reconnectControllers = new Map<string, AbortController>()
 const reconnectDelays = [500, 1000]
+const intentionalDisconnects = new Set<string>()
+const intentionalDisconnectTimers = new Map<string, ReturnType<typeof setTimeout>>()
+
+/** Mark a terminal close as user-initiated so auto-reconnect is skipped. */
+export function markIntentionalDisconnect(terminalId: string) {
+  intentionalDisconnects.add(terminalId)
+  const existing = intentionalDisconnectTimers.get(terminalId)
+  if (existing !== undefined) clearTimeout(existing)
+  intentionalDisconnectTimers.set(
+    terminalId,
+    setTimeout(() => {
+      intentionalDisconnects.delete(terminalId)
+      intentionalDisconnectTimers.delete(terminalId)
+    }, 5000),
+  )
+}
+
+export function consumeIntentionalDisconnect(terminalId: string): boolean {
+  const existing = intentionalDisconnectTimers.get(terminalId)
+  if (existing !== undefined) {
+    clearTimeout(existing)
+    intentionalDisconnectTimers.delete(terminalId)
+  }
+  if (!intentionalDisconnects.has(terminalId)) return false
+  intentionalDisconnects.delete(terminalId)
+  return true
+}
 
 function currentReconnectTarget(tabId: string, sessions: ReconnectSession[]) {
   const state = useAppStore.getState()
   const tab = state.tabs.find((item) => item.id === tabId)
-  if (!tab || tab.type !== 'terminal' || ['connecting', 'reconnecting'].includes(state.connectionStatus[tab.terminalId] ?? '')) return null
+  if (!tab || tab.type !== 'terminal' || ['connecting', 'reconnecting'].includes(state.connectionStatus[tab.terminalId] ?? '')) {
+    return null
+  }
   const session = sessions.find((item) => Number(item.id) === tab.sessionId)
   if (!session) return null
   const terminalId = tab.terminalId
@@ -62,22 +91,40 @@ export async function reconnectSessionTab(tabId: string, sessions: ReconnectSess
     return
   }
   const terminal = state.terminalPool.get(terminalId)?.terminal
-  dialog.openDialog(session.host, session.port, session.username, () => { void reconnectSessionTab(tabId, sessions) })
+  dialog.openDialog(session.host, session.port, session.username, () => {
+    void reconnectSessionTab(tabId, sessions)
+  })
   const controller = new AbortController()
   reconnectControllers.set(tabId, controller)
   state.setConnectionStatus(terminalId, 'reconnecting')
   try {
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
-        const nextTerminalId = await openTerminalWithPoolCapacity(() => TerminalService.Open(Number(session.id), terminal?.cols ?? 80, terminal?.rows ?? 24))
-        if (controller.signal.aborted || !useAppStore.getState().replaceTerminalConnection(tabId, terminalId, nextTerminalId)) { await closeStaleTerminal(nextTerminalId); dialog.closeDialog(); return }
+        const nextTerminalId = await openTerminalWithPoolCapacity(() =>
+          TerminalService.Open(Number(session.id), terminal?.cols ?? 80, terminal?.rows ?? 24),
+        )
+        if (
+          controller.signal.aborted
+          || !useAppStore.getState().replaceTerminalConnection(tabId, terminalId, nextTerminalId)
+        ) {
+          await closeStaleTerminal(nextTerminalId)
+          dialog.closeDialog()
+          return
+        }
         dialog.setState('connected')
         logger.info('reconnected', { previousTerminalId: terminalId, terminalId: nextTerminalId, host: session.host })
         return
       } catch (error: unknown) {
-        if (controller.signal.aborted || !restoreDisconnectedState(tabId, terminalId)) { dialog.closeDialog(); return }
+        if (controller.signal.aborted || !restoreDisconnectedState(tabId, terminalId)) {
+          dialog.closeDialog()
+          return
+        }
         logger.error('reconnect error', error)
-        if (attempt === 2) { state.setConnectionStatus(terminalId, 'error'); dialog.setError(error instanceof Error ? error.message : String(error)); return }
+        if (attempt === 2) {
+          state.setConnectionStatus(terminalId, 'error')
+          dialog.setError(error instanceof Error ? error.message : String(error))
+          return
+        }
         state.setConnectionStatus(terminalId, 'reconnecting')
         await waitForReconnect(reconnectDelays[attempt], controller.signal)
       }
@@ -87,10 +134,31 @@ export async function reconnectSessionTab(tabId: string, sessions: ReconnectSess
   }
 }
 
+/** Auto-reconnect after unexpected disconnect when the setting is enabled. */
+export function maybeAutoReconnectTerminal(terminalId: string, sessions: ReconnectSession[]) {
+  if (consumeIntentionalDisconnect(terminalId)) return
+  if (!useTerminalBehaviorStore.getState().autoReconnect) return
+  const tab = useAppStore.getState().tabs.find(
+    (item) => item.type === 'terminal' && item.terminalId === terminalId,
+  )
+  if (!tab || tab.type !== 'terminal') return
+  void reconnectSessionTab(tab.id, sessions)
+}
+
 function waitForReconnect(delay: number, signal: AbortSignal) {
   return new Promise<void>((resolve) => {
-    if (signal.aborted) { resolve(); return }
+    if (signal.aborted) {
+      resolve()
+      return
+    }
     const timer = window.setTimeout(resolve, delay)
-    signal.addEventListener('abort', () => { window.clearTimeout(timer); resolve() }, { once: true })
+    signal.addEventListener(
+      'abort',
+      () => {
+        window.clearTimeout(timer)
+        resolve()
+      },
+      { once: true },
+    )
   })
 }
