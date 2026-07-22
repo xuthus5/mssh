@@ -1182,5 +1182,7 @@
   "当前模式": "Current mode",
   "所有应用 HTTP 请求直连目标主机。": "All application HTTP requests connect directly.",
   "使用系统环境变量中的 HTTP(S)_PROXY / ALL_PROXY。": "Uses HTTP(S)_PROXY / ALL_PROXY from the system environment.",
-  "代理模式状态": "Proxy mode status"
+  "代理模式状态": "Proxy mode status",
+  "连接默认": "Connection Defaults",
+  "控制终端连接池容量、SSH 保活与默认 TERM 类型。": "Controls terminal pool capacity, SSH keep-alive, and the default TERM type."
 }
