@@ -52,4 +52,6 @@ func TestSettingServiceRejectsSecretKeys(t *testing.T) {
 	require.Error(t, err)
 	_, err = svc.GetMany([]string{"appearance.color_mode", "sync.master_key"})
 	require.Error(t, err)
+	err = svc.Delete("sync.master_key")
+	require.Error(t, err)
 }
