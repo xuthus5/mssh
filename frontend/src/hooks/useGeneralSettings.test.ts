@@ -9,7 +9,7 @@ import { SETTINGS_GENERAL_CHANGED_EVENT, SETTINGS_GENERAL_PREVIEW_EVENT, SETTING
 const savedGeneral = {
   maxPoolSize: 24, defaultKeepAlive: 90, defaultTermType: 'xterm',
   uiFontFamily: 'Arial', uiFontFallbackFamily: 'Segoe UI', uiFontSize: 18,
-  rightClickAction: 'paste' as const, copyOnSelect: true, scrollbackLines: 10000, autoReconnect: false, restoreTabsOnStartup: true,
+  rightClickAction: 'paste' as const, copyOnSelect: true, scrollbackLines: 10000, autoReconnect: false, restoreTabsOnStartup: true, renderer: 'dom' as const,
   closeButtonAction: 'exit' as const,
   logDir: '/tmp/mssh-logs',
   logRetentionDays: 14,
@@ -179,6 +179,7 @@ function setting(key: string, value: unknown) {
       'terminal.restore_tabs_on_startup': setting('terminal.restore_tabs_on_startup', false),
     }))
     __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.SetMany', setMany)
+    __registerHandler('github.com/xuthus5/mssh/internal/service.TerminalService.SetMaxSize', async () => {})
     const { result } = renderHook(() => useGeneralSettings())
     await waitFor(() => expect(result.current.general.autoReconnect).toBe(true))
     expect(result.current.general.restoreTabsOnStartup).toBe(false)
@@ -189,5 +190,24 @@ function setting(key: string, value: unknown) {
       expect.objectContaining({ key: 'terminal.auto_reconnect', value: 'true' }),
       expect.objectContaining({ key: 'terminal.restore_tabs_on_startup', value: 'false' }),
     ]))
+  })
+
+  it('loads and persists terminal renderer preference', async () => {
+    const setMany = vi.fn(async () => {})
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.GetMany', async () => ({
+      'terminal.renderer': setting('terminal.renderer', 'webgl'),
+    }))
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.SetMany', setMany)
+    __registerHandler('github.com/xuthus5/mssh/internal/service.TerminalService.SetMaxSize', async () => {})
+    const { result } = renderHook(() => useGeneralSettings())
+    await waitFor(() => expect(result.current.general.renderer).toBe('webgl'))
+    await act(async () => {
+      await result.current.saveGeneral({ ...savedGeneral, renderer: 'canvas' })
+    })
+    const payload = (setMany.mock.calls.at(-1) ?? []) as unknown[]
+    const entries = (Array.isArray(payload[0]) ? payload[0] : []) as Array<{ key: string; value: string }>
+    const rendererEntry = entries.find((entry) => entry.key === 'terminal.renderer')
+    expect(rendererEntry?.value).toBe(JSON.stringify('canvas'))
+    expect(result.current.general.renderer).toBe('canvas')
   })
 

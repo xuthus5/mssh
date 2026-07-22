@@ -6,14 +6,14 @@ import { logger } from '@/lib/logger'
 import { toast } from '@/components/ui/toast'
 import type { Setting, SettingInput } from '../../bindings/github.com/xuthus5/mssh/internal/model/models'
 import { applyUIFont, clampUIFontSize, DEFAULT_UI_FONT_FALLBACK_FAMILY, DEFAULT_UI_FONT_FAMILY, DEFAULT_UI_FONT_SIZE, normalizeUIFontFallbackFamily, normalizeUIFontFamily } from '@/lib/uiFont'
-import { DEFAULT_TERMINAL_SCROLLBACK_LINES, normalizeAutoReconnect, normalizeCopyOnSelect, normalizeRestoreTabsOnStartup, normalizeScrollbackLines, normalizeTerminalRightClickAction, useTerminalBehaviorStore, type TerminalRightClickAction } from '@/store/terminalBehaviorStore'
+import { DEFAULT_TERMINAL_SCROLLBACK_LINES, DEFAULT_TERMINAL_RENDERER, normalizeAutoReconnect, normalizeCopyOnSelect, normalizeRestoreTabsOnStartup, normalizeScrollbackLines, normalizeTerminalRenderer, normalizeTerminalRightClickAction, useTerminalBehaviorStore, type TerminalRenderer, type TerminalRightClickAction } from '@/store/terminalBehaviorStore'
 import { SETTINGS_GENERAL_CHANGED_EVENT, SETTINGS_GENERAL_PREVIEW_EVENT, SETTINGS_PREVIEW_CANCELLED_EVENT } from '@/lib/settingsWindowEvents'
 import { LANGUAGE_SETTING_KEY, t, type AppLanguage, useLanguageStore } from '@/i18n'
 
 
 const generalSettingKeys = [
   'terminal.max_pool_size', 'terminal.default_keep_alive', 'terminal.default_term_type',
-  'terminal.right_click_action', 'terminal.copy_on_select', 'terminal.scrollback_lines', 'terminal.auto_reconnect', 'terminal.restore_tabs_on_startup', 'appearance.ui_font_family',
+  'terminal.right_click_action', 'terminal.copy_on_select', 'terminal.scrollback_lines', 'terminal.auto_reconnect', 'terminal.restore_tabs_on_startup', 'terminal.renderer', 'appearance.ui_font_family',
   'appearance.ui_font_fallback_family', 'appearance.ui_font_size',
   'application.close_button_action', 'application.log_dir', 'application.log_retention_days',
   'application.proxy_mode', 'application.proxy_url', 'application.proxy_no_proxy',
@@ -36,6 +36,7 @@ export interface GeneralSettings {
   scrollbackLines: number
   autoReconnect: boolean
   restoreTabsOnStartup: boolean
+  renderer: TerminalRenderer
   closeButtonAction: CloseButtonAction
   logDir: string
   logRetentionDays: number
@@ -59,7 +60,7 @@ const defaultGeneralSettings: GeneralSettings = {
   maxPoolSize: 10, defaultKeepAlive: 60, defaultTermType: 'xterm-256color',
   uiFontFamily: DEFAULT_UI_FONT_FAMILY, uiFontFallbackFamily: DEFAULT_UI_FONT_FALLBACK_FAMILY,
   uiFontSize: DEFAULT_UI_FONT_SIZE,
-  rightClickAction: 'menu', copyOnSelect: false, scrollbackLines: DEFAULT_TERMINAL_SCROLLBACK_LINES, autoReconnect: false, restoreTabsOnStartup: true,
+  rightClickAction: 'menu', copyOnSelect: false, scrollbackLines: DEFAULT_TERMINAL_SCROLLBACK_LINES, autoReconnect: false, restoreTabsOnStartup: true, renderer: DEFAULT_TERMINAL_RENDERER,
   closeButtonAction: 'tray',
   logDir: '',
   logRetentionDays: 30,
@@ -118,6 +119,7 @@ function normalizeGeneral(settings: GeneralSettings): GeneralSettings {
     scrollbackLines: normalizeScrollbackLines(settings.scrollbackLines),
     autoReconnect: normalizeAutoReconnect(settings.autoReconnect),
     restoreTabsOnStartup: normalizeRestoreTabsOnStartup(settings.restoreTabsOnStartup),
+    renderer: normalizeTerminalRenderer(settings.renderer),
     closeButtonAction: normalizeCloseButtonAction(settings.closeButtonAction),
     logDir: normalizeLogDir(settings.logDir),
     logRetentionDays: normalizeLogRetentionDays(settings.logRetentionDays),
@@ -141,6 +143,7 @@ function parseGeneral(settings: { [_ in string]?: Setting }): GeneralSettings {
     scrollbackLines: settingValue(settings, 'terminal.scrollback_lines', DEFAULT_TERMINAL_SCROLLBACK_LINES),
     autoReconnect: settingValue(settings, 'terminal.auto_reconnect', false),
     restoreTabsOnStartup: settingValue(settings, 'terminal.restore_tabs_on_startup', true),
+    renderer: settingValue(settings, 'terminal.renderer', DEFAULT_TERMINAL_RENDERER),
     uiFontFamily, uiFontFallbackFamily: settingValue(settings, 'appearance.ui_font_fallback_family', DEFAULT_UI_FONT_FALLBACK_FAMILY),
     uiFontSize: settingValue(settings, 'appearance.ui_font_size', DEFAULT_UI_FONT_SIZE),
     closeButtonAction: settingValue(settings, 'application.close_button_action', 'tray'),
@@ -157,7 +160,7 @@ function parseGeneral(settings: { [_ in string]?: Setting }): GeneralSettings {
 
 function applyGeneral(settings: GeneralSettings) {
   applyUIFont({ family: settings.uiFontFamily, fallbackFamily: settings.uiFontFallbackFamily, size: settings.uiFontSize })
-  useTerminalBehaviorStore.getState().setSettings({ rightClickAction: settings.rightClickAction, copyOnSelect: settings.copyOnSelect, scrollbackLines: settings.scrollbackLines, autoReconnect: settings.autoReconnect, restoreTabsOnStartup: settings.restoreTabsOnStartup })
+  useTerminalBehaviorStore.getState().setSettings({ rightClickAction: settings.rightClickAction, copyOnSelect: settings.copyOnSelect, scrollbackLines: settings.scrollbackLines, autoReconnect: settings.autoReconnect, restoreTabsOnStartup: settings.restoreTabsOnStartup, renderer: settings.renderer })
   useAppStore.getState().setMaxPoolSize(settings.maxPoolSize)
   useLanguageStore.getState().hydrateLanguage(settings.language)
 }
@@ -180,7 +183,7 @@ async function persistGeneral(settings: GeneralSettings) {
   await Promise.all([SettingService.SetMany([
     settingEntry('terminal.max_pool_size', settings.maxPoolSize), settingEntry('terminal.default_keep_alive', settings.defaultKeepAlive),
     settingEntry('terminal.default_term_type', settings.defaultTermType), settingEntry('terminal.right_click_action', settings.rightClickAction),
-    settingEntry('terminal.copy_on_select', settings.copyOnSelect), settingEntry('terminal.scrollback_lines', settings.scrollbackLines), settingEntry('terminal.auto_reconnect', settings.autoReconnect), settingEntry('terminal.restore_tabs_on_startup', settings.restoreTabsOnStartup), settingEntry('appearance.ui_font_family', settings.uiFontFamily),
+    settingEntry('terminal.copy_on_select', settings.copyOnSelect), settingEntry('terminal.scrollback_lines', settings.scrollbackLines), settingEntry('terminal.auto_reconnect', settings.autoReconnect), settingEntry('terminal.restore_tabs_on_startup', settings.restoreTabsOnStartup), settingEntry('terminal.renderer', settings.renderer), settingEntry('appearance.ui_font_family', settings.uiFontFamily),
     settingEntry('appearance.ui_font_fallback_family', settings.uiFontFallbackFamily), settingEntry('appearance.ui_font_size', settings.uiFontSize),
     settingEntry('application.close_button_action', settings.closeButtonAction),
     settingEntry('application.log_dir', settings.logDir),

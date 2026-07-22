@@ -51,7 +51,7 @@ describe('TerminalInteractionSurface', () => {
     vi.clearAllMocks()
     interactions.copyTerminalSelection.mockResolvedValue(true)
     interactions.pasteClipboardIntoTerminal.mockResolvedValue(undefined)
-    useTerminalBehaviorStore.setState({ rightClickAction: 'menu', copyOnSelect: false, autoReconnect: false, restoreTabsOnStartup: true, scrollbackLines: 10000 })
+    useTerminalBehaviorStore.setState({ rightClickAction: 'menu', copyOnSelect: false, autoReconnect: false, restoreTabsOnStartup: true, scrollbackLines: 10000, renderer: 'dom' })
     Object.defineProperty(navigator, 'clipboard', {
       configurable: true,
       value: { readText: vi.fn(async () => 'clipboard'), writeText: vi.fn(async () => {}) },
@@ -95,7 +95,7 @@ describe('TerminalInteractionSurface', () => {
   })
 
   it('prevents the native menu and pastes directly in paste mode', async () => {
-    useTerminalBehaviorStore.setState({ rightClickAction: 'paste', copyOnSelect: false, autoReconnect: false, restoreTabsOnStartup: true, scrollbackLines: 10000 })
+    useTerminalBehaviorStore.setState({ rightClickAction: 'paste', copyOnSelect: false, autoReconnect: false, restoreTabsOnStartup: true, scrollbackLines: 10000, renderer: 'dom' })
     const { terminal, terminalRef } = createTerminal()
     render(<TerminalInteractionSurface terminalRef={terminalRef}><div>terminal</div></TerminalInteractionSurface>)
     const surface = screen.getByText('terminal').parentElement!
@@ -111,7 +111,7 @@ describe('TerminalInteractionSurface', () => {
   })
 
   it('logs and toasts explicit clipboard failures', async () => {
-    useTerminalBehaviorStore.setState({ rightClickAction: 'paste', copyOnSelect: false, autoReconnect: false, restoreTabsOnStartup: true, scrollbackLines: 10000 })
+    useTerminalBehaviorStore.setState({ rightClickAction: 'paste', copyOnSelect: false, autoReconnect: false, restoreTabsOnStartup: true, scrollbackLines: 10000, renderer: 'dom' })
     const error = new Error('clipboard denied')
     interactions.pasteClipboardIntoTerminal.mockRejectedValueOnce(error)
     const { terminalRef } = createTerminal()
@@ -128,12 +128,12 @@ describe('TerminalInteractionSurface', () => {
     render(<TerminalInteractionSurface terminalRef={terminalRef}><div>terminal</div></TerminalInteractionSurface>)
     expect(screen.getByRole('button', { name: '复制' })).toBeInTheDocument()
 
-    act(() => useTerminalBehaviorStore.getState().setSettings({ rightClickAction: 'paste', copyOnSelect: false, scrollbackLines: 10000, autoReconnect: false, restoreTabsOnStartup: true }))
+    act(() => useTerminalBehaviorStore.getState().setSettings({ rightClickAction: 'paste', copyOnSelect: false, scrollbackLines: 10000, autoReconnect: false, restoreTabsOnStartup: true, renderer: 'dom' }))
 
     expect(screen.queryByRole('button', { name: '复制' })).not.toBeInTheDocument()
     expect(screen.getByText('terminal').parentElement).toHaveClass('bg-background', 'text-foreground')
 
-    act(() => useTerminalBehaviorStore.getState().setSettings({ rightClickAction: 'menu', copyOnSelect: false, scrollbackLines: 10000, autoReconnect: false, restoreTabsOnStartup: true }))
+    act(() => useTerminalBehaviorStore.getState().setSettings({ rightClickAction: 'menu', copyOnSelect: false, scrollbackLines: 10000, autoReconnect: false, restoreTabsOnStartup: true, renderer: 'dom' }))
 
     expect(screen.getByRole('button', { name: '复制' })).toBeInTheDocument()
     expect(screen.getByTestId('context-menu-trigger')).toHaveClass('select-text')
@@ -148,10 +148,10 @@ describe('TerminalInteractionSurface', () => {
     )
     const terminalContainer = screen.getByTestId('terminal-container')
 
-    act(() => useTerminalBehaviorStore.getState().setSettings({ rightClickAction: 'paste', copyOnSelect: false, scrollbackLines: 10000, autoReconnect: false, restoreTabsOnStartup: true }))
+    act(() => useTerminalBehaviorStore.getState().setSettings({ rightClickAction: 'paste', copyOnSelect: false, scrollbackLines: 10000, autoReconnect: false, restoreTabsOnStartup: true, renderer: 'dom' }))
     expect(screen.getByTestId('terminal-container')).toBe(terminalContainer)
 
-    act(() => useTerminalBehaviorStore.getState().setSettings({ rightClickAction: 'menu', copyOnSelect: false, scrollbackLines: 10000, autoReconnect: false, restoreTabsOnStartup: true }))
+    act(() => useTerminalBehaviorStore.getState().setSettings({ rightClickAction: 'menu', copyOnSelect: false, scrollbackLines: 10000, autoReconnect: false, restoreTabsOnStartup: true, renderer: 'dom' }))
     expect(screen.getByTestId('terminal-container')).toBe(terminalContainer)
   })
 })
