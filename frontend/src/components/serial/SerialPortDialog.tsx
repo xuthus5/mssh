@@ -196,7 +196,10 @@ export function SerialPortDialog({ open, onOpenChange, port, devices, onSave }: 
               />
             </Field>
             <Field>
-              <FieldLabel>{t('流控')}</FieldLabel>
+              <FieldContent>
+                <FieldLabel>{t('流控')}</FieldLabel>
+                <FieldDescription>{t('连接时应用到底层串口：None / XON-XOFF 软件流控 / RTS-CTS 硬件流控 / DSR-DTR 硬件流控（Windows 完整，Linux 尽力）。')}</FieldDescription>
+              </FieldContent>
               <LabeledSelect
                 ariaLabel={t('流控')}
                 value={String(draft.flow_control || 'none')}
