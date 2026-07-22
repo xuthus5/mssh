@@ -3,6 +3,10 @@ export class TerminalCommandCapture {
   private escape = false
   private tmuxPrefix = false
 
+  current(): string {
+    return this.buffer
+  }
+
   feed(data: string): string[] {
     const commands: string[] = []
     for (const character of data) {

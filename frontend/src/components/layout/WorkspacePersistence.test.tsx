@@ -59,7 +59,7 @@ describe('WorkspacePersistence', () => {
     const view = render(<WorkspacePersistence />)
     // hydrate after mount so this instance evaluates the disabled preference itself
     act(() => {
-      useTerminalBehaviorStore.setState({ settingsHydrated: true, restoreTabsOnStartup: false, renderer: 'dom' })
+      useTerminalBehaviorStore.setState({ settingsHydrated: true, restoreTabsOnStartup: false, renderer: 'dom', historyPredict: false })
     })
     await waitFor(() => expect(services.get).not.toHaveBeenCalled())
     expect(services.open).not.toHaveBeenCalled()

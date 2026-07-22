@@ -18,4 +18,12 @@ describe('TerminalCommandCapture', () => {
     const capture = new TerminalCommandCapture()
     expect(capture.feed('echo one\necho two\r')).toEqual(['echo one', 'echo two'])
   })
+
+  it('exposes the in-progress buffer via current()', () => {
+    const capture = new TerminalCommandCapture()
+    capture.feed('git st')
+    expect(capture.current()).toBe('git st')
+    capture.feed('\u007f')
+    expect(capture.current()).toBe('git s')
+  })
 })

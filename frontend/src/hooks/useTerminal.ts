@@ -5,19 +5,21 @@ import { Unicode11Addon } from '@xterm/addon-unicode11'
 import type { Terminal } from '@xterm/xterm'
 import { useTerminalRuntimeErrorReporter, type TerminalRuntimeErrorReporter } from '@/components/terminal/TerminalErrorBoundary'
 import { installTerminalCopyOnSelect } from '@/components/terminal/terminalBehaviorRuntime'
+import { installHistoryCommandPredict } from '@/components/terminal/terminalHistoryPredictRuntime'
+import { resolveSessionId, subscribeToTerminalData } from '@/hooks/terminalInputRuntime'
+import { subscribeToRenderer, subscribeToScrollback } from '@/hooks/terminalBehaviorSubscriptions'
 import { runTerminalRuntime } from '@/components/terminal/terminalRuntime'
 import { logger } from '@/lib/logger'
 import { toast } from '@/components/ui/toast'
 import { applyTerminalTheme } from '@/lib/terminalTheme'
 import { TerminalService } from '@/lib/wails'
 import { useAppStore, type AppState } from '@/store/appStore'
-import { useTerminalBehaviorStore, type TerminalRenderer } from '@/store/terminalBehaviorStore'
-import { recordCommand } from '@/lib/commandHistory'
+import { useTerminalBehaviorStore } from '@/store/terminalBehaviorStore'
 import { TerminalCommandCapture } from '@/lib/terminalCommandCapture'
 import { registerTerminalSearch, unregisterTerminalSearch } from '@/lib/terminalSearchRegistry'
 import { useTerminalActivation, useTerminalAttachment, useTerminalIdentity } from '@/hooks/terminalLifecycleRuntime'
 import { fitAndRefresh } from '@/hooks/terminalFitRuntime'
-import { applyTerminalScrollback, createTerminalInstance, createTerminalRendererController, safelyDisposeTerminalResource } from '@/hooks/terminalInstanceRuntime'
+import { createTerminalInstance, createTerminalRendererController, safelyDisposeTerminalResource } from '@/hooks/terminalInstanceRuntime'
 import { subscribeToSynchronizedOutputQuery, subscribeToTerminalOutput, subscribeToTerminalVersionQuery } from '@/hooks/terminalOutputRuntime'
 import { subscribeToTerminalWorkingDirectory } from '@/hooks/terminalDirectoryRuntime'
 import { t } from '@/i18n'
@@ -90,19 +92,6 @@ function writeTerminalInput(data: string, refs: TerminalLifecycleRefs) {
   }
 }
 
-function subscribeToData(term: Terminal, refs: TerminalLifecycleRefs) {
-  const capture = new TerminalCommandCapture()
-  return term.onData((data) => {
-    const terminalID = refs.terminalIDRef.current
-    refs.storeRef.current.updateLastUsed(terminalID)
-    writeTerminalInput(data, refs)
-    const tab = refs.storeRef.current.tabs.find((item) => item.type === 'terminal' && item.terminalId === terminalID)
-    if (tab?.type === 'terminal') {
-      for (const command of capture.feed(data)) recordCommand(tab.sessionId, command)
-    }
-  })
-}
-
 function subscribeToTheme({ term, fitAddon, containerRef, refs, reportRuntimeError }: {
   term: Terminal
   fitAddon: FitAddon
@@ -122,27 +111,6 @@ function subscribeToTheme({ term, fitAddon, containerRef, refs, reportRuntimeErr
         reportResize(refs.terminalIDRef.current, term, 'terminal theme resize error', refs.lastResizeRef)
       })
     }
-  })
-}
-
-function subscribeToScrollback(term: Terminal, reportRuntimeError: TerminalRuntimeErrorReporter) {
-  return useTerminalBehaviorStore.subscribe((state, previous) => {
-    if (state.scrollbackLines === previous.scrollbackLines) return
-    runTerminalRuntime(reportRuntimeError, 'terminal scrollback update', () => {
-      applyTerminalScrollback(term, state.scrollbackLines)
-    })
-  })
-}
-
-function subscribeToRenderer(
-  applyRenderer: (mode: TerminalRenderer) => void,
-  reportRuntimeError: TerminalRuntimeErrorReporter,
-) {
-  return useTerminalBehaviorStore.subscribe((state, previous) => {
-    if (state.renderer === previous.renderer) return
-    runTerminalRuntime(reportRuntimeError, 'terminal renderer update', () => {
-      applyRenderer(state.renderer)
-    })
   })
 }
 
@@ -216,10 +184,19 @@ function initializeTerminal(containerRef: RefObject<HTMLDivElement | null>, refs
     addonOwnedByTerminal = true
     refs.storeRef.current.registerTerminal(initialTerminalID, term)
   }
+  const commandCapture = new TerminalCommandCapture()
+  const historyPredict = installHistoryCommandPredict(term, {
+    getSessionId: () => resolveSessionId(refs),
+    getBuffer: () => commandCapture.current(),
+    applyCompletion: (suffix) => {
+      writeTerminalInput(suffix, refs)
+      commandCapture.feed(suffix)
+    },
+  })
   const focusHandler = () => runTerminalRuntime(reportRuntimeError, 'terminal pane activation', () => refs.storeRef.current.setActivePane(refs.terminalIDRef.current))
   container?.addEventListener('focusin', focusHandler)
   container?.addEventListener('pointerdown', focusHandler)
-  const dataDispose = subscribeToData(term, refs)
+  const dataDispose = subscribeToTerminalData(term, refs, commandCapture, (data) => writeTerminalInput(data, refs))
   const synchronizedOutputQueryDispose = subscribeToSynchronizedOutputQuery(term)
   const terminalVersionQueryDispose = subscribeToTerminalVersionQuery(term)
   const terminalDirectoryDispose = subscribeToTerminalWorkingDirectory(term, refs.terminalIDRef)
@@ -246,6 +223,7 @@ function initializeTerminal(containerRef: RefObject<HTMLDivElement | null>, refs
     if (refs.resizeTimerRef.current !== null) window.clearTimeout(refs.resizeTimerRef.current)
     container?.removeEventListener('focusin', focusHandler)
     container?.removeEventListener('pointerdown', focusHandler)
+    safelyDisposeTerminalResource('history predict', historyPredict.dispose)
     safelyDisposeTerminalResource('data subscription', () => dataDispose.dispose())
     safelyDisposeTerminalResource('synchronized output query', () => synchronizedOutputQueryDispose.dispose())
     safelyDisposeTerminalResource('terminal version query', () => terminalVersionQueryDispose.dispose())

@@ -1204,5 +1204,7 @@
   "渲染器": "Renderer",
   "WebGL 不可用时会自动回退到 Canvas，再失败则使用 DOM。默认 DOM。": "Falls back to Canvas when WebGL is unavailable, then to DOM. Defaults to DOM.",
   "DOM": "DOM",
-  "Canvas": "Canvas"
+  "Canvas": "Canvas",
+  "历史命令预测补全": "History command prediction",
+  "根据本会话历史命令预测当前输入，按 Tab 补全剩余内容。开启后会拦截 Tab 完成补全；默认关闭。": "Predict the current input from this session's command history and complete the rest with Tab. When enabled, Tab is intercepted for completion. Off by default."
 }

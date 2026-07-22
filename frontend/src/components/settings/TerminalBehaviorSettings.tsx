@@ -22,11 +22,13 @@ interface Props {
   scrollbackLines: number | string
   autoReconnect: boolean
   restoreTabsOnStartup: boolean
+  historyPredict: boolean
   onRightClickActionChange: (value: TerminalRightClickAction) => void
   onCopyOnSelectChange: (value: boolean) => void
   onScrollbackLinesChange: (value: number) => void
   onAutoReconnectChange: (value: boolean) => void
   onRestoreTabsOnStartupChange: (value: boolean) => void
+  onHistoryPredictChange: (value: boolean) => void
 }
 
 export function TerminalBehaviorSettingsSection({
@@ -35,11 +37,13 @@ export function TerminalBehaviorSettingsSection({
   scrollbackLines,
   autoReconnect,
   restoreTabsOnStartup,
+  historyPredict,
   onRightClickActionChange,
   onCopyOnSelectChange,
   onScrollbackLinesChange,
   onAutoReconnectChange,
   onRestoreTabsOnStartupChange,
+  onHistoryPredictChange,
 }: Props) {
   return (
     <section className="rounded-xl border border-border bg-card p-3 shadow-sm">
@@ -129,6 +133,19 @@ export function TerminalBehaviorSettingsSection({
             id="terminal-restore-tabs"
             checked={restoreTabsOnStartup}
             onCheckedChange={(value) => onRestoreTabsOnStartupChange(value)}
+          />
+        </Field>
+        <Field orientation="horizontal">
+          <FieldContent>
+            <FieldLabel htmlFor="terminal-history-predict">{t('历史命令预测补全')}</FieldLabel>
+            <FieldDescription>
+              {t('根据本会话历史命令预测当前输入，按 Tab 补全剩余内容。开启后会拦截 Tab 完成补全；默认关闭。')}
+            </FieldDescription>
+          </FieldContent>
+          <Switch
+            id="terminal-history-predict"
+            checked={historyPredict}
+            onCheckedChange={(value) => onHistoryPredictChange(value)}
           />
         </Field>
       </div>

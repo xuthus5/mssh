@@ -51,6 +51,7 @@ vi.mock('@xterm/xterm', () => ({
       if (!this.allowProposedApi) throw new Error('you must set the allowProposedApi option to true to use proposed api')
       return this.unicodeApi
     }
+    attachCustomKeyEventHandler() { return true }
     onData() {
       const dispose = vi.fn()
       dataDisposes.push(dispose)
@@ -180,7 +181,7 @@ describe('useTerminal', () => {
     proposedDimensions = []
     canvasLoadFailure = false
     Object.defineProperty(document, 'fonts', { configurable: true, value: undefined })
-    useTerminalBehaviorStore.setState({ rightClickAction: 'menu', copyOnSelect: false, autoReconnect: false, restoreTabsOnStartup: true, scrollbackLines: 10000, renderer: 'dom' })
+    useTerminalBehaviorStore.setState({ rightClickAction: 'menu', copyOnSelect: false, autoReconnect: false, restoreTabsOnStartup: true, scrollbackLines: 10000, renderer: 'dom', historyPredict: false })
     vi.stubGlobal('ResizeObserver', class {
       observe() {}
       disconnect = vi.fn()
@@ -210,7 +211,7 @@ describe('useTerminal', () => {
 
     const { unmount } = renderHook(() => useTerminal('term-1', containerRef, { active: true, focusRequest: { sequence: 0 } }))
 
-    expect(calls).toEqual(['open', 'load:canvas', 'load:unicode11', 'load:search', 'load:fit'])
+    expect(calls).toEqual(['open', 'load:unicode11', 'load:search', 'load:fit'])
     expect(terminalOptions[0]).toEqual(expect.objectContaining({ allowProposedApi: true, cursorInactiveStyle: 'none' }))
     expect(getTerminalSearch('term-1')).not.toBeNull()
     expect(selectionDisposes).toHaveLength(1)
@@ -249,13 +250,14 @@ describe('useTerminal', () => {
   it('falls back to the DOM renderer when canvas activation fails', () => {
     const warn = vi.spyOn(logger, 'warn').mockImplementation(() => {})
     canvasLoadFailure = true
+    useTerminalBehaviorStore.setState({ renderer: 'canvas' })
     const containerRef = createRef<HTMLDivElement>()
     containerRef.current = document.createElement('div')
 
     const { unmount } = renderHook(() => useTerminal('term-canvas-fallback', containerRef, { active: false, focusRequest: { sequence: 0 } }))
 
     expect(calls).toEqual(['open', 'load:canvas', 'load:unicode11', 'load:search', 'load:fit', 'blur'])
-    expect(warn).toHaveBeenCalledWith('terminal canvas renderer unavailable, using DOM renderer', expect.objectContaining({ message: 'canvas unavailable' }))
+    expect(warn).toHaveBeenCalledWith('terminal canvas renderer unavailable', expect.objectContaining({ message: 'canvas unavailable' }))
     act(() => unmount())
     expect(canvasDisposes[0]).toHaveBeenCalledOnce()
   })

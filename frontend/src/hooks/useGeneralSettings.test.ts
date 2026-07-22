@@ -6,10 +6,15 @@ import { useAppStore } from '@/store/appStore'
 import { __clearHandlers, __emitEvent, __registerHandler } from '@/test/__mocks__/wails-runtime'
 import { SETTINGS_GENERAL_CHANGED_EVENT, SETTINGS_GENERAL_PREVIEW_EVENT, SETTINGS_PREVIEW_CANCELLED_EVENT } from '@/lib/settingsWindowEvents'
 
+function setting(key: string, value: unknown) {
+  return { key, namespace: key.split('.')[0], value: JSON.stringify(value), value_type: typeof value, version: 1, updated_at: '' }
+}
+
 const savedGeneral = {
   maxPoolSize: 24, defaultKeepAlive: 90, defaultTermType: 'xterm',
   uiFontFamily: 'Arial', uiFontFallbackFamily: 'Segoe UI', uiFontSize: 18,
   rightClickAction: 'paste' as const, copyOnSelect: true, scrollbackLines: 10000, autoReconnect: false, restoreTabsOnStartup: true, renderer: 'dom' as const,
+  historyPredict: false,
   closeButtonAction: 'exit' as const,
   logDir: '/tmp/mssh-logs',
   logRetentionDays: 14,
@@ -166,11 +171,6 @@ describe('useGeneralSettings cross-window sync', () => {
     }))
     expect(result.current.general.scrollbackLines).toBe(100000)
   })
-})
-
-function setting(key: string, value: unknown) {
-  return { key, namespace: key.split('.')[0], value: JSON.stringify(value), value_type: typeof value, version: 1, updated_at: '' }
-}
 
   it('loads and persists auto reconnect and restore tabs preferences', async () => {
     const setMany = vi.fn(async () => {})
@@ -211,3 +211,20 @@ function setting(key: string, value: unknown) {
     expect(result.current.general.renderer).toBe('canvas')
   })
 
+  it('loads and persists history predict preference', async () => {
+    const setMany = vi.fn(async () => {})
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.GetMany', async () => ({
+      'terminal.history_predict': setting('terminal.history_predict', true),
+    }))
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.SetMany', setMany)
+    __registerHandler('github.com/xuthus5/mssh/internal/service.TerminalService.SetMaxSize', async () => {})
+    const { result } = renderHook(() => useGeneralSettings())
+    await waitFor(() => expect(result.current.general.historyPredict).toBe(true))
+    await act(async () => {
+      await result.current.saveGeneral({ ...savedGeneral, historyPredict: true })
+    })
+    expect(setMany).toHaveBeenCalledWith(expect.arrayContaining([
+      expect.objectContaining({ key: 'terminal.history_predict', value: 'true' }),
+    ]))
+  })
+})
