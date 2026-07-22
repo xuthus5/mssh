@@ -4,6 +4,7 @@ import { GeneralSettingsPanel } from '@/components/settings/GeneralSettingsPanel
 import { TerminalSettingsPanel } from '@/components/settings/TerminalSettingsPanel'
 import { SyncPanel } from '@/components/settings/SyncPanel'
 import { AboutPanel } from '@/components/settings/AboutPanel'
+import { ShortcutSettingsPanel } from '@/components/settings/ShortcutSettingsPanel'
 import { SecurityPanel } from '@/components/settings/SecurityPanel'
 import { SFTPSettingsPanel } from '@/components/settings/SFTPSettingsPanel'
 import { AISettingsPanel } from '@/components/settings/AISettingsPanel'
@@ -91,6 +92,9 @@ function SettingsTabPanels(props: SettingsViewProps) {
       <TabsContent value="sftp" className="min-h-0 min-w-0 overflow-y-auto overscroll-contain pr-2">
         <SFTPSettingsPanel settings={props.sftpSettings} onSave={props.onSaveSFTPSettings} />
       </TabsContent>
+      <TabsContent value="shortcuts" className="min-h-0 min-w-0 overflow-y-auto overscroll-contain pr-2">
+        <ShortcutSettingsPanel />
+      </TabsContent>
       <TabsContent value="about" className="min-h-0 min-w-0 overflow-y-auto overscroll-contain pr-2">
         <AboutPanel />
       </TabsContent>
@@ -114,6 +118,7 @@ export function SettingsView(props: SettingsViewProps) {
         <TabsTrigger value="sync">{t('同步')}</TabsTrigger>
         <TabsTrigger value="security">{t('安全')}</TabsTrigger>
         <TabsTrigger value="sftp">SFTP</TabsTrigger>
+        <TabsTrigger value="shortcuts">{t('快捷键')}</TabsTrigger>
         <TabsTrigger value="about">{t('关于')}</TabsTrigger>
       </TabsList>
       <SettingsTabPanels {...props} />
