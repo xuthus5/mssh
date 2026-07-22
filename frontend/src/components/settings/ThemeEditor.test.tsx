@@ -1,7 +1,7 @@
 import type { ComponentProps } from 'react'
-import { act, render, screen } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ThemeEditor } from '@/components/settings/ThemeEditor'
 import { useToastStore } from '@/components/ui/toast'
 
@@ -14,7 +14,14 @@ const globalStyle = { font_family: 'Global Font', font_size: 16, cursor_style: '
 type ThemeEditorProps = ComponentProps<typeof ThemeEditor>
 
 describe('ThemeEditor dual mode profiles', () => {
-  beforeEach(() => useToastStore.setState({ toasts: [] }))
+  beforeEach(() => {
+    useToastStore.setState({ toasts: [] })
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+  })
+  afterEach(() => {
+    vi.runOnlyPendingTimers()
+    vi.useRealTimers()
+  })
 
   it('renders separate Dark and Light selectors', () => {
     renderEditor()
@@ -46,7 +53,7 @@ describe('ThemeEditor dual mode profiles', () => {
     await userEvent.type(screen.getByLabelText('全局选区背景色 HEX'), '#4f46e5')
     expect(screen.getByTestId('terminal-theme-preview')).toHaveStyle({ fontFamily: 'Cascadia Code' })
     expect(screen.getByTestId('terminal-selection-preview')).toHaveStyle({ backgroundColor: '#4f46e5' })
-    await userEvent.click(screen.getByRole('button', { name: '保存主题配置' }))
+    await vi.advanceTimersByTimeAsync(700)
 
     expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
       global_style: { font_family: 'Cascadia Code', font_size: 16, cursor_style: 'underline', selection_background: '#4f46e5' },
@@ -62,7 +69,7 @@ describe('ThemeEditor dual mode profiles', () => {
     await userEvent.clear(screen.getByLabelText('主题字体'))
     await userEvent.type(screen.getByLabelText('主题字体'), 'Profile Font')
     expect(screen.getByTestId('terminal-theme-preview')).toHaveStyle({ fontFamily: 'Profile Font' })
-    await userEvent.click(screen.getByRole('button', { name: '保存主题配置' }))
+    await vi.advanceTimersByTimeAsync(700)
 
     expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
       profiles: expect.arrayContaining([expect.objectContaining({ id: 1, follow_global_style: false, font_family: 'Profile Font' })]),
@@ -77,7 +84,7 @@ describe('ThemeEditor dual mode profiles', () => {
     await userEvent.clear(screen.getByLabelText('主题选区背景色 HEX'))
     await userEvent.type(screen.getByLabelText('主题选区背景色 HEX'), '#4f46e5')
     expect(screen.getByTestId('terminal-selection-preview')).toHaveStyle({ backgroundColor: '#4f46e5' })
-    await userEvent.click(screen.getByRole('button', { name: '保存主题配置' }))
+    await vi.advanceTimersByTimeAsync(700)
 
     const configuration = onSave.mock.calls[0]?.[0]
     if (!configuration) throw new Error('theme configuration was not saved')
@@ -87,23 +94,20 @@ describe('ThemeEditor dual mode profiles', () => {
   })
 
   it('prevents saving invalid global and Profile style drafts', async () => {
-    renderEditor()
-    const saveButton = screen.getByRole('button', { name: '保存主题配置' })
+    const onSave = vi.fn(async () => {})
+    renderEditor({ onSave })
 
     await userEvent.clear(screen.getByLabelText('全局终端字号'))
-    expect(saveButton).toBeDisabled()
+    await vi.advanceTimersByTimeAsync(700)
+    expect(onSave).not.toHaveBeenCalled()
+    expect(screen.getByText(/自动保存已暂停/)).toBeInTheDocument()
+
     await userEvent.type(screen.getByLabelText('全局终端字号'), '16')
-    expect(saveButton).toBeEnabled()
-
     await userEvent.clear(screen.getByLabelText('全局选区背景色 HEX'))
-    expect(saveButton).toBeDisabled()
-    await userEvent.type(screen.getByLabelText('全局选区背景色 HEX'), '#123456')
-    expect(saveButton).toBeEnabled()
-
-    await userEvent.click(screen.getByRole('switch', { name: '跟随全局字体与光标' }))
-    await userEvent.clear(screen.getByLabelText('主题字号'))
-    expect(saveButton).toBeDisabled()
+    await vi.advanceTimersByTimeAsync(700)
+    expect(onSave).not.toHaveBeenCalled()
   })
+
 
   it('uses the current Light Profile when follow mode is disabled for the first time', async () => {
     const onSave = vi.fn(async () => {})
@@ -113,7 +117,7 @@ describe('ThemeEditor dual mode profiles', () => {
 
     expect(screen.getByRole('combobox', { name: '固定终端主题' })).toHaveValue('GitHub Light')
     expect(screen.queryByRole('tab', { name: 'Dark Mode' })).not.toBeInTheDocument()
-    await userEvent.click(screen.getByRole('button', { name: '保存主题配置' }))
+    await vi.advanceTimersByTimeAsync(700)
     expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
       assignments: { dark_profile_id: 1, light_profile_id: 2, follow_interface_mode: false, fixed_profile_id: 2 },
       profiles: expect.arrayContaining([expect.objectContaining({ id: 1 }), expect.objectContaining({ id: 2 })]),
@@ -139,7 +143,7 @@ describe('ThemeEditor dual mode profiles', () => {
     expect(screen.getByLabelText('背景色 HEX')).toHaveValue('#ffffff')
     await userEvent.clear(screen.getByLabelText('背景色 HEX'))
     await userEvent.type(screen.getByLabelText('背景色 HEX'), '#fefefe')
-    await userEvent.click(screen.getByRole('button', { name: '保存主题配置' }))
+    await vi.advanceTimersByTimeAsync(700)
 
     expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
       profiles: expect.arrayContaining([
@@ -158,7 +162,7 @@ describe('ThemeEditor dual mode profiles', () => {
     await userEvent.type(input, 'Dracula')
     await userEvent.click(await screen.findByRole('option', { name: /Dracula/ }))
     expect(screen.getByLabelText('背景色 HEX')).toHaveValue('#282a36')
-    await userEvent.click(screen.getByRole('button', { name: '保存主题配置' }))
+    await vi.advanceTimersByTimeAsync(700)
     expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ assignments: { dark_profile_id: 3, light_profile_id: 2, follow_interface_mode: true, fixed_profile_id: 0 } }))
   })
 
@@ -195,14 +199,20 @@ describe('ThemeEditor dual mode profiles', () => {
   })
 
   it('keeps edited colors when saving fails', async () => {
-    renderEditor({ onSave: vi.fn(async () => { throw new Error('db failed') }) })
+    const onSave = vi.fn(async () => { throw new Error('db failed') })
+    renderEditor({ onSave })
     await userEvent.clear(screen.getByLabelText('背景色 HEX'))
     await userEvent.type(screen.getByLabelText('背景色 HEX'), '#123456')
 
-    await userEvent.click(screen.getByRole('button', { name: '保存主题配置' }))
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(700)
+    })
 
     expect(screen.getByLabelText('背景色 HEX')).toHaveValue('#123456')
-    expect(useToastStore.getState().toasts.at(-1)?.message).toBe('保存终端主题失败: db failed')
+    await waitFor(() => {
+      expect(onSave).toHaveBeenCalled()
+      expect(screen.getByText(/自动保存失败/)).toBeInTheDocument()
+    })
   })
 
   it('disables reset while a save request is pending', async () => {
@@ -210,32 +220,33 @@ describe('ThemeEditor dual mode profiles', () => {
     const onSave = vi.fn(() => new Promise<void>((resolve) => { resolveSave = resolve }))
     renderEditor({ onSave })
 
-    await userEvent.click(screen.getByRole('button', { name: '保存主题配置' }))
+    await userEvent.clear(screen.getByLabelText('全局终端字体'))
+    await userEvent.type(screen.getByLabelText('全局终端字体'), 'Pending Font')
+    await vi.advanceTimersByTimeAsync(700)
 
     expect(screen.getByRole('button', { name: '重置内置主题' })).toBeDisabled()
     await act(async () => { resolveSave?.() })
   })
 
-  it('keeps save disabled when a historical fixed Profile draft is invalid', async () => {
-    renderEditor({ assignments: { dark_profile_id: 1, light_profile_id: 2, follow_interface_mode: true, fixed_profile_id: 3 } })
+  it('pauses auto-save when a historical fixed Profile draft is invalid', async () => {
+    const onSave = vi.fn(async () => {})
+    renderEditor({ onSave, assignments: { dark_profile_id: 1, light_profile_id: 2, follow_interface_mode: true, fixed_profile_id: 3 } })
     await userEvent.click(screen.getByRole('switch', { name: '跟随界面模式' }))
     await userEvent.clear(screen.getByLabelText('背景色 HEX'))
     await userEvent.type(screen.getByLabelText('背景色 HEX'), '#123')
-    await userEvent.click(screen.getByRole('switch', { name: '跟随界面模式' }))
-
-    const saveButton = document.querySelector('button[type="submit"]')
-    expect(saveButton).toBeDisabled()
+    await vi.advanceTimersByTimeAsync(700)
+    expect(onSave).not.toHaveBeenCalled()
+    expect(screen.getByText(/自动保存已暂停/)).toBeInTheDocument()
   })
 
-  it('disables save while a reset request is pending', async () => {
+  it('disables theme editing controls while a reset request is pending', async () => {
     let resolveReset: ((result: { dark_reset: boolean; light_reset: boolean; fixed_reset: boolean }) => void) | undefined
     const onResetBuiltins = vi.fn(() => new Promise<{ dark_reset: boolean; light_reset: boolean; fixed_reset: boolean }>((resolve) => { resolveReset = resolve }))
     renderEditor({ onResetBuiltins })
     await userEvent.click(screen.getByRole('button', { name: '重置内置主题' }))
     await userEvent.click(screen.getByRole('button', { name: '确认重置' }))
 
-    const saveButton = document.querySelector('button[type="submit"]')
-    expect(saveButton).toBeDisabled()
+    expect(screen.getByLabelText('全局终端字体')).toBeDisabled()
     await act(async () => { resolveReset?.({ dark_reset: true, light_reset: true, fixed_reset: false }) })
   })
 
@@ -251,16 +262,18 @@ describe('ThemeEditor dual mode profiles', () => {
   })
 
   it('disables reset while the editor has unsaved changes', async () => {
-    renderEditor()
+    const onSave = vi.fn(() => new Promise<void>(() => {}))
+    renderEditor({ onSave })
     await userEvent.clear(screen.getByLabelText('背景色 HEX'))
     await userEvent.type(screen.getByLabelText('背景色 HEX'), '#123456')
 
+    // Before debounce flush, dirty draft disables reset; after pending save starts, still disabled.
     const button = screen.getByRole('button', { name: '重置内置主题' })
     expect(button).toBeDisabled()
     const trigger = button.closest('[data-slot="tooltip-trigger"]')
     if (!trigger) throw new Error('reset tooltip trigger not found')
     await userEvent.hover(trigger)
-    expect(await screen.findByText('请先保存或撤销当前主题修改')).toBeInTheDocument()
+    expect(await screen.findByText(/请先保存|正在保存主题配置/)).toBeInTheDocument()
   })
 
   it('prevents duplicate reset submissions while the request is pending', async () => {

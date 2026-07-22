@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { SettingsView } from '@/components/settings/SettingsView'
 import { CursorStyle } from '../../../bindings/github.com/xuthus5/mssh/internal/model/models'
 
@@ -68,6 +68,14 @@ function themeProfile(id: number, mode: 'dark' | 'light', background: string): a
 }
 
 describe('SettingsView', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+  })
+  afterEach(() => {
+    vi.runOnlyPendingTimers()
+    vi.useRealTimers()
+  })
+
   it('uses the terminal category for terminal theme settings', async () => {
     render(<SettingsView {...settingsProps()} />)
 
@@ -87,7 +95,7 @@ describe('SettingsView', () => {
     await user.click(screen.getByRole('switch', { name: '显示隐藏文件' }))
     await user.click(screen.getByRole('switch', { name: '追随终端目录' }))
     await user.click(screen.getByRole('button', { name: '树状视图' }))
-    await user.click(screen.getByRole('button', { name: '保存 SFTP 设置' }))
+    await flushAutoSave(user)
 
     expect(props.onSaveSFTPSettings).toHaveBeenCalledWith({
       showHiddenFiles: true,
@@ -134,7 +142,7 @@ describe('SettingsView', () => {
     await userEvent.type(screen.getByLabelText('界面字号'), '18')
 
     expect(props.onPreviewUIFont).toHaveBeenLastCalledWith('Microsoft YaHei', 'Segoe UI', 18)
-    await userEvent.click(screen.getByRole('button', { name: '保存' }))
+    await flushAutoSave()
     expect(props.onSaveGeneral).toHaveBeenCalledWith(expect.objectContaining({
       uiFontFamily: 'Microsoft YaHei',
       uiFontSize: 18,
@@ -162,7 +170,7 @@ describe('SettingsView', () => {
     await user.click(await screen.findByRole('option', { name: '粘贴' }))
     await user.click(screen.getByRole('switch', { name: '选择即复制' }))
     fireEvent.change(screen.getByRole('spinbutton', { name: '滚动历史行数' }), { target: { value: '8000' } })
-    await user.click(screen.getByRole('button', { name: '保存' }))
+    await flushAutoSave(user)
 
     expect(props.onSaveGeneral).toHaveBeenCalledWith(expect.objectContaining({
       maxPoolSize: 24,
@@ -181,7 +189,7 @@ describe('SettingsView', () => {
 
     await user.click(screen.getByRole('combobox', { name: '关闭按钮行为' }))
     await user.click(await screen.findByRole('option', { name: '关闭应用' }))
-    await user.click(screen.getByRole('button', { name: '保存' }))
+    await flushAutoSave(user)
 
     expect(props.onSaveGeneral).toHaveBeenCalledWith(expect.objectContaining({ closeButtonAction: 'exit' as const, language: 'zh-CN' as const }))
   })
@@ -196,7 +204,7 @@ describe('SettingsView', () => {
     await userEvent.click(await screen.findByRole('option', { name: 'Microsoft YaHei' }))
 
     expect(props.onPreviewUIFont).toHaveBeenLastCalledWith('Arial', 'Microsoft YaHei', 14)
-    await userEvent.click(screen.getByRole('button', { name: '保存' }))
+    await flushAutoSave()
     expect(props.onSaveGeneral).toHaveBeenCalledWith(expect.objectContaining({ uiFontFallbackFamily: 'Microsoft YaHei' }))
   })
 
@@ -212,3 +220,9 @@ describe('SettingsView', () => {
     expect(props.onPreviewUIFont).toHaveBeenLastCalledWith('Segoe UI', 'sans-serif', 14)
   })
 })
+
+async function flushAutoSave(user?: ReturnType<typeof userEvent.setup>) {
+  await vi.advanceTimersByTimeAsync(600)
+  await Promise.resolve()
+  if (user) await Promise.resolve()
+}

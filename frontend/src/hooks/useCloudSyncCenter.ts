@@ -15,7 +15,7 @@ export interface CloudSyncController {
   pending: string | null
   error: string | null
   reload: () => Promise<void>
-  saveConfig: (input: SyncConfigInput) => Promise<void>
+  saveConfig: (input: SyncConfigInput, options?: { quiet?: boolean }) => Promise<void>
   testProvider: (input: SyncConfigInput) => Promise<void>
   syncNow: () => Promise<void>
   pushNow: () => Promise<void>
@@ -44,17 +44,17 @@ export function useCloudSyncCenter(): CloudSyncController {
     }
   }, [])
 
-  const execute = useCallback(async (operation: { name: string; success: string; action: () => Promise<unknown>; refresh?: boolean }) => {
+  const execute = useCallback(async (operation: { name: string; success: string; action: () => Promise<unknown>; refresh?: boolean; quiet?: boolean }) => {
     setPending(operation.name)
     setError(null)
     try {
       await operation.action()
       if (operation.refresh !== false) await reload()
-      toast(operation.success, 'success')
+      if (!operation.quiet) toast(operation.success, 'success')
     } catch (actionError) {
       const message = errorMessage(actionError)
       setError(message)
-      toast(t('${}失败: ${}', operation.success.replace(/成功|完成/g, ''), message), 'error')
+      if (!operation.quiet) toast(t('${}失败: ${}', operation.success.replace(/成功|完成/g, ''), message), 'error')
       logger.error(`cloud sync ${operation.name} failed`, actionError)
       throw actionError
     } finally {
@@ -67,7 +67,7 @@ export function useCloudSyncCenter(): CloudSyncController {
 
   return {
     dashboard, loading, pending, error, reload,
-    saveConfig: (input) => execute({ name: 'save', success: t('同步配置已保存'), action: () => SyncService.SaveConfig(input) }),
+    saveConfig: (input, options) => execute({ name: 'save', success: t('同步配置已保存'), action: () => SyncService.SaveConfig(input), quiet: options?.quiet === true }),
     testProvider: (input) => execute({ name: 'test', success: t('连接测试成功'), action: () => SyncService.TestProvider(input), refresh: false }),
     syncNow: () => execute({ name: 'sync', success: t('同步完成'), action: () => SyncService.SyncNow() }),
     pushNow: () => execute({ name: 'push', success: t('本地版本已推送'), action: () => SyncService.PushNow() }),

@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react'
-import { Cloud, Database, Eye, EyeOff, GitFork, PlugZap, Save } from 'lucide-react'
+import { Cloud, Database, Eye, EyeOff, GitFork, PlugZap } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -17,7 +17,6 @@ interface Props {
   pending: string | null
   error: string | null
   onChange: (input: SyncConfigInput) => void
-  onSave: () => Promise<void>
   onTest: () => Promise<void>
 }
 
@@ -41,7 +40,6 @@ export function SyncProviderTab(props: Props) {
     {props.error && <Alert variant="destructive"><AlertDescription>{props.error}</AlertDescription></Alert>}
     <div className="flex flex-wrap justify-end gap-2 border-t border-border pt-4">
       <Button type="button" variant="outline" disabled={props.pending !== null} onClick={() => void props.onTest().catch(() => undefined)}><PlugZap data-icon="inline-start" />{t('测试连接')}</Button>
-      <Button type="button" disabled={props.pending !== null} onClick={() => void props.onSave().catch(() => undefined)}><Save data-icon="inline-start" />{t('保存配置')}</Button>
     </div>
   </div>
 }
