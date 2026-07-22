@@ -9,6 +9,7 @@ import (
 
 	"github.com/xuthus5/mssh/internal/applog"
 	"github.com/xuthus5/mssh/internal/crypto"
+	"github.com/xuthus5/mssh/internal/netproxy"
 	"github.com/xuthus5/mssh/internal/service"
 	"github.com/xuthus5/mssh/internal/store"
 	"github.com/xuthus5/mssh/pkg/event"
@@ -40,9 +41,10 @@ type App struct {
 }
 
 type Options struct {
-	DataDir    string
-	Logger     *slog.Logger
-	LogManager *applog.Manager
+	DataDir      string
+	Logger       *slog.Logger
+	LogManager   *applog.Manager
+	ProxyManager *netproxy.Manager
 }
 
 func New(opts Options) (*App, error) {
@@ -181,14 +183,15 @@ func newSyncService(input serviceInitialization, runtime *service.CryptoRuntime,
 		}),
 		service.WithVaultInstaller(securitySvc.InstallVaultFromExport),
 		service.WithSyncEventBus(input.eventBus),
-		service.WithSyncLifecycle(syncLifecycleAdapter{terminal: terminalSvc, tunnel: tunnelSvc, session: sessionSvc}))
+		service.WithSyncLifecycle(syncLifecycleAdapter{terminal: terminalSvc, tunnel: tunnelSvc, session: sessionSvc}),
+		service.WithSyncProxy(input.opts.ProxyManager))
 }
 
 func newSettingService(input serviceInitialization) *service.SettingService {
-	if input.opts.LogManager != nil {
-		return service.NewSettingService(input.db, input.logger, input.opts.LogManager)
-	}
-	return service.NewSettingService(input.db, input.logger)
+	return service.NewSettingService(input.db, input.logger, service.SettingServiceOptions{
+		Log:   input.opts.LogManager,
+		Proxy: input.opts.ProxyManager,
+	})
 }
 
 func assembleApp(input serviceInitialization, runtime *service.CryptoRuntime, securitySvc *service.SecurityService, sessionSvc *service.SessionService, terminalSvc *service.TerminalService, tunnelSvc *service.TunnelService, logSvc *service.LogService, themeSvc *service.ThemeService, syncSvc *service.SyncService) *App {
@@ -206,11 +209,11 @@ func assembleApp(input serviceInitialization, runtime *service.CryptoRuntime, se
 		Log:            logSvc,
 		Sync:           syncSvc,
 		Setting:        newSettingService(input),
-		About:          service.NewAboutService(),
+		About:          service.NewAboutService(input.opts.ProxyManager),
 		Font:           service.NewFontService(input.logger),
 		Audit:          service.NewAuditService(input.db, input.logger),
 		AssetCatalog:   service.NewAssetCatalogService(input.db, input.logger),
-		AI:             service.NewAIService(input.db, terminalSvc, input.keychain, input.logger),
+		AI:             service.NewAIService(input.db, terminalSvc, input.keychain, input.logger, input.opts.ProxyManager),
 		Security:       securitySvc,
 		logger:         input.logger,
 	}

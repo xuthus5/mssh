@@ -12,6 +12,7 @@ import (
 
 	"github.com/xuthus5/mssh/internal/crypto"
 	"github.com/xuthus5/mssh/internal/model"
+	"github.com/xuthus5/mssh/internal/netproxy"
 	"github.com/xuthus5/mssh/internal/store"
 )
 
@@ -28,12 +29,12 @@ type AIService struct {
 	logger     *slog.Logger
 }
 
-func NewAIService(db *sql.DB, terminals *TerminalService, keychain crypto.KeychainAdapter, logger *slog.Logger) *AIService {
+func NewAIService(db *sql.DB, terminals *TerminalService, keychain crypto.KeychainAdapter, logger *slog.Logger, proxy ...*netproxy.Manager) *AIService {
 	var terminalController aiTerminalWriter
 	if terminals != nil {
 		terminalController = terminals
 	}
-	return &AIService{db: db, terminals: terminalController, secrets: newAISecretStore(keychain), httpClient: &http.Client{Timeout: 45 * time.Second}, logger: logger}
+	return &AIService{db: db, terminals: terminalController, secrets: newAISecretStore(keychain), httpClient: sharedHTTPClient(45*time.Second, firstProxy(proxy...)), logger: logger}
 }
 
 func (s *AIService) Dashboard() (model.AISettingsDashboard, error) {

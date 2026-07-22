@@ -10,8 +10,9 @@ import (
 )
 
 type SettingService struct {
-	db  *sql.DB
-	log LogConfigurer
+	db    *sql.DB
+	log   LogConfigurer
+	proxy ProxyConfigurer
 }
 
 func (s *SettingService) Get(key string) (*model.Setting, error) {
@@ -54,10 +55,16 @@ func (s *SettingService) Set(setting model.SettingInput) error {
 	if err := rejectBlockedSettingKey(entry.Key); err != nil {
 		return err
 	}
+	if err := s.validateRuntimeSettings([]model.Setting{entry}); err != nil {
+		return err
+	}
 	if err := store.SetSettings(s.db, []model.Setting{entry}); err != nil {
 		return err
 	}
-	return s.applyLogSettings([]model.Setting{entry})
+	if err := s.applyLogSettings([]model.Setting{entry}); err != nil {
+		return err
+	}
+	return s.applyProxySettings([]model.Setting{entry})
 }
 
 func (s *SettingService) SetMany(settings []model.SettingInput) error {
@@ -68,10 +75,16 @@ func (s *SettingService) SetMany(settings []model.SettingInput) error {
 	if err := rejectBlockedSettings(entries); err != nil {
 		return err
 	}
+	if err := s.validateRuntimeSettings(entries); err != nil {
+		return err
+	}
 	if err := store.SetSettings(s.db, entries); err != nil {
 		return err
 	}
-	return s.applyLogSettings(entries)
+	if err := s.applyLogSettings(entries); err != nil {
+		return err
+	}
+	return s.applyProxySettings(entries)
 }
 
 func (s *SettingService) Delete(key string) error {
@@ -81,10 +94,31 @@ func (s *SettingService) Delete(key string) error {
 	return store.DeleteSetting(s.db, key)
 }
 
-func NewSettingService(db *sql.DB, _ *slog.Logger, log ...LogConfigurer) *SettingService {
+type SettingServiceOptions struct {
+	Log   LogConfigurer
+	Proxy ProxyConfigurer
+}
+
+func NewSettingService(db *sql.DB, _ *slog.Logger, options ...any) *SettingService {
 	service := &SettingService{db: db}
-	if len(log) > 0 && !isNilLogConfigurer(log[0]) {
-		service.log = log[0]
+	for _, option := range options {
+		switch value := option.(type) {
+		case LogConfigurer:
+			if !isNilLogConfigurer(value) {
+				service.log = value
+			}
+		case ProxyConfigurer:
+			if value != nil {
+				service.proxy = value
+			}
+		case SettingServiceOptions:
+			if !isNilLogConfigurer(value.Log) {
+				service.log = value.Log
+			}
+			if value.Proxy != nil {
+				service.proxy = value.Proxy
+			}
+		}
 	}
 	return service
 }

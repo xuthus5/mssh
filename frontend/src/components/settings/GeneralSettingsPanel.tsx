@@ -6,6 +6,7 @@ import { SearchableSelect } from '@/components/ui/searchable-select'
 import { TerminalBehaviorSettingsSection } from '@/components/settings/TerminalBehaviorSettings'
 import { ApplicationBehaviorSettingsSection } from '@/components/settings/ApplicationBehaviorSettings'
 import { ApplicationLogSettingsSection } from '@/components/settings/ApplicationLogSettings'
+import { ApplicationNetworkProxySettingsSection } from '@/components/settings/ApplicationNetworkProxySettings'
 import type { GeneralSettings } from '@/hooks/useSettings'
 import { t } from '@/i18n'
 
@@ -25,6 +26,11 @@ interface GeneralDraft {
   closeButtonAction: GeneralSettings['closeButtonAction']
   logDir: string
   logRetentionDays: string
+  proxyMode: GeneralSettings['proxyMode']
+  proxyURL: string
+  proxyNoProxy: string
+  proxyUsername: string
+  proxyPassword: string
   language: GeneralSettings['language']
 }
 
@@ -46,6 +52,11 @@ function createDraft(general: GeneralSettings): GeneralDraft {
     closeButtonAction: general.closeButtonAction,
     logDir: general.logDir,
     logRetentionDays: String(general.logRetentionDays),
+    proxyMode: general.proxyMode,
+    proxyURL: general.proxyURL,
+    proxyNoProxy: general.proxyNoProxy,
+    proxyUsername: general.proxyUsername,
+    proxyPassword: general.proxyPassword,
     language: general.language,
   }
 }
@@ -133,7 +144,7 @@ export function GeneralSettingsPanel({ general, systemFonts, onSave, onPreviewUI
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault(); setSaving(true)
     try {
-      await onSave({ maxPoolSize: parseInt(draft.maxPoolSize, 10) || 10, defaultKeepAlive: parseInt(draft.defaultKeepAlive, 10) || 60, defaultTermType: draft.defaultTermType, uiFontFamily: draft.uiFontFamily, uiFontFallbackFamily: draft.uiFontFallbackFamily, uiFontSize: parseInt(draft.uiFontSize, 10) || 14, rightClickAction: draft.rightClickAction, copyOnSelect: draft.copyOnSelect, scrollbackLines: parseInt(draft.scrollbackLines, 10) || 10000, closeButtonAction: draft.closeButtonAction, logDir: draft.logDir.trim(), logRetentionDays: parseInt(draft.logRetentionDays, 10) || 30, language: draft.language })
+      await onSave({ maxPoolSize: parseInt(draft.maxPoolSize, 10) || 10, defaultKeepAlive: parseInt(draft.defaultKeepAlive, 10) || 60, defaultTermType: draft.defaultTermType, uiFontFamily: draft.uiFontFamily, uiFontFallbackFamily: draft.uiFontFallbackFamily, uiFontSize: parseInt(draft.uiFontSize, 10) || 14, rightClickAction: draft.rightClickAction, copyOnSelect: draft.copyOnSelect, scrollbackLines: parseInt(draft.scrollbackLines, 10) || 10000, closeButtonAction: draft.closeButtonAction, logDir: draft.logDir.trim(), logRetentionDays: parseInt(draft.logRetentionDays, 10) || 30, proxyMode: draft.proxyMode, proxyURL: draft.proxyURL.trim(), proxyNoProxy: draft.proxyNoProxy.trim(), proxyUsername: draft.proxyUsername.trim(), proxyPassword: draft.proxyPassword, language: draft.language })
     } finally { setSaving(false) }
   }
   return <form onSubmit={handleSubmit} className="flex flex-col gap-3 pt-2">
@@ -141,6 +152,18 @@ export function GeneralSettingsPanel({ general, systemFonts, onSave, onPreviewUI
     <LanguageSettings draft={draft} setDraft={setDraft} />
     <ApplicationBehaviorSettingsSection closeButtonAction={draft.closeButtonAction} onCloseButtonActionChange={(value) => setDraft({ ...draft, closeButtonAction: value })} />
     <ApplicationLogSettingsSection logDir={draft.logDir} logRetentionDays={draft.logRetentionDays} onLogDirChange={(value) => setDraft({ ...draft, logDir: value })} onLogRetentionDaysChange={(value) => setDraft({ ...draft, logRetentionDays: value })} />
+    <ApplicationNetworkProxySettingsSection
+      proxyMode={draft.proxyMode}
+      proxyURL={draft.proxyURL}
+      proxyNoProxy={draft.proxyNoProxy}
+      proxyUsername={draft.proxyUsername}
+      proxyPassword={draft.proxyPassword}
+      onProxyModeChange={(value) => setDraft({ ...draft, proxyMode: value })}
+      onProxyURLChange={(value) => setDraft({ ...draft, proxyURL: value })}
+      onProxyNoProxyChange={(value) => setDraft({ ...draft, proxyNoProxy: value })}
+      onProxyUsernameChange={(value) => setDraft({ ...draft, proxyUsername: value })}
+      onProxyPasswordChange={(value) => setDraft({ ...draft, proxyPassword: value })}
+    />
     <TerminalBehaviorSettingsSection rightClickAction={draft.rightClickAction} copyOnSelect={draft.copyOnSelect} scrollbackLines={draft.scrollbackLines} onRightClickActionChange={(value) => setDraft({ ...draft, rightClickAction: value })} onCopyOnSelectChange={(value) => setDraft({ ...draft, copyOnSelect: value })} onScrollbackLinesChange={(value) => setDraft({ ...draft, scrollbackLines: value > 0 ? String(value) : '' })} />
     <UIFontSettings draft={draft} systemFonts={systemFonts} onChange={previewDraft} />
     <div className="flex justify-end"><Button type="submit" size="sm" disabled={saving}>{saving ? t('保存中...') : t('保存')}</Button></div>
