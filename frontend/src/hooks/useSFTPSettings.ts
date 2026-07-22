@@ -53,7 +53,7 @@ export function useSFTPSettings() {
       if (currentRevision === revision.current) { setSettings(persisted); useSFTPSettingsStore.getState().setSettings(persisted) }
     } catch (error) { logger.debug('loadSFTPSettings error', error) }
   }, [])
-  const save = useCallback(async (next: SFTPSettings) => {
+  const save = useCallback(async (next: SFTPSettings, options?: { quiet?: boolean }) => {
     const normalized = normalizeSFTPSettings(next)
     try {
       await SettingService.SetMany([
@@ -65,10 +65,10 @@ export function useSFTPSettings() {
       setSettings(normalized)
       useSFTPSettingsStore.getState().setSettings(normalized)
       emitSFTPSettings(normalized)
-      toast(t('SFTP 设置已保存'), 'success')
+      if (!options?.quiet) toast(t('SFTP 设置已保存'), 'success')
     } catch (error) {
       logger.debug('saveSFTPSettings error', error)
-      toast(t('保存 SFTP 设置失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
+      if (!options?.quiet) toast(t('保存 SFTP 设置失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
       throw error
     }
   }, [])

@@ -1184,5 +1184,14 @@
   "使用系统环境变量中的 HTTP(S)_PROXY / ALL_PROXY。": "Uses HTTP(S)_PROXY / ALL_PROXY from the system environment.",
   "代理模式状态": "Proxy mode status",
   "连接默认": "Connection Defaults",
-  "控制终端连接池容量、SSH 保活与默认 TERM 类型。": "Controls terminal pool capacity, SSH keep-alive, and the default TERM type."
+  "控制终端连接池容量、SSH 保活与默认 TERM 类型。": "Controls terminal pool capacity, SSH keep-alive, and the default TERM type.",
+  "待保存...": "Pending save...",
+  "正在保存...": "Saving...",
+  "已自动保存": "Saved automatically",
+  "自动保存失败: ${}": "Auto-save failed: ${}",
+  "未知错误": "Unknown error",
+  "更改将自动保存": "Changes are saved automatically",
+  "通用设置包含界面外观与应用级偏好。": "General settings cover interface appearance and app-level preferences.",
+  "终端连接与交互偏好会自动保存。": "Terminal connection and interaction preferences are saved automatically.",
+  "当前主题配置无效，自动保存已暂停，请修正颜色或字体后继续。": "Theme configuration is invalid; auto-save is paused until colors and fonts are fixed."
 }

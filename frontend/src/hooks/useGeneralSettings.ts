@@ -216,7 +216,7 @@ export function useGeneralSettings() {
       logger.debug('loadGeneral error', error)
     }
   }, [])
-  const saveGeneral = useCallback(async (settings: GeneralSettings) => {
+  const saveGeneral = useCallback(async (settings: GeneralSettings, options?: { quiet?: boolean }) => {
     const normalized = normalizeGeneral(settings)
     try {
       await persistGeneral(normalized)
@@ -224,11 +224,11 @@ export function useGeneralSettings() {
       applyGeneral(normalized)
       setGeneral(normalized)
       emitSettingsEvent(SETTINGS_GENERAL_CHANGED_EVENT, normalized)
-      toast(t('通用设置已保存'), 'success')
+      if (!options?.quiet) toast(t('通用设置已保存'), 'success')
     } catch (error) {
       applyGeneral(general)
       logger.debug('saveGeneral error', error)
-      toast(t('保存设置失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
+      if (!options?.quiet) toast(t('保存设置失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
       throw error
     }
   }, [general])

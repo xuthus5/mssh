@@ -80,9 +80,12 @@ export function SecurityPanel() {
     }))
   }
 
-  const savePreferences = () => {
+  const savePreferences = (nextRequireLaunch: boolean, nextRememberUnlock: boolean) => {
+    setRequireLaunch(nextRequireLaunch)
+    setRememberUnlock(nextRememberUnlock)
+    if (!status.configured) return
     void run(t('安全偏好已保存'), () => SecurityService.SavePreferences({
-      require_password_on_launch: requireLaunch, remember_unlock: rememberUnlock,
+      require_password_on_launch: nextRequireLaunch, remember_unlock: nextRememberUnlock,
     }))
   }
 
@@ -135,10 +138,9 @@ export function SecurityPanel() {
               <Field label={t('确认新密码')}>
                 <Input type="password" value={confirmNewPassword} onChange={(e) => setConfirmNewPassword(e.target.value)} aria-label={t('确认新密码')} />
               </Field>
-              <PreferenceToggles requireLaunch={requireLaunch} rememberUnlock={rememberUnlock} onRequireLaunch={setRequireLaunch} onRememberUnlock={setRememberUnlock} />
+              <PreferenceToggles requireLaunch={requireLaunch} rememberUnlock={rememberUnlock} onRequireLaunch={(value) => savePreferences(value, rememberUnlock)} onRememberUnlock={(value) => savePreferences(requireLaunch, value)} />
               <div className="flex flex-wrap gap-2">
                 <Button size="sm" disabled={busy} onClick={rotatePassword}>{t('轮转密码并重加密')}</Button>
-                <Button size="sm" variant="outline" disabled={busy} onClick={savePreferences}>{t('保存安全偏好')}</Button>
                 {status.unlocked ? (
                   <Button size="sm" variant="outline" disabled={busy} onClick={() => void run(t('已锁定'), () => SecurityService.Lock())}>{t('锁定')}</Button>
                 ) : (
