@@ -45,7 +45,6 @@ export interface SyncConfig {
   url: string
   username: string
   password: string
-  masterKey?: string
   etag?: string
   lastSyncedAt?: string
   lastDirection?: 'upload' | 'download' | ''
@@ -140,10 +139,10 @@ export function useKeySettings() {
 }
 
 function useSyncSettings() {
-  const [sync, setSync] = useState<SyncConfig>({ enabled: false, url: '', username: '', password: '', masterKey: '' })
+  const [sync, setSync] = useState<SyncConfig>({ enabled: false, url: '', username: '', password: '' })
   const revision = useRef(0)
   const persistSync = useCallback(async (config: SyncConfig) => {
-    await SettingService.SetMany([settingEntry('sync.enabled', config.enabled), settingEntry('sync.url', config.url), settingEntry('sync.username', config.username), settingEntry('sync.master_key', config.masterKey)])
+    await SettingService.SetMany([settingEntry('sync.enabled', config.enabled), settingEntry('sync.url', config.url), settingEntry('sync.username', config.username)])
   }, [])
   const saveSync = useCallback(async (config: SyncConfig) => {
     try {
@@ -156,9 +155,9 @@ function useSyncSettings() {
   const loadSync = useCallback(async () => {
     try {
       const currentRevision = revision.current
-      const settings = await SettingService.GetMany(['sync.enabled', 'sync.url', 'sync.username', 'sync.master_key', 'sync.etag', 'sync.last_at', 'sync.last_direction', 'sync.format_version'])
+      const settings = await SettingService.GetMany(['sync.enabled', 'sync.url', 'sync.username', 'sync.etag', 'sync.last_at', 'sync.last_direction', 'sync.format_version'])
       const value = <T,>(key: string, fallback: T) => settings[key] ? JSON.parse(settings[key].value) as T : fallback
-      if (currentRevision === revision.current) setSync({ enabled: value('sync.enabled', false), url: value('sync.url', ''), username: value('sync.username', ''), password: '', masterKey: value('sync.master_key', ''), etag: value('sync.etag', ''), lastSyncedAt: value('sync.last_at', ''), lastDirection: value('sync.last_direction', ''), formatVersion: value('sync.format_version', 0) })
+      if (currentRevision === revision.current) setSync({ enabled: value('sync.enabled', false), url: value('sync.url', ''), username: value('sync.username', ''), password: '', etag: value('sync.etag', ''), lastSyncedAt: value('sync.last_at', ''), lastDirection: value('sync.last_direction', ''), formatVersion: value('sync.format_version', 0) })
     } catch (error) { logger.debug('loadSync error', error) }
   }, [])
   useEffect(() => { void loadSync() }, [loadSync])
