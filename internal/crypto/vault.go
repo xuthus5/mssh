@@ -219,6 +219,9 @@ func unwrapDEK(password string, vault VaultFile) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("create vault GCM: %w", err)
 	}
+	if len(nonce) != aead.NonceSize() {
+		return nil, errors.New("invalid vault nonce length")
+	}
 	dek, err := aead.Open(nil, nonce, wrapped, nil)
 	if err != nil {
 		return nil, errors.New("invalid application password")

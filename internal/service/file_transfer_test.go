@@ -20,7 +20,7 @@ import (
 func TestFileService_Upload(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	bus := newMockEventBus()
-	sessionSvc := NewSessionService(db, bus, 30, "", nil, testutil.NewTestLogger())
+	sessionSvc := NewSessionService(db, bus, 30, t.TempDir(), nil, testutil.NewTestLogger())
 
 	addr, cleanup := sshtestutil.NewMockServer(t)
 	defer cleanup()
@@ -47,7 +47,7 @@ func TestFileService_Upload(t *testing.T) {
 
 func TestFileService_UploadSessionNotFound(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	sessionSvc := NewSessionService(db, newMockEventBus(), 30, "", nil, testutil.NewTestLogger())
+	sessionSvc := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
 	svc := NewFileService(sessionSvc, newMockEventBus(), testutil.NewTestLogger())
 
 	tmpFile := filepath.Join(t.TempDir(), "upload.dat")
@@ -61,7 +61,7 @@ func TestFileService_UploadSessionNotFound(t *testing.T) {
 func TestFileService_Download(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	bus := newMockEventBus()
-	sessionSvc := NewSessionService(db, bus, 30, "", nil, testutil.NewTestLogger())
+	sessionSvc := NewSessionService(db, bus, 30, t.TempDir(), nil, testutil.NewTestLogger())
 
 	addr, cleanup := sshtestutil.NewMockServer(t)
 	defer cleanup()
@@ -85,7 +85,7 @@ func TestFileService_Download(t *testing.T) {
 
 func TestFileService_DownloadSessionNotFound(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	sessionSvc := NewSessionService(db, newMockEventBus(), 30, "", nil, testutil.NewTestLogger())
+	sessionSvc := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
 	svc := NewFileService(sessionSvc, newMockEventBus(), testutil.NewTestLogger())
 
 	localPath := filepath.Join(t.TempDir(), "downloaded.dat")
@@ -116,7 +116,7 @@ func TestFileService_CancelTransferNotFound(t *testing.T) {
 
 func TestFileService_DeleteSessionNotFound(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	sessionSvc := NewSessionService(db, newMockEventBus(), 30, "", nil, testutil.NewTestLogger())
+	sessionSvc := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
 	svc := NewFileService(sessionSvc, newMockEventBus(), testutil.NewTestLogger())
 
 	err := svc.Delete(999, "/tmp/file")
@@ -126,7 +126,7 @@ func TestFileService_DeleteSessionNotFound(t *testing.T) {
 
 func TestFileService_MkdirSessionNotFound(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	sessionSvc := NewSessionService(db, newMockEventBus(), 30, "", nil, testutil.NewTestLogger())
+	sessionSvc := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
 	svc := NewFileService(sessionSvc, newMockEventBus(), testutil.NewTestLogger())
 
 	err := svc.Mkdir(999, "/tmp/dir")
@@ -136,7 +136,7 @@ func TestFileService_MkdirSessionNotFound(t *testing.T) {
 
 func TestFileService_RenameSessionNotFound(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	sessionSvc := NewSessionService(db, newMockEventBus(), 30, "", nil, testutil.NewTestLogger())
+	sessionSvc := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
 	svc := NewFileService(sessionSvc, newMockEventBus(), testutil.NewTestLogger())
 
 	err := svc.Rename(999, "/tmp/old", "/tmp/new")
@@ -183,7 +183,7 @@ func TestFileService_getFileSize(t *testing.T) {
 
 func TestFileService_ConnectError(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	sessionSvc := NewSessionService(db, newMockEventBus(), 30, "", nil, testutil.NewTestLogger())
+	sessionSvc := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
 	svc := NewFileService(sessionSvc, newMockEventBus(), testutil.NewTestLogger())
 
 	_, err := svc.ListDir(999, "/")

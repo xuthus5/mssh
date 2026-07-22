@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -35,7 +36,7 @@ type ClientWrapper struct {
 }
 
 // Connect establishes an SSH connection to the given session host.
-// When knownHostsPath is non-empty, host key verification is enforced using
+// knownHostsPath is required; host key verification is enforced using
 // the known_hosts file at that path (TOFU for first-seen keys). When empty,
 // host key verification is skipped — this should only be used in tests.
 // onNewHostKey, when non-nil, is called with the fingerprint of a first-seen
@@ -134,12 +135,11 @@ func (c *ClientWrapper) startKeepAlive(interval time.Duration, logger *slog.Logg
 // but no known_hosts path was provided.
 var ErrEmptyKnownHostsPath = errors.New("known_hosts path is required for host key verification")
 
-// createHostKeyCallback builds a host key callback. When knownHostsPath is
-// empty, host key verification is skipped (for tests only). When non-empty,
+// createHostKeyCallback builds a host key callback. knownHostsPath is required;
 // first-seen keys are accepted via TOFU and reported through onNewHostKey.
 func createHostKeyCallback(knownHostsPath string, onNewHostKey HostKeyVerifyFunc, logger *slog.Logger) (gossh.HostKeyCallback, error) {
-	if knownHostsPath == "" {
-		return gossh.InsecureIgnoreHostKey(), nil
+	if strings.TrimSpace(knownHostsPath) == "" {
+		return nil, ErrEmptyKnownHostsPath
 	}
 
 	if err := ensureKnownHostsFile(knownHostsPath); err != nil {

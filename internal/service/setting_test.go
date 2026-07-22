@@ -125,3 +125,31 @@ func TestSettingServiceAppliesLogSettings(t *testing.T) {
 	require.NoError(t, svc.ApplyStoredLogSettings())
 	assert.GreaterOrEqual(t, log.calls, 2)
 }
+
+func TestApplyStoredLogSettingsWithoutConfigurer(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	svc := NewSettingService(db, testutil.NewTestLogger())
+	require.NoError(t, svc.ApplyStoredLogSettings())
+}
+
+func TestCurrentLogSettingsFallbackAndDecodeErrors(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	log := &stubLogConfigurer{dir: "/tmp/from-log", retention: 9}
+	svc := NewSettingService(db, testutil.NewTestLogger(), log)
+	assert.Equal(t, "/tmp/from-log", svc.currentLogDir())
+	assert.Equal(t, 9, svc.currentLogRetention())
+
+	_, err := decodeSettingString("not-json")
+	assert.Error(t, err)
+	_, err = decodeSettingInt(`"x"`)
+	assert.Error(t, err)
+	require.NoError(t, svc.ApplyStoredLogSettings())
+	assert.GreaterOrEqual(t, log.calls, 1)
+}
+
+func TestIsNilLogConfigurerVariants(t *testing.T) {
+	assert.True(t, isNilLogConfigurer(nil))
+	var log *stubLogConfigurer
+	assert.True(t, isNilLogConfigurer(log))
+	assert.False(t, isNilLogConfigurer(&stubLogConfigurer{}))
+}

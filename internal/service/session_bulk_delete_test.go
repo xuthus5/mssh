@@ -13,7 +13,7 @@ import (
 
 func TestSessionService_DeleteSessions(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	svc := NewSessionService(db, newMockEventBus(), 30, "", nil, testutil.NewTestLogger())
+	svc := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
 
 	first, err := svc.CreateSession(model.SessionInputFrom(model.Session{
 		Name: "a", Host: "10.0.0.1", Port: 22, Username: "root", AuthMethod: model.AuthPassword, KeepAlive: 30, TermType: "xterm",
@@ -44,7 +44,7 @@ func TestSessionService_DeleteSessions(t *testing.T) {
 
 func TestSessionService_DeleteSessionsValidation(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	svc := NewSessionService(db, newMockEventBus(), 30, "", nil, testutil.NewTestLogger())
+	svc := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
 	_, err := svc.DeleteSessions(nil)
 	require.Error(t, err)
 	_, err = svc.DeleteSessions([]int64{0})

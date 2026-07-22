@@ -22,7 +22,7 @@ func TestTerminalService_Write(t *testing.T) {
 
 	s := model.Session{Host: "127.0.0.1", Port: port, Username: "test", TermType: "xterm"}
 	ctx := context.Background()
-	cw, err := ssh.Connect(ctx, s, nil, "", nil)
+	cw, err := ssh.Connect(ctx, s, nil, sshtestutil.KnownHostsPath(t), nil)
 	require.NoError(t, err)
 	defer cw.Close()
 
@@ -59,7 +59,7 @@ func TestTerminalService_Resize(t *testing.T) {
 
 	s := model.Session{Host: "127.0.0.1", Port: port, Username: "test", TermType: "xterm"}
 	ctx := context.Background()
-	cw, err := ssh.Connect(ctx, s, nil, "", nil)
+	cw, err := ssh.Connect(ctx, s, nil, sshtestutil.KnownHostsPath(t), nil)
 	require.NoError(t, err)
 	defer cw.Close()
 
@@ -95,7 +95,7 @@ func TestTerminalService_Close(t *testing.T) {
 
 	s := model.Session{Host: "127.0.0.1", Port: port, Username: "test", TermType: "xterm"}
 	ctx := context.Background()
-	cw, err := ssh.Connect(ctx, s, nil, "", nil)
+	cw, err := ssh.Connect(ctx, s, nil, sshtestutil.KnownHostsPath(t), nil)
 	require.NoError(t, err)
 	defer cw.Close()
 
@@ -104,7 +104,7 @@ func TestTerminalService_Close(t *testing.T) {
 
 	bus := newMockEventBus()
 	db := testutil.NewTestDB(t)
-	sessionSvc := NewSessionService(db, bus, 30, "", nil, testutil.NewTestLogger())
+	sessionSvc := NewSessionService(db, bus, 30, t.TempDir(), nil, testutil.NewTestLogger())
 
 	svc := &TerminalService{logger: testutil.NewTestLogger(),
 		eventBus:   bus,
@@ -144,7 +144,7 @@ func TestTerminalService_CloseNotFound(t *testing.T) {
 
 func TestTerminalService_EvictLRU(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	sessionSvc := NewSessionService(db, newMockEventBus(), 30, "", nil, testutil.NewTestLogger())
+	sessionSvc := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
 
 	svc := &TerminalService{logger: testutil.NewTestLogger(),
 		eventBus:   newMockEventBus(),
@@ -177,7 +177,7 @@ func TestTerminalService_EvictLRU(t *testing.T) {
 func TestTerminalService_PoolLimitEnforcement(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	bus := newMockEventBus()
-	sessionSvc := NewSessionService(db, bus, 30, "", nil, testutil.NewTestLogger())
+	sessionSvc := NewSessionService(db, bus, 30, t.TempDir(), nil, testutil.NewTestLogger())
 
 	addr, cleanup := sshtestutil.NewMockServer(t)
 	defer cleanup()
@@ -225,7 +225,7 @@ func TestTerminalService_PoolLimitEnforcement(t *testing.T) {
 func TestSessionService_GetClientWrapper(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	bus := newMockEventBus()
-	svc := NewSessionService(db, bus, 30, "", nil, testutil.NewTestLogger())
+	svc := NewSessionService(db, bus, 30, t.TempDir(), nil, testutil.NewTestLogger())
 
 	_, err := svc.GetClientWrapper("nonexistent")
 	assert.Error(t, err)

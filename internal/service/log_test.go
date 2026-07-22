@@ -32,7 +32,7 @@ func TestLogService_List(t *testing.T) {
 
 func TestLogService_ListBySession(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	sessionSvc := NewSessionService(db, newMockEventBus(), 30, "", nil, testutil.NewTestLogger())
+	sessionSvc := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
 	sess := model.Session{
 		Name: "test-log", Host: "10.0.0.1", Port: 22, Username: "root",
 		AuthMethod: model.AuthPassword, Password: "enc", KeepAlive: 30, TermType: "xterm",
@@ -57,7 +57,7 @@ func TestLogService_StartTerminalRecordingCreatesFile(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	svc := NewLogService(db, t.TempDir(), testutil.NewTestLogger())
 
-	sessionSvc := NewSessionService(db, newMockEventBus(), 30, "", nil, testutil.NewTestLogger())
+	sessionSvc := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
 	sess := model.Session{
 		Name: "test-rec", Host: "10.0.0.1", Port: 22, Username: "root",
 		AuthMethod: model.AuthPassword, Password: "enc", KeepAlive: 30, TermType: "xterm",
@@ -149,7 +149,7 @@ func TestLogService_StopTerminalRecording(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	svc := NewLogService(db, t.TempDir(), testutil.NewTestLogger())
 
-	sessionSvc := NewSessionService(db, newMockEventBus(), 30, "", nil, testutil.NewTestLogger())
+	sessionSvc := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
 	sess := model.Session{
 		Name: "test-stop", Host: "10.0.0.1", Port: 22, Username: "root",
 		AuthMethod: model.AuthPassword, Password: "enc", KeepAlive: 30, TermType: "xterm",
@@ -182,7 +182,7 @@ func TestLogService_GetRecording(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	svc := NewLogService(db, t.TempDir(), testutil.NewTestLogger())
 
-	sessionSvc := NewSessionService(db, newMockEventBus(), 30, "", nil, testutil.NewTestLogger())
+	sessionSvc := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
 	sess := model.Session{
 		Name: "test-get", Host: "10.0.0.1", Port: 22, Username: "root",
 		AuthMethod: model.AuthPassword, Password: "enc", KeepAlive: 30, TermType: "xterm",
@@ -224,7 +224,7 @@ func TestLogService_Delete(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	svc := NewLogService(db, t.TempDir(), testutil.NewTestLogger())
 
-	sessionSvc := NewSessionService(db, newMockEventBus(), 30, "", nil, testutil.NewTestLogger())
+	sessionSvc := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
 	sess := model.Session{
 		Name: "test-del", Host: "10.0.0.1", Port: 22, Username: "root",
 		AuthMethod: model.AuthPassword, Password: "enc", KeepAlive: 30, TermType: "xterm",

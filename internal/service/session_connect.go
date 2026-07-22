@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	"github.com/xuthus5/mssh/internal/model"
 	ssh "github.com/xuthus5/mssh/internal/ssh"
@@ -31,10 +32,13 @@ func (s *SessionService) connect(ctx context.Context, sessionID int64, emitState
 	if err != nil {
 		return "", fmt.Errorf("connect: %w", err)
 	}
-	knownHostsPath := ""
-	if s.dataDir != "" {
-		knownHostsPath = filepath.Join(s.dataDir, "known_hosts")
+	if strings.TrimSpace(s.dataDir) == "" {
+		if cleanup != nil {
+			cleanup()
+		}
+		return "", fmt.Errorf("connect: application data directory is required for host key verification")
 	}
+	knownHostsPath := filepath.Join(s.dataDir, "known_hosts")
 	onNewHostKey := func(hostname, algorithm, fingerprint string) bool {
 		return s.awaitHostKeyDecision(connectCtx, attemptID, hostname, algorithm, fingerprint)
 	}
@@ -100,7 +104,11 @@ func (s *SessionService) awaitHostKeyDecision(ctx context.Context, attemptID, ho
 	if !ok {
 		return false
 	}
-	s.eventBus.Emit(event.HostKeyFingerprint, event.HostKeyPayload{AttemptID: attemptID, Hostname: hostname, Fingerprint: fingerprint, Algorithm: algorithm})
+	payload := event.HostKeyPayload{AttemptID: attemptID, Hostname: hostname, Fingerprint: fingerprint, Algorithm: algorithm}
+	s.eventBus.Emit(event.HostKeyFingerprint, payload)
+	if accepter, ok := s.eventBus.(hostKeyAutoAccepter); ok && accepter.AutoAcceptHostKeys() {
+		return true
+	}
 	select {
 	case accept := <-attempt.decision:
 		return accept

@@ -76,7 +76,7 @@ func TestMacroService_ExecuteTerminalNotFound(t *testing.T) {
 func TestMacroService_ExecuteWithTerminal(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	bus := newMockEventBus()
-	sessionSvc := NewSessionService(db, bus, 30, "", nil, testutil.NewTestLogger())
+	sessionSvc := NewSessionService(db, bus, 30, t.TempDir(), nil, testutil.NewTestLogger())
 
 	addr, cleanup := sshtestutil.NewMockServer(t)
 	defer cleanup()

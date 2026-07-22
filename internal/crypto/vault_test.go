@@ -1,6 +1,8 @@
 package crypto
 
 import (
+	"errors"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -72,4 +74,89 @@ func TestInstallVaultFile(t *testing.T) {
 	loaded, err := LoadVaultFile(VaultPath(dir))
 	require.NoError(t, err)
 	assert.Equal(t, vault.WrappedDEK, loaded.WrappedDEK)
+}
+
+func TestSyncSecretFromDEK(t *testing.T) {
+	secret := SyncSecretFromDEK([]byte{1, 2, 3, 4})
+	assert.NotEmpty(t, secret)
+	assert.Equal(t, secret, SyncSecretFromDEK([]byte{1, 2, 3, 4}))
+}
+
+func TestValidateVaultFileRejectsBadValues(t *testing.T) {
+	assert.Error(t, validateVaultFile(VaultFile{FormatVersion: 99}))
+	assert.Error(t, validateVaultFile(VaultFile{FormatVersion: VaultFormatVersion, Cipher: "x", KDF: "Argon2id"}))
+	assert.Error(t, validateVaultFile(VaultFile{FormatVersion: VaultFormatVersion, Cipher: "AES-256-GCM", KDF: "Argon2id"}))
+	assert.Error(t, validateVaultFile(VaultFile{
+		FormatVersion: VaultFormatVersion, Cipher: "AES-256-GCM", KDF: "Argon2id",
+		Salt: "s", Nonce: "n", WrappedDEK: "w", ArgonTime: 0, ArgonMemory: 1, ArgonThreads: 1,
+	}))
+}
+
+func TestLoadVaultFileMissing(t *testing.T) {
+	_, err := LoadVaultFile(filepath.Join(t.TempDir(), "missing.json"))
+	assert.Error(t, err)
+}
+
+func TestSaveVaultFileCreatesDir(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "nested")
+	vault, _, err := CreateVault("initial-pass-12")
+	require.NoError(t, err)
+	require.NoError(t, SaveVaultFile(VaultPath(dir), vault))
+	loaded, err := LoadVaultFile(VaultPath(dir))
+	require.NoError(t, err)
+	assert.Equal(t, vault.WrappedDEK, loaded.WrappedDEK)
+}
+
+func TestUnlockVaultRejectsShortPassword(t *testing.T) {
+	vault, _, err := CreateVault("initial-pass-12")
+	require.NoError(t, err)
+	_, err = UnlockVault("short", vault)
+	assert.Error(t, err)
+}
+
+func TestRotateVaultPasswordRejects(t *testing.T) {
+	vault, _, err := CreateVault("initial-pass-12")
+	require.NoError(t, err)
+	_, _, err = RotateVaultPassword("wrong-password12", "next-password12", vault, nil)
+	assert.Error(t, err)
+	_, _, err = RotateVaultPassword("initial-pass-12", "short", vault, nil)
+	assert.Error(t, err)
+	_, _, err = RotateVaultPassword("initial-pass-12", "next-password12", vault, func(oldDEK, newDEK []byte) error {
+		return errors.New("reencrypt failed")
+	})
+	assert.Error(t, err)
+}
+
+func TestLoadVaultFileInvalidJSONAndValidate(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "vault.json")
+	require.NoError(t, os.WriteFile(path, []byte("{"), 0o600))
+	_, err := LoadVaultFile(path)
+	assert.Error(t, err)
+
+	require.NoError(t, os.WriteFile(path, []byte(`{"format_version":1,"cipher":"AES-256-GCM","kdf":"Argon2id","argon_time":1,"argon_memory":1,"argon_threads":1,"salt":"YQ==","nonce":"YQ==","wrapped_dek":"YQ=="}`), 0o600))
+	vault, err := LoadVaultFile(path)
+	require.NoError(t, err)
+	_, err = UnlockVault("initial-pass-12", vault)
+	assert.Error(t, err)
+
+	assert.Error(t, InstallVaultFile(t.TempDir(), VaultFile{}))
+	assert.Error(t, SaveVaultFile(filepath.Join(t.TempDir(), "v.json"), VaultFile{}))
+}
+
+func TestUnwrapRejectsBadBase64Fields(t *testing.T) {
+	vault := VaultFile{
+		FormatVersion: VaultFormatVersion, Cipher: "AES-256-GCM", KDF: "Argon2id",
+		ArgonTime: 1, ArgonMemory: 8, ArgonThreads: 1,
+		Salt: "!!!", Nonce: "YQ==", WrappedDEK: "YQ==",
+	}
+	_, err := UnlockVault("initial-pass-12", vault)
+	assert.Error(t, err)
+	vault.Salt = "YQ=="
+	vault.Nonce = "!!!"
+	_, err = UnlockVault("initial-pass-12", vault)
+	assert.Error(t, err)
+	vault.Nonce = "YQ=="
+	vault.WrappedDEK = "!!!"
+	_, err = UnlockVault("initial-pass-12", vault)
+	assert.Error(t, err)
 }

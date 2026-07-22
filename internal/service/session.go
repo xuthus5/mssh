@@ -24,6 +24,11 @@ type EventBus interface {
 	Emit(name string, payload interface{})
 }
 
+// hostKeyAutoAccepter is implemented by test event buses to accept TOFU without UI.
+type hostKeyAutoAccepter interface {
+	AutoAcceptHostKeys() bool
+}
+
 const DefaultKeepAliveSeconds = 60
 
 type managedConn struct {

@@ -23,7 +23,7 @@ import (
 
 func TestSessionService_buildAuthMethodsPassword(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	svc := NewSessionService(db, newMockEventBus(), 30, "", nil, testutil.NewTestLogger())
+	svc := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
 
 	sess := &model.Session{AuthMethod: model.AuthPassword, Password: "secret"}
 	methods, err := svc.buildAuthMethods(sess)
@@ -33,7 +33,7 @@ func TestSessionService_buildAuthMethodsPassword(t *testing.T) {
 
 func TestSessionService_buildAuthMethodsKey(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	svc := NewSessionService(db, newMockEventBus(), 30, "", nil, testutil.NewTestLogger())
+	svc := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
 
 	sess := &model.Session{AuthMethod: model.AuthKey, KeyID: ptr(int64(999))}
 	_, err := svc.buildAuthMethods(sess)
@@ -53,7 +53,7 @@ func TestSessionService_buildAuthMethodsKey(t *testing.T) {
 
 func TestSessionService_buildAuthMethodsKeyboardInteractive(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	svc := NewSessionService(db, newMockEventBus(), 30, "", nil, testutil.NewTestLogger())
+	svc := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
 
 	sess := &model.Session{AuthMethod: model.AuthKeyboardInteractive, Password: "secret"}
 	methods, err := svc.buildAuthMethods(sess)
@@ -63,7 +63,7 @@ func TestSessionService_buildAuthMethodsKeyboardInteractive(t *testing.T) {
 
 func TestSessionService_buildAuthMethodsUnknown(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	svc := NewSessionService(db, newMockEventBus(), 30, "", nil, testutil.NewTestLogger())
+	svc := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
 
 	sess := &model.Session{AuthMethod: "unknown"}
 	methods, err := svc.buildAuthMethods(sess)
@@ -73,7 +73,7 @@ func TestSessionService_buildAuthMethodsUnknown(t *testing.T) {
 
 func TestSessionService_buildAuthMethodsKeyInvalidKey(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	svc := NewSessionService(db, newMockEventBus(), 30, "", nil, testutil.NewTestLogger())
+	svc := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
 
 	testKey := model.SSHKey{Name: "bad-key", Type: model.KeyTypeED25519, PrivateKey: "not-a-valid-private-key"}
 	createdKey, err := store.CreateKey(db, testKey)
@@ -87,7 +87,7 @@ func TestSessionService_buildAuthMethodsKeyInvalidKey(t *testing.T) {
 
 func TestSessionService_buildAuthMethodsKeyNilID(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	svc := NewSessionService(db, newMockEventBus(), 30, "", nil, testutil.NewTestLogger())
+	svc := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
 
 	sess := &model.Session{AuthMethod: model.AuthKey}
 	_, err := svc.buildAuthMethods(sess)
@@ -97,7 +97,7 @@ func TestSessionService_buildAuthMethodsKeyNilID(t *testing.T) {
 
 func TestSessionService_buildAuthMethodsAgent(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	svc := NewSessionService(db, newMockEventBus(), 30, "", nil, testutil.NewTestLogger())
+	svc := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
 
 	sess := &model.Session{AuthMethod: model.AuthAgent}
 	methods, err := svc.buildAuthMethods(sess)
@@ -108,7 +108,7 @@ func TestSessionService_buildAuthMethodsAgent(t *testing.T) {
 
 func TestSessionService_GetSessionNotFound(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	svc := NewSessionService(db, newMockEventBus(), 30, "", nil, testutil.NewTestLogger())
+	svc := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
 
 	_, err := svc.GetSession(999)
 	assert.Error(t, err)
@@ -136,7 +136,7 @@ func generateTestPrivateKey(t *testing.T) string {
 
 func TestSessionService_buildKeyboardInteractiveAuthEmpty(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	svc := NewSessionService(db, newMockEventBus(), 30, "", nil, testutil.NewTestLogger())
+	svc := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
 
 	sess := &model.Session{AuthMethod: model.AuthKeyboardInteractive, Password: ""}
 	methods := svc.buildKeyboardInteractiveAuth(sess)
@@ -146,7 +146,7 @@ func TestSessionService_buildKeyboardInteractiveAuthEmpty(t *testing.T) {
 func TestSessionService_decryptPrivateKeyWithCrypto(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	enc := &noopCrypto{}
-	svc := NewSessionService(db, newMockEventBus(), 30, "", enc, testutil.NewTestLogger())
+	svc := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), enc, testutil.NewTestLogger())
 
 	keyPEM := generateTestPrivateKey(t)
 	encrypted, err := enc.Encrypt([]byte(keyPEM))
@@ -160,7 +160,7 @@ func TestSessionService_decryptPrivateKeyWithCrypto(t *testing.T) {
 func TestSessionService_decryptPrivateKeyFail(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	enc := &errCrypto{}
-	svc := NewSessionService(db, newMockEventBus(), 30, "", enc, testutil.NewTestLogger())
+	svc := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), enc, testutil.NewTestLogger())
 
 	_, err := svc.decryptPrivateKey("invalid-encrypted-data")
 	assert.Error(t, err)
@@ -168,7 +168,7 @@ func TestSessionService_decryptPrivateKeyFail(t *testing.T) {
 
 func TestSessionService_buildKeyboardInteractiveCallback(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	svc := NewSessionService(db, newMockEventBus(), 30, "", nil, testutil.NewTestLogger())
+	svc := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
 
 	sess := &model.Session{AuthMethod: model.AuthKeyboardInteractive, Password: "secret"}
 	methods := svc.buildKeyboardInteractiveAuth(sess)
@@ -232,7 +232,7 @@ func TestSessionService_buildAgentAuthSuccess(t *testing.T) {
 	defer cleanup()
 
 	db := testutil.NewTestDB(t)
-	svc := NewSessionService(db, newMockEventBus(), 30, "", nil, testutil.NewTestLogger())
+	svc := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
 
 	t.Setenv("SSH_AUTH_SOCK", socketPath)
 	methods, err := svc.buildAgentAuth()
@@ -242,7 +242,7 @@ func TestSessionService_buildAgentAuthSuccess(t *testing.T) {
 
 func TestSessionService_buildAgentAuthInvalidSocket(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	svc := NewSessionService(db, newMockEventBus(), 30, "", nil, testutil.NewTestLogger())
+	svc := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
 
 	// 指向不存在的 socket 文件，触发 net.Dial 失败
 	t.Setenv("SSH_AUTH_SOCK", filepath.Join(t.TempDir(), "nonexistent.sock"))
@@ -256,11 +256,18 @@ func TestSessionService_buildAuthMethodsAgentSuccess(t *testing.T) {
 	defer cleanup()
 
 	db := testutil.NewTestDB(t)
-	svc := NewSessionService(db, newMockEventBus(), 30, "", nil, testutil.NewTestLogger())
+	svc := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
 
 	sess := &model.Session{AuthMethod: model.AuthAgent}
 	t.Setenv("SSH_AUTH_SOCK", socketPath)
 	methods, err := svc.buildAuthMethods(sess)
 	require.NoError(t, err)
 	assert.NotEmpty(t, methods)
+}
+
+func TestAgentAuthCloseNilSafe(t *testing.T) {
+	var auth *agentAuth
+	auth.Close()
+	auth = &agentAuth{}
+	auth.Close()
 }

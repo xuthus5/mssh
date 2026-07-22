@@ -14,7 +14,7 @@ import (
 
 func TestSessionServiceHostKeyDecisionAccept(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	bus := newMockEventBus()
+	bus := newManualHostKeyEventBus()
 	svc := NewSessionService(db, bus, 30, t.TempDir(), nil, testutil.NewTestLogger())
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -36,7 +36,7 @@ func TestSessionServiceHostKeyDecisionAccept(t *testing.T) {
 
 func TestSessionServiceHostKeyDecisionReject(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	svc := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
+	svc := NewSessionService(db, newManualHostKeyEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
