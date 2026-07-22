@@ -17,7 +17,7 @@ import (
 
 func TestNewTerminalService(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	sessionSvc := NewSessionService(db, newMockEventBus(), 30, "", nil, testutil.NewTestLogger())
+	sessionSvc := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
 	bus := newMockEventBus()
 
 	svc := NewTerminalService(sessionSvc, bus, 0, testutil.NewTestLogger())
@@ -53,7 +53,7 @@ func TestTerminalService_SetMaxSize(t *testing.T) {
 func TestTerminalService_Open(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	bus := newMockEventBus()
-	sessionSvc := NewSessionService(db, bus, 30, "", nil, testutil.NewTestLogger())
+	sessionSvc := NewSessionService(db, bus, 30, t.TempDir(), nil, testutil.NewTestLogger())
 
 	addr, cleanup := sshtestutil.NewMockServer(t)
 	defer cleanup()
@@ -86,7 +86,7 @@ func TestTerminalService_Open(t *testing.T) {
 
 func TestTerminalService_CloseInvokesCleanupHandler(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	sessionSvc := NewSessionService(db, newMockEventBus(), 30, "", nil, testutil.NewTestLogger())
+	sessionSvc := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
 	svc := NewTerminalService(sessionSvc, newMockEventBus(), 2, testutil.NewTestLogger())
 	svc.ptys["term-1"] = nil
 	svc.lastUsed["term-1"] = time.Now()
@@ -100,7 +100,7 @@ func TestTerminalService_CloseInvokesCleanupHandler(t *testing.T) {
 func TestTerminalService_OpenDefaultTermType(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	bus := newMockEventBus()
-	sessionSvc := NewSessionService(db, bus, 30, "", nil, testutil.NewTestLogger())
+	sessionSvc := NewSessionService(db, bus, 30, t.TempDir(), nil, testutil.NewTestLogger())
 
 	addr, cleanup := sshtestutil.NewMockServer(t)
 	defer cleanup()
@@ -126,7 +126,7 @@ func TestTerminalService_OpenDefaultTermType(t *testing.T) {
 func TestTerminalService_RemoteExitCleansTerminalAndEmitsDisconnectedState(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	terminalBus := newMockEventBus()
-	sessionSvc := NewSessionService(db, terminalBus, 30, "", nil, testutil.NewTestLogger())
+	sessionSvc := NewSessionService(db, terminalBus, 30, t.TempDir(), nil, testutil.NewTestLogger())
 	addr, cleanup := sshtestutil.NewMockServerAutoLogout(t)
 	defer cleanup()
 
@@ -174,7 +174,7 @@ func TestTerminalService_RemoteExitCleansTerminalAndEmitsDisconnectedState(t *te
 func TestTerminalService_ImmediateRemoteExitOrdersLifecycleAndCleans(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	bus := newMockEventBus()
-	sessionSvc := NewSessionService(db, bus, 30, "", nil, testutil.NewTestLogger())
+	sessionSvc := NewSessionService(db, bus, 30, t.TempDir(), nil, testutil.NewTestLogger())
 	addr, cleanup := sshtestutil.NewMockServerImmediateLogout(t)
 	defer cleanup()
 	created, err := sessionSvc.CreateSession(model.SessionInputFrom(model.Session{
@@ -217,7 +217,7 @@ func TestTerminalService_ImmediateRemoteExitOrdersLifecycleAndCleans(t *testing.
 
 func TestTerminalService_OpenSessionNotFound(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	sessionSvc := NewSessionService(db, newMockEventBus(), 30, "", nil, testutil.NewTestLogger())
+	sessionSvc := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
 	termSvc := NewTerminalService(sessionSvc, newMockEventBus(), 32, testutil.NewTestLogger())
 
 	ctx := context.Background()
@@ -229,7 +229,7 @@ func TestTerminalService_OpenSessionNotFound(t *testing.T) {
 func TestTerminalService_ReadCallback(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	bus := newMockEventBus()
-	sessionSvc := NewSessionService(db, bus, 30, "", nil, testutil.NewTestLogger())
+	sessionSvc := NewSessionService(db, bus, 30, t.TempDir(), nil, testutil.NewTestLogger())
 
 	addr, cleanup := sshtestutil.NewMockServer(t)
 	defer cleanup()

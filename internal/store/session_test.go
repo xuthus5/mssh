@@ -253,7 +253,6 @@ func TestDeleteFolderRollsBackOnMigrationFailures(t *testing.T) {
 	}
 }
 
-
 func TestDeleteSessionsRemovesTunnels(t *testing.T) {
 	db := setupTestDB(t)
 	folder, err := CreateFolder(db, "default", nil)

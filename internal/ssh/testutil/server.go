@@ -4,11 +4,18 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"net"
+	"path/filepath"
 	"testing"
 	"time"
 
 	gossh "golang.org/x/crypto/ssh"
 )
+
+// KnownHostsPath returns a writable known_hosts path under t.TempDir for tests.
+func KnownHostsPath(t *testing.T) string {
+	t.Helper()
+	return filepath.Join(t.TempDir(), "known_hosts")
+}
 
 func NewMockServer(t *testing.T) (string, func()) {
 	t.Helper()

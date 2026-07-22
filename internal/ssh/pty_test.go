@@ -21,7 +21,7 @@ func TestOpenPTY(t *testing.T) {
 	defer cleanup()
 	s := model.Session{Host: "127.0.0.1", Port: mustParsePort(addr), Username: "test", TermType: "xterm-256color"}
 	ctx := context.Background()
-	cw, err := Connect(ctx, s, nil, "", slog.Default())
+	cw, err := Connect(ctx, s, nil, testutil.KnownHostsPath(t), slog.Default())
 	require.NoError(t, err)
 	defer cw.Close()
 	ptys, err := OpenPTY(cw, s.TermType, 80, 24)
@@ -34,7 +34,7 @@ func TestPreparePTYStartsReadingOnlyAfterStart(t *testing.T) {
 	addr, cleanup := testutil.NewMockServer(t)
 	defer cleanup()
 	session := model.Session{Host: "127.0.0.1", Port: mustParsePort(addr), Username: "test", TermType: "xterm-256color"}
-	client, err := Connect(context.Background(), session, nil, "", slog.Default())
+	client, err := Connect(context.Background(), session, nil, testutil.KnownHostsPath(t), slog.Default())
 	require.NoError(t, err)
 	defer client.Close()
 	pty, err := PreparePTY(client, session.TermType, 80, 24)
@@ -55,7 +55,7 @@ func TestOpenPTY_ClosedWrapper(t *testing.T) {
 	defer cleanup()
 	s := model.Session{Host: "127.0.0.1", Port: mustParsePort(addr), Username: "test", TermType: "xterm"}
 	ctx := context.Background()
-	cw, err := Connect(ctx, s, nil, "", slog.Default())
+	cw, err := Connect(ctx, s, nil, testutil.KnownHostsPath(t), slog.Default())
 	require.NoError(t, err)
 	cw.Close()
 	_, err = OpenPTY(cw, s.TermType, 80, 24)
@@ -68,7 +68,7 @@ func TestOpenPTY_RejectPty(t *testing.T) {
 	defer cleanup()
 	s := model.Session{Host: "127.0.0.1", Port: mustParsePort(addr), Username: "test", TermType: "xterm"}
 	ctx := context.Background()
-	cw, err := Connect(ctx, s, nil, "", slog.Default())
+	cw, err := Connect(ctx, s, nil, testutil.KnownHostsPath(t), slog.Default())
 	require.NoError(t, err)
 	defer cw.Close()
 	_, err = OpenPTY(cw, s.TermType, 80, 24)
@@ -81,7 +81,7 @@ func TestOpenPTY_RejectShell(t *testing.T) {
 	defer cleanup()
 	s := model.Session{Host: "127.0.0.1", Port: mustParsePort(addr), Username: "test", TermType: "xterm"}
 	ctx := context.Background()
-	cw, err := Connect(ctx, s, nil, "", slog.Default())
+	cw, err := Connect(ctx, s, nil, testutil.KnownHostsPath(t), slog.Default())
 	require.NoError(t, err)
 	defer cw.Close()
 	_, err = OpenPTY(cw, s.TermType, 80, 24)
@@ -94,7 +94,7 @@ func TestPTYWrite(t *testing.T) {
 	defer cleanup()
 	s := model.Session{Host: "127.0.0.1", Port: mustParsePort(addr), Username: "test", TermType: "xterm"}
 	ctx := context.Background()
-	cw, _ := Connect(ctx, s, nil, "", slog.Default())
+	cw, _ := Connect(ctx, s, nil, testutil.KnownHostsPath(t), slog.Default())
 	defer cw.Close()
 	ptys, _ := OpenPTY(cw, s.TermType, 80, 24)
 	defer ptys.Close()
@@ -108,7 +108,7 @@ func TestPTYReadCallback(t *testing.T) {
 	defer cleanup()
 	s := model.Session{Host: "127.0.0.1", Port: mustParsePort(addr), Username: "test", TermType: "xterm"}
 	ctx := context.Background()
-	cw, _ := Connect(ctx, s, nil, "", slog.Default())
+	cw, _ := Connect(ctx, s, nil, testutil.KnownHostsPath(t), slog.Default())
 	defer cw.Close()
 	ptys, _ := OpenPTY(cw, s.TermType, 80, 24)
 	defer ptys.Close()
@@ -163,7 +163,7 @@ func TestPTYResize(t *testing.T) {
 	defer cleanup()
 	s := model.Session{Host: "127.0.0.1", Port: mustParsePort(addr), Username: "test", TermType: "xterm"}
 	ctx := context.Background()
-	cw, _ := Connect(ctx, s, nil, "", slog.Default())
+	cw, _ := Connect(ctx, s, nil, testutil.KnownHostsPath(t), slog.Default())
 	defer cw.Close()
 	ptys, _ := OpenPTY(cw, s.TermType, 80, 24)
 	defer ptys.Close()
@@ -176,7 +176,7 @@ func TestPTYCloseDouble(t *testing.T) {
 	defer cleanup()
 	s := model.Session{Host: "127.0.0.1", Port: mustParsePort(addr), Username: "test", TermType: "xterm"}
 	ctx := context.Background()
-	cw, _ := Connect(ctx, s, nil, "", slog.Default())
+	cw, _ := Connect(ctx, s, nil, testutil.KnownHostsPath(t), slog.Default())
 	defer cw.Close()
 	ptys, _ := OpenPTY(cw, s.TermType, 80, 24)
 	err := ptys.Close()
