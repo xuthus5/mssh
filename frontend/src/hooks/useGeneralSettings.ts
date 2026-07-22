@@ -13,7 +13,7 @@ import { LANGUAGE_SETTING_KEY, t, type AppLanguage, useLanguageStore } from '@/i
 
 const generalSettingKeys = [
   'terminal.max_pool_size', 'terminal.default_keep_alive', 'terminal.default_term_type',
-  'terminal.right_click_action', 'terminal.copy_on_select', 'terminal.scrollback_lines', 'terminal.auto_reconnect', 'terminal.restore_tabs_on_startup', 'terminal.renderer', 'terminal.history_predict', 'appearance.ui_font_family',
+  'terminal.right_click_action', 'terminal.copy_on_select', 'terminal.scrollback_lines', 'terminal.auto_reconnect', 'terminal.restore_tabs_on_startup', 'terminal.renderer', 'terminal.history_predict', 'terminal.local_shell', 'terminal.local_shell_args', 'terminal.local_shell_cwd', 'terminal.local_shell_login', 'appearance.ui_font_family',
   'appearance.ui_font_fallback_family', 'appearance.ui_font_size',
   'application.close_button_action', 'application.log_dir', 'application.log_retention_days',
   'application.proxy_mode', 'application.proxy_url', 'application.proxy_no_proxy',
@@ -38,6 +38,10 @@ export interface GeneralSettings {
   restoreTabsOnStartup: boolean
   renderer: TerminalRenderer
   historyPredict: boolean
+  localShell: string
+  localShellArgs: string
+  localShellCwd: string
+  localShellLogin: boolean
   closeButtonAction: CloseButtonAction
   logDir: string
   logRetentionDays: number
@@ -61,7 +65,7 @@ const defaultGeneralSettings: GeneralSettings = {
   maxPoolSize: 10, defaultKeepAlive: 60, defaultTermType: 'xterm-256color',
   uiFontFamily: DEFAULT_UI_FONT_FAMILY, uiFontFallbackFamily: DEFAULT_UI_FONT_FALLBACK_FAMILY,
   uiFontSize: DEFAULT_UI_FONT_SIZE,
-  rightClickAction: 'menu', copyOnSelect: false, scrollbackLines: DEFAULT_TERMINAL_SCROLLBACK_LINES, autoReconnect: false, restoreTabsOnStartup: true, renderer: DEFAULT_TERMINAL_RENDERER, historyPredict: false,
+  rightClickAction: 'menu', copyOnSelect: false, scrollbackLines: DEFAULT_TERMINAL_SCROLLBACK_LINES, autoReconnect: false, restoreTabsOnStartup: true, renderer: DEFAULT_TERMINAL_RENDERER, historyPredict: false, localShell: '', localShellArgs: '', localShellCwd: '', localShellLogin: true,
   closeButtonAction: 'tray',
   logDir: '',
   logRetentionDays: 30,
@@ -122,6 +126,10 @@ function normalizeGeneral(settings: GeneralSettings): GeneralSettings {
     restoreTabsOnStartup: normalizeRestoreTabsOnStartup(settings.restoreTabsOnStartup),
     renderer: normalizeTerminalRenderer(settings.renderer),
     historyPredict: normalizeHistoryPredict(settings.historyPredict),
+    localShell: String(settings.localShell ?? ''),
+    localShellArgs: String(settings.localShellArgs ?? ''),
+    localShellCwd: String(settings.localShellCwd ?? ''),
+    localShellLogin: settings.localShellLogin !== false,
     closeButtonAction: normalizeCloseButtonAction(settings.closeButtonAction),
     logDir: normalizeLogDir(settings.logDir),
     logRetentionDays: normalizeLogRetentionDays(settings.logRetentionDays),
@@ -147,6 +155,10 @@ function parseGeneral(settings: { [_ in string]?: Setting }): GeneralSettings {
     restoreTabsOnStartup: settingValue(settings, 'terminal.restore_tabs_on_startup', true),
     renderer: settingValue(settings, 'terminal.renderer', DEFAULT_TERMINAL_RENDERER),
     historyPredict: settingValue(settings, 'terminal.history_predict', false),
+    localShell: settingValue(settings, 'terminal.local_shell', ''),
+    localShellArgs: settingValue(settings, 'terminal.local_shell_args', ''),
+    localShellCwd: settingValue(settings, 'terminal.local_shell_cwd', ''),
+    localShellLogin: settingValue(settings, 'terminal.local_shell_login', true),
     uiFontFamily, uiFontFallbackFamily: settingValue(settings, 'appearance.ui_font_fallback_family', DEFAULT_UI_FONT_FALLBACK_FAMILY),
     uiFontSize: settingValue(settings, 'appearance.ui_font_size', DEFAULT_UI_FONT_SIZE),
     closeButtonAction: settingValue(settings, 'application.close_button_action', 'tray'),
@@ -186,7 +198,7 @@ async function persistGeneral(settings: GeneralSettings) {
   await Promise.all([SettingService.SetMany([
     settingEntry('terminal.max_pool_size', settings.maxPoolSize), settingEntry('terminal.default_keep_alive', settings.defaultKeepAlive),
     settingEntry('terminal.default_term_type', settings.defaultTermType), settingEntry('terminal.right_click_action', settings.rightClickAction),
-    settingEntry('terminal.copy_on_select', settings.copyOnSelect), settingEntry('terminal.scrollback_lines', settings.scrollbackLines), settingEntry('terminal.auto_reconnect', settings.autoReconnect), settingEntry('terminal.restore_tabs_on_startup', settings.restoreTabsOnStartup), settingEntry('terminal.renderer', settings.renderer), settingEntry('terminal.history_predict', settings.historyPredict), settingEntry('appearance.ui_font_family', settings.uiFontFamily),
+    settingEntry('terminal.copy_on_select', settings.copyOnSelect), settingEntry('terminal.scrollback_lines', settings.scrollbackLines), settingEntry('terminal.auto_reconnect', settings.autoReconnect), settingEntry('terminal.restore_tabs_on_startup', settings.restoreTabsOnStartup), settingEntry('terminal.renderer', settings.renderer), settingEntry('terminal.history_predict', settings.historyPredict), settingEntry('terminal.local_shell', settings.localShell), settingEntry('terminal.local_shell_args', settings.localShellArgs), settingEntry('terminal.local_shell_cwd', settings.localShellCwd), settingEntry('terminal.local_shell_login', settings.localShellLogin), settingEntry('appearance.ui_font_family', settings.uiFontFamily),
     settingEntry('appearance.ui_font_fallback_family', settings.uiFontFallbackFamily), settingEntry('appearance.ui_font_size', settings.uiFontSize),
     settingEntry('application.close_button_action', settings.closeButtonAction),
     settingEntry('application.log_dir', settings.logDir),

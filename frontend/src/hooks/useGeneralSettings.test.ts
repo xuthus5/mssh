@@ -15,6 +15,7 @@ const savedGeneral = {
   uiFontFamily: 'Arial', uiFontFallbackFamily: 'Segoe UI', uiFontSize: 18,
   rightClickAction: 'paste' as const, copyOnSelect: true, scrollbackLines: 10000, autoReconnect: false, restoreTabsOnStartup: true, renderer: 'dom' as const,
   historyPredict: false,
+  localShell: '', localShellArgs: '', localShellCwd: '', localShellLogin: true,
   closeButtonAction: 'exit' as const,
   logDir: '/tmp/mssh-logs',
   logRetentionDays: 14,
@@ -228,3 +229,35 @@ describe('useGeneralSettings cross-window sync', () => {
     ]))
   })
 })
+
+  it('loads and persists local shell preference', async () => {
+    let savedEntries: Array<{ key: string; value: string }> = []
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.GetMany', async () => ({
+      'terminal.local_shell': setting('terminal.local_shell', '/bin/zsh'),
+      'terminal.local_shell_args': setting('terminal.local_shell_args', '-i'),
+      'terminal.local_shell_cwd': setting('terminal.local_shell_cwd', '/tmp'),
+      'terminal.local_shell_login': setting('terminal.local_shell_login', false),
+    }))
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.SetMany', async (entries) => { savedEntries = entries })
+    const { result } = renderHook(() => useGeneralSettings())
+    await waitFor(() => expect(result.current.general.localShell).toBe('/bin/zsh'))
+    expect(result.current.general.localShellArgs).toBe('-i')
+    expect(result.current.general.localShellCwd).toBe('/tmp')
+    expect(result.current.general.localShellLogin).toBe(false)
+    await act(async () => {
+      await result.current.saveGeneral({
+        ...savedGeneral,
+        localShell: '/bin/bash',
+        localShellArgs: '-l',
+        localShellCwd: '~',
+        localShellLogin: true,
+      })
+    })
+    expect(savedEntries).toEqual(expect.arrayContaining([
+      expect.objectContaining({ key: 'terminal.local_shell', value: '"/bin/bash"' }),
+      expect.objectContaining({ key: 'terminal.local_shell_args', value: '"-l"' }),
+      expect.objectContaining({ key: 'terminal.local_shell_cwd', value: '"~"' }),
+      expect.objectContaining({ key: 'terminal.local_shell_login', value: 'true' }),
+    ]))
+  })
+

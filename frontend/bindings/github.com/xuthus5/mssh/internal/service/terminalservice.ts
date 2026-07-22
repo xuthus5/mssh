@@ -32,6 +32,14 @@ export function Open(sessionID: number, cols: number, rows: number): $Cancellabl
 /**
  * OpenSerial opens a terminal attached to a configured serial port profile.
  */
+
+/**
+ * OpenLocal opens a terminal attached to a local interactive shell.
+ */
+export function OpenLocal(cols: number, rows: number): $CancellablePromise<string> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.TerminalService.OpenLocal", cols, rows);
+}
+
 export function OpenSerial(serialPortID: number, cols: number, rows: number): $CancellablePromise<string> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.TerminalService.OpenSerial", serialPortID, cols, rows);
 }

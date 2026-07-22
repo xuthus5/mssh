@@ -1257,5 +1257,16 @@
   "串口配置已复制": "Serial profile duplicated",
   "副本": "copy",
   "已发送 Break": "Break sent",
-  "连接时应用到底层串口：None / XON-XOFF 软件流控 / RTS-CTS 硬件流控 / DSR-DTR 硬件流控（Windows 完整，Linux 尽力）。": "Applied to the native port on connect: None / XON-XOFF software / RTS-CTS hardware / DSR-DTR hardware (full on Windows, best-effort on Linux)."
+  "连接时应用到底层串口：None / XON-XOFF 软件流控 / RTS-CTS 硬件流控 / DSR-DTR 硬件流控（Windows 完整，Linux 尽力）。": "Applied to the native port on connect: None / XON-XOFF software / RTS-CTS hardware / DSR-DTR hardware (full on Windows, best-effort on Linux).",
+  "本地终端": "Local Terminal",
+  "打开本地终端": "Open local terminal",
+  "配置本机交互 Shell 的默认路径、参数、工作目录与登录行为。": "Configure the default path, arguments, working directory, and login behavior for the local interactive shell.",
+  "Shell 路径": "Shell path",
+  "留空则使用系统默认（Unix: $SHELL，Windows: ComSpec/cmd.exe）。": "Leave empty to use the system default (Unix: $SHELL, Windows: ComSpec/cmd.exe).",
+  "启动参数": "Startup arguments",
+  "工作目录": "Working directory",
+  "留空则使用用户家目录。": "Leave empty to use the user home directory.",
+  "以登录 Shell 启动": "Start as a login shell",
+  "Unix 下默认附加 -l；若自定义了启动参数则不再自动附加。": "On Unix, appends -l by default; custom startup arguments disable automatic -l.",
+  "打开本地终端失败: ${}": "Failed to open local terminal: ${}"
 }
