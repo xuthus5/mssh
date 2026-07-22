@@ -1155,5 +1155,13 @@
   "即将删除 ${} 个会话。正在分析关联资产影响范围。此操作不可撤销。": "About to delete ${} sessions. Analyzing impact on linked assets. This cannot be undone.",
   "应用渲染失败": "Application failed to render",
   "页面遇到意外错误。你可以重试恢复，或重新加载应用。": "The page hit an unexpected error. Retry to recover, or reload the app.",
-  "重新加载": "Reload"
+  "重新加载": "Reload",
+  "应用日志": "Application Logs",
+  "按日期写入日志文件，并自动清理超出保留天数的旧日志。": "Write daily log files and automatically prune files older than the retention window.",
+  "日志目录": "Log Directory",
+  "默认为用户家目录下的 .mssh/logs，文件名形如 2026-07-15.log。": "Defaults to ~/.mssh/logs under the home directory, with names like 2026-07-15.log.",
+  "选择日志目录": "Select Log Directory",
+  "浏览": "Browse",
+  "日志保留天数": "Log Retention Days",
+  "超过保留天数的按日日志文件会被自动删除，默认 30 天。": "Daily log files older than this many days are deleted automatically. Default is 30 days."
 }

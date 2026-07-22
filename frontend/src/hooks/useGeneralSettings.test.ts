@@ -11,6 +11,8 @@ const savedGeneral = {
   uiFontFamily: 'Arial', uiFontFallbackFamily: 'Segoe UI', uiFontSize: 18,
   rightClickAction: 'paste' as const, copyOnSelect: true, scrollbackLines: 10000,
   closeButtonAction: 'exit' as const,
+  logDir: '/tmp/mssh-logs',
+  logRetentionDays: 14,
   language: 'zh-CN' as const,
 }
 
@@ -95,6 +97,24 @@ describe('useGeneralSettings cross-window sync', () => {
     expect(savedEntries).toContainEqual(expect.objectContaining({
       key: 'application.close_button_action', value: '"tray"',
     }))
+  })
+
+  it('loads and persists application log settings', async () => {
+    let savedEntries: Array<{ key: string; value: string }> = []
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.GetMany', async () => ({
+      'application.log_dir': setting('application.log_dir', '/var/log/mssh'),
+      'application.log_retention_days': setting('application.log_retention_days', 45),
+    }))
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.SetMany', async (entries) => { savedEntries = entries })
+    const { result } = renderHook(() => useGeneralSettings())
+    await waitFor(() => expect(result.current.general.logDir).toBe('/var/log/mssh'))
+    await waitFor(() => expect(result.current.general.logRetentionDays).toBe(45))
+    await act(async () => {
+      await result.current.saveGeneral({ ...savedGeneral, logDir: ' /data/logs ', logRetentionDays: 99999 })
+    })
+    expect(savedEntries).toContainEqual(expect.objectContaining({ key: 'application.log_dir', value: '"/data/logs"' }))
+    expect(savedEntries).toContainEqual(expect.objectContaining({ key: 'application.log_retention_days', value: '3650' }))
+    expect(result.current.general.logRetentionDays).toBe(3650)
   })
 
   it('loads and persists terminal scrollback lines with clamping', async () => {
