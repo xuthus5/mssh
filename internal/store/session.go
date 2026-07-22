@@ -232,14 +232,6 @@ func UpdateSessionWithTags(db *sql.DB, s model.Session, tagIDs []int64) error {
 	return tx.Commit()
 }
 
-func DeleteSession(db *sql.DB, id int64) error {
-	_, err := db.Exec("DELETE FROM sessions WHERE id = ?", id)
-	if err != nil {
-		return fmt.Errorf("delete session: %w", err)
-	}
-	return nil
-}
-
 func GetSession(db *sql.DB, id int64) (*model.Session, error) {
 	s, err := scanSession(db.QueryRow(sessionSelectColumns+" FROM sessions s LEFT JOIN asset_environments e ON e.id = s.environment_id LEFT JOIN asset_projects p ON p.id = s.project_id WHERE s.id = ?", id))
 	if err != nil {

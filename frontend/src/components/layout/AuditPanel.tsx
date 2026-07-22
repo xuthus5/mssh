@@ -20,7 +20,7 @@ const actionOptions = [
   { value: 'export', label: t('导出配置') }, { value: 'import', label: t('导入配置') },
   { value: 'cloud_upload', label: t('云端上传') }, { value: 'cloud_download', label: t('云端下载') },
   { value: 'delete', label: t('删除资产') }, { value: 'key_view', label: t('查看密钥') },
-  { value: 'batch_connect', label: t('批量连接') }, { value: 'batch_macro', label: t('批量宏') },
+  { value: 'batch_connect', label: t('批量连接') }, { value: 'batch_macro', label: t('批量宏') }, { value: 'batch_delete', label: t('批量删除') },
 ]
 
 export function AuditPanel() {

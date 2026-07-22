@@ -7,7 +7,7 @@ import { logger } from '@/lib/logger'
 import { createTerminalTab } from '@/lib/terminalTabs'
 import type { SessionInput } from '../../bindings/github.com/xuthus5/mssh/internal/model/models'
 import { reconnectSessionTab } from '@/hooks/sessionReconnect'
-import { runBatchSessions } from '@/lib/sessionBatch'
+import { runBatchDeleteSessions, runBatchSessions } from '@/lib/sessionBatch'
 import { mapFolder, mapSession, mapTunnel, type AssetEnvironment, type AssetProject, type AssetTag, type Folder, type Session, type Tunnel } from '@/lib/sessionModels'
 import { useSessionAssetCatalog } from '@/hooks/useSessionAssetCatalog'
 import { useSessionCSVTransfer } from '@/hooks/useSessionCSVTransfer'
@@ -231,6 +231,17 @@ export function useSession() {
   }, [listRecentSessions, listSessions, sessions])
   const batchConnect = useCallback((sessionIDs: string[]) => runBatch(sessionIDs), [runBatch])
   const batchExecuteMacro = useCallback((sessionIDs: string[], command: string) => runBatch(sessionIDs, command), [runBatch])
+  const batchDeleteSessions = useCallback(async (sessionIDs: string[]) => {
+    const selected = sessionIDs.map((id) => sessions.find((session) => session.id === id)).filter((session): session is Session => session !== undefined)
+    const results = await runBatchDeleteSessions(selected)
+    const succeeded = new Set(results.filter((result) => result.success).map((result) => result.sessionId))
+    if (succeeded.size > 0) {
+      setSessions((prev) => prev.filter((session) => !succeeded.has(session.id)))
+      setRecentSessions((prev) => prev.filter((session) => !succeeded.has(session.id)))
+    }
+    await Promise.all([listRecentSessions(), listSessions(), listAssetCatalogs()])
+    return results
+  }, [listAssetCatalogs, listRecentSessions, listSessions, sessions])
 
   const disconnect = useCallback(async (terminalId: string) => {
     try {
@@ -261,7 +272,7 @@ export function useSession() {
     folders, sessions, recentSessions, tunnels, environments, projects, tags, loading, sessionsLoaded, error,
     listFolders, createFolder, deleteFolder, updateFolder, setDefaultFolder,
     listSessions, listRecentSessions, createSession, updateSession, deleteSession, moveSession,
-    connect, batchConnect, batchExecuteMacro, reconnect, disconnect, listTunnels,
+    connect, batchConnect, batchExecuteMacro, batchDeleteSessions, reconnect, disconnect, listTunnels,
     ...csvTransfer,
     ...assetCatalog,
   }
