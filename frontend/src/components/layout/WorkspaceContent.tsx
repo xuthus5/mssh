@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
 import { useAppStore } from '@/store/appStore'
 import { WORKSPACE_PANEL_ID, workspaceTabID } from '@/store/tabNavigation'
-import { APP_NEW_SESSION_EVENT, emitAppEvent } from '@/lib/appEvents'
+import { APP_NEW_LOCAL_TERMINAL_EVENT, APP_NEW_SESSION_EVENT, emitAppEvent } from '@/lib/appEvents'
 import { SESSION_QUICK_SEARCH_EVENT } from '@/lib/sessionQuickSearch'
 import QuickCommands from '@/components/session/QuickCommands'
 import { useEffect, useState } from 'react'
@@ -30,9 +30,14 @@ function WelcomeScreen() {
         <span className="text-sm text-muted-foreground">{t('Secure Shell Client & Session Manager')}</span>
       </div>
       <div className="flex flex-col items-center gap-3">
-        <Button size="lg" onClick={() => emitAppEvent(APP_NEW_SESSION_EVENT)}>
-          <Plus />{t('新建会话')}
-        </Button>
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          <Button size="lg" onClick={() => emitAppEvent(APP_NEW_SESSION_EVENT)}>
+            <Plus />{t('新建会话')}
+          </Button>
+          <Button size="lg" variant="outline" onClick={() => emitAppEvent(APP_NEW_LOCAL_TERMINAL_EVENT)}>
+            <Terminal />{t('本地终端')}
+          </Button>
+        </div>
         <span className="text-xs text-muted-foreground">{t('也可双击侧边栏会话列表中的主机开始连接')}</span>
       </div>
       <ShortcutCard mod={mod} />
@@ -48,6 +53,7 @@ function WelcomeScreen() {
 function ShortcutCard({ mod }: { mod: string }) {
   const rows = [
     [`${mod}+N`, t('新建会话')],
+    [`${mod}+Shift+N`, t('本地终端')],
     [`${mod}+W`, t('关闭标签页')],
     [`${mod}+F`, t('快速搜索会话')],
     [`${mod}+Shift+C`, t('复制')],

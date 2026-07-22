@@ -17,6 +17,9 @@ export function resolveSessionId(refs: TerminalInputRefs): number | null {
   if (tab.connectionKind === 'serial') {
     return tab.serialPortId && tab.serialPortId > 0 ? -tab.serialPortId : null
   }
+  if (tab.connectionKind === 'local') {
+    return -1
+  }
   return tab.sessionId
 }
 

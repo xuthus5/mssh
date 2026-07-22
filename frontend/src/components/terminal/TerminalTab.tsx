@@ -64,7 +64,9 @@ export function TerminalTab({ terminalID, sessionId, onOpenFiles, active, focusR
   const toolPanel = currentTab?.toolPanel ?? null
   const historySessionId = currentTab?.connectionKind === 'serial'
     ? -(currentTab.serialPortId ?? 0)
-    : sessionId
+    : currentTab?.connectionKind === 'local'
+      ? -1
+      : sessionId
   const splitRef = useRef<TerminalSplitHandle>(null)
   const [splitState, setSplitState] = useState({ paneCount: 1, busy: false })
   const [searchOpen, setSearchOpen] = useState(false)
@@ -84,9 +86,9 @@ export function TerminalTab({ terminalID, sessionId, onOpenFiles, active, focusR
         recordingLogId={null}
         onToggleRecording={recording.toggle}
         hostname={currentTab?.title}
-        filesSupported={currentTab?.connectionKind !== 'serial'}
+        filesSupported={currentTab?.connectionKind !== 'serial' && currentTab?.connectionKind !== 'local'}
         serialControls={currentTab?.connectionKind === 'serial'}
-        onOpenFiles={currentTab?.connectionKind === 'serial' ? undefined : () => onOpenFiles(activeTerminalID)}
+        onOpenFiles={(currentTab?.connectionKind === 'serial' || currentTab?.connectionKind === 'local') ? undefined : () => onOpenFiles(activeTerminalID)}
         onSplit={(direction) => splitRef.current?.split(direction)}
         splitDisabled={splitState.busy || splitState.paneCount >= 8}
         paneCount={splitState.paneCount}

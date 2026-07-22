@@ -12,7 +12,8 @@ import { WorkspaceContent } from '@/components/layout/WorkspaceContent'
 import { TerminalLayers } from '@/components/terminal/TerminalLayers'
 import { SessionQuickSearchHost } from '@/components/session/SessionQuickSearchHost'
 import { SESSION_QUICK_SEARCH_EVENT } from '@/lib/sessionQuickSearch'
-import { APP_NEW_SESSION_EVENT, emitAppEvent } from '@/lib/appEvents'
+import { APP_NEW_LOCAL_TERMINAL_EVENT, APP_NEW_SESSION_EVENT, emitAppEvent, onAppEvent } from '@/lib/appEvents'
+import { openLocalTerminal } from '@/lib/openLocalTerminal'
 import { GeneralSettingsRuntime } from '@/components/layout/GeneralSettingsRuntime'
 import { WorkspacePersistence } from '@/components/layout/WorkspacePersistence'
 import { createAppSyncDataReload, hotReloadSessionWorkspace, registerSyncDataReload } from '@/lib/syncDataReload'
@@ -88,6 +89,7 @@ function handleShortcut(event: KeyboardEvent) {
   const state = useAppStore.getState()
 
   if (!event.shiftKey && key === 'n') emitAppEvent(APP_NEW_SESSION_EVENT)
+  else if (event.shiftKey && key === 'n') emitAppEvent(APP_NEW_LOCAL_TERMINAL_EVENT)
   else if (!event.shiftKey && key === 'w') closeActiveTab(state)
   else if (event.shiftKey && key === 'c') copySelection(state)
   else if (event.shiftKey && key === 'v') pasteClipboard(state)
@@ -104,6 +106,12 @@ function AppShell() {
     document.addEventListener('keydown', handleShortcut)
     return () => document.removeEventListener('keydown', handleShortcut)
   }, [])
+
+  useEffect(() => onAppEvent(APP_NEW_LOCAL_TERMINAL_EVENT, () => {
+    void openLocalTerminal().catch((error: unknown) => {
+      toast(error instanceof Error ? error.message : String(error), 'error')
+    })
+  }), [])
 
   useEffect(() => registerSyncDataReload(createAppSyncDataReload({
     hotReload: () => hotReloadSessionWorkspace(workspace),

@@ -71,3 +71,19 @@ describe('createTerminalTab', () => {
     })
     expect(second.title).toBe('ESP32 #2')
   })
+
+  it('creates local shell tabs without session assets', () => {
+    expect(createTerminalTab({
+      sessionID: 0,
+      sessionName: '本地终端',
+      terminalID: 'term-local',
+      tabs: [],
+      connectionKind: 'local',
+    })).toMatchObject({
+      sessionId: 0,
+      connectionKind: 'local',
+      title: '本地终端',
+      terminalInstance: 1,
+    })
+  })
+
