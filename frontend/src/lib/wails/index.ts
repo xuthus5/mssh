@@ -18,6 +18,7 @@ import * as _AuditService from '../../../bindings/github.com/xuthus5/mssh/intern
 import * as _AssetCatalogService from '../../../bindings/github.com/xuthus5/mssh/internal/service/assetcatalogservice'
 import * as _AIService from '../../../bindings/github.com/xuthus5/mssh/internal/service/aiservice'
 import * as _SecurityService from '../../../bindings/github.com/xuthus5/mssh/internal/service/securityservice'
+import * as _SerialService from '../../../bindings/github.com/xuthus5/mssh/internal/service/serialservice'
 
 export const SessionService = _SessionService
 export const TerminalService = _TerminalService
@@ -36,3 +37,4 @@ export const AuditService = _AuditService
 export const AssetCatalogService = _AssetCatalogService
 export const AIService = _AIService
 export const SecurityService = _SecurityService
+export const SerialService = _SerialService

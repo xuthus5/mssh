@@ -11,6 +11,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import type { SplitDirection } from '@/components/terminal/splitTree'
 import { getClipboard } from '@/lib/clipboard'
 import { t } from '@/i18n'
+import { SerialSignalToolbar } from '@/components/terminal/SerialSignalToolbar'
 
 
 interface TerminalToolbarProps {
@@ -20,7 +21,9 @@ interface TerminalToolbarProps {
   recordingLogId: number | null
   onToggleRecording: () => void
   hostname?: string
-  onOpenFiles: () => void
+  onOpenFiles?: () => void
+  filesSupported?: boolean
+  serialControls?: boolean
   onSplit: (direction: SplitDirection) => void
   splitDisabled: boolean
   paneCount: number
@@ -157,7 +160,7 @@ function SessionLogPopover({ open, sessionId, setOpen, setBlocked, onOpenChange 
   </Popover>
 }
 
-interface ToolbarActionsProps extends Pick<TerminalToolbarProps, 'sessionId' | 'isRecording' | 'onToggleRecording' | 'onOpenFiles' | 'onSplit' | 'splitDisabled' | 'paneCount' | 'searchOpen' | 'onToggleSearch' | 'composeOpen' | 'onToggleCompose'> {
+interface ToolbarActionsProps extends Pick<TerminalToolbarProps, 'sessionId' | 'isRecording' | 'onToggleRecording' | 'onOpenFiles' | 'filesSupported' | 'onSplit' | 'splitDisabled' | 'paneCount' | 'searchOpen' | 'onToggleSearch' | 'composeOpen' | 'onToggleCompose'> {
   clipboard: ReturnType<typeof useClipboardActions>
   logOpen: boolean
   setLogOpen: Dispatch<SetStateAction<boolean>>
@@ -178,18 +181,24 @@ function ToolbarActions(props: ToolbarActionsProps) {
     </button>
     <button type="button" className={actionClass} onClick={props.onOpenHistory} title={t('命令历史')}><History className="h-3 w-3" /><span className="hidden sm:inline">{t('历史')}</span></button>
     <div className="w-px h-4 bg-border mx-0.5" />
-    <button type="button" className={actionClass} onClick={props.onOpenFiles} title={t('文件管理')}>
-      <FolderOpen className="h-3 w-3" /><span className="hidden sm:inline">{t('文件')}</span>
-    </button>
+    {props.filesSupported !== false && props.onOpenFiles ? (
+      <button type="button" className={actionClass} onClick={props.onOpenFiles} title={t('文件管理')}>
+        <FolderOpen className="h-3 w-3" /><span className="hidden sm:inline">{t('文件')}</span>
+      </button>
+    ) : null}
     <button type="button" className={props.composeOpen ? `${actionClass} bg-primary/15 text-primary` : actionClass}
       onClick={props.onToggleCompose} title={props.composeOpen ? t('关闭撰写面板') : t('撰写终端内容')}>
       <PenLine className="h-3 w-3" /><span className="hidden sm:inline">{t('撰写')}</span>
     </button>
     <button type="button" className={actionClass} onClick={props.onOpenAI} title={t('AI 运维')}><Bot className="h-3 w-3" /><span className="hidden sm:inline">AI</span></button>
-    <button type="button" className={actionClass} onClick={props.onOpenTunnels} title={t('隧道管理')}>
-      <Network className="h-3 w-3" /><span className="hidden sm:inline">{t('隧道')}</span>
-    </button>
-    <button type="button" className={actionClass} onClick={props.onOpenSystem} title={t('系统监控')}><Activity className="h-3 w-3" /><span className="hidden sm:inline">{t('系统')}</span></button>
+    {props.filesSupported !== false ? (
+      <button type="button" className={actionClass} onClick={props.onOpenTunnels} title={t('隧道管理')}>
+        <Network className="h-3 w-3" /><span className="hidden sm:inline">{t('隧道')}</span>
+      </button>
+    ) : null}
+    {props.filesSupported !== false ? (
+      <button type="button" className={actionClass} onClick={props.onOpenSystem} title={t('系统监控')}><Activity className="h-3 w-3" /><span className="hidden sm:inline">{t('系统')}</span></button>
+    ) : null}
     <div className="w-px h-4 bg-border mx-0.5" />
     <SplitAction disabled={props.splitDisabled} paneCount={props.paneCount} onSplit={props.onSplit} />
     <div className="w-px h-4 bg-border mx-0.5" />
@@ -212,6 +221,7 @@ export function TerminalToolbar(props: TerminalToolbarProps) {
   }, [sessionLogBlocked])
   return <div className="relative flex h-8 flex-shrink-0 items-center gap-1 bg-muted/30 px-2">
     <span className="text-xs text-muted-foreground truncate mr-2">{props.hostname ?? 'Terminal'}</span>
+    {props.serialControls ? <SerialSignalToolbar terminalID={props.terminalID} /> : null}
     <ToolbarActions {...props} onOpenSystem={props.onOpenSystem ?? (() => {})} onOpenHistory={props.onOpenHistory ?? (() => {})} onOpenAI={props.onOpenAI ?? (() => {})} onOpenTunnels={() => { setTunnelOpen(true); void tunnels.load() }} clipboard={clipboard} logOpen={showSessionLog} setLogOpen={setShowSessionLog}
       setLogBlocked={setSessionLogBlocked} onLogOpenChange={handleSessionLogOpenChange} />
     <TunnelDialog open={tunnelOpen} onOpenChange={setTunnelOpen} tunnels={tunnels.tunnels}

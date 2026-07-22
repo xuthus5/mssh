@@ -62,6 +62,9 @@ export function TerminalTab({ terminalID, sessionId, onOpenFiles, active, focusR
   const updateTerminalWorkspace = useAppStore((state) => state.updateTerminalWorkspace)
   const currentTab = tabs.find((tab): tab is TerminalTabState => tab.type === 'terminal' && tab.terminalId === terminalID)
   const toolPanel = currentTab?.toolPanel ?? null
+  const historySessionId = currentTab?.connectionKind === 'serial'
+    ? -(currentTab.serialPortId ?? 0)
+    : sessionId
   const splitRef = useRef<TerminalSplitHandle>(null)
   const [splitState, setSplitState] = useState({ paneCount: 1, busy: false })
   const [searchOpen, setSearchOpen] = useState(false)
@@ -81,7 +84,9 @@ export function TerminalTab({ terminalID, sessionId, onOpenFiles, active, focusR
         recordingLogId={null}
         onToggleRecording={recording.toggle}
         hostname={currentTab?.title}
-        onOpenFiles={() => onOpenFiles(activeTerminalID)}
+        filesSupported={currentTab?.connectionKind !== 'serial'}
+        serialControls={currentTab?.connectionKind === 'serial'}
+        onOpenFiles={currentTab?.connectionKind === 'serial' ? undefined : () => onOpenFiles(activeTerminalID)}
         onSplit={(direction) => splitRef.current?.split(direction)}
         splitDisabled={splitState.busy || splitState.paneCount >= 8}
         paneCount={splitState.paneCount}
@@ -98,7 +103,7 @@ export function TerminalTab({ terminalID, sessionId, onOpenFiles, active, focusR
           active={active} focusRequest={focusRequest} onStateChange={setSplitState}
           onPaneClosed={onPaneClosed} onPaneReplaced={onPaneReplaced} onCloseTerminal={onCloseTerminal} /> : null}
         <TerminalSearchBar terminalID={activeTerminalID} open={searchOpen} onOpenChange={setSearchOpen} />
-        {toolPanel === 'history' && <CommandHistoryPanel sessionID={sessionId} onClose={() => updateWorkspace({ toolPanel: null })} onFill={(command) => { const terminal = useAppStore.getState().terminalPool.get(activeTerminalID)?.terminal; terminal?.paste(command); terminal?.focus() }} />}
+        {toolPanel === 'history' && historySessionId !== 0 && <CommandHistoryPanel sessionID={historySessionId} onClose={() => updateWorkspace({ toolPanel: null })} onFill={(command) => { const terminal = useAppStore.getState().terminalPool.get(activeTerminalID)?.terminal; terminal?.paste(command); terminal?.focus() }} />}
         {toolPanel === 'system' && <SystemPanel terminalID={activeTerminalID} onClose={() => updateWorkspace({ toolPanel: null })} />}
         {toolPanel === 'ai' && <AITerminalPanel terminalID={activeTerminalID} sessionID={sessionId} onClose={() => updateWorkspace({ toolPanel: null })} />}
       </div>

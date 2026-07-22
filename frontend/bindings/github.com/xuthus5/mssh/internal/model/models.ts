@@ -2074,6 +2074,196 @@ export class SecurityUnlockInput {
     }
 }
 
+/**
+ * SerialParity represents serial parity mode.
+ */
+export enum SerialParity {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    SerialParityNone = "none",
+    SerialParityOdd = "odd",
+    SerialParityEven = "even",
+    SerialParityMark = "mark",
+    SerialParitySpace = "space",
+};
+
+/**
+ * SerialPort is a saved serial connection profile.
+ */
+export class SerialPort {
+    "id": number;
+    "name": string;
+    "device": string;
+    "baud_rate": number;
+    "data_bits": number;
+    "parity": SerialParity;
+    "stop_bits": SerialStopBits;
+    "flow_control": string;
+    "line_ending": SerialLineEnding;
+    "local_echo": boolean;
+    "dtr_on_open": boolean;
+    "rts_on_open": boolean;
+    "notes": string;
+    "sort_order": number;
+    "created_at": string;
+    "updated_at": string;
+
+    /** Creates a new SerialPort instance. */
+    constructor($$source: Partial<SerialPort> = {}) {
+        if (!("id" in $$source)) {
+            this["id"] = 0;
+        }
+        if (!("name" in $$source)) {
+            this["name"] = "";
+        }
+        if (!("device" in $$source)) {
+            this["device"] = "";
+        }
+        if (!("baud_rate" in $$source)) {
+            this["baud_rate"] = 0;
+        }
+        if (!("data_bits" in $$source)) {
+            this["data_bits"] = 0;
+        }
+        if (!("parity" in $$source)) {
+            this["parity"] = SerialParity.$zero;
+        }
+        if (!("stop_bits" in $$source)) {
+            this["stop_bits"] = SerialStopBits.$zero;
+        }
+        if (!("flow_control" in $$source)) {
+            this["flow_control"] = "";
+        }
+        if (!("line_ending" in $$source)) {
+            this["line_ending"] = SerialLineEnding.$zero;
+        }
+        if (!("local_echo" in $$source)) {
+            this["local_echo"] = false;
+        }
+        if (!("dtr_on_open" in $$source)) {
+            this["dtr_on_open"] = false;
+        }
+        if (!("rts_on_open" in $$source)) {
+            this["rts_on_open"] = false;
+        }
+        if (!("notes" in $$source)) {
+            this["notes"] = "";
+        }
+        if (!("sort_order" in $$source)) {
+            this["sort_order"] = 0;
+        }
+        if (!("created_at" in $$source)) {
+            this["created_at"] = "0001-01-01T00:00:00.000Z";
+        }
+        if (!("updated_at" in $$source)) {
+            this["updated_at"] = "0001-01-01T00:00:00.000Z";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new SerialPort instance from a string or object.
+     */
+    static createFrom($$source: any = {}): SerialPort {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new SerialPort($$parsedSource as Partial<SerialPort>);
+    }
+}
+
+/**
+ * SerialPortInput is the create/update payload for serial profiles.
+ */
+export class SerialPortInput {
+    "id": number;
+    "name": string;
+    "device": string;
+    "baud_rate": number;
+    "data_bits": number;
+    "parity": SerialParity;
+    "stop_bits": SerialStopBits;
+    "flow_control": string;
+    "line_ending": SerialLineEnding;
+    "local_echo": boolean;
+    "dtr_on_open": boolean;
+    "rts_on_open": boolean;
+    "notes": string;
+    "sort_order": number;
+
+    /** Creates a new SerialPortInput instance. */
+    constructor($$source: Partial<SerialPortInput> = {}) {
+        if (!("id" in $$source)) {
+            this["id"] = 0;
+        }
+        if (!("name" in $$source)) {
+            this["name"] = "";
+        }
+        if (!("device" in $$source)) {
+            this["device"] = "";
+        }
+        if (!("baud_rate" in $$source)) {
+            this["baud_rate"] = 0;
+        }
+        if (!("data_bits" in $$source)) {
+            this["data_bits"] = 0;
+        }
+        if (!("parity" in $$source)) {
+            this["parity"] = SerialParity.$zero;
+        }
+        if (!("stop_bits" in $$source)) {
+            this["stop_bits"] = SerialStopBits.$zero;
+        }
+        if (!("flow_control" in $$source)) {
+            this["flow_control"] = "";
+        }
+        if (!("line_ending" in $$source)) {
+            this["line_ending"] = SerialLineEnding.$zero;
+        }
+        if (!("local_echo" in $$source)) {
+            this["local_echo"] = false;
+        }
+        if (!("dtr_on_open" in $$source)) {
+            this["dtr_on_open"] = false;
+        }
+        if (!("rts_on_open" in $$source)) {
+            this["rts_on_open"] = false;
+        }
+        if (!("notes" in $$source)) {
+            this["notes"] = "";
+        }
+        if (!("sort_order" in $$source)) {
+            this["sort_order"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new SerialPortInput instance from a string or object.
+     */
+    static createFrom($$source: any = {}): SerialPortInput {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new SerialPortInput($$parsedSource as Partial<SerialPortInput>);
+    }
+}
+
+/**
+ * SerialStopBits represents serial stop bit configuration.
+ */
+export enum SerialStopBits {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    SerialStopBitsOne = "1",
+    SerialStopBitsOnePointFive = "1.5",
+    SerialStopBitsTwo = "2",
+};
+
 export class Session {
     "id": number;
     "folder_id": number | null;
@@ -3988,3 +4178,45 @@ const $$createType45 = ThemeImportResult.createFrom;
 const $$createType46 = $Create.Array($$createType45);
 const $$createType47 = ThemeDefinition.createFrom;
 const $$createType48 = $Create.Nullable($$createType47);
+/**
+ * SerialLineEnding controls how Enter / newline is sent to the device.
+ */
+export enum SerialLineEnding {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    SerialLineEndingCR = "cr",
+    SerialLineEndingLF = "lf",
+    SerialLineEndingCRLF = "crlf",
+}
+
+/**
+ * SerialSignals is the runtime modem output state for an open serial terminal.
+ */
+export class SerialSignals {
+    "dtr": boolean;
+    "rts": boolean;
+
+    /** Creates a new SerialSignals instance. */
+    constructor($$source: Partial<SerialSignals> = {}) {
+        if (!("dtr" in $$source)) {
+            this["dtr"] = false;
+        }
+        if (!("rts" in $$source)) {
+            this["rts"] = false;
+        }
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new SerialSignals instance from a string or object.
+     */
+    static createFrom($$source: any = {}): SerialSignals {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new SerialSignals($$parsedSource as Partial<SerialSignals>);
+    }
+}
+
+

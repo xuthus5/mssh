@@ -9,6 +9,13 @@ import { Call as $Call, CancellablePromise as $CancellablePromise, Create as $Cr
 // @ts-ignore: Unused imports
 import * as model$0 from "../model/models.js";
 
+/**
+ * AdoptVaultFromContent installs the vault envelope embedded in a sync/backup artifact.
+ */
+export function AdoptVaultFromContent(password: string, content: string): $CancellablePromise<void> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.SyncService.AdoptVaultFromContent", password, content);
+}
+
 export function Dashboard(): $CancellablePromise<model$0.SyncDashboard> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.SyncService.Dashboard").then(($result: any) => {
         return $$createType0($result);
@@ -27,45 +34,51 @@ export function Import(path: string): $CancellablePromise<void> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.SyncService.Import", path);
 }
 
+/**
+ * ImportWithPassword installs the embedded vault (if present) using the application password,
+ * then imports the encrypted snapshot. Intended for first-run restore on a new device.
+ */
 export function ImportWithPassword(path: string, password: string): $CancellablePromise<void> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.SyncService.ImportWithPassword", path, password);
 }
 
+/**
+ * JoinWithPassword bootstraps a new device from the remote cloud backup using the application password.
+ * It installs the embedded vault envelope, saves provider config/secrets, then restores remote data.
+ */
 export function JoinWithPassword(input: model$0.SyncConfigInput, password: string): $CancellablePromise<model$0.SyncResult> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.SyncService.JoinWithPassword", input, password).then(($result: any) => {
-        return $$createType6($result);
+        return $$createType1($result);
     });
 }
 
-
-
 export function ListEvents(): $CancellablePromise<model$0.SyncEvent[]> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.SyncService.ListEvents").then(($result: any) => {
-        return $$createType2($result);
+        return $$createType3($result);
     });
 }
 
 export function ListVersions(): $CancellablePromise<model$0.SyncVersion[]> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.SyncService.ListVersions").then(($result: any) => {
-        return $$createType4($result);
+        return $$createType5($result);
     });
 }
 
 export function LoadConfig(): $CancellablePromise<model$0.SyncConfig> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.SyncService.LoadConfig").then(($result: any) => {
-        return $$createType5($result);
+        return $$createType6($result);
     });
 }
 
 export function PullNow(): $CancellablePromise<model$0.SyncResult> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.SyncService.PullNow").then(($result: any) => {
-        return $$createType6($result);
+        return $$createType1($result);
     });
 }
 
 export function PushNow(): $CancellablePromise<model$0.SyncResult> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.SyncService.PushNow").then(($result: any) => {
-        return $$createType6($result);
+        return $$createType1($result);
     });
 }
 
@@ -75,7 +88,7 @@ export function ResetLocalData(): $CancellablePromise<void> {
 
 export function ResolveConflict(choice: model$0.SyncConflictChoice): $CancellablePromise<model$0.SyncResult> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.SyncService.ResolveConflict", choice).then(($result: any) => {
-        return $$createType6($result);
+        return $$createType1($result);
     });
 }
 
@@ -95,7 +108,7 @@ export function SyncFromCloud(endpoint: string, username: string, password: stri
 
 export function SyncNow(): $CancellablePromise<model$0.SyncResult> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.SyncService.SyncNow").then(($result: any) => {
-        return $$createType6($result);
+        return $$createType1($result);
     });
 }
 
@@ -113,9 +126,9 @@ export function TestProvider(input: model$0.SyncConfigInput): $CancellablePromis
 
 // Private type creation functions
 const $$createType0 = model$0.SyncDashboard.createFrom;
-const $$createType1 = model$0.SyncEvent.createFrom;
-const $$createType2 = $Create.Array($$createType1);
-const $$createType3 = model$0.SyncVersion.createFrom;
-const $$createType4 = $Create.Array($$createType3);
-const $$createType5 = model$0.SyncConfig.createFrom;
-const $$createType6 = model$0.SyncResult.createFrom;
+const $$createType1 = model$0.SyncResult.createFrom;
+const $$createType2 = model$0.SyncEvent.createFrom;
+const $$createType3 = $Create.Array($$createType2);
+const $$createType4 = model$0.SyncVersion.createFrom;
+const $$createType5 = $Create.Array($$createType4);
+const $$createType6 = model$0.SyncConfig.createFrom;

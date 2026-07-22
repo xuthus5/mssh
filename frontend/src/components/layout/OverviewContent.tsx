@@ -13,6 +13,7 @@ import { useTunnelManager } from '@/hooks/useTunnelManager'
 import { SessionAssetCenter } from '@/components/session/SessionAssetCenter'
 import { useAppStore } from '@/store/appStore'
 import { AuditPanel } from '@/components/layout/AuditPanel'
+import { SerialPortCenter } from '@/components/serial/SerialPortCenter'
 import { t } from '@/i18n'
 
 
@@ -20,6 +21,7 @@ export function OverviewContent() {
   const selected = useAppStore((state) => state.overviewSection)
   if (selected === 'keys') return <OverviewKeys />
   if (selected === 'tunnels') return <OverviewTunnels />
+  if (selected === 'serial') return <SerialPortCenter />
   if (selected === 'audit') return <AuditPanel />
   return <SessionAssetCenter />
 }

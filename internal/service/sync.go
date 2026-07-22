@@ -30,9 +30,9 @@ const (
 	maxCloudBackupSize   = 32 * 1024 * 1024
 )
 
-var backupTables = []string{"session_folders", "ssh_keys", "asset_environments", "asset_projects", "asset_tags", "sessions", "session_tags", "tunnels", "macros", "settings", "themes", "terminal_theme_profiles", "transfer_jobs"}
+var backupTables = []string{"session_folders", "ssh_keys", "asset_environments", "asset_projects", "asset_tags", "sessions", "session_tags", "tunnels", "macros", "serial_ports", "settings", "themes", "terminal_theme_profiles", "transfer_jobs"}
 
-var backupDeleteOrder = []string{"transfer_jobs", "terminal_theme_profiles", "themes", "tunnels", "session_tags", "sessions", "asset_tags", "asset_projects", "asset_environments", "ssh_keys", "session_folders", "macros", "settings"}
+var backupDeleteOrder = []string{"transfer_jobs", "terminal_theme_profiles", "themes", "tunnels", "session_tags", "sessions", "asset_tags", "asset_projects", "asset_environments", "ssh_keys", "session_folders", "macros", "serial_ports", "settings"}
 
 type SyncService struct {
 	db              *sql.DB

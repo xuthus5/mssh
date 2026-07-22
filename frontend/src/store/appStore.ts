@@ -10,6 +10,10 @@ export interface TerminalTab {
   type: 'terminal'
   terminalId: string
   sessionId: number
+  /** Connection backend. Defaults to ssh when omitted. */
+  connectionKind?: 'ssh' | 'serial'
+  /** Serial profile id when connectionKind is serial. */
+  serialPortId?: number
   terminalInstance?: number
   toolPanel?: 'files' | 'history' | 'system' | 'ai' | null
 }

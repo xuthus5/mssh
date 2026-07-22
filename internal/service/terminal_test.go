@@ -10,7 +10,6 @@ import (
 
 	"github.com/xuthus5/mssh/internal/model"
 	"github.com/xuthus5/mssh/internal/service/testutil"
-	ssh "github.com/xuthus5/mssh/internal/ssh"
 	sshtestutil "github.com/xuthus5/mssh/internal/ssh/testutil"
 	"github.com/xuthus5/mssh/pkg/event"
 )
@@ -34,7 +33,7 @@ func TestNewTerminalService(t *testing.T) {
 
 func TestTerminalService_Count(t *testing.T) {
 	svc := &TerminalService{logger: testutil.NewTestLogger(),
-		ptys:     make(map[string]*ssh.PTYSession),
+		ptys:     make(map[string]terminalIO),
 		lastUsed: make(map[string]time.Time),
 	}
 	assert.Equal(t, 0, svc.Count())

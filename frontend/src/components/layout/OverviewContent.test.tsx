@@ -5,6 +5,7 @@ vi.mock('@/components/session/SessionAssetCenter', () => ({ SessionAssetCenter: 
 vi.mock('@/components/settings/KeyManager', () => ({ KeyManager: () => <div>密钥管理页面</div> }))
 vi.mock('@/components/session/TunnelDialog', () => ({ default: () => <div>隧道管理弹框</div> }))
 vi.mock('@/components/layout/AuditPanel', () => ({ AuditPanel: () => <div>审计日志页面</div> }))
+vi.mock('@/components/serial/SerialPortCenter', () => ({ SerialPortCenter: () => <div>串口管理页面</div> }))
 vi.mock('@/hooks/useSettings', () => ({
   useKeySettings: () => ({
     keys: [], generateKey: vi.fn(), importKey: vi.fn(), deleteKey: vi.fn(), exportKey: vi.fn(),
@@ -48,5 +49,11 @@ describe('OverviewContent', () => {
     useAppStore.setState({ overviewSection: 'audit' })
     render(<OverviewContent />)
     expect(screen.getByText('审计日志页面')).toBeInTheDocument()
+  })
+
+  it('renders serial management as an overview page', () => {
+    useAppStore.setState({ overviewSection: 'serial' })
+    render(<OverviewContent />)
+    expect(screen.getByText('串口管理页面')).toBeInTheDocument()
   })
 })

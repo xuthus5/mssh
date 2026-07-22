@@ -32,7 +32,7 @@ func TestTerminalService_Write(t *testing.T) {
 
 	svc := &TerminalService{logger: testutil.NewTestLogger(),
 		eventBus: newMockEventBus(),
-		ptys:     map[string]*ssh.PTYSession{"term-1": pty},
+		ptys:     map[string]terminalIO{"term-1": pty},
 		lastUsed: map[string]time.Time{"term-1": time.Now()},
 	}
 
@@ -43,7 +43,7 @@ func TestTerminalService_Write(t *testing.T) {
 
 func TestTerminalService_WriteNotFound(t *testing.T) {
 	svc := &TerminalService{logger: testutil.NewTestLogger(),
-		ptys:     make(map[string]*ssh.PTYSession),
+		ptys:     make(map[string]terminalIO),
 		lastUsed: make(map[string]time.Time),
 	}
 
@@ -69,7 +69,7 @@ func TestTerminalService_Resize(t *testing.T) {
 
 	svc := &TerminalService{logger: testutil.NewTestLogger(),
 		eventBus: newMockEventBus(),
-		ptys:     map[string]*ssh.PTYSession{"term-1": pty},
+		ptys:     map[string]terminalIO{"term-1": pty},
 		lastUsed: map[string]time.Time{"term-1": time.Now()},
 	}
 
@@ -79,7 +79,7 @@ func TestTerminalService_Resize(t *testing.T) {
 
 func TestTerminalService_ResizeNotFound(t *testing.T) {
 	svc := &TerminalService{logger: testutil.NewTestLogger(),
-		ptys:     make(map[string]*ssh.PTYSession),
+		ptys:     make(map[string]terminalIO),
 		lastUsed: make(map[string]time.Time),
 	}
 
@@ -109,7 +109,7 @@ func TestTerminalService_Close(t *testing.T) {
 	svc := &TerminalService{logger: testutil.NewTestLogger(),
 		eventBus:   bus,
 		sessionSvc: sessionSvc,
-		ptys:       map[string]*ssh.PTYSession{"term-1": pty},
+		ptys:       map[string]terminalIO{"term-1": pty},
 		lastUsed:   map[string]time.Time{"term-1": time.Now()},
 	}
 
@@ -133,7 +133,7 @@ func TestTerminalService_Close(t *testing.T) {
 
 func TestTerminalService_CloseNotFound(t *testing.T) {
 	svc := &TerminalService{logger: testutil.NewTestLogger(),
-		ptys:     make(map[string]*ssh.PTYSession),
+		ptys:     make(map[string]terminalIO),
 		lastUsed: make(map[string]time.Time),
 	}
 
@@ -149,7 +149,7 @@ func TestTerminalService_EvictLRU(t *testing.T) {
 	svc := &TerminalService{logger: testutil.NewTestLogger(),
 		eventBus:   newMockEventBus(),
 		sessionSvc: sessionSvc,
-		ptys:       make(map[string]*ssh.PTYSession),
+		ptys:       make(map[string]terminalIO),
 		lastUsed:   make(map[string]time.Time),
 		maxSize:    3,
 	}

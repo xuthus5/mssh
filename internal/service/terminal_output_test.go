@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/xuthus5/mssh/internal/service/testutil"
-	ssh "github.com/xuthus5/mssh/internal/ssh"
 	"github.com/xuthus5/mssh/pkg/event"
 )
 
@@ -42,7 +41,7 @@ func (b *blockingOutputBus) Events() []CapturedEvent {
 func TestTerminalService_AttachOrdersPendingBeforeLiveOutput(t *testing.T) {
 	bus := newBlockingOutputBus()
 	service := NewTerminalService(nil, bus, 32, testutil.NewTestLogger())
-	service.ptys["term-1"] = (*ssh.PTYSession)(nil)
+	service.ptys["term-1"] = nil
 	service.pendingOutput["term-1"] = []byte("old")
 	attached := make(chan error, 1)
 	go func() { attached <- service.Attach("term-1") }()
@@ -65,8 +64,8 @@ func TestTerminalService_AttachOrdersPendingBeforeLiveOutput(t *testing.T) {
 func TestTerminalService_OutputSequenceIsPerTerminal(t *testing.T) {
 	bus := newMockEventBus()
 	service := NewTerminalService(nil, bus, 32, testutil.NewTestLogger())
-	service.ptys["term-1"] = (*ssh.PTYSession)(nil)
-	service.ptys["term-2"] = (*ssh.PTYSession)(nil)
+	service.ptys["term-1"] = nil
+	service.ptys["term-2"] = nil
 	service.attached["term-1"] = true
 	service.attached["term-2"] = true
 
@@ -84,7 +83,7 @@ func TestTerminalService_OutputSequenceIsPerTerminal(t *testing.T) {
 func TestTerminalService_CloseWaitsForPendingOutputDrain(t *testing.T) {
 	bus := newBlockingOutputBus()
 	service := NewTerminalService(nil, bus, 32, testutil.NewTestLogger())
-	service.ptys["term-1"] = (*ssh.PTYSession)(nil)
+	service.ptys["term-1"] = nil
 	service.pendingOutput["term-1"] = []byte("old")
 	attached := make(chan error, 1)
 	go func() { attached <- service.Attach("term-1") }()
@@ -104,7 +103,7 @@ func TestTerminalService_CloseWaitsForPendingOutputDrain(t *testing.T) {
 
 func TestTerminalService_PendingOutputIsBoundedAndExpires(t *testing.T) {
 	service := NewTerminalService(nil, newMockEventBus(), 32, testutil.NewTestLogger())
-	service.ptys["term-1"] = (*ssh.PTYSession)(nil)
+	service.ptys["term-1"] = nil
 	service.handlePTYOutput("term-1", make([]byte, maxPendingTerminalOutput+1024))
 	assert.Len(t, service.pendingOutput["term-1"], maxPendingTerminalOutput)
 
