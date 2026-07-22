@@ -19,7 +19,7 @@ func (s *SyncService) TestCloudConnection(endpoint, username, password string) e
 	if err != nil {
 		return err
 	}
-	response, err := cloudHTTPClient().Do(request)
+	response, err := s.cloudHTTPClient().Do(request)
 	if err != nil {
 		return fmt.Errorf("cloud connection: %w", err)
 	}
@@ -57,7 +57,7 @@ func (s *SyncService) SyncToCloud(endpoint, username, password string) error {
 	} else {
 		request.Header.Set("If-None-Match", "*")
 	}
-	response, err := cloudHTTPClient().Do(request)
+	response, err := s.cloudHTTPClient().Do(request)
 	if err != nil {
 		return fmt.Errorf("cloud upload: %w", err)
 	}
@@ -84,7 +84,7 @@ func (s *SyncService) SyncFromCloud(endpoint, username, password string) error {
 	if err != nil {
 		return err
 	}
-	response, err := cloudHTTPClient().Do(request)
+	response, err := s.cloudHTTPClient().Do(request)
 	if err != nil {
 		return fmt.Errorf("cloud download: %w", err)
 	}
@@ -154,7 +154,9 @@ func cloudRequest(method, endpoint, username, password string, body io.Reader) (
 	return request, nil
 }
 
-func cloudHTTPClient() *http.Client { return &http.Client{Timeout: 20 * time.Second} }
+func (s *SyncService) cloudHTTPClient() *http.Client {
+	return sharedHTTPClient(20*time.Second, s.proxyManager)
+}
 
 func (s *SyncService) cloudETag() string {
 	var raw string

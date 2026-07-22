@@ -13,6 +13,11 @@ const savedGeneral = {
   closeButtonAction: 'exit' as const,
   logDir: '/tmp/mssh-logs',
   logRetentionDays: 14,
+  proxyMode: 'system' as const,
+  proxyURL: '',
+  proxyNoProxy: '',
+  proxyUsername: '',
+  proxyPassword: '',
   language: 'zh-CN' as const,
 }
 
@@ -115,6 +120,33 @@ describe('useGeneralSettings cross-window sync', () => {
     expect(savedEntries).toContainEqual(expect.objectContaining({ key: 'application.log_dir', value: '"/data/logs"' }))
     expect(savedEntries).toContainEqual(expect.objectContaining({ key: 'application.log_retention_days', value: '3650' }))
     expect(result.current.general.logRetentionDays).toBe(3650)
+  })
+
+  it('loads and persists network proxy settings', async () => {
+    let savedEntries: Array<{ key: string; value: string }> = []
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.GetMany', async () => ({
+      'application.proxy_mode': setting('application.proxy_mode', 'manual'),
+      'application.proxy_url': setting('application.proxy_url', 'http://127.0.0.1:1080'),
+      'application.proxy_no_proxy': setting('application.proxy_no_proxy', 'localhost'),
+    }))
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.SetMany', async (entries) => { savedEntries = entries })
+    const { result } = renderHook(() => useGeneralSettings())
+    await waitFor(() => expect(result.current.general.proxyMode).toBe('manual'))
+    await waitFor(() => expect(result.current.general.proxyURL).toBe('http://127.0.0.1:1080'))
+    await act(async () => {
+      await result.current.saveGeneral({
+        ...savedGeneral,
+        proxyMode: 'manual',
+        proxyURL: ' http://127.0.0.1:7890 ',
+        proxyNoProxy: ' 127.0.0.1 ',
+        proxyUsername: ' u ',
+        proxyPassword: 'secret',
+      })
+    })
+    expect(savedEntries).toContainEqual(expect.objectContaining({ key: 'application.proxy_mode', value: '"manual"' }))
+    expect(savedEntries).toContainEqual(expect.objectContaining({ key: 'application.proxy_url', value: '"http://127.0.0.1:7890"' }))
+    expect(savedEntries).toContainEqual(expect.objectContaining({ key: 'application.proxy_no_proxy', value: '"127.0.0.1"' }))
+    expect(result.current.general.proxyURL).toBe('http://127.0.0.1:7890')
   })
 
   it('loads and persists terminal scrollback lines with clamping', async () => {

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/xuthus5/mssh/internal/model"
+	"github.com/xuthus5/mssh/internal/netproxy"
 )
 
 const (
@@ -24,8 +25,9 @@ type AboutService struct {
 	latestAPIURL string
 }
 
-func NewAboutService() *AboutService {
-	return &AboutService{client: &http.Client{Timeout: 10 * time.Second}, latestAPIURL: latestAPIURL}
+func NewAboutService(proxy ...*netproxy.Manager) *AboutService {
+	client := sharedHTTPClient(10*time.Second, firstProxy(proxy...))
+	return &AboutService{client: client, latestAPIURL: latestAPIURL}
 }
 
 func (a *AboutService) Info() model.AboutInfo {
