@@ -12,14 +12,10 @@ import { MacroService } from '@/lib/wails'
 import { logger } from '@/lib/logger'
 import { toast } from '@/components/ui/toast'
 import { t } from '@/i18n'
-
-function platformModKey(): string {
-  if (typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform)) return '⌘'
-  return 'Ctrl'
-}
+import { useShortcutStore } from '@/store/shortcutStore'
+import { SHORTCUT_DEFINITIONS, formatChordDisplay } from '@/lib/shortcuts'
 
 function WelcomeScreen() {
-  const mod = platformModKey()
   return (
     <div className="flex min-h-0 flex-1 select-none flex-col items-center justify-center gap-6 bg-background">
       <div className="flex flex-col items-center gap-3">
@@ -40,7 +36,7 @@ function WelcomeScreen() {
         </div>
         <span className="text-xs text-muted-foreground">{t('也可双击侧边栏会话列表中的主机开始连接')}</span>
       </div>
-      <ShortcutCard mod={mod} />
+      <ShortcutCard />
       <div className="mt-2 flex gap-8">
         <Feature icon={Terminal} label={t('多标签终端')} />
         <Feature icon={FileText} label={t('会话录制')} />
@@ -50,16 +46,13 @@ function WelcomeScreen() {
   )
 }
 
-function ShortcutCard({ mod }: { mod: string }) {
-  const rows = [
-    [`${mod}+N`, t('新建会话')],
-    [`${mod}+Shift+N`, t('本地终端')],
-    [`${mod}+W`, t('关闭标签页')],
-    [`${mod}+F`, t('快速搜索会话')],
-    [`${mod}+Shift+C`, t('复制')],
-    [`${mod}+Shift+V`, t('粘贴')],
-    [`${mod}+Shift+L`, t('清屏')],
-  ]
+function ShortcutCard() {
+  const bindings = useShortcutStore((state) => state.bindings)
+  const rows = SHORTCUT_DEFINITIONS.map((definition) => ({
+    key: formatChordDisplay(bindings[definition.id]),
+    label: t(definition.label),
+    id: definition.id,
+  }))
   return (
     <div className="mt-4 flex flex-col items-center gap-2 rounded-xl border border-border bg-card/50 px-6 py-4">
       <div className="flex items-center gap-1.5 rounded-xl text-xs text-muted-foreground">
@@ -67,9 +60,9 @@ function ShortcutCard({ mod }: { mod: string }) {
       </div>
       <span className="text-[10px] text-muted-foreground/70">{t('macOS 使用 ⌘，Windows/Linux 使用 Ctrl')}</span>
       <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-xs">
-        {rows.flatMap(([key, label]) => [
-          <span key={`${key}-k`} className="text-muted-foreground">{key}</span>,
-          <span key={`${key}-l`} className="text-foreground/70">{label}</span>,
+        {rows.flatMap((row) => [
+          <span key={`${row.id}-k`} className="text-muted-foreground">{row.key}</span>,
+          <span key={`${row.id}-l`} className="text-foreground/70">{row.label}</span>,
         ])}
       </div>
       <button type="button" className="text-xs text-primary hover:underline" onClick={() => window.dispatchEvent(new CustomEvent(SESSION_QUICK_SEARCH_EVENT))}>

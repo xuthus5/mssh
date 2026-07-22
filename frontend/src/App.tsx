@@ -20,6 +20,10 @@ import { createAppSyncDataReload, hotReloadSessionWorkspace, registerSyncDataRel
 import { getClipboard } from '@/lib/clipboard'
 import { t } from '@/i18n'
 import { VaultGate } from '@/components/security/VaultGate'
+import { useShortcutStore } from '@/store/shortcutStore'
+import { useShortcutRuntimeHydration } from '@/hooks/useShortcutSettings'
+import { resolveShortcutAction } from '@/lib/shortcutRuntime'
+import type { ShortcutActionId } from '@/lib/shortcuts'
 
 
 function activeTab(state: AppState): Tab | undefined {
@@ -68,39 +72,46 @@ function closeActiveTab(state: AppState) {
   closeTabsWithFeedback([tab.id], state.closeTab)
 }
 
-function isOrdinaryEditable(target: HTMLElement | null) {
-  if (!target?.matches('input, textarea, select, [contenteditable="true"]')) return false
-  if (target.classList.contains('xterm-helper-textarea')) return false
-  return !target.hasAttribute('data-session-search-input')
+
+function runShortcutAction(actionId: ShortcutActionId) {
+  const state = useAppStore.getState()
+  switch (actionId) {
+    case 'new-session':
+      emitAppEvent(APP_NEW_SESSION_EVENT)
+      return
+    case 'new-local-terminal':
+      emitAppEvent(APP_NEW_LOCAL_TERMINAL_EVENT)
+      return
+    case 'close-tab':
+      closeActiveTab(state)
+      return
+    case 'quick-search':
+      emitAppEvent(SESSION_QUICK_SEARCH_EVENT)
+      return
+    case 'copy-selection':
+      copySelection(state)
+      return
+    case 'paste-clipboard':
+      pasteClipboard(state)
+      return
+    case 'clear-terminal':
+      clearTerminal(state)
+      return
+  }
 }
 
 function handleShortcut(event: KeyboardEvent) {
-  const target = event.target as HTMLElement | null
-  const commandKey = event.ctrlKey || event.metaKey
-  if (!commandKey) return
-  const key = event.key.toLowerCase()
-  if (!event.shiftKey && key === 'f') {
-    if (isOrdinaryEditable(target)) return
-    emitAppEvent(SESSION_QUICK_SEARCH_EVENT)
-    event.preventDefault()
-    return
-  }
-  if (isOrdinaryEditable(target)) return
-  const state = useAppStore.getState()
-
-  if (!event.shiftKey && key === 'n') emitAppEvent(APP_NEW_SESSION_EVENT)
-  else if (event.shiftKey && key === 'n') emitAppEvent(APP_NEW_LOCAL_TERMINAL_EVENT)
-  else if (!event.shiftKey && key === 'w') closeActiveTab(state)
-  else if (event.shiftKey && key === 'c') copySelection(state)
-  else if (event.shiftKey && key === 'v') pasteClipboard(state)
-  else if (event.shiftKey && key === 'l') clearTerminal(state)
-  else return
+  const bindings = useShortcutStore.getState().bindings
+  const actionId = resolveShortcutAction(event, bindings)
+  if (!actionId) return
   event.preventDefault()
+  runShortcutAction(actionId)
 }
 
 function AppShell() {
   const activeSurface = useAppStore((state) => state.activeSurface)
   const workspace = useSessionWorkspace()
+  useShortcutRuntimeHydration()
 
   useEffect(() => {
     document.addEventListener('keydown', handleShortcut)

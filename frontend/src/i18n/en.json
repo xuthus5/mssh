@@ -1270,5 +1270,19 @@
   "Unix 下默认附加 -l；若自定义了启动参数则不再自动附加。": "On Unix, appends -l by default; custom startup arguments disable automatic -l.",
   "打开本地终端失败: ${}": "Failed to open local terminal: ${}",
   "正在为当前终端创建新的连接通道。": "Creating a new connection channel for the current terminal.",
-  "会话可能因空闲超时、进程退出或网络中断而结束，可在当前终端中重新连接。": "The session may have ended due to idle timeout, process exit, or network interruption. You can reconnect in the current terminal."
+  "会话可能因空闲超时、进程退出或网络中断而结束，可在当前终端中重新连接。": "The session may have ended due to idle timeout, process exit, or network interruption. You can reconnect in the current terminal.",
+  "自定义全局快捷键。修改后自动保存；冲突项会以警告标出。macOS 使用 ⌘，Windows/Linux 使用 Ctrl。": "Customize global shortcuts. Changes auto-save; conflicts are highlighted. macOS uses ⌘, Windows/Linux uses Ctrl.",
+  "恢复默认": "Restore defaults",
+  "录制快捷键": "Record shortcut",
+  "按下组合键…（Esc 取消）": "Press a combination… (Esc to cancel)",
+  "清除快捷键": "Clear shortcut",
+  "与「${}」冲突": "Conflicts with \"${}\"",
+  "保存快捷键失败: ${}": "Failed to save shortcuts: ${}",
+  "打开新建 SSH 会话流程。": "Start the new SSH session flow.",
+  "打开一个本机交互 Shell 终端。": "Open a local interactive shell terminal.",
+  "关闭当前活动标签（活动连接需手动确认）。": "Close the active tab (active connections require confirmation).",
+  "打开会话快速搜索面板。": "Open the session quick-search panel.",
+  "复制当前终端选中文本。": "Copy the current terminal selection.",
+  "将剪贴板内容粘贴到当前终端。": "Paste clipboard content into the current terminal.",
+  "清空当前终端可见内容。": "Clear the current terminal view."
 }
