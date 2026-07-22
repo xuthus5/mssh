@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"net/http"
 
 	"github.com/xuthus5/mssh/internal/model"
 )
@@ -36,16 +37,34 @@ type syncProviderFactory interface {
 	Create(context.Context, model.SyncConfig, syncProviderSecrets) (syncProvider, error)
 }
 
-type defaultSyncProviderFactory struct{}
+type defaultSyncProviderFactory struct {
+	clientFactory func() *http.Client
+}
 
-func (defaultSyncProviderFactory) Create(ctx context.Context, config model.SyncConfig, secrets syncProviderSecrets) (syncProvider, error) {
+type proxyAwareSyncProviderFactory struct {
+	service *SyncService
+}
+
+func (f defaultSyncProviderFactory) Create(ctx context.Context, config model.SyncConfig, secrets syncProviderSecrets) (syncProvider, error) {
+	clientFactory := f.clientFactory
+	if clientFactory == nil {
+		clientFactory = syncHTTPClient
+	}
+	return createSyncProvider(ctx, clientFactory(), config, secrets)
+}
+
+func (f proxyAwareSyncProviderFactory) Create(ctx context.Context, config model.SyncConfig, secrets syncProviderSecrets) (syncProvider, error) {
+	return createSyncProvider(ctx, f.service.syncHTTPClient(), config, secrets)
+}
+
+func createSyncProvider(ctx context.Context, client *http.Client, config model.SyncConfig, secrets syncProviderSecrets) (syncProvider, error) {
 	switch config.Provider {
 	case model.SyncProviderGist:
-		return newGistSyncProvider(syncHTTPClient(), "https://api.github.com", config.Gist.GistID, secrets.GistToken)
+		return newGistSyncProvider(client, "https://api.github.com", config.Gist.GistID, secrets.GistToken)
 	case model.SyncProviderWebDAV:
-		return newWebDAVSyncProvider(syncHTTPClient(), config.WebDAV.URL, config.WebDAV.Username, secrets.WebDAVPassword)
+		return newWebDAVSyncProvider(client, config.WebDAV.URL, config.WebDAV.Username, secrets.WebDAVPassword)
 	case model.SyncProviderS3:
-		return newS3SyncProvider(ctx, config.S3, secrets.S3SecretKey)
+		return newS3SyncProvider(ctx, config.S3, secrets.S3SecretKey, client)
 	default:
 		return nil, fmt.Errorf("unsupported sync provider %s", config.Provider)
 	}

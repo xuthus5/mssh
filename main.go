@@ -15,6 +15,7 @@ import (
 
 	"github.com/xuthus5/mssh/internal/app"
 	"github.com/xuthus5/mssh/internal/applog"
+	"github.com/xuthus5/mssh/internal/netproxy"
 	"github.com/xuthus5/mssh/internal/windowing"
 )
 
@@ -37,10 +38,12 @@ func main() {
 	logger := slog.New(logManager.Handler())
 
 	logger.Info("starting MSSH", "dataDir", defaultDataDir(), "logDir", logManager.Dir())
+	proxyManager := netproxy.New()
 	appInstance, err := app.New(app.Options{
-		DataDir:    defaultDataDir(),
-		Logger:     logger,
-		LogManager: logManager,
+		DataDir:      defaultDataDir(),
+		Logger:       logger,
+		LogManager:   logManager,
+		ProxyManager: proxyManager,
 	})
 	if err != nil {
 		logger.Error("startup failed", "error", err)

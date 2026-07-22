@@ -16,6 +16,7 @@ import (
 
 	backupcrypto "github.com/xuthus5/mssh/internal/crypto"
 	"github.com/xuthus5/mssh/internal/model"
+	"github.com/xuthus5/mssh/internal/netproxy"
 )
 
 const (
@@ -50,6 +51,7 @@ type SyncService struct {
 	schedulerMu     sync.Mutex
 	schedulerCancel context.CancelFunc
 	schedulerWG     sync.WaitGroup
+	proxyManager    *netproxy.Manager
 }
 
 type SyncOption func(*SyncService)
@@ -58,6 +60,9 @@ func NewSyncService(db *sql.DB, logger *slog.Logger, options ...SyncOption) *Syn
 	service := &SyncService{db: db, logger: logger, providerFactory: defaultSyncProviderFactory{}}
 	for _, option := range options {
 		option(service)
+	}
+	if service.proxyManager != nil {
+		service.providerFactory = proxyAwareSyncProviderFactory{service: service}
 	}
 	return service
 }
