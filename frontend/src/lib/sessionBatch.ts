@@ -1,4 +1,4 @@
-import { AuditService, MacroService, TerminalService } from '@/lib/wails'
+import { AuditService, MacroService, SessionService, TerminalService } from '@/lib/wails'
 import { logger } from '@/lib/logger'
 import { createTerminalTab } from '@/lib/terminalTabs'
 import { useAppStore } from '@/store/appStore'
@@ -54,4 +54,28 @@ export async function runBatchSessions(sessions: BatchSession[], command?: strin
     logger.error('record batch audit failed', error)
   }
   return results
+}
+
+export async function runBatchDeleteSessions(sessions: BatchSession[]): Promise<BatchSessionResult[]> {
+  if (sessions.length === 0) return []
+  const ids = sessions.map((session) => Number(session.id))
+  try {
+    await SessionService.DeleteSessions(ids)
+    const results = sessions.map((session) => ({ sessionId: session.id, name: session.name, success: true }))
+    try {
+      await AuditService.RecordBatch('batch_delete', ids, results.map(() => 'success'))
+    } catch (error) {
+      logger.error('record batch delete audit failed', error)
+    }
+    return results
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    const results = sessions.map((session) => ({ sessionId: session.id, name: session.name, success: false, error: message }))
+    try {
+      await AuditService.RecordBatch('batch_delete', ids, results.map(() => 'failed'))
+    } catch (auditError) {
+      logger.error('record batch delete audit failed', auditError)
+    }
+    return results
+  }
 }
