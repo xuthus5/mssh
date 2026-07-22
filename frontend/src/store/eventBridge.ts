@@ -5,9 +5,22 @@ import { FileService } from '@/lib/wails'
 import { logger } from '@/lib/logger'
 import { mapBackendTransferJobs } from '@/lib/transferDTO'
 import { t } from '@/i18n'
+import { maybeAutoReconnectTerminal, type ReconnectSession } from '@/hooks/sessionReconnect'
 
 
 interface EventEnvelope<T> { data?: T }
+
+let reconnectSessionProvider: (() => ReconnectSession[]) | null = null
+
+/** Register a live session list provider for auto-reconnect lookups. */
+export function setReconnectSessionProvider(provider: (() => ReconnectSession[]) | null) {
+  reconnectSessionProvider = provider
+}
+
+function reconnectSessions(): ReconnectSession[] {
+  return reconnectSessionProvider?.() ?? []
+}
+
 interface ConnectionPayload { terminal_id?: string; attempt_id?: string; state?: string }
 interface FingerprintPayload { attempt_id?: string; fingerprint?: string; algorithm?: string }
 interface TransferPayload {
@@ -39,6 +52,7 @@ function handleSessionState(event: EventEnvelope<ConnectionPayload>) {
   }
   if (payload.state === 'disconnected') {
     useAppStore.getState().setConnectionStatus(payload.terminal_id, 'disconnected')
+    maybeAutoReconnectTerminal(payload.terminal_id, reconnectSessions())
   }
 }
 

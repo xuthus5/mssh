@@ -15,11 +15,13 @@ vi.mock('@/hooks/SessionWorkspaceContext', () => ({
 
 import { WorkspacePersistence } from '@/components/layout/WorkspacePersistence'
 import { useAppStore } from '@/store/appStore'
+import { DEFAULT_TERMINAL_BEHAVIOR, useTerminalBehaviorStore } from '@/store/terminalBehaviorStore'
 
 describe('WorkspacePersistence', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     useAppStore.setState({ tabs: [], activeSurface: null, workspaceTab: 'sessions', overviewSection: 'sessions', connectionStatus: {}, activePaneId: null })
+    useTerminalBehaviorStore.setState({ ...DEFAULT_TERMINAL_BEHAVIOR, settingsHydrated: true, restoreTabsOnStartup: true })
   })
 
   it('restores saved workspace intents and persists later layout changes', async () => {
@@ -39,3 +41,29 @@ describe('WorkspacePersistence', () => {
     expect(JSON.stringify(saved)).not.toContain('fresh-terminal')
   })
 })
+
+  it('skips restoring terminal tabs when restore-on-startup is disabled', async () => {
+    services.open.mockClear()
+    services.get.mockClear()
+    useAppStore.setState({ tabs: [], activeSurface: null, workspaceTab: 'sessions', overviewSection: 'sessions', connectionStatus: {}, activePaneId: null })
+    useTerminalBehaviorStore.setState({
+      ...DEFAULT_TERMINAL_BEHAVIOR,
+      settingsHydrated: false,
+      restoreTabsOnStartup: false,
+    })
+    services.get.mockResolvedValue({ value: JSON.stringify({
+      version: 2,
+      tabs: [{ type: 'terminal', title: 'prod', sessionId: 7, toolPanel: 'history' }],
+      active: { type: 'tab', index: 0 }, workspaceTab: 'sessions', overviewSection: 'keys',
+    }) })
+    const view = render(<WorkspacePersistence />)
+    // hydrate after mount so this instance evaluates the disabled preference itself
+    act(() => {
+      useTerminalBehaviorStore.setState({ settingsHydrated: true, restoreTabsOnStartup: false })
+    })
+    await waitFor(() => expect(services.get).not.toHaveBeenCalled())
+    expect(services.open).not.toHaveBeenCalled()
+    expect(useAppStore.getState().tabs).toHaveLength(0)
+    view.unmount()
+  })
+

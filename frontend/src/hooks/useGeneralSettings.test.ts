@@ -1,5 +1,5 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { Events } from '@wailsio/runtime'
 import { useGeneralSettings } from '@/hooks/useGeneralSettings'
 import { useAppStore } from '@/store/appStore'
@@ -9,7 +9,7 @@ import { SETTINGS_GENERAL_CHANGED_EVENT, SETTINGS_GENERAL_PREVIEW_EVENT, SETTING
 const savedGeneral = {
   maxPoolSize: 24, defaultKeepAlive: 90, defaultTermType: 'xterm',
   uiFontFamily: 'Arial', uiFontFallbackFamily: 'Segoe UI', uiFontSize: 18,
-  rightClickAction: 'paste' as const, copyOnSelect: true, scrollbackLines: 10000,
+  rightClickAction: 'paste' as const, copyOnSelect: true, scrollbackLines: 10000, autoReconnect: false, restoreTabsOnStartup: true,
   closeButtonAction: 'exit' as const,
   logDir: '/tmp/mssh-logs',
   logRetentionDays: 14,
@@ -171,3 +171,23 @@ describe('useGeneralSettings cross-window sync', () => {
 function setting(key: string, value: unknown) {
   return { key, namespace: key.split('.')[0], value: JSON.stringify(value), value_type: typeof value, version: 1, updated_at: '' }
 }
+
+  it('loads and persists auto reconnect and restore tabs preferences', async () => {
+    const setMany = vi.fn(async () => {})
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.GetMany', async () => ({
+      'terminal.auto_reconnect': setting('terminal.auto_reconnect', true),
+      'terminal.restore_tabs_on_startup': setting('terminal.restore_tabs_on_startup', false),
+    }))
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.SetMany', setMany)
+    const { result } = renderHook(() => useGeneralSettings())
+    await waitFor(() => expect(result.current.general.autoReconnect).toBe(true))
+    expect(result.current.general.restoreTabsOnStartup).toBe(false)
+    await act(async () => {
+      await result.current.saveGeneral({ ...savedGeneral, autoReconnect: true, restoreTabsOnStartup: false })
+    })
+    expect(setMany).toHaveBeenCalledWith(expect.arrayContaining([
+      expect.objectContaining({ key: 'terminal.auto_reconnect', value: 'true' }),
+      expect.objectContaining({ key: 'terminal.restore_tabs_on_startup', value: 'false' }),
+    ]))
+  })
+

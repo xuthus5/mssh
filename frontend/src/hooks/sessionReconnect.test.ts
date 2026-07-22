@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { reconnectSessionTab } from '@/hooks/sessionReconnect'
+import { markIntentionalDisconnect, maybeAutoReconnectTerminal, reconnectSessionTab } from '@/hooks/sessionReconnect'
+import { DEFAULT_TERMINAL_BEHAVIOR, useTerminalBehaviorStore } from '@/store/terminalBehaviorStore'
 import { logger } from '@/lib/logger'
 import { useConnectDialog } from '@/store/connectDialog'
 import { useAppStore } from '@/store/appStore'
@@ -34,6 +35,7 @@ describe('reconnectSessionTab', () => {
     seedDisconnectedTab()
     useAppStore.setState({ replaceTerminalConnection })
     useConnectDialog.setState({ open: false, state: 'idle', attemptId: '', error: '', fingerprint: '', algorithm: '' })
+    useTerminalBehaviorStore.setState({ ...DEFAULT_TERMINAL_BEHAVIOR, autoReconnect: false })
   })
 
   it('ignores missing and already connecting terminal targets', async () => {
@@ -126,3 +128,42 @@ describe('reconnectSessionTab', () => {
     expect(useAppStore.getState().connectionStatus['term-old']).toBe('disconnected')
   })
 })
+
+describe('maybeAutoReconnectTerminal', () => {
+  beforeEach(() => {
+    __clearHandlers()
+    seedDisconnectedTab()
+    useAppStore.setState({ replaceTerminalConnection })
+    useConnectDialog.setState({ open: false, state: 'idle', attemptId: '', error: '', fingerprint: '', algorithm: '' })
+    useTerminalBehaviorStore.setState({ ...DEFAULT_TERMINAL_BEHAVIOR, autoReconnect: false })
+  })
+
+  it('does nothing when auto reconnect is disabled', async () => {
+    const open = vi.fn(async () => 'term-new')
+    __registerHandler(service + 'Open', open)
+    maybeAutoReconnectTerminal('term-old', sessions)
+    await Promise.resolve()
+    expect(open).not.toHaveBeenCalled()
+  })
+
+  it('starts reconnect when auto reconnect is enabled', async () => {
+    useTerminalBehaviorStore.setState({ autoReconnect: true })
+    const open = deferred<string>()
+    __registerHandler(service + 'Open', async () => open.promise)
+    maybeAutoReconnectTerminal('term-old', sessions)
+    await Promise.resolve()
+    expect(useAppStore.getState().connectionStatus['term-old']).toBe('reconnecting')
+    open.resolve('term-new')
+  })
+
+  it('skips auto reconnect for intentional disconnects', async () => {
+    useTerminalBehaviorStore.setState({ autoReconnect: true })
+    const open = vi.fn(async () => 'term-new')
+    __registerHandler(service + 'Open', open)
+    markIntentionalDisconnect('term-old')
+    maybeAutoReconnectTerminal('term-old', sessions)
+    await Promise.resolve()
+    expect(open).not.toHaveBeenCalled()
+  })
+})
+
