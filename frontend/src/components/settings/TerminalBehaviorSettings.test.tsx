@@ -8,6 +8,8 @@ describe('TerminalBehaviorSettingsSection', () => {
     const onRightClickActionChange = vi.fn()
     const onCopyOnSelectChange = vi.fn()
     const onScrollbackLinesChange = vi.fn()
+    const onAutoReconnectChange = vi.fn()
+    const onRestoreTabsOnStartupChange = vi.fn()
     const user = userEvent.setup()
 
     render(
@@ -15,9 +17,13 @@ describe('TerminalBehaviorSettingsSection', () => {
         rightClickAction="menu"
         copyOnSelect={false}
         scrollbackLines={10000}
+        autoReconnect={false}
+        restoreTabsOnStartup={true}
         onRightClickActionChange={onRightClickActionChange}
         onCopyOnSelectChange={onCopyOnSelectChange}
         onScrollbackLinesChange={onScrollbackLinesChange}
+        onAutoReconnectChange={onAutoReconnectChange}
+        onRestoreTabsOnStartupChange={onRestoreTabsOnStartupChange}
       />,
     )
 
@@ -29,9 +35,13 @@ describe('TerminalBehaviorSettingsSection', () => {
     const scrollback = screen.getByRole('spinbutton', { name: '滚动历史行数' })
     expect(scrollback).toHaveValue(10000)
     fireEvent.change(scrollback, { target: { value: '5000' } })
+    await user.click(screen.getByRole('switch', { name: 'SSH 断线自动重连' }))
+    await user.click(screen.getByRole('switch', { name: '启动时恢复终端标签' }))
 
     expect(onRightClickActionChange).toHaveBeenCalledWith('paste')
     expect(onCopyOnSelectChange).toHaveBeenCalledWith(true)
     expect(onScrollbackLinesChange).toHaveBeenCalledWith(5000)
+    expect(onAutoReconnectChange).toHaveBeenCalledWith(true)
+    expect(onRestoreTabsOnStartupChange).toHaveBeenCalledWith(false)
   })
 })

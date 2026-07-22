@@ -14,6 +14,8 @@ const general = {
   rightClickAction: 'menu' as const,
   copyOnSelect: false,
   scrollbackLines: 10000,
+  autoReconnect: false,
+  restoreTabsOnStartup: true,
   closeButtonAction: 'tray' as const,
   logDir: '',
   logRetentionDays: 30,

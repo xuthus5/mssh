@@ -25,6 +25,8 @@ interface TerminalDraft {
   rightClickAction: GeneralSettings['rightClickAction']
   copyOnSelect: boolean
   scrollbackLines: string
+  autoReconnect: boolean
+  restoreTabsOnStartup: boolean
 }
 
 interface Props {
@@ -51,6 +53,8 @@ function createDraft(general: GeneralSettings): TerminalDraft {
     rightClickAction: general.rightClickAction,
     copyOnSelect: general.copyOnSelect,
     scrollbackLines: String(general.scrollbackLines),
+    autoReconnect: general.autoReconnect,
+    restoreTabsOnStartup: general.restoreTabsOnStartup,
   }
 }
 
@@ -63,6 +67,8 @@ function buildSavePayload(general: GeneralSettings, draft: TerminalDraft): Gener
     rightClickAction: draft.rightClickAction,
     copyOnSelect: draft.copyOnSelect,
     scrollbackLines: parseInt(draft.scrollbackLines, 10) || 10000,
+    autoReconnect: draft.autoReconnect,
+    restoreTabsOnStartup: draft.restoreTabsOnStartup,
   }
 }
 
@@ -113,11 +119,15 @@ export function TerminalSettingsPanel({
           rightClickAction={draft.rightClickAction}
           copyOnSelect={draft.copyOnSelect}
           scrollbackLines={draft.scrollbackLines}
+          autoReconnect={draft.autoReconnect}
+          restoreTabsOnStartup={draft.restoreTabsOnStartup}
           onRightClickActionChange={(value) => setDraft({ ...draft, rightClickAction: value })}
           onCopyOnSelectChange={(value) => setDraft({ ...draft, copyOnSelect: value })}
           onScrollbackLinesChange={(value) =>
             setDraft({ ...draft, scrollbackLines: value > 0 ? String(value) : '' })
           }
+          onAutoReconnectChange={(value) => setDraft({ ...draft, autoReconnect: value })}
+          onRestoreTabsOnStartupChange={(value) => setDraft({ ...draft, restoreTabsOnStartup: value })}
         />
       </div>
       <ThemeEditor

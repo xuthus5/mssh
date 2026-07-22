@@ -15,6 +15,7 @@ import type { AppState, Tab } from '@/store/appStore'
 import { selectTerminalPoolEvictionID } from '@/store/terminalPool'
 import { applyTerminalPoolEviction, ensureTerminalPoolCapacity } from '@/store/terminalPoolReclaim'
 import { canTransitionConnection } from '@/store/connectionStatus'
+import { markIntentionalDisconnect } from '@/hooks/sessionReconnect'
 
 type StoreSet = StoreApi<AppState>['setState']
 type StoreGet = StoreApi<AppState>['getState']
@@ -37,6 +38,7 @@ function openTabState(state: AppState, tab: Tab): Partial<AppState> {
 async function closeTab(get: StoreGet, id: string) {
   const tab = get().tabs.find((item) => item.id === id)
   if (tab?.type === 'terminal') {
+    markIntentionalDisconnect(tab.terminalId)
     try {
       await TerminalService.Close(tab.terminalId)
     } catch (error: unknown) {

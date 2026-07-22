@@ -11,7 +11,7 @@ import {
 } from '@/store/terminalBehaviorStore'
 
 describe('terminal behavior store', () => {
-  beforeEach(() => useTerminalBehaviorStore.setState(DEFAULT_TERMINAL_BEHAVIOR))
+  beforeEach(() => useTerminalBehaviorStore.setState({ ...DEFAULT_TERMINAL_BEHAVIOR, settingsHydrated: false }))
 
   it.each([
     ['menu', 'menu'],
@@ -45,11 +45,15 @@ describe('terminal behavior store', () => {
       rightClickAction: 'paste',
       copyOnSelect: true,
       scrollbackLines: 5000,
+      autoReconnect: true,
+      restoreTabsOnStartup: false,
     })
     expect(useTerminalBehaviorStore.getState()).toMatchObject({
       rightClickAction: 'paste',
       copyOnSelect: true,
       scrollbackLines: 5000,
+      autoReconnect: true,
+      restoreTabsOnStartup: false,
     })
   })
 
@@ -58,6 +62,8 @@ describe('terminal behavior store', () => {
       rightClickAction: 'menu',
       copyOnSelect: false,
       scrollbackLines: 999999,
+      autoReconnect: false,
+      restoreTabsOnStartup: true,
     })
     expect(useTerminalBehaviorStore.getState().scrollbackLines).toBe(MAX_TERMINAL_SCROLLBACK_LINES)
   })

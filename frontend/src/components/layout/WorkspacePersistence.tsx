@@ -6,6 +6,7 @@ import { logger } from '@/lib/logger'
 import { toast } from '@/components/ui/toast'
 import { createWorkspaceSnapshot, parseWorkspaceSnapshot, restoreWorkspaceSnapshot, WORKSPACE_LAYOUT_SETTING } from '@/store/workspacePersistence'
 import { openTerminalWithPoolCapacity } from '@/lib/openTerminal'
+import { useTerminalBehaviorStore } from '@/store/terminalBehaviorStore'
 import { t } from '@/i18n'
 
 
@@ -13,6 +14,7 @@ const SAVE_DELAY_MS = 300
 
 export function WorkspacePersistence() {
   const { sessions, sessionsLoaded } = useSessionWorkspace()
+  const settingsHydrated = useTerminalBehaviorStore((state) => state.settingsHydrated)
   const tabs = useAppStore((state) => state.tabs)
   const activeSurface = useAppStore((state) => state.activeSurface)
   const workspaceTab = useAppStore((state) => state.workspaceTab)
@@ -20,10 +22,14 @@ export function WorkspacePersistence() {
   const initialized = useRef(false)
 
   useEffect(() => {
-    if (!sessionsLoaded || initialized.current) return
+    if (!sessionsLoaded || !settingsHydrated || initialized.current) return
     let cancelled = false
     const restore = async () => {
       try {
+        if (!useTerminalBehaviorStore.getState().restoreTabsOnStartup) {
+          initialized.current = true
+          return
+        }
         const setting = await SettingService.Get(WORKSPACE_LAYOUT_SETTING)
         if (!setting || cancelled) return
         const snapshot = parseWorkspaceSnapshot(setting.value)
@@ -40,7 +46,7 @@ export function WorkspacePersistence() {
     }
     void restore()
     return () => { cancelled = true }
-  }, [sessions, sessionsLoaded])
+  }, [sessions, sessionsLoaded, settingsHydrated])
 
   useEffect(() => {
     if (!initialized.current) return

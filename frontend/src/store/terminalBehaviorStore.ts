@@ -11,16 +11,24 @@ export interface TerminalBehaviorSettings {
   copyOnSelect: boolean
   /** Max retained scrollback lines per terminal instance (xterm buffer). */
   scrollbackLines: number
+  /** Automatically reconnect after unexpected SSH disconnects. */
+  autoReconnect: boolean
+  /** Restore open terminal tabs after application restart. */
+  restoreTabsOnStartup: boolean
 }
 
 interface TerminalBehaviorState extends TerminalBehaviorSettings {
+  settingsHydrated: boolean
   setSettings: (settings: TerminalBehaviorSettings) => void
+  markSettingsHydrated: () => void
 }
 
 export const DEFAULT_TERMINAL_BEHAVIOR: TerminalBehaviorSettings = {
   rightClickAction: 'menu',
   copyOnSelect: false,
   scrollbackLines: DEFAULT_TERMINAL_SCROLLBACK_LINES,
+  autoReconnect: false,
+  restoreTabsOnStartup: true,
 }
 
 export function normalizeTerminalRightClickAction(value: unknown): TerminalRightClickAction {
@@ -33,19 +41,31 @@ export function normalizeCopyOnSelect(value: unknown): boolean {
 
 /** Clamp scrollback to a safe bounded range; invalid values fall back to default. */
 export function normalizeScrollbackLines(value: unknown): number {
-  const numeric = typeof value === 'number' ? value : typeof value === 'string' ? Number(value) : NaN
-  if (!Number.isFinite(numeric)) return DEFAULT_TERMINAL_SCROLLBACK_LINES
-  const rounded = Math.round(numeric)
-  if (rounded < MIN_TERMINAL_SCROLLBACK_LINES) return MIN_TERMINAL_SCROLLBACK_LINES
-  if (rounded > MAX_TERMINAL_SCROLLBACK_LINES) return MAX_TERMINAL_SCROLLBACK_LINES
-  return rounded
+  if (value === null || value === undefined) return DEFAULT_TERMINAL_SCROLLBACK_LINES
+  const parsed = typeof value === 'number' ? value : Number(value)
+  if (!Number.isFinite(parsed)) return DEFAULT_TERMINAL_SCROLLBACK_LINES
+  if (parsed < MIN_TERMINAL_SCROLLBACK_LINES) return MIN_TERMINAL_SCROLLBACK_LINES
+  if (parsed > MAX_TERMINAL_SCROLLBACK_LINES) return MAX_TERMINAL_SCROLLBACK_LINES
+  return Math.floor(parsed)
+}
+
+export function normalizeAutoReconnect(value: unknown): boolean {
+  return value === true
+}
+
+export function normalizeRestoreTabsOnStartup(value: unknown): boolean {
+  return value !== false
 }
 
 export const useTerminalBehaviorStore = create<TerminalBehaviorState>((set) => ({
   ...DEFAULT_TERMINAL_BEHAVIOR,
+  settingsHydrated: false,
   setSettings: (settings) => set({
     rightClickAction: normalizeTerminalRightClickAction(settings.rightClickAction),
     copyOnSelect: normalizeCopyOnSelect(settings.copyOnSelect),
     scrollbackLines: normalizeScrollbackLines(settings.scrollbackLines),
+    autoReconnect: normalizeAutoReconnect(settings.autoReconnect),
+    restoreTabsOnStartup: normalizeRestoreTabsOnStartup(settings.restoreTabsOnStartup),
   }),
+  markSettingsHydrated: () => set({ settingsHydrated: true }),
 }))
