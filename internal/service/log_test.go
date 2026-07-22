@@ -253,3 +253,17 @@ func TestLogService_StartTerminalRecordingCreateDirectoryError(t *testing.T) {
 	_, err := svc.StartTerminalRecording("term-invalid-dir", 1, 80, 24, "xterm")
 	assert.Error(t, err)
 }
+
+func TestLogService_StartTerminalRecordingWithoutSession(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	svc := NewLogService(db, t.TempDir(), testutil.NewTestLogger())
+	logID, err := svc.StartTerminalRecording("term-local", 0, 80, 24, "xterm")
+	require.NoError(t, err)
+	assert.NotZero(t, logID)
+	t.Cleanup(func() { _ = svc.StopTerminalRecordingIfActive("term-local") })
+	sessionID := int64(0)
+	logs, err := svc.List(&sessionID)
+	require.NoError(t, err)
+	require.Len(t, logs, 1)
+	assert.Nil(t, logs[0].SessionID)
+}

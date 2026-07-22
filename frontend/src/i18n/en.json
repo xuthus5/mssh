@@ -1268,5 +1268,7 @@
   "留空则使用用户家目录。": "Leave empty to use the user home directory.",
   "以登录 Shell 启动": "Start as a login shell",
   "Unix 下默认附加 -l；若自定义了启动参数则不再自动附加。": "On Unix, appends -l by default; custom startup arguments disable automatic -l.",
-  "打开本地终端失败: ${}": "Failed to open local terminal: ${}"
+  "打开本地终端失败: ${}": "Failed to open local terminal: ${}",
+  "正在为当前终端创建新的连接通道。": "Creating a new connection channel for the current terminal.",
+  "会话可能因空闲超时、进程退出或网络中断而结束，可在当前终端中重新连接。": "The session may have ended due to idle timeout, process exit, or network interruption. You can reconnect in the current terminal."
 }

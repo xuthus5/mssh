@@ -65,12 +65,22 @@ func resolveOptions(opts Options) (resolvedConfig, error) {
 }
 
 func resolveShell(raw string) (string, error) {
-	shell := strings.TrimSpace(raw)
+	shell, err := expandPath(strings.TrimSpace(raw))
+	if err != nil {
+		return "", err
+	}
 	if shell == "" {
 		shell = defaultShell()
 	}
 	if shell == "" {
 		return "", fmt.Errorf("unable to resolve local shell path")
+	}
+	info, err := os.Stat(shell)
+	if err != nil {
+		return "", fmt.Errorf("local shell path is invalid: %s", shell)
+	}
+	if info.IsDir() {
+		return "", fmt.Errorf("local shell path is a directory: %s", shell)
 	}
 	return shell, nil
 }
