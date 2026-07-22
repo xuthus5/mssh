@@ -8,6 +8,8 @@ vi.mock('@/components/terminal/TerminalEmulator', () => ({
 vi.mock('@/lib/wails', () => ({
   TerminalService: {
     Open: vi.fn(),
+    OpenLocal: vi.fn(),
+    OpenSerial: vi.fn(),
     Close: vi.fn(async () => {}),
   },
 }))
@@ -62,7 +64,8 @@ describe('TerminalSplit', () => {
   it('keeps the initial terminal pane expanded to the full viewport', () => {
     render(<Harness />)
 
-    expect(screen.getByTestId('pane-primary-1').parentElement).toHaveClass('flex-1', 'h-full', 'w-full')
+    expect(screen.getByTestId('pane-host-primary-1')).toHaveClass('h-full', 'w-full')
+    expect(screen.getByTestId('pane-primary-1')).toBeInTheDocument()
   })
 
   it('adds a new terminal on every split request without recycling existing panes', async () => {
@@ -100,7 +103,7 @@ describe('TerminalSplit', () => {
     await waitFor(() => expect(splitStateChange).toHaveBeenLastCalledWith({ paneCount: 8, busy: false }))
     fireEvent.click(screen.getByText('向右'))
 
-    expect(await screen.findByRole('status')).toHaveTextContent('单个标签最多支持 8 个终端窗格')
+    expect(await screen.findByRole('status')).toHaveTextContent('每个标签最多支持 8 个终端窗格')
     expect(TerminalService.Open).toHaveBeenCalledTimes(7)
     view.unmount()
   })
@@ -225,5 +228,37 @@ describe('TerminalSplit', () => {
 
     await waitFor(() => expect(TerminalService.Close).toHaveBeenCalledWith('split-1'))
     expect(TerminalService.Close).not.toHaveBeenCalledWith('primary-1')
+  })
+
+it('preserves the primary pane host when splitting', async () => {
+    render(<Harness />)
+    const primaryHost = screen.getByTestId('pane-host-primary-1')
+    fireEvent.click(screen.getByText('向右'))
+    await screen.findByTestId('pane-split-1')
+    expect(screen.getByTestId('pane-host-primary-1')).toBe(primaryHost)
+    expect(screen.getByTestId('pane-primary-1')).toBeInTheDocument()
+    expect(TerminalService.Close).not.toHaveBeenCalled()
+  })
+
+  it('opens local shell panes with OpenLocal', async () => {
+    vi.mocked(TerminalService.OpenLocal).mockResolvedValue('local-split-1')
+    const splitRef = createRef<TerminalSplitHandle>()
+    render(
+      <TerminalSplit
+        ref={splitRef}
+        tabID="tab-local"
+        primaryID="primary-local"
+        sessionId={0}
+        connectionKind="local"
+        active
+        focusRequest={focusRequest}
+        onStateChange={splitStateChange}
+        onCloseTerminal={closeTerminal}
+      />,
+    )
+    act(() => splitRef.current?.split('horizontal'))
+    await screen.findByTestId('pane-local-split-1')
+    expect(TerminalService.OpenLocal).toHaveBeenCalled()
+    expect(TerminalService.Open).not.toHaveBeenCalled()
   })
 })
