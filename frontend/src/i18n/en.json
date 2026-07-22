@@ -1198,5 +1198,11 @@
   "SSH 断线自动重连": "Auto-reconnect after SSH disconnect",
   "意外断开后自动尝试重新连接；手动断开或关闭标签不会触发。默认关闭。": "Automatically retries after unexpected disconnects. Manual disconnect or closing a tab does not trigger it. Off by default.",
   "启动时恢复终端标签": "Restore terminal tabs on startup",
-  "重启应用后自动恢复上次未关闭的终端标签。默认开启。": "Automatically restores previously open terminal tabs after restart. On by default."
+  "重启应用后自动恢复上次未关闭的终端标签。默认开启。": "Automatically restores previously open terminal tabs after restart. On by default.",
+  "渲染": "Rendering",
+  "选择终端画面渲染后端。DOM 兼容性最好；Canvas / WebGL 在大量输出时更流畅。": "Choose the terminal rendering backend. DOM is most compatible; Canvas / WebGL are smoother with heavy output.",
+  "渲染器": "Renderer",
+  "WebGL 不可用时会自动回退到 Canvas，再失败则使用 DOM。默认 DOM。": "Falls back to Canvas when WebGL is unavailable, then to DOM. Defaults to DOM.",
+  "DOM": "DOM",
+  "Canvas": "Canvas"
 }

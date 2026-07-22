@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { AutoSaveStatusIndicator } from '@/components/settings/AutoSaveStatus'
 import { TerminalBehaviorSettingsSection } from '@/components/settings/TerminalBehaviorSettings'
+import { TerminalRendererSettingsSection } from '@/components/settings/TerminalRendererSettings'
 import { TerminalConnectionDefaultsSettingsSection } from '@/components/settings/TerminalConnectionDefaultsSettings'
 import { ThemeEditor } from '@/components/settings/ThemeEditor'
 import { ThemeManager } from '@/components/settings/ThemeManager'
@@ -27,6 +28,7 @@ interface TerminalDraft {
   scrollbackLines: string
   autoReconnect: boolean
   restoreTabsOnStartup: boolean
+  renderer: GeneralSettings['renderer']
 }
 
 interface Props {
@@ -55,6 +57,7 @@ function createDraft(general: GeneralSettings): TerminalDraft {
     scrollbackLines: String(general.scrollbackLines),
     autoReconnect: general.autoReconnect,
     restoreTabsOnStartup: general.restoreTabsOnStartup,
+    renderer: general.renderer,
   }
 }
 
@@ -69,6 +72,7 @@ function buildSavePayload(general: GeneralSettings, draft: TerminalDraft): Gener
     scrollbackLines: parseInt(draft.scrollbackLines, 10) || 10000,
     autoReconnect: draft.autoReconnect,
     restoreTabsOnStartup: draft.restoreTabsOnStartup,
+    renderer: draft.renderer,
   }
 }
 
@@ -128,6 +132,10 @@ export function TerminalSettingsPanel({
           }
           onAutoReconnectChange={(value) => setDraft({ ...draft, autoReconnect: value })}
           onRestoreTabsOnStartupChange={(value) => setDraft({ ...draft, restoreTabsOnStartup: value })}
+        />
+        <TerminalRendererSettingsSection
+          renderer={draft.renderer}
+          onRendererChange={(value) => setDraft({ ...draft, renderer: value })}
         />
       </div>
       <ThemeEditor

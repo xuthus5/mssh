@@ -11,13 +11,13 @@ import { toast } from '@/components/ui/toast'
 import { applyTerminalTheme } from '@/lib/terminalTheme'
 import { TerminalService } from '@/lib/wails'
 import { useAppStore, type AppState } from '@/store/appStore'
-import { useTerminalBehaviorStore } from '@/store/terminalBehaviorStore'
+import { useTerminalBehaviorStore, type TerminalRenderer } from '@/store/terminalBehaviorStore'
 import { recordCommand } from '@/lib/commandHistory'
 import { TerminalCommandCapture } from '@/lib/terminalCommandCapture'
 import { registerTerminalSearch, unregisterTerminalSearch } from '@/lib/terminalSearchRegistry'
 import { useTerminalActivation, useTerminalAttachment, useTerminalIdentity } from '@/hooks/terminalLifecycleRuntime'
 import { fitAndRefresh } from '@/hooks/terminalFitRuntime'
-import { applyTerminalScrollback, createTerminalInstance, loadCanvasRenderer, safelyDisposeTerminalResource } from '@/hooks/terminalInstanceRuntime'
+import { applyTerminalScrollback, createTerminalInstance, createTerminalRendererController, safelyDisposeTerminalResource } from '@/hooks/terminalInstanceRuntime'
 import { subscribeToSynchronizedOutputQuery, subscribeToTerminalOutput, subscribeToTerminalVersionQuery } from '@/hooks/terminalOutputRuntime'
 import { subscribeToTerminalWorkingDirectory } from '@/hooks/terminalDirectoryRuntime'
 import { t } from '@/i18n'
@@ -134,6 +134,18 @@ function subscribeToScrollback(term: Terminal, reportRuntimeError: TerminalRunti
   })
 }
 
+function subscribeToRenderer(
+  applyRenderer: (mode: TerminalRenderer) => void,
+  reportRuntimeError: TerminalRuntimeErrorReporter,
+) {
+  return useTerminalBehaviorStore.subscribe((state, previous) => {
+    if (state.renderer === previous.renderer) return
+    runTerminalRuntime(reportRuntimeError, 'terminal renderer update', () => {
+      applyRenderer(state.renderer)
+    })
+  })
+}
+
 function recoverTerminal({ term, fitAddon, container, refs }: {
   term: Terminal
   fitAddon: FitAddon
@@ -189,9 +201,10 @@ function initializeTerminal(containerRef: RefObject<HTMLDivElement | null>, refs
   const initialTerminalID = refs.terminalIDRef.current
   refs.termRef.current = term
   refs.fitAddonRef.current = fitAddon
+  const rendererController = createTerminalRendererController(term)
   if (container) {
     term.open(container)
-    loadCanvasRenderer(term)
+    rendererController.apply(useTerminalBehaviorStore.getState().renderer)
     term.loadAddon(unicodeAddon)
     unicodeAddonOwnedByTerminal = true
     if (term.unicode) term.unicode.activeVersion = '11'
@@ -219,6 +232,9 @@ function initializeTerminal(containerRef: RefObject<HTMLDivElement | null>, refs
   refs.outputFlushRef.current = () => outputSubscription.flush()
   const unsubscribeTheme = subscribeToTheme({ term, fitAddon, containerRef, refs, reportRuntimeError })
   const unsubscribeScrollback = subscribeToScrollback(term, reportRuntimeError)
+  const unsubscribeRenderer = subscribeToRenderer((mode) => {
+    rendererController.apply(mode)
+  }, reportRuntimeError)
   const resizeObserver = observeResize({ term, fitAddon, containerRef, refs, reportRuntimeError })
   if (container) resizeObserver.observe(container)
 
@@ -237,6 +253,8 @@ function initializeTerminal(containerRef: RefObject<HTMLDivElement | null>, refs
     safelyDisposeTerminalResource('output subscription', outputSubscription.dispose)
     safelyDisposeTerminalResource('theme subscription', unsubscribeTheme)
     safelyDisposeTerminalResource('scrollback subscription', unsubscribeScrollback)
+    safelyDisposeTerminalResource('renderer subscription', unsubscribeRenderer)
+    safelyDisposeTerminalResource('renderer addon', () => rendererController.dispose())
     safelyDisposeTerminalResource('resize observer', () => resizeObserver.disconnect())
     if (cleanupCopyOnSelect) safelyDisposeTerminalResource('copy-on-select subscription', cleanupCopyOnSelect)
     unregisterTerminalSearch(refs.registeredTerminalIDRef.current)

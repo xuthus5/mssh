@@ -1,10 +1,12 @@
 import { create } from 'zustand'
 
 export type TerminalRightClickAction = 'menu' | 'paste'
+export type TerminalRenderer = 'dom' | 'canvas' | 'webgl'
 
 export const DEFAULT_TERMINAL_SCROLLBACK_LINES = 10000
 export const MIN_TERMINAL_SCROLLBACK_LINES = 1000
 export const MAX_TERMINAL_SCROLLBACK_LINES = 100000
+export const DEFAULT_TERMINAL_RENDERER: TerminalRenderer = 'dom'
 
 export interface TerminalBehaviorSettings {
   rightClickAction: TerminalRightClickAction
@@ -15,6 +17,8 @@ export interface TerminalBehaviorSettings {
   autoReconnect: boolean
   /** Restore open terminal tabs after application restart. */
   restoreTabsOnStartup: boolean
+  /** xterm renderer backend. */
+  renderer: TerminalRenderer
 }
 
 interface TerminalBehaviorState extends TerminalBehaviorSettings {
@@ -29,6 +33,7 @@ export const DEFAULT_TERMINAL_BEHAVIOR: TerminalBehaviorSettings = {
   scrollbackLines: DEFAULT_TERMINAL_SCROLLBACK_LINES,
   autoReconnect: false,
   restoreTabsOnStartup: true,
+  renderer: DEFAULT_TERMINAL_RENDERER,
 }
 
 export function normalizeTerminalRightClickAction(value: unknown): TerminalRightClickAction {
@@ -57,6 +62,11 @@ export function normalizeRestoreTabsOnStartup(value: unknown): boolean {
   return value !== false
 }
 
+export function normalizeTerminalRenderer(value: unknown): TerminalRenderer {
+  if (value === 'canvas' || value === 'webgl' || value === 'dom') return value
+  return DEFAULT_TERMINAL_RENDERER
+}
+
 export const useTerminalBehaviorStore = create<TerminalBehaviorState>((set) => ({
   ...DEFAULT_TERMINAL_BEHAVIOR,
   settingsHydrated: false,
@@ -66,6 +76,7 @@ export const useTerminalBehaviorStore = create<TerminalBehaviorState>((set) => (
     scrollbackLines: normalizeScrollbackLines(settings.scrollbackLines),
     autoReconnect: normalizeAutoReconnect(settings.autoReconnect),
     restoreTabsOnStartup: normalizeRestoreTabsOnStartup(settings.restoreTabsOnStartup),
+    renderer: normalizeTerminalRenderer(settings.renderer),
   }),
   markSettingsHydrated: () => set({ settingsHydrated: true }),
 }))

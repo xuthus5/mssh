@@ -16,6 +16,7 @@ const general = {
   scrollbackLines: 10000,
   autoReconnect: false,
   restoreTabsOnStartup: true,
+  renderer: 'dom' as const,
   closeButtonAction: 'tray' as const,
   logDir: '',
   logRetentionDays: 30,

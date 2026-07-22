@@ -6,6 +6,7 @@ import {
   MIN_TERMINAL_SCROLLBACK_LINES,
   normalizeCopyOnSelect,
   normalizeScrollbackLines,
+  normalizeTerminalRenderer,
   normalizeTerminalRightClickAction,
   useTerminalBehaviorStore,
 } from '@/store/terminalBehaviorStore'
@@ -40,6 +41,16 @@ describe('terminal behavior store', () => {
     expect(normalizeScrollbackLines(value)).toBe(expected)
   })
 
+  it.each([
+    ['dom', 'dom'],
+    ['canvas', 'canvas'],
+    ['webgl', 'webgl'],
+    ['invalid', 'dom'],
+    [null, 'dom'],
+  ])('normalizes renderer %o', (value, expected) => {
+    expect(normalizeTerminalRenderer(value)).toBe(expected)
+  })
+
   it('publishes complete settings atomically', () => {
     useTerminalBehaviorStore.getState().setSettings({
       rightClickAction: 'paste',
@@ -47,6 +58,7 @@ describe('terminal behavior store', () => {
       scrollbackLines: 5000,
       autoReconnect: true,
       restoreTabsOnStartup: false,
+      renderer: 'webgl',
     })
     expect(useTerminalBehaviorStore.getState()).toMatchObject({
       rightClickAction: 'paste',
@@ -54,6 +66,7 @@ describe('terminal behavior store', () => {
       scrollbackLines: 5000,
       autoReconnect: true,
       restoreTabsOnStartup: false,
+      renderer: 'webgl',
     })
   })
 
@@ -64,6 +77,7 @@ describe('terminal behavior store', () => {
       scrollbackLines: 999999,
       autoReconnect: false,
       restoreTabsOnStartup: true,
+      renderer: 'dom',
     })
     expect(useTerminalBehaviorStore.getState().scrollbackLines).toBe(MAX_TERMINAL_SCROLLBACK_LINES)
   })

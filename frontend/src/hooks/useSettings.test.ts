@@ -50,7 +50,7 @@ describe('useSettings', () => {
   it('saves general settings and updates state', async () => {
     const { result } = renderHook(() => useSettings())
     await act(async () => {
-      await result.current.saveGeneral({ maxPoolSize: 32, defaultKeepAlive: 120, defaultTermType: 'xterm', uiFontFamily: 'Segoe UI', uiFontFallbackFamily: 'Microsoft YaHei', uiFontSize: 16, rightClickAction: 'paste', copyOnSelect: true, scrollbackLines: 5000, autoReconnect: false, restoreTabsOnStartup: true, closeButtonAction: 'exit', logDir: '', logRetentionDays: 30, proxyMode: 'system', proxyURL: '', proxyNoProxy: '', proxyUsername: '', proxyPassword: '', language: 'zh-CN' })
+      await result.current.saveGeneral({ maxPoolSize: 32, defaultKeepAlive: 120, defaultTermType: 'xterm', uiFontFamily: 'Segoe UI', uiFontFallbackFamily: 'Microsoft YaHei', uiFontSize: 16, rightClickAction: 'paste', copyOnSelect: true, scrollbackLines: 5000, autoReconnect: false, restoreTabsOnStartup: true, renderer: 'dom', closeButtonAction: 'exit', logDir: '', logRetentionDays: 30, proxyMode: 'system', proxyURL: '', proxyNoProxy: '', proxyUsername: '', proxyPassword: '', language: 'zh-CN' })
     })
     expect(result.current.general.maxPoolSize).toBe(32)
     expect(result.current.general.defaultKeepAlive).toBe(120)
@@ -141,7 +141,7 @@ describe('useSettings', () => {
   })
 
   it('does not publish terminal behavior when persistence fails', async () => {
-    useTerminalBehaviorStore.getState().setSettings({ rightClickAction: 'menu', copyOnSelect: false, scrollbackLines: 10000, autoReconnect: false, restoreTabsOnStartup: true })
+    useTerminalBehaviorStore.getState().setSettings({ rightClickAction: 'menu', copyOnSelect: false, scrollbackLines: 10000, autoReconnect: false, restoreTabsOnStartup: true, renderer: 'dom' })
     __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.SetMany', async () => { throw new Error('db failed') })
     const { result } = renderHook(() => useSettings())
     await act(async () => {})
