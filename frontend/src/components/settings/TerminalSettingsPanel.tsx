@@ -28,6 +28,7 @@ interface TerminalDraft {
   scrollbackLines: string
   autoReconnect: boolean
   restoreTabsOnStartup: boolean
+  historyPredict: boolean
   renderer: GeneralSettings['renderer']
 }
 
@@ -57,6 +58,7 @@ function createDraft(general: GeneralSettings): TerminalDraft {
     scrollbackLines: String(general.scrollbackLines),
     autoReconnect: general.autoReconnect,
     restoreTabsOnStartup: general.restoreTabsOnStartup,
+    historyPredict: general.historyPredict,
     renderer: general.renderer,
   }
 }
@@ -72,6 +74,7 @@ function buildSavePayload(general: GeneralSettings, draft: TerminalDraft): Gener
     scrollbackLines: parseInt(draft.scrollbackLines, 10) || 10000,
     autoReconnect: draft.autoReconnect,
     restoreTabsOnStartup: draft.restoreTabsOnStartup,
+    historyPredict: draft.historyPredict,
     renderer: draft.renderer,
   }
 }
@@ -125,6 +128,7 @@ export function TerminalSettingsPanel({
           scrollbackLines={draft.scrollbackLines}
           autoReconnect={draft.autoReconnect}
           restoreTabsOnStartup={draft.restoreTabsOnStartup}
+          historyPredict={draft.historyPredict}
           onRightClickActionChange={(value) => setDraft({ ...draft, rightClickAction: value })}
           onCopyOnSelectChange={(value) => setDraft({ ...draft, copyOnSelect: value })}
           onScrollbackLinesChange={(value) =>
@@ -132,6 +136,7 @@ export function TerminalSettingsPanel({
           }
           onAutoReconnectChange={(value) => setDraft({ ...draft, autoReconnect: value })}
           onRestoreTabsOnStartupChange={(value) => setDraft({ ...draft, restoreTabsOnStartup: value })}
+          onHistoryPredictChange={(value) => setDraft({ ...draft, historyPredict: value })}
         />
         <TerminalRendererSettingsSection
           renderer={draft.renderer}

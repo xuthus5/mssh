@@ -17,6 +17,7 @@ const general = {
   autoReconnect: false,
   restoreTabsOnStartup: true,
   renderer: 'dom' as const,
+  historyPredict: false,
   closeButtonAction: 'tray' as const,
   logDir: '',
   logRetentionDays: 30,
