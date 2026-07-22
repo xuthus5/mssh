@@ -11,6 +11,7 @@ import { SystemPanel } from '@/components/terminal/SystemPanel'
 import { TerminalSearchBar } from '@/components/terminal/TerminalSearchBar'
 import { TerminalComposePanel } from '@/components/terminal/TerminalComposePanel'
 import { AITerminalPanel } from '@/components/terminal/AITerminalPanel'
+import { localHistoryBucket } from '@/hooks/terminalInputRuntime'
 import { t } from '@/i18n'
 
 
@@ -67,7 +68,7 @@ export function TerminalTab({ terminalID, sessionId, onOpenFiles, active, focusR
   const historySessionId = connectionKind === 'serial'
     ? -(currentTab?.serialPortId ?? 0)
     : connectionKind === 'local'
-      ? -1
+      ? localHistoryBucket(currentTab?.terminalInstance)
       : sessionId
   const recordingSessionId = remoteFeatures ? sessionId : 0
   const splitRef = useRef<TerminalSplitHandle>(null)

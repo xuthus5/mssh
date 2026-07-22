@@ -172,19 +172,33 @@ func (p *PortSession) notifyExit(err error) {
 }
 
 func (p *PortSession) Write(data []byte) (int, error) {
-	if p.port == nil {
+	p.mu.RLock()
+	port := p.port
+	lineEnding := p.lineEnding
+	localEcho := p.localEcho
+	exited := p.exited
+	p.mu.RUnlock()
+	if exited || port == nil {
 		return 0, fmt.Errorf("serial port not available")
 	}
-	payload := transformLineEnding(data, p.lineEnding)
-	n, err := p.port.Write(payload)
-	if err != nil {
-		return n, err
+	payload := transformLineEnding(data, lineEnding)
+	written := 0
+	for written < len(payload) {
+		n, err := port.Write(payload[written:])
+		written += n
+		if err != nil {
+			return written, err
+		}
+		if n == 0 {
+			return written, fmt.Errorf("serial write returned zero bytes")
+		}
 	}
-	if p.localEcho && len(data) > 0 {
+	if localEcho && len(data) > 0 {
 		echo := make([]byte, len(data))
 		copy(echo, data)
 		p.deliverRead(echo)
 	}
+	// Report input length so callers can treat line-ending expansion as transparent.
 	return len(data), nil
 }
 
@@ -196,8 +210,12 @@ func (p *PortSession) Resize(cols, rows int) error {
 
 func (p *PortSession) Close() error {
 	p.closeOnce.Do(func() {
-		if p.port != nil {
-			p.closeErr = p.port.Close()
+		p.mu.Lock()
+		port := p.port
+		p.port = nil
+		p.mu.Unlock()
+		if port != nil {
+			p.closeErr = port.Close()
 		}
 		p.notifyExit(io.EOF)
 	})

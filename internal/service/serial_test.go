@@ -83,3 +83,25 @@ func TestSerialServiceDeviceReservation(t *testing.T) {
 	active := svc.ActiveDeviceMap()
 	assert.Equal(t, "term-2", active["/dev/ttyUSB0"])
 }
+
+func TestSerialServiceDeleteBlocksInUse(t *testing.T) {
+	db, err := store.OpenDB(t.TempDir())
+	require.NoError(t, err)
+	require.NoError(t, store.InitializeSchema(db))
+	t.Cleanup(func() { _ = db.Close() })
+
+	svc := NewSerialService(db, slog.Default())
+	created, err := svc.Create(model.SerialPortInput{
+		Name: "in-use", Device: "/dev/ttyTEST-inuse", BaudRate: 115200,
+	})
+	require.NoError(t, err)
+	require.NoError(t, svc.reserveDevice(created.Device, "term-1"))
+	err = svc.Delete(created.ID)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "in use")
+	_, err = svc.DeleteMany([]int64{created.ID})
+	require.Error(t, err)
+	svc.releaseDevice(created.Device, "term-1")
+	require.NoError(t, svc.Delete(created.ID))
+}
+

@@ -58,6 +58,9 @@ func (s *SerialService) Update(input model.SerialPortInput) error {
 }
 
 func (s *SerialService) Delete(id int64) error {
+	if err := s.ensureProfilesNotInUse([]int64{id}); err != nil {
+		return err
+	}
 	return store.DeleteSerialPort(s.db, id)
 }
 
@@ -75,7 +78,31 @@ func (s *SerialService) DeleteMany(ids []int64) (int64, error) {
 		seen[id] = struct{}{}
 		clean = append(clean, id)
 	}
+	if err := s.ensureProfilesNotInUse(clean); err != nil {
+		return 0, err
+	}
 	return store.DeleteSerialPorts(s.db, clean)
+}
+
+func (s *SerialService) ensureProfilesNotInUse(ids []int64) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	active := s.ActiveDeviceMap()
+	if len(active) == 0 {
+		return nil
+	}
+	for _, id := range ids {
+		port, err := store.GetSerialPort(s.db, id)
+		if err != nil {
+			// Missing profiles are ignored so delete remains idempotent for callers.
+			continue
+		}
+		if _, ok := active[strings.TrimSpace(port.Device)]; ok {
+			return fmt.Errorf("serial profile %q is in use and cannot be deleted", port.Name)
+		}
+	}
+	return nil
 }
 
 func (s *SerialService) ListDevices() ([]string, error) {

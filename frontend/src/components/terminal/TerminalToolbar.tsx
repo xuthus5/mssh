@@ -10,6 +10,8 @@ import { useAppStore } from '@/store/appStore'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import type { SplitDirection } from '@/components/terminal/splitTree'
 import { getClipboard } from '@/lib/clipboard'
+import { useShortcutStore } from '@/store/shortcutStore'
+import { formatChordDisplay } from '@/lib/shortcuts'
 import { t } from '@/i18n'
 import { SerialSignalToolbar } from '@/components/terminal/SerialSignalToolbar'
 
@@ -85,14 +87,18 @@ function useClipboardActions(getTerminal: () => ToolbarTerminal | null, restoreF
 }
 
 function ClipboardActions({ copy, paste, clear }: { copy: () => void; paste: () => void; clear: () => void }) {
+  const bindings = useShortcutStore((state) => state.bindings)
+  const copyHint = formatChordDisplay(bindings['copy-selection'])
+  const pasteHint = formatChordDisplay(bindings['paste-clipboard'])
+  const clearHint = formatChordDisplay(bindings['clear-terminal'])
   return <>
-    <button type="button" className={actionClass} onClick={copy} title={t('复制 (Ctrl+Shift+C)')}>
+    <button type="button" className={actionClass} onClick={copy} title={`${t('复制')} (${copyHint})`}>
       <Copy className="h-3 w-3" /><span className="hidden sm:inline">{t('复制')}</span>
     </button>
-    <button type="button" className={actionClass} onClick={paste} title={t('粘贴 (Ctrl+Shift+V)')}>
+    <button type="button" className={actionClass} onClick={paste} title={`${t('粘贴')} (${pasteHint})`}>
       <ClipboardPaste className="h-3 w-3" /><span className="hidden sm:inline">{t('粘贴')}</span>
     </button>
-    <button type="button" className={actionClass} onClick={clear} title={t('清屏 (Ctrl+Shift+L)')}>
+    <button type="button" className={actionClass} onClick={clear} title={`${t('清屏')} (${clearHint})`}>
       <Trash2 className="h-3 w-3" /><span className="hidden sm:inline">{t('清屏')}</span>
     </button>
   </>

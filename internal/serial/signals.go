@@ -44,7 +44,11 @@ func (p *PortSession) Signals() model.SerialSignals {
 
 // Break sends a break condition for the given duration.
 func (p *PortSession) Break(duration time.Duration) error {
-	if p.port == nil {
+	p.mu.RLock()
+	port := p.port
+	exited := p.exited
+	p.mu.RUnlock()
+	if exited || port == nil {
 		return fmt.Errorf("serial port not available")
 	}
 	if duration <= 0 {
@@ -53,5 +57,5 @@ func (p *PortSession) Break(duration time.Duration) error {
 	if duration > 2*time.Second {
 		duration = 2 * time.Second
 	}
-	return p.port.Break(duration)
+	return port.Break(duration)
 }
