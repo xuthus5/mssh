@@ -20,6 +20,7 @@ const state = vi.hoisted(() => ({
   moveSession: vi.fn(),
   batchConnect: vi.fn(),
   batchExecuteMacro: vi.fn(),
+  batchDeleteSessions: vi.fn(),
   listAssetCatalogs: vi.fn(), bulkSetEnvironment: vi.fn(), bulkSetProject: vi.fn(), bulkUpdateTags: vi.fn(),
   createEnvironment: vi.fn(), createProject: vi.fn(), createTag: vi.fn(), updateEnvironment: vi.fn(), updateProject: vi.fn(), updateTag: vi.fn(),
   deleteEnvironment: vi.fn(), deleteProject: vi.fn(), deleteTag: vi.fn(), reorderEnvironments: vi.fn(), reorderProjects: vi.fn(),
@@ -28,6 +29,13 @@ const toast = vi.hoisted(() => vi.fn())
 
 vi.mock('@/hooks/SessionWorkspaceContext', () => ({ useSessionWorkspace: () => state }))
 vi.mock('@/components/ui/toast', () => ({ toast }))
+vi.mock('@/lib/wails', () => ({
+  SessionService: {
+    SessionDeleteImpact: vi.fn(async () => ({ tunnels: 0, history: 0, recordings: 0 })),
+    SessionsDeleteImpact: vi.fn(async () => ({ tunnels: 0, history: 0, recordings: 0 })),
+  },
+  MacroService: { List: vi.fn(async () => []) },
+}))
 vi.mock('@/components/ui/dropdown-menu', async () => {
   const React = await import('react')
   return {

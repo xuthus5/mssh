@@ -19,6 +19,7 @@ const state = {
   deleteEnvironment: vi.fn(), deleteProject: vi.fn(), deleteTag: vi.fn(), reorderEnvironments: vi.fn(), reorderProjects: vi.fn(),
   batchConnect: vi.fn(async (ids: string[]) => ids.map((id) => ({ sessionId: id, name: id === '1' ? '生产服务器' : '测试服务器', success: id === '1' }))),
   batchExecuteMacro: vi.fn(async () => []),
+  batchDeleteSessions: vi.fn(async (ids: string[]) => ids.map((id) => ({ sessionId: id, name: id === '1' ? '生产服务器' : '测试服务器', success: true }))),
   exportSessionsCSV: vi.fn(async () => ({ count: 0, included_passwords: false })),
   previewSessionsCSV: vi.fn(async () => ({ headers: [], sample_rows: [], total_rows: 0 })),
   importSessionsCSV: vi.fn(async () => ({ total: 0, imported: 0, updated: 0, skipped: 0, failed: 0, results: [] })),
@@ -26,7 +27,7 @@ const state = {
 
 vi.mock('@/hooks/SessionWorkspaceContext', () => ({ useSessionWorkspace: () => state }))
 vi.mock('@/lib/wails', () => ({
-  SessionService: { SessionDeleteImpact: vi.fn(async () => ({ tunnels: 0, history: 0, recordings: 0 })) },
+  SessionService: { SessionDeleteImpact: vi.fn(async () => ({ tunnels: 0, history: 0, recordings: 0 })), SessionsDeleteImpact: vi.fn(async () => ({ tunnels: 1, history: 0, recordings: 0 })) },
   AssetCatalogService: { EnvironmentDeleteImpact: vi.fn(), ProjectDeleteImpact: vi.fn(), TagDeleteImpact: vi.fn() },
   MacroService: { List: vi.fn(async () => [{ id: 9, name: '巡检', command: 'uptime\n' }]) },
 }))
@@ -77,6 +78,21 @@ describe('SessionAssetCenter', () => {
     expect(screen.getAllByText('生产服务器')).toHaveLength(2)
     expect(screen.getAllByText('测试服务器')).toHaveLength(2)
   })
+
+  it('selects multiple sessions, confirms batch delete, and shows results', async () => {
+    render(<SessionAssetCenter />)
+    await userEvent.click(screen.getByRole('tab', { name: /所有节点/ }))
+    await userEvent.click(screen.getByRole('checkbox', { name: '选择 生产服务器' }))
+    await userEvent.click(screen.getByRole('checkbox', { name: '选择 测试服务器' }))
+    await userEvent.click(screen.getByRole('button', { name: '批量删除' }))
+
+    expect(screen.getByRole('alertdialog')).toHaveTextContent('确认批量删除？')
+    await userEvent.click(screen.getByRole('button', { name: '确认删除' }))
+
+    expect(state.batchDeleteSessions).toHaveBeenCalledWith(['1', '2'])
+    expect(await screen.findByText('成功 2 项，失败 0 项。')).toBeInTheDocument()
+  })
+
 })
 
 function session(id: string, name: string, folderId: string) {

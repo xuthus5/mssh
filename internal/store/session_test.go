@@ -252,3 +252,18 @@ func TestDeleteFolderRollsBackOnMigrationFailures(t *testing.T) {
 		})
 	}
 }
+
+
+func TestDeleteSessionsRemovesTunnels(t *testing.T) {
+	db := setupTestDB(t)
+	folder, err := CreateFolder(db, "default", nil)
+	require.NoError(t, err)
+	session, err := CreateSession(db, model.Session{FolderID: &folder.ID, Name: "n", Host: "10.0.0.1", Port: 22, Username: "root", AuthMethod: model.AuthPassword, KeepAlive: 30, TermType: "xterm"})
+	require.NoError(t, err)
+	_, err = CreateTunnel(db, model.Tunnel{SessionID: session.ID, Name: "t", Type: model.TunnelLocal, LocalHost: "127.0.0.1", LocalPort: 1, RemoteHost: "r", RemotePort: 2})
+	require.NoError(t, err)
+	require.NoError(t, DeleteSessions(db, []int64{session.ID}))
+	tunnels, err := ListTunnels(db)
+	require.NoError(t, err)
+	assert.Len(t, tunnels, 0)
+}

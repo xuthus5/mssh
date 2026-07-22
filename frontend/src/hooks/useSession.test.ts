@@ -215,4 +215,43 @@ describe('useSession - loading state', () => {
 
     expect(result.current.loading).toBe(false)
   })
+
+  it('batch deletes selected sessions and removes them from state', async () => {
+    const firstId = nextId()
+    const secondId = nextId()
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SessionService.ListFolders', async () => [])
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SessionService.ListSessions', async () => [])
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SessionService.ListRecentSessions', async () => [])
+    __registerHandler('github.com/xuthus5/mssh/internal/service.AssetCatalogService.ListEnvironments', async () => [])
+    __registerHandler('github.com/xuthus5/mssh/internal/service.AssetCatalogService.ListProjects', async () => [])
+    __registerHandler('github.com/xuthus5/mssh/internal/service.AssetCatalogService.ListTags', async () => [])
+    let created = 0
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SessionService.CreateSession', async (s: any) => {
+      created += 1
+      return Object.assign({}, s, { id: created === 1 ? firstId : secondId })
+    })
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SessionService.DeleteSessions', async () => 2)
+    __registerHandler('github.com/xuthus5/mssh/internal/service.AuditService.RecordBatch', async () => {})
+
+    const { result } = renderHook(() => useSession())
+    await act(async () => {
+      await result.current.createSession({
+        name: 'a', host: '1', port: 22, username: 'u',
+        authMethod: 'password', keepAlive: 30, termType: 'xterm', folderId: null,
+      })
+      await result.current.createSession({
+        name: 'b', host: '2', port: 22, username: 'u',
+        authMethod: 'password', keepAlive: 30, termType: 'xterm', folderId: null,
+      })
+    })
+    expect(result.current.sessions).toHaveLength(2)
+
+    let results: any[] = []
+    await act(async () => {
+      results = await result.current.batchDeleteSessions(result.current.sessions.map((session) => session.id))
+    })
+    expect(results.every((item) => item.success)).toBe(true)
+    expect(result.current.sessions).toHaveLength(0)
+  })
+
 })

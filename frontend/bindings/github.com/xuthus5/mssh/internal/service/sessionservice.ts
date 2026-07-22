@@ -52,6 +52,10 @@ export function DeleteSession(id: number): $CancellablePromise<void> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.SessionService.DeleteSession", id);
 }
 
+export function DeleteSessions(ids: number[]): $CancellablePromise<number> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.SessionService.DeleteSessions", ids);
+}
+
 export function ExportCSV(path: string, options: model$0.SessionCSVExportOptions): $CancellablePromise<model$0.SessionCSVExportResult> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.SessionService.ExportCSV", path, options).then(($result: any) => {
         return $$createType4($result);
@@ -116,6 +120,12 @@ export function PreviewCSV(path: string): $CancellablePromise<model$0.SessionCSV
 
 export function SessionDeleteImpact(id: number): $CancellablePromise<model$0.SessionDeleteImpact | null> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.SessionService.SessionDeleteImpact", id).then(($result: any) => {
+        return $$createType14($result);
+    });
+}
+
+export function SessionsDeleteImpact(ids: number[]): $CancellablePromise<model$0.SessionDeleteImpact | null> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.SessionService.SessionsDeleteImpact", ids).then(($result: any) => {
         return $$createType14($result);
     });
 }
