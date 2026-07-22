@@ -32,7 +32,7 @@ func TestValidateTunnelBindRejectsNonLoopback(t *testing.T) {
 
 func TestTunnelService_CreateRejectsNonLoopback(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	sessionSvc := NewSessionService(db, newMockEventBus(), 30, "", nil, testutil.NewTestLogger())
+	sessionSvc := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
 	svc := NewTunnelService(db, sessionSvc, newMockEventBus(), testutil.NewTestLogger())
 	sess, err := sessionSvc.CreateSession(model.SessionInputFrom(model.Session{
 		Name: "t", Host: "10.0.0.1", Port: 22, Username: "root", AuthMethod: model.AuthPassword, KeepAlive: 30, TermType: "xterm",
@@ -100,7 +100,7 @@ func TestSessionCSVExportDecryptsSealedPassword(t *testing.T) {
 		key[i] = byte(i + 1)
 	}
 	crypto := &staticCrypto{key: key}
-	svc := NewSessionService(db, newMockEventBus(), 30, "", crypto, testutil.NewTestLogger())
+	svc := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), crypto, testutil.NewTestLogger())
 	created, err := svc.CreateSession(model.SessionInputFrom(model.Session{
 		Name: "sec", Host: "10.0.0.2", Port: 22, Username: "root",
 		AuthMethod: model.AuthPassword, Password: "export-secret", KeepAlive: 30, TermType: "xterm",
@@ -146,7 +146,7 @@ func TestCryptoRuntimeClearZeroizesDEK(t *testing.T) {
 
 func TestBuildAuthBundleAgentMissingSocket(t *testing.T) {
 	t.Setenv("SSH_AUTH_SOCK", "")
-	svc := NewSessionService(testutil.NewTestDB(t), newMockEventBus(), 30, "", nil, testutil.NewTestLogger())
+	svc := NewSessionService(testutil.NewTestDB(t), newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
 	_, cleanup, err := svc.buildAuthBundle(&model.Session{AuthMethod: model.AuthAgent})
 	require.Error(t, err)
 	assert.Nil(t, cleanup)

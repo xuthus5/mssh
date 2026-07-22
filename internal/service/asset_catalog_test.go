@@ -49,7 +49,7 @@ func TestAssetCatalogSessionAssignmentAndDetail(t *testing.T) {
 	tag, err := catalog.CreateTag(model.AssetTagInput{Name: "数据库", ColorToken: model.AssetColorBlue})
 	require.NoError(t, err)
 
-	sessionSvc := NewSessionService(db, newMockEventBus(), 30, "", nil, testutil.NewTestLogger())
+	sessionSvc := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
 	created, err := sessionSvc.CreateSession(model.SessionInput{Name: "db", Host: "127.0.0.1", Port: 22, Username: "root", AuthMethod: model.AuthAgent, EnvironmentID: &environment.ID, ProjectID: &project.ID, TagIDs: []int64{tag.ID}})
 	require.NoError(t, err)
 	detail, err := catalog.GetSessionAssetDetail(created.ID)
