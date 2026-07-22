@@ -8,13 +8,16 @@ import {
 import {
   applyTerminalScrollback,
   createTerminalInstance,
+  createTerminalRendererController,
 } from '@/hooks/terminalInstanceRuntime'
 
 const constructed: Array<Record<string, unknown>> = []
 
+const loadAddon = vi.fn()
 vi.mock('@xterm/xterm', () => ({
   Terminal: class {
     options: Record<string, unknown>
+    loadAddon = loadAddon
     constructor(options: Record<string, unknown>) {
       constructed.push(options)
       this.options = { ...options }
@@ -23,7 +26,15 @@ vi.mock('@xterm/xterm', () => ({
 }))
 
 vi.mock('@xterm/addon-canvas', () => ({
-  CanvasAddon: class {},
+  CanvasAddon: class {
+    dispose = vi.fn()
+  },
+}))
+
+vi.mock('@xterm/addon-webgl', () => ({
+  WebglAddon: class {
+    dispose = vi.fn()
+  },
 }))
 
 describe('terminalInstanceRuntime scrollback', () => {
@@ -49,5 +60,24 @@ describe('terminalInstanceRuntime scrollback', () => {
     expect(term.options.scrollback).toBe(2500)
     applyTerminalScrollback(term, 999999)
     expect(term.options.scrollback).toBe(MAX_TERMINAL_SCROLLBACK_LINES)
+  })
+})
+
+describe('terminalInstanceRuntime renderer', () => {
+  beforeEach(() => {
+    loadAddon.mockClear()
+    useTerminalBehaviorStore.setState(DEFAULT_TERMINAL_BEHAVIOR)
+  })
+
+  it('loads webgl and canvas addons on demand and falls back to dom', () => {
+    const term = createTerminalInstance()
+    const controller = createTerminalRendererController(term as never)
+    expect(controller.apply('dom')).toBe('dom')
+    expect(loadAddon).not.toHaveBeenCalled()
+    expect(controller.apply('canvas')).toBe('canvas')
+    expect(loadAddon).toHaveBeenCalledTimes(1)
+    expect(controller.apply('webgl')).toBe('webgl')
+    expect(loadAddon).toHaveBeenCalledTimes(2)
+    expect(controller.apply('dom')).toBe('dom')
   })
 })
