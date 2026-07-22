@@ -127,6 +127,25 @@ describe('reconnectSessionTab', () => {
     await first
     expect(useAppStore.getState().connectionStatus['term-old']).toBe('disconnected')
   })
+
+  it('reconnects local shell tabs via OpenLocal without host dialog', async () => {
+    useAppStore.setState({
+      tabs: [{ id: 'tab-local', title: '本地终端', type: 'terminal', terminalId: 'term-local-old', sessionId: 0, connectionKind: 'local' }],
+      activeSurface: { type: 'terminal', id: 'tab-local' },
+      connectionStatus: { 'term-local-old': 'disconnected' },
+      terminalPool: new Map(),
+    })
+    const openLocal = vi.fn(async () => 'term-local-new')
+    __registerHandler(service + 'OpenLocal', openLocal)
+    __registerHandler(service + 'Open', vi.fn(async () => 'should-not-open'))
+    __registerHandler(service + 'Close', vi.fn(async () => {}))
+    await reconnectSessionTab('tab-local', sessions)
+    expect(openLocal).toHaveBeenCalled()
+    expect(useConnectDialog.getState().open).toBe(false)
+    const tab = useAppStore.getState().tabs.find((item) => item.id === 'tab-local')
+    expect(tab).toMatchObject({ terminalId: 'term-local-new', connectionKind: 'local' })
+    expect(useAppStore.getState().connectionStatus['term-local-new']).toBe('connected')
+  })
 })
 
 describe('maybeAutoReconnectTerminal', () => {
@@ -165,24 +184,17 @@ describe('maybeAutoReconnectTerminal', () => {
     await Promise.resolve()
     expect(open).not.toHaveBeenCalled()
   })
-})
 
-  it('reconnects local shell tabs via OpenLocal without host dialog', async () => {
+  it('does not auto-reconnect serial terminals', async () => {
+    useTerminalBehaviorStore.setState({ autoReconnect: true, renderer: 'dom', historyPredict: false })
     useAppStore.setState({
-      tabs: [{ id: 'tab-local', title: '本地终端', type: 'terminal', terminalId: 'term-local-old', sessionId: 0, connectionKind: 'local' }],
-      activeSurface: { type: 'terminal', id: 'tab-local' },
-      connectionStatus: { 'term-local-old': 'disconnected' },
-      terminalPool: new Map(),
+      tabs: [{ id: 'tab-serial', title: 'UART', type: 'terminal', terminalId: 'term-serial', sessionId: 0, connectionKind: 'serial', serialPortId: 9 }],
+      connectionStatus: { 'term-serial': 'disconnected' },
     })
-    const openLocal = vi.fn(async () => 'term-local-new')
-    __registerHandler(service + 'OpenLocal', openLocal)
-    __registerHandler(service + 'Open', vi.fn(async () => 'should-not-open'))
-    __registerHandler(service + 'Close', vi.fn(async () => {}))
-    await reconnectSessionTab('tab-local', sessions)
-    expect(openLocal).toHaveBeenCalled()
-    expect(useConnectDialog.getState().open).toBe(false)
-    const tab = useAppStore.getState().tabs.find((item) => item.id === 'tab-local')
-    expect(tab).toMatchObject({ terminalId: 'term-local-new', connectionKind: 'local' })
-    expect(useAppStore.getState().connectionStatus['term-local-new']).toBe('connected')
+    const openSerial = vi.fn(async () => 'term-serial-new')
+    __registerHandler(service + 'OpenSerial', openSerial)
+    maybeAutoReconnectTerminal('term-serial', [])
+    await new Promise((resolve) => setTimeout(resolve, 30))
+    expect(openSerial).not.toHaveBeenCalled()
   })
-
+})

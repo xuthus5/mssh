@@ -3,6 +3,7 @@ package localshell
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -75,12 +76,26 @@ func resolveShell(raw string) (string, error) {
 	if shell == "" {
 		return "", fmt.Errorf("unable to resolve local shell path")
 	}
+	if !filepath.IsAbs(shell) {
+		looked, lookErr := execLookPath(shell)
+		if lookErr != nil {
+			return "", fmt.Errorf("local shell path must be absolute or on PATH: %s", shell)
+		}
+		shell = looked
+	}
+	if resolved, err := filepath.EvalSymlinks(shell); err == nil {
+		shell = resolved
+	}
 	info, err := os.Stat(shell)
 	if err != nil {
 		return "", fmt.Errorf("local shell path is invalid: %s", shell)
 	}
 	if info.IsDir() {
 		return "", fmt.Errorf("local shell path is a directory: %s", shell)
+	}
+	// Windows file modes do not reliably expose Unix execute bits.
+	if runtime.GOOS != "windows" && info.Mode().Perm()&0o111 == 0 {
+		return "", fmt.Errorf("local shell path is not executable: %s", shell)
 	}
 	return shell, nil
 }
@@ -184,4 +199,8 @@ func ParseArgs(raw string) []string {
 		return nil
 	}
 	return strings.Fields(raw)
+}
+
+func execLookPath(file string) (string, error) {
+	return exec.LookPath(file)
 }

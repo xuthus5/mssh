@@ -43,6 +43,18 @@ export interface RestoredWorkspace {
   failures: number
 }
 
+
+function sanitizeToolPanelForConnection(
+  kind: TerminalConnectionKind | undefined,
+  toolPanel: TerminalTab['toolPanel'] | undefined,
+): TerminalTab['toolPanel'] | undefined {
+  if (!toolPanel) return toolPanel
+  if (kind === 'local' || kind === 'serial') {
+    if (toolPanel === 'files' || toolPanel === 'system' || toolPanel === 'ai') return null
+  }
+  return toolPanel
+}
+
 export function createWorkspaceSnapshot(state: Pick<AppState, 'tabs' | 'activeSurface' | 'workspaceTab' | 'overviewSection'>): WorkspaceSnapshot {
   const activeIndex = state.activeSurface && state.activeSurface.type !== 'workspace'
     ? state.tabs.findIndex((tab) => tab.id === state.activeSurface?.id)
@@ -65,7 +77,7 @@ function tabIntent(tab: Tab): TabIntent {
     title: tab.title,
     sessionId: tab.sessionId,
     terminalInstance: tab.terminalInstance,
-    toolPanel: tab.toolPanel ?? null,
+    toolPanel: sanitizeToolPanelForConnection(tab.connectionKind, tab.toolPanel) ?? null,
   }
   if (tab.connectionKind === 'local' || tab.connectionKind === 'serial') {
     intent.connectionKind = tab.connectionKind
@@ -194,7 +206,7 @@ async function restoreTabIntent(
       terminalId,
       sessionId: intent.sessionId,
       terminalInstance: intent.terminalInstance,
-      toolPanel: intent.toolPanel ?? null,
+      toolPanel: sanitizeToolPanelForConnection(kind, intent.toolPanel) ?? null,
     }
     if (kind === 'local') tab.connectionKind = 'local'
     if (kind === 'serial') {
