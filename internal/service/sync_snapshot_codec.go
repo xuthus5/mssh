@@ -29,7 +29,14 @@ func encodeEncryptedSnapshot(data ExportData, masterKey string) ([]byte, error) 
 }
 
 func writePrivateFileAtomic(path string, content []byte) error {
-	temporary, err := os.CreateTemp(filepath.Dir(path), ".mssh-backup-*.tmp")
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return fmt.Errorf("create parent directory: %w", err)
+	}
+	if err := os.Chmod(dir, 0o700); err != nil {
+		return fmt.Errorf("secure parent directory: %w", err)
+	}
+	temporary, err := os.CreateTemp(dir, ".mssh-backup-*.tmp")
 	if err != nil {
 		return err
 	}

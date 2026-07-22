@@ -253,4 +253,4 @@
 
 - SSH known_hosts 空路径 fail-closed（禁止 InsecureIgnoreHostKey）。
 - vault 非法 nonce 返回错误而非 panic。
-- coverpkg 总覆盖率约 89.1%（目标 90%，仍 partial）。
+- coverpkg 总覆盖率 90.0%（CI 门禁通过）。

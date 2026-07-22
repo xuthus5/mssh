@@ -142,7 +142,10 @@ func TestSyncServiceRejectsInvalidPathAndClosedDatabase(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	setSyncMasterKey(t, db, syncTestMasterKey)
 	svc := newTestSyncService(db, syncTestMasterKey)
-	assert.Error(t, svc.Export("/missing/backup.msshbackup"))
+	// Parent path is a regular file, so MkdirAll cannot create the export directory.
+	parentFile := filepath.Join(t.TempDir(), "as-file")
+	require.NoError(t, os.WriteFile(parentFile, []byte("x"), 0o600))
+	assert.Error(t, svc.Export(filepath.Join(parentFile, "backup.msshbackup")))
 	require.NoError(t, db.Close())
 	assert.Error(t, svc.Export(filepath.Join(t.TempDir(), "backup.msshbackup")))
 }
@@ -224,7 +227,11 @@ func TestSyncCodecAndCloudErrorPaths(t *testing.T) {
 	t.Run("snapshot encoding and database errors", func(t *testing.T) {
 		_, err := encodeEncryptedSnapshot(ExportData{Tables: map[string][]map[string]any{"bad": {{"value": make(chan int)}}}}, syncTestMasterKey)
 		require.Error(t, err)
-		require.Error(t, writePrivateFileAtomic(filepath.Join(t.TempDir(), "missing", "backup"), []byte("x")))
+		path := filepath.Join(t.TempDir(), "missing", "backup")
+		require.NoError(t, writePrivateFileAtomic(path, []byte("x")))
+		content, readErr := os.ReadFile(path)
+		require.NoError(t, readErr)
+		require.Equal(t, []byte("x"), content)
 
 		memoryDB, err := sql.Open("sqlite", ":memory:")
 		require.NoError(t, err)
