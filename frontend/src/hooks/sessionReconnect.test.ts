@@ -147,7 +147,7 @@ describe('maybeAutoReconnectTerminal', () => {
   })
 
   it('starts reconnect when auto reconnect is enabled', async () => {
-    useTerminalBehaviorStore.setState({ autoReconnect: true, renderer: 'dom' })
+    useTerminalBehaviorStore.setState({ autoReconnect: true, renderer: 'dom', historyPredict: false })
     const open = deferred<string>()
     __registerHandler(service + 'Open', async () => open.promise)
     maybeAutoReconnectTerminal('term-old', sessions)
@@ -157,7 +157,7 @@ describe('maybeAutoReconnectTerminal', () => {
   })
 
   it('skips auto reconnect for intentional disconnects', async () => {
-    useTerminalBehaviorStore.setState({ autoReconnect: true, renderer: 'dom' })
+    useTerminalBehaviorStore.setState({ autoReconnect: true, renderer: 'dom', historyPredict: false })
     const open = vi.fn(async () => 'term-new')
     __registerHandler(service + 'Open', open)
     markIntentionalDisconnect('term-old')

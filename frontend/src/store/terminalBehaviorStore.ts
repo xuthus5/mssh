@@ -19,6 +19,8 @@ export interface TerminalBehaviorSettings {
   restoreTabsOnStartup: boolean
   /** xterm renderer backend. */
   renderer: TerminalRenderer
+  /** Predict and Tab-complete from historical commands while typing. */
+  historyPredict: boolean
 }
 
 interface TerminalBehaviorState extends TerminalBehaviorSettings {
@@ -34,6 +36,7 @@ export const DEFAULT_TERMINAL_BEHAVIOR: TerminalBehaviorSettings = {
   autoReconnect: false,
   restoreTabsOnStartup: true,
   renderer: DEFAULT_TERMINAL_RENDERER,
+  historyPredict: false,
 }
 
 export function normalizeTerminalRightClickAction(value: unknown): TerminalRightClickAction {
@@ -67,6 +70,10 @@ export function normalizeTerminalRenderer(value: unknown): TerminalRenderer {
   return DEFAULT_TERMINAL_RENDERER
 }
 
+export function normalizeHistoryPredict(value: unknown): boolean {
+  return value === true
+}
+
 export const useTerminalBehaviorStore = create<TerminalBehaviorState>((set) => ({
   ...DEFAULT_TERMINAL_BEHAVIOR,
   settingsHydrated: false,
@@ -77,6 +84,7 @@ export const useTerminalBehaviorStore = create<TerminalBehaviorState>((set) => (
     autoReconnect: normalizeAutoReconnect(settings.autoReconnect),
     restoreTabsOnStartup: normalizeRestoreTabsOnStartup(settings.restoreTabsOnStartup),
     renderer: normalizeTerminalRenderer(settings.renderer),
+    historyPredict: normalizeHistoryPredict(settings.historyPredict),
   }),
   markSettingsHydrated: () => set({ settingsHydrated: true }),
 }))

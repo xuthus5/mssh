@@ -11,7 +11,7 @@ import { TerminalEmulator } from '@/components/terminal/TerminalEmulator'
 describe('TerminalEmulator', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    useTerminalBehaviorStore.setState({ rightClickAction: 'menu', copyOnSelect: false, autoReconnect: false, restoreTabsOnStartup: true, scrollbackLines: 10000, renderer: 'dom' })
+    useTerminalBehaviorStore.setState({ rightClickAction: 'menu', copyOnSelect: false, autoReconnect: false, restoreTabsOnStartup: true, scrollbackLines: 10000, renderer: 'dom', historyPredict: false })
   })
 
   it('passes active state and the layer focus request to useTerminal', () => {
