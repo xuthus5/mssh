@@ -79,3 +79,7 @@ export function removeTerminal(node: SplitNode, terminalID: string, lastUsed: (t
   const second = removeTerminal(node.second, terminalID, lastUsed)
   return second ? { node: { ...node, second: second.node }, focusID: second.focusID } : null
 }
+
+export function collectLeaves(node: SplitNode): SplitLeaf[] {
+  return node.kind === 'leaf' ? [node] : [...collectLeaves(node.first), ...collectLeaves(node.second)]
+}
