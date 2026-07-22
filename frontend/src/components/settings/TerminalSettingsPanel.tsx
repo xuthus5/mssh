@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { AutoSaveStatusIndicator } from '@/components/settings/AutoSaveStatus'
 import { TerminalBehaviorSettingsSection } from '@/components/settings/TerminalBehaviorSettings'
 import { TerminalRendererSettingsSection } from '@/components/settings/TerminalRendererSettings'
+import { TerminalLocalShellSettingsSection } from '@/components/settings/TerminalLocalShellSettings'
 import { TerminalConnectionDefaultsSettingsSection } from '@/components/settings/TerminalConnectionDefaultsSettings'
 import { ThemeEditor } from '@/components/settings/ThemeEditor'
 import { ThemeManager } from '@/components/settings/ThemeManager'
@@ -30,6 +31,10 @@ interface TerminalDraft {
   restoreTabsOnStartup: boolean
   historyPredict: boolean
   renderer: GeneralSettings['renderer']
+  localShell: string
+  localShellArgs: string
+  localShellCwd: string
+  localShellLogin: boolean
 }
 
 interface Props {
@@ -60,6 +65,10 @@ function createDraft(general: GeneralSettings): TerminalDraft {
     restoreTabsOnStartup: general.restoreTabsOnStartup,
     historyPredict: general.historyPredict,
     renderer: general.renderer,
+    localShell: general.localShell,
+    localShellArgs: general.localShellArgs,
+    localShellCwd: general.localShellCwd,
+    localShellLogin: general.localShellLogin,
   }
 }
 
@@ -76,6 +85,10 @@ function buildSavePayload(general: GeneralSettings, draft: TerminalDraft): Gener
     restoreTabsOnStartup: draft.restoreTabsOnStartup,
     historyPredict: draft.historyPredict,
     renderer: draft.renderer,
+    localShell: draft.localShell,
+    localShellArgs: draft.localShellArgs,
+    localShellCwd: draft.localShellCwd,
+    localShellLogin: draft.localShellLogin,
   }
 }
 
@@ -137,6 +150,16 @@ export function TerminalSettingsPanel({
           onAutoReconnectChange={(value) => setDraft({ ...draft, autoReconnect: value })}
           onRestoreTabsOnStartupChange={(value) => setDraft({ ...draft, restoreTabsOnStartup: value })}
           onHistoryPredictChange={(value) => setDraft({ ...draft, historyPredict: value })}
+        />
+        <TerminalLocalShellSettingsSection
+          shell={draft.localShell}
+          args={draft.localShellArgs}
+          cwd={draft.localShellCwd}
+          login={draft.localShellLogin}
+          onShellChange={(value) => setDraft({ ...draft, localShell: value })}
+          onArgsChange={(value) => setDraft({ ...draft, localShellArgs: value })}
+          onCwdChange={(value) => setDraft({ ...draft, localShellCwd: value })}
+          onLoginChange={(value) => setDraft({ ...draft, localShellLogin: value })}
         />
         <TerminalRendererSettingsSection
           renderer={draft.renderer}

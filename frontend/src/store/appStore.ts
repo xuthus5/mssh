@@ -11,7 +11,7 @@ export interface TerminalTab {
   terminalId: string
   sessionId: number
   /** Connection backend. Defaults to ssh when omitted. */
-  connectionKind?: 'ssh' | 'serial'
+  connectionKind?: 'ssh' | 'serial' | 'local'
   /** Serial profile id when connectionKind is serial. */
   serialPortId?: number
   terminalInstance?: number

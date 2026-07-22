@@ -5,7 +5,7 @@ interface CreateTerminalTabOptions {
   sessionName: string
   terminalID: string
   tabs: Tab[]
-  connectionKind?: 'ssh' | 'serial'
+  connectionKind?: 'ssh' | 'serial' | 'local'
   serialPortId?: number
 }
 
@@ -15,6 +15,7 @@ function nextTerminalInstance(sessionKey: string, tabs: Tab[]): number {
       .filter((tab): tab is TerminalTab => {
         if (tab.type !== 'terminal') return false
         const kind = tab.connectionKind ?? 'ssh'
+        if (kind === 'local') return sessionKey === 'local'
         if (kind === 'serial') return `serial:${tab.serialPortId ?? 0}` === sessionKey
         return `ssh:${tab.sessionId}` === sessionKey
       })
@@ -34,7 +35,11 @@ export function createTerminalTab({
   connectionKind = 'ssh',
   serialPortId,
 }: CreateTerminalTabOptions): TerminalTab {
-  const sessionKey = connectionKind === 'serial' ? `serial:${serialPortId ?? 0}` : `ssh:${sessionID}`
+  const sessionKey = connectionKind === 'local'
+    ? 'local'
+    : connectionKind === 'serial'
+      ? `serial:${serialPortId ?? 0}`
+      : `ssh:${sessionID}`
   const terminalInstance = nextTerminalInstance(sessionKey, tabs)
   const tab: TerminalTab = {
     id: `terminal-${terminalID}`,
@@ -48,6 +53,9 @@ export function createTerminalTab({
   if (connectionKind === 'serial') {
     tab.connectionKind = 'serial'
     tab.serialPortId = serialPortId
+  }
+  if (connectionKind === 'local') {
+    tab.connectionKind = 'local'
   }
   return tab
 }
