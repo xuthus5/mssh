@@ -196,7 +196,7 @@ describe('TerminalSplit', () => {
 
     const alert = screen.getByRole('alert')
     expect(alert.firstElementChild).toHaveClass('max-w-sm', 'p-5')
-    expect(screen.getByText('远端会话可能因空闲超时或网络中断而结束，可在当前终端中重新连接。')).toBeInTheDocument()
+    expect(screen.getByText('会话可能因空闲超时、进程退出或网络中断而结束，可在当前终端中重新连接。')).toBeInTheDocument()
     await fireEvent.click(screen.getByRole('button', { name: '关闭终端' }))
     expect(closeTerminal).toHaveBeenCalledOnce()
     expect(TerminalService.Close).not.toHaveBeenCalled()

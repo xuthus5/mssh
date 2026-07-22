@@ -147,7 +147,11 @@ func (l *LogService) createActiveRecording(sessionID int64, size [2]int, termTyp
 		createErr := fmt.Errorf("start terminal recording: %w", err)
 		return nil, errors.Join(createErr, l.removeRecordingFile(dataPath))
 	}
-	logEntry := model.SessionLog{SessionID: &sessionID, DataPath: dataPath}
+	var sessionRef *int64
+	if sessionID > 0 {
+		sessionRef = &sessionID
+	}
+	logEntry := model.SessionLog{SessionID: sessionRef, DataPath: dataPath}
 	created, err := l.createSessionLog(l.db, logEntry)
 	if err != nil {
 		createErr := fmt.Errorf("start terminal recording: %w", err)

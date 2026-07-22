@@ -35,6 +35,8 @@ interface Props {
   tabID: string
   primaryID: string
   sessionId: number
+  connectionKind?: 'ssh' | 'serial' | 'local'
+  serialPortId?: number
   active: boolean
   focusRequest: TerminalFocusRequest
   onStateChange?: (state: { paneCount: number; busy: boolean }) => void
@@ -58,7 +60,7 @@ function ConnectionOverlay({ terminalID, onReconnect, onClose }: { terminalID: s
       {connecting ? <RefreshCw aria-hidden="true" className="mb-3 size-8 animate-spin text-primary" /> : <WifiOff aria-hidden="true" className="mb-3 size-8 text-destructive" />}
       <h3 className="text-sm font-semibold text-foreground">{connecting ? t('正在重新连接') : t('连接已断开')}</h3>
       <p className="mt-1 text-xs leading-5 text-muted-foreground">
-        {connecting ? t('正在为当前终端创建新的 SSH 通道。') : t('远端会话可能因空闲超时或网络中断而结束，可在当前终端中重新连接。')}
+        {connecting ? t('正在为当前终端创建新的连接通道。') : t('会话可能因空闲超时、进程退出或网络中断而结束，可在当前终端中重新连接。')}
       </p>
       <div className="mt-4 flex items-center gap-2">
         <Button type="button" size="sm" variant="outline" disabled={connecting} onClick={onClose}><X />{t('关闭终端')}</Button>
@@ -146,7 +148,13 @@ function TreeView(props: TreeViewProps) {
   </div>
 }
 
-export const TerminalSplit = forwardRef<TerminalSplitHandle, Props>(function TerminalSplit({ tabID, primaryID, sessionId, active, focusRequest, onStateChange, onPaneClosed, onPaneReplaced, onCloseTerminal }, ref) {
+function openSplitTerminal(sessionId: number, connectionKind: 'ssh' | 'serial' | 'local' | undefined, serialPortId: number | undefined) {
+  if (connectionKind === 'local') return TerminalService.OpenLocal(80, 24)
+  if (connectionKind === 'serial' && serialPortId) return TerminalService.OpenSerial(serialPortId, 80, 24)
+  return TerminalService.Open(sessionId, 80, 24)
+}
+
+export const TerminalSplit = forwardRef<TerminalSplitHandle, Props>(function TerminalSplit({ tabID, primaryID, sessionId, connectionKind, serialPortId, active, focusRequest, onStateChange, onPaneClosed, onPaneReplaced, onCloseTerminal }, ref) {
   const [tree, setTree] = useState<SplitNode>(() => splitLeaf(primaryID))
   const [busy, setBusy] = useState(false)
   const [closingID, setClosingID] = useState<string | null>(null)
@@ -177,7 +185,7 @@ export const TerminalSplit = forwardRef<TerminalSplitHandle, Props>(function Ter
     operationRef.current = true
     setBusy(true)
     try {
-      const terminalID = await openTerminalWithPoolCapacity(() => TerminalService.Open(sessionId, 80, 24))
+      const terminalID = await openTerminalWithPoolCapacity(() => openSplitTerminal(sessionId, connectionKind, serialPortId))
       if (!mountedRef.current) return closeInBackground(terminalID, 'TerminalSplit: cancelled split cleanup failed')
       setTree((current) => insertSplit(current, targetID, terminalID, direction, crypto.randomUUID()))
       useAppStore.getState().setConnectionStatus(terminalID, 'connected')
@@ -226,7 +234,7 @@ export const TerminalSplit = forwardRef<TerminalSplitHandle, Props>(function Ter
     useAppStore.getState().setConnectionStatus(terminalID, 'reconnecting')
     setBusy(true)
     try {
-      const nextID = await openTerminalWithPoolCapacity(() => TerminalService.Open(sessionId, 80, 24))
+      const nextID = await openTerminalWithPoolCapacity(() => openSplitTerminal(sessionId, connectionKind, serialPortId))
       if (!mountedRef.current) return closeInBackground(nextID, 'TerminalSplit: cancelled reconnect cleanup failed')
       setTree((current) => replaceTerminal(current, terminalID, nextID))
       if (terminalID === primaryID) {

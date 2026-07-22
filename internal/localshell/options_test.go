@@ -46,3 +46,8 @@ func TestExpandPathHome(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, home, cfg.CWD)
 }
+
+func TestResolveOptionsInvalidShell(t *testing.T) {
+	_, err := resolveOptions(Options{Shell: t.TempDir() + "/missing-shell"})
+	require.Error(t, err)
+}
