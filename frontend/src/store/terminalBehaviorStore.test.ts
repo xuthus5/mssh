@@ -6,6 +6,7 @@ import {
   MIN_TERMINAL_SCROLLBACK_LINES,
   normalizeCopyOnSelect,
   normalizeScrollbackLines,
+  normalizeHistoryPredict,
   normalizeTerminalRenderer,
   normalizeTerminalRightClickAction,
   useTerminalBehaviorStore,
@@ -41,6 +42,11 @@ describe('terminal behavior store', () => {
     expect(normalizeScrollbackLines(value)).toBe(expected)
   })
 
+
+  it.each([[true, true], [false, false], ['true', false], [1, false]])('normalizes history predict %o', (value, expected) => {
+    expect(normalizeHistoryPredict(value)).toBe(expected)
+  })
+
   it.each([
     ['dom', 'dom'],
     ['canvas', 'canvas'],
@@ -59,6 +65,7 @@ describe('terminal behavior store', () => {
       autoReconnect: true,
       restoreTabsOnStartup: false,
       renderer: 'webgl',
+      historyPredict: true,
     })
     expect(useTerminalBehaviorStore.getState()).toMatchObject({
       rightClickAction: 'paste',
@@ -67,6 +74,7 @@ describe('terminal behavior store', () => {
       autoReconnect: true,
       restoreTabsOnStartup: false,
       renderer: 'webgl',
+      historyPredict: true,
     })
   })
 
@@ -78,6 +86,7 @@ describe('terminal behavior store', () => {
       autoReconnect: false,
       restoreTabsOnStartup: true,
       renderer: 'dom',
+      historyPredict: false,
     })
     expect(useTerminalBehaviorStore.getState().scrollbackLines).toBe(MAX_TERMINAL_SCROLLBACK_LINES)
   })

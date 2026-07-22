@@ -12,7 +12,7 @@ import { installTerminalCopyOnSelect } from '@/components/terminal/terminalBehav
 describe('terminal behavior runtime', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    useTerminalBehaviorStore.setState({ rightClickAction: 'menu', copyOnSelect: false, autoReconnect: false, restoreTabsOnStartup: true, scrollbackLines: 10000, renderer: 'dom' })
+    useTerminalBehaviorStore.setState({ rightClickAction: 'menu', copyOnSelect: false, autoReconnect: false, restoreTabsOnStartup: true, scrollbackLines: 10000, renderer: 'dom', historyPredict: false })
   })
 
   it('follows copy-on-select settings and disposes only once', () => {
@@ -21,11 +21,11 @@ describe('terminal behavior runtime', () => {
     createCopyOnSelectController.mockReturnValue(controller)
 
     const cleanup = installTerminalCopyOnSelect(terminal, 'primary')
-    useTerminalBehaviorStore.getState().setSettings({ rightClickAction: 'menu', copyOnSelect: true, scrollbackLines: 10000, autoReconnect: false, restoreTabsOnStartup: true, renderer: 'dom' })
-    useTerminalBehaviorStore.getState().setSettings({ rightClickAction: 'paste', copyOnSelect: true, scrollbackLines: 10000, autoReconnect: false, restoreTabsOnStartup: true, renderer: 'dom' })
+    useTerminalBehaviorStore.getState().setSettings({ rightClickAction: 'menu', copyOnSelect: true, scrollbackLines: 10000, autoReconnect: false, restoreTabsOnStartup: true, renderer: 'dom', historyPredict: false })
+    useTerminalBehaviorStore.getState().setSettings({ rightClickAction: 'paste', copyOnSelect: true, scrollbackLines: 10000, autoReconnect: false, restoreTabsOnStartup: true, renderer: 'dom', historyPredict: false })
     cleanup()
     cleanup()
-    useTerminalBehaviorStore.getState().setSettings({ rightClickAction: 'menu', copyOnSelect: false, scrollbackLines: 10000, autoReconnect: false, restoreTabsOnStartup: true, renderer: 'dom' })
+    useTerminalBehaviorStore.getState().setSettings({ rightClickAction: 'menu', copyOnSelect: false, scrollbackLines: 10000, autoReconnect: false, restoreTabsOnStartup: true, renderer: 'dom', historyPredict: false })
     expect(controller.setEnabled).toHaveBeenNthCalledWith(1, false)
     expect(controller.setEnabled).toHaveBeenNthCalledWith(2, true)
     expect(controller.setEnabled).toHaveBeenCalledTimes(2)
