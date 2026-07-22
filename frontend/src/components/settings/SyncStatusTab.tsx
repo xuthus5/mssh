@@ -18,7 +18,6 @@ interface Props {
   pending: string | null
   error: string | null
   onChange: (input: SyncConfigInput) => void
-  onSave: () => Promise<void>
   onSync: () => Promise<void>
   onPush: () => Promise<void>
   onPull: () => Promise<void>
@@ -38,7 +37,7 @@ export function SyncStatusTab(props: Props) {
     {props.error && <Alert variant="destructive"><AlertDescription>{props.error}</AlertDescription></Alert>}
     <div className="flex flex-wrap gap-2"><Button type="button" disabled={actionsDisabled} onClick={() => void props.onSync().catch(() => undefined)}><RefreshCw data-icon="inline-start" />{t('立即同步')}</Button><Button type="button" variant="outline" disabled={actionsDisabled} onClick={() => void props.onPush().catch(() => undefined)}><ArrowUpFromLine data-icon="inline-start" />{t('推送本地')}</Button><Button type="button" variant="outline" disabled={actionsDisabled} onClick={() => void props.onPull().catch(() => undefined)}><ArrowDownToLine data-icon="inline-start" />{t('拉取云端')}</Button></div>
     {props.dashboard.conflict && <ConflictPanel pending={props.pending !== null} onResolve={props.onResolve} />}
-    <SyncPolicySettings input={props.input} pending={props.pending} onChange={props.onChange} onSave={props.onSave} />
+    <SyncPolicySettings input={props.input} pending={props.pending} onChange={props.onChange} />
     <SyncVersionHistory versions={props.dashboard.versions} pending={props.pending} onRestore={props.onRestore} onDelete={props.onDelete} />
     <SyncActivityLog events={props.dashboard.events} />
     <SyncDangerActions pending={props.pending} masterKeySaved={props.dashboard.config.master_key_saved} onExport={props.onExport} onImport={props.onImport} onReset={props.onReset} />

@@ -1,9 +1,10 @@
-import { useEffect, useState, type FormEvent } from 'react'
-import { Button } from '@/components/ui/button'
+import { useCallback, useEffect, useState } from 'react'
+import { AutoSaveStatusIndicator } from '@/components/settings/AutoSaveStatus'
 import { TerminalBehaviorSettingsSection } from '@/components/settings/TerminalBehaviorSettings'
 import { TerminalConnectionDefaultsSettingsSection } from '@/components/settings/TerminalConnectionDefaultsSettings'
 import { ThemeEditor } from '@/components/settings/ThemeEditor'
 import { ThemeManager } from '@/components/settings/ThemeManager'
+import { useAutoSave } from '@/hooks/useAutoSave'
 import type { GeneralSettings } from '@/hooks/useSettings'
 import type { ColorMode } from '@/lib/effectiveTerminalTheme'
 import type {
@@ -81,24 +82,25 @@ export function TerminalSettingsPanel({
   onResetBuiltinThemes,
 }: Props) {
   const [draft, setDraft] = useState(() => createDraft(general))
-  const [saving, setSaving] = useState(false)
   useEffect(() => {
     setDraft(createDraft(general))
   }, [general])
 
-  const handleSubmit = async (event: FormEvent) => {
-    event.preventDefault()
-    setSaving(true)
-    try {
-      await onSaveGeneral(buildSavePayload(general, draft))
-    } finally {
-      setSaving(false)
-    }
-  }
+  const persist = useCallback(
+    async (next: TerminalDraft) => {
+      await onSaveGeneral(buildSavePayload(general, next))
+    },
+    [general, onSaveGeneral],
+  )
+  const autoSave = useAutoSave({ value: draft, onSave: persist, delayMs: 450 })
 
   return (
     <div className="flex flex-col gap-5 pt-2">
-      <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-xs text-muted-foreground">{t('终端连接与交互偏好会自动保存。')}</p>
+          <AutoSaveStatusIndicator status={autoSave.status} error={autoSave.error} />
+        </div>
         <TerminalConnectionDefaultsSettingsSection
           maxPoolSize={draft.maxPoolSize}
           defaultKeepAlive={draft.defaultKeepAlive}
@@ -117,12 +119,7 @@ export function TerminalSettingsPanel({
             setDraft({ ...draft, scrollbackLines: value > 0 ? String(value) : '' })
           }
         />
-        <div className="flex justify-end">
-          <Button type="submit" size="sm" disabled={saving}>
-            {saving ? t('保存中...') : t('保存')}
-          </Button>
-        </div>
-      </form>
+      </div>
       <ThemeEditor
         profiles={themeProfiles}
         assignments={themeAssignments}

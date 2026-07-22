@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { SyncPanel } from '@/components/settings/SyncPanel'
 import { SyncProvider, SyncState, SyncStrategy } from '../../../bindings/github.com/xuthus5/mssh/internal/model/models'
 
@@ -13,6 +13,9 @@ function controller(overrides: Record<string, unknown> = {}) {
 }
 
 describe('SyncPanel', () => {
+  beforeEach(() => { vi.useFakeTimers({ shouldAdvanceTime: true }) })
+  afterEach(() => { vi.runOnlyPendingTimers(); vi.useRealTimers() })
+
   it('reveals provider and status tabs after enabling sync', async () => {
     const sync = controller()
     render(<SyncPanel controller={sync} onExport={vi.fn()} onImport={vi.fn()} />)
@@ -32,8 +35,11 @@ describe('SyncPanel', () => {
     await userEvent.type(screen.getByLabelText('WebDAV URL'), 'https://dav.example/backups')
     await userEvent.click(screen.getByRole('button', { name: '测试连接' }))
     expect(sync.testProvider).toHaveBeenCalledWith(expect.objectContaining({ provider: SyncProvider.SyncProviderWebDAV, webdav: expect.objectContaining({ url: 'https://dav.example/backups' }) }))
-    await userEvent.click(screen.getByRole('button', { name: '保存配置' }))
-    expect(sync.saveConfig).toHaveBeenCalled()
+    await vi.advanceTimersByTimeAsync(700)
+    expect(sync.saveConfig).toHaveBeenCalledWith(expect.objectContaining({
+      provider: SyncProvider.SyncProviderWebDAV,
+      webdav: expect.objectContaining({ url: 'https://dav.example/backups' }),
+    }), { quiet: true })
   })
 
   it('shows status controls and local reset action', async () => {

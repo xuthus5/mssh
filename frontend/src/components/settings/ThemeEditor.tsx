@@ -1,5 +1,7 @@
-import { useEffect, useState, type FormEvent } from 'react'
-import { RotateCcw, Save, SquareTerminal } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { RotateCcw, SquareTerminal } from 'lucide-react'
+import { AutoSaveStatusIndicator } from '@/components/settings/AutoSaveStatus'
+import { useAutoSave } from '@/hooks/useAutoSave'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -36,28 +38,46 @@ interface Props {
 
 export function ThemeEditor({ profiles, assignments, globalStyle, colorMode, onSave, onResetBuiltins }: Props) {
   const state = useThemeEditorDraftState(profiles, assignments, globalStyle)
-  const submission = useThemeConfigurationSubmit(state, profiles, onSave)
+  const setDirty = state.setDirty
   const activeProfileID = profileIDForSlot(state.editorSlot, state.draftAssignments)
   const activeProfile = findProfile(profiles, activeProfileID)
   const activeTheme = state.drafts.get(activeProfileID)
+  const configuration = useMemo(() => buildThemeConfiguration({
+    profiles,
+    drafts: state.drafts,
+    assignments: state.draftAssignments,
+    globalStyle: state.draftGlobalStyle,
+  }), [profiles, state.drafts, state.draftAssignments, state.draftGlobalStyle])
+  const valid = themeConfigurationValid(state.drafts, state.draftAssignments, state.draftGlobalStyle)
+  const ready = Boolean(activeProfile && activeTheme)
+  const persist = useCallback(async (next: ThemeConfigurationInput) => {
+    await onSave(next)
+    setDirty(false)
+  }, [onSave, setDirty])
+  const autoSave = useAutoSave({
+    value: configuration,
+    onSave: persist,
+    enabled: valid && !state.resetting,
+    isReady: ready,
+    delayMs: 500,
+  })
   if (!activeProfile || !activeTheme) return <p className="text-sm text-muted-foreground">{t('终端主题配置不可用，请重新加载设置。')}</p>
   const actions = themeEditorActions(state, activeProfileID, colorMode)
-  const busy = submission.saving || state.resetting
+  const busy = autoSave.status === 'saving' || state.resetting
   const effectiveTheme = effectiveDraftTheme(activeTheme, state.draftGlobalStyle)
-  const valid = themeConfigurationValid(state.drafts, state.draftAssignments, state.draftGlobalStyle)
   const canReset = canResetBuiltinProfiles(profiles, assignments)
   const mismatch = !state.draftAssignments.follow_interface_mode && activeProfile.definition?.mode !== 'universal' && activeProfile.definition?.mode !== colorMode
   const sharedLabels = !state.draftAssignments.follow_interface_mode ? fixedProfileSharing(state.draftAssignments) : []
 
-  return <form onSubmit={submission.submit} className="flex flex-col gap-5 pb-2 pt-2">
-    <div className="flex items-start justify-between gap-4"><div><h2 className="text-lg font-semibold text-foreground">{t('终端主题')}</h2><p className="text-sm text-muted-foreground">{t('选择终端是否跟随应用模式，或固定使用一个独立主题。')}</p></div><BuiltinThemeResetControl canReset={canReset} dirty={state.dirty} saving={submission.saving} resetting={state.resetting} includesFixed={!assignments.follow_interface_mode} onResettingChange={state.setResetting} onReset={onResetBuiltins} /></div>
+  return <div className="flex flex-col gap-5 pb-2 pt-2">
+    <div className="flex items-start justify-between gap-4"><div><h2 className="text-lg font-semibold text-foreground">{t('终端主题')}</h2><p className="text-sm text-muted-foreground">{t('选择终端是否跟随应用模式，或固定使用一个独立主题。')}</p></div><div className="flex items-center gap-3"><AutoSaveStatusIndicator status={valid ? autoSave.status : 'idle'} error={autoSave.error} /><BuiltinThemeResetControl canReset={canReset} dirty={state.dirty} saving={autoSave.status === 'saving'} resetting={state.resetting} includesFixed={!assignments.follow_interface_mode} onResettingChange={state.setResetting} onReset={onResetBuiltins} /></div></div>
+    {!valid && state.dirty && <Alert variant="destructive"><AlertDescription>{t('当前主题配置无效，自动保存已暂停，请修正颜色或字体后继续。')}</AlertDescription></Alert>}
     <ThemeStrategyCard assignments={state.draftAssignments} busy={busy} onFollowChange={actions.setFollowInterfaceMode} />
     <TerminalGlobalStyleEditor style={state.draftGlobalStyle} disabled={busy} onChange={actions.updateGlobalStyle} />
     <ThemeAssignmentCard profiles={profiles} assignments={state.draftAssignments} busy={busy} onSelect={actions.selectProfile} />
     {mismatch && <Alert><AlertDescription>{t('该终端主题为')} {activeProfile.definition?.mode === 'dark' ? 'Dark' : 'Light'} {t('类型，当前界面为')} {colorMode === 'dark' ? 'Dark' : 'Light'} {t('Mode。终端颜色将保持固定，不受界面模式影响。')}</AlertDescription></Alert>}
     <ThemeWorkspace profile={activeProfile} draft={activeTheme} effectiveTheme={effectiveTheme} globalStyle={state.draftGlobalStyle} editorSlot={state.editorSlot} followInterfaceMode={state.draftAssignments.follow_interface_mode} sharedLabels={sharedLabels} busy={busy} onEditorSlotChange={state.setEditorSlot} onThemeChange={actions.updateTheme} onProfileStyleChange={actions.updateProfileStyle} onAnsiChange={actions.updateAnsi} />
-    <div className="flex justify-end"><Button type="submit" disabled={!valid || busy}><Save data-icon="inline-start" />{submission.saving ? t('保存中...') : t('保存主题配置')}</Button></div>
-  </form>
+  </div>
 }
 
 function useThemeEditorDraftState(profiles: ThemeProfile[], assignments: ThemeAssignments, globalStyle: TerminalGlobalStyle) {
@@ -122,24 +142,6 @@ function themeEditorActions(state: ThemeEditorDraftState, activeProfileID: numbe
     state.setEditorSlot(checked ? colorMode : 'fixed')
   }
   return { updateTheme, updateProfileStyle, updateGlobalStyle, updateAnsi, selectProfile, setFollowInterfaceMode }
-}
-
-function useThemeConfigurationSubmit(state: ThemeEditorDraftState, profiles: ThemeProfile[], onSave: Props['onSave']) {
-  const [saving, setSaving] = useState(false)
-  const submit = async (event: FormEvent) => {
-    event.preventDefault()
-    if (state.resetting) return
-    setSaving(true)
-    try {
-      await onSave(buildThemeConfiguration({ profiles, drafts: state.drafts, assignments: state.draftAssignments, globalStyle: state.draftGlobalStyle }))
-      state.setDirty(false)
-    } catch (error) {
-      toast(t('保存终端主题失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
-    } finally {
-      setSaving(false)
-    }
-  }
-  return { saving, submit }
 }
 
 function themeConfigurationValid(drafts: Map<number, ThemeDraft>, assignments: ThemeAssignments, globalStyle: TerminalGlobalStyle) {

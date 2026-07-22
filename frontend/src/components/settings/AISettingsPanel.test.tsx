@@ -1,9 +1,12 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { AISettingsPanel } from '@/components/settings/AISettingsPanel'
 
 describe('AISettingsPanel', () => {
+  beforeEach(() => { vi.useFakeTimers({ shouldAdvanceTime: true }) })
+  afterEach(() => { vi.runOnlyPendingTimers(); vi.useRealTimers() })
+
   it('uses horizontal tabs and saves interaction changes', async () => {
     const controller = aiController()
     render(<AISettingsPanel controller={controller as never} />)
@@ -19,8 +22,8 @@ describe('AISettingsPanel', () => {
     await changeNumber(user, '历史保留天数', '60')
     await changeNumber(user, '最多对话数', '200')
     for (const label of ['附带会话信息', '附带系统摘要', '流式响应', '自动滚动', '渲染 Markdown']) await user.click(screen.getByRole('switch', { name: label }))
-    await user.click(screen.getByRole('button', { name: '保存配置' }))
-    expect(controller.saveSettings).toHaveBeenCalledWith(expect.objectContaining({ interaction: expect.objectContaining({ panel_width: 500, context_lines: 120, history_retention_days: 60, max_conversations: 200, stream_responses: false }) }))
+    await vi.advanceTimersByTimeAsync(600)
+    expect(controller.saveSettings).toHaveBeenCalledWith(expect.objectContaining({ interaction: expect.objectContaining({ panel_width: 500, context_lines: 120, history_retention_days: 60, max_conversations: 200, stream_responses: false }) }), { quiet: true })
   })
 
   it('saves network search configuration', async () => {
@@ -35,8 +38,8 @@ describe('AISettingsPanel', () => {
     await changeNumber(user, '最大结果数', '8')
     await user.type(screen.getByLabelText('搜索 API Key'), 'search-secret')
     await user.click(screen.getByRole('switch', { name: '要求回答提供引用' }))
-    await user.click(screen.getByRole('button', { name: '保存配置' }))
-    expect(controller.saveSettings).toHaveBeenCalledWith(expect.objectContaining({ search: expect.objectContaining({ enabled: true, mode: 'independent', provider: 'tavily', timeout_seconds: 20, max_results: 8, require_citations: false, api_key: 'search-secret' }) }))
+    await vi.advanceTimersByTimeAsync(600)
+    expect(controller.saveSettings).toHaveBeenCalledWith(expect.objectContaining({ search: expect.objectContaining({ enabled: true, mode: 'independent', provider: 'tavily', timeout_seconds: 20, max_results: 8, require_citations: false, api_key: 'search-secret' }) }), { quiet: true })
   })
 
   it('saves security policy patterns', async () => {
@@ -51,8 +54,8 @@ describe('AISettingsPanel', () => {
     await user.type(screen.getByLabelText('允许模式'), '^safe$')
     await user.type(screen.getByLabelText('禁止模式'), '^danger$')
     await user.type(screen.getByLabelText('脱敏模式'), 'token=.*')
-    await user.click(screen.getByRole('button', { name: '保存配置' }))
-    expect(controller.saveSettings).toHaveBeenCalledWith(expect.objectContaining({ security: expect.objectContaining({ auto_execute_read_only: true, command_timeout_seconds: 90, max_output_bytes: 131072, max_plan_steps: 8, allow_patterns: ['^safe$'], deny_patterns: ['^danger$'], redaction_patterns: ['token=.*'] }) }))
+    await vi.advanceTimersByTimeAsync(600)
+    expect(controller.saveSettings).toHaveBeenCalledWith(expect.objectContaining({ security: expect.objectContaining({ auto_execute_read_only: true, command_timeout_seconds: 90, max_output_bytes: 131072, max_plan_steps: 8, allow_patterns: ['^safe$'], deny_patterns: ['^danger$'], redaction_patterns: ['token=.*'] }) }), { quiet: true })
   })
 
   it('renders loading and failure states', () => {

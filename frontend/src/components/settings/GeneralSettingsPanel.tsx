@@ -1,11 +1,12 @@
-import { useEffect, useState, type FormEvent } from 'react'
-import { Button } from '@/components/ui/button'
+import { useCallback, useEffect, useState } from 'react'
 import { Input } from '@/components/ui/input'
 import { LabeledSelect } from '@/components/ui/labeled-select'
 import { SearchableSelect } from '@/components/ui/searchable-select'
 import { ApplicationBehaviorSettingsSection } from '@/components/settings/ApplicationBehaviorSettings'
 import { ApplicationLogSettingsSection } from '@/components/settings/ApplicationLogSettings'
 import { ApplicationNetworkProxySettingsSection } from '@/components/settings/ApplicationNetworkProxySettings'
+import { AutoSaveStatusIndicator } from '@/components/settings/AutoSaveStatus'
+import { useAutoSave } from '@/hooks/useAutoSave'
 import type { GeneralSettings } from '@/hooks/useSettings'
 import { t } from '@/i18n'
 
@@ -177,7 +178,6 @@ function LanguageSettings({
 
 export function GeneralSettingsPanel({ general, systemFonts, onSave, onPreviewUIFont }: Props) {
   const [draft, setDraft] = useState(() => createDraft(general))
-  const [saving, setSaving] = useState(false)
   useEffect(() => {
     setDraft(createDraft(general))
   }, [general])
@@ -187,18 +187,20 @@ export function GeneralSettingsPanel({ general, systemFonts, onSave, onPreviewUI
     onPreviewUIFont(next.uiFontFamily, next.uiFontFallbackFamily, parseInt(next.uiFontSize, 10) || 14)
   }
 
-  const handleSubmit = async (event: FormEvent) => {
-    event.preventDefault()
-    setSaving(true)
-    try {
-      await onSave(buildSavePayload(general, draft))
-    } finally {
-      setSaving(false)
-    }
-  }
+  const persist = useCallback(
+    async (next: GeneralDraft) => {
+      await onSave(buildSavePayload(general, next))
+    },
+    [general, onSave],
+  )
+  const autoSave = useAutoSave({ value: draft, onSave: persist, delayMs: 450 })
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-3 pt-2">
+    <div className="flex flex-col gap-3 pt-2">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-xs text-muted-foreground">{t('通用设置包含界面外观与应用级偏好。')}</p>
+        <AutoSaveStatusIndicator status={autoSave.status} error={autoSave.error} />
+      </div>
       <LanguageSettings draft={draft} setDraft={setDraft} />
       <UIFontSettings draft={draft} systemFonts={systemFonts} onChange={previewDraft} />
       <ApplicationBehaviorSettingsSection
@@ -223,11 +225,6 @@ export function GeneralSettingsPanel({ general, systemFonts, onSave, onPreviewUI
         onProxyUsernameChange={(value) => setDraft({ ...draft, proxyUsername: value })}
         onProxyPasswordChange={(value) => setDraft({ ...draft, proxyPassword: value })}
       />
-      <div className="flex justify-end">
-        <Button type="submit" size="sm" disabled={saving}>
-          {saving ? t('保存中...') : t('保存')}
-        </Button>
-      </div>
-    </form>
+    </div>
   )
 }
