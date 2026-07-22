@@ -190,7 +190,9 @@ function ToolbarActions(props: ToolbarActionsProps) {
       onClick={props.onToggleCompose} title={props.composeOpen ? t('关闭撰写面板') : t('撰写终端内容')}>
       <PenLine className="h-3 w-3" /><span className="hidden sm:inline">{t('撰写')}</span>
     </button>
-    <button type="button" className={actionClass} onClick={props.onOpenAI} title={t('AI 运维')}><Bot className="h-3 w-3" /><span className="hidden sm:inline">AI</span></button>
+    {props.filesSupported !== false ? (
+      <button type="button" className={actionClass} onClick={props.onOpenAI} title={t('AI 运维')}><Bot className="h-3 w-3" /><span className="hidden sm:inline">AI</span></button>
+    ) : null}
     {props.filesSupported !== false ? (
       <button type="button" className={actionClass} onClick={props.onOpenTunnels} title={t('隧道管理')}>
         <Network className="h-3 w-3" /><span className="hidden sm:inline">{t('隧道')}</span>

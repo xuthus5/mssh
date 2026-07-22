@@ -4,7 +4,24 @@ import type { ActiveSurface, OverviewSection, WorkspaceID } from '@/store/tabNav
 export const WORKSPACE_LAYOUT_SETTING = 'workspace.layout'
 export const WORKSPACE_LAYOUT_VERSION = 2
 
-type TerminalIntent = Pick<TerminalTab, 'title' | 'sessionId' | 'terminalInstance' | 'toolPanel'> & { type: 'terminal' }
+export type TerminalConnectionKind = 'ssh' | 'serial' | 'local'
+
+export type OpenTerminalIntent = {
+  connectionKind: TerminalConnectionKind
+  sessionId: number
+  serialPortId?: number
+  title: string
+}
+
+type TerminalIntent = {
+  type: 'terminal'
+  title: string
+  sessionId: number
+  terminalInstance?: number
+  toolPanel?: TerminalTab['toolPanel']
+  connectionKind?: TerminalConnectionKind
+  serialPortId?: number
+}
 type PlaybackIntent = { type: 'playback'; title: string; recordingPath: string }
 type TabIntent = TerminalIntent | PlaybackIntent
 
@@ -43,10 +60,20 @@ export function createWorkspaceSnapshot(state: Pick<AppState, 'tabs' | 'activeSu
 
 function tabIntent(tab: Tab): TabIntent {
   if (tab.type === 'playback') return { type: 'playback', title: tab.title, recordingPath: tab.recordingPath }
-  return {
-    type: 'terminal', title: tab.title, sessionId: tab.sessionId, terminalInstance: tab.terminalInstance,
+  const intent: TerminalIntent = {
+    type: 'terminal',
+    title: tab.title,
+    sessionId: tab.sessionId,
+    terminalInstance: tab.terminalInstance,
     toolPanel: tab.toolPanel ?? null,
   }
+  if (tab.connectionKind === 'local' || tab.connectionKind === 'serial') {
+    intent.connectionKind = tab.connectionKind
+  }
+  if (tab.connectionKind === 'serial' && tab.serialPortId) {
+    intent.serialPortId = tab.serialPortId
+  }
+  return intent
 }
 
 export function parseWorkspaceSnapshot(raw: string): WorkspaceSnapshot {
@@ -64,9 +91,22 @@ function isWorkspaceSnapshot(value: unknown): value is WorkspaceSnapshot {
 function isTabIntent(value: unknown): value is TabIntent {
   if (!isRecord(value) || typeof value.title !== 'string' || value.title.length === 0) return false
   if (value.type === 'playback') return typeof value.recordingPath === 'string' && value.recordingPath.length > 0
-  return value.type === 'terminal' && Number.isSafeInteger(value.sessionId) && Number(value.sessionId) > 0
-    && (value.terminalInstance === undefined || Number.isSafeInteger(value.terminalInstance))
-    && (value.toolPanel === undefined || value.toolPanel === null || value.toolPanel === 'files' || value.toolPanel === 'history' || value.toolPanel === 'system' || value.toolPanel === 'ai')
+  if (value.type !== 'terminal' || !Number.isSafeInteger(value.sessionId) || Number(value.sessionId) < 0) return false
+  if (value.terminalInstance !== undefined && !Number.isSafeInteger(value.terminalInstance)) return false
+  if (value.toolPanel !== undefined && value.toolPanel !== null
+    && value.toolPanel !== 'files' && value.toolPanel !== 'history'
+    && value.toolPanel !== 'system' && value.toolPanel !== 'ai') {
+    return false
+  }
+  const kind = value.connectionKind
+  if (kind === undefined || kind === 'ssh') return Number(value.sessionId) > 0
+  if (kind === 'local') return Number(value.sessionId) === 0
+  if (kind === 'serial') {
+    return Number(value.sessionId) === 0
+      && Number.isSafeInteger(value.serialPortId)
+      && Number(value.serialPortId) > 0
+  }
+  return false
 }
 
 function isActive(value: unknown, tabCount: number): value is WorkspaceSnapshot['active'] {
@@ -80,8 +120,13 @@ const isRecord = (value: unknown): value is Record<string, unknown> => typeof va
 const isWorkspaceID = (value: unknown): value is WorkspaceID => value === 'overview' || value === 'sessions' || value === 'macros'
 const isOverviewSection = (value: unknown): value is OverviewSection => value === 'sessions' || value === 'keys' || value === 'tunnels' || value === 'serial' || value === 'audit'
 
-export async function restoreWorkspaceSnapshot(snapshot: WorkspaceSnapshot, sessionIDs: Set<number>, openTerminal: (sessionID: number) => Promise<string>): Promise<RestoredWorkspace> {
-  const restored = await restoreTabIntents(snapshot.tabs, sessionIDs, openTerminal)
+export async function restoreWorkspaceSnapshot(
+  snapshot: WorkspaceSnapshot,
+  sessionIDs: Set<number>,
+  openTerminal: (intent: OpenTerminalIntent) => Promise<string>,
+  serialPortIDs: Set<number> = new Set(),
+): Promise<RestoredWorkspace> {
+  const restored = await restoreTabIntents(snapshot.tabs, sessionIDs, serialPortIDs, openTerminal)
   const tabs = restored.map((tab) => tab ?? undefined).filter((tab): tab is Tab => tab !== undefined)
   const activeTab = snapshot.active?.type === 'tab' ? restored[snapshot.active.index] : undefined
   const activeSurface = snapshot.active?.type === 'workspace'
@@ -91,32 +136,72 @@ export async function restoreWorkspaceSnapshot(snapshot: WorkspaceSnapshot, sess
     ? tabs.find((tab): tab is TerminalTab => tab.type === 'terminal' && tab.id === activeSurface.id)
     : undefined
   const activePaneId = activeTerminal?.terminalId ?? null
-  const connectionStatus = Object.fromEntries(tabs.filter((tab): tab is TerminalTab => tab.type === 'terminal').map((tab) => [tab.terminalId, 'connected' as const]))
+  const connectionStatus = Object.fromEntries(
+    tabs.filter((tab): tab is TerminalTab => tab.type === 'terminal').map((tab) => [tab.terminalId, 'connected' as const]),
+  )
   return {
-    tabs, activeSurface, workspaceTab: snapshot.workspaceTab, overviewSection: snapshot.overviewSection,
-    activePaneId, connectionStatus, failures: restored.filter((tab) => tab === null).length,
+    tabs,
+    activeSurface,
+    workspaceTab: snapshot.workspaceTab,
+    overviewSection: snapshot.overviewSection,
+    activePaneId,
+    connectionStatus,
+    failures: restored.filter((tab) => tab === null).length,
   }
 }
 
-async function restoreTabIntents(intents: TabIntent[], sessionIDs: Set<number>, openTerminal: (sessionID: number) => Promise<string>): Promise<Array<Tab | null>> {
+async function restoreTabIntents(
+  intents: TabIntent[],
+  sessionIDs: Set<number>,
+  serialPortIDs: Set<number>,
+  openTerminal: (intent: OpenTerminalIntent) => Promise<string>,
+): Promise<Array<Tab | null>> {
   const results: Array<Tab | null> = Array.from({ length: intents.length }, () => null)
   let nextIndex = 0
   const worker = async () => {
     while (nextIndex < intents.length) {
       const index = nextIndex++
-      results[index] = await restoreTabIntent(intents[index], sessionIDs, openTerminal)
+      results[index] = await restoreTabIntent(intents[index], sessionIDs, serialPortIDs, openTerminal)
     }
   }
   await Promise.all(Array.from({ length: Math.min(4, intents.length) }, worker))
   return results
 }
 
-async function restoreTabIntent(intent: TabIntent, sessionIDs: Set<number>, openTerminal: (sessionID: number) => Promise<string>): Promise<Tab | null> {
+async function restoreTabIntent(
+  intent: TabIntent,
+  sessionIDs: Set<number>,
+  serialPortIDs: Set<number>,
+  openTerminal: (intent: OpenTerminalIntent) => Promise<string>,
+): Promise<Tab | null> {
   if (intent.type === 'playback') return { id: `playback-restored-${crypto.randomUUID()}`, ...intent }
-  if (!sessionIDs.has(intent.sessionId)) return null
+  const kind: TerminalConnectionKind = intent.connectionKind === 'local' || intent.connectionKind === 'serial'
+    ? intent.connectionKind
+    : 'ssh'
+  if (kind === 'ssh' && !sessionIDs.has(intent.sessionId)) return null
+  if (kind === 'serial' && (!intent.serialPortId || !serialPortIDs.has(intent.serialPortId))) return null
   try {
-    const terminalId = await openTerminal(intent.sessionId)
-    return { id: `terminal-${terminalId}`, terminalId, ...intent }
+    const terminalId = await openTerminal({
+      connectionKind: kind,
+      sessionId: intent.sessionId,
+      serialPortId: intent.serialPortId,
+      title: intent.title,
+    })
+    const tab: TerminalTab = {
+      id: `terminal-${terminalId}`,
+      title: intent.title,
+      type: 'terminal',
+      terminalId,
+      sessionId: intent.sessionId,
+      terminalInstance: intent.terminalInstance,
+      toolPanel: intent.toolPanel ?? null,
+    }
+    if (kind === 'local') tab.connectionKind = 'local'
+    if (kind === 'serial') {
+      tab.connectionKind = 'serial'
+      tab.serialPortId = intent.serialPortId
+    }
+    return tab
   } catch {
     return null
   }
