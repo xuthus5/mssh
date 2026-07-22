@@ -30,6 +30,11 @@ export function CommandHistoryPanel({
   const [viewportHeight, setViewportHeight] = useState(360)
 
   useEffect(() => {
+    // Local/serial history buckets use non-positive IDs and are localStorage-only.
+    if (sessionID <= 0) {
+      setEntries(readCommandHistory(sessionID))
+      return
+    }
     const load = async () => {
       try {
         const items = await CommandHistoryService.List(sessionID, '')

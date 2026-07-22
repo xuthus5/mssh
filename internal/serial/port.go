@@ -209,3 +209,8 @@ func (p *PortSession) Device() string { return p.device }
 
 // ProfileID returns the serial profile id used to open this session.
 func (p *PortSession) ProfileID() int64 { return p.profileID }
+
+// NewTestPortSession builds an offline session handle for lifecycle tests.
+func NewTestPortSession(device string) *PortSession {
+	return &PortSession{device: device}
+}

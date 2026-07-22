@@ -27,7 +27,6 @@ describe('KeyManager', () => {
   beforeEach(() => {
     __clearHandlers()
     __registerHandler('github.com/xuthus5/mssh/internal/service.KeyService.UsageCount', async () => 0)
-    vi.spyOn(window, 'confirm').mockReturnValue(true)
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: vi.fn(async () => {}) } })
     useToastStore.setState({ toasts: [] })
   })
@@ -113,6 +112,8 @@ describe('KeyManager', () => {
 
     await userEvent.click(screen.getByRole('button', { name: '复制 generated 公钥' }))
     await userEvent.click(screen.getByRole('button', { name: '删除 generated' }))
+    expect(await screen.findByRole('alertdialog')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: '确认删除' }))
 
     expect(view.onExport).toHaveBeenCalledWith('7')
     expect(navigator.clipboard.writeText).toHaveBeenCalledWith(material.publicKey)

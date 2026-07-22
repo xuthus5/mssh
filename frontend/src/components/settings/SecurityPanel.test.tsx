@@ -29,7 +29,6 @@ describe('SecurityPanel', () => {
     security.Setup.mockResolvedValue({
       configured: true, unlocked: true, require_password_on_launch: false, remember_unlock: true, updated_at: '2026-07-21T00:00:00Z',
     })
-    vi.spyOn(window, 'confirm').mockReturnValue(true)
   })
 
   it('shows application password card first and sets up a password', async () => {
@@ -49,6 +48,8 @@ describe('SecurityPanel', () => {
     render(<SecurityPanel />)
     expect(await screen.findByText('example.com')).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: '删除 example.com 的主机指纹' }))
-    expect(session.DeleteHostKey).toHaveBeenCalledWith(1)
+    expect(await screen.findByRole('alertdialog')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: '确认' }))
+    await waitFor(() => expect(session.DeleteHostKey).toHaveBeenCalledWith(1))
   })
 })
