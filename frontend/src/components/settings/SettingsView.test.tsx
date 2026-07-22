@@ -109,6 +109,17 @@ describe('SettingsView', () => {
     expect(props.onResetBuiltinThemes).toHaveBeenCalledOnce()
   })
 
+  it('places appearance cards at the top of general settings', () => {
+    render(<SettingsView {...settingsProps()} />)
+    const language = screen.getByText('界面语言')
+    const font = screen.getByText('界面字体')
+    const behavior = screen.getByText('应用行为')
+    expect(language.compareDocumentPosition(font) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(font.compareDocumentPosition(behavior) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(screen.queryByText('最大终端池大小')).not.toBeInTheDocument()
+    expect(screen.queryByText('行为')).not.toBeInTheDocument()
+  })
+
   it('previews and saves the selected font settings', async () => {
     const props = settingsProps()
     render(<SettingsView {...props} />)
@@ -124,21 +135,43 @@ describe('SettingsView', () => {
 
     expect(props.onPreviewUIFont).toHaveBeenLastCalledWith('Microsoft YaHei', 'Segoe UI', 18)
     await userEvent.click(screen.getByRole('button', { name: '保存' }))
-    expect(props.onSaveGeneral).toHaveBeenCalledWith(expect.objectContaining({ uiFontFamily: 'Microsoft YaHei', uiFontSize: 18, rightClickAction: 'menu', copyOnSelect: false }))
+    expect(props.onSaveGeneral).toHaveBeenCalledWith(expect.objectContaining({
+      uiFontFamily: 'Microsoft YaHei',
+      uiFontSize: 18,
+      maxPoolSize: 10,
+      defaultKeepAlive: 60,
+      defaultTermType: 'xterm-256color',
+      rightClickAction: 'menu',
+      copyOnSelect: false,
+    }))
   })
 
-  it('saves changed terminal behavior settings', async () => {
+  it('saves changed terminal connection and behavior settings from the terminal tab', async () => {
     const props = settingsProps()
     const user = userEvent.setup()
     render(<SettingsView {...props} />)
 
+    await user.click(screen.getByRole('tab', { name: '终端' }))
+    await user.clear(screen.getByRole('spinbutton', { name: '最大终端池大小' }))
+    await user.type(screen.getByRole('spinbutton', { name: '最大终端池大小' }), '24')
+    await user.clear(screen.getByRole('spinbutton', { name: '默认保活间隔 (秒)' }))
+    await user.type(screen.getByRole('spinbutton', { name: '默认保活间隔 (秒)' }), '120')
+    await user.click(screen.getByRole('combobox', { name: '默认终端类型' }))
+    await user.click(await screen.findByRole('option', { name: 'xterm' }))
     await user.click(screen.getByRole('combobox', { name: '鼠标右键行为' }))
     await user.click(await screen.findByRole('option', { name: '粘贴' }))
     await user.click(screen.getByRole('switch', { name: '选择即复制' }))
     fireEvent.change(screen.getByRole('spinbutton', { name: '滚动历史行数' }), { target: { value: '8000' } })
     await user.click(screen.getByRole('button', { name: '保存' }))
 
-    expect(props.onSaveGeneral).toHaveBeenCalledWith(expect.objectContaining({ rightClickAction: 'paste', copyOnSelect: true, scrollbackLines: 8000 }))
+    expect(props.onSaveGeneral).toHaveBeenCalledWith(expect.objectContaining({
+      maxPoolSize: 24,
+      defaultKeepAlive: 120,
+      defaultTermType: 'xterm',
+      rightClickAction: 'paste',
+      copyOnSelect: true,
+      scrollbackLines: 8000,
+    }))
   })
 
   it('saves the selected close button behavior', async () => {
@@ -178,5 +211,4 @@ describe('SettingsView', () => {
 
     expect(props.onPreviewUIFont).toHaveBeenLastCalledWith('Segoe UI', 'sans-serif', 14)
   })
-
 })
