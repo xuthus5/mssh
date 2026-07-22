@@ -31,7 +31,7 @@ func (a *AuditService) List(filter model.AuditFilter) ([]model.AuditEvent, error
 }
 
 func (a *AuditService) RecordBatch(action string, sessionIDs []int64, outcomes []string) error {
-	if action != "batch_connect" && action != "batch_macro" {
+	if action != "batch_connect" && action != "batch_macro" && action != "batch_delete" {
 		return fmt.Errorf("unsupported batch audit action %s", action)
 	}
 	if len(sessionIDs) != len(outcomes) {
