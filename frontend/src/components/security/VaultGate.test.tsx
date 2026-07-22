@@ -117,4 +117,18 @@ describe('VaultGate', () => {
     await waitFor(() => expect(sync.ImportWithPassword).toHaveBeenCalledWith('/tmp/device.msshbackup', 'password-1234'))
     expect(await screen.findByText('app-ready')).toBeInTheDocument()
   })
+
+  it('syncs setup completion from another window via vault-changed event', async () => {
+    security.Status.mockResolvedValue({
+      configured: false, unlocked: false, require_password_on_launch: false, remember_unlock: true, updated_at: '',
+    })
+    render(<VaultGate><div>app-ready</div></VaultGate>)
+    expect(await screen.findByText('首次使用需设置应用密码，用于加密本机敏感数据与云同步备份。')).toBeInTheDocument()
+
+    await Events.Emit('security:vault-changed', {
+      configured: true, unlocked: true, require_password_on_launch: false, remember_unlock: true, updated_at: '',
+    })
+    expect(await screen.findByText('app-ready')).toBeInTheDocument()
+  })
+
 })

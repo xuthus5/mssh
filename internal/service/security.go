@@ -18,6 +18,8 @@ const (
 	securityKeychainService       = "mssh"
 	securityKeychainDEKAccount    = "app-dek"
 	sessionPasswordPrefix         = "enc1:"
+	securityVaultChangedEvent     = "security:vault-changed"
+	securityVaultLockedEvent      = "security:vault-locked"
 )
 
 type SecurityService struct {
@@ -44,6 +46,14 @@ func (s *SecurityService) SetEventBus(bus EventBus) {
 }
 
 // RequireUnlocked returns a stable error when the application vault is locked.
+
+func (s *SecurityService) emitVaultStatus(status model.SecurityStatus) {
+	if s.eventBus == nil {
+		return
+	}
+	s.eventBus.Emit(securityVaultChangedEvent, status)
+}
+
 func (s *SecurityService) RequireUnlocked() error {
 	if s.runtime == nil {
 		return ErrVaultLocked
@@ -87,7 +97,12 @@ func (s *SecurityService) Setup(input model.SecuritySetupInput) (model.SecurityS
 		_ = s.clearRememberedDEK()
 	}
 	recordAudit(s.db, s.logger, model.AuditEvent{Action: "security_setup", TargetType: "vault", Summary: "设置应用密码", Outcome: "success"})
-	return s.Status()
+	status, err := s.Status()
+	if err != nil {
+		return model.SecurityStatus{}, err
+	}
+	s.emitVaultStatus(status)
+	return status, nil
 }
 
 func (s *SecurityService) Unlock(input model.SecurityUnlockInput) (model.SecurityStatus, error) {
@@ -107,16 +122,26 @@ func (s *SecurityService) Unlock(input model.SecurityUnlockInput) (model.Securit
 		_ = s.setBoolSetting(securityRememberUnlockSetting, false)
 		_ = s.clearRememberedDEK()
 	}
-	return s.Status()
+	status, err := s.Status()
+	if err != nil {
+		return model.SecurityStatus{}, err
+	}
+	s.emitVaultStatus(status)
+	return status, nil
 }
 
 func (s *SecurityService) Lock() (model.SecurityStatus, error) {
 	s.ClearMemory()
 	_ = s.clearRememberedDEK()
 	if s.eventBus != nil {
-		s.eventBus.Emit("security:vault-locked", map[string]any{"locked": true})
+		s.eventBus.Emit(securityVaultLockedEvent, map[string]any{"locked": true})
 	}
-	return s.Status()
+	status, err := s.Status()
+	if err != nil {
+		return model.SecurityStatus{}, err
+	}
+	s.emitVaultStatus(status)
+	return status, nil
 }
 
 // ClearMemory drops the in-process DEK without changing keychain preferences.
@@ -147,7 +172,12 @@ func (s *SecurityService) Rotate(input model.SecurityRotateInput) (model.Securit
 		_ = s.persistRememberedDEK(newDEK)
 	}
 	recordAudit(s.db, s.logger, model.AuditEvent{Action: "security_rotate", TargetType: "vault", Summary: "轮转应用密码并重加密数据", Outcome: "success"})
-	return s.Status()
+	status, err := s.Status()
+	if err != nil {
+		return model.SecurityStatus{}, err
+	}
+	s.emitVaultStatus(status)
+	return status, nil
 }
 
 func (s *SecurityService) SavePreferences(input model.SecurityPreferenceInput) (model.SecurityStatus, error) {
@@ -163,7 +193,12 @@ func (s *SecurityService) SavePreferences(input model.SecurityPreferenceInput) (
 	} else if !input.RememberUnlock {
 		_ = s.clearRememberedDEK()
 	}
-	return s.Status()
+	status, err := s.Status()
+	if err != nil {
+		return model.SecurityStatus{}, err
+	}
+	s.emitVaultStatus(status)
+	return status, nil
 }
 
 // TryAutoUnlock restores the DEK from keychain when allowed by preferences.
@@ -234,6 +269,9 @@ func (s *SecurityService) InstallVaultFromExport(password string, vault crypto.V
 	s.runtime.SetDEK(dek)
 	if s.boolSetting(securityRememberUnlockSetting, true) && !s.boolSetting(securityRequireLaunchSetting, false) {
 		_ = s.persistRememberedDEK(dek)
+	}
+	if status, err := s.Status(); err == nil {
+		s.emitVaultStatus(status)
 	}
 	return nil
 }

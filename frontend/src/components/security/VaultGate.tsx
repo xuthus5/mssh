@@ -18,6 +18,7 @@ const emptyStatus: SecurityStatus = {
 }
 
 const vaultLockedEvent = 'security:vault-locked'
+const vaultChangedEvent = 'security:vault-changed'
 
 type GateMode = 'loading' | 'setup' | 'unlock' | 'ready' | 'error'
 
@@ -54,14 +55,30 @@ export function VaultGate({ children }: { children: ReactNode }) {
   useEffect(() => { void refresh() }, [refresh])
 
   useEffect(() => {
-    const stop = Events.On(vaultLockedEvent, () => {
+    const stopLocked = Events.On(vaultLockedEvent, () => {
       setMode('unlock')
       setStatus((prev) => ({ ...prev, unlocked: false }))
       setPassword('')
       setError('')
     })
-    return () => { stop() }
-  }, [])
+    const stopChanged = Events.On(vaultChangedEvent, (event: { data?: SecurityStatus | null }) => {
+      const next = event?.data
+      if (!next) {
+        void refresh()
+        return
+      }
+      applyStatus(next)
+      if (next.unlocked) {
+        setPassword('')
+        setConfirmPassword('')
+        setError('')
+      }
+    })
+    return () => {
+      stopLocked()
+      stopChanged()
+    }
+  }, [applyStatus, refresh])
 
   const run = async (operation: () => Promise<unknown>) => {
     setBusy(true)
