@@ -289,3 +289,26 @@ func TestSyncService_JoinWithPassword(t *testing.T) {
 	require.NotEmpty(t, sessions)
 	assert.Equal(t, "edge", sessions[0].Name)
 }
+
+func TestSecurityService_EmitsVaultChangedOnSetupAndUnlock(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	dir := t.TempDir()
+	runtime := NewCryptoRuntime()
+	svc := NewSecurityService(db, dir, runtime, &memoryKeychain{}, nil)
+	bus := newMockEventBus()
+	svc.SetEventBus(bus)
+
+	_, err := svc.Setup(model.SecuritySetupInput{Password: "initial-pass-12", RememberUnlock: true})
+	require.NoError(t, err)
+	require.True(t, bus.hasEvent(securityVaultChangedEvent))
+
+	_, err = svc.Lock()
+	require.NoError(t, err)
+	require.True(t, bus.hasEvent(securityVaultLockedEvent))
+
+	bus = newMockEventBus()
+	svc.SetEventBus(bus)
+	_, err = svc.Unlock(model.SecurityUnlockInput{Password: "initial-pass-12", RememberUnlock: true})
+	require.NoError(t, err)
+	require.True(t, bus.hasEvent(securityVaultChangedEvent))
+}
