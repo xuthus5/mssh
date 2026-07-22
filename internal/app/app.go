@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"sync"
 
+	"github.com/xuthus5/mssh/internal/applog"
 	"github.com/xuthus5/mssh/internal/crypto"
 	"github.com/xuthus5/mssh/internal/service"
 	"github.com/xuthus5/mssh/internal/store"
@@ -39,8 +40,9 @@ type App struct {
 }
 
 type Options struct {
-	DataDir string
-	Logger  *slog.Logger
+	DataDir    string
+	Logger     *slog.Logger
+	LogManager *applog.Manager
 }
 
 func New(opts Options) (*App, error) {
@@ -123,6 +125,11 @@ func startApp(opts Options, logger *slog.Logger, dependencies appDependencies) (
 	if appInstance.Sync != nil {
 		appInstance.Sync.StartScheduler()
 	}
+	if appInstance.Setting != nil {
+		if err := appInstance.Setting.ApplyStoredLogSettings(); err != nil {
+			logger.Warn("apply stored log settings failed", "error", err)
+		}
+	}
 	cleanup = false
 	return appInstance, nil
 }
@@ -177,6 +184,13 @@ func newSyncService(input serviceInitialization, runtime *service.CryptoRuntime,
 		service.WithSyncLifecycle(syncLifecycleAdapter{terminal: terminalSvc, tunnel: tunnelSvc, session: sessionSvc}))
 }
 
+func newSettingService(input serviceInitialization) *service.SettingService {
+	if input.opts.LogManager != nil {
+		return service.NewSettingService(input.db, input.logger, input.opts.LogManager)
+	}
+	return service.NewSettingService(input.db, input.logger)
+}
+
 func assembleApp(input serviceInitialization, runtime *service.CryptoRuntime, securitySvc *service.SecurityService, sessionSvc *service.SessionService, terminalSvc *service.TerminalService, tunnelSvc *service.TunnelService, logSvc *service.LogService, themeSvc *service.ThemeService, syncSvc *service.SyncService) *App {
 	return &App{
 		DB:             input.db,
@@ -191,7 +205,7 @@ func assembleApp(input serviceInitialization, runtime *service.CryptoRuntime, se
 		Theme:          themeSvc,
 		Log:            logSvc,
 		Sync:           syncSvc,
-		Setting:        service.NewSettingService(input.db, input.logger),
+		Setting:        newSettingService(input),
 		About:          service.NewAboutService(),
 		Font:           service.NewFontService(input.logger),
 		Audit:          service.NewAuditService(input.db, input.logger),
@@ -200,88 +214,4 @@ func assembleApp(input serviceInitialization, runtime *service.CryptoRuntime, se
 		Security:       securitySvc,
 		logger:         input.logger,
 	}
-}
-
-type terminalRecordingStopper interface {
-	StopTerminalRecordingIfActive(terminalID string) error
-}
-
-type syncLifecycleAdapter struct {
-	terminal *service.TerminalService
-	tunnel   *service.TunnelService
-	session  *service.SessionService
-}
-
-func (s syncLifecycleAdapter) PrepareDestructiveSync() error {
-	if err := service.CloseAllTerminals(s.terminal); err != nil {
-		return err
-	}
-	if s.tunnel != nil {
-		s.tunnel.StopAll()
-	}
-	if s.session != nil {
-		return s.session.CloseAll()
-	}
-	return nil
-}
-
-func configureTerminalLogging(terminalSvc *service.TerminalService, logSvc *service.LogService, logger *slog.Logger) {
-	terminalSvc.SetOutputHandler(func(terminalID string, data []byte) { logSvc.HandleOutput(terminalID, data) })
-	terminalSvc.SetCloseHandler(func(terminalID string) { handleTerminalRecordingClose(logSvc, logger, terminalID) })
-}
-
-func handleTerminalRecordingClose(stopper terminalRecordingStopper, logger *slog.Logger, terminalID string) {
-	if err := stopper.StopTerminalRecordingIfActive(terminalID); err != nil {
-		logger.Error("stop terminal recording on close failed", "terminalID", terminalID, "error", err)
-	}
-}
-
-func (a *App) Shutdown() {
-	a.shutdownOnce.Do(a.shutdown)
-}
-
-func (a *App) shutdown() {
-	if a.Security != nil {
-		a.Security.ClearMemory()
-	}
-
-	logger := a.logger
-	if logger == nil {
-		logger = slog.Default()
-	}
-	if err := service.CloseAllActiveRecordings(a.Log); err != nil {
-		logger.Error("close active recordings during shutdown failed", "error", err)
-	}
-	if a.File != nil {
-		a.File.CancelAll()
-	}
-	if a.Sync != nil {
-		a.Sync.StopScheduler()
-	}
-	if a.Tunnel != nil {
-		a.Tunnel.StopAll()
-	}
-	if a.Session != nil {
-		if err := a.Session.CloseAll(); err != nil {
-			logger.Error("close SSH connections during shutdown failed", "error", err)
-		}
-	}
-	if a.DB != nil {
-		if err := a.DB.Close(); err != nil {
-			logger.Error("close database during shutdown failed", "error", err)
-		}
-	}
-}
-
-func DefaultTestLogger(t interface{ Logf(string, ...any) }) *slog.Logger {
-	return slog.New(slog.NewTextHandler(&testLogWriter{t}, &slog.HandlerOptions{Level: slog.LevelDebug}))
-}
-
-type testLogWriter struct {
-	t interface{ Logf(string, ...any) }
-}
-
-func (w *testLogWriter) Write(p []byte) (int, error) {
-	w.t.Logf("%s", p)
-	return len(p), nil
 }

@@ -14,6 +14,7 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/events"
 
 	"github.com/xuthus5/mssh/internal/app"
+	"github.com/xuthus5/mssh/internal/applog"
 	"github.com/xuthus5/mssh/internal/windowing"
 )
 
@@ -29,21 +30,30 @@ const (
 )
 
 func main() {
-	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo}))
+	logManager := applog.New(applog.Options{Dir: applog.DefaultDir(), RetentionDays: applog.DefaultRetentionDays})
+	if err := logManager.Configure(applog.DefaultDir(), applog.DefaultRetentionDays); err != nil {
+		fmt.Fprintf(os.Stderr, "open application log failed: %v\n", err)
+	}
+	logger := slog.New(logManager.Handler())
 
-	logger.Info("starting MSSH", "dataDir", defaultDataDir())
+	logger.Info("starting MSSH", "dataDir", defaultDataDir(), "logDir", logManager.Dir())
 	appInstance, err := app.New(app.Options{
-		DataDir: defaultDataDir(),
-		Logger:  logger,
+		DataDir:    defaultDataDir(),
+		Logger:     logger,
+		LogManager: logManager,
 	})
 	if err != nil {
 		logger.Error("startup failed", "error", err)
+		_ = logManager.Close()
 		os.Exit(1)
 	}
 
 	wailsApp := newWailsApplication(appInstance, logger)
 	configureWindows(wailsApp, windowConfiguration{Settings: appInstance.Setting, Logger: logger})
-	wailsApp.OnShutdown(func() { appInstance.Shutdown() })
+	wailsApp.OnShutdown(func() {
+		appInstance.Shutdown()
+		_ = logManager.Close()
+	})
 
 	logger.Info("MSSH started")
 	if err := wailsApp.Run(); err != nil {
