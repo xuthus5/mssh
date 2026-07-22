@@ -13,25 +13,55 @@ type SettingService struct {
 }
 
 func (s *SettingService) Get(key string) (*model.Setting, error) {
+	if err := rejectBlockedSettingKey(key); err != nil {
+		return nil, err
+	}
 	return store.GetSettingEntry(s.db, key)
 }
 
 func (s *SettingService) GetMany(keys []string) (map[string]model.Setting, error) {
-	return store.GetSettings(s.db, keys)
+	for _, key := range keys {
+		if err := rejectBlockedSettingKey(key); err != nil {
+			return nil, err
+		}
+	}
+	settings, err := store.GetSettings(s.db, keys)
+	if err != nil {
+		return nil, err
+	}
+	return filterBlockedSettings(settings), nil
 }
 
 func (s *SettingService) List(namespace string) ([]model.Setting, error) {
-	return store.ListSettings(s.db, namespace)
+	settings, err := store.ListSettings(s.db, namespace)
+	if err != nil {
+		return nil, err
+	}
+	filtered := make([]model.Setting, 0, len(settings))
+	for _, setting := range settings {
+		if settingBlocked(setting.Key) {
+			continue
+		}
+		filtered = append(filtered, setting)
+	}
+	return filtered, nil
 }
 
 func (s *SettingService) Set(setting model.SettingInput) error {
-	return store.SetSettings(s.db, []model.Setting{setting.Setting()})
+	entry := setting.Setting()
+	if err := rejectBlockedSettingKey(entry.Key); err != nil {
+		return err
+	}
+	return store.SetSettings(s.db, []model.Setting{entry})
 }
 
 func (s *SettingService) SetMany(settings []model.SettingInput) error {
 	entries := make([]model.Setting, len(settings))
 	for index, setting := range settings {
 		entries[index] = setting.Setting()
+	}
+	if err := rejectBlockedSettings(entries); err != nil {
+		return err
 	}
 	return store.SetSettings(s.db, entries)
 }
