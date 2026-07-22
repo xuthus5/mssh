@@ -14,6 +14,7 @@ import (
 
 	backupcrypto "github.com/xuthus5/mssh/internal/crypto"
 	"github.com/xuthus5/mssh/internal/model"
+	"github.com/xuthus5/mssh/internal/netproxy"
 	"github.com/xuthus5/mssh/internal/store"
 )
 
@@ -45,6 +46,10 @@ func WithVaultInstaller(installer func(password string, vault backupcrypto.Vault
 
 func WithSyncCrypto(crypto KeyCrypto) SyncOption {
 	return func(service *SyncService) { service.crypto = crypto }
+}
+
+func WithSyncProxy(manager *netproxy.Manager) SyncOption {
+	return func(service *SyncService) { service.proxyManager = manager }
 }
 
 func WithSyncEventBus(eventBus EventBus) SyncOption {
@@ -261,6 +266,10 @@ func syncVersionPath(dataDir, fileName string) string {
 	return filepath.Join(dataDir, "sync", "versions", fileName)
 }
 
+func (s *SyncService) syncHTTPClient() *http.Client {
+	return sharedHTTPClient(syncNetworkTimeout, s.proxyManager)
+}
+
 func syncHTTPClient() *http.Client {
-	return &http.Client{Timeout: syncNetworkTimeout}
+	return sharedHTTPClient(syncNetworkTimeout, nil)
 }

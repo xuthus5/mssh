@@ -16,10 +16,13 @@ const generalSettingKeys = [
   'terminal.right_click_action', 'terminal.copy_on_select', 'terminal.scrollback_lines', 'appearance.ui_font_family',
   'appearance.ui_font_fallback_family', 'appearance.ui_font_size',
   'application.close_button_action', 'application.log_dir', 'application.log_retention_days',
+  'application.proxy_mode', 'application.proxy_url', 'application.proxy_no_proxy',
+  'application.proxy_username', 'application.proxy_password',
   LANGUAGE_SETTING_KEY,
 ]
 
 export type CloseButtonAction = 'tray' | 'exit'
+export type NetworkProxyMode = 'system' | 'direct' | 'manual'
 
 export interface GeneralSettings {
   maxPoolSize: number
@@ -34,6 +37,11 @@ export interface GeneralSettings {
   closeButtonAction: CloseButtonAction
   logDir: string
   logRetentionDays: number
+  proxyMode: NetworkProxyMode
+  proxyURL: string
+  proxyNoProxy: string
+  proxyUsername: string
+  proxyPassword: string
   language: AppLanguage
 }
 
@@ -53,6 +61,11 @@ const defaultGeneralSettings: GeneralSettings = {
   closeButtonAction: 'tray',
   logDir: '',
   logRetentionDays: 30,
+  proxyMode: 'system',
+  proxyURL: '',
+  proxyNoProxy: '',
+  proxyUsername: '',
+  proxyPassword: '',
   language: 'zh-CN',
 }
 
@@ -69,6 +82,15 @@ export function normalizeLogRetentionDays(value: unknown): number {
   if (!Number.isFinite(parsed) || parsed < 1) return 30
   if (parsed > 3650) return 3650
   return Math.floor(parsed)
+}
+
+export function normalizeProxyMode(value: unknown): NetworkProxyMode {
+  if (value === 'direct' || value === 'manual' || value === 'system') return value
+  return 'system'
+}
+
+export function normalizeProxyText(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : ''
 }
 
 export function settingEntry(key: string, value: unknown): SettingInput {
@@ -95,6 +117,11 @@ function normalizeGeneral(settings: GeneralSettings): GeneralSettings {
     closeButtonAction: normalizeCloseButtonAction(settings.closeButtonAction),
     logDir: normalizeLogDir(settings.logDir),
     logRetentionDays: normalizeLogRetentionDays(settings.logRetentionDays),
+    proxyMode: normalizeProxyMode(settings.proxyMode),
+    proxyURL: normalizeProxyText(settings.proxyURL),
+    proxyNoProxy: normalizeProxyText(settings.proxyNoProxy),
+    proxyUsername: normalizeProxyText(settings.proxyUsername),
+    proxyPassword: typeof settings.proxyPassword === 'string' ? settings.proxyPassword : '',
     language: settings.language === 'en' ? 'en' : 'zh-CN',
   }
 }
@@ -113,6 +140,11 @@ function parseGeneral(settings: { [_ in string]?: Setting }): GeneralSettings {
     closeButtonAction: settingValue(settings, 'application.close_button_action', 'tray'),
     logDir: settingValue(settings, 'application.log_dir', ''),
     logRetentionDays: settingValue(settings, 'application.log_retention_days', 30),
+    proxyMode: settingValue(settings, 'application.proxy_mode', 'system'),
+    proxyURL: settingValue(settings, 'application.proxy_url', ''),
+    proxyNoProxy: settingValue(settings, 'application.proxy_no_proxy', ''),
+    proxyUsername: settingValue(settings, 'application.proxy_username', ''),
+    proxyPassword: settingValue(settings, 'application.proxy_password', ''),
     language: (settingValue<string>(settings, LANGUAGE_SETTING_KEY, 'zh-CN') === 'en' ? 'en' : 'zh-CN'),
   })
 }
@@ -147,6 +179,11 @@ async function persistGeneral(settings: GeneralSettings) {
     settingEntry('application.close_button_action', settings.closeButtonAction),
     settingEntry('application.log_dir', settings.logDir),
     settingEntry('application.log_retention_days', settings.logRetentionDays),
+    settingEntry('application.proxy_mode', settings.proxyMode),
+    settingEntry('application.proxy_url', settings.proxyURL),
+    settingEntry('application.proxy_no_proxy', settings.proxyNoProxy),
+    settingEntry('application.proxy_username', settings.proxyUsername),
+    settingEntry('application.proxy_password', settings.proxyPassword),
     settingEntry(LANGUAGE_SETTING_KEY, settings.language),
   ]), TerminalService.SetMaxSize(settings.maxPoolSize)])
 }

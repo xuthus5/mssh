@@ -17,6 +17,11 @@ const general = {
   closeButtonAction: 'tray' as const,
   logDir: '',
   logRetentionDays: 30,
+  proxyMode: 'system' as const,
+  proxyURL: '',
+  proxyNoProxy: '',
+  proxyUsername: '',
+  proxyPassword: '',
   language: 'zh-CN' as const,
 }
 

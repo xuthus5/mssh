@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -28,9 +29,16 @@ type s3SyncProvider struct {
 	key    string
 }
 
-func newS3SyncProvider(ctx context.Context, config model.S3SyncConfig, secretKey string) (*s3SyncProvider, error) {
+func newS3SyncProvider(ctx context.Context, config model.S3SyncConfig, secretKey string, httpClient ...*http.Client) (*s3SyncProvider, error) {
 	credentialsProvider := credentials.NewStaticCredentialsProvider(config.AccessKeyID, secretKey, "")
-	awsConfig, err := awsconfig.LoadDefaultConfig(ctx, awsconfig.WithRegion(config.Region), awsconfig.WithCredentialsProvider(credentialsProvider))
+	loadOptions := []func(*awsconfig.LoadOptions) error{
+		awsconfig.WithRegion(config.Region),
+		awsconfig.WithCredentialsProvider(credentialsProvider),
+	}
+	if len(httpClient) > 0 && httpClient[0] != nil {
+		loadOptions = append(loadOptions, awsconfig.WithHTTPClient(httpClient[0]))
+	}
+	awsConfig, err := awsconfig.LoadDefaultConfig(ctx, loadOptions...)
 	if err != nil {
 		return nil, fmt.Errorf("load S3 configuration: %w", err)
 	}
