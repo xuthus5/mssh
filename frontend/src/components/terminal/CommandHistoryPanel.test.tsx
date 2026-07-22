@@ -4,7 +4,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { CommandHistoryPanel } from '@/components/terminal/CommandHistoryPanel'
 import { recordCommand } from '@/lib/commandHistory'
 
-const listHistory = vi.fn(async () => [{ id: 1, command: 'git status' }, { id: 2, command: 'npm test' }])
+const { listHistory } = vi.hoisted(() => ({
+  listHistory: vi.fn(async () => [{ id: 1, command: 'git status' }, { id: 2, command: 'npm test' }]),
+}))
 vi.mock('@/lib/wails', () => ({ CommandHistoryService: { List: listHistory } }))
 
 describe('CommandHistoryPanel', () => {

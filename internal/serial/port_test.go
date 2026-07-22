@@ -2,6 +2,7 @@ package serial
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -57,3 +58,12 @@ func TestMapOpenErrorBusy(t *testing.T) {
 type assertErr string
 
 func (e assertErr) Error() string { return string(e) }
+
+
+func TestPortSessionWriteAndBreakAfterClose(t *testing.T) {
+	session := NewTestPortSession("/dev/ttyTEST")
+	require.NoError(t, session.Close())
+	_, err := session.Write([]byte("hi"))
+	require.Error(t, err)
+	require.Error(t, session.Break(10*time.Millisecond))
+}

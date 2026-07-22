@@ -9,6 +9,14 @@ export interface TerminalInputRefs {
   storeRef: RefObject<AppState>
 }
 
+/** Local-shell history buckets: -(2_000_000 + terminalInstance). Serial uses -serialPortId. */
+export const LOCAL_HISTORY_BUCKET_BASE = 2_000_000
+
+export function localHistoryBucket(terminalInstance?: number): number {
+  const instance = terminalInstance && terminalInstance > 0 ? terminalInstance : 1
+  return -(LOCAL_HISTORY_BUCKET_BASE + instance)
+}
+
 /** Resolve history bucket id: SSH sessions use real ids; serial uses negative serialPortId. */
 export function resolveSessionId(refs: TerminalInputRefs): number | null {
   const terminalID = refs.terminalIDRef.current
@@ -18,7 +26,7 @@ export function resolveSessionId(refs: TerminalInputRefs): number | null {
     return tab.serialPortId && tab.serialPortId > 0 ? -tab.serialPortId : null
   }
   if (tab.connectionKind === 'local') {
-    return -1
+    return localHistoryBucket(tab.terminalInstance)
   }
   return tab.sessionId
 }
