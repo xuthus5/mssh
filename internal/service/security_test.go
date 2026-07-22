@@ -3,6 +3,7 @@ package service
 import (
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -311,4 +312,32 @@ func TestSecurityService_EmitsVaultChangedOnSetupAndUnlock(t *testing.T) {
 	_, err = svc.Unlock(model.SecurityUnlockInput{Password: "initial-pass-12", RememberUnlock: true})
 	require.NoError(t, err)
 	require.True(t, bus.hasEvent(securityVaultChangedEvent))
+}
+
+func TestSecurityService_UnlockRateLimit(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	dir := t.TempDir()
+	runtime := NewCryptoRuntime()
+	svc := NewSecurityService(db, dir, runtime, &memoryKeychain{}, nil)
+	_, err := svc.Setup(model.SecuritySetupInput{Password: "initial-pass-12", RememberUnlock: false})
+	require.NoError(t, err)
+	require.NoError(t, runtime.RequireUnlocked())
+	_, err = svc.Lock()
+	require.NoError(t, err)
+
+	for i := 0; i < securityUnlockMaxFailures; i++ {
+		_, err = svc.Unlock(model.SecurityUnlockInput{Password: "wrong-password"})
+		require.Error(t, err)
+		require.NotErrorIs(t, err, errUnlockRateLimited)
+	}
+	_, err = svc.Unlock(model.SecurityUnlockInput{Password: "initial-pass-12"})
+	require.Error(t, err)
+	require.ErrorIs(t, err, errUnlockRateLimited)
+
+	svc.unlock.mu.Lock()
+	svc.unlock.lockedUntil = svc.unlock.now().Add(-time.Second)
+	svc.unlock.mu.Unlock()
+	status, err := svc.Unlock(model.SecurityUnlockInput{Password: "initial-pass-12"})
+	require.NoError(t, err)
+	assert.True(t, status.Unlocked)
 }

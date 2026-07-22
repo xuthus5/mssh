@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Dialogs } from '@wailsio/runtime'
-import { FontService, KeyService, SettingService, SyncService } from '@/lib/wails'
+import { FontService, KeyService, SyncService } from '@/lib/wails'
 import { logger } from '@/lib/logger'
 import { toast } from '@/components/ui/toast'
 import { KeyType } from '../../bindings/github.com/xuthus5/mssh/internal/model/models'
-import { settingEntry, useGeneralSettings } from '@/hooks/useGeneralSettings'
+import { useGeneralSettings } from '@/hooks/useGeneralSettings'
 import { useSFTPSettings } from '@/hooks/useSFTPSettings'
 import { t } from '@/i18n'
 
@@ -38,17 +38,6 @@ export interface KeyMaterial extends KeyInfo {
 export interface KeyImportFile {
   name: string
   privateKey: string
-}
-
-export interface SyncConfig {
-  enabled: boolean
-  url: string
-  username: string
-  password: string
-  etag?: string
-  lastSyncedAt?: string
-  lastDirection?: 'upload' | 'download' | ''
-  formatVersion?: number
 }
 
 function keyTypeName(type: KeyType): KeyInfo['type'] {
@@ -138,44 +127,6 @@ export function useKeySettings() {
   return { keys, listKeys, generateKey, importKey, deleteKey, exportKey, loadKeyMaterial, updateKey, selectKeyImportFile }
 }
 
-function useSyncSettings() {
-  const [sync, setSync] = useState<SyncConfig>({ enabled: false, url: '', username: '', password: '' })
-  const revision = useRef(0)
-  const persistSync = useCallback(async (config: SyncConfig) => {
-    await SettingService.SetMany([settingEntry('sync.enabled', config.enabled), settingEntry('sync.url', config.url), settingEntry('sync.username', config.username)])
-  }, [])
-  const saveSync = useCallback(async (config: SyncConfig) => {
-    try {
-      revision.current++
-      await persistSync(config)
-      setSync(config)
-      toast(t('同步配置已保存'), 'success')
-    } catch (error) { keyOperationFailed(t('保存同步配置'), error) }
-  }, [persistSync])
-  const loadSync = useCallback(async () => {
-    try {
-      const currentRevision = revision.current
-      const settings = await SettingService.GetMany(['sync.enabled', 'sync.url', 'sync.username', 'sync.etag', 'sync.last_at', 'sync.last_direction', 'sync.format_version'])
-      const value = <T,>(key: string, fallback: T) => settings[key] ? JSON.parse(settings[key].value) as T : fallback
-      if (currentRevision === revision.current) setSync({ enabled: value('sync.enabled', false), url: value('sync.url', ''), username: value('sync.username', ''), password: '', etag: value('sync.etag', ''), lastSyncedAt: value('sync.last_at', ''), lastDirection: value('sync.last_direction', ''), formatVersion: value('sync.format_version', 0) })
-    } catch (error) { logger.debug('loadSync error', error) }
-  }, [])
-  useEffect(() => { void loadSync() }, [loadSync])
-  const runCloud = useCallback(async (action: string, config: SyncConfig, operation: () => Promise<void>) => {
-    try {
-      revision.current++
-      await persistSync(config)
-      await operation()
-      await loadSync()
-      toast(action, 'success')
-    } catch (error) { keyOperationFailed(action, error) }
-  }, [loadSync, persistSync])
-  const testCloud = useCallback(async (config: SyncConfig) => { await runCloud(t('云同步连接成功'), config, () => SyncService.TestCloudConnection(config.url, config.username, config.password)) }, [runCloud])
-  const pushCloud = useCallback(async (config: SyncConfig) => { await runCloud(t('配置已上传到云端'), config, () => SyncService.SyncToCloud(config.url, config.username, config.password)) }, [runCloud])
-  const pullCloud = useCallback(async (config: SyncConfig) => { await runCloud(t('云端配置已导入'), config, () => SyncService.SyncFromCloud(config.url, config.username, config.password)) }, [runCloud])
-  return { sync, saveSync, testCloud, pushCloud, pullCloud }
-}
-
 function useConfigTransfer() {
   const exportConfig = useCallback(async () => {
     try {
@@ -196,14 +147,12 @@ function useConfigTransfer() {
 export function useSettings() {
   const general = useGeneralSettings()
   const keys = useKeySettings()
-  const sync = useSyncSettings()
   const config = useConfigTransfer()
   const sftp = useSFTPSettings()
   const systemFonts = useSystemFonts()
   return {
     ...general,
     ...keys,
-    ...sync,
     ...config,
     sftpSettings: sftp.settings, saveSFTPSettings: sftp.save,
     systemFonts,
