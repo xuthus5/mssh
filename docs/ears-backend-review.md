@@ -254,3 +254,8 @@
 - SSH known_hosts 空路径 fail-closed（禁止 InsecureIgnoreHostKey）。
 - vault 非法 nonce 返回错误而非 panic。
 - coverpkg 总覆盖率 90.0%（CI 门禁通过）。
+
+## 可商用基线（2026-07-22）
+
+- `wails3 task ci` 全绿（race + coverpkg 90.0% + 前端 + 生产构建）。
+- 高危安全/可靠性项已闭环；仅保留文档记载的 P2 增强残留。

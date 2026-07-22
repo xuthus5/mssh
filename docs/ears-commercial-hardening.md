@@ -81,3 +81,31 @@
 | QA-005 | 当执行 CI 覆盖率门禁时，`go test -coverpkg=./internal/...,./pkg/...` 总覆盖率应 ≥90%。 | **done**（coverpkg total 90.0%） |
 
 实现锚点：`internal/ssh/client.go`、`internal/service/session_connect.go`、`internal/crypto/vault.go`，以及 host key / vault / rotate / terminal exit 等测试。
+
+## 19. 2026-07-22 可商用验收证据
+
+本地完整门禁 `wails3 task ci` 已通过（`EXIT:0`），与 `.github/workflows/ci.yml` 对齐：
+
+| 门禁 | 结果 |
+|---|---|
+| golangci-lint v2.12.2 | 0 issues |
+| `go test -race -coverpkg=./internal/...,./pkg/...` | 全绿；coverpkg total **90.0%** |
+| Go 生产文件行数 | `check-go-source-limits.mjs` OK（≤300） |
+| 前端 source limits / bundle budget | OK |
+| 前端 Vitest | 139 files / 709 tests passed |
+| 生产构建 `wails3 build` | 成功生成 `bin/mssh` |
+
+安全锚点复核（代码）：
+
+- SSH known_hosts 空路径 fail-closed（禁止 `InsecureIgnoreHostKey`）
+- 会话密码 `enc1:` + Vault DEK；通用 Setting API 阻断密钥键
+- 解锁失败限速；vault 非法 nonce 不 panic
+- 同步密钥由 DEK 派生，不再经遗留 master_key 设置面
+
+非阻塞残留（不阻断可商用验收，属后续增强）：
+
+- 跨平台系统探针命令矩阵扩展
+- 事件总线 Emit 零拷贝契约
+- SQLite 读写分离 / 多连接架构
+
+结论：在当前 EARS 清单、CI 门禁与安全锚点证据下，项目代码质量达到**可商用基线**。
