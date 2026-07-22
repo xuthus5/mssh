@@ -24,6 +24,7 @@ A cross-platform SSH client built with Go + Wails v3 + React + xterm.js.
 - 24 curated offline terminal themes with optional Dark/Light following or a fixed Profile, `.itermcolors` import, live preview, and built-in style reset
 - Searchable system font and size settings for the application interface
 - Terminal behavior settings support right-click menus or paste and optional copy-on-select
+- Serial port management in Overview with baud/data/parity/stop/flow, line ending, local echo, DTR/RTS/Break controls, exclusive device lock, and dedicated serial terminals
 - System tray controls support showing, hiding, and exiting, with a configurable close-button action
 - Application logs write daily files under `~/.mssh/logs` by default, with a configurable directory and retention window
 - Lazy-loaded native settings window with a frameless application title bar and live cross-window preview

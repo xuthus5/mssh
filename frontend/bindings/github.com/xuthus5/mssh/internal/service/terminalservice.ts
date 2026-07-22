@@ -9,6 +9,10 @@ import { Call as $Call, CancellablePromise as $CancellablePromise, Create as $Cr
 // @ts-ignore: Unused imports
 import * as model$0 from "../model/models.js";
 
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
+import * as $models from "./models.js";
+
 export function Attach(terminalID: string): $CancellablePromise<void> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.TerminalService.Attach", terminalID);
 }
@@ -25,6 +29,13 @@ export function Open(sessionID: number, cols: number, rows: number): $Cancellabl
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.TerminalService.Open", sessionID, cols, rows);
 }
 
+/**
+ * OpenSerial opens a terminal attached to a configured serial port profile.
+ */
+export function OpenSerial(serialPortID: number, cols: number, rows: number): $CancellablePromise<string> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.TerminalService.OpenSerial", serialPortID, cols, rows);
+}
+
 export function ProcessInfo(terminalID: string): $CancellablePromise<model$0.ProcessInfo[]> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.TerminalService.ProcessInfo", terminalID).then(($result: any) => {
         return $$createType1($result);
@@ -33,6 +44,30 @@ export function ProcessInfo(terminalID: string): $CancellablePromise<model$0.Pro
 
 export function Resize(terminalID: string, cols: number, rows: number): $CancellablePromise<void> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.TerminalService.Resize", terminalID, cols, rows);
+}
+
+
+/**
+ * SerialBreak sends a break signal on an open serial terminal.
+ */
+export function SerialBreak(terminalID: string, durationMs: number): $CancellablePromise<void> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.TerminalService.SerialBreak", terminalID, durationMs);
+}
+
+/**
+ * SerialSetSignals updates DTR/RTS for an open serial terminal.
+ */
+export function SerialSetSignals(terminalID: string, dtr: boolean, rts: boolean): $CancellablePromise<void> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.TerminalService.SerialSetSignals", terminalID, dtr, rts);
+}
+
+/**
+ * SerialSignals returns the current DTR/RTS state for an open serial terminal.
+ */
+export function SerialSignals(terminalID: string): $CancellablePromise<model$0.SerialSignals> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.TerminalService.SerialSignals", terminalID).then(($result: any) => {
+        return $$createType4($result);
+    });
 }
 
 export function SetCloseHandler(fn: any): $CancellablePromise<void> {
@@ -45,6 +80,10 @@ export function SetMaxSize(maxSize: number): $CancellablePromise<void> {
 
 export function SetOutputHandler(fn: any): $CancellablePromise<void> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.TerminalService.SetOutputHandler", fn);
+}
+
+export function SetSerialService(serialSvc: $models.SerialService | null): $CancellablePromise<void> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.TerminalService.SetSerialService", serialSvc);
 }
 
 export function SystemInfo(terminalID: string): $CancellablePromise<model$0.SystemInfo | null> {
@@ -62,3 +101,4 @@ const $$createType0 = model$0.ProcessInfo.createFrom;
 const $$createType1 = $Create.Array($$createType0);
 const $$createType2 = model$0.SystemInfo.createFrom;
 const $$createType3 = $Create.Nullable($$createType2);
+const $$createType4 = model$0.SerialSignals.createFrom;

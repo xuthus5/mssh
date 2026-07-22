@@ -215,6 +215,8 @@ describe('Sidebar behavior', () => {
     expect(useAppStore.getState().overviewSection).toBe('keys')
     await userEvent.click(screen.getByRole('button', { name: '隧道配置' }))
     expect(useAppStore.getState().overviewSection).toBe('tunnels')
+    await userEvent.click(screen.getByRole('button', { name: '串口' }))
+    expect(useAppStore.getState().overviewSection).toBe('serial')
     await userEvent.click(screen.getByRole('button', { name: '审计日志' }))
     expect(useAppStore.getState().overviewSection).toBe('audit')
     await userEvent.click(screen.getByRole('button', { name: '返回工作区' }))

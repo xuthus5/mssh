@@ -14,6 +14,7 @@ import {
   SyncService,
   AboutService,
   FontService,
+  SerialService,
 } from '@/lib/wails'
 
 describe('Generated Bindings Barrel', () => {
@@ -100,6 +101,16 @@ describe('Generated Bindings Barrel', () => {
   it('exports FontService', () => {
     expect(FontService).toBeDefined()
     expect(typeof FontService.List).toBe('function')
+  })
+
+  it('exports SerialService', () => {
+    expect(SerialService).toBeDefined()
+    expect(typeof SerialService.List).toBe('function')
+    expect(typeof SerialService.ListDevices).toBe('function')
+  })
+
+  it('exports TerminalService.OpenSerial', () => {
+    expect(typeof TerminalService.OpenSerial).toBe('function')
   })
 
 })

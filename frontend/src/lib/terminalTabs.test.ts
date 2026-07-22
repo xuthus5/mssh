@@ -50,3 +50,24 @@ describe('createTerminalTab', () => {
     expect(createTerminalTab({ sessionID: 7, sessionName: '生产服务器', terminalID: 'term-new', tabs }).terminalInstance).toBe(1)
   })
 })
+
+  it('creates serial terminal tabs with independent instance counters', () => {
+    const first = createTerminalTab({
+      sessionID: 0,
+      sessionName: 'ESP32',
+      terminalID: 'term-s1',
+      tabs: [],
+      connectionKind: 'serial',
+      serialPortId: 3,
+    })
+    expect(first).toMatchObject({ connectionKind: 'serial', serialPortId: 3, terminalInstance: 1, title: 'ESP32' })
+    const second = createTerminalTab({
+      sessionID: 0,
+      sessionName: 'ESP32',
+      terminalID: 'term-s2',
+      tabs: [first],
+      connectionKind: 'serial',
+      serialPortId: 3,
+    })
+    expect(second.title).toBe('ESP32 #2')
+  })

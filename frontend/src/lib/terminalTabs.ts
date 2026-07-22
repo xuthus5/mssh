@@ -5,12 +5,19 @@ interface CreateTerminalTabOptions {
   sessionName: string
   terminalID: string
   tabs: Tab[]
+  connectionKind?: 'ssh' | 'serial'
+  serialPortId?: number
 }
 
-function nextTerminalInstance(sessionID: number, tabs: Tab[]): number {
+function nextTerminalInstance(sessionKey: string, tabs: Tab[]): number {
   const used = new Set(
     tabs
-      .filter((tab): tab is TerminalTab => tab.type === 'terminal' && tab.sessionId === sessionID)
+      .filter((tab): tab is TerminalTab => {
+        if (tab.type !== 'terminal') return false
+        const kind = tab.connectionKind ?? 'ssh'
+        if (kind === 'serial') return `serial:${tab.serialPortId ?? 0}` === sessionKey
+        return `ssh:${tab.sessionId}` === sessionKey
+      })
       .map((tab) => tab.terminalInstance)
       .filter((instance): instance is number => instance !== undefined),
   )
@@ -19,9 +26,17 @@ function nextTerminalInstance(sessionID: number, tabs: Tab[]): number {
   return instance
 }
 
-export function createTerminalTab({ sessionID, sessionName, terminalID, tabs }: CreateTerminalTabOptions): TerminalTab {
-  const terminalInstance = nextTerminalInstance(sessionID, tabs)
-  return {
+export function createTerminalTab({
+  sessionID,
+  sessionName,
+  terminalID,
+  tabs,
+  connectionKind = 'ssh',
+  serialPortId,
+}: CreateTerminalTabOptions): TerminalTab {
+  const sessionKey = connectionKind === 'serial' ? `serial:${serialPortId ?? 0}` : `ssh:${sessionID}`
+  const terminalInstance = nextTerminalInstance(sessionKey, tabs)
+  const tab: TerminalTab = {
     id: `terminal-${terminalID}`,
     title: terminalInstance === 1 ? sessionName : `${sessionName} #${terminalInstance}`,
     type: 'terminal',
@@ -30,4 +45,9 @@ export function createTerminalTab({ sessionID, sessionName, terminalID, tabs }: 
     terminalInstance,
     toolPanel: null,
   }
+  if (connectionKind === 'serial') {
+    tab.connectionKind = 'serial'
+    tab.serialPortId = serialPortId
+  }
+  return tab
 }
