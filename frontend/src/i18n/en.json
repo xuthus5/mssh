@@ -265,8 +265,6 @@
   "创建项目失败": "Failed to create project",
   "删除": "Delete",
   "删除 ${}": "Delete ${}",
-  "删除 ${} Profile": "Delete profile ${}",
-  "删除 ${} 主题定义": "Delete theme definition ${}",
   "删除 ${} 的主机指纹": "Delete host fingerprint for ${}",
   "删除 ${} 的已信任主机指纹？下次连接时将重新确认。": "Delete trusted fingerprint for ${}? It will be reconfirmed on next connect.",
   "删除“": "删除“",
@@ -830,8 +828,6 @@
   "相邻标签仍在运行": "相邻标签仍在运行",
   "确定": "OK",
   "确认删除": "Confirm Delete",
-  "确认删除 ${} Profile？": "confirmdelete ${} Profile?",
-  "确认删除 ${} 主题定义？": "Confirmdelete ${} themedefinition?",
   "确认后将从所有关联会话移除此标签。": "This will remove the tag from all linked sessions.",
   "确认处理 ${} 个会话并删除": "Confirm handling ${} sessions and delete",
   "确认导入": "Confirmimport",
@@ -1284,5 +1280,8 @@
   "打开会话快速搜索面板。": "Open the session quick-search panel.",
   "复制当前终端选中文本。": "Copy the current terminal selection.",
   "将剪贴板内容粘贴到当前终端。": "Paste clipboard content into the current terminal.",
-  "清空当前终端可见内容。": "Clear the current terminal view."
+  "清空当前终端可见内容。": "Clear the current terminal view.",
+  "删除主题「${}」？": "Delete theme “${}”?",
+  "将移除该主题配置（Profile）。内置颜色定义会保留，不会被删除。": "This removes the theme profile. Built-in color definitions are kept and will not be deleted.",
+  "将移除该主题配置（Profile）。若自定义颜色定义不再被引用，也会一并清理。此操作不可撤销。": "This removes the theme profile. Unused custom color definitions will also be cleaned up. This cannot be undone."
 }
