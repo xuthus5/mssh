@@ -62,3 +62,14 @@ func TestValidateAppPassword(t *testing.T) {
 	assert.Error(t, ValidateAppPassword("short"))
 	assert.NoError(t, ValidateAppPassword("twelve chars"))
 }
+
+func TestInstallVaultFile(t *testing.T) {
+	dir := t.TempDir()
+	vault, _, err := CreateVault("initial-pass-12")
+	require.NoError(t, err)
+	require.NoError(t, InstallVaultFile(dir, vault))
+	assert.True(t, VaultExists(dir))
+	loaded, err := LoadVaultFile(VaultPath(dir))
+	require.NoError(t, err)
+	assert.Equal(t, vault.WrappedDEK, loaded.WrappedDEK)
+}

@@ -15,7 +15,7 @@ const generalSettingKeys = [
   'terminal.max_pool_size', 'terminal.default_keep_alive', 'terminal.default_term_type',
   'terminal.right_click_action', 'terminal.copy_on_select', 'terminal.scrollback_lines', 'appearance.ui_font_family',
   'appearance.ui_font_fallback_family', 'appearance.ui_font_size',
-  'application.close_button_action',
+  'application.close_button_action', 'application.log_dir', 'application.log_retention_days',
   LANGUAGE_SETTING_KEY,
 ]
 
@@ -32,6 +32,8 @@ export interface GeneralSettings {
   copyOnSelect: boolean
   scrollbackLines: number
   closeButtonAction: CloseButtonAction
+  logDir: string
+  logRetentionDays: number
   language: AppLanguage
 }
 
@@ -49,11 +51,24 @@ const defaultGeneralSettings: GeneralSettings = {
   uiFontSize: DEFAULT_UI_FONT_SIZE,
   rightClickAction: 'menu', copyOnSelect: false, scrollbackLines: DEFAULT_TERMINAL_SCROLLBACK_LINES,
   closeButtonAction: 'tray',
+  logDir: '',
+  logRetentionDays: 30,
   language: 'zh-CN',
 }
 
 export function normalizeCloseButtonAction(value: unknown): CloseButtonAction {
   return value === 'exit' ? 'exit' : 'tray'
+}
+
+export function normalizeLogDir(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : ''
+}
+
+export function normalizeLogRetentionDays(value: unknown): number {
+  const parsed = typeof value === 'number' ? value : Number(value)
+  if (!Number.isFinite(parsed) || parsed < 1) return 30
+  if (parsed > 3650) return 3650
+  return Math.floor(parsed)
 }
 
 export function settingEntry(key: string, value: unknown): SettingInput {
@@ -78,6 +93,8 @@ function normalizeGeneral(settings: GeneralSettings): GeneralSettings {
     copyOnSelect: normalizeCopyOnSelect(settings.copyOnSelect),
     scrollbackLines: normalizeScrollbackLines(settings.scrollbackLines),
     closeButtonAction: normalizeCloseButtonAction(settings.closeButtonAction),
+    logDir: normalizeLogDir(settings.logDir),
+    logRetentionDays: normalizeLogRetentionDays(settings.logRetentionDays),
     language: settings.language === 'en' ? 'en' : 'zh-CN',
   }
 }
@@ -94,6 +111,8 @@ function parseGeneral(settings: { [_ in string]?: Setting }): GeneralSettings {
     uiFontFamily, uiFontFallbackFamily: settingValue(settings, 'appearance.ui_font_fallback_family', DEFAULT_UI_FONT_FALLBACK_FAMILY),
     uiFontSize: settingValue(settings, 'appearance.ui_font_size', DEFAULT_UI_FONT_SIZE),
     closeButtonAction: settingValue(settings, 'application.close_button_action', 'tray'),
+    logDir: settingValue(settings, 'application.log_dir', ''),
+    logRetentionDays: settingValue(settings, 'application.log_retention_days', 30),
     language: (settingValue<string>(settings, LANGUAGE_SETTING_KEY, 'zh-CN') === 'en' ? 'en' : 'zh-CN'),
   })
 }
@@ -125,7 +144,10 @@ async function persistGeneral(settings: GeneralSettings) {
     settingEntry('terminal.default_term_type', settings.defaultTermType), settingEntry('terminal.right_click_action', settings.rightClickAction),
     settingEntry('terminal.copy_on_select', settings.copyOnSelect), settingEntry('terminal.scrollback_lines', settings.scrollbackLines), settingEntry('appearance.ui_font_family', settings.uiFontFamily),
     settingEntry('appearance.ui_font_fallback_family', settings.uiFontFallbackFamily), settingEntry('appearance.ui_font_size', settings.uiFontSize),
-    settingEntry('application.close_button_action', settings.closeButtonAction), settingEntry(LANGUAGE_SETTING_KEY, settings.language),
+    settingEntry('application.close_button_action', settings.closeButtonAction),
+    settingEntry('application.log_dir', settings.logDir),
+    settingEntry('application.log_retention_days', settings.logRetentionDays),
+    settingEntry(LANGUAGE_SETTING_KEY, settings.language),
   ]), TerminalService.SetMaxSize(settings.maxPoolSize)])
 }
 
