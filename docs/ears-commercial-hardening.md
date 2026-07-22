@@ -55,3 +55,11 @@
 3. 加固导入校验、日志脱敏和终端尺寸同步。
 4. 为新增路径补测试，并运行 Go、前端、lint、构建门禁。
 5. 逐项闭环产品能力、统一交互、集成测试、资源测试和性能预算，不得以占位实现冒充完成。
+
+## 16. 2026-07-22 追加商用硬化（generic settings / crash shell）
+
+| ID | EARS 验收条件 | 状态 |
+|---|---|---|
+| SEC-007 | 当通过通用 SettingService 读写 settings 时，系统必须拒绝 `sync.master_key` 与 `*.secret.*` 等敏感键，敏感凭证只能经 Security/Sync 专用 API。 | done |
+| DESKTOP-002 | 当任意窗口 React 树渲染抛错时，系统必须展示可恢复错误壳（重试/重新加载），不得白屏。 | done |
+| SYNC-002 | 当遗留 `useSyncSettings` 持久化云配置时，系统不得再写入明文 `sync.master_key`；同步密钥仅由应用 Vault DEK 派生。 | done |

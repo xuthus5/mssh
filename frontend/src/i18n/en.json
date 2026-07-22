@@ -1152,5 +1152,8 @@
   "确认批量删除？": "Confirm batch delete?",
   "删除选中会话": "Delete selected sessions",
   "即将删除 ${} 个会话。将同时影响 ${} 条隧道、${} 条命令历史和 ${} 条录制记录。此操作不可撤销。": "About to delete ${} sessions. This will also affect ${} tunnels, ${} command history entries and ${} recordings. This cannot be undone.",
-  "即将删除 ${} 个会话。正在分析关联资产影响范围。此操作不可撤销。": "About to delete ${} sessions. Analyzing impact on linked assets. This cannot be undone."
+  "即将删除 ${} 个会话。正在分析关联资产影响范围。此操作不可撤销。": "About to delete ${} sessions. Analyzing impact on linked assets. This cannot be undone.",
+  "应用渲染失败": "Application failed to render",
+  "页面遇到意外错误。你可以重试恢复，或重新加载应用。": "The page hit an unexpected error. Retry to recover, or reload the app.",
+  "重新加载": "Reload"
 }
