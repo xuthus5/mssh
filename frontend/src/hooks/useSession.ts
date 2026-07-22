@@ -6,7 +6,7 @@ import { toast } from '@/components/ui/toast'
 import { logger } from '@/lib/logger'
 import { createTerminalTab } from '@/lib/terminalTabs'
 import type { SessionInput } from '../../bindings/github.com/xuthus5/mssh/internal/model/models'
-import { reconnectSessionTab } from '@/hooks/sessionReconnect'
+import { markIntentionalDisconnect, reconnectSessionTab } from '@/hooks/sessionReconnect'
 import { runBatchDeleteSessions, runBatchSessions } from '@/lib/sessionBatch'
 import { mapFolder, mapSession, mapTunnel, type AssetEnvironment, type AssetProject, type AssetTag, type Folder, type Session, type Tunnel } from '@/lib/sessionModels'
 import { useSessionAssetCatalog } from '@/hooks/useSessionAssetCatalog'
@@ -245,6 +245,7 @@ export function useSession() {
 
   const disconnect = useCallback(async (terminalId: string) => {
     try {
+      markIntentionalDisconnect(terminalId)
       await TerminalService.Close(terminalId)
       useAppStore.getState().setConnectionStatus(terminalId, 'disconnected')
     } catch (err) {
