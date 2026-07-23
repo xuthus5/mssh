@@ -40,7 +40,7 @@ export function ConnectDialog() {
                   {state === 'cancelling' ? t('正在取消连接...') : t('SSH 握手进行中...')}
                 </p>
               </div>
-              <Button variant="outline" size="sm" disabled={state === 'cancelling'} onClick={() => { void cancelConnection() }}>
+              <Button variant="outline" size="sm" disabled={state === 'cancelling'} onClick={() => { void cancelConnection().catch(() => undefined) }}>
                 {t('取消连接')}
               </Button>
             </>
@@ -61,10 +61,10 @@ export function ConnectDialog() {
                 {algorithm && <p className="mt-2 text-xs text-muted-foreground">{t('算法：')}{algorithm}</p>}
               </div>
               <div className="flex gap-2 mt-2">
-                <Button variant="outline" size="sm" onClick={() => { void rejectHostKey() }}>
+                <Button variant="outline" size="sm" onClick={() => { void rejectHostKey().catch(() => undefined) }}>
                   {t('拒绝')}
                 </Button>
-                <Button size="sm" onClick={() => { void acceptHostKey() }}>
+                <Button size="sm" onClick={() => { void acceptHostKey().catch(() => undefined) }}>
                   {t('信任并连接')}
                 </Button>
               </div>
