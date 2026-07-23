@@ -385,3 +385,10 @@
 |---|---|---|
 | AI-EXEC-001 | `ExecuteCommand` 写入终端必须受 `security.command_timeout_seconds` 约束；超时返回明确错误并记录 failed 审计。 | done |
 | AI-EXEC-002 | AI 注入终端的命令字节长度必须有上界（32KiB），超限拒绝执行。 | done |
+
+## 2026-07-23 商用硬化波次（远程隧道暴露提示）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| SEC-TUNNEL-001 | 创建/编辑远程转发时，UI 必须提示远端监听暴露风险（尤其 0.0.0.0/:: 与非回环地址）。 | done |
+| SEC-TUNNEL-002 | `remoteTunnelExposureWarning` 对 local/dynamic 返回 null，对 loopback remote 不报警。 | done |
