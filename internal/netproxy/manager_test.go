@@ -21,6 +21,11 @@ func TestNormalizeAndValidate(t *testing.T) {
 	assert.Error(t, Validate(Config{Mode: ModeManual, URL: "ftp://proxy.local:1080"}))
 	require.NoError(t, Validate(Config{Mode: ModeManual, URL: "http://127.0.0.1:1080"}))
 	require.NoError(t, Validate(Config{Mode: ModeManual, URL: "socks5://127.0.0.1:1080"}))
+	require.NoError(t, Validate(Config{Mode: ModeManual, URL: "http://proxy.local:8080"}))
+	assert.Error(t, Validate(Config{Mode: ModeManual, URL: "http://user:pass@proxy.local:8080"}))
+	assert.Error(t, Validate(Config{Mode: ModeManual, URL: "http://169.254.169.254:80"}))
+	assert.Error(t, Validate(Config{Mode: ModeManual, URL: "socks5://metadata.google.internal:1080"}))
+	assert.Error(t, Validate(Config{Mode: ModeManual, URL: "http://0.0.0.0:1080"}))
 }
 
 func TestManagerConfigureAndProxyModes(t *testing.T) {
