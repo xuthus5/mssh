@@ -17,6 +17,16 @@ import (
 
 func (s *SessionService) ListHostKeys() ([]model.HostKeyEntry, error) {
 	path := filepath.Join(s.dataDir, "known_hosts")
+	var entries []model.HostKeyEntry
+	err := msshssh.WithKnownHostsLock(func() error {
+		var listErr error
+		entries, listErr = s.listHostKeysLocked(path)
+		return listErr
+	})
+	return entries, err
+}
+
+func (s *SessionService) listHostKeysLocked(path string) ([]model.HostKeyEntry, error) {
 	file, err := os.Open(path)
 	if errors.Is(err, os.ErrNotExist) {
 		return []model.HostKeyEntry{}, nil
@@ -27,6 +37,8 @@ func (s *SessionService) ListHostKeys() ([]model.HostKeyEntry, error) {
 	defer func() { _ = file.Close() }()
 	entries := make([]model.HostKeyEntry, 0)
 	scanner := bufio.NewScanner(file)
+	// Bound line size so a corrupt known_hosts cannot exhaust memory.
+	scanner.Buffer(make([]byte, 64*1024), 64*1024)
 	for line := 1; scanner.Scan(); line++ {
 		if entry, ok := parseKnownHostLine(line, scanner.Text()); ok {
 			entries = append(entries, entry)
