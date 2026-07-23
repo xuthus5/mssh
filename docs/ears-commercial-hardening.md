@@ -142,3 +142,11 @@
 | WORKSPACE-003 | 串口标签不得持久化或多开分屏拓扑（设备独占）。 | done |
 | WORKSPACE-004 | 恢复标签时 TerminalSplit 必须按 snapshot 打开额外窗格并 materialize 树。 | done |
 
+## 2026-07-23 商用硬化波次（占用匹配 / 工作区迁移 / 终端搜索快捷键）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| SERIAL-009 | 串口中心“使用中/在线”状态必须通过路径归一比较 active map 与设备列表，避免 symlink/COM 形式不一致导致误判。 | done |
+| WORKSPACE-005 | 当持久化布局为 v2 时，系统必须迁移到 v3 后恢复，而不是直接丢弃用户标签。 | done |
+| SHORTCUT-003 | 当活动面为终端标签时，Mod+F（quick-search 绑定）必须切换终端内搜索；非终端活动面仍打开会话快速搜索。 | done |
+

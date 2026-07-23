@@ -115,3 +115,20 @@ func TestSerialServiceRejectsInvalidBaud(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "baud rate")
 }
+
+func TestSerialServiceDeviceReservationCanonical(t *testing.T) {
+	db, err := store.OpenDB(t.TempDir())
+	require.NoError(t, err)
+	require.NoError(t, store.InitializeSchema(db))
+	t.Cleanup(func() { _ = db.Close() })
+	svc := NewSerialService(db, slog.Default())
+	require.NoError(t, svc.reserveDevice("/dev/./ttyUSB0", "term-1"))
+	err = svc.reserveDevice("/dev/ttyUSB0", "term-2")
+	require.Error(t, err)
+	active := svc.ActiveDeviceMap()
+	// Active map stores canonical absolute path
+	require.NotEmpty(t, active)
+	for _, owner := range active {
+		assert.Equal(t, "term-1", owner)
+	}
+}

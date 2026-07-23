@@ -64,6 +64,18 @@ describe('workspace persistence', () => {
     expect(parseWorkspaceSnapshot(JSON.stringify(snapshot)).tabs).toHaveLength(2)
   })
 
+  it('migrates version 2 snapshots into version 3', () => {
+    const migrated = parseWorkspaceSnapshot(JSON.stringify({
+      version: 2,
+      tabs: [{ type: 'terminal', title: 'prod', sessionId: 7, toolPanel: 'files' }],
+      active: { type: 'tab', index: 0 },
+      workspaceTab: 'sessions',
+      overviewSection: 'sessions',
+    }))
+    expect(migrated.version).toBe(3)
+    expect(migrated.tabs).toHaveLength(1)
+  })
+
   it('rejects obsolete or malformed layouts instead of maintaining compatibility code', () => {
     expect(() => parseWorkspaceSnapshot('{"version":0,"tabs":[]}')).toThrow('workspace layout is invalid')
     expect(() => parseWorkspaceSnapshot('{"version":3,"tabs":[],"active":null,"workspaceTab":"bad","overviewSection":"sessions"}')).toThrow('workspace layout is invalid')

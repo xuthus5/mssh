@@ -24,6 +24,8 @@ import { useShortcutStore } from '@/store/shortcutStore'
 import { useShortcutRuntimeHydration } from '@/hooks/useShortcutSettings'
 import { resolveShortcutAction } from '@/lib/shortcutRuntime'
 import type { ShortcutActionId } from '@/lib/shortcuts'
+import { emitTerminalSearchToggle } from '@/lib/terminalSearchEvents'
+import { resolveQuickSearchTarget } from '@/lib/quickSearchRouting'
 
 
 function activeTab(state: AppState): Tab | undefined {
@@ -87,6 +89,11 @@ function runShortcutAction(actionId: ShortcutActionId): boolean {
     case 'close-tab':
       return closeActiveTab(state)
     case 'quick-search':
+      // When a terminal tab is active, Mod+F opens in-terminal search; otherwise session quick search.
+      if (resolveQuickSearchTarget(state.activeSurface) === 'terminal-search') {
+        emitTerminalSearchToggle()
+        return true
+      }
       emitAppEvent(SESSION_QUICK_SEARCH_EVENT)
       return true
     case 'copy-selection':

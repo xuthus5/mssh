@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import type { SerialPort } from '@/hooks/useSerial'
+import { isSerialDeviceActive, isSerialDevicePresent } from '@/lib/serialDeviceMatch'
 import { t } from '@/i18n'
 
 function formatSerialMode(port: SerialPort): string {
@@ -64,8 +65,8 @@ export function SerialPortTable(props: Props) {
             </TableRow>
           ) : filtered.map((port) => {
             const id = Number(port.id)
-            const inUse = Boolean(activeDevices[port.device])
-            const present = devices.includes(port.device)
+            const inUse = isSerialDeviceActive(port.device, activeDevices)
+            const present = isSerialDevicePresent(port.device, devices)
             return (
               <TableRow key={port.id}>
                 <TableCell>
