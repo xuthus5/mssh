@@ -33,7 +33,7 @@ export function WindowTitleBar() {
 
   const toggleColorMode = () => {
     const nextMode = colorMode === 'dark' ? 'light' : 'dark'
-    void themeCatalog.setColorMode(nextMode)
+    void themeCatalog.setColorMode(nextMode).catch((error: unknown) => logger.error('toggle color mode failed', error))
   }
 
   const navigationButton = (tab: WorkspaceID, label: string) => {
