@@ -48,6 +48,9 @@ describe('isSensitiveCommand matrix', () => {
     ['ls -la', false],
     ['git status', false],
     ['echo hello', false],
+    ['pacman -Syu', false],
+    ['ps -p 1', false],
+    ['docker ps -p', false],
   ])('%s => %s', (command, expected) => {
     expect(isSensitiveCommand(command)).toBe(expected)
   })
