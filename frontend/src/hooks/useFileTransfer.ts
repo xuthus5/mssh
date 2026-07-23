@@ -38,21 +38,25 @@ function useFileListing(sessionId: number) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const requestID = useRef(0)
-  const listFiles = useCallback(async (path: string) => {
+  const listFiles = useCallback(async (path: string, options?: { silent?: boolean }) => {
     setLoading(true)
-    setError('')
+    if (!options?.silent) setError('')
     const currentRequest = ++requestID.current
     try {
       const result = await loadRemoteDirectory(sessionId, path)
       if (currentRequest !== requestID.current) return
       setFiles(result)
       setCurrentPath(path)
+      if (options?.silent) setError('')
     } catch (listError) {
       logger.error('listFiles error', listError)
       if (currentRequest === requestID.current) {
         const message = listError instanceof Error ? listError.message : String(listError)
-        setError(message)
-        toast(t('加载文件列表失败: ${}', message), 'error')
+        // Post-mutation reloads stay silent so successful delete/rename/mkdir is not rebranded.
+        if (!options?.silent) {
+          setError(message)
+          toast(t('加载文件列表失败: ${}', message), 'error')
+        }
       }
     } finally {
       if (currentRequest === requestID.current) setLoading(false)
@@ -99,7 +103,7 @@ function useTransferCommands({ sessionId, sessionName }: TransferCommandOptions)
 interface FileMutationOptions {
   sessionId: number
   currentPath: string
-  listFiles: (path: string) => Promise<void>
+  listFiles: (path: string, options?: { silent?: boolean }) => Promise<void>
   setFiles: Dispatch<SetStateAction<FileInfo[]>>
 }
 
@@ -108,7 +112,7 @@ function useFileMutations({ sessionId, currentPath, listFiles, setFiles }: FileM
     try {
       await FileService.Delete(sessionId, path)
       setFiles((files) => files.filter((file) => file.path !== path))
-      void listFiles(currentPath)
+      void listFiles(currentPath, { silent: true })
     } catch (error) {
       logger.error('deleteFile error', error)
       toast(t('删除文件失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
@@ -118,7 +122,7 @@ function useFileMutations({ sessionId, currentPath, listFiles, setFiles }: FileM
   const renameFile = useCallback(async (oldPath: string, newName: string) => {
     try {
       await FileService.Rename(sessionId, oldPath, newName)
-      void listFiles(currentPath)
+      void listFiles(currentPath, { silent: true })
     } catch (error) {
       logger.error('renameFile error', error)
       toast(t('重命名失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
@@ -128,7 +132,7 @@ function useFileMutations({ sessionId, currentPath, listFiles, setFiles }: FileM
   const makeDir = useCallback(async (name: string) => {
     try {
       await FileService.Mkdir(sessionId, `${currentPath}/${name}`.replace('//', '/'))
-      void listFiles(currentPath)
+      void listFiles(currentPath, { silent: true })
     } catch (error) {
       logger.error('makeDir error', error)
       toast(t('创建目录失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
