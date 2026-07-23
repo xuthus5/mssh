@@ -52,6 +52,9 @@ export function cancelTransfer(jobId: string): Promise<void> {
 }
 
 export async function retryTransfer(transfer: TransferJob): Promise<TransferJob> {
+  if (transfer.status === 'cancelled' || transfer.error === '会话已删除') {
+    throw new Error('会话已删除，无法重试传输')
+  }
   const request = { sessionId: transfer.sessionId, sessionName: transfer.sessionName, sourcePath: transfer.sourcePath, targetPath: transfer.targetPath }
   const replacement = await startTransfer(transfer.direction, request)
   useAppStore.getState().removeTransfer(transfer.id)
