@@ -164,3 +164,10 @@
 | LOCAL-006 | 本地 Shell 路径必须属于允许列表（Unix：`/etc/shells` ∪ 常见 shell；Windows：ComSpec/PowerShell 族），拒绝任意可执行文件。 | done |
 | LOCAL-007 | 本地 Shell 启动参数必须支持引号分组解析，不得因空格错误拆分参数。 | done |
 
+## 2026-07-23 商用硬化波次（分屏恢复清理 / 系统保留快捷键）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| WORKSPACE-006 | 当分屏布局恢复被取消或组件卸载时，系统必须关闭已打开的额外窗格终端，避免连接泄漏。 | done |
+| SHORTCUT-004 | 当用户绑定系统保留快捷键（如 Mod+Q、Alt+F4、Mod+Tab）时，系统必须拒绝保存并提示。 | done |
+
