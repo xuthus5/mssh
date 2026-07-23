@@ -1231,3 +1231,9 @@
 | UX-SFTP-123 | SFTP 目录 list 失败仅 FilePanel inline error + 重试；TerminalLayers 不得再 toast 叠加。 | done |
 | UX-SFTP-124 | 拖拽上传失败仅由 transfer 动作 toast 一次；Layers 不得二次包装。 | done |
 
+## 2026-07-24 商用硬化波次（分屏重连错误归属）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| UX-SPLIT-125 | 分屏窗格手动重连失败时仅 connectionStatus=error + pane overlay，不得 toast 叠加。 | done |
+
