@@ -399,3 +399,4 @@
 |---|---|---|
 | SEC-MACRO-001 | 宏执行必须加载当前 AI 安全策略（deny/allow/auto-readonly 默认值），不得使用空 security 配置绕过自定义 deny。 | done |
 | SEC-MACRO-002 | 宏写入终端必须复用 AI 命令超时与 32KiB 长度上界，超时/超限记录审计并失败。 | done |
+| SEC-MACRO-003 | 创建/更新宏时必须校验名称非空、命令非空、命令长度上界、DelayMs ∈ [0,60000]。 | done |
