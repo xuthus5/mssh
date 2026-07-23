@@ -292,3 +292,11 @@
 |---|---|---|
 | SFTP-PATH-001 | ListDir/Delete/Mkdir/Rename 必须拒绝空远程路径与含 NUL 的路径，与上传/下载策略对齐。 | done |
 | SFTP-PATH-002 | 非法远程路径必须在建立 SSH/SFTP 连接前失败返回。 | done |
+
+## 2026-07-23 商用硬化波次（同步端点 URL 策略）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| SYNC-URL-001 | WebDAV/Gist/云端端点 URL 必须拒绝 URL userinfo 凭据。 | done |
+| SYNC-URL-002 | 同步端点必须拒绝链路本地/未指定/组播及云元数据主机（与 AI URL 策略一致）。 | done |
+| SYNC-URL-003 | 非回环主机仍必须 HTTPS；仅 loopback 允许 HTTP 本地调试。 | done |
