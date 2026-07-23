@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"time"
 )
 
@@ -47,8 +48,34 @@ func (s *SyncService) runScheduler(ctx context.Context, interval time.Duration) 
 		case <-ctx.Done():
 			return
 		case <-timer.C:
-			_, _ = s.runSync(ctx, syncDirectionStrategy, "scheduled")
+			s.runScheduledSync(ctx)
 			timer.Reset(interval)
 		}
 	}
+}
+
+// runScheduledSync skips ticks while the application vault is locked so we do not
+// spam SyncStateError / failed events before the user unlocks.
+func (s *SyncService) runScheduledSync(ctx context.Context) {
+	if err := s.ensureVaultReadyForSync(); err != nil {
+		if s.logger != nil {
+			s.logger.Debug("scheduled sync skipped", "reason", err.Error())
+		}
+		return
+	}
+	_, _ = s.runSync(ctx, syncDirectionStrategy, "scheduled")
+}
+
+func (s *SyncService) ensureVaultReadyForSync() error {
+	if s.secretSource == nil {
+		return errors.New("application vault is locked or not configured")
+	}
+	key, err := s.secretSource()
+	if err != nil {
+		return err
+	}
+	if key == "" {
+		return errors.New("application vault is locked or not configured")
+	}
+	return nil
 }

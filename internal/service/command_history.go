@@ -19,7 +19,12 @@ func NewCommandHistoryService(db *sql.DB, logger *slog.Logger) *CommandHistorySe
 }
 
 func (s *CommandHistoryService) Add(sessionID int64, command string) (*model.CommandHistory, error) {
-	return store.AddCommandHistory(s.db, sessionID, strings.TrimSpace(command))
+	value := strings.TrimSpace(command)
+	// Defense-in-depth: skip empty and sensitive commands (frontend already filters).
+	if value == "" || isSensitiveCommand(value) {
+		return nil, nil
+	}
+	return store.AddCommandHistory(s.db, sessionID, value)
 }
 
 func (s *CommandHistoryService) List(sessionID int64, query string) ([]model.CommandHistory, error) {
