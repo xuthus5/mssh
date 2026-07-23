@@ -174,6 +174,7 @@ func initializeServices(input serviceInitialization) (*App, error) {
 	serialSvc := service.NewSerialService(input.db, input.logger)
 	terminalSvc.SetSerialService(serialSvc)
 	tunnelSvc := service.NewTunnelService(input.db, sessionSvc, input.eventBus, input.logger)
+	sessionSvc.SetTunnelStopper(tunnelSvc)
 	logSvc := service.NewLogService(input.db, input.opts.DataDir, input.logger)
 	themeSvc, err := newThemeService(input)
 	if err != nil {
