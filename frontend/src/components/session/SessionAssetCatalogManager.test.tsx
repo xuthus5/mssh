@@ -7,6 +7,8 @@ const impacts = vi.hoisted(() => ({
   project: vi.fn(async () => ({ id: 1, name: '支付', session_count: 1 })),
   tag: vi.fn(async () => ({ id: 3, name: '核心', session_count: 4 })),
 }))
+const toast = vi.hoisted(() => vi.fn())
+vi.mock('@/components/ui/toast', () => ({ toast }))
 vi.mock('@/lib/wails', () => ({ AssetCatalogService: { EnvironmentDeleteImpact: impacts.environment, ProjectDeleteImpact: impacts.project, TagDeleteImpact: impacts.tag } }))
 
 import { SessionAssetCatalogManager } from '@/components/session/SessionAssetCatalogManager'
@@ -58,5 +60,13 @@ describe('SessionAssetCatalogManager', () => {
     await userEvent.click(await screen.findByRole('option', { name: '测试' }))
     await userEvent.click(screen.getByRole('button', { name: '确认处理 2 个会话并删除' }))
     await waitFor(() => expect(values.onDeleteEnvironment).toHaveBeenCalledWith('1', 'migrate', '2'))
+  })
+
+  it('toasts reorder failures with explicit templates', async () => {
+    const values = props()
+    values.onReorderEnvironments = vi.fn(async () => { throw new Error('reorder failed') })
+    render(<SessionAssetCatalogManager {...values} />)
+    await userEvent.click(screen.getByRole('button', { name: '下移 生产' }))
+    await waitFor(() => expect(toast).toHaveBeenCalledWith('调整资产排序失败: reorder failed', 'error'))
   })
 })

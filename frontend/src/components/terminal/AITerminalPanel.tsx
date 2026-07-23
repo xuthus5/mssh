@@ -50,9 +50,9 @@ export function AITerminalPanel({ terminalID, sessionID, onClose }: { terminalID
       let autoExecuted: string[] = []
       try { autoExecuted = await executeAutoCommands(response.commands, response.conversation_id, sessionID, terminalID) }
       catch (executionError) {
-        const message = t('只读命令自动执行失败: ${}', errorMessage(executionError))
-        setError(message)
-        toast(message, 'error')
+        const message = errorMessage(executionError)
+        setError(t('只读命令自动执行失败: ${}', message))
+        toast(t('只读命令自动执行失败: ${}', message), 'error')
       }
       setMessages((current) => [...current, { id: `assistant-${Date.now()}`, role: 'assistant', content: response.answer, commands: response.commands, citations: response.citations, autoExecuted }])
       setConversations(await AIService.ListConversations(sessionID, 20))
