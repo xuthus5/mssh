@@ -371,3 +371,10 @@
 | LOG-DIR-001 | 用户配置 `application.log_dir` 必须拒绝含 NUL、超长路径、清理后为 `.`/`..` 的目录。 | done |
 | LOG-DIR-002 | 非法 log_dir 必须在持久化前由 `validateRuntimeSettings`/`ValidateDir` 失败，不得写入 DB，也不得调用 log Configure。 | done |
 | LOG-DIR-003 | 空 log_dir 仍归一为默认 `~/.mssh/logs`；合法相对/绝对路径经 `filepath.Clean` 后使用。 | done |
+
+## 2026-07-23 商用硬化波次（known_hosts 列表读锁）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| SEC-HOSTKEY-009 | `ListHostKeys` 必须在 `WithKnownHostsLock` 下读取，避免与 TOFU append/delete 并发产生撕裂读。 | done |
+| SEC-HOSTKEY-010 | known_hosts 扫描单行缓冲必须有上界（64KiB），超长行按读错误失败而非无限扩容。 | done |
