@@ -805,3 +805,10 @@
 | UX-ASSET-017 | 设置默认分组失败 toast 必须使用明确失败模板。 | done |
 | UX-MACRO-012 | 宏执行失败 toast 必须使用 i18n 模板（含撰写面板/工作区）。 | done |
 | UX-AI-015 | AI 只读命令自动执行失败 toast 不得双重包装文案。 | done |
+
+
+## 2026-07-23 商用硬化波次（隧道操作 Promise 拒绝收口）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| UX-TUNNEL-014 | 隧道列表启动/停止/删除点击产生的 Promise 拒绝不得未处理；错误 toast 由 manager 负责。 | done |
