@@ -36,6 +36,7 @@ export function TerminalLocalShellSettingsSection({
         <Field className="md:col-span-2">
           <FieldContent>
             <FieldLabel htmlFor="terminal-local-shell">{t('Shell 路径')}</FieldLabel>
+            <p className="text-xs text-muted-foreground">{t('仅允许系统认可的 Shell（Unix 参考 /etc/shells）。')}</p>
             <FieldDescription>
               {t('留空则使用系统默认（Unix: $SHELL，Windows: ComSpec/cmd.exe）。')}
             </FieldDescription>
