@@ -150,5 +150,5 @@ func (s *SettingService) validateRuntimeSettings(entries []model.Setting) error 
 	if _, _, _, err := s.resolveLogSettings(entries); err != nil {
 		return err
 	}
-	return nil
+	return validateLocalShellSettings(entries)
 }

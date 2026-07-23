@@ -520,3 +520,11 @@
 | UX-ASSET-010 | 资产分类列表加载失败必须 toast，不得仅写日志与 setError。 | done |
 | UX-SHORTCUT-010 | 快捷键设置加载失败必须 toast，并回退默认绑定。 | done |
 
+## 2026-07-23 商用硬化波次（云同步/SFTP树加载可见 + 本地Shell设置边界）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| UX-SYNC-010 | 云同步 Dashboard 加载失败必须 toast，并保留 error 状态。 | done |
+| UX-SFTP-010 | SFTP 树展开目录加载失败必须 toast，并收回展开状态。 | done |
+| SEC-LOCALSHELL-010 | 通过 SettingService 写入 local shell path/args/cwd 时必须拒绝 NUL 与超长值；path 不得含父目录穿越。 | done |
+

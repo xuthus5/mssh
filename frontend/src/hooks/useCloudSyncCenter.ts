@@ -37,8 +37,10 @@ export function useCloudSyncCenter(): CloudSyncController {
       setDashboard(await SyncService.Dashboard())
       setError(null)
     } catch (loadError) {
-      setError(errorMessage(loadError))
+      const message = errorMessage(loadError)
+      setError(message)
       logger.error('load cloud sync dashboard failed', loadError)
+      toast(t('加载云同步失败: ${}', message), 'error')
     } finally {
       setLoading(false)
     }
