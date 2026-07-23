@@ -114,7 +114,13 @@ export function KeyMaterialDialog({ state, onOpenChange, onUpdate }: MaterialPro
   const title = state.mode === 'generated' ? t('密钥已生成') : editable ? t('编辑密钥') : t('查看密钥')
   const save = async () => {
     setSaving(true)
-    try { if (await onUpdate(draft)) onOpenChange(false) } finally { setSaving(false) }
+    try {
+      if (await onUpdate(draft)) onOpenChange(false)
+    } catch {
+      // parent surfaces toast
+    } finally {
+      setSaving(false)
+    }
   }
   return <Dialog open onOpenChange={onOpenChange}><DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-3xl"><DialogHeader><DialogTitle>{title}</DialogTitle></DialogHeader>
     <Alert><AlertDescription>{t('私钥属于敏感凭据。仅复制到可信位置，不要通过聊天、邮件或日志传输。')}</AlertDescription></Alert>
