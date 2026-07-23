@@ -16,6 +16,10 @@ vi.mock('@/lib/wails', () => ({
     Execute: (...args: unknown[]) => executeMacro(...args),
     Delete: vi.fn(),
   },
+  CommandHistoryService: {
+    Add: vi.fn(async () => {}),
+    Clear: vi.fn(async () => {}),
+  },
 }))
 
 vi.mock('@/components/ui/toast', () => ({

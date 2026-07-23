@@ -6,9 +6,8 @@ import { useSessionWorkspace } from '@/hooks/SessionWorkspaceContext'
 import { MacroService } from '@/lib/wails'
 import { logger } from '@/lib/logger'
 import { toast } from '@/components/ui/toast'
+import { executeMacroOnActiveTerminal } from '@/lib/executeMacro'
 import { t } from '@/i18n'
-import { recordCommand } from '@/lib/commandHistory'
-import { useAppStore } from '@/store/appStore'
 import type { Macro, MacroInput } from '../../bindings/github.com/xuthus5/mssh/internal/model/models'
 import { sessionAssetSearchText } from '@/lib/sessionAssetSearch'
 
@@ -146,15 +145,7 @@ export function useSidebarMacros() {
   const [macros, setMacros] = useState<CommandItem[]>([])
   useEffect(() => { void loadMacros(setMacros) }, [])
   const execute = useCallback((command: string) => {
-    const state = useAppStore.getState()
-    if (state.activeSurface?.type !== 'terminal') return
-    const activeTab = state.tabs.find((tab) => tab.id === state.activeSurface?.id)
-    if (!activeTab || activeTab.type !== 'terminal') return
-    const terminalID = state.activePaneId ?? activeTab.terminalId
-    MacroService.Execute(terminalID, command).then(() => recordCommand(activeTab.sessionId, command)).catch((error: unknown) => {
-      logger.error('Sidebar: execute macro error', error)
-      toast(t('执行宏失败: ${}', macroErrorMessage(error)), 'error')
-    })
+    void executeMacroOnActiveTerminal(command, { requireTerminalSurface: true })
   }, [])
   const add = useCallback((item: Omit<CommandItem, 'id'>) => addMacro(item, setMacros), [])
   const remove = useCallback((id: string) => deleteMacro(id, setMacros), [])
