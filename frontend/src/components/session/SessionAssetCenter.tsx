@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { FolderPlus, Plus, Server, SquareTerminal } from 'lucide-react'
+import { FolderPlus, Plus, SquareTerminal } from 'lucide-react'
 import { useSessionWorkspace } from '@/hooks/SessionWorkspaceContext'
 import type { Folder, Session } from '@/hooks/useSession'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { toast } from '@/components/ui/toast'
 import { SessionBatchActions } from '@/components/session/SessionBatchActions'
 import { SessionAssetBulkBar } from '@/components/session/SessionAssetBulkBar'
 import { SessionAssetCatalogManager } from '@/components/session/SessionAssetCatalogManager'
@@ -66,7 +65,9 @@ export function SessionAssetCenter() {
     }
   }
   const runFolderAction = async (action: () => Promise<unknown>) => {
-    try { await action() } catch (error) { toast(t('设置默认分组失败: ${}', error instanceof Error ? error.message : String(error)), 'error') }
+    try { await action() } catch {
+      // toast already shown by workspace mutation helpers
+    }
   }
 
   return <section className="relative flex min-h-0 flex-1 flex-col bg-background p-5">
