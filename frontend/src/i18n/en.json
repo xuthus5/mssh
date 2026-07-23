@@ -1375,5 +1375,11 @@
   "加载串口占用状态失败: ${}": "Failed to load serial device usage: ${}",
   "加载安全状态失败: ${}": "Failed to load security status: ${}",
   "安全操作失败: ${}": "Security operation failed: ${}",
-  "创建资产失败: ${}": "Failed to create asset: ${}"
+  "创建资产失败: ${}": "Failed to create asset: ${}",
+  "保存资产分类失败: ${}": "Failed to save asset category: ${}",
+  "加载删除影响失败: ${}": "Failed to load delete impact: ${}",
+  "删除资产分类失败: ${}": "Failed to delete asset category: ${}",
+  "批量更新资产失败: ${}": "Failed to bulk-update assets: ${}",
+  "保存会话失败: ${}": "Failed to save session: ${}",
+  "保存串口配置失败: ${}": "Failed to save serial port: ${}"
 }

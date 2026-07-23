@@ -118,6 +118,7 @@ describe('SessionDialog', () => {
     await user.type(screen.getByLabelText('备注'), '不要丢失')
     await user.click(screen.getByRole('button', { name: '创建会话' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('保存失败')
+    expect(useToastStore.getState().toasts.some((item) => item.message.includes('保存失败'))).toBe(true)
     expect(screen.getByLabelText('备注')).toHaveValue('不要丢失')
     expect(screen.getByRole('dialog')).toBeInTheDocument()
   })
