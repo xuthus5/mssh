@@ -37,13 +37,16 @@ describe('useCloudSyncCenter', () => {
     await waitFor(() => expect(dashboardLoads).toBeGreaterThan(previousLoads))
   })
 
-  it('surfaces operation failures without losing the dashboard', async () => {
+  it('surfaces operation failures on the page banner without toast', async () => {
+    const { useToastStore } = await import('@/components/ui/toast')
+    useToastStore.setState({ toasts: [] })
     __registerHandler('github.com/xuthus5/mssh/internal/service.SyncService.SyncNow', async () => { throw new Error('network failed') })
     const { result } = renderHook(() => useCloudSyncCenter())
     await waitFor(() => expect(result.current.dashboard).not.toBeNull())
     await act(async () => { await result.current.syncNow().catch(() => undefined) })
-    expect(result.current.error).toBeNull()
+    expect(result.current.error).toContain('network failed')
     expect(result.current.pending).toBeNull()
+    expect(useToastStore.getState().toasts.filter((item) => item.type === 'error')).toHaveLength(0)
   })
 
   it('exposes every sync operation through the controller', async () => {
@@ -70,7 +73,7 @@ describe('useCloudSyncCenter', () => {
     expect(result.current.error).toBeNull()
   })
 
-  it('quiet saveConfig still surfaces error toasts and does not set page error', async () => {
+  it('quiet saveConfig still surfaces page errors without toast', async () => {
     const { useToastStore } = await import('@/components/ui/toast')
     useToastStore.setState({ toasts: [] })
     __registerHandler('github.com/xuthus5/mssh/internal/service.SyncService.SaveConfig', async () => {
@@ -81,9 +84,8 @@ describe('useCloudSyncCenter', () => {
     await act(async () => {
       await result.current.saveConfig(createSyncInput(dashboard.config as any), { quiet: true }).catch(() => undefined)
     })
-    expect(result.current.error).toBeNull()
-    const messages = useToastStore.getState().toasts.map((item) => `${item.type}:${item.message}`)
-    expect(messages.some((item) => item.startsWith('error:') && item.includes('失败'))).toBe(true)
+    expect(result.current.error).toContain('save config failed')
+    expect(useToastStore.getState().toasts.filter((item) => item.type === 'error')).toHaveLength(0)
   })
 
   it('sets page error when dashboard load fails without toast', async () => {
