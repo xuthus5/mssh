@@ -130,4 +130,15 @@
 | LOCAL-005 | Unix 本地 Shell 使用新会话并在关闭时向进程组发信号。 | done |
 | SHORTCUT-002 | 终端工具栏复制/粘贴/清屏提示显示当前自定义快捷键。 | done |
 
+## 2026-07-23 商用硬化波次（串口 modem / 路径 / 分屏持久化）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| SERIAL-005 | 当查询串口信号时，系统必须返回 DTR/RTS 输出与 CTS/DSR/DCD/RI 输入状态（GetModemStatusBits）。 | done |
+| SERIAL-006 | 串口工具栏必须以指示灯展示 CTS/DSR/DCD/RI，并周期性刷新输入状态。 | done |
+| SERIAL-007 | 设备路径在列表、预留与配置归一时必须 canonical（Unix symlink / Windows COM）。 | done |
+| SERIAL-008 | 串口中心在窗口 focus 与可见轮询时刷新设备列表（热插拔）。 | done |
+| WORKSPACE-002 | 工作区快照 v3 必须按 role 持久化 SSH/本地分屏拓扑，且不得写入运行时 terminalID。 | done |
+| WORKSPACE-003 | 串口标签不得持久化或多开分屏拓扑（设备独占）。 | done |
+| WORKSPACE-004 | 恢复标签时 TerminalSplit 必须按 snapshot 打开额外窗格并 materialize 树。 | done |
 

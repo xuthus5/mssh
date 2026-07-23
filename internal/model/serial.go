@@ -89,8 +89,13 @@ func (input SerialPortInput) SerialPort() SerialPort {
 	}
 }
 
-// SerialSignals is the runtime modem output state for an open serial terminal.
+// SerialSignals is the runtime modem line state for an open serial terminal.
+// DTR/RTS are outputs (last requested). CTS/DSR/DCD/RI are inputs from GetModemStatusBits.
 type SerialSignals struct {
 	DTR bool `json:"dtr"`
 	RTS bool `json:"rts"`
+	CTS bool `json:"cts"`
+	DSR bool `json:"dsr"`
+	DCD bool `json:"dcd"`
+	RI  bool `json:"ri"`
 }

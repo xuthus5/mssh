@@ -46,6 +46,15 @@ export function useSerial() {
 
   useEffect(() => {
     void refresh()
+    const onFocus = () => { void refresh() }
+    window.addEventListener('focus', onFocus)
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === 'visible') void refresh()
+    }, 5000)
+    return () => {
+      window.removeEventListener('focus', onFocus)
+      window.clearInterval(timer)
+    }
   }, [refresh])
 
   const createPort = useCallback(async (input: SerialPortInput) => {

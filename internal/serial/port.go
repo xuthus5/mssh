@@ -50,7 +50,7 @@ func OpenPort(profile model.SerialPort) (*PortSession, error) {
 	}
 	session := &PortSession{
 		port:       port,
-		device:     profile.Device,
+		device:     CanonicalDevicePath(profile.Device),
 		profileID:  profile.ID,
 		lineEnding: profile.LineEnding,
 		localEcho:  profile.LocalEcho,
@@ -71,7 +71,7 @@ func OpenPort(profile model.SerialPort) (*PortSession, error) {
 	return session, nil
 }
 
-// ListDevices returns system serial device paths.
+// ListDevices returns system serial device paths (canonicalized).
 func ListDevices() ([]string, error) {
 	ports, err := goserial.GetPortsList()
 	if err != nil {
@@ -80,7 +80,7 @@ func ListDevices() ([]string, error) {
 	if ports == nil {
 		return []string{}, nil
 	}
-	return ports, nil
+	return CanonicalDevicePaths(ports), nil
 }
 
 func (p *PortSession) Start() {
