@@ -20,6 +20,14 @@ export interface AISettingsController {
   detectAgents: () => Promise<void>
 }
 
+const failureLabels: Record<string, string> = {
+  'provider-save': '保存提供商配置失败: ${}',
+  'provider-delete': '删除提供商配置失败: ${}',
+  'provider-test': '测试提供商连接失败: ${}',
+  settings: '保存 AI 配置失败: ${}',
+  agents: '检测 Agent 失败: ${}',
+}
+
 export function useAISettings(): AISettingsController {
   const [dashboard, setDashboard] = useState<AISettingsDashboard | null>(null)
   const [agents, setAgents] = useState<AIAgentCLIStatus[]>([])
@@ -27,26 +35,64 @@ export function useAISettings(): AISettingsController {
   const [pending, setPending] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const reload = useCallback(async () => {
-    try { setDashboard(await AIService.Dashboard()); setError(null) }
-    catch (loadError) { const message = errorMessage(loadError); setError(message); logger.error('load AI settings failed', loadError); toast(t('加载 AI 设置失败: ${}', message), 'error') }
-    finally { setLoading(false) }
+    try {
+      setDashboard(await AIService.Dashboard())
+      setError(null)
+    } catch (loadError) {
+      const message = errorMessage(loadError)
+      setError(message)
+      logger.error('load AI settings failed', loadError)
+      toast(t('加载 AI 设置失败: ${}', message), 'error')
+    } finally {
+      setLoading(false)
+    }
   }, [])
   const execute = useCallback(async (name: string, success: string, action: () => Promise<unknown>, refresh = true, quiet = false) => {
-    setPending(name); setError(null)
-    try { await action(); if (refresh) await reload(); if (!quiet) toast(success, 'success') }
-    catch (actionError) { const message = errorMessage(actionError); setError(message); toast(t('${}失败: ${}', success, message), 'error'); throw actionError }
-    finally { setPending(null) }
+    setPending(name)
+    setError(null)
+    try {
+      await action()
+      if (refresh) await reload()
+      if (!quiet) toast(success, 'success')
+    } catch (actionError) {
+      const message = errorMessage(actionError)
+      setError(message)
+      const failureKey = failureLabels[name] ?? '${}失败: ${}'
+      if (failureLabels[name]) toast(t(failureKey, message), 'error')
+      else toast(t(failureKey, name, message), 'error')
+      throw actionError
+    } finally {
+      setPending(null)
+    }
   }, [reload])
   const detectAgents = useCallback(async () => {
-    await execute('agents', t('Agent 检测完成'), async () => { setAgents(await AIService.DetectAgentCLIs()) }, false)
+    await execute('agents', t('Agent 检测完成'), async () => {
+      setAgents(await AIService.DetectAgentCLIs())
+    }, false)
   }, [execute])
-  useEffect(() => { void reload() }, [reload])
+  useEffect(() => {
+    void reload()
+  }, [reload])
   return {
-    dashboard, agents, loading, pending, error, reload,
-    saveProvider: async (input) => { let saved: AIProviderProfile | null = null; await execute('provider-save', t('提供商配置已保存'), async () => { saved = await AIService.SaveProvider(input) }); return saved },
+    dashboard,
+    agents,
+    loading,
+    pending,
+    error,
+    reload,
+    saveProvider: async (input) => {
+      let saved: AIProviderProfile | null = null
+      await execute('provider-save', t('提供商配置已保存'), async () => {
+        saved = await AIService.SaveProvider(input)
+      })
+      return saved
+    },
     deleteProvider: (id) => execute('provider-delete', t('提供商配置已删除'), () => AIService.DeleteProvider(id)),
     testProvider: (id) => execute('provider-test', t('提供商连接测试成功'), () => AIService.TestProvider(id), false),
-    saveSettings: (input, options?: { quiet?: boolean }) => execute('settings', t('AI 配置已保存'), async () => { await AIService.SaveSettings(input); localStorage.setItem('mssh:tool-panel-width:ai', String(input.interaction.panel_width)) }, true, options?.quiet === true),
+    saveSettings: (input, options?: { quiet?: boolean }) => execute('settings', t('AI 配置已保存'), async () => {
+      await AIService.SaveSettings(input)
+      localStorage.setItem('mssh:tool-panel-width:ai', String(input.interaction.panel_width))
+    }, true, options?.quiet === true),
     detectAgents,
   }
 }
