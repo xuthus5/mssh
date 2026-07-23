@@ -14,8 +14,9 @@ import (
 // OpenSerial opens a terminal attached to a configured serial port profile.
 func (t *TerminalService) OpenSerial(ctx context.Context, serialPortID int64, cols, rows int) (string, error) {
 	_ = ctx
-	_ = cols
-	_ = rows
+	if err := validateTerminalSize(cols, rows); err != nil {
+		return "", err
+	}
 	outcome := "failed"
 	defer func() {
 		if t.sessionSvc != nil {
