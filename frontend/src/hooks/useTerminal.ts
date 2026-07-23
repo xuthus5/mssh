@@ -131,6 +131,14 @@ function recoverTerminal({ term, fitAddon, container, refs }: {
   return true
 }
 
+function scheduleBackendResize(term: Terminal, refs: TerminalLifecycleRefs) {
+  if (refs.resizeTimerRef.current !== null) window.clearTimeout(refs.resizeTimerRef.current)
+  refs.resizeTimerRef.current = window.setTimeout(() => {
+    refs.resizeTimerRef.current = null
+    reportResize(refs.terminalIDRef.current, term, 'terminal resize error', refs.lastResizeRef)
+  }, RESIZE_DEBOUNCE_MS)
+}
+
 function observeResize({ term, fitAddon, containerRef, refs, reportRuntimeError }: {
   term: Terminal
   fitAddon: FitAddon
@@ -140,17 +148,19 @@ function observeResize({ term, fitAddon, containerRef, refs, reportRuntimeError 
 }) {
   return new ResizeObserver(() => {
     runTerminalRuntime(reportRuntimeError, 'terminal resize', () => {
-      if (!refs.activeRef.current) return
+      // Inactive split panes still need fit + PTY resize when layout changes;
+      // skipping leaves blank or desynced shells after split/tab switch.
+      if (!refs.activeRef.current) {
+        if (!fitAndRefresh(term, fitAddon, containerRef.current)) return
+        scheduleBackendResize(term, refs)
+        return
+      }
       if (refs.recoveryPendingRef.current) {
         recoverTerminal({ term, fitAddon, container: containerRef.current, refs })
         return
       }
       if (!fitAndRefresh(term, fitAddon, containerRef.current)) return
-      if (refs.resizeTimerRef.current !== null) window.clearTimeout(refs.resizeTimerRef.current)
-      refs.resizeTimerRef.current = window.setTimeout(() => {
-        refs.resizeTimerRef.current = null
-        reportResize(refs.terminalIDRef.current, term, 'terminal resize error', refs.lastResizeRef)
-      }, RESIZE_DEBOUNCE_MS)
+      scheduleBackendResize(term, refs)
     })
   })
 }
