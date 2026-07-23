@@ -4,6 +4,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { logger } from '@/lib/logger'
+import { toast } from '@/components/ui/toast'
 import { LogService } from '@/lib/wails'
 import { t } from '@/i18n'
 
@@ -42,7 +43,9 @@ function useRecordings(sessionId: number) {
       setRecordings(result as SessionLogEntry[])
     } catch (loadError: unknown) {
       logger.error('SessionLog: load recordings error:', loadError)
-      setError(loadError instanceof Error ? loadError.message : String(loadError))
+      const message = loadError instanceof Error ? loadError.message : String(loadError)
+      setError(message)
+      toast(t('加载会话录制失败: ${}', message), 'error')
     } finally {
       setLoading(false)
     }
@@ -73,7 +76,9 @@ function useRecordingDeletion(
       setRecordings((current) => current.filter((recording) => recording.id !== logId))
       setDeleteID(null)
     } catch (error: unknown) {
-      setDeleteError(error instanceof Error ? error.message : String(error))
+      const message = error instanceof Error ? error.message : String(error)
+      setDeleteError(message)
+      toast(t('删除会话录制失败: ${}', message), 'error')
     } finally {
       setDeletingID(null)
     }
