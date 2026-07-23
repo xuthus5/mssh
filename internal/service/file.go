@@ -156,6 +156,9 @@ func (f *FileService) Rename(sessionID int64, oldPath, newPath string) error {
 
 // connect establishes a temporary SSH connection for a file operation.
 func (f *FileService) connect(sessionID int64) (*ssh.ClientWrapper, string, error) {
+	if sessionID <= 0 {
+		return nil, "", fmt.Errorf("invalid session id")
+	}
 	ctx := context.Background()
 	connID, err := f.sessions.connect(ctx, sessionID, false)
 	if err != nil {

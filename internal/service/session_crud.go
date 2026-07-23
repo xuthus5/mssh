@@ -287,6 +287,9 @@ func (s *SessionService) GetSession(id int64) (*model.Session, error) {
 }
 
 func (s *SessionService) sessionForConnect(id int64) (*model.Session, error) {
+	if id <= 0 {
+		return nil, fmt.Errorf("invalid session id")
+	}
 	session, err := store.GetSession(s.db, id)
 	if err != nil {
 		return nil, err

@@ -90,6 +90,9 @@ func (l *LogService) List(sessionID *int64) ([]model.SessionLog, error) {
 	if sessionID == nil {
 		return store.ListSessionLogs(l.db)
 	}
+	if *sessionID < 0 {
+		return nil, fmt.Errorf("invalid session id")
+	}
 	return store.ListSessionLogsBySession(l.db, *sessionID)
 }
 
