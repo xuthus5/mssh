@@ -9,6 +9,11 @@ import (
 	"github.com/xuthus5/mssh/internal/store"
 )
 
+const (
+	maxCommandHistoryBytes = 8 * 1024
+	maxCommandHistoryList  = 1000
+)
+
 type CommandHistoryService struct {
 	db     *sql.DB
 	logger *slog.Logger
@@ -24,11 +29,17 @@ func (s *CommandHistoryService) Add(sessionID int64, command string) (*model.Com
 	if value == "" || isSensitiveCommand(value) {
 		return nil, nil
 	}
+	if len(value) > maxCommandHistoryBytes {
+		return nil, nil
+	}
+	if strings.ContainsRune(value, 0) {
+		return nil, nil
+	}
 	return store.AddCommandHistory(s.db, sessionID, value)
 }
 
 func (s *CommandHistoryService) List(sessionID int64, query string) ([]model.CommandHistory, error) {
-	return store.ListCommandHistory(s.db, sessionID, strings.TrimSpace(query), 10000)
+	return store.ListCommandHistory(s.db, sessionID, strings.TrimSpace(query), maxCommandHistoryList)
 }
 
 func (s *CommandHistoryService) Delete(id int64) error { return store.DeleteCommandHistory(s.db, id) }
