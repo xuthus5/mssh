@@ -572,3 +572,17 @@
 | SEC-THEME-010 | DeleteProfile/DeleteDefinition 必须拒绝 id<=0。 | done |
 | SEC-LOG-010 | LogService.Delete 必须拒绝 id<=0。 | done |
 | SEC-SYNC-010 | Sync DeleteVersion 必须拒绝 id<=0。 | done |
+
+## 2026-07-23 商用硬化波次（Get/Update/Restore 正向 ID 校验）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| SEC-SESSION-013 | GetSession 必须拒绝 id<=0。 | done |
+| SEC-SERIAL-012 | Serial Get 必须拒绝 id<=0。 | done |
+| SEC-THEME-011 | Theme GetProfile/UpdateProfile 必须拒绝 id<=0。 | done |
+| SEC-SYNC-011 | Sync RestoreVersion 必须拒绝 id<=0。 | done |
+| SEC-KEY-011 | Key GetMaterial/Update 必须拒绝 id<=0。 | done |
+| SEC-AI-011 | ListConversations/ListMessages/TestProvider 必须拒绝 id<=0。 | done |
+| SEC-ASSET-012 | GetSessionAssetDetail 必须拒绝 sessionID<=0。 | done |
+| SEC-MACRO-012 | Macro Update 必须拒绝 id<=0。 | done |
+| SEC-TUNNEL-011 | Tunnel Update 必须拒绝 id<=0。 | done |

@@ -44,6 +44,9 @@ func (service *ThemeService) ListProfiles(mode string) ([]model.ThemeProfile, er
 }
 
 func (service *ThemeService) GetProfile(id int64) (*model.ThemeProfile, error) {
+	if id <= 0 {
+		return nil, fmt.Errorf("invalid theme profile id")
+	}
 	return store.GetThemeProfile(service.db, id)
 }
 
@@ -57,6 +60,9 @@ func (service *ThemeService) CreateCustomProfile(input model.ThemeProfileInput) 
 }
 
 func (service *ThemeService) UpdateProfile(input model.ThemeProfileInput) error {
+	if input.ID <= 0 {
+		return fmt.Errorf("invalid theme profile id")
+	}
 	profile := normalizeThemeProfile(input.ThemeProfile())
 	if err := validateThemeProfile(profile); err != nil {
 		return err

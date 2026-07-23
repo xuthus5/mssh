@@ -36,6 +36,9 @@ func (s *SerialService) List() ([]model.SerialPort, error) {
 }
 
 func (s *SerialService) Get(id int64) (*model.SerialPort, error) {
+	if id <= 0 {
+		return nil, fmt.Errorf("invalid serial port id")
+	}
 	return store.GetSerialPort(s.db, id)
 }
 
