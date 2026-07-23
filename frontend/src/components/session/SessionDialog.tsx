@@ -16,7 +16,6 @@ import { KeyService } from '@/lib/wails'
 import type { AssetEnvironment, AssetProject, AssetTag, Session, Folder } from '@/hooks/useSession'
 import type { AssetColorToken } from '@/lib/sessionModels'
 import { SessionAssetFields } from '@/components/session/SessionAssetFields'
-import { toast } from '@/components/ui/toast'
 import { t } from '@/i18n'
 
 
@@ -88,6 +87,7 @@ export default function SessionDialog({ open, onOpenChange, session, folders, en
   }, [open, session?.folderId, defaultFolderID])
 
   const [keys, setKeys] = useState<KeyItem[]>([])
+  const [keysError, setKeysError] = useState('')
   const keyOptions = keys.map((key) => ({ value: String(key.id), label: `${key.name} (${key.type})` }))
   const [pending, setPending] = useState(false)
   const [submitError, setSubmitError] = useState('')
@@ -95,10 +95,13 @@ export default function SessionDialog({ open, onOpenChange, session, folders, en
   useEffect(() => {
     if (!open) return
     KeyService.List()
-      .then((list) => setKeys(list as KeyItem[]))
+      .then((list) => {
+        setKeys(list as KeyItem[])
+        setKeysError('')
+      })
       .catch((error: unknown) => {
         setKeys([])
-        toast(t('加载密钥列表失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
+        setKeysError(error instanceof Error ? error.message : String(error))
       })
   }, [open])
 
@@ -176,7 +179,11 @@ export default function SessionDialog({ open, onOpenChange, session, folders, en
             {authMethod === 'key' && (
               <label className="flex flex-col gap-1.5">
                 <span className="text-xs font-medium text-muted-foreground">{t('SSH 密钥')}</span>
-                {keys.length === 0 ? (
+                {keysError ? (
+                  <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive" role="alert">
+                    {t('加载密钥列表失败: ${}', keysError)}
+                  </div>
+                ) : keys.length === 0 ? (
                   <div className="rounded-lg border border-dashed px-3 py-2 text-xs text-muted-foreground">
                     {t('暂无可用密钥，请先在总览 → 密钥配置中导入')}
                   </div>

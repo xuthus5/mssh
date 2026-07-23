@@ -76,7 +76,8 @@ describe('SessionBatchActions', () => {
     expect(await screen.findByText('成功 2 项，失败 0 项。')).toBeInTheDocument()
   })
 
-  it('toasts macro list failures', async () => {
+  it('shows macro list failures inline without toast', async () => {
+    useToastStore.setState({ toasts: [] })
     vi.mocked(MacroService.List).mockRejectedValueOnce(new Error('macro list failed'))
     render(
       <SessionBatchActions
@@ -87,10 +88,12 @@ describe('SessionBatchActions', () => {
         onComplete={vi.fn()}
       />,
     )
-    await waitFor(() => expect(useToastStore.getState().toasts.some((item) => item.message.includes('macro list failed'))).toBe(true))
+    expect(await screen.findByRole('alert')).toHaveTextContent('macro list failed')
+    expect(useToastStore.getState().toasts).toHaveLength(0)
   })
 
-  it('toasts delete impact failures', async () => {
+  it('shows delete impact failures in confirmation without faking zero impact', async () => {
+    useToastStore.setState({ toasts: [] })
     vi.mocked(SessionService.SessionsDeleteImpact).mockRejectedValueOnce(new Error('impact failed'))
     const user = userEvent.setup()
     render(
@@ -103,6 +106,10 @@ describe('SessionBatchActions', () => {
       />,
     )
     await user.click(screen.getByRole('button', { name: /批量删除/ }))
-    await waitFor(() => expect(useToastStore.getState().toasts.some((item) => item.message.includes('impact failed'))).toBe(true))
+    const dialog = await screen.findByRole('alertdialog')
+    await waitFor(() => expect(dialog).toHaveTextContent('impact failed'))
+    expect(dialog).toHaveTextContent('影响范围未知')
+    expect(dialog).not.toHaveTextContent('0 条隧道')
+    expect(useToastStore.getState().toasts).toHaveLength(0)
   })
 })

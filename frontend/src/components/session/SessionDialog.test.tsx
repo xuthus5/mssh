@@ -178,10 +178,14 @@ describe('SessionDialog', () => {
     expect(within(folderSelect).queryByText('1')).not.toBeInTheDocument()
   })
 
-  it('toasts key list failures', async () => {
+  it('shows key list failures inline without toast', async () => {
     listKeys.mockRejectedValueOnce(new Error('key list failed'))
-    render(<SessionDialog {...defaultProps} />)
-    await waitFor(() => expect(useToastStore.getState().toasts.some((item) => item.message.includes('key list failed'))).toBe(true))
+    render(<SessionDialog {...defaultProps} session={{
+      id: '1', name: 'key-host', host: '10.0.0.1', port: 22, username: 'root', authMethod: 'key', keepAlive: 0, termType: 'xterm', folderId: null,
+    } as never} />)
+    expect(await screen.findByRole('alert')).toHaveTextContent('key list failed')
+    expect(screen.queryByText(/暂无可用密钥/)).not.toBeInTheDocument()
+    expect(useToastStore.getState().toasts).toHaveLength(0)
   })
 
   it('closes dialog after successful save without local failure toast', async () => {

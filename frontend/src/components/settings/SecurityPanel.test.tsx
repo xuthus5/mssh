@@ -2,6 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { SecurityPanel } from '@/components/settings/SecurityPanel'
+import { useToastStore } from '@/components/ui/toast'
 
 const security = vi.hoisted(() => ({
   Status: vi.fn(),
@@ -52,4 +53,15 @@ describe('SecurityPanel', () => {
     await userEvent.click(screen.getByRole('button', { name: '确认' }))
     await waitFor(() => expect(session.DeleteHostKey).toHaveBeenCalledWith(1))
   })
+
+  it('shows load failures instead of empty host keys without toast', async () => {
+    useToastStore.setState({ toasts: [] })
+    security.Status.mockRejectedValueOnce(new Error('status boom'))
+    render(<SecurityPanel />)
+    expect(await screen.findByRole('alert')).toHaveTextContent('status boom')
+    expect(screen.queryByText('尚未信任任何 SSH 主机。')).not.toBeInTheDocument()
+    expect(screen.getByText(/主机指纹暂不可用/)).toBeInTheDocument()
+    expect(useToastStore.getState().toasts).toHaveLength(0)
+  })
+
 })
