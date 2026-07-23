@@ -33,6 +33,10 @@ describe('eventBridge', () => {
     // Late I/O error after session-delete cancel must not regress cancelled jobs.
     __emitEvent('file:error', { data: { task_id: 'task-1', error: 'denied' } })
     expect(useAppStore.getState().transfers[0]).toMatchObject({ status: 'cancelled' })
+    __emitEvent('file:progress', { data: { task_id: 'task-1', transferred: 9, total: 10, speed: 1, eta: 1 } })
+    expect(useAppStore.getState().transfers[0]).toMatchObject({ status: 'cancelled', transferredBytes: 5 })
+    __emitEvent('file:complete', { data: { task_id: 'task-1', status: 'completed', transferred: 10, total: 10 } })
+    expect(useAppStore.getState().transfers[0]).toMatchObject({ status: 'cancelled' })
     stop()
   })
 
