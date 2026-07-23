@@ -104,6 +104,10 @@ export default function SessionDialog({ open, onOpenChange, session, folders, en
 
   const handleSubmit = useCallback(async () => {
     const needsPassword = authMethod === 'password' || authMethod === 'keyboard-interactive'
+    if (authMethod === 'key' && !keyId) {
+      setSubmitError(t('请选择 SSH 密钥'))
+      return
+    }
     setPending(true)
     setSubmitError('')
     try {
