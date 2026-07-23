@@ -9,6 +9,7 @@ import { LabeledSelect } from '@/components/ui/labeled-select'
 import { Textarea } from '@/components/ui/textarea'
 import type { AssetColorToken, AssetEnvironment, AssetProject, AssetTag } from '@/lib/sessionModels'
 import { ASSET_COLOR_OPTIONS } from '@/lib/assetColors'
+import { toast } from '@/components/ui/toast'
 import { t } from '@/i18n'
 
 
@@ -67,7 +68,7 @@ function QuickCreateDialog({ kind, onOpenChange, onCreated, onCreateEnvironment,
     try {
       const created = kind === 'environment' ? await onCreateEnvironment(name, color) : kind === 'project' ? await onCreateProject(name, code) : await onCreateTag(name, color)
       onCreated(created.id); setName(''); setCode(''); setColor('slate')
-    } catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)) }
+    } catch (reason) { const message = reason instanceof Error ? reason.message : String(reason); setError(message); toast(t('创建资产失败: ${}', message), 'error') }
     finally { setPending(false) }
   }
   const title = kind === 'environment' ? t('新建环境') : kind === 'project' ? t('新建项目') : t('新建标签')

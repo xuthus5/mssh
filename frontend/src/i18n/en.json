@@ -1372,5 +1372,8 @@
   "导入会话 CSV 失败: ${}": "Failed to import session CSV: ${}",
   "重连失败: ${}": "Reconnect failed: ${}",
   "加载串口设备失败: ${}": "Failed to load serial devices: ${}",
-  "加载串口占用状态失败: ${}": "Failed to load serial device usage: ${}"
+  "加载串口占用状态失败: ${}": "Failed to load serial device usage: ${}",
+  "加载安全状态失败: ${}": "Failed to load security status: ${}",
+  "安全操作失败: ${}": "Security operation failed: ${}",
+  "创建资产失败: ${}": "Failed to create asset: ${}"
 }
