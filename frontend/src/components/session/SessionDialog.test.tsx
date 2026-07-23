@@ -5,7 +5,7 @@ import SessionDialog from '@/components/session/SessionDialog'
 import { useToastStore } from '@/components/ui/toast'
 import type { AssetColorToken } from '@/lib/sessionModels'
 
-const listKeys = vi.fn(async () => [])
+const listKeys = vi.fn(async (): Promise<Array<{ id: number; name: string; type: string }>> => [])
 vi.mock('@/lib/wails', () => ({ KeyService: { List: () => listKeys() } }))
 
 describe('SessionDialog', () => {
@@ -204,5 +204,16 @@ describe('SessionDialog', () => {
     }} />)
     expect(screen.getByPlaceholderText('留空则保留原密码')).toBeInTheDocument()
   })
-})
 
+  it('requires a key selection for key auth before save', async () => {
+    const user = userEvent.setup()
+    listKeys.mockResolvedValueOnce([{ id: 1, name: 'prod', type: 'ed25519' }])
+    render(<SessionDialog {...defaultProps} session={{
+      id: '1', name: 'key-host', host: '10.0.0.1', port: 22, username: 'root', authMethod: 'key', keepAlive: 0, termType: 'xterm', folderId: null,
+    }} />)
+    await user.click(screen.getByRole('button', { name: '保存' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('请选择 SSH 密钥')
+    expect(defaultProps.onSave).not.toHaveBeenCalled()
+  })
+
+})
