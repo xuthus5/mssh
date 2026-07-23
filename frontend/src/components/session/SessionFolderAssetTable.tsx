@@ -6,6 +6,7 @@ import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbP
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { SessionService } from '@/lib/wails'
+import { toast } from '@/components/ui/toast'
 import type { Folder, Session } from '@/hooks/useSession'
 import { t } from '@/i18n'
 
@@ -28,13 +29,22 @@ export function SessionAssetDeleteDialog({ target, folders, sessions, onOpenChan
     setError('')
     if (target?.type !== 'session') { setImpact(null); return }
     let current = true
-    void SessionService.SessionDeleteImpact(Number(target.item.id)).then((value) => { if (current) setImpact(value) }).catch((reason) => { if (current) setError(reason instanceof Error ? reason.message : String(reason)) })
+    void SessionService.SessionDeleteImpact(Number(target.item.id)).then((value) => { if (current) setImpact(value) }).catch((reason) => {
+      if (!current) return
+      const message = reason instanceof Error ? reason.message : String(reason)
+      setError(message)
+      toast(t('加载删除影响失败: ${}', message), 'error')
+    })
     return () => { current = false }
   }, [target])
   const confirm = async () => {
     if (!target) return
     setPending(true); setError('')
-    try { await onConfirm(target) } catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)) }
+    try { await onConfirm(target) } catch (reason) {
+      const message = reason instanceof Error ? reason.message : String(reason)
+      setError(message)
+      toast(t('删除失败: ${}', message), 'error')
+    }
     finally { setPending(false) }
   }
   const folder = target?.type === 'folder' ? target.item as Folder : undefined
