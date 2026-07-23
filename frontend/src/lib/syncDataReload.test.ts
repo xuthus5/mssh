@@ -51,11 +51,11 @@ describe('hotReloadSessionWorkspace', () => {
       listTunnels: vi.fn(async () => ['t']),
     }
     await hotReloadSessionWorkspace(workspace)
-    expect(workspace.listFolders).toHaveBeenCalledOnce()
-    expect(workspace.listSessions).toHaveBeenCalledOnce()
-    expect(workspace.listRecentSessions).toHaveBeenCalledOnce()
-    expect(workspace.listAssetCatalogs).toHaveBeenCalledOnce()
-    expect(workspace.listTunnels).toHaveBeenCalledOnce()
+    expect(workspace.listFolders).toHaveBeenCalledWith({ silent: true })
+    expect(workspace.listSessions).toHaveBeenCalledWith({ silent: true })
+    expect(workspace.listRecentSessions).toHaveBeenCalledWith({ silent: true })
+    expect(workspace.listAssetCatalogs).toHaveBeenCalledWith({ silent: true })
+    expect(workspace.listTunnels).toHaveBeenCalledWith({ silent: true })
   })
 
   it('only requires folders and sessions when optional loaders are absent', async () => {
@@ -64,8 +64,8 @@ describe('hotReloadSessionWorkspace', () => {
       listSessions: vi.fn(async () => []),
     }
     await hotReloadSessionWorkspace(workspace)
-    expect(workspace.listFolders).toHaveBeenCalledOnce()
-    expect(workspace.listSessions).toHaveBeenCalledOnce()
+    expect(workspace.listFolders).toHaveBeenCalledWith({ silent: true })
+    expect(workspace.listSessions).toHaveBeenCalledWith({ silent: true })
   })
 })
 

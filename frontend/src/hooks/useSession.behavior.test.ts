@@ -1,5 +1,6 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { useToastStore } from '@/components/ui/toast'
 import { useSession } from '@/hooks/useSession'
 import { useConnectDialog } from '@/store/connectDialog'
 import { useAppStore } from '@/store/appStore'
@@ -122,12 +123,16 @@ describe('useSession behavior', () => {
     __registerHandler(service + 'TerminalService.Open', async () => 'term-ok')
     const { result } = renderHook(() => useSession())
     await waitFor(() => expect(result.current.sessions).toHaveLength(1))
+    useToastStore.setState({ toasts: [] })
     __registerHandler(service + 'SessionService.ListSessions', async () => { throw new Error('refresh boom') })
     __registerHandler(service + 'SessionService.ListRecentSessions', async () => { throw new Error('recent boom') })
     await act(async () => result.current.connect('5'))
     expect(useAppStore.getState().tabs).toHaveLength(1)
     expect(useConnectDialog.getState().open).toBe(false)
     expect(useConnectDialog.getState().state).toBe('idle')
+    const messages = useToastStore.getState().toasts.map((item) => item.message)
+    expect(messages.some((message) => message.includes('加载会话失败'))).toBe(false)
+    expect(messages.some((message) => message.includes('加载最近会话失败'))).toBe(false)
   })
 
   it('does not start a second session while another connection dialog is active', async () => {

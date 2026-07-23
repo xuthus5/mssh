@@ -1003,3 +1003,12 @@
 | UX-SERIAL-043 | 串口连接成功后的列表刷新必须 silent，避免连接成功 toast 叠加「加载串口配置失败」。 | done |
 | UX-CSV-044 | CSV 导入后的 listFolders 刷新必须 silent，避免叠加「加载分组失败」。 | done |
 
+## 2026-07-24 商用硬化波次（嵌套 list 加载 silent 统一）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| UX-CONN-045 | 连接成功后的 listSessions/listRecentSessions 必须 silent，不得 toast「加载会话失败/加载最近会话失败」。 | done |
+| UX-SESSION-046 | 创建/更新会话后的 listAssetCatalogs 必须 silent，不得 toast「加载资产分类失败」。 | done |
+| UX-SYNC-047 | 云同步热刷新调用的 folders/sessions/recent/catalogs/tunnels 列表必须 silent，由热刷新路径统一失败 toast。 | done |
+| UX-LIST-048 | 独立手动/初始加载仍 toast 列表失败；silent 模式失败需 rethrow 以便外层处理。 | done |
+
