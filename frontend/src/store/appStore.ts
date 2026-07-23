@@ -125,6 +125,7 @@ export interface AppState {
   workspaceRestoreError: string
   workspaceRestoreNotice: string
   workspaceRestoreNonce: number
+  workspaceSaveError: string
   activePaneId: string | null
   recordingState: Record<string, 'idle' | 'starting' | 'recording' | 'stopping' | 'error'>
   tunnelState: Record<string, 'running' | 'stopped'>
@@ -136,6 +137,7 @@ export interface AppState {
   setTransferCenterOpen: (open: boolean) => void
   setWorkspaceRestoreError: (error: string) => void
   setWorkspaceRestoreNotice: (notice: string) => void
+  setWorkspaceSaveError: (error: string) => void
   retryWorkspaceRestore: () => void
   openTab: (tab: Tab) => void
   closeTab: (id: string) => Promise<void>
@@ -185,6 +187,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   workspaceRestoreError: '',
   workspaceRestoreNotice: '',
   workspaceRestoreNonce: 0,
+  workspaceSaveError: '',
   activePaneId: null,
   recordingState: {},
   tunnelState: {},
