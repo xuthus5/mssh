@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { hasEnglishTranslation, t, translateMessage, useLanguageStore } from '@/i18n'
+import { enCatalog } from '@/i18n/enCatalog'
 
 describe('i18n', () => {
   beforeEach(() => {
@@ -34,11 +35,10 @@ describe('i18n', () => {
     expect(t('AI')).toBe('AI')
     expect(t('CPU')).toBe('CPU')
   })
-})
 
   it('rejects CJK leftovers and glued English catalog values', async () => {
     const catalog = (await import('@/i18n/en.json')).default as Record<string, string>
-    const cjkKeys = Object.entries(catalog).filter(([, value]) => /[\u4e00-\u9fff]/.test(value)).map(([key]) => key)
+    const cjkKeys = Object.entries(catalog).filter(([, value]) => /[一-鿿]/.test(value)).map(([key]) => key)
     expect(cjkKeys).toEqual([])
     expect(catalog['打开设置']).toBe('Open settings')
     expect(catalog['批量设置环境']).toBe('Batch set environment')
@@ -47,3 +47,20 @@ describe('i18n', () => {
     expect(catalog['输入SSH密码']).toBe('Enter SSH password')
   })
 
+  it('keeps english catalog free of glued labels for multi-word chinese keys', () => {
+    const glued = Object.entries(enCatalog).filter(([key, value]) => {
+      if (typeof value !== 'string') return false
+      if (!/[一-鿿]/.test(key)) return false
+      if (value.includes(' ') || /[:/\\${}]/.test(value)) return false
+      if (!/^[A-Za-z][A-Za-z0-9''’\-]*$/.test(value)) return false
+      if (value.length < 10) return false
+      const allow = new Set([
+        'Foreground', 'Description', 'Recordings', 'Production', 'Transferring', 'Reconnecting',
+        'Disconnected', 'Connecting', 'Recording', 'Playback', 'Authentication', 'Configuration',
+        'Environment', 'Successfully', 'Blue-Green',
+      ])
+      return !allow.has(value)
+    })
+    expect(glued).toEqual([])
+  })
+})
