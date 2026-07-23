@@ -398,7 +398,7 @@
   "取消传输失败: ${}": "Failed to cancel transfer: ${}",
   "取消批量选择": "Cancel batch selection",
   "取消编辑": "Cancel edit",
-  "取消连接": "Cancelconnect",
+  "取消连接": "Cancel Connection",
   "只检测本机安装状态，不会向 SSH 服务器安装或执行 Agent。": "Only checks local install status; does not install or run Agents on the SSH server.",
   "只读": "Read-only",
   "只读命令自动执行失败: ${}": "Failed to auto-run read-only commands: ${}",
@@ -676,7 +676,7 @@
   "意外断开后自动尝试重新连接；手动断开或关闭标签不会触发。默认关闭。": "Automatically retries after unexpected disconnects. Manual disconnect or closing a tab does not trigger it. Off by default.",
   "成功": "Success",
   "成功 1 项，失败 1 项。": "Succeeded 1 item, failed 1 item.",
-  "成功连接会话后会显示在这里。": "successconnectsession after will show in here.",
+  "成功连接会话后会显示在这里。": "Successfully connected sessions will appear here.",
   "我有其他设备的加密备份": "I have an encrypted backup from another device",
   "所有应用 HTTP 请求直连目标主机。": "All application HTTP requests connect directly.",
   "所有节点": "All nodes",
@@ -938,7 +938,7 @@
   "正在分析关联资产影响范围。": "Analyzing impact on linked assets.",
   "正在加载 AI 配置...": "in load AI configuration...",
   "正在加载主机指纹...": "Loading host fingerprints...",
-  "正在取消连接...": "In cancelconnect...",
+  "正在取消连接...": "Cancelling connection...",
   "正在检查安全状态…": "Checking security status…",
   "正在连接到": "Connecting to ",
   "正在采集系统信息...": "Collecting system information...",
@@ -1429,5 +1429,6 @@
   "清空命令历史失败: ${}": "Failed to clear command history: ${}",
   "清空": "Clear",
   "选择上传文件失败: ${}": "Failed to choose upload file: ${}",
-  "选择下载位置失败: ${}": "Failed to choose download location: ${}"
+  "选择下载位置失败: ${}": "Failed to choose download location: ${}",
+  "选择主题文件失败: ${}": "Failed to choose theme file: ${}"
 }
