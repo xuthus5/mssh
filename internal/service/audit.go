@@ -38,6 +38,9 @@ func (a *AuditService) RecordBatch(action string, sessionIDs []int64, outcomes [
 		return fmt.Errorf("batch audit results length mismatch")
 	}
 	for index, sessionID := range sessionIDs {
+		if sessionID <= 0 {
+			return fmt.Errorf("invalid session id %d", sessionID)
+		}
 		if outcomes[index] != "success" && outcomes[index] != "failed" {
 			return fmt.Errorf("invalid batch audit outcome %s", outcomes[index])
 		}

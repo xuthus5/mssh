@@ -30,4 +30,6 @@ func TestAuditServiceRecordsValidatedBatchEvents(t *testing.T) {
 	require.Error(t, service.RecordBatch("unknown", []int64{1}, []string{"success"}))
 	require.Error(t, service.RecordBatch("batch_macro", []int64{1}, nil))
 	require.Error(t, service.RecordBatch("batch_macro", []int64{1}, []string{"secret"}))
+	require.Error(t, service.RecordBatch("batch_macro", []int64{0}, []string{"success"}))
+	require.Error(t, service.RecordBatch("batch_connect", []int64{-1}, []string{"failed"}))
 }
