@@ -223,3 +223,10 @@ func TestSystemInfoRejectsEmptyTerminalID(t *testing.T) {
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "invalid terminal id")
 }
+
+func TestProcessInfoRejectsEmptyTerminalID(t *testing.T) {
+	svc := &TerminalService{logger: testutil.NewTestLogger(), connIDs: map[string]string{}}
+	_, err := svc.ProcessInfo("")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "invalid terminal id")
+}

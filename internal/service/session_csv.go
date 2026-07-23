@@ -52,6 +52,11 @@ type sessionCSVRecord struct {
 
 func (s *SessionService) ExportCSV(path string, options model.SessionCSVExportOptions) (model.SessionCSVExportResult, error) {
 	result := model.SessionCSVExportResult{IncludedPasswords: options.IncludePasswords}
+	cleaned, pathErr := validateLocalFilePath(path)
+	if pathErr != nil {
+		return result, fmt.Errorf("export session csv: %w", pathErr)
+	}
+	path = cleaned
 	outcome := "failed"
 	defer func() {
 		recordAudit(s.db, s.logger, model.AuditEvent{
