@@ -90,6 +90,9 @@ func validateMacroPayload(macro model.Macro) error {
 }
 
 func (m *MacroService) Delete(id int64) error {
+	if id <= 0 {
+		return fmt.Errorf("invalid macro id")
+	}
 	m.logger.Info("deleting macro", "id", id)
 	return store.DeleteMacro(m.db, id)
 }
