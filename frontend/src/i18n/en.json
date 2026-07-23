@@ -1362,5 +1362,6 @@
   "加载命令历史失败: ${}": "Failed to load command history: ${}",
   "加载关于信息失败: ${}": "Failed to load about info: ${}",
   "恢复工作区失败: ${}": "Failed to restore workspace: ${}",
-  "保存工作区失败: ${}": "Failed to save workspace: ${}"
+  "保存工作区失败: ${}": "Failed to save workspace: ${}",
+  "选择日志目录失败: ${}": "Failed to choose log directory: ${}"
 }

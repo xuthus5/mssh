@@ -242,6 +242,9 @@ func normalizedSessionIDs(ids []int64) ([]int64, error) {
 }
 
 func (s *SessionService) SessionDeleteImpact(id int64) (*model.SessionDeleteImpact, error) {
+	if id <= 0 {
+		return nil, fmt.Errorf("invalid session id")
+	}
 	impact := &model.SessionDeleteImpact{}
 	queries := []struct {
 		query  string

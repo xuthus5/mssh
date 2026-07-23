@@ -664,3 +664,14 @@
 | UX-MACRO-010 | 宏工作区 List 失败必须 toast。 | done |
 | UX-ABOUT-010 | About Info 加载失败必须 toast。 | done |
 | UX-WORKSPACE-010 | 工作区恢复/保存失败必须 toast。 | done |
+
+## 2026-07-23 商用硬化波次（串口/删除影响/设置 key 校验 + 日志目录选择可见）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| SEC-SERIAL-013 | OpenSerial 必须拒绝 serialPortID<=0。 | done |
+| SEC-SERIAL-014 | SerialSetSignals/SerialSignals/SerialBreak 必须拒绝空 terminalID。 | done |
+| SEC-SESSION-017 | SessionDeleteImpact 必须拒绝 id<=0。 | done |
+| SEC-ASSET-013 | Environment/Project/Tag DeleteImpact 必须拒绝 id<=0。 | done |
+| SEC-SETTING-010 | Setting Get/Delete 必须拒绝空 key。 | done |
+| UX-LOG-011 | 选择应用日志目录失败必须 toast。 | done |
