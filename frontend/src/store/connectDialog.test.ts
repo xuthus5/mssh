@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { useToastStore } from '@/components/ui/toast'
 import { __clearHandlers, __registerHandler } from '@/test/__mocks__/wails-runtime'
 import { useConnectDialog } from '@/store/connectDialog'
 
@@ -8,6 +9,7 @@ const cancelConnect = 'github.com/xuthus5/mssh/internal/service.SessionService.C
 describe('connectDialog', () => {
   beforeEach(() => {
     __clearHandlers()
+    useToastStore.setState({ toasts: [] })
     useConnectDialog.setState({
       open: false,
       state: 'idle',
@@ -110,5 +112,16 @@ describe('connectDialog', () => {
     await useConnectDialog.getState().cancelConnection()
     expect(cancel).toHaveBeenCalledTimes(1)
     expect(useConnectDialog.getState().state).toBe('idle')
+  })
+
+  it('toasts host key decision failures', async () => {
+    __registerHandler(decideHostKey, async () => {
+      throw new Error('host key failed')
+    })
+    useConnectDialog.getState().openDialog('h', 22, 'u', vi.fn())
+    useConnectDialog.getState().setAttempt('attempt-err')
+    await expect(useConnectDialog.getState().acceptHostKey()).rejects.toThrow('host key failed')
+    expect(useConnectDialog.getState()).toMatchObject({ state: 'failed', error: 'host key failed' })
+    expect(useToastStore.getState().toasts.some((item) => item.message.includes('host key failed'))).toBe(true)
   })
 })
