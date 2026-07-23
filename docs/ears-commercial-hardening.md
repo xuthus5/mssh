@@ -1312,3 +1312,21 @@
 | ID | 验收条件 | 状态 |
 |---|---|---|
 | UX-SERIAL-140 | 串口中心复制/删除/批量删除失败仅中心 banner 展示，不得 error toast；连接失败由 useSerial error banner 承接，不得 toast。 | done |
+
+## 2026-07-24 商用硬化波次（密钥材料对话框复制错误归属）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| UX-KEY-141 | 密钥查看/编辑对话框内复制公钥/私钥失败仅对话框 inline alert 展示，不得 error toast；成功可 toast。 | done |
+
+## 2026-07-24 商用硬化波次（AI 设置错误归属）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| UX-AI-142 | AI 设置动作失败（提供商/设置/Agent 检测）仅设置页 error banner 展示，不得 error toast；成功可 toast。 | done |
+
+## 2026-07-24 商用硬化波次（主题删除对话框拆分）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| UX-ENG-143 | `ThemeManager.tsx` 提取 `ThemeDeleteDialog.tsx` 保持 ≤300 行余量；主题行为回归测试通过。 | done |

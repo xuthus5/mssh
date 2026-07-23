@@ -1,16 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Copy, Download, Trash2 } from 'lucide-react'
 import { Dialogs } from '@wailsio/runtime'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
+import { ThemeDeleteDialog } from '@/components/settings/ThemeDeleteDialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -240,47 +231,6 @@ function ThemeRow({
         </div>
       </TableCell>
     </TableRow>
-  )
-}
-
-function ThemeDeleteDialog({
-  target,
-  pending,
-  onOpenChange,
-  onConfirm,
-}: {
-  target: DeleteTarget
-  pending: boolean
-  onOpenChange: (open: boolean) => void
-  onConfirm: () => void
-}) {
-  const builtin = Boolean(target?.definition?.is_builtin)
-  return (
-    <AlertDialog open={target !== null} onOpenChange={onOpenChange}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>
-            {t('删除主题「${}」？', target?.name ?? '')}
-          </AlertDialogTitle>
-          <AlertDialogDescription>
-            {builtin
-              ? t('将移除该主题配置（Profile）。内置颜色定义会保留，不会被删除。')
-              : t('将移除该主题配置（Profile）。若自定义颜色定义不再被引用，也会一并清理。此操作不可撤销。')}
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel disabled={pending}>{t('取消')}</AlertDialogCancel>
-          <AlertDialogAction
-            type="button"
-            variant="destructive"
-            disabled={pending}
-            onClick={onConfirm}
-          >
-            {pending ? t('删除中…') : t('确认删除')}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
   )
 }
 
