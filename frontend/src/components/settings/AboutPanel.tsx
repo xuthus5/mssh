@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { logger } from '@/lib/logger'
-import { toast } from '@/components/ui/toast'
 import { t } from '@/i18n'
 
 
@@ -55,7 +54,7 @@ export function AboutPanel() {
     void Browser.OpenURL(url).catch((error: unknown) => {
       const message = error instanceof Error ? error.message : String(error)
       logger.error('open URL failed', error)
-      toast(t('打开链接失败: ${}', message), 'error')
+      setMessage(t('打开链接失败: ${}', message))
     })
   }
 

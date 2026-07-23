@@ -79,8 +79,10 @@ export function useSFTPSettings() {
       if (!options?.quiet) toast(t('SFTP 设置已保存'), 'success')
     } catch (error) {
       logger.debug('saveSFTPSettings error', error)
-      // Quiet autosave only suppresses success toasts; failures must still surface.
-      toast(t('保存 SFTP 设置失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
+      // Quiet autosave is owned by AutoSaveStatusIndicator; non-quiet keeps toast.
+      if (!options?.quiet) {
+        toast(t('保存 SFTP 设置失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
+      }
       throw error
     }
   }, [])
