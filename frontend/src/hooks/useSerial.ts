@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { SerialService, TerminalService } from '@/lib/wails'
 import { logger } from '@/lib/logger'
-import { toast } from '@/components/ui/toast'
 import { t } from '@/i18n'
 import { useAppStore } from '@/store/appStore'
 import { createTerminalTab } from '@/lib/terminalTabs'
@@ -162,7 +161,7 @@ export function useSerial() {
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
       logger.error('serial connect failed', err)
-      toast(t('串口连接失败: ${}', message), 'error')
+      setError(t('串口连接失败: ${}', message))
       throw err
     }
   }, [refresh])

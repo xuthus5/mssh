@@ -132,4 +132,20 @@ describe('useSerial', () => {
     expect(closeTab).toHaveBeenCalledWith('tab-b')
   })
 
+
+  it('surfaces connect failures via error banner without toast', async () => {
+    useToastStore.setState({ toasts: [] })
+    __registerHandler(service + 'SerialService.List', async () => [{
+      id: 9, name: 'UART', device: '/dev/ttyUSB0', baud_rate: 115200, data_bits: 8, parity: 'none', stop_bits: 1, flow_control: 'none', notes: '',
+    }])
+    __registerHandler(service + 'TerminalService.OpenSerial', async () => { throw new Error('port busy') })
+    const { result } = renderHook(() => useSerial())
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    await act(async () => {
+      await result.current.connectPort(result.current.ports[0]).catch(() => undefined)
+    })
+    expect(result.current.error).toContain('port busy')
+    expect(useToastStore.getState().toasts.filter((item) => item.type === 'error')).toHaveLength(0)
+  })
+
 })
