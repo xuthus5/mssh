@@ -187,6 +187,8 @@ export function useSettings() {
     ...config,
     sftpSettings: sftp.settings,
     sftpSettingsReady: sftp.settingsReady,
+    sftpLoadError: sftp.loadError,
+    reloadSFTPSettings: sftp.reload,
     saveSFTPSettings: sftp.save,
     systemFonts,
   }
