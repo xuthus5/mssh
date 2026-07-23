@@ -1330,3 +1330,12 @@
 | ID | 验收条件 | 状态 |
 |---|---|---|
 | UX-ENG-143 | `ThemeManager.tsx` 提取 `ThemeDeleteDialog.tsx` 保持 ≤300 行余量；主题行为回归测试通过。 | done |
+
+## 2026-07-24 商用硬化波次（设置自动保存错误归属）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| UX-SET-144 | 通用/终端设置 quiet autosave 失败仅由 AutoSaveStatusIndicator 展示，不得 error toast；非 quiet 失败仍可 toast。 | done |
+| UX-SFTP-145 | SFTP 设置 quiet autosave 失败仅由 AutoSaveStatusIndicator 展示，不得 error toast。 | done |
+| UX-SHORTCUT-146 | 快捷键 quiet 保存失败仅由 AutoSaveStatusIndicator 展示，不得 error toast；加载失败仍走 banner。 | done |
+| UX-ABOUT-147 | 关于页打开外链失败仅 panel message/Alert 展示，不得 error toast。 | done |
