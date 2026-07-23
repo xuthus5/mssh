@@ -27,6 +27,10 @@ export function getConfirmDialogSnapshot(): ConfirmDialogRequest | null {
   return pending?.request ?? null
 }
 
+export function confirmDialogSubscriberCount(): number {
+  return listeners.size
+}
+
 /** Show a modal confirm dialog; resolves true when confirmed. */
 export function requestConfirm(request: ConfirmDialogRequest): Promise<boolean> {
   if (pending) {
@@ -34,6 +38,11 @@ export function requestConfirm(request: ConfirmDialogRequest): Promise<boolean> 
     pending = null
   }
   return new Promise<boolean>((resolve) => {
+    // No host mounted: fail closed immediately so callers never hang.
+    if (listeners.size === 0) {
+      resolve(false)
+      return
+    }
     pending = { request, resolve }
     emit()
   })

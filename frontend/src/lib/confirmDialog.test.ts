@@ -23,10 +23,17 @@ describe('confirmDialog', () => {
   })
 
   it('cancels a previous pending request when a new one arrives', async () => {
+    const stop = subscribeConfirmDialog(() => {})
     const first = requestConfirm({ title: 'first' })
     const second = requestConfirm({ title: 'second' })
     resolveConfirmDialog(true)
     await expect(first).resolves.toBe(false)
     await expect(second).resolves.toBe(true)
+    stop()
+  })
+
+  it('fails closed immediately when no dialog host is subscribed', async () => {
+    await expect(requestConfirm({ title: 'orphan' })).resolves.toBe(false)
+    expect(getConfirmDialogSnapshot()).toBeNull()
   })
 })
