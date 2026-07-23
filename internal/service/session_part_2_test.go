@@ -74,3 +74,11 @@ func TestSessionServiceHostKeyDecisionUnknownAttempt(t *testing.T) {
 	assert.Error(t, svc.DecideHostKey("missing", true))
 	assert.Error(t, svc.CancelConnect("missing"))
 }
+
+func TestSessionServiceRejectsEmptyAttemptID(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	svc := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
+	assert.Error(t, svc.DecideHostKey("", true))
+	assert.Error(t, svc.DecideHostKey("   ", false))
+	assert.Error(t, svc.CancelConnect(""))
+}

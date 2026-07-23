@@ -4,6 +4,8 @@ import type { Terminal } from '@xterm/xterm'
 import type { TerminalRuntimeErrorReporter } from '@/components/terminal/TerminalErrorBoundary'
 import { runTerminalRuntime } from '@/components/terminal/terminalRuntime'
 import { logger } from '@/lib/logger'
+import { toast } from '@/components/ui/toast'
+import { t } from '@/i18n'
 import { replaceTerminalSearch } from '@/lib/terminalSearchRegistry'
 import { TerminalService } from '@/lib/wails'
 
@@ -77,9 +79,15 @@ export function useTerminalActivation({ refs, active, sequence, reportRuntimeErr
 export function useTerminalAttachment(terminalID: string) {
   useEffect(() => {
     try {
-      void TerminalService.Attach(terminalID).catch((error: unknown) => logger.error('terminal attach error', error))
+      void TerminalService.Attach(terminalID).catch((error: unknown) => {
+        logger.error('terminal attach error', error)
+        const message = error instanceof Error ? error.message : String(error)
+        toast(t('终端挂载失败: ${}', message), 'error')
+      })
     } catch (error: unknown) {
       logger.error('terminal attach error', error)
+      const message = error instanceof Error ? error.message : String(error)
+      toast(t('终端挂载失败: ${}', message), 'error')
     }
   }, [terminalID])
 }

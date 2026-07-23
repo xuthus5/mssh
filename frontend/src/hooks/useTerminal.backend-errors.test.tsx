@@ -102,6 +102,16 @@ describe('useTerminal backend failures', () => {
     vi.stubGlobal('cancelAnimationFrame', vi.fn())
   })
 
+  it('toasts when terminal attach fails', async () => {
+    const error = new Error('attach failed')
+    backend.attach.mockRejectedValue(error)
+    const containerRef = createRef<HTMLDivElement>()
+    containerRef.current = document.createElement('div')
+    const wrapper = ({ children }: { children: ReactNode }) => <>{boundary({ children })}<ToastContainer /></>
+    renderHook(() => useTerminal('term-attach', containerRef, { active: false, focusRequest: { sequence: 0 } }), { wrapper })
+    expect(await screen.findByText(/终端挂载失败/)).toBeInTheDocument()
+  })
+
   it('disconnects and reports only the first rejected write', async () => {
     const error = new Error('write failed')
     const loggerError = vi.spyOn(logger, 'error').mockImplementation(() => {})
