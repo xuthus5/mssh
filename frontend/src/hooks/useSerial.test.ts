@@ -26,20 +26,24 @@ describe('useSerial', () => {
     expect(useToastStore.getState().toasts.some((item) => item.message.includes('serial list failed'))).toBe(false)
   })
 
-  it('toasts when serial device discovery fails', async () => {
+  it('records serial device discovery failures without toast spam', async () => {
     __registerHandler(service + 'SerialService.ListDevices', async () => {
       throw new Error('device list failed')
     })
-    renderHook(() => useSerial())
-    await waitFor(() => expect(useToastStore.getState().toasts.some((item) => item.message.includes('device list failed'))).toBe(true))
+    const { result } = renderHook(() => useSerial())
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    expect(result.current.deviceProbeError).toContain('device list failed')
+    expect(useToastStore.getState().toasts.some((item) => item.message.includes('device list failed'))).toBe(false)
   })
 
-  it('toasts when active serial map fails', async () => {
+  it('records active serial map failures without toast spam', async () => {
     __registerHandler(service + 'SerialService.ActiveDeviceMap', async () => {
       throw new Error('active map failed')
     })
-    renderHook(() => useSerial())
-    await waitFor(() => expect(useToastStore.getState().toasts.some((item) => item.message.includes('active map failed'))).toBe(true))
+    const { result } = renderHook(() => useSerial())
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    expect(result.current.activeMapError).toContain('active map failed')
+    expect(useToastStore.getState().toasts.some((item) => item.message.includes('active map failed'))).toBe(false)
   })
 
   it('suppresses device discovery toasts during silent mutation refresh', async () => {
