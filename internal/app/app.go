@@ -128,13 +128,30 @@ func startApp(opts Options, logger *slog.Logger, dependencies appDependencies) (
 	if appInstance.Sync != nil {
 		appInstance.Sync.StartScheduler()
 	}
-	if appInstance.Setting != nil {
-		if err := appInstance.Setting.ApplyStoredLogSettings(); err != nil {
-			logger.Warn("apply stored log settings failed", "error", err)
-		}
-	}
+	applyStartupSettings(appInstance, logger)
 	cleanup = false
 	return appInstance, nil
+}
+
+func applyStartupSettings(appInstance *App, logger *slog.Logger) {
+	if appInstance == nil || appInstance.Setting == nil {
+		return
+	}
+	if err := appInstance.Setting.ApplyStoredLogSettings(); err != nil {
+		logger.Warn("apply stored log settings failed", "error", err)
+	}
+	if err := appInstance.Setting.ApplyStoredProxySettings(); err != nil {
+		logger.Warn("apply stored proxy settings failed", "error", err)
+	}
+	if appInstance.Security == nil {
+		return
+	}
+	settingSvc := appInstance.Setting
+	appInstance.Security.SetAfterUnlock(func() {
+		if err := settingSvc.ApplyStoredProxySettings(); err != nil {
+			logger.Warn("apply proxy settings after unlock failed", "error", err)
+		}
+	})
 }
 
 func initializeServices(input serviceInitialization) (*App, error) {

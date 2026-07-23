@@ -21,13 +21,14 @@ const (
 )
 
 type SecurityService struct {
-	db       *sql.DB
-	dataDir  string
-	runtime  *CryptoRuntime
-	keychain crypto.KeychainAdapter
-	eventBus EventBus
-	logger   *slog.Logger
-	unlock   *unlockLimiter
+	db          *sql.DB
+	dataDir     string
+	runtime     *CryptoRuntime
+	keychain    crypto.KeychainAdapter
+	eventBus    EventBus
+	logger      *slog.Logger
+	unlock      *unlockLimiter
+	afterUnlock func()
 }
 
 func NewSecurityService(db *sql.DB, dataDir string, runtime *CryptoRuntime, keychain crypto.KeychainAdapter, logger *slog.Logger) *SecurityService {
@@ -42,6 +43,18 @@ func NewSecurityService(db *sql.DB, dataDir string, runtime *CryptoRuntime, keyc
 //wails:ignore
 func (s *SecurityService) SetEventBus(bus EventBus) {
 	s.eventBus = bus
+}
+
+// SetAfterUnlock registers a callback invoked after vault DEK becomes available.
+func (s *SecurityService) SetAfterUnlock(hook func()) {
+	s.afterUnlock = hook
+}
+
+func (s *SecurityService) runAfterUnlock() {
+	if s.afterUnlock == nil {
+		return
+	}
+	s.afterUnlock()
 }
 
 // RequireUnlocked returns a stable error when the application vault is locked.
@@ -87,6 +100,7 @@ func (s *SecurityService) Setup(input model.SecuritySetupInput) (model.SecurityS
 		return model.SecurityStatus{}, err
 	}
 	s.runtime.SetDEK(dek)
+	s.runAfterUnlock()
 	if err := s.savePreferences(input.RequirePasswordOnLaunch, input.RememberUnlock); err != nil {
 		return model.SecurityStatus{}, err
 	}
@@ -119,6 +133,7 @@ func (s *SecurityService) Unlock(input model.SecurityUnlockInput) (model.Securit
 	}
 	s.unlock.success()
 	s.runtime.SetDEK(dek)
+	s.runAfterUnlock()
 	if input.RememberUnlock {
 		_ = s.setBoolSetting(securityRememberUnlockSetting, true)
 		_ = s.persistRememberedDEK(dek)
@@ -172,6 +187,7 @@ func (s *SecurityService) Rotate(input model.SecurityRotateInput) (model.Securit
 		return model.SecurityStatus{}, err
 	}
 	s.runtime.SetDEK(newDEK)
+	s.runAfterUnlock()
 	if s.boolSetting(securityRememberUnlockSetting, true) {
 		_ = s.persistRememberedDEK(newDEK)
 	}
@@ -227,6 +243,7 @@ func (s *SecurityService) TryAutoUnlock() error {
 	}
 	// Validate DEK can decrypt vault by ensuring vault file loads (DEK itself is the secret).
 	s.runtime.SetDEK(dek)
+	s.runAfterUnlock()
 	return nil
 }
 

@@ -2,6 +2,7 @@ package app
 
 import (
 	"errors"
+	"log/slog"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -9,8 +10,10 @@ import (
 
 	"github.com/xuthus5/mssh/internal/applog"
 	"github.com/xuthus5/mssh/internal/model"
+	"github.com/xuthus5/mssh/internal/netproxy"
 	"github.com/xuthus5/mssh/internal/service"
 	"github.com/xuthus5/mssh/internal/service/testutil"
+	"github.com/xuthus5/mssh/internal/store"
 )
 
 type memoryKeychain struct {
@@ -126,4 +129,28 @@ func TestNewSyncServiceExportHitsVaultSource(t *testing.T) {
 	input := serviceInitialization{db: db, logger: logger, eventBus: bus, opts: Options{DataDir: dir}}
 	syncSvc := newSyncService(input, runtime, security, terminal, tunnel, session)
 	require.NoError(t, syncSvc.Export(dir+"/out.msshbackup"))
+}
+
+func TestStartAppAppliesStoredProxySettings(t *testing.T) {
+	dataDir := t.TempDir()
+	db, err := store.OpenDB(dataDir)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+	require.NoError(t, store.InitializeSchema(db))
+
+	// Seed manual proxy before app start.
+	require.NoError(t, store.SetSettings(db, []model.Setting{
+		{Key: "application.proxy_mode", Namespace: "application", Value: `"manual"`, ValueType: "string", Version: 1},
+		{Key: "application.proxy_url", Namespace: "application", Value: `"http://127.0.0.1:18080"`, ValueType: "string", Version: 1},
+	}))
+	_ = db.Close()
+
+	proxy := netproxy.New()
+	appInstance, err := New(Options{DataDir: dataDir, Logger: slog.Default(), ProxyManager: proxy})
+	require.NoError(t, err)
+	t.Cleanup(func() { appInstance.Shutdown() })
+
+	cfg := proxy.Config()
+	assert.Equal(t, netproxy.ModeManual, cfg.Mode)
+	assert.Equal(t, "http://127.0.0.1:18080", cfg.URL)
 }
