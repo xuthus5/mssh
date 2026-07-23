@@ -42,6 +42,8 @@ export function SecurityPanel() {
   const [rememberUnlock, setRememberUnlock] = useState(true)
   const [busy, setBusy] = useState(false)
   const [loadError, setLoadError] = useState('')
+  const [formError, setFormError] = useState('')
+  const [actionError, setActionError] = useState('')
   const [confirmAction, setConfirmAction] = useState<null | { type: 'rotate' } | { type: 'host'; entry: HostKeyEntry }>(null)
 
   const load = useCallback(async () => {
@@ -64,29 +66,44 @@ export function SecurityPanel() {
 
   const run = async (success: string, failure: string, operation: () => Promise<unknown>) => {
     setBusy(true)
+    setFormError('')
+    setActionError('')
     try {
       await operation()
       await load()
       toast(success, 'success')
       setPassword(''); setConfirmPassword(''); setCurrentPassword(''); setNewPassword(''); setConfirmNewPassword('')
     } catch (error) {
-      toast(t(failure, error instanceof Error ? error.message : String(error)), 'error')
+      setActionError(t(failure, error instanceof Error ? error.message : String(error)))
     } finally {
       setBusy(false)
     }
   }
 
   const setupPassword = () => {
-    if (password.length < 12) return toast(t('应用密码至少需要 12 个字符'), 'error')
-    if (password !== confirmPassword) return toast(t('两次输入的密码不一致'), 'error')
+    if (password.length < 12) {
+      setFormError(t('应用密码至少需要 12 个字符'))
+      return
+    }
+    if (password !== confirmPassword) {
+      setFormError(t('两次输入的密码不一致'))
+      return
+    }
     void run(t('应用密码已设置'), '设置应用密码失败: ${}', () => SecurityService.Setup({
       password, require_password_on_launch: requireLaunch, remember_unlock: rememberUnlock,
     }))
   }
 
   const rotatePassword = () => {
-    if (newPassword.length < 12) return toast(t('应用密码至少需要 12 个字符'), 'error')
-    if (newPassword !== confirmNewPassword) return toast(t('两次输入的密码不一致'), 'error')
+    if (newPassword.length < 12) {
+      setFormError(t('应用密码至少需要 12 个字符'))
+      return
+    }
+    if (newPassword !== confirmNewPassword) {
+      setFormError(t('两次输入的密码不一致'))
+      return
+    }
+    setFormError('')
     setConfirmAction({ type: 'rotate' })
   }
 
@@ -112,13 +129,19 @@ export function SecurityPanel() {
       }))
       return
     }
+    const entry = confirmAction.entry
+    setBusy(true)
+    setActionError('')
     try {
-      await SessionService.DeleteHostKey(confirmAction.entry.line)
+      await SessionService.DeleteHostKey(entry.line)
       setConfirmAction(null)
       await load()
       toast(t('主机指纹已删除'), 'success')
     } catch (error) {
-      toast(t('删除主机指纹失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
+      setConfirmAction(null)
+      setActionError(t('删除主机指纹失败: ${}', error instanceof Error ? error.message : String(error)))
+    } finally {
+      setBusy(false)
     }
   }
 
@@ -128,6 +151,16 @@ export function SecurityPanel() {
         <div className="rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive" role="alert">
           {t('加载安全设置失败: ${}', loadError)}
           <Button size="xs" variant="outline" className="ml-2" onClick={() => { void load() }}>{t('重试')}</Button>
+        </div>
+      ) : null}
+      {formError ? (
+        <div className="rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive" role="alert">
+          {formError}
+        </div>
+      ) : null}
+      {actionError ? (
+        <div className="rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive" role="alert">
+          {actionError}
         </div>
       ) : null}
       <Card>
@@ -147,10 +180,10 @@ export function SecurityPanel() {
           {!status.configured ? (
             <div className="space-y-3">
               <Field label={t('设置应用密码')}>
-                <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={t('至少 12 个字符')} aria-label={t('设置应用密码')} />
+                <Input type="password" value={password} onChange={(e) => { setPassword(e.target.value); setFormError('') }} placeholder={t('至少 12 个字符')} aria-label={t('设置应用密码')} />
               </Field>
               <Field label={t('确认应用密码')}>
-                <Input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} aria-label={t('确认应用密码')} />
+                <Input type="password" value={confirmPassword} onChange={(e) => { setConfirmPassword(e.target.value); setFormError('') }} aria-label={t('确认应用密码')} />
               </Field>
               <PreferenceToggles requireLaunch={requireLaunch} rememberUnlock={rememberUnlock} onRequireLaunch={setRequireLaunch} onRememberUnlock={setRememberUnlock} />
               <Button size="sm" disabled={busy || loading} onClick={setupPassword}>{t('创建应用密码')}</Button>
@@ -161,10 +194,10 @@ export function SecurityPanel() {
                 <Input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} aria-label={t('当前密码')} />
               </Field>
               <Field label={t('新密码')}>
-                <Input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder={t('至少 12 个字符')} aria-label={t('新密码')} />
+                <Input type="password" value={newPassword} onChange={(e) => { setNewPassword(e.target.value); setFormError('') }} placeholder={t('至少 12 个字符')} aria-label={t('新密码')} />
               </Field>
               <Field label={t('确认新密码')}>
-                <Input type="password" value={confirmNewPassword} onChange={(e) => setConfirmNewPassword(e.target.value)} aria-label={t('确认新密码')} />
+                <Input type="password" value={confirmNewPassword} onChange={(e) => { setConfirmNewPassword(e.target.value); setFormError('') }} aria-label={t('确认新密码')} />
               </Field>
               <PreferenceToggles requireLaunch={requireLaunch} rememberUnlock={rememberUnlock} onRequireLaunch={(value) => savePreferences(value, rememberUnlock)} onRememberUnlock={(value) => savePreferences(requireLaunch, value)} />
               <div className="flex flex-wrap gap-2">
