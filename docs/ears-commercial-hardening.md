@@ -1000,3 +1000,6 @@
 | UX-TUNNEL-041 | 隧道启动成功后的列表重载失败不得 toast「加载隧道失败」。 | done |
 | UX-CSV-042 | CSV 导入成功后的 folders/assets 刷新失败不得拒绝 import Promise。 | done |
 
+| UX-SERIAL-043 | 串口连接成功后的列表刷新必须 silent，避免连接成功 toast 叠加「加载串口配置失败」。 | done |
+| UX-CSV-044 | CSV 导入后的 listFolders 刷新必须 silent，避免叠加「加载分组失败」。 | done |
+
