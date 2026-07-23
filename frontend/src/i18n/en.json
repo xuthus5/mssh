@@ -1444,5 +1444,9 @@
   "打开传输中心，传输记录加载失败": "Open transfer center; failed to load transfer history",
   "加载失败": "Load failed",
   "连接异常": "Connection error",
-  "终端通道不可用（挂载或通信失败），可在当前终端中重新连接。": "The terminal channel is unavailable (attach or transport failed). You can reconnect in this terminal."
+  "终端通道不可用（挂载或通信失败），可在当前终端中重新连接。": "The terminal channel is unavailable (attach or transport failed). You can reconnect in this terminal.",
+  "加载录制失败": "Failed to load recording",
+  "未找到录制数据": "No recording data found",
+  "录制：${}": "Recording: ${}",
+  "${} 条记录可回放": "${} entries ready for playback"
 }
