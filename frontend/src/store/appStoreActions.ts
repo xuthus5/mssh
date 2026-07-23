@@ -14,7 +14,6 @@ import {
 import type { AppState, Tab } from '@/store/appStore'
 import { selectTerminalPoolEvictionID } from '@/store/terminalPool'
 import { applyTerminalPoolEviction } from '@/store/terminalPoolReclaim'
-import { canTransitionConnection } from '@/store/connectionStatus'
 import { markIntentionalDisconnect } from '@/hooks/sessionReconnect'
 import { rewriteSplitPaneIDs, scrubTerminalRuntime, terminalTabPaneIDs } from '@/store/terminalTabPanes'
 
@@ -24,8 +23,6 @@ type TransferActions = Pick<AppState, 'addTransfer' | 'removeTransfer' | 'update
 type TabActions = Pick<AppState, 'openTab' | 'closeTab' | 'removeTabLocal' | 'replaceTerminalConnection' | 'promoteTerminalConnection' | 'updateTerminalWorkspace'>
 type NavigationActions = Pick<AppState, 'activateWorkspace' | 'setOverviewSection' | 'leaveOverview' | 'activateTab' | 'requestTerminalFocus' | 'toggleNavigation' | 'setSidebarWidth'>
 type PoolActions = Pick<AppState, 'registerTerminal' | 'unregisterTerminal' | 'forgetTerminal' | 'updateLastUsed' | 'evictLRU'>
-type StatusActions = Pick<AppState, 'setConnectionStatus' | 'setActivePane' | 'setRecordingState' | 'setTunnelState' | 'setAppStatus' | 'setTerminalTheme' | 'setMaxPoolSize' | 'setWorkspaceRestoreError' | 'setWorkspaceRestoreNotice' | 'retryWorkspaceRestore'>
-
 function workspaceTabForSurface(activeSurface: ActiveSurface | null, workspaceTab: WorkspaceID): WorkspaceID {
   return activeSurface?.type === 'workspace' ? activeSurface.id : workspaceTab
 }
@@ -269,27 +266,5 @@ export function createPoolActions(set: StoreSet, get: StoreGet): PoolActions {
   }
 }
 
-export function createStatusActions(set: StoreSet): StatusActions {
-  return {
-    setConnectionStatus: (id, status) => set((state) => {
-      const current = state.connectionStatus[id]
-      if (!canTransitionConnection(current, status)) return state
-      return { connectionStatus: { ...state.connectionStatus, [id]: status } }
-    }),
-    setActivePane: (activePaneId) => set({ activePaneId }),
-    setRecordingState: (id, recording) => set((state) => ({ recordingState: { ...state.recordingState, [id]: recording } })),
-    setTunnelState: (id, tunnel) => set((state) => ({ tunnelState: { ...state.tunnelState, [id]: tunnel } })),
-    setAppStatus: (appStatus) => set({ appStatus }),
-    setTerminalTheme: (terminalTheme) => set({ terminalTheme }),
-    setMaxPoolSize: (maxPoolSize) => set({ maxPoolSize }),
-    setWorkspaceRestoreError: (workspaceRestoreError) => set({ workspaceRestoreError }),
-    setWorkspaceRestoreNotice: (workspaceRestoreNotice) => set({ workspaceRestoreNotice }),
-    retryWorkspaceRestore: () => set((state) => ({
-      workspaceRestoreError: '',
-      workspaceRestoreNotice: '',
-      workspaceRestoreNonce: state.workspaceRestoreNonce + 1,
-    })),
-  }
-}
-
+export { createStatusActions } from '@/store/appStoreStatusActions'
 export { canTransitionConnection } from '@/store/connectionStatus'
