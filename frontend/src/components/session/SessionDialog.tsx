@@ -166,7 +166,7 @@ export default function SessionDialog({ open, onOpenChange, session, folders, en
             {(authMethod === 'password' || authMethod === 'keyboard-interactive') && (
               <label className="flex flex-col gap-1.5">
                 <span className="text-xs font-medium text-muted-foreground">{t('密码')}</span>
-                <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={t('输入SSH密码')} />
+                <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={session ? t('留空则保留原密码') : t('输入SSH密码')} />
               </label>
             )}
             {authMethod === 'key' && (

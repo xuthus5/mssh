@@ -197,4 +197,12 @@ describe('SessionDialog', () => {
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
     expect(useToastStore.getState().toasts).toEqual([])
   })
+
+  it('shows keep-existing password placeholder when editing', () => {
+    render(<SessionDialog {...defaultProps} session={{
+      id: '1', name: 's', host: 'h', port: 22, username: 'u', authMethod: 'password', keepAlive: 0, termType: 'xterm', folderId: null,
+    }} />)
+    expect(screen.getByPlaceholderText('留空则保留原密码')).toBeInTheDocument()
+  })
 })
+

@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useSession } from '@/hooks/useSession'
+import { useToastStore } from '@/components/ui/toast'
 import { __registerHandler, __clearHandlers } from '@/test/__mocks__/wails-runtime'
 import { useAppStore } from '@/store/appStore'
 
@@ -165,6 +166,30 @@ describe('useSession', () => {
     expect(store.activeSurface).toEqual({ type: 'terminal', id: 'terminal-term-abc' })
     expect(store).not.toHaveProperty('activeTabId')
     expect(store).not.toHaveProperty('hasEnteredWorkspace')
+  })
+
+
+  it('keeps createSession success when catalog refresh fails', async () => {
+    useToastStore.setState({ toasts: [] })
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SessionService.ListFolders', async () => [])
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SessionService.ListSessions', async () => [])
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SessionService.CreateSession', async (s: any) => ({
+      id: 99, name: s.name, host: s.host, port: s.port, username: s.username, auth_method: s.auth_method,
+      keep_alive: s.keep_alive, term_type: s.term_type, folder_id: null, notes: '', tags: [],
+    }))
+    __registerHandler('github.com/xuthus5/mssh/internal/service.AssetCatalogService.ListEnvironments', async () => { throw new Error('catalog refresh boom') })
+    __registerHandler('github.com/xuthus5/mssh/internal/service.AssetCatalogService.ListProjects', async () => [])
+    __registerHandler('github.com/xuthus5/mssh/internal/service.AssetCatalogService.ListTags', async () => [])
+    const { result } = renderHook(() => useSession())
+    await act(async () => {
+      await result.current.createSession({
+        name: 'ok', host: '1.1.1.1', port: 22, username: 'root',
+        authMethod: 'password', keepAlive: 30, termType: 'xterm', folderId: null,
+      })
+    })
+    expect(result.current.sessions.some((item) => item.name === 'ok')).toBe(true)
+    expect(useToastStore.getState().toasts.some((item) => item.message.includes('创建会话失败'))).toBe(false)
+    expect(useToastStore.getState().toasts.some((item) => item.message.includes('catalog refresh boom'))).toBe(true)
   })
 
   it('handles createSession error gracefully', async () => {
