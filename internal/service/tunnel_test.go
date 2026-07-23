@@ -343,3 +343,33 @@ func TestTunnelServiceRejectsNonLoopbackLocalBind(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "loopback")
 }
+
+func TestValidateTunnelBindCoreFields(t *testing.T) {
+	base := model.Tunnel{
+		SessionID: 1, Name: "web", Type: model.TunnelLocal,
+		LocalHost: "127.0.0.1", LocalPort: 8080, RemoteHost: "10.0.0.2", RemotePort: 80,
+	}
+	require.NoError(t, validateTunnelBind(base))
+
+	tests := []struct {
+		name   string
+		mutate func(*model.Tunnel)
+	}{
+		{name: "missing session", mutate: func(tunnel *model.Tunnel) { tunnel.SessionID = 0 }},
+		{name: "empty name", mutate: func(tunnel *model.Tunnel) { tunnel.Name = "  " }},
+		{name: "bad type", mutate: func(tunnel *model.Tunnel) { tunnel.Type = "magic" }},
+		{name: "remote port zero", mutate: func(tunnel *model.Tunnel) { tunnel.RemotePort = 0 }},
+		{name: "missing remote host", mutate: func(tunnel *model.Tunnel) { tunnel.RemoteHost = "" }},
+		{name: "local host nul", mutate: func(tunnel *model.Tunnel) { tunnel.LocalHost = string([]byte{'a', 0}) }},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			tunnel := base
+			test.mutate(&tunnel)
+			require.Error(t, validateTunnelBind(tunnel))
+		})
+	}
+
+	dynamic := model.Tunnel{SessionID: 1, Name: "socks", Type: model.TunnelDynamic, LocalHost: "127.0.0.1", LocalPort: 1080}
+	require.NoError(t, validateTunnelBind(dynamic))
+}

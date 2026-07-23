@@ -16,17 +16,28 @@ import (
 )
 
 func TestValidateTunnelBindRejectsNonLoopback(t *testing.T) {
-	err := validateTunnelBind(model.Tunnel{Type: model.TunnelLocal, LocalHost: "0.0.0.0"})
+	err := validateTunnelBind(model.Tunnel{
+		SessionID: 1, Name: "local", Type: model.TunnelLocal,
+		LocalHost: "0.0.0.0", LocalPort: 8080, RemoteHost: "10.0.0.2", RemotePort: 80,
+	})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "loopback")
 
-	err = validateTunnelBind(model.Tunnel{Type: model.TunnelDynamic, LocalHost: "192.168.1.10"})
+	err = validateTunnelBind(model.Tunnel{
+		SessionID: 1, Name: "dyn", Type: model.TunnelDynamic, LocalHost: "192.168.1.10", LocalPort: 1080,
+	})
 	require.Error(t, err)
 
-	err = validateTunnelBind(model.Tunnel{Type: model.TunnelLocal, LocalHost: "127.0.0.1"})
+	err = validateTunnelBind(model.Tunnel{
+		SessionID: 1, Name: "local", Type: model.TunnelLocal,
+		LocalHost: "127.0.0.1", LocalPort: 8080, RemoteHost: "10.0.0.2", RemotePort: 80,
+	})
 	require.NoError(t, err)
 
-	err = validateTunnelBind(model.Tunnel{Type: model.TunnelRemote, LocalHost: "0.0.0.0"})
+	err = validateTunnelBind(model.Tunnel{
+		SessionID: 1, Name: "remote", Type: model.TunnelRemote,
+		LocalHost: "0.0.0.0", LocalPort: 0, RemoteHost: "0.0.0.0", RemotePort: 2222,
+	})
 	require.NoError(t, err)
 }
 

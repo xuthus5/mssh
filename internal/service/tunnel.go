@@ -7,6 +7,7 @@ import (
 	"net"
 	"strings"
 	"sync"
+	"unicode/utf8"
 
 	"github.com/xuthus5/mssh/internal/model"
 	"github.com/xuthus5/mssh/internal/store"
@@ -123,22 +124,87 @@ func (t *TunnelService) StopAll() {
 	}
 }
 
+const (
+	tunnelNameLimit = 128
+	tunnelHostLimit = 255
+)
+
 func validateTunnelBind(tunnel model.Tunnel) error {
+	if err := validateTunnelIdentity(tunnel); err != nil {
+		return err
+	}
+	if err := validateTunnelPorts(tunnel); err != nil {
+		return err
+	}
+	if err := validateTunnelHosts(tunnel); err != nil {
+		return err
+	}
+	return validateTunnelLocalLoopback(tunnel)
+}
+
+func validateTunnelIdentity(tunnel model.Tunnel) error {
+	if tunnel.SessionID <= 0 {
+		return fmt.Errorf("session_id is required")
+	}
+	name := strings.TrimSpace(tunnel.Name)
+	if name == "" || utf8.RuneCountInString(name) > tunnelNameLimit {
+		return fmt.Errorf("name must contain between 1 and %d characters", tunnelNameLimit)
+	}
+	if strings.ContainsRune(name, 0) {
+		return fmt.Errorf("name contains NUL")
+	}
+	switch tunnel.Type {
+	case model.TunnelLocal, model.TunnelRemote, model.TunnelDynamic:
+		return nil
+	default:
+		return fmt.Errorf("unsupported tunnel type %q", tunnel.Type)
+	}
+}
+
+func validateTunnelPorts(tunnel model.Tunnel) error {
 	if tunnel.LocalPort < 0 || tunnel.LocalPort > 65535 {
 		return fmt.Errorf("local port out of range")
 	}
-	if tunnel.Type != model.TunnelDynamic && (tunnel.RemotePort < 0 || tunnel.RemotePort > 65535) {
-		return fmt.Errorf("remote port out of range")
+	if tunnel.Type != model.TunnelDynamic && (tunnel.RemotePort < 1 || tunnel.RemotePort > 65535) {
+		return fmt.Errorf("remote port must be between 1 and 65535")
 	}
-	switch tunnel.Type {
-	case model.TunnelLocal, model.TunnelDynamic:
-		host := strings.TrimSpace(tunnel.LocalHost)
-		if host == "" {
+	return nil
+}
+
+func validateTunnelHosts(tunnel model.Tunnel) error {
+	if err := validateTunnelHostField("local_host", tunnel.LocalHost, true); err != nil {
+		return err
+	}
+	if tunnel.Type == model.TunnelDynamic {
+		return nil
+	}
+	return validateTunnelHostField("remote_host", tunnel.RemoteHost, false)
+}
+
+func validateTunnelLocalLoopback(tunnel model.Tunnel) error {
+	if tunnel.Type != model.TunnelLocal && tunnel.Type != model.TunnelDynamic {
+		return nil
+	}
+	host := strings.TrimSpace(tunnel.LocalHost)
+	if host == "" || isLoopbackHost(host) {
+		return nil
+	}
+	return fmt.Errorf("local/dynamic tunnels must bind loopback (127.0.0.1, ::1, localhost); got %q", host)
+}
+
+func validateTunnelHostField(field, host string, allowEmpty bool) error {
+	host = strings.TrimSpace(host)
+	if host == "" {
+		if allowEmpty {
 			return nil
 		}
-		if !isLoopbackHost(host) {
-			return fmt.Errorf("local/dynamic tunnels must bind loopback (127.0.0.1, ::1, localhost); got %q", host)
-		}
+		return fmt.Errorf("%s is required", field)
+	}
+	if strings.ContainsRune(host, 0) {
+		return fmt.Errorf("%s contains NUL", field)
+	}
+	if utf8.RuneCountInString(host) > tunnelHostLimit {
+		return fmt.Errorf("%s must not exceed %d characters", field, tunnelHostLimit)
 	}
 	return nil
 }

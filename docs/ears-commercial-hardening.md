@@ -475,3 +475,11 @@
 | SEC-SESSION-003 | AuthMethod 必须为 password/key/agent/keyboard-interactive；key 认证必须提供有效 key_id。 | done |
 | SEC-SESSION-004 | term_type 若提供必须满足长度上限；folder/key/environment/project 可选 ID 必须 >0。 | done |
 
+## 2026-07-23 商用硬化波次（隧道创建字段校验）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| SEC-TUNNEL-003 | Create/Update/Start 隧道必须校验 session_id、name、type，拒绝空名与未知类型。 | done |
+| SEC-TUNNEL-004 | local/remote 端口范围必须合法；非 dynamic 隧道 remote_port ∈ [1,65535] 且 remote_host 必填。 | done |
+| SEC-TUNNEL-005 | host 字段禁止 NUL 与超长；local/dynamic 仍强制 loopback 绑定。 | done |
+
