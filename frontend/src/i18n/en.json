@@ -1354,5 +1354,13 @@
   "鼠标右键行为": "Right-click behavior",
   "（手动输入）": "(manual)",
   "（空）": "( empty )",
-  "（默认）": " (default)"
+  "（默认）": " (default)",
+  "加载 AI 面板失败: ${}": "Failed to load AI panel: ${}",
+  "发送 AI 消息失败: ${}": "Failed to send AI message: ${}",
+  "加载对话历史失败: ${}": "Failed to load chat history: ${}",
+  "执行命令失败: ${}": "Failed to execute command: ${}",
+  "加载命令历史失败: ${}": "Failed to load command history: ${}",
+  "加载关于信息失败: ${}": "Failed to load about info: ${}",
+  "恢复工作区失败: ${}": "Failed to restore workspace: ${}",
+  "保存工作区失败: ${}": "Failed to save workspace: ${}"
 }

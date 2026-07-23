@@ -131,4 +131,11 @@ describe('MacrosWorkspace execute path', () => {
       expect(executeMacro).toHaveBeenCalledWith('term-1', 'uptime')
     })
   })
+
+  it('toasts macro list failures', async () => {
+    listMacros.mockRejectedValueOnce(new Error('list macros failed'))
+    render(<WorkspaceContent />)
+    expect(await screen.findByText('list macros failed')).toBeInTheDocument()
+    expect(toast).toHaveBeenCalledWith(expect.stringContaining('list macros failed'), 'error')
+  })
 })

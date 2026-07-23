@@ -44,7 +44,9 @@ export function CommandHistoryPanel({
           createdAt: Date.parse(item.created_at ?? item.createdAt ?? '') || Date.now(),
         })))
       } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error)
         logger.error('command history loading failed', error)
+        toast(t('加载命令历史失败: ${}', message), 'error')
       }
     }
     if (typeof CommandHistoryService?.List === 'function') void load()
