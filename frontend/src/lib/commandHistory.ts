@@ -67,6 +67,9 @@ export function recordCommand(sessionID: number, command: string, limits: Comman
   localStorage.setItem(`${prefix}${sessionID}`, JSON.stringify(trimCommandHistory(entries, limits)))
 }
 
-export function clearCommandHistory(sessionID: number): void {
+export async function clearCommandHistory(sessionID: number): Promise<void> {
+  if (sessionID > 0 && typeof CommandHistoryService?.Clear === 'function') {
+    await CommandHistoryService.Clear(sessionID)
+  }
   localStorage.removeItem(`${prefix}${sessionID}`)
 }

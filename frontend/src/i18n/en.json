@@ -1422,5 +1422,10 @@
   "调整资产排序失败: ${}": "Failed to reorder assets: ${}",
   "${}: ${}": "${}: ${}",
   "删除宏": "Delete macro",
-  "确认删除宏「${}」？此操作不可撤销。": "Delete macro “${}”? This cannot be undone."
+  "确认删除宏「${}」？此操作不可撤销。": "Delete macro “${}”? This cannot be undone.",
+  "清空命令历史": "Clear command history",
+  "确认清空当前会话的命令历史？此操作不可撤销。": "Clear command history for this session? This cannot be undone.",
+  "命令历史已清空": "Command history cleared",
+  "清空命令历史失败: ${}": "Failed to clear command history: ${}",
+  "清空": "Clear"
 }
