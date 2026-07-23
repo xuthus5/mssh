@@ -269,3 +269,11 @@
 | SEC-HIST-002 | 敏感命令被拒绝时不得返回错误（前端静默跳过），避免刷错误日志。 | done |
 | SYNC-SCHED-001 | 定时云同步在应用 vault 锁定或未配置时必须跳过本轮，不得将运行时状态置为 error，也不得写入失败同步事件。 | done |
 | SYNC-SCHED-002 | vault 解锁后下一定时 tick 必须可继续执行同步（调度器保持运行）。 | done |
+
+## 2026-07-23 商用硬化波次（HTTP 重定向 SSRF）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| SEC-HTTP-001 | 应用共享 HTTP 客户端（AI/同步/检查更新）必须限制重定向次数（<=5）。 | done |
+| SEC-HTTP-002 | 重定向目标必须拒绝非 http(s)、URL 凭据、链路本地/元数据主机，且非回环主机强制 HTTPS。 | done |
+| SEC-HTTP-003 | 跨主机重定向必须剥离 Authorization 与常见 API Key 头，防止密钥泄漏。 | done |
