@@ -441,3 +441,11 @@
 | TERM-RECONNECT-002 | 次级分屏自动重连必须通过 TerminalSplit 树内 reconnect（事件 `mssh:reconnect-split-pane`），保持布局与 splitPaneIDs 同步。 | done |
 | TERM-RECONNECT-003 | 串口连接仍不得自动重连。 | done |
 
+## 2026-07-23 商用硬化波次（密钥/备份操作错误可见）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| UX-SETTINGS-001 | 删除 SSH 密钥失败时必须 toast 错误，不得仅写 debug 日志并静默保持对话框关闭。 | done |
+| UX-SETTINGS-002 | 导出/导入本地加密备份失败时必须 toast 错误；成功时给出明确成功反馈。 | done |
+| UX-SETTINGS-003 | KeyManager 确认删除必须 await onDelete；失败时保持对话框可重试。 | done |
+

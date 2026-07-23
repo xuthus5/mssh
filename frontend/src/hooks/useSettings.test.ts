@@ -311,13 +311,34 @@ describe('useSettings', () => {
 
     await act(async () => {
       await result.current.importKey('bad', 'bad')
-      await result.current.deleteKey('1')
+      await expect(result.current.deleteKey('1')).rejects.toThrow('delete failed')
       await result.current.exportKey('1')
-      await result.current.exportConfig()
-      await result.current.importConfig()
+      await expect(result.current.exportConfig()).rejects.toThrow('dialog failed')
+      await expect(result.current.importConfig()).rejects.toThrow('dialog failed')
     })
 
     expect(result.current.keys).toEqual([])
     expect(result.current.systemFonts).toEqual(['sans-serif'])
+  })
+
+  it('surfaces delete and backup transfer failures to the user', async () => {
+    const toast = await import('@/components/ui/toast')
+    const toastSpy = vi.spyOn(toast, 'toast')
+    __registerHandler('github.com/xuthus5/mssh/internal/service.KeyService.Delete', async () => { throw new Error('delete failed') })
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SyncService.Export', async () => { throw new Error('export failed') })
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SyncService.Import', async () => { throw new Error('import failed') })
+    vi.spyOn(Dialogs, 'SaveFile').mockResolvedValue('/tmp/mssh-export.msshbackup')
+    vi.spyOn(Dialogs, 'OpenFile').mockResolvedValue(['/tmp/mssh-import.msshbackup'])
+    const { result } = renderHook(() => useSettings())
+
+    await act(async () => {
+      await expect(result.current.deleteKey('1')).rejects.toThrow('delete failed')
+      await expect(result.current.exportConfig()).rejects.toThrow('export failed')
+      await expect(result.current.importConfig()).rejects.toThrow('import failed')
+    })
+
+    expect(toastSpy).toHaveBeenCalledWith(expect.stringContaining('删除密钥'), 'error')
+    expect(toastSpy).toHaveBeenCalledWith(expect.stringContaining('导出本地备份'), 'error')
+    expect(toastSpy).toHaveBeenCalledWith(expect.stringContaining('导入本地备份'), 'error')
   })
 })
