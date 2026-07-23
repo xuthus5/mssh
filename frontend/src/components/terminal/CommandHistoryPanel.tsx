@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input'
 import { toast } from '@/components/ui/toast'
 import { getClipboard } from '@/lib/clipboard'
 import { clearCommandHistory, readCommandHistory, type CommandHistoryEntry } from '@/lib/commandHistory'
+import { requestConfirm } from '@/lib/confirmDialog'
 import { computeVirtualWindow } from '@/lib/virtualWindow'
 import { CommandHistoryService } from '@/lib/wails'
 import { logger } from '@/lib/logger'
@@ -72,9 +73,25 @@ export function CommandHistoryPanel({
       toast(t('复制失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
     }
   }
-  const clear = () => {
-    clearCommandHistory(sessionID)
-    setEntries([])
+  const clear = async () => {
+    if (entries.length === 0) return
+    const ok = await requestConfirm({
+      title: t('清空命令历史'),
+      description: t('确认清空当前会话的命令历史？此操作不可撤销。'),
+      confirmLabel: t('清空'),
+      cancelLabel: t('取消'),
+      destructive: true,
+    })
+    if (!ok) return
+    try {
+      await clearCommandHistory(sessionID)
+      setEntries([])
+      toast(t('命令历史已清空'), 'success')
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error)
+      logger.error('command history clear failed', error)
+      toast(t('清空命令历史失败: ${}', message), 'error')
+    }
   }
   const onScroll = (event: UIEvent<HTMLDivElement>) => {
     setScrollTop(event.currentTarget.scrollTop)
@@ -90,7 +107,7 @@ export function CommandHistoryPanel({
       </div>
       <div className="flex gap-2 border-b border-border p-2">
         <Input placeholder={t('搜索历史命令...')} value={query} onChange={(event) => setQuery(event.target.value)} />
-        <Button size="xs" variant="ghost" onClick={clear} disabled={entries.length === 0} title={t('清空历史')}><Trash2 /></Button>
+        <Button size="xs" variant="ghost" onClick={() => { void clear() }} disabled={entries.length === 0} title={t('清空历史')} aria-label={t('清空历史')}><Trash2 /></Button>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto p-2" onScroll={onScroll}>
         {filtered.length === 0 ? (
