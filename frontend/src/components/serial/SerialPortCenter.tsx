@@ -28,7 +28,7 @@ type DeleteTarget =
 
 export function SerialPortCenter() {
   const {
-    ports, devices, activeDevices, loading, error, refresh,
+    ports, devices, activeDevices, loading, error, deviceProbeError, activeMapError, refresh,
     createPort, updatePort, deletePort, deleteMany, duplicatePort, connectPort,
   } = useSerial()
   const [query, setQuery] = useState('')
@@ -149,6 +149,22 @@ export function SerialPortCenter() {
         <Alert variant="destructive" className="mb-4">
           <AlertDescription>
             {error}
+            <Button size="xs" variant="outline" className="ml-3" onClick={() => void refresh()}>{t('重试')}</Button>
+          </AlertDescription>
+        </Alert>
+      ) : null}
+      {deviceProbeError ? (
+        <Alert className="mb-4">
+          <AlertDescription>
+            {t('加载串口设备失败: ${}', deviceProbeError)}
+            <Button size="xs" variant="outline" className="ml-3" onClick={() => void refresh()}>{t('重试')}</Button>
+          </AlertDescription>
+        </Alert>
+      ) : null}
+      {activeMapError ? (
+        <Alert className="mb-4">
+          <AlertDescription>
+            {t('加载串口占用状态失败: ${}', activeMapError)}
             <Button size="xs" variant="outline" className="ml-3" onClick={() => void refresh()}>{t('重试')}</Button>
           </AlertDescription>
         </Alert>

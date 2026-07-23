@@ -1187,3 +1187,10 @@
 |---|---|---|
 | UX-ENG-110 | 前端生产源文件必须满足 ≤300 行门禁；`useSession.ts`/`useTerminal.ts` 超标完成拆分。 | done |
 | UX-TUNNEL-111 | 移除无 UI 消费的 `useSession.listTunnels` 死状态与 toast 路径；隧道列表仅由 `useTunnelManager` 承载。 | done |
+
+## 2026-07-24 商用硬化波次（串口探测错误归属与设置模型拆分）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| UX-SERIAL-112 | 串口设备/占用探测失败不得 toast 刷屏（含 5s 轮询）；须在串口中心以非破坏性 banner + 重试展示。 | done |
+| UX-ENG-113 | `useGeneralSettings` 拆分模型层以满足前端 ≤300 行门禁并降低超标风险。 | done |
