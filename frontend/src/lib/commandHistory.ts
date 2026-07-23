@@ -1,4 +1,4 @@
-import { CommandHistoryService } from '@/lib/wails'
+import * as Wails from '@/lib/wails'
 import { logger } from '@/lib/logger'
 
 export interface CommandHistoryEntry { id: string; command: string; createdAt: number }
@@ -9,6 +9,14 @@ export interface CommandHistoryLimits {
 }
 
 const prefix = 'mssh:command-history:'
+
+function commandHistoryAPI() {
+  return (Wails as { CommandHistoryService?: {
+    Add?: (sessionID: number, command: string) => Promise<unknown>
+    Clear?: (sessionID: number) => Promise<unknown>
+  } }).CommandHistoryService
+}
+
 const defaultLimits: CommandHistoryLimits = { maxEntries: 500, maxBytes: 256 * 1024 }
 
 export function getCommandHistoryLimits(): CommandHistoryLimits {
@@ -58,7 +66,7 @@ export function isSensitiveCommand(command: string): boolean {
 export function recordCommand(sessionID: number, command: string, limits: CommandHistoryLimits = defaultLimits): void {
   const value = command.trim()
   if (!value || isSensitiveCommand(value)) return
-  const persist = CommandHistoryService?.Add
+  const persist = commandHistoryAPI()?.Add
   if (sessionID > 0 && typeof persist === 'function') {
     void persist(sessionID, value).catch((error: unknown) => logger.error('command history persistence failed', error))
   }
@@ -68,8 +76,9 @@ export function recordCommand(sessionID: number, command: string, limits: Comman
 }
 
 export async function clearCommandHistory(sessionID: number): Promise<void> {
-  if (sessionID > 0 && typeof CommandHistoryService?.Clear === 'function') {
-    await CommandHistoryService.Clear(sessionID)
+  const clear = commandHistoryAPI()?.Clear
+  if (sessionID > 0 && typeof clear === 'function') {
+    await clear(sessionID)
   }
   localStorage.removeItem(`${prefix}${sessionID}`)
 }
