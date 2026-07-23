@@ -97,6 +97,9 @@ func (l *LogService) List(sessionID *int64) ([]model.SessionLog, error) {
 }
 
 func (l *LogService) StartTerminalRecording(terminalID string, sessionID int64, cols, rows int, termType string) (int64, error) {
+	if err := validateTerminalID(terminalID); err != nil {
+		return 0, err
+	}
 	l.logger.Info("starting terminal recording", "terminalID", terminalID, "sessionID", sessionID)
 	l.mu.Lock()
 	if l.shuttingDown {
@@ -214,6 +217,9 @@ func (l *LogService) closeAllActiveRecordings() error {
 }
 
 func (l *LogService) StopTerminalRecording(terminalID string) error {
+	if err := validateTerminalID(terminalID); err != nil {
+		return err
+	}
 	l.logger.Info("stopping terminal recording", "terminalID", terminalID)
 	recording, ok := l.takeRecording(terminalID)
 	if !ok {

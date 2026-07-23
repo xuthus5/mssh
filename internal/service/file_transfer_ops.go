@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/xuthus5/mssh/internal/ssh"
 	"github.com/xuthus5/mssh/pkg/event"
@@ -123,6 +124,9 @@ func (f *FileService) runDownload(ctx context.Context, taskID string, sftpClient
 
 // CancelTransfer cancels an in-progress file transfer.
 func (f *FileService) CancelTransfer(taskID string) error {
+	if strings.TrimSpace(taskID) == "" {
+		return fmt.Errorf("invalid task id")
+	}
 	f.logger.Info("cancelling transfer", "taskID", taskID)
 	f.mu.Lock()
 	cancel, ok := f.tasks[taskID]

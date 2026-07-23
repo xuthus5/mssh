@@ -1089,6 +1089,7 @@
   "终端发送 OSC 7 工作目录信息时，文件面板自动切换到该目录。": "When the terminal sends OSC 7 working-directory info, the file panel follows that directory.",
   "终端字体": "Terminalfont",
   "终端字号": "Terminalfont size",
+  "终端挂载失败: ${}": "Failed to attach terminal: ${}",
   "终端撰写面板": "Terminal Composepanel",
   "终端未返回 OSC 7 工作目录信息": "Terminal did not return OSC 7 working-directory info",
   "终端池已满": "Terminal pool is full",
