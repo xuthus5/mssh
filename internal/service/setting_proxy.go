@@ -147,5 +147,8 @@ func (s *SettingService) validateRuntimeSettings(entries []model.Setting) error 
 	if _, _, err := s.resolveProxySettings(entries); err != nil {
 		return err
 	}
+	if _, _, _, err := s.resolveLogSettings(entries); err != nil {
+		return err
+	}
 	return nil
 }

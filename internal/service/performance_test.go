@@ -9,6 +9,7 @@ import (
 	"github.com/xuthus5/mssh/internal/service/testutil"
 )
 
+// Runtime budgets (docs/performance-budgets.md).
 const (
 	terminalOutputBudget = 500 * time.Millisecond
 	monitorParsingBudget = 500 * time.Millisecond

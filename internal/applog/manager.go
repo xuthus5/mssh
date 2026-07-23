@@ -65,12 +65,33 @@ func DefaultDir() string {
 }
 
 // NormalizeDir returns the configured directory or the product default when empty.
+// Non-empty values are filepath.Clean'ed; call ValidateDir before persisting user input.
 func NormalizeDir(dir string) string {
 	dir = strings.TrimSpace(dir)
 	if dir == "" {
 		return DefaultDir()
 	}
-	return dir
+	return filepath.Clean(dir)
+}
+
+// ValidateDir validates a user-supplied log directory.
+// Empty input resolves to DefaultDir. Rejects NUL bytes, oversized paths, and cleaned "." / "..".
+func ValidateDir(dir string) (string, error) {
+	dir = strings.TrimSpace(dir)
+	if dir == "" {
+		return DefaultDir(), nil
+	}
+	if strings.ContainsRune(dir, 0) {
+		return "", fmt.Errorf("log directory contains NUL")
+	}
+	if len(dir) > 4096 {
+		return "", fmt.Errorf("log directory path is too long")
+	}
+	cleaned := filepath.Clean(dir)
+	if cleaned == "." || cleaned == ".." {
+		return "", fmt.Errorf("log directory is invalid")
+	}
+	return cleaned, nil
 }
 
 // NormalizeRetentionDays clamps retention into the supported range.
@@ -88,7 +109,11 @@ func NormalizeRetentionDays(days int) int {
 func (m *Manager) Configure(dir string, retentionDays int) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.dir = NormalizeDir(dir)
+	validated, err := ValidateDir(dir)
+	if err != nil {
+		return err
+	}
+	m.dir = validated
 	m.retention = NormalizeRetentionDays(retentionDays)
 	if err := m.ensureFileLocked(); err != nil {
 		return err

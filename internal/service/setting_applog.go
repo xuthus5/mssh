@@ -68,7 +68,11 @@ func (s *SettingService) resolveLogSettings(entries []model.Setting) (string, in
 	if !retentionChanged {
 		retention = s.currentLogRetention()
 	}
-	return applog.NormalizeDir(dir), applog.NormalizeRetentionDays(retention), true, nil
+	validated, err := applog.ValidateDir(dir)
+	if err != nil {
+		return "", 0, false, err
+	}
+	return validated, applog.NormalizeRetentionDays(retention), true, nil
 }
 
 func (s *SettingService) currentLogDir() string {
