@@ -41,10 +41,10 @@ export function registerSyncDataReload(reload: SyncDataReloadHandler): () => voi
 export function createAppSyncDataReload(options: {
   hotReload: () => Promise<void>
   hardReload?: () => void
-  confirmHardReload?: () => boolean
+  confirmHardReload?: () => Promise<boolean> | boolean
 }): SyncDataReloadHandler {
   const hardReload = options.hardReload ?? (() => { window.location.reload() })
-  const confirmHardReload = options.confirmHardReload ?? (() => window.confirm(t('同步数据已变更，热更新失败。是否重新加载应用？')))
+  const confirmHardReload = options.confirmHardReload ?? defaultConfirmHardReload
   return async () => {
     try {
       await options.hotReload()
@@ -52,7 +52,18 @@ export function createAppSyncDataReload(options: {
     } catch (error: unknown) {
       logger.error('hot reload after sync failed', error)
       toast(t('同步后热更新失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
-      if (confirmHardReload()) hardReload()
+      if (await confirmHardReload()) hardReload()
     }
   }
+}
+
+async function defaultConfirmHardReload(): Promise<boolean> {
+  const { requestConfirm } = await import('@/lib/confirmDialog')
+  return requestConfirm({
+    title: t('同步数据已变更'),
+    description: t('热更新失败。是否重新加载应用？'),
+    confirmLabel: t('重新加载'),
+    cancelLabel: t('取消'),
+    destructive: false,
+  })
 }

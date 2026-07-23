@@ -23,6 +23,6 @@ export function openTerminalWithPoolCapacity(
 
 export function ensureAppTerminalPoolCapacity(
   options?: Omit<EnsureTerminalPoolCapacityOptions, keyof TerminalPoolStoreAccess>,
-): boolean {
+): Promise<boolean> {
   return ensureTerminalPoolCapacity({ ...appStoreAccess(), ...options })
 }
