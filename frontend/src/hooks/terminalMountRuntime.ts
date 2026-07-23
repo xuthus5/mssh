@@ -214,16 +214,26 @@ export function initializeTerminal(containerRef: RefObject<HTMLDivElement | null
   const onHostMoved = (event: Event) => {
     const detail = (event as CustomEvent<{ terminalID?: string }>).detail
     if (!detail?.terminalID || detail.terminalID !== refs.terminalIDRef.current) return
-    runTerminalRuntime(reportRuntimeError, 'terminal host reparent', () => {
-      // WebGL contexts can be lost when the host is reparented across split slots.
-      rendererController.apply(useTerminalBehaviorStore.getState().renderer)
-      if (!fitAndRefresh(term, fitAddon, containerRef.current)) {
-        refs.recoveryPendingRef.current = true
-        return
-      }
-      refs.recoveryPendingRef.current = false
-      scheduleBackendResize(term, refs)
-    })
+    // Reparent can leave both active and inactive panes at zero size or with a lost GL context.
+    // Retry across frames even when the pane is not focused (common after split on the old shell).
+    cancelActivationFrame(refs.activationFrameRef)
+    refs.recoveryPendingRef.current = true
+    let attempts = 0
+    const recoverMovedHost = () => {
+      refs.activationFrameRef.current = null
+      attempts += 1
+      let recovered = false
+      const succeeded = runTerminalRuntime(reportRuntimeError, 'terminal host reparent', () => {
+        rendererController.apply(useTerminalBehaviorStore.getState().renderer)
+        if (!fitAndRefresh(term, fitAddon, containerRef.current)) return
+        recovered = true
+        refs.recoveryPendingRef.current = false
+        scheduleBackendResize(term, refs)
+      })
+      if (!succeeded || recovered || attempts >= 30 || disposed) return
+      refs.activationFrameRef.current = window.requestAnimationFrame(recoverMovedHost)
+    }
+    refs.activationFrameRef.current = window.requestAnimationFrame(recoverMovedHost)
   }
   window.addEventListener('mssh:terminal-host-moved', onHostMoved)
 
