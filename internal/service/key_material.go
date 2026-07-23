@@ -18,6 +18,9 @@ import (
 const maxPrivateKeyFileSize = 1024 * 1024
 
 func (k *KeyService) GetMaterial(id int64) (*model.SSHKeyMaterial, error) {
+	if id <= 0 {
+		return nil, fmt.Errorf("invalid key id")
+	}
 	outcome := "failed"
 	defer func() {
 		recordAudit(k.db, k.logger, model.AuditEvent{Action: "key_view", TargetType: "key", TargetID: fmt.Sprint(id), Summary: "查看 SSH 密钥材料", Outcome: outcome})
@@ -38,6 +41,9 @@ func (k *KeyService) GetMaterial(id int64) (*model.SSHKeyMaterial, error) {
 }
 
 func (k *KeyService) Update(input model.SSHKeyUpdateInput) (*model.SSHKeyMaterial, error) {
+	if input.ID <= 0 {
+		return nil, fmt.Errorf("invalid key id")
+	}
 	name, err := normalizedKeyName(input.Name)
 	if err != nil {
 		return nil, fmt.Errorf("update key: %w", err)

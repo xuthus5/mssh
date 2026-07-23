@@ -77,6 +77,9 @@ func (s *AIService) recordAIExecution(input model.AICommandExecutionInput, risk 
 }
 
 func (s *AIService) ListConversations(sessionID int64, limit int) ([]model.AIConversation, error) {
+	if sessionID <= 0 {
+		return nil, fmt.Errorf("invalid session id")
+	}
 	if limit <= 0 {
 		limit = 100
 	}
@@ -84,6 +87,9 @@ func (s *AIService) ListConversations(sessionID int64, limit int) ([]model.AICon
 }
 
 func (s *AIService) ListMessages(conversationID int64) ([]model.AIMessage, error) {
+	if conversationID <= 0 {
+		return nil, fmt.Errorf("invalid conversation id")
+	}
 	return store.ListAIMessages(s.db, conversationID)
 }
 

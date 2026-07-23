@@ -16,6 +16,9 @@ type syncLifecycle interface {
 }
 
 func (s *SyncService) RestoreVersion(id int64) error {
+	if id <= 0 {
+		return errors.New("invalid sync version id")
+	}
 	config, err := s.LoadConfig()
 	if err != nil {
 		return err

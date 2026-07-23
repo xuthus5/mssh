@@ -45,6 +45,9 @@ func (m *MacroService) Create(input model.MacroInput) (*model.Macro, error) {
 
 func (m *MacroService) Update(input model.MacroInput) error {
 	macro := input.Macro()
+	if macro.ID <= 0 {
+		return fmt.Errorf("invalid macro id")
+	}
 	if err := validateMacroPayload(macro); err != nil {
 		return err
 	}

@@ -209,6 +209,9 @@ func (s *AssetCatalogService) UpdateTag(input model.AssetTagInput) error {
 }
 
 func (s *AssetCatalogService) GetSessionAssetDetail(sessionID int64) (*model.Session, error) {
+	if sessionID <= 0 {
+		return nil, fmt.Errorf("invalid session id")
+	}
 	return store.GetSession(s.db, sessionID)
 }
 
