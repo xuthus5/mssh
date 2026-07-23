@@ -53,5 +53,9 @@ export function Unlock(input: model$0.SecurityUnlockInput): $CancellablePromise<
     });
 }
 
+export function VerifyPassword(password: string): $CancellablePromise<void> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.SecurityService.VerifyPassword", password);
+}
+
 // Private type creation functions
 const $$createType0 = model$0.SecurityStatus.createFrom;

@@ -35,9 +35,13 @@ describe('SessionCSVTransferActions', () => {
     await userEvent.click(screen.getByRole('button', { name: '已选 2 项' }))
     await userEvent.click(screen.getByRole('checkbox'))
     expect(screen.getByText(/密码将以明文写入 CSV/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /选择位置并导出/ })).toBeDisabled()
+    await userEvent.type(screen.getByLabelText('应用密码确认'), 'app-pass-12')
     await userEvent.click(screen.getByRole('button', { name: /选择位置并导出/ }))
 
-    await waitFor(() => expect(actions.exportSessionsCSV).toHaveBeenCalledWith({ path: '/tmp/sessions.csv', sessionIDs: ['3', '5'], includePasswords: true }))
+    await waitFor(() => expect(actions.exportSessionsCSV).toHaveBeenCalledWith({
+      path: '/tmp/sessions.csv', sessionIDs: ['3', '5'], includePasswords: true, confirmPassword: 'app-pass-12',
+    }))
     expect(Dialogs.SaveFile).toHaveBeenCalledWith(expect.objectContaining({ Title: '导出 SSH 会话 CSV' }))
   })
 

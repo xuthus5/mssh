@@ -11,6 +11,7 @@ export interface SessionCSVExportRequest {
   path: string
   sessionIDs: string[]
   includePasswords: boolean
+  confirmPassword?: string
 }
 
 export interface SessionCSVImportRequest {
@@ -25,6 +26,7 @@ export function useSessionCSVTransfer(refreshers: Refreshers) {
     return SessionService.ExportCSV(request.path, {
       session_ids: request.sessionIDs.map(Number),
       include_passwords: request.includePasswords,
+      confirm_password: request.includePasswords ? (request.confirmPassword ?? '') : '',
     })
   }, [])
 

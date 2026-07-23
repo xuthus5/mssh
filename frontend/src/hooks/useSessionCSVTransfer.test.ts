@@ -17,10 +17,10 @@ describe('useSessionCSVTransfer', () => {
     const { result } = renderHook(() => useSessionCSVTransfer({ refreshFolders, refreshAssets }))
 
     await act(async () => {
-      expect(await result.current.exportSessionsCSV({ path: '/tmp/sessions.csv', sessionIDs: ['3', '5'], includePasswords: true })).toEqual(expect.objectContaining({ count: 2 }))
+      expect(await result.current.exportSessionsCSV({ path: '/tmp/sessions.csv', sessionIDs: ['3', '5'], includePasswords: true, confirmPassword: 'app-pass-12' })).toEqual(expect.objectContaining({ count: 2 }))
     })
 
-    expect(handler).toHaveBeenCalledWith('/tmp/sessions.csv', { session_ids: [3, 5], include_passwords: true })
+    expect(handler).toHaveBeenCalledWith('/tmp/sessions.csv', { session_ids: [3, 5], include_passwords: true, confirm_password: 'app-pass-12' })
     expect(refreshFolders).not.toHaveBeenCalled()
   })
 

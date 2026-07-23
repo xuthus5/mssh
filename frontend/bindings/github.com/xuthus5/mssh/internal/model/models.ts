@@ -2373,6 +2373,7 @@ export enum SessionCSVConflictPolicy {
 export class SessionCSVExportOptions {
     "session_ids": number[];
     "include_passwords": boolean;
+    "confirm_password"?: string;
 
     /** Creates a new SessionCSVExportOptions instance. */
     constructor($$source: Partial<SessionCSVExportOptions> = {}) {

@@ -63,6 +63,9 @@ func (s *SessionService) ExportCSV(path string, options model.SessionCSVExportOp
 		return result, fmt.Errorf("export session csv: %w", err)
 	}
 	if options.IncludePasswords {
+		if err := s.requireExportPasswordConfirmation(options.ConfirmPassword); err != nil {
+			return result, err
+		}
 		sessions, err = s.decryptSessionPasswordsForExport(sessions)
 		if err != nil {
 			return result, fmt.Errorf("export session csv: %w", err)
@@ -276,4 +279,14 @@ func (s *SessionService) decryptSessionPasswordsForExport(sessions []model.Sessi
 		out[i].Password = plain
 	}
 	return out, nil
+}
+
+func (s *SessionService) requireExportPasswordConfirmation(password string) error {
+	if s.passwords == nil {
+		return fmt.Errorf("export with passwords requires application password verification")
+	}
+	if err := s.passwords.VerifyPassword(password); err != nil {
+		return fmt.Errorf("confirm application password: %w", err)
+	}
+	return nil
 }

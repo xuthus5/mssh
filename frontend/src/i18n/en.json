@@ -1310,5 +1310,8 @@
   "配置 AI 可调用的网络搜索能力与凭据。": "Configure web search capabilities and credentials available to AI.",
   "自动": "Automatic",
   "主机：${}\n端口：${}\n用户：${}": "Host: ${}\nPort: ${}\nUser: ${}",
-  "清除已保存代理密码": "Clear saved proxy password"
+  "清除已保存代理密码": "Clear saved proxy password",
+  "应用密码确认": "Confirm application password",
+  "导出含密码时需验证应用密码": "Required when exporting passwords",
+  "二次验证可防止已解锁设备被他人直接导出明文密码。": "Step-up verification prevents exporting plaintext passwords from an unlocked device without the app password."
 }
