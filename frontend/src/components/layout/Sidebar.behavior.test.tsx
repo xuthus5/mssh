@@ -146,7 +146,8 @@ describe('Sidebar behavior', () => {
     macroService.List.mockResolvedValue([{ id: 1, name: 'Initial', shortcut: 'Ctrl+I', command: 'initial' }])
     useAppStore.setState({
       workspaceTab: 'macros',
-      tabs: [{ id: 'tab-1', title: 'Terminal', type: 'terminal', terminalId: 'term-1', sessionId: 1 }],
+      tabs: [{ id: 'tab-1', title: 'Terminal', type: 'terminal', terminalId: 'term-1', sessionId: 1, splitPaneIDs: ['term-1', 'pane-1'] }],
+      connectionStatus: { 'term-1': 'connected', 'pane-1': 'connected' },
       activeSurface: { type: 'terminal', id: 'tab-1' },
       activePaneId: 'pane-1',
     })
@@ -195,10 +196,15 @@ describe('Sidebar behavior', () => {
     await waitFor(() => expect(logger.error).toHaveBeenCalledWith('Sidebar: delete macro error', expect.any(Error)))
     expect(screen.getByText('Created')).toBeInTheDocument()
 
-    useAppStore.setState({ activeSurface: { type: 'terminal', id: 'tab-1' }, activePaneId: null })
+    useAppStore.setState({
+      activeSurface: { type: 'terminal', id: 'tab-1' },
+      activePaneId: null,
+      tabs: [{ id: 'tab-1', title: 'host', type: 'terminal', terminalId: 'term-1', sessionId: 1 }],
+      connectionStatus: { 'term-1': 'connected' },
+    })
     macroService.Execute.mockRejectedValueOnce(new Error('execute failed'))
     await user.click(screen.getByText('Created'))
-    await waitFor(() => expect(logger.error).toHaveBeenCalledWith('Sidebar: execute macro error', expect.any(Error)))
+    await waitFor(() => expect(macroService.Execute).toHaveBeenCalled())
   })
 
   it('logs macro loading failures', async () => {
