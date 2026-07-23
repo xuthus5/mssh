@@ -63,7 +63,7 @@ export function useSplitLayoutRestore(options: Options): boolean {
         const restored = await restoreSplitTreeFromLayout(
           layout,
           primaryRef.current,
-          () => openSplitTerminal(sessionId, connectionKind, serialPortId, t('串口终端为设备独占，不支持分屏')),
+          () => openSplitTerminal(sessionId, connectionKind, serialPortId, t('串口终端为设备独占，不支持分屏'), primaryRef.current),
         )
         if (!restored) return
         if (cancelled || !mountedRef.current) {

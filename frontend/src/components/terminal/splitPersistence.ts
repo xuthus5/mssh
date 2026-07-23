@@ -8,6 +8,7 @@ import {
 } from '@/components/terminal/splitLayout'
 import { splitLeaf, type SplitNode } from '@/components/terminal/splitTree'
 import { logger } from '@/lib/logger'
+import { resolveOpenTerminalSize } from '@/lib/terminalOpenSize'
 
 export function readTabSplitLayout(tabID: string): SplitLayoutSnapshot | null {
   const tab = useAppStore.getState().tabs.find((item) => item.id === tabID && item.type === 'terminal')
@@ -85,10 +86,12 @@ export function openSplitTerminal(
   connectionKind: 'ssh' | 'serial' | 'local' | undefined,
   serialPortId: number | undefined,
   serialBlockedMessage: string,
+  preferredTerminalID?: string | null,
 ): Promise<string> {
-  if (connectionKind === 'local') return TerminalService.OpenLocal(80, 24)
+  const size = resolveOpenTerminalSize(preferredTerminalID)
+  if (connectionKind === 'local') return TerminalService.OpenLocal(size.cols, size.rows)
   if (connectionKind === 'serial') throw new Error(serialBlockedMessage)
-  return TerminalService.Open(sessionId, 80, 24)
+  return TerminalService.Open(sessionId, size.cols, size.rows)
 }
 
 export function closeInBackground(terminalID: string, context: string, isNotFound: (error: unknown) => boolean) {

@@ -56,8 +56,8 @@ function bgClose(terminalID: string, context: string) {
   closeInBackground(terminalID, context, isTerminalNotFoundError)
 }
 
-function openPane(sessionId: number, connectionKind: Props['connectionKind'], serialPortId?: number) {
-  return openSplitTerminal(sessionId, connectionKind, serialPortId, t('串口终端为设备独占，不支持分屏'))
+function openPane(sessionId: number, connectionKind: Props['connectionKind'], serialPortId: number | undefined, preferredTerminalID: string) {
+  return openSplitTerminal(sessionId, connectionKind, serialPortId, t('串口终端为设备独占，不支持分屏'), preferredTerminalID)
 }
 
 export const TerminalSplit = forwardRef<TerminalSplitHandle, Props>(function TerminalSplit({
@@ -147,7 +147,7 @@ export const TerminalSplit = forwardRef<TerminalSplitHandle, Props>(function Ter
     operationRef.current = true
     setBusy(true)
     try {
-      const terminalID = await openTerminalWithPoolCapacity(() => openPane(sessionId, connectionKind, serialPortId))
+      const terminalID = await openTerminalWithPoolCapacity(() => openPane(sessionId, connectionKind, serialPortId, primaryRef.current))
       if (!mountedRef.current) return bgClose(terminalID, 'TerminalSplit: cancelled split cleanup failed')
       setTree((current) => insertSplit(current, targetID, terminalID, direction, crypto.randomUUID()))
       useAppStore.getState().setConnectionStatus(terminalID, 'connected')
@@ -196,7 +196,7 @@ export const TerminalSplit = forwardRef<TerminalSplitHandle, Props>(function Ter
     useAppStore.getState().setConnectionStatus(terminalID, 'reconnecting')
     setBusy(true)
     try {
-      const nextID = await openTerminalWithPoolCapacity(() => openPane(sessionId, connectionKind, serialPortId))
+      const nextID = await openTerminalWithPoolCapacity(() => openPane(sessionId, connectionKind, serialPortId, primaryRef.current))
       if (!mountedRef.current) return bgClose(nextID, 'TerminalSplit: cancelled reconnect cleanup failed')
       setTree((current) => replaceTerminal(current, terminalID, nextID))
       if (terminalID === primaryID) {
