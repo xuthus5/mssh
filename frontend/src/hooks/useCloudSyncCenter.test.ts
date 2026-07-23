@@ -85,7 +85,6 @@ describe('useCloudSyncCenter', () => {
     const messages = useToastStore.getState().toasts.map((item) => `${item.type}:${item.message}`)
     expect(messages.some((item) => item.startsWith('error:') && item.includes('失败'))).toBe(true)
   })
-})
 
   it('sets page error when dashboard load fails without toast', async () => {
     const { useToastStore } = await import('@/components/ui/toast')
@@ -98,3 +97,4 @@ describe('useCloudSyncCenter', () => {
     expect(result.current.error).toBe('dashboard load failed')
     expect(useToastStore.getState().toasts).toHaveLength(0)
   })
+})

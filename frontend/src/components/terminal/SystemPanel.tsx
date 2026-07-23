@@ -116,6 +116,7 @@ function ProcessesView({ processes, query, onQueryChange }: { processes: Process
 function useSystemInfo(terminalID: string) {
   const [info, setInfo] = useState<Info | null>(null)
   const [failed, setFailed] = useState(false)
+  const [attempt, setAttempt] = useState(0)
   useEffect(() => {
     let cancelled = false
     let timer: number | null = null
@@ -139,16 +140,18 @@ function useSystemInfo(terminalID: string) {
         if (!cancelled) setFailed(true)
       }
     }
+    setFailed(false)
     void load()
     timer = window.setInterval(() => { void load() }, 3000)
     return () => { cancelled = true; stop() }
-  }, [terminalID])
-  return { info, failed }
+  }, [terminalID, attempt])
+  return { info, failed, retry: () => setAttempt((value) => value + 1) }
 }
 
 function useProcesses(terminalID: string, active: boolean) {
   const [processes, setProcesses] = useState<Process[]>([])
   const [failed, setFailed] = useState(false)
+  const [attempt, setAttempt] = useState(0)
   useEffect(() => {
     if (!active) return
     let cancelled = false
@@ -173,11 +176,21 @@ function useProcesses(terminalID: string, active: boolean) {
         if (!cancelled) setFailed(true)
       }
     }
+    setFailed(false)
     void load()
     timer = window.setInterval(() => { void load() }, 5000)
     return () => { cancelled = true; stop() }
-  }, [active, terminalID])
-  return { processes, failed }
+  }, [active, terminalID, attempt])
+  return { processes, failed, retry: () => setAttempt((value) => value + 1) }
+}
+
+function CollectionError({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return (
+    <div role="alert" className="flex flex-wrap items-center gap-2 text-sm text-destructive">
+      <span>{message}</span>
+      <Button type="button" size="xs" variant="outline" onClick={onRetry}>{t('重试')}</Button>
+    </div>
+  )
 }
 
 export function SystemPanel({ terminalID, onClose }: { terminalID: string; onClose: () => void }) {
@@ -195,10 +208,10 @@ export function SystemPanel({ terminalID, onClose }: { terminalID: string; onClo
     <Tabs value={tab} onValueChange={setTab} className="flex min-h-0 flex-1 flex-col">
       <TabsList className="mx-4 mt-3"><TabsTrigger value="overview">{t('概览')}</TabsTrigger><TabsTrigger value="processes">{t('进程')}</TabsTrigger></TabsList>
       <TabsContent value="overview" className="min-h-0 flex-1 overflow-y-auto p-4">
-        {system.failed ? <p className="text-sm text-destructive">{t('系统信息采集失败')}</p> : system.info ? <Overview info={system.info} /> : <p className="text-sm text-muted-foreground">{t('正在采集系统信息...')}</p>}
+        {system.failed ? <CollectionError message={t('系统信息采集失败')} onRetry={system.retry} /> : system.info ? <Overview info={system.info} /> : <p className="text-sm text-muted-foreground">{t('正在采集系统信息...')}</p>}
       </TabsContent>
       <TabsContent value="processes" className="min-h-0 flex-1 overflow-y-auto p-4">
-        {processState.failed ? <p className="text-sm text-destructive">{t('进程信息采集失败')}</p> : <ProcessesView processes={processState.processes} query={query} onQueryChange={setQuery} />}
+        {processState.failed ? <CollectionError message={t('进程信息采集失败')} onRetry={processState.retry} /> : <ProcessesView processes={processState.processes} query={query} onQueryChange={setQuery} />}
       </TabsContent>
     </Tabs>
   </aside>
