@@ -54,6 +54,7 @@ type SessionService struct {
 	logger    *slog.Logger
 	passwords PasswordVerifier
 	tunnels   SessionTunnelStopper
+	transfers SessionTransferCanceller
 }
 
 type connectAttempt struct {

@@ -1036,3 +1036,11 @@
 | UX-SERIAL-055 | 串口 mutation/连接成功后，silent refresh 失败不得写入页面 error banner 或 toast「加载串口配置失败」。 | done |
 | UX-SFTP-056 | 删除/重命名/新建目录成功后的目录重载失败不得 toast「加载文件列表失败」。 | done |
 
+## 2026-07-24 商用硬化波次（删除会话取消进行中传输）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| UX-TRANSFER-057 | 删除/批量删除会话前必须取消该会话仍在进行中的 SFTP 上传/下载（取消 context），并释放相关连接。 | done |
+| UX-TRANSFER-058 | 对应 transfer_jobs 中 queued/running 任务标记为 cancelled（原因：会话已删除），前端传输中心可通过 complete 事件收敛为 cancelled。 | done |
+| UX-TRANSFER-059 | 会话删除影响分析需统计进行中传输数量，并在删除确认文案中展示。 | done |
+

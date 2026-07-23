@@ -2,6 +2,7 @@ package service
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -25,7 +26,13 @@ func TestSessionAndKeyDeleteImpact(t *testing.T) {
 
 	impact, err := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger()).SessionDeleteImpact(session.ID)
 	require.NoError(t, err)
-	require.Equal(t, &model.SessionDeleteImpact{Tunnels: 1, History: 1, Recordings: 1}, impact)
+	require.Equal(t, &model.SessionDeleteImpact{Tunnels: 1, History: 1, Recordings: 1, Transfers: 0}, impact)
+
+	err = store.CreateTransferJob(db, model.TransferJob{ID: "file-impact", SessionID: session.ID, SessionName: session.Name, Direction: "upload", SourcePath: "/l", TargetPath: "/r", Status: "running", StartedAt: time.Now()})
+	require.NoError(t, err)
+	impact, err = NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger()).SessionDeleteImpact(session.ID)
+	require.NoError(t, err)
+	require.Equal(t, &model.SessionDeleteImpact{Tunnels: 1, History: 1, Recordings: 1, Transfers: 1}, impact)
 	usage, err := NewKeyService(db, nil, testutil.NewTestLogger()).UsageCount(key.ID)
 	require.NoError(t, err)
 	require.Equal(t, 1, usage)
