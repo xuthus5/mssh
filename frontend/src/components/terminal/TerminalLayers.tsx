@@ -71,14 +71,26 @@ function FilePanelContainer({ sessionID, terminalID, onClose }: { sessionID: num
   const loadedInitialPath = useRef(false)
   const [syncingCurrentDirectory, setSyncingCurrentDirectory] = useState(false)
 
+  const runSftpAction = useCallback((action: Promise<unknown>, failureKey: string) => {
+    void action.catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error)
+      toast(t(failureKey, message), 'error')
+    })
+  }, [])
+
   useEffect(() => {
     if (!loadedInitialPath.current) {
       loadedInitialPath.current = true
-      void transfer.listFiles(followTerminalDirectory && terminalDirectory ? terminalDirectory : '/')
+      runSftpAction(
+        transfer.listFiles(followTerminalDirectory && terminalDirectory ? terminalDirectory : '/'),
+        '加载文件列表失败: ${}',
+      )
       return
     }
-    if (followTerminalDirectory && terminalDirectory) void transfer.listFiles(terminalDirectory)
-  }, [followTerminalDirectory, terminalDirectory, transfer.listFiles])
+    if (followTerminalDirectory && terminalDirectory) {
+      runSftpAction(transfer.listFiles(terminalDirectory), '加载文件列表失败: ${}')
+    }
+  }, [followTerminalDirectory, runSftpAction, terminalDirectory, transfer.listFiles])
 
   const syncCurrentDirectory = useCallback(async () => {
     if (syncingCurrentDirectory) return
@@ -99,17 +111,29 @@ function FilePanelContainer({ sessionID, terminalID, onClose }: { sessionID: num
     const files = event.data?.files ?? []
     const targetID = event.data?.details?.id
     if (files.length === 0 || targetID !== dropTargetID) return
-    void transfer.uploadMany(files, transfer.currentPath)
-  }), [dropTargetID, transfer.currentPath, transfer.uploadMany])
+    runSftpAction(transfer.uploadMany(files, transfer.currentPath), '上传失败: ${}')
+  }), [dropTargetID, runSftpAction, transfer.currentPath, transfer.uploadMany])
 
   const handleUpload = useCallback(async () => {
-    const selected = await Dialogs.OpenFile({ Title: t('选择要上传的文件'), CanChooseFiles: true, CanChooseDirectories: false, AllowsMultipleSelection: false })
-    const localPath = typeof selected === 'string' ? selected : selected[0]
+    let localPath = ''
+    try {
+      const selected = await Dialogs.OpenFile({ Title: t('选择要上传的文件'), CanChooseFiles: true, CanChooseDirectories: false, AllowsMultipleSelection: false })
+      localPath = typeof selected === 'string' ? selected : selected?.[0] ?? ''
+    } catch (error) {
+      toast(t('选择上传文件失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
+      return
+    }
     if (localPath) await transfer.upload(localPath, transfer.currentPath)
   }, [transfer.currentPath, transfer.upload])
 
   const handleDownload = useCallback(async (remotePath: string) => {
-    const localPath = await Dialogs.SaveFile({ Title: t('选择下载位置'), Filename: remotePath.split('/').pop() ?? 'download', CanCreateDirectories: true })
+    let localPath = ''
+    try {
+      localPath = await Dialogs.SaveFile({ Title: t('选择下载位置'), Filename: remotePath.split('/').pop() ?? 'download', CanCreateDirectories: true }) ?? ''
+    } catch (error) {
+      toast(t('选择下载位置失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
+      return
+    }
     if (localPath) await transfer.download(remotePath, localPath)
   }, [transfer.download])
 

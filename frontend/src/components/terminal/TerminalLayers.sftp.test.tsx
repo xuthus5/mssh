@@ -8,7 +8,27 @@ const transfer = vi.hoisted(() => ({
   download: vi.fn(async () => {}),
 }))
 const terminalService = vi.hoisted(() => ({ write: vi.fn(async (_terminalID: string, _data: string) => 0) }))
+type DropHandler = (event: { data?: { files?: string[]; details?: { id?: string } } }) => void
+const runtime = vi.hoisted(() => ({
+  openFile: vi.fn(async (..._args: unknown[]) => ''),
+  saveFile: vi.fn(async (..._args: unknown[]) => ''),
+  onFilesDropped: vi.fn((_handler?: DropHandler) => vi.fn()),
+}))
+const notify = vi.hoisted(() => vi.fn((..._args: unknown[]) => undefined))
 
+vi.mock('@wailsio/runtime', () => ({
+  Dialogs: {
+    OpenFile: (...args: unknown[]) => runtime.openFile(...args),
+    SaveFile: (...args: unknown[]) => runtime.saveFile(...args),
+  },
+  Events: {
+    On: (name: string, handler: DropHandler) => {
+      if (name === 'sftp:files-dropped') return runtime.onFilesDropped(handler)
+      return vi.fn()
+    },
+  },
+}))
+vi.mock('@/components/ui/toast', () => ({ toast: (...args: unknown[]) => notify(...args) }))
 vi.mock('@/components/terminal/TerminalTab', () => ({
   TerminalTab: ({ terminalID, onOpenFiles, onPaneClosed, onPaneReplaced }: {
     terminalID: string
@@ -26,9 +46,18 @@ vi.mock('@/components/terminal/TerminalTab', () => ({
 }))
 vi.mock('@/components/terminal/PlaybackTab', () => ({ PlaybackTab: () => null }))
 vi.mock('@/components/file/FilePanel', () => ({
-  default: ({ dropTargetId, showHiddenFiles, defaultView, onSyncCurrentDirectory }: { dropTargetId: string; showHiddenFiles: boolean; defaultView: string; onSyncCurrentDirectory: () => void }) => (
+  default: ({ dropTargetId, showHiddenFiles, defaultView, onSyncCurrentDirectory, onUpload, onDownload }: {
+    dropTargetId: string
+    showHiddenFiles: boolean
+    defaultView: string
+    onSyncCurrentDirectory: () => void
+    onUpload: () => void
+    onDownload: (path: string) => void
+  }) => (
     <div data-testid="file-panel" data-drop-target-id={dropTargetId} data-show-hidden={String(showHiddenFiles)} data-default-view={defaultView}>
       <button type="button" onClick={onSyncCurrentDirectory}>同步当前目录</button>
+      <button type="button" onClick={onUpload}>upload</button>
+      <button type="button" onClick={() => onDownload('/remote/app.log')}>download</button>
     </div>
   ),
 }))
@@ -48,6 +77,11 @@ import { MANUAL_TERMINAL_DIRECTORY_REPORT } from '@/hooks/terminalDirectoryRunti
 describe('TerminalLayers SFTP isolation', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    notify.mockReset()
+    runtime.openFile.mockReset()
+    runtime.saveFile.mockReset()
+    runtime.onFilesDropped.mockReset()
+    runtime.onFilesDropped.mockImplementation(() => vi.fn())
     useSFTPSettingsStore.setState({ showHiddenFiles: false, followTerminalDirectory: false, defaultView: 'list' })
     useTerminalDirectoryStore.setState({ directories: {}, revisions: {} })
     terminalService.write.mockImplementation(async (terminalID: string, _data: string) => {
@@ -119,5 +153,50 @@ describe('TerminalLayers SFTP isolation', () => {
     act(() => store.activateTab('terminal-a'))
     expect(within(terminalA).getByTestId('file-panel')).toBeInTheDocument()
     expect(within(terminalB).getByTestId('file-panel')).toBeInTheDocument()
+  })
+
+  it('surfaces upload dialog failures without unhandled rejections', async () => {
+    runtime.openFile.mockRejectedValue(new Error('picker unavailable'))
+    render(<TerminalLayers />)
+    const terminalA = (await screen.findByTestId('terminal-term-a')).closest('[data-layer-id="terminal-a"]') as HTMLElement
+    fireEvent.click(within(terminalA).getByRole('button', { name: 'files' }))
+    fireEvent.click(await within(terminalA).findByRole('button', { name: 'upload' }))
+    await waitFor(() => expect(notify).toHaveBeenCalledWith('选择上传文件失败: picker unavailable', 'error'))
+    expect(transfer.upload).not.toHaveBeenCalled()
+  })
+
+  it('surfaces download dialog failures without unhandled rejections', async () => {
+    runtime.saveFile.mockRejectedValue(new Error('save cancelled hard'))
+    render(<TerminalLayers />)
+    const terminalA = (await screen.findByTestId('terminal-term-a')).closest('[data-layer-id="terminal-a"]') as HTMLElement
+    fireEvent.click(within(terminalA).getByRole('button', { name: 'files' }))
+    fireEvent.click(await within(terminalA).findByRole('button', { name: 'download' }))
+    await waitFor(() => expect(notify).toHaveBeenCalledWith('选择下载位置失败: save cancelled hard', 'error'))
+    expect(transfer.download).not.toHaveBeenCalled()
+  })
+
+  it('catches listFiles rejections from initial directory load', async () => {
+    transfer.listFiles.mockRejectedValueOnce(new Error('sftp offline'))
+    render(<TerminalLayers />)
+    const terminalA = (await screen.findByTestId('terminal-term-a')).closest('[data-layer-id="terminal-a"]') as HTMLElement
+    fireEvent.click(within(terminalA).getByRole('button', { name: 'files' }))
+    await waitFor(() => expect(notify).toHaveBeenCalledWith('加载文件列表失败: sftp offline', 'error'))
+  })
+
+  it('catches drop-upload promise rejections', async () => {
+    let dropHandler: ((event: { data?: { files?: string[]; details?: { id?: string } } }) => void) | undefined
+    runtime.onFilesDropped.mockImplementation((handler?: DropHandler) => {
+      dropHandler = handler
+      return vi.fn()
+    })
+    transfer.uploadMany.mockRejectedValueOnce(new Error('drop denied'))
+    render(<TerminalLayers />)
+    const terminalA = (await screen.findByTestId('terminal-term-a')).closest('[data-layer-id="terminal-a"]') as HTMLElement
+    fireEvent.click(within(terminalA).getByRole('button', { name: 'files' }))
+    await within(terminalA).findByTestId('file-panel')
+    expect(dropHandler).toBeTypeOf('function')
+    dropHandler?.({ data: { files: ['/tmp/a.txt'], details: { id: 'sftp-drop-zone-term-a' } } })
+    await waitFor(() => expect(transfer.uploadMany).toHaveBeenCalledWith(['/tmp/a.txt'], '/'))
+    await waitFor(() => expect(notify).toHaveBeenCalledWith('上传失败: drop denied', 'error'))
   })
 })
