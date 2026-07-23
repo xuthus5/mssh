@@ -26,6 +26,14 @@ export function persistTabSplitLayout(tabID: string, tree: SplitNode, primaryID:
 
 type OpenFn = () => Promise<string>
 
+export function closeExtraSplitPanes(terminalIDs: string[], context: string): void {
+  for (const id of terminalIDs) {
+    void TerminalService.Close(id).catch((closeErr: unknown) => {
+      logger.error(context, closeErr)
+    })
+  }
+}
+
 export async function openExtraSplitPanes(
   count: number,
   openOne: OpenFn,
@@ -39,35 +47,34 @@ export async function openExtraSplitPanes(
     }
     return ids
   } catch (error) {
-    for (const id of ids) {
-      void TerminalService.Close(id).catch((closeErr: unknown) => {
-        logger.error('split restore cleanup failed', closeErr)
-      })
-    }
+    closeExtraSplitPanes(ids, 'split restore cleanup failed')
     throw error
   }
+}
+
+export type RestoredSplitLayout = {
+  tree: SplitNode
+  /** Secondary terminal IDs opened during restore; callers must close these if they discard the tree. */
+  extraTerminalIDs: string[]
 }
 
 export async function restoreSplitTreeFromLayout(
   layout: SplitLayoutSnapshot,
   primaryID: string,
   openOne: OpenFn,
-): Promise<SplitNode | null> {
+): Promise<RestoredSplitLayout | null> {
   if (!layout || layout.paneCount < 2) return null
   const extra = layout.paneCount - 1
   const extras = await openExtraSplitPanes(extra, openOne)
   const terminalIDs = [primaryID, ...extras]
   const tree = materializeSplitLayout(layout, terminalIDs)
   if (!tree) {
-    for (const id of extras) {
-      void TerminalService.Close(id).catch((closeErr: unknown) => {
-        logger.error('split restore materialize cleanup failed', closeErr)
-      })
-    }
+    closeExtraSplitPanes(extras, 'split restore materialize cleanup failed')
     return null
   }
-  return tree
+  return { tree, extraTerminalIDs: extras }
 }
+
 
 export function initialSplitTree(primaryID: string): SplitNode {
   return splitLeaf(primaryID)
