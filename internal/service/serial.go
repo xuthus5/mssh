@@ -148,15 +148,16 @@ func (s *SerialService) releaseDevice(device, terminalID string) {
 
 func normalizeSerialPort(port model.SerialPort) (model.SerialPort, error) {
 	port.Name = strings.TrimSpace(port.Name)
-	port.Device = serial.CanonicalDevicePath(port.Device)
+	device, err := serial.ValidateDevicePath(port.Device)
+	if err != nil {
+		return model.SerialPort{}, err
+	}
+	port.Device = device
 	port.Notes = strings.TrimSpace(port.Notes)
 	port.FlowControl = strings.TrimSpace(port.FlowControl)
 	port.LineEnding = model.SerialLineEnding(strings.TrimSpace(string(port.LineEnding)))
 	if port.Name == "" {
 		return model.SerialPort{}, fmt.Errorf("serial port name is required")
-	}
-	if port.Device == "" {
-		return model.SerialPort{}, fmt.Errorf("serial device is required")
 	}
 	baud, err := normalizeBaudRate(port.BaudRate)
 	if err != nil {
