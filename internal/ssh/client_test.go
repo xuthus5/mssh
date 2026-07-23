@@ -272,3 +272,34 @@ func TestVerifyHostKeyBlocksChangedKey(t *testing.T) {
 	assert.Contains(t, err.Error(), gossh.FingerprintSHA256(keyA))
 	assert.Contains(t, err.Error(), gossh.FingerprintSHA256(keyB))
 }
+
+func TestAppendKnownHostConcurrent(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "known_hosts")
+	pubA, _, err := ed25519.GenerateKey(rand.Reader)
+	require.NoError(t, err)
+	pubB, _, err := ed25519.GenerateKey(rand.Reader)
+	require.NoError(t, err)
+	keyA, err := gossh.NewPublicKey(pubA)
+	require.NoError(t, err)
+	keyB, err := gossh.NewPublicKey(pubB)
+	require.NoError(t, err)
+
+	var waitGroup sync.WaitGroup
+	waitGroup.Add(2)
+	go func() {
+		defer waitGroup.Done()
+		require.NoError(t, appendKnownHost(path, "a.example.com", keyA))
+	}()
+	go func() {
+		defer waitGroup.Done()
+		require.NoError(t, appendKnownHost(path, "b.example.com", keyB))
+	}()
+	waitGroup.Wait()
+
+	content, err := os.ReadFile(path)
+	require.NoError(t, err)
+	lines := strings.Split(strings.TrimSpace(string(content)), "\n")
+	require.Len(t, lines, 2)
+	assert.Contains(t, string(content), "a.example.com")
+	assert.Contains(t, string(content), "b.example.com")
+}
