@@ -175,7 +175,7 @@ function DeleteRecordingDialog({ deleteID, deletingID, error, onOpenChange, onDe
       <AlertDialogFooter>
         <AlertDialogCancel disabled={deletingID !== null}>{t('取消')}</AlertDialogCancel>
         <AlertDialogAction variant="destructive" disabled={deletingID !== null}
-          onClick={() => { if (deleteID !== null) void onDelete(deleteID) }}>
+          onClick={() => { if (deleteID !== null) void onDelete(deleteID).catch(() => undefined) }}>
           {deletingID !== null ? t('删除中...') : t('删除')}
         </AlertDialogAction>
       </AlertDialogFooter>
