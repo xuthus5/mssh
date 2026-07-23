@@ -392,3 +392,10 @@
 |---|---|---|
 | SEC-TUNNEL-001 | 创建/编辑远程转发时，UI 必须提示远端监听暴露风险（尤其 0.0.0.0/:: 与非回环地址）。 | done |
 | SEC-TUNNEL-002 | `remoteTunnelExposureWarning` 对 local/dynamic 返回 null，对 loopback remote 不报警。 | done |
+
+## 2026-07-23 商用硬化波次（宏执行策略对齐 AI）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| SEC-MACRO-001 | 宏执行必须加载当前 AI 安全策略（deny/allow/auto-readonly 默认值），不得使用空 security 配置绕过自定义 deny。 | done |
+| SEC-MACRO-002 | 宏写入终端必须复用 AI 命令超时与 32KiB 长度上界，超时/超限记录审计并失败。 | done |

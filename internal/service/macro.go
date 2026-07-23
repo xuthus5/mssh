@@ -4,10 +4,13 @@ import (
 	"database/sql"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/xuthus5/mssh/internal/model"
 	"github.com/xuthus5/mssh/internal/store"
 )
+
+const maxMacroCommandBytes = 32 * 1024
 
 type MacroService struct {
 	db        *sql.DB
@@ -41,7 +44,8 @@ func (m *MacroService) Delete(id int64) error {
 }
 
 func (m *MacroService) Execute(terminalID, command string) error {
-	proposal := classifyAICommand(command, model.AISecuritySettings{})
+	security := m.loadMacroSecuritySettings()
+	proposal := classifyAICommand(command, security)
 	if proposal.Blocked {
 		recordAudit(m.db, m.logger, model.AuditEvent{
 			Action: "macro_execute", TargetType: "terminal", TargetID: terminalID,
@@ -49,11 +53,22 @@ func (m *MacroService) Execute(terminalID, command string) error {
 		})
 		return fmt.Errorf("macro blocked: %s", proposal.BlockedReason)
 	}
+	if len(command) > maxMacroCommandBytes {
+		recordAudit(m.db, m.logger, model.AuditEvent{
+			Action: "macro_execute", TargetType: "terminal", TargetID: terminalID,
+			Summary: "宏执行命令过长", Outcome: "blocked",
+		})
+		return fmt.Errorf("macro command exceeds size limit")
+	}
 	m.logger.Info("executing macro", "terminalID", terminalID)
 	if m.terminals == nil {
 		return fmt.Errorf("execute macro: no terminal service available")
 	}
-	_, err := m.terminals.Write(terminalID, command)
+	timeout := time.Duration(security.CommandTimeoutSeconds) * time.Second
+	if timeout < time.Second {
+		timeout = time.Duration(defaultAISettings().Security.CommandTimeoutSeconds) * time.Second
+	}
+	err := writeTerminalWithTimeout(m.terminals, terminalID, command, timeout)
 	outcome := "success"
 	if err != nil {
 		outcome = "failed"
@@ -66,4 +81,12 @@ func (m *MacroService) Execute(terminalID, command string) error {
 		return fmt.Errorf("execute macro: %w", err)
 	}
 	return nil
+}
+
+func (m *MacroService) loadMacroSecuritySettings() model.AISecuritySettings {
+	settings, err := store.LoadAISettings(m.db, defaultAISettings())
+	if err != nil {
+		return defaultAISettings().Security
+	}
+	return settings.Security
 }
