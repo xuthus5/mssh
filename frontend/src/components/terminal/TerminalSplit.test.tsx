@@ -1,4 +1,4 @@
-import { createRef } from 'react'
+import { createRef, useRef } from 'react'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -30,7 +30,7 @@ function deferred<T>() {
 }
 
 function Harness() {
-  const splitRef = createRef<TerminalSplitHandle>()
+  const splitRef = useRef<TerminalSplitHandle>(null)
   const terminalSplitProps = { onCloseTerminal: closeTerminal }
   return <>
     <button type="button" onClick={() => splitRef.current?.split('horizontal')}>向右</button>
@@ -90,7 +90,8 @@ describe('TerminalSplit', () => {
     const view = render(<><Harness /><ToastContainer /></>)
     fireEvent.click(screen.getByText('向右'))
     fireEvent.click(screen.getByText('向右'))
-    expect(TerminalService.Open).toHaveBeenCalledOnce()
+    // openTerminalWithPoolCapacity awaits async capacity checks before Open.
+    await waitFor(() => expect(TerminalService.Open).toHaveBeenCalledOnce())
     act(() => opening.resolve('split-1'))
     await screen.findByTestId('pane-split-1')
 

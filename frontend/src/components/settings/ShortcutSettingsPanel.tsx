@@ -10,11 +10,14 @@ import {
   defaultShortcutBindings,
   findShortcutConflicts,
   formatChordDisplay,
+  isReservedShortcutChord,
+  reservedShortcutReason,
   type ShortcutActionId,
   type ShortcutBindings,
   type ShortcutChord,
 } from '@/lib/shortcuts'
 import { t } from '@/i18n'
+import { toast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'
 
 function ShortcutRecorder({
@@ -105,6 +108,11 @@ export function ShortcutSettingsPanel() {
   })
 
   const updateBinding = (id: ShortcutActionId, chord: ShortcutChord | null) => {
+    if (chord && isReservedShortcutChord(chord)) {
+      toast(t(reservedShortcutReason(chord) ?? '该快捷键被系统保留，请选择其他组合'), 'warning')
+      setRecordingId(null)
+      return
+    }
     setDraft((current) => ({ ...current, [id]: chord }))
     setRecordingId(null)
   }

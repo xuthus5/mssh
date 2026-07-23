@@ -162,6 +162,33 @@ export function chordsEqual(a: ShortcutChord | null, b: ShortcutChord | null): b
   return aMod === bMod && a.alt === b.alt && a.shift === b.shift && a.key === b.key
 }
 
+/** OS / browser reserved chords that must never be bound by users. */
+const HARD_RESERVED_SHORTCUTS = new Set([
+  'Mod+Q',
+  'Mod+M',
+  'Mod+H',
+  'Mod+Tab',
+  'Alt+Tab',
+  'Mod+Alt+Escape',
+  'Mod+Shift+Q',
+  'Mod+Alt+Delete',
+  'Ctrl+Alt+Delete',
+  'Mod+Space',
+  'Alt+F4',
+])
+
+export function isReservedShortcutChord(chord: ShortcutChord | null): boolean {
+  if (!chord) return false
+  const key = /^f\d{1,2}$/i.test(chord.key) ? chord.key.toUpperCase() : chord.key
+  const serialized = serializeChord({ ...chord, key })
+  return Boolean(serialized && HARD_RESERVED_SHORTCUTS.has(serialized))
+}
+
+export function reservedShortcutReason(chord: ShortcutChord | null): string | null {
+  if (!isReservedShortcutChord(chord)) return null
+  return '该快捷键被系统保留，请选择其他组合'
+}
+
 /** Match event against stored chord; Ctrl and Meta are interchangeable as Mod. */
 export function eventMatchesChord(event: Pick<KeyboardEvent, 'key' | 'ctrlKey' | 'metaKey' | 'altKey' | 'shiftKey'>, chord: ShortcutChord | null): boolean {
   if (!chord) return false
@@ -200,7 +227,8 @@ export function normalizeShortcutBindings(value: unknown): ShortcutBindings {
       continue
     }
     if (typeof raw === 'string') {
-      next[definition.id] = parseChord(raw)
+      const parsed = parseChord(raw)
+      next[definition.id] = isReservedShortcutChord(parsed) ? null : parsed
       continue
     }
     if (raw && typeof raw === 'object') {
@@ -212,7 +240,11 @@ export function normalizeShortcutBindings(value: unknown): ShortcutBindings {
         shift: Boolean(object.shift),
         key: normalizeKey(String(object.key ?? '')),
       }
-      next[definition.id] = chord.key ? chord : null
+      if (!chord.key || isReservedShortcutChord(chord)) {
+        next[definition.id] = null
+      } else {
+        next[definition.id] = chord
+      }
     }
   }
   return next
