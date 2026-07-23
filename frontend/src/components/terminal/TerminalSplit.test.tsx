@@ -330,4 +330,14 @@ it('preserves the primary pane host when splitting', async () => {
     expect(useAppStore.getState().connectionStatus['primary-local']).toBe('connected')
   })
 
+
+  it('shows attach-style connection error overlay without toast', async () => {
+    useToastStore.setState({ toasts: [] })
+    render(<Harness />)
+    act(() => useAppStore.getState().setConnectionStatus('primary-1', 'error'))
+    expect(await screen.findByText('连接异常')).toBeInTheDocument()
+    expect(screen.getByText('终端通道不可用（挂载或通信失败），可在当前终端中重新连接。')).toBeInTheDocument()
+    expect(useToastStore.getState().toasts).toHaveLength(0)
+  })
+
 })
