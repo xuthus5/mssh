@@ -113,7 +113,8 @@ func TestSessionCSVExportDecryptsSealedPassword(t *testing.T) {
 	require.True(t, strings.HasPrefix(raw.Password, sessionPasswordPrefix))
 
 	path := t.TempDir() + "/export.csv"
-	result, err := svc.ExportCSV(path, model.SessionCSVExportOptions{IncludePasswords: true, SessionIDs: []int64{created.ID}})
+	svc.SetPasswordVerifier(staticPasswordVerifier("export-pass"))
+	result, err := svc.ExportCSV(path, model.SessionCSVExportOptions{IncludePasswords: true, ConfirmPassword: "export-pass", SessionIDs: []int64{created.ID}})
 	require.NoError(t, err)
 	assert.True(t, result.IncludedPasswords)
 	content, err := readFileString(path)

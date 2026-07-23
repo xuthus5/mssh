@@ -158,6 +158,7 @@ func initializeServices(input serviceInitialization) (*App, error) {
 	runtime := service.NewCryptoRuntime()
 	securitySvc := newSecurityService(input, runtime)
 	sessionSvc := service.NewSessionService(input.db, input.eventBus, service.DefaultKeepAliveSeconds, input.opts.DataDir, runtime, input.logger)
+	sessionSvc.SetPasswordVerifier(securitySvc)
 	terminalSvc := service.NewTerminalService(sessionSvc, input.eventBus, 32, input.logger)
 	serialSvc := service.NewSerialService(input.db, input.logger)
 	terminalSvc.SetSerialService(serialSvc)

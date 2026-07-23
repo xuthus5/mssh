@@ -36,6 +36,11 @@ type managedConn struct {
 	cleanup func()
 }
 
+// PasswordVerifier confirms the application password for step-up actions.
+type PasswordVerifier interface {
+	VerifyPassword(password string) error
+}
+
 type SessionService struct {
 	db        *sql.DB
 	mu        sync.RWMutex
@@ -46,6 +51,7 @@ type SessionService struct {
 	dataDir   string
 	crypto    KeyCrypto
 	logger    *slog.Logger
+	passwords PasswordVerifier
 }
 
 type connectAttempt struct {
@@ -67,6 +73,13 @@ func NewSessionService(db *sql.DB, eventBus EventBus, keepAlive int, dataDir str
 		crypto:    crypto,
 		logger:    logger,
 	}
+}
+
+// SetPasswordVerifier wires step-up authentication for sensitive exports.
+//
+//wails:ignore
+func (s *SessionService) SetPasswordVerifier(verifier PasswordVerifier) {
+	s.passwords = verifier
 }
 
 func (s *SessionService) disconnect(terminalID string, emitState bool) error {
