@@ -42,7 +42,6 @@ function useMacroCatalog(open: boolean) {
       if (requestID === requestRef.current) {
         const message = errorMessage(error)
         setState({ status: 'error', items: [], error: message })
-        toast(t('加载宏失败: ${}', message), 'error')
       }
     }
   }, [])

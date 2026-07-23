@@ -66,7 +66,6 @@ export function useSerial() {
       // Nested mutation refresh must not paint a failure banner over a successful save/connect.
       if (!options?.silent) {
         setError(message)
-        toast(t('加载串口配置失败: ${}', message), 'error')
       }
     } finally {
       setLoading(false)

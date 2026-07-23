@@ -55,7 +55,6 @@ function useFileListing(sessionId: number) {
         // Post-mutation reloads stay silent so successful delete/rename/mkdir is not rebranded.
         if (!options?.silent) {
           setError(message)
-          toast(t('加载文件列表失败: ${}', message), 'error')
         }
       }
     } finally {

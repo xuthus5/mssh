@@ -27,7 +27,7 @@ describe('SessionAssetBulkBar', () => {
     await userEvent.click(screen.getByRole('button', { name: '项目' }))
     await userEvent.click(screen.getByRole('button', { name: '确认更新 1 个会话' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('事务回滚')
-    expect(useToastStore.getState().toasts.some((item) => item.message.includes('事务回滚'))).toBe(true)
+    expect(useToastStore.getState().toasts).toHaveLength(0)
     expect(clear).not.toHaveBeenCalled()
   })
 

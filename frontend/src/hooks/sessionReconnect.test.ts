@@ -149,12 +149,13 @@ describe('reconnectSessionTab', () => {
     expect(useAppStore.getState().connectionStatus['term-local-new']).toBe('connected')
   })
 
-  it('toasts after final reconnect failure', async () => {
+  it('surfaces final reconnect failure in dialog without toast', async () => {
     const open = vi.fn(async () => { throw new Error('reconnect boom') })
     __registerHandler(service + 'Open', open)
     await reconnectSessionTab('tab-1', sessions)
     expect(useAppStore.getState().connectionStatus['term-old']).toBe('error')
-    expect(useToastStore.getState().toasts.some((item) => item.message.includes('reconnect boom'))).toBe(true)
+    expect(useConnectDialog.getState()).toMatchObject({ state: 'failed', error: 'reconnect boom' })
+    expect(useToastStore.getState().toasts.some((item) => item.message.includes('reconnect boom'))).toBe(false)
   })
 })
 

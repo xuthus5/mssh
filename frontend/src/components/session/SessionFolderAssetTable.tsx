@@ -6,7 +6,6 @@ import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbP
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { SessionService } from '@/lib/wails'
-import { toast } from '@/components/ui/toast'
 import type { Folder, Session } from '@/hooks/useSession'
 import { t } from '@/i18n'
 
@@ -33,7 +32,6 @@ export function SessionAssetDeleteDialog({ target, folders, sessions, onOpenChan
       if (!current) return
       const message = reason instanceof Error ? reason.message : String(reason)
       setError(message)
-      toast(t('加载删除影响失败: ${}', message), 'error')
     })
     return () => { current = false }
   }, [target])

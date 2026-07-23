@@ -115,7 +115,7 @@ describe('connectDialog', () => {
     expect(useConnectDialog.getState().state).toBe('idle')
   })
 
-  it('toasts host key decision failures', async () => {
+  it('surfaces host key decision failures in dialog state without toast', async () => {
     __registerHandler(decideHostKey, async () => {
       throw new Error('host key failed')
     })
@@ -123,7 +123,7 @@ describe('connectDialog', () => {
     useConnectDialog.getState().setAttempt('attempt-err')
     await expect(useConnectDialog.getState().acceptHostKey()).rejects.toThrow('host key failed')
     expect(useConnectDialog.getState()).toMatchObject({ state: 'failed', error: 'host key failed' })
-    expect(useToastStore.getState().toasts.some((item) => item.message.includes('host key failed'))).toBe(true)
+    expect(useToastStore.getState().toasts).toHaveLength(0)
   })
 
   it('tracks session id and dismisses only matching connect dialogs', () => {

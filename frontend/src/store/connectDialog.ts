@@ -1,6 +1,5 @@
 import { create } from 'zustand'
 import { SessionService } from '@/lib/wails'
-import { toast } from '@/components/ui/toast'
 import { t } from '@/i18n'
 
 
@@ -68,7 +67,6 @@ export const useConnectDialog = create<ConnectDialogState>((set) => ({
     if (!attemptId) {
       const message = t('连接尝试尚未就绪')
       set({ state: 'failed', error: message })
-      toast(t('主机密钥确认失败: ${}', message), 'error')
       throw new Error(message)
     }
     try {
@@ -77,7 +75,6 @@ export const useConnectDialog = create<ConnectDialogState>((set) => ({
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       set({ state: 'failed', error: message })
-      toast(t('主机密钥确认失败: ${}', message), 'error')
       throw error
     }
   },
@@ -89,7 +86,6 @@ export const useConnectDialog = create<ConnectDialogState>((set) => ({
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       set({ state: 'failed', error: message })
-      toast(t('拒绝主机密钥失败: ${}', message), 'error')
       throw error
     }
   },
@@ -102,7 +98,6 @@ export const useConnectDialog = create<ConnectDialogState>((set) => ({
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       set({ state: 'failed', error: message })
-      toast(t('取消连接失败: ${}', message), 'error')
       throw error
     }
   },

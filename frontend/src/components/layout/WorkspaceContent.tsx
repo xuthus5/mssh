@@ -105,7 +105,6 @@ function MacrosWorkspace() {
       const message = err instanceof Error ? err.message : String(err)
       setError(message)
       logger.error('macros workspace load failed', err)
-      toast(t('加载宏失败: ${}', message), 'error')
     } finally {
       setLoading(false)
     }
