@@ -73,7 +73,7 @@ describe('ThemeManager', () => {
       />,
     )
 
-    await userEvent.click(screen.getByRole('button', { name: '重命名' }))
+    await userEvent.click(screen.getAllByRole('button', { name: '重命名' })[0])
     await userEvent.clear(screen.getByLabelText('重命名 Custom'))
     await userEvent.type(screen.getByLabelText('重命名 Custom'), 'Renamed')
     await userEvent.click(screen.getByRole('button', { name: '保存名称' }))
@@ -112,7 +112,7 @@ describe('ThemeManager', () => {
   })
 
 
-  it('surfaces theme file picker failures without unhandled rejections', async () => {
+  it('surfaces theme file picker failures panel-owned without toast', async () => {
     openFile.mockRejectedValueOnce(new Error('picker unavailable'))
     const onImport = vi.fn(async () => ({ results: [] }))
     render(
@@ -126,8 +126,29 @@ describe('ThemeManager', () => {
       />,
     )
     await userEvent.click(screen.getByRole('button', { name: '导入 iTerm2 主题' }))
-    expect(notify).toHaveBeenCalledWith('选择主题文件失败: picker unavailable', 'error')
+    expect(await screen.findByRole('alert')).toHaveTextContent('选择主题文件失败: picker unavailable')
+    expect(notify).not.toHaveBeenCalled()
     expect(onImport).not.toHaveBeenCalled()
+  })
+
+  it('surfaces theme mutation failures panel-owned without toast', async () => {
+    const onUpdateProfile = vi.fn(async () => { throw new Error('rename boom') })
+    render(
+      <ThemeManager
+        profiles={profiles as never}
+        onImport={vi.fn()}
+        onDeleteProfile={vi.fn()}
+        onDeleteDefinition={vi.fn()}
+        onCreateProfile={vi.fn()}
+        onUpdateProfile={onUpdateProfile}
+      />,
+    )
+    await userEvent.click(screen.getAllByRole('button', { name: '重命名' })[0])
+    await userEvent.clear(screen.getByLabelText('重命名 GitHub Dark'))
+    await userEvent.type(screen.getByLabelText('重命名 GitHub Dark'), 'Renamed')
+    await userEvent.click(screen.getByRole('button', { name: '保存名称' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('主题操作失败: rename boom')
+    expect(notify).not.toHaveBeenCalled()
   })
 
   it('ignores orphan definition cleanup failures after profile delete', async () => {

@@ -71,12 +71,25 @@ describe('CommandHistoryPanel', () => {
     expect(screen.getByText('git status')).toBeInTheDocument()
   })
 
-  it('toasts remote clear failures and keeps history', async () => {
+  it('surfaces remote clear failures inline and keeps history', async () => {
     clearHistory.mockRejectedValueOnce(new Error('clear failed'))
     render(<CommandHistoryPanel sessionID={5} onClose={vi.fn()} onFill={vi.fn()} />)
     expect(await screen.findByText('git status')).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: '清空历史' }))
-    await waitFor(() => expect(useToastStore.getState().toasts.some((item) => item.message.includes('clear failed'))).toBe(true))
+    expect(await screen.findByRole('alert')).toHaveTextContent('清空命令历史失败: clear failed')
     expect(screen.getByText('git status')).toBeInTheDocument()
+    expect(useToastStore.getState().toasts.filter((item) => item.type === 'error')).toHaveLength(0)
+  })
+
+  it('surfaces copy failures panel-owned without toast', async () => {
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: vi.fn(async () => { throw new Error('clipboard unavailable') }) },
+    })
+    render(<CommandHistoryPanel sessionID={5} onClose={vi.fn()} onFill={vi.fn()} />)
+    expect(await screen.findByText('git status')).toBeInTheDocument()
+    await userEvent.click(screen.getAllByRole('button', { name: '复制' })[0])
+    expect(await screen.findByRole('alert')).toHaveTextContent('复制失败: clipboard unavailable')
+    expect(useToastStore.getState().toasts.filter((item) => item.type === 'error')).toHaveLength(0)
   })
 })
