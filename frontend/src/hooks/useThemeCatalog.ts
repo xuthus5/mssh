@@ -62,9 +62,9 @@ export function useThemeCatalog() {
   return { ...state, reload: loadThemeCatalog, setColorMode: changeColorMode, saveAssignments, saveConfiguration, saveProfile, createProfile, importThemes, deleteProfile, deleteDefinition, resetBuiltinStyles }
 }
 
-export async function loadThemeCatalog(): Promise<boolean> {
+export async function loadThemeCatalog(options?: { force?: boolean; silent?: boolean }): Promise<boolean> {
   const current = useThemeCatalogStore.getState()
-  if (current.loading || current.loaded) return current.loaded
+  if (!options?.force && (current.loading || current.loaded)) return current.loaded
   useThemeCatalogStore.setState({ loading: true, error: null })
   try {
     await ThemeService.InitializeDefaults()
@@ -78,7 +78,7 @@ export async function loadThemeCatalog(): Promise<boolean> {
     const message = error instanceof Error ? error.message : String(error)
     useThemeCatalogStore.setState({ loading: false, error: message })
     logger.error('load theme catalog failed', error)
-    toast(t('加载主题失败: ${}', message), 'error')
+    if (!options?.silent) toast(t('加载主题失败: ${}', message), 'error')
     return false
   }
 }
@@ -182,13 +182,14 @@ function broadcastThemeCatalog() {
 }
 
 async function refreshThemeCatalog() {
-  await loadThemeCatalogFresh()
+  // Mutations already surface their own failure toast; keep refresh silent to avoid double toasts.
+  await loadThemeCatalogFresh({ silent: true })
   broadcastThemeCatalog()
 }
 
-async function loadThemeCatalogFresh() {
+async function loadThemeCatalogFresh(options?: { silent?: boolean }) {
   useThemeCatalogStore.setState({ loaded: false, loading: false })
-  const loaded = await loadThemeCatalog()
+  const loaded = await loadThemeCatalog({ force: true, silent: options?.silent })
   if (!loaded) throw new Error(useThemeCatalogStore.getState().error ?? 'load theme catalog failed')
 }
 

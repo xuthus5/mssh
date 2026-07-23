@@ -1,4 +1,4 @@
-import { renderHook, waitFor } from '@testing-library/react'
+import { act, renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { __clearHandlers, __registerHandler } from '@/test/__mocks__/wails-runtime'
 import { useSerial } from '@/hooks/useSerial'
@@ -39,5 +39,24 @@ describe('useSerial', () => {
     })
     renderHook(() => useSerial())
     await waitFor(() => expect(useToastStore.getState().toasts.some((item) => item.message.includes('active map failed'))).toBe(true))
+  })
+
+  it('suppresses device discovery toasts during silent mutation refresh', async () => {
+    __registerHandler(service + 'SerialService.Create', async (input: any) => ({ ...input, id: 9 }))
+    __registerHandler(service + 'SerialService.List', async () => [{
+      id: 9, name: 'COM1', device: '/dev/ttyUSB0', baud_rate: 115200, data_bits: 8, parity: 'none', stop_bits: 1,
+      flow_control: 'none', line_ending: 'lf', local_echo: false, dtr_on_open: true, rts_on_open: true, notes: '', sort_order: 0,
+    }])
+    __registerHandler(service + 'SerialService.ListDevices', async () => { throw new Error('device list failed') })
+    const { result } = renderHook(() => useSerial())
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    useToastStore.setState({ toasts: [] })
+    await act(async () => {
+      await result.current.createPort({
+        id: 0, name: 'COM1', device: '/dev/ttyUSB0', baud_rate: 115200, data_bits: 8, parity: 'none', stop_bits: 1,
+        flow_control: 'none', line_ending: 'lf', local_echo: false, dtr_on_open: true, rts_on_open: true, notes: '', sort_order: 0,
+      } as any)
+    })
+    expect(useToastStore.getState().toasts.some((item) => item.message.includes('device list failed'))).toBe(false)
   })
 })
