@@ -32,6 +32,7 @@ interface Props {
   systemFonts: string[]
   onSave: (settings: GeneralSettings) => Promise<void>
   onPreviewUIFont: (fontFamily: string, fallbackFamily: string, fontSize: number) => void
+  settingsReady?: boolean
 }
 
 function createDraft(general: GeneralSettings): GeneralDraft {
@@ -182,7 +183,7 @@ function LanguageSettings({
   )
 }
 
-export function GeneralSettingsPanel({ general, systemFonts, onSave, onPreviewUIFont }: Props) {
+export function GeneralSettingsPanel({ general, systemFonts, onSave, onPreviewUIFont, settingsReady = true }: Props) {
   const [draft, setDraft] = useState(() => createDraft(general))
   useEffect(() => {
     setDraft(createDraft(general))
@@ -199,7 +200,7 @@ export function GeneralSettingsPanel({ general, systemFonts, onSave, onPreviewUI
     },
     [general, onSave],
   )
-  const autoSave = useAutoSave({ value: draft, onSave: persist, delayMs: 450 })
+  const autoSave = useAutoSave({ value: draft, onSave: persist, isReady: settingsReady, delayMs: 450 })
 
   return (
     <div className="flex flex-col gap-3 pt-2">

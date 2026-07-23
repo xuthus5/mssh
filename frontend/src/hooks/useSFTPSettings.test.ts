@@ -99,5 +99,17 @@ describe('quiet SFTP autosave error feedback', () => {
     const messages = useToastStore.getState().toasts.map((item) => `${item.type}:${item.message}`)
     expect(messages.some((item) => item.startsWith('error:') && item.includes('保存 SFTP 设置失败'))).toBe(true)
   })
+  it('keeps settingsReady false when SFTP settings load fails', async () => {
+    const toast = await import('@/components/ui/toast')
+    const toastSpy = vi.spyOn(toast, 'toast')
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.GetMany', async () => {
+      throw new Error('sftp load failed')
+    })
+    const { result } = renderHook(() => useSFTPSettings())
+    await act(async () => {})
+    expect(result.current.settingsReady).toBe(false)
+    expect(toastSpy).toHaveBeenCalledWith(expect.stringContaining('加载 SFTP 设置失败'), 'error')
+  })
+
 })
 

@@ -51,6 +51,7 @@ interface Props {
   onDeleteThemeProfile: (id: number) => Promise<void>
   onDeleteThemeDefinition: (id: number) => Promise<void>
   onResetBuiltinThemes: () => Promise<BuiltinThemeResetResult>
+  settingsReady?: boolean
 }
 
 function createDraft(general: GeneralSettings): TerminalDraft {
@@ -106,6 +107,7 @@ export function TerminalSettingsPanel({
   onDeleteThemeProfile,
   onDeleteThemeDefinition,
   onResetBuiltinThemes,
+  settingsReady = true,
 }: Props) {
   const [draft, setDraft] = useState(() => createDraft(general))
   useEffect(() => {
@@ -118,7 +120,7 @@ export function TerminalSettingsPanel({
     },
     [general, onSaveGeneral],
   )
-  const autoSave = useAutoSave({ value: draft, onSave: persist, delayMs: 450 })
+  const autoSave = useAutoSave({ value: draft, onSave: persist, isReady: settingsReady, delayMs: 450 })
 
   return (
     <div className="flex flex-col gap-5 pt-2">

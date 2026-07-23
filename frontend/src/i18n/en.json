@@ -1322,5 +1322,8 @@
   "远程转发会在 SSH 服务端打开监听端口；绑定非回环地址时请确认安全边界。": "Remote forwarding opens a listen port on the SSH server; confirm the security boundary when binding non-loopback addresses.",
   "删除密钥": "Delete key",
   "本地备份已导出": "Local backup exported",
-  "本地备份已导入": "Local backup imported"
+  "本地备份已导入": "Local backup imported",
+  "加载设置失败: ${}": "Failed to load settings: ${}",
+  "加载 SFTP 设置失败: ${}": "Failed to load SFTP settings: ${}",
+  "加载密钥列表失败: ${}": "Failed to load key list: ${}"
 }
