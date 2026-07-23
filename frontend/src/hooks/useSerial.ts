@@ -36,29 +36,35 @@ export function useSerial() {
   const [activeDevices, setActiveDevices] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [deviceProbeError, setDeviceProbeError] = useState('')
+  const [activeMapError, setActiveMapError] = useState('')
 
   const refresh = useCallback(async (options?: { silent?: boolean }) => {
     setLoading(true)
     if (!options?.silent) setError('')
     try {
+      let nextDeviceError = ''
+      let nextActiveError = ''
       const [list, deviceList, active] = await Promise.all([
         SerialService.List(),
         SerialService.ListDevices().catch((err: unknown) => {
           const message = err instanceof Error ? err.message : String(err)
           logger.error('list serial devices failed', err)
-          if (!options?.silent) toast(t('加载串口设备失败: ${}', message), 'error')
+          nextDeviceError = message
           return [] as string[]
         }),
         SerialService.ActiveDeviceMap().catch((err: unknown) => {
           const message = err instanceof Error ? err.message : String(err)
           logger.error('list active serial devices failed', err)
-          if (!options?.silent) toast(t('加载串口占用状态失败: ${}', message), 'error')
+          nextActiveError = message
           return {} as Record<string, string>
         }),
       ])
       setPorts(list ?? [])
       setDevices(deviceList ?? [])
       setActiveDevices(active ?? {})
+      setDeviceProbeError(nextDeviceError)
+      setActiveMapError(nextActiveError)
       setError('')
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
@@ -167,6 +173,8 @@ export function useSerial() {
     activeDevices,
     loading,
     error,
+    deviceProbeError,
+    activeMapError,
     refresh,
     createPort,
     updatePort,
