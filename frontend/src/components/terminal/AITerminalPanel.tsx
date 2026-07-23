@@ -28,6 +28,7 @@ export function AITerminalPanel({ terminalID, sessionID, onClose }: { terminalID
   const [historyOpen, setHistoryOpen] = useState(false)
   useEffect(() => { void loadPanel() }, [sessionID])
   const contextLines = dashboard?.settings.interaction.context_lines ?? 80
+  const maxOutputBytes = dashboard?.settings.security.max_output_bytes ?? 65536
   const terminal = useAppStore((state) => state.terminalPool.get(terminalID)?.terminal)
   const canSend = useMemo(() => prompt.trim().length > 0 && !pending, [pending, prompt])
   async function loadPanel() {
@@ -40,7 +41,7 @@ export function AITerminalPanel({ terminalID, sessionID, onClose }: { terminalID
     setPrompt(''); setPending(true); setError('')
     setMessages((current) => [...current, { id: `user-${Date.now()}`, role: 'user', content: text }])
     try {
-      const response = await AIService.Chat({ conversation_id: conversationID, session_id: sessionID, terminal_id: terminalID, prompt: text, terminal_context: captureTerminalContext(terminal, contextLines), use_search: useSearch })
+      const response = await AIService.Chat({ conversation_id: conversationID, session_id: sessionID, terminal_id: terminalID, prompt: text, terminal_context: captureTerminalContext(terminal, contextLines, maxOutputBytes), use_search: useSearch })
       setConversationID(response.conversation_id)
       let autoExecuted: string[] = []
       try { autoExecuted = await executeAutoCommands(response.commands, response.conversation_id, sessionID, terminalID) }

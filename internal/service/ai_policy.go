@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/xuthus5/mssh/internal/model"
 )
@@ -25,6 +26,22 @@ var (
 		regexp.MustCompile(`^(pwd|whoami|id|uname(\s+-a)?|hostname|date|uptime|df(\s+[^|;&]+)?|free(\s+[^|;&]+)?|ps(\s+[^|;&]+)?|top(\s+[^|;&]+)?|env|printenv|systemctl\s+status(\s+[^|;&]+)?|journalctl\s+[^|;&]+|ls(\s+[^|;&]+)?|find\s+[^|;&]+|cat\s+[^|;&]+)$`),
 	}
 )
+
+// clampAITextBytes keeps the trailing UTF-8 text within maxBytes, dropping whole runes from the start.
+func clampAITextBytes(value string, maxBytes int) string {
+	if maxBytes <= 0 || len(value) <= maxBytes {
+		return value
+	}
+	// Fast path when all ASCII / already byte-indexed safely.
+	if maxBytes >= len(value) {
+		return value
+	}
+	start := len(value) - maxBytes
+	for start < len(value) && !utf8.RuneStart(value[start]) {
+		start++
+	}
+	return strings.TrimSpace(value[start:])
+}
 
 func redactAIText(value string, custom []string) string {
 	redacted := value
