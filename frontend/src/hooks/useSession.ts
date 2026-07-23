@@ -61,6 +61,7 @@ export function useSession() {
       logger.error('listFolders error', err)
       setError(msg)
       if (!options?.silent) toast(t('加载分组失败: ${}', msg), 'error')
+      else throw err
     } finally {
       setLoading(false)
     }
@@ -119,7 +120,7 @@ export function useSession() {
     }
   }, [])
 
-  const listSessions = useCallback(async () => {
+  const listSessions = useCallback(async (options?: { silent?: boolean }) => {
     setLoading(true)
     setError('')
     try {
@@ -129,14 +130,15 @@ export function useSession() {
       const msg = err instanceof Error ? err.message : String(err)
       logger.error('listSessions error', err)
       setError(msg)
-      toast(t('加载会话失败: ${}', msg), 'error')
+      if (!options?.silent) toast(t('加载会话失败: ${}', msg), 'error')
+      else throw err
     } finally {
       setLoading(false)
       setSessionsLoaded(true)
     }
   }, [])
 
-  const listRecentSessions = useCallback(async () => {
+  const listRecentSessions = useCallback(async (options?: { silent?: boolean }) => {
     try {
       const result = await SessionService.ListRecentSessions(10)
       setRecentSessions((result ?? []).map(mapSession))
@@ -144,7 +146,8 @@ export function useSession() {
       const msg = err instanceof Error ? err.message : String(err)
       logger.error('listRecentSessions error', err)
       setError(msg)
-      toast(t('加载最近会话失败: ${}', msg), 'error')
+      if (!options?.silent) toast(t('加载最近会话失败: ${}', msg), 'error')
+      else throw err
     }
   }, [])
   const csvTransfer = useSessionCSVTransfer({ refreshFolders: listFolders, refreshAssets })
@@ -170,9 +173,8 @@ export function useSession() {
       if (result) {
         setSessions((prev) => [...prev, mapSession(result)])
         try {
-          await listAssetCatalogs()
+          await listAssetCatalogs({ silent: true })
         } catch (refreshError) {
-          // session already persisted; refresh toast/error is owned by listAssetCatalogs
           logger.error('createSession catalog refresh failed', refreshError)
         }
       }
@@ -205,9 +207,8 @@ export function useSession() {
       const refreshed = await SessionService.GetSession(Number(session.id))
       if (refreshed) setSessions((prev) => prev.map((item) => (item.id === session.id ? mapSession(refreshed) : item)))
       try {
-        await listAssetCatalogs()
+        await listAssetCatalogs({ silent: true })
       } catch (refreshError) {
-        // session already updated; refresh toast/error is owned by listAssetCatalogs
         logger.error('updateSession catalog refresh failed', refreshError)
       }
     } catch (err) {
@@ -253,7 +254,10 @@ export function useSession() {
       dialog.setState('connected')
       logger.info('connected', { terminalId, host: session.host })
       // Session is already open; refresh failures must not flip the dialog to failed.
-      void Promise.all([listRecentSessions(), listSessions()]).catch((refreshError: unknown) => {
+      void Promise.all([
+        listRecentSessions({ silent: true }),
+        listSessions({ silent: true }),
+      ]).catch((refreshError: unknown) => {
         logger.error('connect post-refresh failed', refreshError)
       })
     } catch (err) {
@@ -301,14 +305,15 @@ export function useSession() {
     }
   }, [])
   const reconnect = useCallback((tabId: string) => reconnectSessionTab(tabId, sessions), [sessions])
-  const listTunnels = useCallback(async () => {
+  const listTunnels = useCallback(async (options?: { silent?: boolean }) => {
     try {
       const result = await TunnelService.List()
       setTunnels((result ?? []).map(mapTunnel))
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       logger.error('listTunnels error', err)
-      toast(t('加载隧道失败: ${}', msg), 'error')
+      if (!options?.silent) toast(t('加载隧道失败: ${}', msg), 'error')
+      else throw err
     }
   }, [])
 
