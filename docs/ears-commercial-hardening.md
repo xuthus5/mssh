@@ -528,3 +528,13 @@
 | UX-SFTP-010 | SFTP 树展开目录加载失败必须 toast，并收回展开状态。 | done |
 | SEC-LOCALSHELL-010 | 通过 SettingService 写入 local shell path/args/cwd 时必须拒绝 NUL 与超长值；path 不得含父目录穿越。 | done |
 
+## 2026-07-23 商用硬化波次（SFTP 操作/AI 设置加载可见 + 会话移动 ID 校验）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| UX-SFTP-011 | 文件列表加载失败必须 toast，并写入 error 状态。 | done |
+| UX-SFTP-012 | 删除/重命名/建目录失败必须 toast 并向上抛错。 | done |
+| UX-SFTP-013 | 取消传输失败必须 toast 并向上抛错。 | done |
+| UX-AI-010 | AI 设置 Dashboard 加载失败必须 toast。 | done |
+| SEC-SESSION-010 | MoveSession/MoveFolder/SetDefaultFolder 必须拒绝 id<=0 与非法 folder/parent id。 | done |
+

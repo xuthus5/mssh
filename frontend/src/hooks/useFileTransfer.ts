@@ -50,7 +50,9 @@ function useFileListing(sessionId: number) {
     } catch (listError) {
       logger.error('listFiles error', listError)
       if (currentRequest === requestID.current) {
-        setError(listError instanceof Error ? listError.message : String(listError))
+        const message = listError instanceof Error ? listError.message : String(listError)
+        setError(message)
+        toast(t('加载文件列表失败: ${}', message), 'error')
       }
     } finally {
       if (currentRequest === requestID.current) setLoading(false)
@@ -109,6 +111,8 @@ function useFileMutations({ sessionId, currentPath, listFiles, setFiles }: FileM
       void listFiles(currentPath)
     } catch (error) {
       logger.error('deleteFile error', error)
+      toast(t('删除文件失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
+      throw error
     }
   }, [sessionId, currentPath, listFiles, setFiles])
   const renameFile = useCallback(async (oldPath: string, newName: string) => {
@@ -117,6 +121,8 @@ function useFileMutations({ sessionId, currentPath, listFiles, setFiles }: FileM
       void listFiles(currentPath)
     } catch (error) {
       logger.error('renameFile error', error)
+      toast(t('重命名失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
+      throw error
     }
   }, [sessionId, currentPath, listFiles])
   const makeDir = useCallback(async (name: string) => {
@@ -125,6 +131,8 @@ function useFileMutations({ sessionId, currentPath, listFiles, setFiles }: FileM
       void listFiles(currentPath)
     } catch (error) {
       logger.error('makeDir error', error)
+      toast(t('创建目录失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
+      throw error
     }
   }, [sessionId, currentPath, listFiles])
   return { deleteFile, renameFile, makeDir }
@@ -136,6 +144,8 @@ function useCancelTransfer() {
       await cancelTransferAction(jobId)
     } catch (error) {
       logger.error('cancelTransfer error', error)
+      toast(t('取消传输失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
+      throw error
     }
   }, [])
 }

@@ -61,11 +61,20 @@ func (s *SessionService) DeleteFolder(id int64) error {
 }
 
 func (s *SessionService) SetDefaultFolder(id int64) error {
+	if id <= 0 {
+		return fmt.Errorf("invalid folder id")
+	}
 	s.logger.Info("setting default folder", "id", id)
 	return store.SetDefaultFolder(s.db, id)
 }
 
 func (s *SessionService) MoveFolder(id int64, newParentID *int64) error {
+	if id <= 0 {
+		return fmt.Errorf("invalid folder id")
+	}
+	if err := validateOptionalParentFolderID(newParentID); err != nil {
+		return err
+	}
 	s.logger.Info("moving folder", "id", id, "newParentID", newParentID)
 	err := store.MoveFolder(s.db, id, newParentID)
 	if err != nil {
@@ -242,6 +251,12 @@ func (s *SessionService) SessionDeleteImpact(id int64) (*model.SessionDeleteImpa
 }
 
 func (s *SessionService) MoveSession(id int64, newFolderID *int64) error {
+	if id <= 0 {
+		return fmt.Errorf("invalid session id")
+	}
+	if err := validateOptionalAssetID("folder", newFolderID); err != nil {
+		return err
+	}
 	s.logger.Info("moving session", "id", id, "newFolderID", newFolderID)
 	err := store.MoveSession(s.db, id, newFolderID)
 	if err != nil {
