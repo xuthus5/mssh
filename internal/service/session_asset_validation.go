@@ -110,3 +110,23 @@ func validateOptionalAssetID(kind string, id *int64) error {
 	}
 	return nil
 }
+
+const sessionFolderNameLimit = 128
+
+func validateFolderName(name string) (string, error) {
+	normalized := strings.TrimSpace(name)
+	if normalized == "" || utf8.RuneCountInString(normalized) > sessionFolderNameLimit {
+		return "", fmt.Errorf("folder name must contain between 1 and %d characters", sessionFolderNameLimit)
+	}
+	if strings.ContainsRune(normalized, 0) {
+		return "", fmt.Errorf("folder name contains NUL")
+	}
+	return normalized, nil
+}
+
+func validateOptionalParentFolderID(parentID *int64) error {
+	if parentID != nil && *parentID <= 0 {
+		return fmt.Errorf("invalid parent folder id")
+	}
+	return nil
+}

@@ -160,8 +160,9 @@ func (k *KeyService) ExportPublicKey(id int64) (string, error) {
 }
 
 func (k *KeyService) generateRSA(name string, bits int) ([]byte, string, error) {
-	if bits <= 0 {
-		bits = 3072
+	bits, err := normalizeRSABits(bits)
+	if err != nil {
+		return nil, "", err
 	}
 	pk, err := rsa.GenerateKey(rand.Reader, bits)
 	if err != nil {

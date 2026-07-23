@@ -61,3 +61,28 @@ func TestValidateSessionCoreFieldsDirect(t *testing.T) {
 		Name: "ok", Host: "example.com", Port: 22, Username: "root", AuthMethod: model.AuthKey, KeyID: &keyID, KeepAlive: 60, TermType: "xterm",
 	}))
 }
+
+func TestValidateFolderName(t *testing.T) {
+	_, err := validateFolderName("  ")
+	require.Error(t, err)
+	_, err = validateFolderName(strings.Repeat("f", sessionFolderNameLimit+1))
+	require.Error(t, err)
+	_, err = validateFolderName(string([]byte{'a', 0}))
+	require.Error(t, err)
+	name, err := validateFolderName(" 生产环境 ")
+	require.NoError(t, err)
+	require.Equal(t, "生产环境", name)
+	require.Error(t, validateOptionalParentFolderID(int64Ptr(0)))
+	require.NoError(t, validateOptionalParentFolderID(nil))
+}
+
+func TestSessionService_CreateFolderRejectsBlankName(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	service := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
+	_, err := service.CreateFolder("   ", nil)
+	require.Error(t, err)
+	require.Error(t, service.UpdateFolder(1, ""))
+	require.Error(t, service.UpdateFolder(0, "ok"))
+}
+
+func int64Ptr(v int64) *int64 { return &v }
