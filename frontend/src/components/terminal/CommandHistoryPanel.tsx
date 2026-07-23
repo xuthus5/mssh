@@ -29,11 +29,13 @@ export function CommandHistoryPanel({
   const [query, setQuery] = useState('')
   const [scrollTop, setScrollTop] = useState(0)
   const [viewportHeight, setViewportHeight] = useState(360)
+  const [loadError, setLoadError] = useState('')
 
   useEffect(() => {
     // Local/serial history buckets use non-positive IDs and are localStorage-only.
     if (sessionID <= 0) {
       setEntries(readCommandHistory(sessionID))
+      setLoadError('')
       return
     }
     const load = async () => {
@@ -44,10 +46,11 @@ export function CommandHistoryPanel({
           command: item.command,
           createdAt: Date.parse(item.created_at ?? item.createdAt ?? '') || Date.now(),
         })))
+        setLoadError('')
       } catch (error: unknown) {
         const message = error instanceof Error ? error.message : String(error)
         logger.error('command history loading failed', error)
-        toast(t('加载命令历史失败: ${}', message), 'error')
+        setLoadError(message)
       }
     }
     if (typeof CommandHistoryService?.List === 'function') void load()
@@ -110,7 +113,9 @@ export function CommandHistoryPanel({
         <Button size="xs" variant="ghost" onClick={() => { void clear() }} disabled={entries.length === 0} title={t('清空历史')} aria-label={t('清空历史')}><Trash2 /></Button>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto p-2" onScroll={onScroll}>
-        {filtered.length === 0 ? (
+        {loadError ? (
+          <p className="p-3 text-xs text-destructive" role="alert">{t('加载命令历史失败: ${}', loadError)}</p>
+        ) : filtered.length === 0 ? (
           <p className="p-3 text-xs text-muted-foreground">{t('暂无命令历史')}</p>
         ) : (
           <div style={{ height: windowed.totalSize, position: 'relative' }}>

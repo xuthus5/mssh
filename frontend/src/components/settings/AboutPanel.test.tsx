@@ -25,21 +25,22 @@ describe('AboutPanel', () => {
     expect(openURL).toHaveBeenCalledWith('https://github.com/xuthus5/mssh')
   })
 
-  it('toasts about info load failures', async () => {
+  it('shows about info load failures inline without toast', async () => {
     useToastStore.setState({ toasts: [] })
     info.mockRejectedValueOnce(new Error('about failed'))
     render(<AboutPanel />)
     expect(await screen.findByText('未知')).toBeInTheDocument()
-    await waitFor(() => expect(useToastStore.getState().toasts.some((item) => item.message.includes('about failed'))).toBe(true))
+    expect(await screen.findByText(/about failed/)).toBeInTheDocument()
+    expect(useToastStore.getState().toasts).toHaveLength(0)
   })
 
-  it('toasts check-update failures while keeping the panel message', async () => {
+  it('shows check-update failures as panel message without toast', async () => {
     useToastStore.setState({ toasts: [] })
     checkUpdate.mockRejectedValueOnce(new Error('update failed'))
     render(<AboutPanel />)
     await userEvent.click(await screen.findByRole('button', { name: '检查更新' }))
     expect(await screen.findByText('检查更新失败：update failed')).toBeInTheDocument()
-    await waitFor(() => expect(useToastStore.getState().toasts.some((item) => item.message.includes('update failed') && item.type === 'error')).toBe(true))
+    expect(useToastStore.getState().toasts.filter((item) => item.type === 'error')).toHaveLength(0)
   })
 
   it('toasts external link open failures', async () => {

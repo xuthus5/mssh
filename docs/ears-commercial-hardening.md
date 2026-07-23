@@ -1121,3 +1121,11 @@
 | UX-ASSET-089 | 资产分类 list/refresh 失败仅 workspace error banner，不得叠加 toast。 | done |
 
 | UX-AISET-090 | AI 设置 dashboard 加载失败仅页面 error 文案；动作失败仅 toast，不写 controller.error。 | done |
+
+## 2026-07-24 商用硬化波次（加载失败不得伪装空列表）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| UX-TUNNEL-091 | 隧道列表加载失败时必须展示错误与重试，不得显示「无隧道/当前会话暂无隧道」空态误导。 | done |
+| UX-HIST-092 | 命令历史远端加载失败时仅面板 inline error，不得 toast；不得静默显示为空。 | done |
+| UX-ABOUT-093 | 关于页信息加载/检查更新失败仅面板 message，不得叠加 toast；打开外链失败仍 toast。 | done |
