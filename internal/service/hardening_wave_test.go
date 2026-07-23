@@ -193,3 +193,30 @@ func TestRequireHTTPSUnlessLoopbackBlocksMetadataAndCredentials(t *testing.T) {
 	require.NoError(t, err)
 	require.Error(t, requireHTTPSUnlessLoopback(fileURL))
 }
+
+func TestValidateS3Endpoint(t *testing.T) {
+	require.NoError(t, validateS3Endpoint(""))
+	require.NoError(t, validateS3Endpoint("https://s3.amazonaws.com"))
+	require.NoError(t, validateS3Endpoint("http://127.0.0.1:9000"))
+	require.Error(t, validateS3Endpoint("http://minio.example.com"))
+	require.Error(t, validateS3Endpoint("https://169.254.169.254"))
+	require.Error(t, validateS3Endpoint("not-a-url"))
+	require.Error(t, validateS3Endpoint("https://user:pass@s3.example.com"))
+}
+
+func TestValidateSyncConfigS3AndWebDAVURL(t *testing.T) {
+	config := defaultSyncConfig()
+	config.Provider = model.SyncProviderS3
+	config.S3.Endpoint = "http://evil.example.com"
+	require.Error(t, validateSyncConfig(config))
+
+	config.S3.Endpoint = "https://s3.example.com"
+	require.NoError(t, validateSyncConfig(config))
+
+	config = defaultSyncConfig()
+	config.Provider = model.SyncProviderWebDAV
+	config.WebDAV.URL = "http://dav.example.com/path"
+	require.Error(t, validateSyncConfig(config))
+	config.WebDAV.URL = "https://dav.example.com/path"
+	require.NoError(t, validateSyncConfig(config))
+}

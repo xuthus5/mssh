@@ -53,3 +53,17 @@ func isBlockedSyncHost(host string) bool {
 	}
 	return false
 }
+
+// validateS3Endpoint checks optional custom S3-compatible endpoints.
+// Empty endpoint means AWS default (SDK-managed) and is allowed.
+func validateS3Endpoint(endpoint string) error {
+	endpoint = strings.TrimSpace(endpoint)
+	if endpoint == "" {
+		return nil
+	}
+	parsed, err := url.Parse(endpoint)
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+		return fmt.Errorf("S3 endpoint URL is invalid")
+	}
+	return requireHTTPSUnlessLoopback(parsed)
+}

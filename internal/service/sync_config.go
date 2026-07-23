@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -137,7 +138,30 @@ func validateSyncConfig(config model.SyncConfig) error {
 	if config.RetentionCount < 1 || config.RetentionCount > 500 || config.RetentionDays < 1 || config.RetentionDays > 3650 {
 		return errors.New("sync retention is outside the supported range")
 	}
-	return nil
+	return validateSyncProviderEndpoints(config)
+}
+
+func validateSyncProviderEndpoints(config model.SyncConfig) error {
+	switch config.Provider {
+	case model.SyncProviderS3:
+		return validateS3Endpoint(config.S3.Endpoint)
+	case model.SyncProviderWebDAV:
+		return validateWebDAVEndpoint(config.WebDAV.URL)
+	default:
+		return nil
+	}
+}
+
+func validateWebDAVEndpoint(endpoint string) error {
+	endpoint = strings.TrimSpace(endpoint)
+	if endpoint == "" {
+		return nil
+	}
+	parsed, err := url.ParseRequestURI(endpoint)
+	if err != nil {
+		return errors.New("WebDAV URL is invalid")
+	}
+	return requireHTTPSUnlessLoopback(parsed)
 }
 
 func providerIdentity(config model.SyncConfig) string {

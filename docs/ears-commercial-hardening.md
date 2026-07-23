@@ -300,3 +300,11 @@
 | SYNC-URL-001 | WebDAV/Gist/云端端点 URL 必须拒绝 URL userinfo 凭据。 | done |
 | SYNC-URL-002 | 同步端点必须拒绝链路本地/未指定/组播及云元数据主机（与 AI URL 策略一致）。 | done |
 | SYNC-URL-003 | 非回环主机仍必须 HTTPS；仅 loopback 允许 HTTP 本地调试。 | done |
+
+## 2026-07-23 商用硬化波次（S3/WebDAV 配置期 URL 校验）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| SYNC-URL-004 | 保存同步配置时，S3 自定义 Endpoint 与 WebDAV URL 必须通过 HTTPS/主机策略校验。 | done |
+| SYNC-URL-005 | 创建 S3 provider 时必须再次校验 Endpoint（防御直接构造路径）。 | done |
+| SYNC-URL-006 | 空 S3 Endpoint（使用 AWS 默认）必须允许。 | done |
