@@ -12,6 +12,7 @@ import { Switch } from '@/components/ui/switch'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useAsyncAction } from '@/hooks/useAsyncAction'
 import { AsyncState } from '@/components/ui/async-state'
+import { toast } from '@/components/ui/toast'
 import { t } from '@/i18n'
 
 
@@ -36,18 +37,60 @@ export function AuditPanel() {
   const query = useAsyncAction(listEvents, 'latest')
   const load = useCallback(async () => {
     if (!enabled) { query.reset(); return }
-    await query.run({ action, session_id: sessionID ? Number(sessionID) : null, from: toISO(from), to: toISO(to), limit: 200 })
+    setError('')
+    try {
+      await query.run({ action, session_id: sessionID ? Number(sessionID) : null, from: toISO(from), to: toISO(to), limit: 200 })
+    } catch (loadError: unknown) {
+      const message = loadError instanceof Error ? loadError.message : String(loadError)
+      setError(message)
+      toast(t('加载审计日志失败: ${}', message), 'error')
+      throw loadError
+    }
   }, [action, enabled, from, query.reset, query.run, sessionID, to])
-  useEffect(() => { void AuditService.Enabled().then(setEnabled).catch((loadError: unknown) => setError(loadError instanceof Error ? loadError.message : String(loadError))).finally(() => setInitializing(false)) }, [])
+
+  const bootstrap = useCallback(async () => {
+    setInitializing(true)
+    setError('')
+    try {
+      const next = await AuditService.Enabled()
+      setEnabled(next)
+    } catch (loadError: unknown) {
+      const message = loadError instanceof Error ? loadError.message : String(loadError)
+      setError(message)
+      toast(t('加载审计设置失败: ${}', message), 'error')
+    } finally {
+      setInitializing(false)
+    }
+  }, [])
+
+  useEffect(() => { void bootstrap() }, [bootstrap])
   useEffect(() => { void load().catch(() => undefined) }, [load])
+
   const toggle = async (next: boolean) => {
-    try { await AuditService.SetEnabled(next); setEnabled(next) } catch (toggleError) { setError(toggleError instanceof Error ? toggleError.message : String(toggleError)) }
+    try {
+      await AuditService.SetEnabled(next)
+      setEnabled(next)
+      setError('')
+    } catch (toggleError) {
+      const message = toggleError instanceof Error ? toggleError.message : String(toggleError)
+      setError(message)
+      toast(t('更新审计设置失败: ${}', message), 'error')
+    }
   }
+
+  const retry = () => {
+    if (!enabled) {
+      void bootstrap()
+      return
+    }
+    void load().catch(() => undefined)
+  }
+
   return <section className="flex min-h-0 flex-1 flex-col overflow-auto bg-background p-5">
     <header className="mb-5 flex items-center gap-3"><ScrollText className="size-5 text-primary" /><div><h1 className="text-xl font-semibold">{t('审计日志')}</h1><p className="text-sm text-muted-foreground">{t('记录关键资产与连接操作，不保存密码、密钥或命令正文')}</p></div><div className="ml-auto flex items-center gap-2 text-sm"><span>{enabled ? t('已启用') : t('已停用')}</span><Switch aria-label={t('启用审计日志')} checked={enabled} onCheckedChange={(value) => { void toggle(value) }} /></div></header>
-    <Card><CardHeader className="flex flex-row items-center justify-between gap-4"><CardTitle className="text-sm">{t('操作记录')}</CardTitle><Button size="sm" variant="outline" disabled={!enabled || query.pending} onClick={() => { void load().catch(() => undefined) }}><RefreshCw />{t('刷新')}</Button></CardHeader><CardContent className="flex flex-col gap-4">
+    <Card><CardHeader className="flex flex-row items-center justify-between gap-4"><CardTitle className="text-sm">{t('操作记录')}</CardTitle><Button size="sm" variant="outline" disabled={!enabled || query.pending} onClick={retry}><RefreshCw />{t('刷新')}</Button></CardHeader><CardContent className="flex flex-col gap-4">
       <div className="grid gap-3 md:grid-cols-4"><LabeledSelect ariaLabel={t('审计动作')} value={action} options={actionOptions} onValueChange={setAction} /><LabeledSelect ariaLabel={t('审计会话')} value={sessionID} options={[{ value: '', label: t('全部会话') }, ...sessions.map((session) => ({ value: session.id, label: session.name }))]} onValueChange={setSessionID} /><Input aria-label={t('开始时间')} type="datetime-local" value={from} onChange={(event) => setFrom(event.target.value)} /><Input aria-label={t('结束时间')} type="datetime-local" value={to} onChange={(event) => setTo(event.target.value)} /></div>
-      {!enabled && !initializing ? <p className="rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">{t('启用审计日志后开始记录关键操作。')}</p> : <AsyncState pending={initializing || query.pending} error={error || query.error} empty={(query.result?.length ?? 0) === 0} emptyText={t('当前筛选条件下暂无审计记录。')} onRetry={() => { void load().catch(() => undefined) }}><AuditTable events={query.result ?? []} sessions={sessions} /></AsyncState>}
+      {(error || query.error) ? <AsyncState pending={false} error={error || query.error} empty={false} emptyText="" onRetry={retry}><div /></AsyncState> : !enabled && !initializing ? <p className="rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">{t('启用审计日志后开始记录关键操作。')}</p> : <AsyncState pending={initializing || query.pending} error={error || query.error} empty={(query.result?.length ?? 0) === 0} emptyText={t('当前筛选条件下暂无审计记录。')} onRetry={retry}><AuditTable events={query.result ?? []} sessions={sessions} /></AsyncState>}
     </CardContent></Card>
   </section>
 }

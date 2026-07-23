@@ -119,6 +119,12 @@ func matchedUserPattern(command string, expressions []string) bool {
 }
 
 func validateAISettings(settings model.AISettings) error {
+	if settings.DefaultProviderID != nil && *settings.DefaultProviderID <= 0 {
+		return fmt.Errorf("invalid default provider id")
+	}
+	if settings.FallbackProviderID != nil && *settings.FallbackProviderID <= 0 {
+		return fmt.Errorf("invalid fallback provider id")
+	}
 	if err := validateAIInteractionSettings(settings.Interaction); err != nil {
 		return err
 	}
