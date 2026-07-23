@@ -332,3 +332,14 @@ func TestTunnelService_StartConnectError(t *testing.T) {
 	err = svc.Start(created.ID)
 	assert.Error(t, err)
 }
+
+func TestTunnelServiceRejectsNonLoopbackLocalBind(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	svc := NewTunnelService(db, NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger()), newMockEventBus(), testutil.NewTestLogger())
+	_, err := svc.Create(model.TunnelInputFrom(model.Tunnel{
+		Name: "dyn", SessionID: 1, Type: model.TunnelDynamic,
+		LocalHost: "0.0.0.0", LocalPort: 1080,
+	}))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "loopback")
+}
