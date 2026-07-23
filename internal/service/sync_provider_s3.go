@@ -30,6 +30,9 @@ type s3SyncProvider struct {
 }
 
 func newS3SyncProvider(ctx context.Context, config model.S3SyncConfig, secretKey string, httpClient ...*http.Client) (*s3SyncProvider, error) {
+	if err := validateS3Endpoint(config.Endpoint); err != nil {
+		return nil, err
+	}
 	credentialsProvider := credentials.NewStaticCredentialsProvider(config.AccessKeyID, secretKey, "")
 	loadOptions := []func(*awsconfig.LoadOptions) error{
 		awsconfig.WithRegion(config.Region),
