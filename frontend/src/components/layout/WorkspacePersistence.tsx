@@ -14,18 +14,20 @@ import {
 import { openTerminalWithPoolCapacity } from '@/lib/openTerminal'
 import { useTerminalBehaviorStore } from '@/store/terminalBehaviorStore'
 import { t } from '@/i18n'
+import { resolveOpenTerminalSize } from '@/lib/terminalOpenSize'
 
 const SAVE_DELAY_MS = 300
 
 async function openRestoredTerminal(intent: OpenTerminalIntent): Promise<string> {
+  const size = resolveOpenTerminalSize()
   return openTerminalWithPoolCapacity(() => {
     if (intent.connectionKind === 'local') {
-      return TerminalService.OpenLocal(80, 24)
+      return TerminalService.OpenLocal(size.cols, size.rows)
     }
     if (intent.connectionKind === 'serial' && intent.serialPortId) {
-      return TerminalService.OpenSerial(intent.serialPortId, 80, 24)
+      return TerminalService.OpenSerial(intent.serialPortId, size.cols, size.rows)
     }
-    return TerminalService.Open(intent.sessionId, 80, 24)
+    return TerminalService.Open(intent.sessionId, size.cols, size.rows)
   })
 }
 

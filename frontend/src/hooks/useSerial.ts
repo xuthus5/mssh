@@ -6,6 +6,7 @@ import { t } from '@/i18n'
 import { useAppStore } from '@/store/appStore'
 import { createTerminalTab } from '@/lib/terminalTabs'
 import { openTerminalWithPoolCapacity } from '@/lib/openTerminal'
+import { resolveOpenTerminalSize } from '@/lib/terminalOpenSize'
 import type { SerialPort, SerialPortInput } from '../../bindings/github.com/xuthus5/mssh/internal/model/models'
 
 export type { SerialPort, SerialPortInput }
@@ -100,8 +101,9 @@ export function useSerial() {
 
   const connectPort = useCallback(async (port: SerialPort) => {
     try {
+      const size = resolveOpenTerminalSize()
       const terminalId = await openTerminalWithPoolCapacity(
-        () => TerminalService.OpenSerial(Number(port.id), 80, 24),
+        () => TerminalService.OpenSerial(Number(port.id), size.cols, size.rows),
       )
       const store = useAppStore.getState()
       const tab = createTerminalTab({

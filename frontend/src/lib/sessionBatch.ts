@@ -3,6 +3,7 @@ import { logger } from '@/lib/logger'
 import { createTerminalTab } from '@/lib/terminalTabs'
 import { useAppStore } from '@/store/appStore'
 import { openTerminalWithPoolCapacity } from '@/lib/openTerminal'
+import { resolveOpenTerminalSize } from '@/lib/terminalOpenSize'
 
 interface BatchSession {
   id: string
@@ -18,7 +19,8 @@ export interface BatchSessionResult {
 }
 
 async function openSessionTab(session: BatchSession, command?: string): Promise<string> {
-  const terminalId = await openTerminalWithPoolCapacity(() => TerminalService.Open(Number(session.id), 80, 24))
+  const size = resolveOpenTerminalSize()
+  const terminalId = await openTerminalWithPoolCapacity(() => TerminalService.Open(Number(session.id), size.cols, size.rows))
   try {
     if (command) await MacroService.Execute(terminalId, command)
   } catch (error) {
