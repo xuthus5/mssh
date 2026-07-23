@@ -217,4 +217,14 @@ describe('KeyManager', () => {
     expect(screen.queryByRole('heading', { name: '编辑密钥' })).not.toBeInTheDocument()
   })
 
+
+  it('shows load failures instead of empty keys', async () => {
+    const onReload = vi.fn(async () => {})
+    render(<KeyManager {...props()} keys={[]} loadError="list boom" loading={false} onReload={onReload} />)
+    expect(screen.getByRole('alert')).toHaveTextContent('list boom')
+    expect(screen.queryByText('无密钥')).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: '重试' }))
+    expect(onReload).toHaveBeenCalled()
+  })
+
 })

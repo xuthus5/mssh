@@ -318,6 +318,7 @@ describe('useSettings', () => {
     })
 
     expect(result.current.keys).toEqual([])
+    expect(result.current.error).toBe('list failed')
     expect(result.current.systemFonts).toEqual(['sans-serif'])
   })
 
