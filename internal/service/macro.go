@@ -101,6 +101,9 @@ func (m *MacroService) Delete(id int64) error {
 }
 
 func (m *MacroService) Execute(terminalID, command string) error {
+	if strings.TrimSpace(terminalID) == "" {
+		return fmt.Errorf("invalid terminal id")
+	}
 	security := m.loadMacroSecuritySettings()
 	proposal := classifyAICommand(command, security)
 	if proposal.Blocked {
