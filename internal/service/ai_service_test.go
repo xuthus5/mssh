@@ -5,7 +5,9 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -264,4 +266,50 @@ func createAIServiceSession(t *testing.T, db *sql.DB) *model.Session {
 	session, err := store.CreateSession(db, model.Session{Name: "prod", Host: "127.0.0.1", Port: 22, Username: "root", AuthMethod: model.AuthAgent, KeepAlive: 30})
 	require.NoError(t, err)
 	return session
+}
+
+type slowAITerminalStub struct {
+	delay time.Duration
+}
+
+func (s *slowAITerminalStub) Write(_ string, data string) (int, error) {
+	time.Sleep(s.delay)
+	return len(data), nil
+}
+
+func (s *slowAITerminalStub) SystemInfo(string) (*model.SystemInfo, error) {
+	return &model.SystemInfo{}, nil
+}
+
+func TestAIServiceExecuteCommandWriteTimeout(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	session := createAIServiceSession(t, db)
+	service := NewAIService(db, nil, nil, testutil.NewTestLogger())
+	service.terminals = &slowAITerminalStub{delay: 200 * time.Millisecond}
+	settings := defaultAISettings()
+	settings.Security.CommandTimeoutSeconds = 1
+	// Use sub-second by writing through helper directly with short timeout.
+	err := writeTerminalWithTimeout(service.terminals, "term", "echo ok\n", 50*time.Millisecond)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "timed out")
+
+	// Fast path still succeeds.
+	service.terminals = &aiTerminalStub{}
+	require.NoError(t, service.ExecuteCommand(model.AICommandExecutionInput{
+		SessionID: session.ID, TerminalID: "term", Command: "echo ok", Approved: true,
+	}))
+}
+
+func TestAIServiceExecuteCommandRejectsOversizedCommand(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	session := createAIServiceSession(t, db)
+	service := NewAIService(db, nil, nil, testutil.NewTestLogger())
+	service.terminals = &aiTerminalStub{}
+	huge := strings.Repeat("a", maxAICommandBytes)
+	err := service.ExecuteCommand(model.AICommandExecutionInput{
+		SessionID: session.ID, TerminalID: "term", Command: huge, Approved: true,
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "size limit")
+	assert.Empty(t, service.terminals.(*aiTerminalStub).writes)
 }
