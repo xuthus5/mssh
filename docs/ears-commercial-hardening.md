@@ -865,3 +865,9 @@
 | UX-THEME-016 | 导入 iTerm2 主题时文件选择对话框失败不得产生未处理 Promise，并 toast 明确失败文案。 | done |
 | UX-I18N-021 | 连接相关英文文案不得出现单词粘连（Cancelconnect / successconnectsession 等）。 | done |
 
+## 2026-07-23 商用硬化波次（英文词条粘连清理）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| UX-I18N-022 | en.json 中中文多词 UI 文案的英文翻译不得出现无空格粘连词（如 Executemacro / Commandhistory）。 | done |
+
