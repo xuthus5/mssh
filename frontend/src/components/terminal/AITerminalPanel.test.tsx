@@ -13,11 +13,13 @@ vi.mock('@/lib/wails', () => ({ AIService: {
 } }))
 
 import { AITerminalPanel } from '@/components/terminal/AITerminalPanel'
+import { useToastStore } from '@/components/ui/toast'
 import { useAppStore } from '@/store/appStore'
 
 describe('AITerminalPanel', () => {
   beforeEach(() => {
     localStorage.clear()
+    useToastStore.setState({ toasts: [] })
     ai.dashboard.mockResolvedValue(aiDashboard())
     ai.listConversations.mockResolvedValue([])
     ai.listMessages.mockResolvedValue([])
@@ -65,7 +67,9 @@ describe('AITerminalPanel', () => {
     ai.dashboard.mockRejectedValueOnce(new Error('dashboard failed'))
     const { unmount } = render(<AITerminalPanel terminalID="term-1" sessionID={7} onClose={vi.fn()} />)
     expect(await screen.findByText('dashboard failed')).toBeInTheDocument()
+    await waitFor(() => expect(useToastStore.getState().toasts.some((item) => item.message.includes('dashboard failed'))).toBe(true))
     unmount()
+    useToastStore.setState({ toasts: [] })
     ai.dashboard.mockResolvedValue(aiDashboard())
     ai.chat.mockRejectedValueOnce(new Error('chat failed'))
     render(<AITerminalPanel terminalID="term-1" sessionID={7} onClose={vi.fn()} />)
@@ -73,6 +77,30 @@ describe('AITerminalPanel', () => {
     await user.type(screen.getByPlaceholderText('描述要排查或执行的运维任务'), '失败测试')
     await user.click(screen.getByRole('button', { name: '发送问题' }))
     expect(await screen.findByText('chat failed')).toBeInTheDocument()
+    await waitFor(() => expect(useToastStore.getState().toasts.some((item) => item.message.includes('chat failed'))).toBe(true))
+  })
+
+  it('toasts conversation history load failures', async () => {
+    ai.listConversations.mockResolvedValue([{ id: 3, session_id: 7, title: '历史排查', created_at: '', updated_at: '' }])
+    ai.listMessages.mockRejectedValueOnce(new Error('messages failed'))
+    render(<AITerminalPanel terminalID="term-1" sessionID={7} onClose={vi.fn()} />)
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: '对话历史' }))
+    await user.click(await screen.findByRole('button', { name: '历史排查' }))
+    expect(await screen.findByText('messages failed')).toBeInTheDocument()
+    await waitFor(() => expect(useToastStore.getState().toasts.some((item) => item.message.includes('messages failed'))).toBe(true))
+  })
+
+  it('toasts command execution failures', async () => {
+    ai.executeCommand.mockRejectedValueOnce(new Error('exec failed'))
+    render(<AITerminalPanel terminalID="term-1" sessionID={7} onClose={vi.fn()} />)
+    const user = userEvent.setup()
+    await waitFor(() => expect(ai.dashboard).toHaveBeenCalled())
+    await user.type(screen.getByPlaceholderText('描述要排查或执行的运维任务'), '检查 nginx')
+    await user.click(screen.getByRole('button', { name: '发送问题' }))
+    await user.click(await screen.findByRole('button', { name: '审批并执行' }))
+    expect(await screen.findByText('exec failed')).toBeInTheDocument()
+    await waitFor(() => expect(useToastStore.getState().toasts.some((item) => item.message.includes('exec failed'))).toBe(true))
   })
 
   it('automatically executes trusted read-only proposals', async () => {

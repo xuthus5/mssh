@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -12,14 +12,24 @@ vi.mock('@/lib/wails', () => ({ AboutService: { Info: info, CheckUpdate: checkUp
 vi.mock('@wailsio/runtime', () => ({ Browser: { OpenURL: openURL } }))
 
 import { AboutPanel } from '@/components/settings/AboutPanel'
+import { useToastStore } from '@/components/ui/toast'
 
 describe('AboutPanel', () => {
   it('shows versions and opens the community repository', async () => {
+    useToastStore.setState({ toasts: [] })
     render(<AboutPanel />)
     expect(await screen.findByText('0.1.0')).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: '检查更新' }))
     expect(await screen.findByText('v0.2.0')).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'GitHub 社区' }))
     expect(openURL).toHaveBeenCalledWith('https://github.com/xuthus5/mssh')
+  })
+
+  it('toasts about info load failures', async () => {
+    useToastStore.setState({ toasts: [] })
+    info.mockRejectedValueOnce(new Error('about failed'))
+    render(<AboutPanel />)
+    expect(await screen.findByText('未知')).toBeInTheDocument()
+    await waitFor(() => expect(useToastStore.getState().toasts.some((item) => item.message.includes('about failed'))).toBe(true))
   })
 })
