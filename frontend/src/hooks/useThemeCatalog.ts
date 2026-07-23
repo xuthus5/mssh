@@ -182,9 +182,13 @@ function broadcastThemeCatalog() {
 }
 
 async function refreshThemeCatalog() {
-  // Mutations already surface their own failure toast; keep refresh silent to avoid double toasts.
-  await loadThemeCatalogFresh({ silent: true })
-  broadcastThemeCatalog()
+  // Mutations already succeeded; silent refresh failures must not rebrand them as mutation failures.
+  try {
+    await loadThemeCatalogFresh({ silent: true })
+    broadcastThemeCatalog()
+  } catch (refreshError) {
+    logger.error('theme mutation post-refresh failed', refreshError)
+  }
 }
 
 async function loadThemeCatalogFresh(options?: { silent?: boolean }) {

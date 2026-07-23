@@ -190,25 +190,23 @@ describe('useThemeCatalog', () => {
     expect(useAppStore.getState().terminalTheme).toBe(terminalThemeBefore)
   })
 
-  it('propagates catalog reload failures after a successful database save', async () => {
+  it('keeps configuration save success when catalog reload fails', async () => {
     __registerHandler('github.com/xuthus5/mssh/internal/service.ThemeService.SaveConfiguration', async () => {})
     const { result } = renderHook(() => useThemeCatalog())
     await waitFor(() => expect(result.current.loaded).toBe(true))
+    useToastStore.setState({ toasts: [] })
     __registerHandler('github.com/xuthus5/mssh/internal/service.ThemeService.ListProfiles', async () => { throw new Error('reload failed') })
 
-    let reloadError: unknown
     await act(async () => {
-      try {
-        await result.current.saveConfiguration({
-          global_style: globalStyle,
-          profiles: [],
-          assignments: { dark_profile_id: 1, light_profile_id: 2, follow_interface_mode: true, fixed_profile_id: 0 },
-        } as never)
-      } catch (error) {
-        reloadError = error
-      }
+      await result.current.saveConfiguration({
+        global_style: globalStyle,
+        profiles: [],
+        assignments: { dark_profile_id: 1, light_profile_id: 2, follow_interface_mode: true, fixed_profile_id: 0 },
+      } as never)
     })
-    expect(reloadError).toEqual(expect.objectContaining({ message: 'reload failed' }))
+    const messages = useToastStore.getState().toasts.map((item) => item.message)
+    expect(messages.some((message) => message.includes('reload failed'))).toBe(false)
+    expect(messages.some((message) => message.includes('加载主题失败'))).toBe(false)
   })
 
   it('reloads and hot-applies the active theme after resetting built-in styles', async () => {
@@ -228,16 +226,17 @@ describe('useThemeCatalog', () => {
     expect(useAppStore.getState().terminalTheme.background).toBe('#f5f5f5')
   })
 
-  it('keeps mutation failure toast free of nested catalog load toast on silent refresh', async () => {
+  it('keeps mutation success when post-mutation silent catalog refresh fails', async () => {
     useToastStore.setState({ toasts: [] })
     registerCatalogHandlers('dark')
     __registerHandler('github.com/xuthus5/mssh/internal/service.ThemeService.DeleteProfile', async () => undefined)
     const { result } = renderHook(() => useThemeCatalog())
     await waitFor(() => expect(result.current.loaded).toBe(true))
     __registerHandler('github.com/xuthus5/mssh/internal/service.ThemeService.ListProfiles', async () => { throw new Error('reload boom') })
-    await expect(act(async () => { await result.current.deleteProfile(3) })).rejects.toThrow()
+    await act(async () => { await result.current.deleteProfile(3) })
     const messages = useToastStore.getState().toasts.map((item) => item.message)
     expect(messages.some((message) => message.includes('加载主题失败'))).toBe(false)
+    expect(messages.some((message) => message.includes('reload boom'))).toBe(false)
   })
 })
 

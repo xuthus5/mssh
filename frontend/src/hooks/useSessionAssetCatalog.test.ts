@@ -80,14 +80,13 @@ describe('useSessionAssetCatalog', () => {
     expect(result.current.error).toBe('catalog failed')
     expect(useToastStore.getState().toasts.some((item) => item.message.includes('catalog failed'))).toBe(true)
   })
-})
 
-  it('keeps mutation callers free of refresh toast noise when silent', async () => {
+  it('keeps mutation success when post-mutation silent refresh fails', async () => {
     __registerHandler(service + 'AssetCatalogService.UpdateEnvironment', async () => undefined)
     __registerHandler(service + 'AssetCatalogService.ListEnvironments', async () => { throw new Error('refresh failed') })
     const { result } = renderHook(() => useHarness())
     const environment: AssetEnvironment = { id: '1', name: '生产', colorToken: 'red', sortOrder: 0, sessionCount: 1 }
-    await expect(act(async () => result.current.updateEnvironment(environment))).rejects.toThrow('refresh failed')
+    await act(async () => result.current.updateEnvironment(environment))
     expect(useToastStore.getState().toasts.some((item) => item.message.includes('refresh failed'))).toBe(false)
   })
 
@@ -97,4 +96,5 @@ describe('useSessionAssetCatalog', () => {
     await expect(act(async () => result.current.refreshAssets())).rejects.toThrow('refresh only failed')
     expect(useToastStore.getState().toasts.some((item) => item.message.includes('refresh only failed'))).toBe(true)
   })
+})
 

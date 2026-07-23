@@ -44,8 +44,31 @@ describe('useSessionCSVTransfer', () => {
     expect(handler).toHaveBeenCalledWith('/tmp/sessions.csv', {
       conflict_policy: 'overwrite', header_mapping: { name: 'Session' }, default_values: { port: '22' },
     })
-    expect(refreshFolders).toHaveBeenCalledOnce()
-    expect(refreshAssets).toHaveBeenCalledOnce()
+    await vi.waitFor(() => {
+      expect(refreshFolders).toHaveBeenCalledOnce()
+      expect(refreshAssets).toHaveBeenCalledOnce()
+    })
+  })
+
+  it('keeps import success when post-import refresh fails', async () => {
+    const summary = { total: 1, imported: 1, updated: 0, skipped: 0, failed: 0, results: [] }
+    __registerHandler(service + 'ImportCSV', async () => summary)
+    const refreshFolders = vi.fn(async () => { throw new Error('folder boom') })
+    const refreshAssets = vi.fn(async () => { throw new Error('asset boom') })
+    const { result } = renderHook(() => useSessionCSVTransfer({ refreshFolders, refreshAssets }))
+
+    await act(async () => {
+      expect(await result.current.importSessionsCSV({
+        path: '/tmp/sessions.csv',
+        conflictPolicy: SessionCSVConflictPolicy.SessionCSVConflictOverwrite,
+        headerMapping: { name: 'Session' },
+        defaultValues: { port: '22' },
+      })).toEqual(expect.objectContaining({ imported: 1 }))
+    })
+    await vi.waitFor(() => {
+      expect(refreshFolders).toHaveBeenCalledOnce()
+      expect(refreshAssets).toHaveBeenCalledOnce()
+    })
   })
 
   it('previews external csv headers without refreshing workspace data', async () => {

@@ -166,6 +166,47 @@ describe('useSession behavior', () => {
     expect(useAppStore.getState().tabs).toHaveLength(1)
   })
 
+  it('keeps batch macro results when post-batch asset refresh fails', async () => {
+    registerInitial({ sessions: [bindingSession(5, 'One', null), bindingSession(6, 'Two', null)] })
+    __registerHandler(service + 'TerminalService.Open', async (sessionID: number) => `term-${sessionID}`)
+    __registerHandler(service + 'MacroService.Execute', async () => {})
+    const { result } = renderHook(() => useSession())
+    await waitFor(() => expect(result.current.sessions).toHaveLength(2))
+    __registerHandler(service + 'SessionService.ListSessions', async () => { throw new Error('refresh boom') })
+    __registerHandler(service + 'SessionService.ListRecentSessions', async () => { throw new Error('recent boom') })
+    __registerHandler(service + 'AssetCatalogService.ListEnvironments', async () => { throw new Error('env boom') })
+
+    let batchResults: Awaited<ReturnType<typeof result.current.batchExecuteMacro>> = []
+    await act(async () => {
+      batchResults = await result.current.batchExecuteMacro(['5', '6'], 'uptime\n')
+    })
+
+    expect(batchResults).toEqual([
+      expect.objectContaining({ sessionId: '5', success: true, terminalId: 'term-5' }),
+      expect.objectContaining({ sessionId: '6', success: true, terminalId: 'term-6' }),
+    ])
+    expect(useAppStore.getState().tabs).toHaveLength(2)
+  })
+
+  it('keeps batch delete results when post-delete asset refresh fails', async () => {
+    registerInitial({ sessions: [bindingSession(5, 'One', null), bindingSession(6, 'Two', null)] })
+    __registerHandler(service + 'SessionService.DeleteSessions', async () => 2)
+    __registerHandler(service + 'AuditService.RecordBatch', async () => {})
+    const { result } = renderHook(() => useSession())
+    await waitFor(() => expect(result.current.sessions).toHaveLength(2))
+    __registerHandler(service + 'SessionService.ListSessions', async () => { throw new Error('refresh boom') })
+    __registerHandler(service + 'SessionService.ListRecentSessions', async () => { throw new Error('recent boom') })
+    __registerHandler(service + 'AssetCatalogService.ListEnvironments', async () => { throw new Error('env boom') })
+
+    let batchResults: Awaited<ReturnType<typeof result.current.batchDeleteSessions>> = []
+    await act(async () => {
+      batchResults = await result.current.batchDeleteSessions(['5', '6'])
+    })
+
+    expect(batchResults.every((item) => item.success)).toBe(true)
+    expect(result.current.sessions).toHaveLength(0)
+  })
+
   it('disconnects a specific terminal instance by backend terminal ID', async () => {
     registerInitial({ sessions: [bindingSession(5, 'Connect', null)] })
     const closeTerminal = vi.fn(async () => {})

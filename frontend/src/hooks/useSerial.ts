@@ -44,8 +44,8 @@ export function useSerial() {
       const message = err instanceof Error ? err.message : String(err)
       setError(message)
       logger.error('list serial ports failed', err)
-      // Primary list failures always surface; silent only suppresses device discovery noise.
-      toast(t('加载串口配置失败: ${}', message), 'error')
+      // Standalone refresh surfaces list failures; nested mutation refresh stays silent.
+      if (!options?.silent) toast(t('加载串口配置失败: ${}', message), 'error')
     } finally {
       setLoading(false)
     }

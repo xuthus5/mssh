@@ -1,3 +1,4 @@
+import { logger } from '@/lib/logger'
 import { useCallback } from 'react'
 import { SessionService } from '@/lib/wails'
 import type { SessionCSVConflictPolicy, SessionCSVExportResult, SessionCSVImportSummary, SessionCSVPreview } from '../../bindings/github.com/xuthus5/mssh/internal/model/models'
@@ -40,7 +41,15 @@ export function useSessionCSVTransfer(refreshers: Refreshers) {
       header_mapping: request.headerMapping,
       default_values: request.defaultValues,
     })
-    await Promise.all([refreshers.refreshFolders(), refreshers.refreshAssets({ silent: true })])
+    // Import already completed; refresh noise must not rebrand success as import failure.
+    void Promise.all([
+      refreshers.refreshFolders().catch((error: unknown) => {
+        logger.error('csv import folder refresh failed', error)
+      }),
+      refreshers.refreshAssets({ silent: true }).catch((error: unknown) => {
+        logger.error('csv import asset refresh failed', error)
+      }),
+    ])
     return summary
   }, [refreshers.refreshAssets, refreshers.refreshFolders])
 
