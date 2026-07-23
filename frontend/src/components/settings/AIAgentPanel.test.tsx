@@ -13,4 +13,11 @@ describe('AIAgentPanel', () => {
     await userEvent.click(screen.getByRole('button', { name: '重新检测' }))
     expect(detectAgents).toHaveBeenCalledTimes(2)
   })
+
+  it('surfaces agent detection failures without unhandled rejections', async () => {
+    const detectAgents = vi.fn(async () => { throw new Error('detect failed') })
+    render(<AIAgentPanel controller={{ agents: [], pending: null, detectAgents } as never} />)
+    await userEvent.click(screen.getByRole('button', { name: '重新检测' }))
+    expect(detectAgents).toHaveBeenCalled()
+  })
 })

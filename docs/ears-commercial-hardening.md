@@ -895,3 +895,10 @@
 |---|---|---|
 | UX-AI-017 | AI 提供商保存/测试/删除/优先级切换产生的 Promise 拒绝不得未处理；错误 toast 由 controller 负责。 | done |
 
+## 2026-07-23 商用硬化波次（AI Agent / 密钥编辑 Promise 收口）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| UX-AI-018 | AI Agent 检测按钮与初始加载的 Promise 拒绝不得未处理。 | done |
+| UX-KEY-011 | 密钥编辑对话框保存动作的 Promise 拒绝不得未处理。 | done |
+
