@@ -153,7 +153,11 @@ function MacrosWorkspace() {
           onExecute={(command) => { void executeMacroOnActiveTerminal(command) }}
           onAdd={() => {}}
           onDelete={(id) => {
-            void MacroService.Delete(Number(id)).then(reload).catch((error: unknown) => {
+            void MacroService.Delete(Number(id)).then(() => {
+              void reload().catch((error: unknown) => {
+                logger.error('reload macros after delete failed', error)
+              })
+            }).catch((error: unknown) => {
               toast(t('删除宏失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
             })
           }}
