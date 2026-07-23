@@ -683,3 +683,13 @@
 | SEC-LOG-014 | StartTerminalRecording 必须拒绝 sessionID<0；0 表示本地/无会话录制。 | done |
 | SEC-LOG-015 | StopTerminalRecordingIfActive 必须拒绝空 terminalID。 | done |
 | SEC-SERIAL-015 | SerialBreak 必须拒绝 durationMs<0。 | done |
+
+## 2026-07-23 商用硬化波次（审计可见错误 + AI provider / Audit session 校验）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| SEC-AI-015 | AI Settings 的 default/fallback provider id 必须 >0（若提供）。 | done |
+| SEC-AUDIT-011 | Audit List 的 sessionID 若提供必须 >0。 | done |
+| UX-AUDIT-010 | 审计设置加载失败必须 toast，并在面板中展示错误。 | done |
+| UX-AUDIT-011 | 审计开关切换失败必须 toast。 | done |
+| UX-AUDIT-012 | 审计日志加载失败必须 toast。 | done |

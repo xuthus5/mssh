@@ -1363,5 +1363,8 @@
   "加载关于信息失败: ${}": "Failed to load about info: ${}",
   "恢复工作区失败: ${}": "Failed to restore workspace: ${}",
   "保存工作区失败: ${}": "Failed to save workspace: ${}",
-  "选择日志目录失败: ${}": "Failed to choose log directory: ${}"
+  "选择日志目录失败: ${}": "Failed to choose log directory: ${}",
+  "加载审计设置失败: ${}": "Failed to load audit settings: ${}",
+  "更新审计设置失败: ${}": "Failed to update audit settings: ${}",
+  "加载审计日志失败: ${}": "Failed to load audit logs: ${}"
 }
