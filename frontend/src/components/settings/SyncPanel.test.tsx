@@ -49,4 +49,26 @@ describe('SyncPanel', () => {
     expect(screen.getByText('本地版本')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '清空本地业务数据' })).toBeInTheDocument()
   })
+
+  it('swallows export/import promise rejections from header actions', async () => {
+    const onExport = vi.fn(async () => { throw new Error('export boom') })
+    const onImport = vi.fn(async () => { throw new Error('import boom') })
+    render(<SyncPanel controller={controller()} onExport={onExport} onImport={onImport} />)
+    await userEvent.click(screen.getByRole('button', { name: '导出' }))
+    await userEvent.click(screen.getByRole('button', { name: '导入' }))
+    expect(onExport).toHaveBeenCalled()
+    expect(onImport).toHaveBeenCalled()
+  })
+
+  it('swallows export/import promise rejections from danger actions', async () => {
+    const onExport = vi.fn(async () => { throw new Error('export boom') })
+    const onImport = vi.fn(async () => { throw new Error('import boom') })
+    const sync = controller({ dashboard: { ...controller().dashboard, config: { ...controller().dashboard.config, enabled: true }, state: SyncState.SyncStateSynced } })
+    render(<SyncPanel controller={sync} onExport={onExport} onImport={onImport} />)
+    await userEvent.click(screen.getByRole('tab', { name: '同步状态与配置' }))
+    await userEvent.click(screen.getByRole('button', { name: '导出本地备份' }))
+    await userEvent.click(screen.getByRole('button', { name: '导入本地备份' }))
+    expect(onExport).toHaveBeenCalled()
+    expect(onImport).toHaveBeenCalled()
+  })
 })

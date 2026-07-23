@@ -25,8 +25,8 @@ interface Props {
   onRestore: (id: number) => Promise<void>
   onDelete: (id: number) => Promise<void>
   onReset: () => Promise<void>
-  onExport: () => void
-  onImport: () => void
+  onExport: () => void | Promise<void>
+  onImport: () => void | Promise<void>
 }
 
 export function SyncStatusTab(props: Props) {
