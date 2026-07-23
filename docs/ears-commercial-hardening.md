@@ -1052,3 +1052,9 @@
 | UX-TERM-061 | 关闭后应发出 terminal closed 事件；即使前端未先关标签，后端也不得留下悬空 PTY/连接。 | done |
 | UX-TERM-062 | 删除会话时对无终端映射的残余 session 连接也必须 disconnect 清理。 | done |
 
+## 2026-07-24 商用硬化波次（删除会话取消进行中连接）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| UX-CONN-063 | 删除/批量删除会话前，必须取消该会话仍在进行中的 SSH 连接 attempt（含 host key 等待）。 | done |
+
