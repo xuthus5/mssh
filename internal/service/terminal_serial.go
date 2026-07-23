@@ -71,7 +71,7 @@ func (t *TerminalService) SerialSetSignals(terminalID string, dtr, rts bool) err
 	return port.SetSignals(dtr, rts)
 }
 
-// SerialSignals returns the current DTR/RTS state for an open serial terminal.
+// SerialSignals returns DTR/RTS outputs and modem input status for an open serial terminal.
 func (t *TerminalService) SerialSignals(terminalID string) (model.SerialSignals, error) {
 	port, err := t.serialPortSession(terminalID)
 	if err != nil {

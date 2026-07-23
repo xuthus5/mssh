@@ -4193,11 +4193,16 @@ export enum SerialLineEnding {
 }
 
 /**
- * SerialSignals is the runtime modem output state for an open serial terminal.
+ * SerialSignals is the runtime modem line state for an open serial terminal.
+ * DTR/RTS are outputs; CTS/DSR/DCD/RI are inputs from the modem status bits.
  */
 export class SerialSignals {
     "dtr": boolean;
     "rts": boolean;
+    "cts": boolean;
+    "dsr": boolean;
+    "dcd": boolean;
+    "ri": boolean;
 
     /** Creates a new SerialSignals instance. */
     constructor($$source: Partial<SerialSignals> = {}) {
@@ -4206,6 +4211,18 @@ export class SerialSignals {
         }
         if (!("rts" in $$source)) {
             this["rts"] = false;
+        }
+        if (!("cts" in $$source)) {
+            this["cts"] = false;
+        }
+        if (!("dsr" in $$source)) {
+            this["dsr"] = false;
+        }
+        if (!("dcd" in $$source)) {
+            this["dcd"] = false;
+        }
+        if (!("ri" in $$source)) {
+            this["ri"] = false;
         }
         Object.assign(this, $$source);
     }

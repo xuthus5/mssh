@@ -35,11 +35,23 @@ func (p *PortSession) SetSignals(dtr, rts bool) error {
 	return nil
 }
 
-// Signals returns the last requested DTR/RTS state.
+// Signals returns DTR/RTS output state plus live modem input bits when available.
 func (p *PortSession) Signals() model.SerialSignals {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
-	return model.SerialSignals{DTR: p.dtr, RTS: p.rts}
+	out := model.SerialSignals{DTR: p.dtr, RTS: p.rts}
+	if p.port == nil || p.exited {
+		return out
+	}
+	bits, err := p.port.GetModemStatusBits()
+	if err != nil || bits == nil {
+		return out
+	}
+	out.CTS = bits.CTS
+	out.DSR = bits.DSR
+	out.DCD = bits.DCD
+	out.RI = bits.RI
+	return out
 }
 
 // Break sends a break condition for the given duration.
