@@ -250,3 +250,11 @@ func TestSessionService_GetClientWrapper(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotNil(t, wrapper)
 }
+
+func TestSessionService_GetClientWrapperRejectsEmptyID(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	svc := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
+	_, err := svc.GetClientWrapper("")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "invalid connection id")
+}

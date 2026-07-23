@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net"
 	"os"
+	"strings"
 	"sync"
 
 	"github.com/google/uuid"
@@ -113,6 +114,9 @@ func (s *SessionService) disconnect(terminalID string, emitState bool) error {
 }
 
 func (s *SessionService) GetClientWrapper(connID string) (*ssh.ClientWrapper, error) {
+	if strings.TrimSpace(connID) == "" {
+		return nil, fmt.Errorf("invalid connection id")
+	}
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	conn, ok := s.conns[connID]

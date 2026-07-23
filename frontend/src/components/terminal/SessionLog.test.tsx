@@ -19,6 +19,7 @@ vi.mock('@/components/ui/alert-dialog', () => ({
 
 import SessionLog from '@/components/terminal/SessionLog'
 import { logger } from '@/lib/logger'
+import { ToastContainer, useToastStore } from '@/components/ui/toast'
 
 const recording = {
   id: 7,
@@ -41,6 +42,7 @@ function deferred<T>() {
 describe('SessionLog', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    useToastStore.setState({ toasts: [] })
     listRecordings.mockResolvedValue([recording])
   })
 
@@ -73,9 +75,10 @@ describe('SessionLog', () => {
     const loadError = new Error('list failed')
     const loggerError = vi.spyOn(logger, 'error').mockImplementation(() => {})
     listRecordings.mockRejectedValueOnce(loadError).mockResolvedValueOnce([])
-    render(<SessionLog sessionId={1} onPlayback={vi.fn()} onDeleteRecording={vi.fn(async () => {})} onClose={vi.fn()} />)
+    render(<><SessionLog sessionId={1} onPlayback={vi.fn()} onDeleteRecording={vi.fn(async () => {})} onClose={vi.fn()} /><ToastContainer /></>)
 
     expect(await screen.findByText('list failed')).toBeInTheDocument()
+    expect(await screen.findByText(/加载会话录制失败/)).toBeInTheDocument()
     expect(loggerError).toHaveBeenCalledWith('SessionLog: load recordings error:', loadError)
     await userEvent.click(screen.getByRole('button', { name: '重试' }))
 
@@ -92,7 +95,7 @@ describe('SessionLog', () => {
   it('keeps the recording count when deletion fails', async () => {
     const deletion = deferred<void>()
     const onDeleteRecording = vi.fn(() => deletion.promise)
-    render(<SessionLog sessionId={1} onPlayback={vi.fn()} onDeleteRecording={onDeleteRecording} onClose={vi.fn()} />)
+    render(<><SessionLog sessionId={1} onPlayback={vi.fn()} onDeleteRecording={onDeleteRecording} onClose={vi.fn()} /><ToastContainer /></>)
     expect(await screen.findByText('录制 #7')).toBeInTheDocument()
 
     await userEvent.click(screen.getByRole('button', { name: '删除录制 #7' }))
@@ -103,6 +106,7 @@ describe('SessionLog', () => {
     deletion.reject(new Error('delete failed'))
 
     expect(await screen.findByText('delete failed')).toBeInTheDocument()
+    expect(await screen.findByText(/删除会话录制失败/)).toBeInTheDocument()
     expect(screen.getByText('1 条')).toBeInTheDocument()
     expect(screen.getByText('录制 #7')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '删除' })).toBeEnabled()
