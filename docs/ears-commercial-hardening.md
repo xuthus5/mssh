@@ -1224,3 +1224,10 @@
 | UX-CONN-121 | 主机指纹接受/拒绝与取消连接失败仅连接对话框 failed+error 展示，不得 toast。 | done |
 | UX-MACRO-122 | 宏工作区列表加载失败仅工作区内 error+重试，不得 toast；测试与实现一致。 | done |
 
+## 2026-07-24 商用硬化波次（SFTP 列表错误单一归属）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| UX-SFTP-123 | SFTP 目录 list 失败仅 FilePanel inline error + 重试；TerminalLayers 不得再 toast 叠加。 | done |
+| UX-SFTP-124 | 拖拽上传失败仅由 transfer 动作 toast 一次；Layers 不得二次包装。 | done |
+
