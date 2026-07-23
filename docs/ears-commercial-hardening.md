@@ -586,3 +586,11 @@
 | SEC-ASSET-012 | GetSessionAssetDetail 必须拒绝 sessionID<=0。 | done |
 | SEC-MACRO-012 | Macro Update 必须拒绝 id<=0。 | done |
 | SEC-TUNNEL-011 | Tunnel Update 必须拒绝 id<=0。 | done |
+
+## 2026-07-23 商用硬化波次（连接/SFTP/日志 sessionID 校验）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| SEC-SESSION-014 | sessionForConnect 必须拒绝 id<=0。 | done |
+| SEC-SFTP-010 | FileService.connect 必须拒绝 sessionID<=0。 | done |
+| SEC-LOG-011 | LogService.List(sessionID) 若提供必须 >=0（0=本地/无会话日志，负值拒绝）。 | done |
