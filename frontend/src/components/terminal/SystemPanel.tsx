@@ -7,6 +7,7 @@ import { logger } from '@/lib/logger'
 import { useToolPanelResize } from '@/hooks/useToolPanelResize'
 import { TerminalService } from '@/lib/wails'
 import { t } from '@/i18n'
+import { isTerminalGone } from '@/lib/terminalGone'
 
 
 type Info = {
@@ -117,18 +118,30 @@ function useSystemInfo(terminalID: string) {
   const [failed, setFailed] = useState(false)
   useEffect(() => {
     let cancelled = false
+    let timer: number | null = null
+    const stop = () => {
+      if (timer !== null) {
+        window.clearInterval(timer)
+        timer = null
+      }
+    }
     const load = async () => {
       try {
         const value = await TerminalService.SystemInfo(terminalID)
         if (!cancelled) { setInfo(value); setFailed(false) }
       } catch (error: unknown) {
+        if (isTerminalGone(error)) {
+          if (!cancelled) setFailed(true)
+          stop()
+          return
+        }
         logger.error('system panel info collection failed', error)
         if (!cancelled) setFailed(true)
       }
     }
     void load()
-    const timer = window.setInterval(() => { void load() }, 3000)
-    return () => { cancelled = true; window.clearInterval(timer) }
+    timer = window.setInterval(() => { void load() }, 3000)
+    return () => { cancelled = true; stop() }
   }, [terminalID])
   return { info, failed }
 }
@@ -139,18 +152,30 @@ function useProcesses(terminalID: string, active: boolean) {
   useEffect(() => {
     if (!active) return
     let cancelled = false
+    let timer: number | null = null
+    const stop = () => {
+      if (timer !== null) {
+        window.clearInterval(timer)
+        timer = null
+      }
+    }
     const load = async () => {
       try {
         const value = await TerminalService.ProcessInfo(terminalID)
         if (!cancelled) { setProcesses(value); setFailed(false) }
       } catch (error: unknown) {
+        if (isTerminalGone(error)) {
+          if (!cancelled) setFailed(true)
+          stop()
+          return
+        }
         logger.error('system panel process collection failed', error)
         if (!cancelled) setFailed(true)
       }
     }
     void load()
-    const timer = window.setInterval(() => { void load() }, 5000)
-    return () => { cancelled = true; window.clearInterval(timer) }
+    timer = window.setInterval(() => { void load() }, 5000)
+    return () => { cancelled = true; stop() }
   }, [active, terminalID])
   return { processes, failed }
 }

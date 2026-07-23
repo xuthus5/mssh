@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { SystemPanel } from '@/components/terminal/SystemPanel'
@@ -56,3 +56,23 @@ describe('SystemPanel', () => {
     expect(onClose).toHaveBeenCalledOnce()
   })
 })
+
+  it('stops polling when the terminal is gone', async () => {
+    vi.useFakeTimers()
+    let calls = 0
+    terminalService.SystemInfo.mockImplementation(async () => {
+      calls += 1
+      if (calls === 1) return systemInfo
+      throw new Error('terminal term-gone not found')
+    })
+    render(<SystemPanel terminalID="term-gone" onClose={vi.fn()} />)
+    await act(async () => { await Promise.resolve() })
+    expect(calls).toBe(1)
+    await act(async () => { await vi.advanceTimersByTimeAsync(3200) })
+    expect(calls).toBe(2)
+    const after = calls
+    await act(async () => { await vi.advanceTimersByTimeAsync(6000) })
+    expect(calls).toBe(after)
+    vi.useRealTimers()
+  })
+
