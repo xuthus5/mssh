@@ -16,8 +16,9 @@ interface ConnectDialogState {
   fingerprint: string
   algorithm: string
   attemptId: string
+  sessionId: string
   retry: (() => void) | null
-  openDialog: (host: string, port: number, user: string, retry: () => void) => void
+  openDialog: (host: string, port: number, user: string, retry: () => void, sessionId?: string) => void
   setState: (s: ConnectState) => void
   setError: (msg: string) => void
   setAttempt: (attemptId: string) => void
@@ -26,6 +27,8 @@ interface ConnectDialogState {
   rejectHostKey: () => Promise<void>
   cancelConnection: () => Promise<void>
   closeDialog: () => void
+  /** Close dialog if it is tracking one of the given sessions (e.g. session deleted). */
+  dismissForSessions: (sessionIDs: Iterable<string>) => void
 }
 
 export const useConnectDialog = create<ConnectDialogState>((set) => ({
@@ -38,8 +41,21 @@ export const useConnectDialog = create<ConnectDialogState>((set) => ({
   fingerprint: '',
   algorithm: '',
   attemptId: '',
+  sessionId: '',
   retry: null,
-  openDialog: (host, port, user, retry) => set({ open: true, state: 'connecting', host, port, user, retry, error: '', fingerprint: '', algorithm: '', attemptId: '' }),
+  openDialog: (host, port, user, retry, sessionId = '') => set({
+    open: true,
+    state: 'connecting',
+    host,
+    port,
+    user,
+    retry,
+    sessionId: sessionId ? String(sessionId) : '',
+    error: '',
+    fingerprint: '',
+    algorithm: '',
+    attemptId: '',
+  }),
   setState: (s) => {
     if (s === 'connected') set({ open: false, state: 'idle' })
     else set({ state: s })
@@ -69,7 +85,7 @@ export const useConnectDialog = create<ConnectDialogState>((set) => ({
     const { attemptId } = useConnectDialog.getState()
     try {
       if (attemptId) await SessionService.DecideHostKey(attemptId, false)
-      set({ open: false, state: 'idle', fingerprint: '', algorithm: '', attemptId: '', error: '' })
+      set({ open: false, state: 'idle', fingerprint: '', algorithm: '', attemptId: '', sessionId: '', error: '' })
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       set({ state: 'failed', error: message })
@@ -82,7 +98,7 @@ export const useConnectDialog = create<ConnectDialogState>((set) => ({
     set({ state: 'cancelling' })
     try {
       if (attemptId) await SessionService.CancelConnect(attemptId)
-      set({ open: false, state: 'idle', attemptId: '', fingerprint: '', algorithm: '', error: '' })
+      set({ open: false, state: 'idle', attemptId: '', sessionId: '', fingerprint: '', algorithm: '', error: '' })
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       set({ state: 'failed', error: message })
@@ -90,5 +106,12 @@ export const useConnectDialog = create<ConnectDialogState>((set) => ({
       throw error
     }
   },
-  closeDialog: () => set({ open: false, state: 'idle', attemptId: '', fingerprint: '', algorithm: '', retry: null }),
+  closeDialog: () => set({ open: false, state: 'idle', attemptId: '', sessionId: '', fingerprint: '', algorithm: '', retry: null }),
+  dismissForSessions: (sessionIDs) => {
+    const targets = new Set([...sessionIDs].map(String).filter(Boolean))
+    if (targets.size === 0) return
+    const current = useConnectDialog.getState()
+    if (!current.open || !current.sessionId || !targets.has(String(current.sessionId))) return
+    useConnectDialog.getState().closeDialog()
+  },
 }))

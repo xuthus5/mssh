@@ -1065,3 +1065,10 @@
 | UX-TRANSFER-064 | 会话删除取消传输时，传输中心应收敛为 cancelled，不得被后续 I/O 错误事件改写为 failed。 | done |
 | UX-TRANSFER-065 | worker 在 ctx 已取消时，OpenSFTP/上传/下载/收尾错误统一按 cancelled 处理并 emit cancelled。 | done |
 
+## 2026-07-24 商用硬化波次（删除会话收敛连接对话框）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| UX-CONN-066 | 连接对话框需绑定 sessionId；删除/批量删除该会话后对话框必须关闭并回到 idle，不得残留 connecting/host-key/failed。 | done |
+| UX-CONN-067 | dismiss 仅影响匹配 sessionId 的对话框，不误关其他会话连接流程。 | done |
+
