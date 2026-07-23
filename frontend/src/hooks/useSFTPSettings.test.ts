@@ -79,3 +79,25 @@ describe('useSFTPSettings', () => {
     loggerError.mockRestore()
   })
 })
+
+describe('quiet SFTP autosave error feedback', () => {
+  beforeEach(() => {
+    __clearHandlers()
+    useSFTPSettingsStore.setState(DEFAULT_SFTP_SETTINGS)
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.GetMany', async () => ({}))
+  })
+
+  it('still toasts errors when quiet is true', async () => {
+    const { useToastStore } = await import('@/components/ui/toast')
+    useToastStore.setState({ toasts: [] })
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.SetMany', async () => {
+      throw new Error('sftp save failed')
+    })
+    const { result } = renderHook(() => useSFTPSettings())
+    await waitFor(() => expect(result.current.settings).toBeTruthy())
+    await expect(result.current.save(result.current.settings, { quiet: true })).rejects.toThrow('sftp save failed')
+    const messages = useToastStore.getState().toasts.map((item) => `${item.type}:${item.message}`)
+    expect(messages.some((item) => item.startsWith('error:') && item.includes('保存 SFTP 设置失败'))).toBe(true)
+  })
+})
+

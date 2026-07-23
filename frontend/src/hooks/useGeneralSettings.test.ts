@@ -228,7 +228,6 @@ describe('useGeneralSettings cross-window sync', () => {
       expect.objectContaining({ key: 'terminal.history_predict', value: 'true' }),
     ]))
   })
-})
 
   it('loads and persists local shell preference', async () => {
     let savedEntries: Array<{ key: string; value: string }> = []
@@ -260,8 +259,7 @@ describe('useGeneralSettings cross-window sync', () => {
       expect.objectContaining({ key: 'terminal.local_shell_login', value: 'true' }),
     ]))
   })
-
-
+})
 
 describe('resolveProxyPasswordWrite', () => {
   it('keeps empty writes, clears with sentinel, and passes new secrets', () => {
@@ -270,3 +268,22 @@ describe('resolveProxyPasswordWrite', () => {
     expect(resolveProxyPasswordWrite({ proxyPassword: 'new-secret', clearProxyPassword: false })).toBe('new-secret')
   })
 })
+
+describe('quiet autosave error feedback', () => {
+  it('still toasts errors when quiet is true', async () => {
+    const { useToastStore } = await import('@/components/ui/toast')
+    useToastStore.setState({ toasts: [] })
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.GetMany', async () => ({
+      'terminal.max_pool_size': setting('terminal.max_pool_size', 10),
+    }))
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.SetMany', async () => {
+      throw new Error('persist failed')
+    })
+    const { result } = renderHook(() => useGeneralSettings())
+    await waitFor(() => expect(result.current.general.maxPoolSize).toBe(10))
+    await expect(result.current.saveGeneral({ ...result.current.general }, { quiet: true })).rejects.toThrow('persist failed')
+    const messages = useToastStore.getState().toasts.map((item) => `${item.type}:${item.message}`)
+    expect(messages.some((item) => item.startsWith('error:') && item.includes('保存设置失败'))).toBe(true)
+  })
+})
+
