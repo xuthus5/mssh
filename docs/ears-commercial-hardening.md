@@ -361,3 +361,13 @@
 |---|---|---|
 | UX-AUTOSAVE-001 | quiet 自动保存仅抑制成功 toast，失败时仍必须弹出错误 toast。 | done |
 | UX-AUTOSAVE-002 | 通用设置、SFTP、AI 设置、云同步配置保存路径均遵守上述错误可见性。 | done |
+
+## 2026-07-23 商用硬化波次（性能预算对齐 + 日志目录校验）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| PERF-BUDGET-001 | 性能预算文档必须与 `performance_test.go` 常量一致（list 750ms / transfer 3s / output+parse 500ms），并说明 CI/race slack 与本地 profiling 目标差异。 | done |
+| PERF-BUDGET-002 | 硬门禁不得再引用已废弃的 250ms list / 2s transfer 作为 CI 失败阈值。 | done |
+| LOG-DIR-001 | 用户配置 `application.log_dir` 必须拒绝含 NUL、超长路径、清理后为 `.`/`..` 的目录。 | done |
+| LOG-DIR-002 | 非法 log_dir 必须在持久化前由 `validateRuntimeSettings`/`ValidateDir` 失败，不得写入 DB，也不得调用 log Configure。 | done |
+| LOG-DIR-003 | 空 log_dir 仍归一为默认 `~/.mssh/logs`；合法相对/绝对路径经 `filepath.Clean` 后使用。 | done |
