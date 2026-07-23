@@ -625,3 +625,13 @@
 | SEC-TERM-021 | Terminal Open 必须拒绝 sessionID<=0。 | done |
 | SEC-TERM-022 | SystemInfo 必须拒绝空 terminalID。 | done |
 | SEC-AI-012 | ExecuteCommand 必须拒绝 sessionID<=0 与空 terminalID。 | done |
+
+## 2026-07-23 商用硬化波次（ProcessInfo / AI Chat / 导入导出路径）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| SEC-TERM-023 | ProcessInfo 必须拒绝空 terminalID。 | done |
+| SEC-AI-013 | Chat 必须拒绝空白 terminalID。 | done |
+| SEC-IO-010 | Sync Export/Import/ImportWithPassword 必须拒绝空/无效本地路径。 | done |
+| SEC-IO-011 | Session CSV Export/Import/Preview 必须拒绝空/无效本地路径。 | done |
+| SEC-IO-012 | Theme ImportFiles 必须拒绝空/无效本地路径。 | done |

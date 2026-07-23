@@ -13,6 +13,11 @@ import (
 // ImportWithPassword installs the embedded vault (if present) using the application password,
 // then imports the encrypted snapshot. Intended for first-run restore on a new device.
 func (s *SyncService) ImportWithPassword(path, password string) error {
+	cleaned, err := validateLocalFilePath(path)
+	if err != nil {
+		return fmt.Errorf("import: %w", err)
+	}
+	path = cleaned
 	content, err := os.ReadFile(path)
 	if err != nil {
 		return fmt.Errorf("import: %w", err)

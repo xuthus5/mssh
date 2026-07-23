@@ -32,3 +32,8 @@ func validateRemotePath(path string) error {
 	}
 	return nil
 }
+
+// validateLocalFilePath rejects empty/NUL local paths for import/export surfaces.
+func validateLocalFilePath(path string) (string, error) {
+	return validateLocalTransferPath(path)
+}

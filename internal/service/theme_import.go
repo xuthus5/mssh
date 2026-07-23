@@ -23,6 +23,12 @@ func (service *ThemeService) ImportFiles(paths []string) (model.ThemeImportSumma
 
 func (service *ThemeService) importThemeFile(path string, importers []themeimport.ThemeImporter) model.ThemeImportResult {
 	result := model.ThemeImportResult{File: path}
+	cleaned, err := validateLocalFilePath(path)
+	if err != nil {
+		return failedImport(result, err)
+	}
+	path = cleaned
+	result.File = path
 	content, err := os.ReadFile(path)
 	if err != nil {
 		return failedImport(result, fmt.Errorf("read theme file: %w", err))
