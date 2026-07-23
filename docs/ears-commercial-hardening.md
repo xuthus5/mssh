@@ -1209,3 +1209,10 @@
 | UX-TEST-116 | 测试文件中的 `it` 必须位于 `describe` 内；修复遗漏的孤儿用例（SystemPanel/TransferCenter/SessionTree/CSV/Proxy/CloudSync/Tabs/Coalescer）。 | done |
 | UX-SYS-117 | 系统监控概览/进程采集失败时仅面板 inline error + 重试，不得 toast；重试后可恢复展示。 | done |
 
+## 2026-07-24 商用硬化波次（终端挂载/写入错误归属）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| UX-TERM-118 | 终端 Attach 失败时仅通过连接状态进入 pane overlay（error）并支持重连，不得 toast 叠加。 | done |
+| UX-TERM-119 | 终端 Write 失败时仅将连接状态置为 disconnected 并由 pane overlay 承接，不得 toast 叠加；仅记录一次日志。 | done |
+

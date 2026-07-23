@@ -10,7 +10,6 @@ import { resolveSessionId, subscribeToTerminalData } from '@/hooks/terminalInput
 import { subscribeToRenderer, subscribeToScrollback } from '@/hooks/terminalBehaviorSubscriptions'
 import { runTerminalRuntime } from '@/components/terminal/terminalRuntime'
 import { logger } from '@/lib/logger'
-import { toast } from '@/components/ui/toast'
 import { applyTerminalTheme } from '@/lib/terminalTheme'
 import { TerminalService } from '@/lib/wails'
 import { useAppStore, type AppState } from '@/store/appStore'
@@ -21,7 +20,6 @@ import { fitAndRefresh } from '@/hooks/terminalFitRuntime'
 import { createTerminalInstance, createTerminalRendererController, safelyDisposeTerminalResource } from '@/hooks/terminalInstanceRuntime'
 import { subscribeToSynchronizedOutputQuery, subscribeToTerminalOutput, subscribeToTerminalVersionQuery } from '@/hooks/terminalOutputRuntime'
 import { subscribeToTerminalWorkingDirectory } from '@/hooks/terminalDirectoryRuntime'
-import { t } from '@/i18n'
 
 export const RESIZE_DEBOUNCE_MS = 80
 
@@ -64,8 +62,8 @@ function reportWriteFailure(terminalID: string, error: unknown, refs: TerminalLi
   refs.storeRef.current.setConnectionStatus(terminalID, 'disconnected')
   if (refs.writeFailureReportedRef.current) return
   refs.writeFailureReportedRef.current = true
+  // Pane ConnectionOverlay owns recovery UX; avoid toast + overlay double reporting.
   logger.error('terminal write failed', { terminalID, error })
-  toast(t('终端写入失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
 }
 
 function writeTerminalInput(data: string, refs: TerminalLifecycleRefs) {

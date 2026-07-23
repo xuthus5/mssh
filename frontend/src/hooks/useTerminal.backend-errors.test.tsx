@@ -102,14 +102,17 @@ describe('useTerminal backend failures', () => {
     vi.stubGlobal('cancelAnimationFrame', vi.fn())
   })
 
-  it('toasts when terminal attach fails', async () => {
+  it('marks connection error when terminal attach fails without toast', async () => {
     const error = new Error('attach failed')
     backend.attach.mockRejectedValue(error)
+    useToastStore.setState({ toasts: [] })
     const containerRef = createRef<HTMLDivElement>()
     containerRef.current = document.createElement('div')
     const wrapper = ({ children }: { children: ReactNode }) => <>{boundary({ children })}<ToastContainer /></>
     renderHook(() => useTerminal('term-attach', containerRef, { active: false, focusRequest: { sequence: 0 } }), { wrapper })
-    expect(await screen.findByText(/终端挂载失败/)).toBeInTheDocument()
+    await waitFor(() => expect(useAppStore.getState().connectionStatus['term-attach']).toBe('error'))
+    expect(useToastStore.getState().toasts).toHaveLength(0)
+    expect(screen.queryByText(/终端挂载失败/)).not.toBeInTheDocument()
   })
 
   it('disconnects and reports only the first rejected write', async () => {
@@ -125,7 +128,8 @@ describe('useTerminal backend failures', () => {
 
     await waitFor(() => expect(useAppStore.getState().connectionStatus['term-write']).toBe('disconnected'))
     expect(screen.queryByText('终端渲染失败')).not.toBeInTheDocument()
-    expect(screen.getAllByRole('alert')).toHaveLength(1)
+    expect(useToastStore.getState().toasts).toHaveLength(0)
+    expect(screen.queryByText(/终端写入失败/)).not.toBeInTheDocument()
     expect(terminalDisposes[0]).not.toHaveBeenCalled()
     expect(loggerError).toHaveBeenCalledTimes(1)
   })

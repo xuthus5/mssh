@@ -1442,5 +1442,7 @@
   "即将删除 ${} 个会话。分析关联资产影响失败：${}。仍可继续删除，但影响范围未知。此操作不可撤销。": "About to delete ${} sessions. Impact analysis failed: ${}. You can still delete, but the impact scope is unknown. This cannot be undone.",
   "正在加载密钥...": "Loading keys...",
   "打开传输中心，传输记录加载失败": "Open transfer center; failed to load transfer history",
-  "加载失败": "Load failed"
+  "加载失败": "Load failed",
+  "连接异常": "Connection error",
+  "终端通道不可用（挂载或通信失败），可在当前终端中重新连接。": "The terminal channel is unavailable (attach or transport failed). You can reconnect in this terminal."
 }
