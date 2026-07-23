@@ -32,6 +32,25 @@ async function openSessionTab(session: Session): Promise<string> {
   return terminalId
 }
 
+
+async function closeTerminalTabsForSessions(sessionIDs: Iterable<string>) {
+  const targets = new Set([...sessionIDs].map(String))
+  if (targets.size === 0) return
+  const store = useAppStore.getState()
+  const tabs = store.tabs.filter((tab) => (
+    tab.type === 'terminal'
+    && (tab.connectionKind ?? 'ssh') === 'ssh'
+    && targets.has(String(tab.sessionId))
+  ))
+  for (const tab of tabs) {
+    try {
+      await store.closeTab(tab.id)
+    } catch (error) {
+      logger.error('close session terminal tab failed', tab.id, error)
+    }
+  }
+}
+
 export function useSession() {
   const [folders, setFolders] = useState<Folder[]>([])
   const [sessions, setSessions] = useState<Session[]>([])
@@ -229,6 +248,8 @@ export function useSession() {
     try {
       await SessionService.DeleteSession(Number(id))
       setSessions((prev) => prev.filter((s) => s.id !== id))
+      setRecentSessions((prev) => prev.filter((s) => s.id !== id))
+      await closeTerminalTabsForSessions([id])
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       logger.error('deleteSession error', err)
@@ -291,6 +312,7 @@ export function useSession() {
     if (succeeded.size > 0) {
       setSessions((prev) => prev.filter((session) => !succeeded.has(session.id)))
       setRecentSessions((prev) => prev.filter((session) => !succeeded.has(session.id)))
+      await closeTerminalTabsForSessions(succeeded)
     }
     // Local delete results already applied; silent refresh reconciles without aborting the results dialog.
     void refreshAssets({ silent: true }).catch((refreshError: unknown) => {

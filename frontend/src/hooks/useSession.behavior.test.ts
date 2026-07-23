@@ -135,7 +135,46 @@ describe('useSession behavior', () => {
     expect(messages.some((message) => message.includes('加载最近会话失败'))).toBe(false)
   })
 
+  it('closes terminal tabs after batch delete', async () => {
+    registerInitial({ sessions: [bindingSession(5, 'One', null), bindingSession(6, 'Two', null)] })
+    __registerHandler(service + 'TerminalService.Open', async (sessionID: number) => `term-${sessionID}`)
+    __registerHandler(service + 'SessionService.DeleteSessions', async () => {
+      __registerHandler(service + 'SessionService.ListSessions', async () => [])
+      __registerHandler(service + 'SessionService.ListRecentSessions', async () => [])
+      return 2
+    })
+    __registerHandler(service + 'AuditService.RecordBatch', async () => {})
+    const closeTerminal = vi.fn(async () => {})
+    __registerHandler(service + 'TerminalService.Close', closeTerminal)
+    const { result } = renderHook(() => useSession())
+    await waitFor(() => expect(result.current.sessions).toHaveLength(2))
+    await act(async () => { await result.current.batchConnect(['5', '6']) })
+    expect(useAppStore.getState().tabs).toHaveLength(2)
+    await act(async () => { await result.current.batchDeleteSessions(['5', '6']) })
+    await waitFor(() => expect(result.current.sessions).toHaveLength(0))
+    await waitFor(() => expect(useAppStore.getState().tabs).toHaveLength(0))
+    expect(closeTerminal).toHaveBeenCalled()
+  })
+
+  it('closes terminal tabs when deleting a session', async () => {
+
+    registerInitial({ sessions: [bindingSession(5, 'Connect', null)] })
+    __registerHandler(service + 'TerminalService.Open', async () => 'term-ok')
+    __registerHandler(service + 'SessionService.DeleteSession', async () => undefined)
+    const closeTerminal = vi.fn(async () => {})
+    __registerHandler(service + 'TerminalService.Close', closeTerminal)
+    const { result } = renderHook(() => useSession())
+    await waitFor(() => expect(result.current.sessions).toHaveLength(1))
+    await act(async () => result.current.connect('5'))
+    expect(useAppStore.getState().tabs).toHaveLength(1)
+    await act(async () => result.current.deleteSession('5'))
+    expect(result.current.sessions).toHaveLength(0)
+    expect(useAppStore.getState().tabs).toHaveLength(0)
+    expect(closeTerminal).toHaveBeenCalledWith('term-ok')
+  })
+
   it('does not start a second session while another connection dialog is active', async () => {
+
     registerInitial({ sessions: [bindingSession(5, 'Connect', null)] })
     const openTerminal = vi.fn(async () => 'term-new')
     __registerHandler(service + 'TerminalService.Open', openTerminal)
