@@ -3,7 +3,6 @@ import { SerialService, SettingService, TerminalService } from '@/lib/wails'
 import { useSessionWorkspace } from '@/hooks/SessionWorkspaceContext'
 import { useAppStore } from '@/store/appStore'
 import { logger } from '@/lib/logger'
-import { toast } from '@/components/ui/toast'
 import {
   createWorkspaceSnapshot,
   parseWorkspaceSnapshot,
@@ -132,10 +131,12 @@ export function WorkspacePersistence() {
         value: JSON.stringify(snapshot),
         value_type: 'object',
         version: 1,
+      }).then(() => {
+        useAppStore.getState().setWorkspaceSaveError('')
       }).catch((error: unknown) => {
         const message = error instanceof Error ? error.message : String(error)
         logger.error('save workspace failed', error)
-        toast(t('保存工作区失败: ${}', message), 'error')
+        useAppStore.getState().setWorkspaceSaveError(message)
       })
     }, SAVE_DELAY_MS)
     return () => window.clearTimeout(timer)
@@ -147,15 +148,27 @@ export function WorkspacePersistence() {
 export function WorkspaceRestoreBanner() {
   const error = useAppStore((state) => state.workspaceRestoreError)
   const notice = useAppStore((state) => state.workspaceRestoreNotice)
+  const saveError = useAppStore((state) => state.workspaceSaveError)
   const retry = useAppStore((state) => state.retryWorkspaceRestore)
   const dismissNotice = useAppStore((state) => state.setWorkspaceRestoreNotice)
-  if (!error && !notice) return null
+  const dismissSaveError = useAppStore((state) => state.setWorkspaceSaveError)
+  if (!error && !notice && !saveError) return null
   if (error) {
     return (
       <Alert variant="destructive" className="rounded-none border-x-0 border-t-0">
         <AlertDescription className="flex flex-wrap items-center justify-between gap-2">
           <span>{t('恢复工作区失败: ${}', error)}</span>
           <Button type="button" size="xs" variant="outline" onClick={() => retry()}>{t('重试')}</Button>
+        </AlertDescription>
+      </Alert>
+    )
+  }
+  if (saveError) {
+    return (
+      <Alert variant="destructive" className="rounded-none border-x-0 border-t-0">
+        <AlertDescription className="flex flex-wrap items-center justify-between gap-2">
+          <span>{t('保存工作区失败: ${}', saveError)}</span>
+          <Button type="button" size="xs" variant="outline" onClick={() => dismissSaveError('')}>{t('关闭')}</Button>
         </AlertDescription>
       </Alert>
     )
