@@ -116,3 +116,13 @@ func TestKeyImportRejectsEmptyPrivateKey(t *testing.T) {
 	_, err = svc.Import("k", "  ")
 	require.Error(t, err)
 }
+
+func TestKeyUpdateRejectsEmptyPrivateKey(t *testing.T) {
+	db, err := store.OpenDB(t.TempDir())
+	require.NoError(t, err)
+	require.NoError(t, store.InitializeSchema(db))
+	t.Cleanup(func() { _ = db.Close() })
+	svc := NewKeyService(db, nil, testutil.NewTestLogger())
+	_, err = svc.Update(model.SSHKeyUpdateInput{ID: 1, Name: "k", PrivateKey: "  ", PublicKey: "y"})
+	require.Error(t, err)
+}

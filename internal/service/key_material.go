@@ -44,6 +44,9 @@ func (k *KeyService) Update(input model.SSHKeyUpdateInput) (*model.SSHKeyMateria
 	if input.ID <= 0 {
 		return nil, fmt.Errorf("invalid key id")
 	}
+	if strings.TrimSpace(input.PrivateKey) == "" {
+		return nil, fmt.Errorf("update key: private key is required")
+	}
 	name, err := normalizedKeyName(input.Name)
 	if err != nil {
 		return nil, fmt.Errorf("update key: %w", err)

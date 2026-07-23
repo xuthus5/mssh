@@ -25,11 +25,15 @@ export function useSerial() {
       const [list, deviceList, active] = await Promise.all([
         SerialService.List(),
         SerialService.ListDevices().catch((err: unknown) => {
+          const message = err instanceof Error ? err.message : String(err)
           logger.error('list serial devices failed', err)
+          toast(t('加载串口设备失败: ${}', message), 'error')
           return [] as string[]
         }),
         SerialService.ActiveDeviceMap().catch((err: unknown) => {
+          const message = err instanceof Error ? err.message : String(err)
           logger.error('list active serial devices failed', err)
+          toast(t('加载串口占用状态失败: ${}', message), 'error')
           return {} as Record<string, string>
         }),
       ])

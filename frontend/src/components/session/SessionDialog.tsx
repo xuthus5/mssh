@@ -16,6 +16,7 @@ import { KeyService } from '@/lib/wails'
 import type { AssetEnvironment, AssetProject, AssetTag, Session, Folder } from '@/hooks/useSession'
 import type { AssetColorToken } from '@/lib/sessionModels'
 import { SessionAssetFields } from '@/components/session/SessionAssetFields'
+import { toast } from '@/components/ui/toast'
 import { t } from '@/i18n'
 
 
@@ -95,7 +96,10 @@ export default function SessionDialog({ open, onOpenChange, session, folders, en
     if (!open) return
     KeyService.List()
       .then((list) => setKeys(list as KeyItem[]))
-      .catch(() => setKeys([]))
+      .catch((error: unknown) => {
+        setKeys([])
+        toast(t('加载密钥列表失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
+      })
   }, [open])
 
   const handleSubmit = useCallback(async () => {
