@@ -433,3 +433,11 @@
 | TERM-SPLIT-POOL-005 | replace/promote primary 与次级窗格 reconnect 时必须同步 rewrite splitPaneIDs，避免 protected 集合残留 stale ID 或漏保护新 ID。 | done |
 | TERM-SPLIT-POOL-006 | removeTabLocal 必须 scrub 全部 pane 的 terminalPool/connectionStatus/recordingState/activePane。 | done |
 
+## 2026-07-23 商用硬化波次（分屏次级窗格自动重连）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| TERM-RECONNECT-001 | 启用自动重连时，次级分屏 pane 断线必须能被识别（splitPaneIDs），不得仅匹配 primary terminalId。 | done |
+| TERM-RECONNECT-002 | 次级分屏自动重连必须通过 TerminalSplit 树内 reconnect（事件 `mssh:reconnect-split-pane`），保持布局与 splitPaneIDs 同步。 | done |
+| TERM-RECONNECT-003 | 串口连接仍不得自动重连。 | done |
+

@@ -19,6 +19,10 @@ const reconnectDelays = [500, 1000]
 const intentionalDisconnects = new Set<string>()
 const intentionalDisconnectTimers = new Map<string, ReturnType<typeof setTimeout>>()
 
+export const RECONNECT_SPLIT_PANE_EVENT = 'mssh:reconnect-split-pane' as const
+
+export type ReconnectSplitPaneDetail = { tabID: string; terminalID: string }
+
 /** Mark a terminal close as user-initiated so auto-reconnect is skipped. */
 export function markIntentionalDisconnect(terminalId: string) {
   intentionalDisconnects.add(terminalId)
@@ -164,17 +168,35 @@ export async function reconnectSessionTab(tabId: string, sessions: ReconnectSess
   }
 }
 
+function findTerminalTabForPane(terminalId: string) {
+  return useAppStore.getState().tabs.find((item) => {
+    if (item.type !== 'terminal') return false
+    if (item.terminalId === terminalId) return true
+    return (item.splitPaneIDs ?? []).includes(terminalId)
+  })
+}
+
+function requestSplitPaneReconnect(tabID: string, terminalID: string) {
+  if (typeof window === 'undefined') return
+  window.dispatchEvent(new CustomEvent<ReconnectSplitPaneDetail>(RECONNECT_SPLIT_PANE_EVENT, {
+    detail: { tabID, terminalID },
+  }))
+}
+
 /** Auto-reconnect after unexpected disconnect when the setting is enabled. */
 export function maybeAutoReconnectTerminal(terminalId: string, sessions: ReconnectSession[]) {
   if (consumeIntentionalDisconnect(terminalId)) return
   if (!useTerminalBehaviorStore.getState().autoReconnect) return
-  const tab = useAppStore.getState().tabs.find(
-    (item) => item.type === 'terminal' && item.terminalId === terminalId,
-  )
+  const tab = findTerminalTabForPane(terminalId)
   if (!tab || tab.type !== 'terminal') return
   // Serial DTR-on-open can reset MCUs; never auto-reopen serial ports.
   if (tab.connectionKind === 'serial') return
-  void reconnectSessionTab(tab.id, sessions)
+  if (tab.terminalId === terminalId) {
+    void reconnectSessionTab(tab.id, sessions)
+    return
+  }
+  // Secondary split panes reconnect through TerminalSplit tree state.
+  requestSplitPaneReconnect(tab.id, terminalId)
 }
 
 function waitForReconnect(delay: number, signal: AbortSignal) {

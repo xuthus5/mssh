@@ -197,4 +197,30 @@ describe('maybeAutoReconnectTerminal', () => {
     await new Promise((resolve) => setTimeout(resolve, 30))
     expect(openSerial).not.toHaveBeenCalled()
   })
+  it('dispatches split-pane reconnect for secondary panes without reopening primary', async () => {
+    useTerminalBehaviorStore.setState({ autoReconnect: true, renderer: 'dom', historyPredict: false })
+    useAppStore.setState({
+      tabs: [{
+        id: 'tab-1',
+        title: 'Server',
+        type: 'terminal',
+        terminalId: 'term-primary',
+        sessionId: 5,
+        splitPaneIDs: ['term-primary', 'term-split'],
+      }],
+      connectionStatus: { 'term-primary': 'connected', 'term-split': 'disconnected' },
+    })
+    const open = vi.fn(async () => 'term-new')
+    __registerHandler(service + 'Open', open)
+    const spy = vi.fn()
+    window.addEventListener('mssh:reconnect-split-pane', spy)
+    maybeAutoReconnectTerminal('term-split', sessions)
+    await Promise.resolve()
+    expect(open).not.toHaveBeenCalled()
+    expect(spy).toHaveBeenCalledTimes(1)
+    const event = spy.mock.calls[0][0] as CustomEvent
+    expect(event.detail).toEqual({ tabID: 'tab-1', terminalID: 'term-split' })
+    window.removeEventListener('mssh:reconnect-split-pane', spy)
+  })
+
 })
