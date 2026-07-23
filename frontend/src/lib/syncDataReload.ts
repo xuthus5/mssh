@@ -16,7 +16,6 @@ export async function hotReloadSessionWorkspace(workspace: {
   listSessions: SilentList
   listRecentSessions?: SilentList
   listAssetCatalogs?: SilentList
-  listTunnels?: SilentList
 }): Promise<void> {
   // Nested list loaders must stay silent so this path owns a single failure toast.
   const silent = { silent: true as const }
@@ -26,7 +25,6 @@ export async function hotReloadSessionWorkspace(workspace: {
   ]
   if (workspace.listRecentSessions) tasks.push(workspace.listRecentSessions(silent))
   if (workspace.listAssetCatalogs) tasks.push(workspace.listAssetCatalogs(silent))
-  if (workspace.listTunnels) tasks.push(workspace.listTunnels(silent))
   await Promise.all(tasks)
 }
 

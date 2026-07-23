@@ -48,14 +48,12 @@ describe('hotReloadSessionWorkspace', () => {
       listSessions: vi.fn(async () => ['s']),
       listRecentSessions: vi.fn(async () => ['r']),
       listAssetCatalogs: vi.fn(async () => ['a']),
-      listTunnels: vi.fn(async () => ['t']),
     }
     await hotReloadSessionWorkspace(workspace)
     expect(workspace.listFolders).toHaveBeenCalledWith({ silent: true })
     expect(workspace.listSessions).toHaveBeenCalledWith({ silent: true })
     expect(workspace.listRecentSessions).toHaveBeenCalledWith({ silent: true })
     expect(workspace.listAssetCatalogs).toHaveBeenCalledWith({ silent: true })
-    expect(workspace.listTunnels).toHaveBeenCalledWith({ silent: true })
   })
 
   it('only requires folders and sessions when optional loaders are absent', async () => {
