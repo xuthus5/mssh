@@ -6,6 +6,7 @@ import { PlaybackHeader, PlaybackTimeline } from '@/components/terminal/Playback
 import { installTerminalCopyOnSelect } from '@/components/terminal/terminalBehaviorRuntime'
 import { runTerminalRuntime } from '@/components/terminal/terminalRuntime'
 import { logger } from '@/lib/logger'
+import { toast } from '@/components/ui/toast'
 import { applyTerminalTheme, xtermTheme } from '@/lib/terminalTheme'
 import { LogService } from '@/lib/wails'
 import { useAppStore } from '@/store/appStore'
@@ -92,6 +93,8 @@ async function loadRecording({ recordingId, title, term, setEntries, isDisposed,
   } catch (error: unknown) {
     if (isDisposed()) return
     logger.error('PlaybackTab: GetRecording error:', error)
+    const message = error instanceof Error ? error.message : String(error)
+    toast(t('加载回放失败: ${}', message), 'error')
     runTerminalRuntime(reportRuntimeError, 'playback load status', () => term.writeln('\x1b[31mFailed to load recording\x1b[0m'))
     return
   }

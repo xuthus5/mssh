@@ -355,6 +355,7 @@
   "加载云同步失败: ${}": "Failed to load cloud sync: ${}",
   "加载会话失败: ${}": "Failed to load sessions: ${}",
   "加载分组失败: ${}": "Failed to load folders: ${}",
+  "加载回放失败: ${}": "Failed to load recording: ${}",
   "加载安全设置失败: ${}": "Failed to load security settings: ${}",
   "加载宏...": "Loading macros...",
   "加载宏失败": "Failed to load macros",
