@@ -31,8 +31,8 @@ vi.mock('@/hooks/SessionWorkspaceContext', () => ({ useSessionWorkspace: () => s
 vi.mock('@/components/ui/toast', () => ({ toast }))
 vi.mock('@/lib/wails', () => ({
   SessionService: {
-    SessionDeleteImpact: vi.fn(async () => ({ tunnels: 0, history: 0, recordings: 0 })),
-    SessionsDeleteImpact: vi.fn(async () => ({ tunnels: 0, history: 0, recordings: 0 })),
+    SessionDeleteImpact: vi.fn(async () => ({ tunnels: 0, history: 0, recordings: 0, transfers: 0 })),
+    SessionsDeleteImpact: vi.fn(async () => ({ tunnels: 0, history: 0, recordings: 0, transfers: 0 })),
   },
   MacroService: { List: vi.fn(async () => []) },
 }))

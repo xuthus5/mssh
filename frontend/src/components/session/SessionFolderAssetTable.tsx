@@ -22,7 +22,7 @@ export function SessionNodeBreadcrumb({ folder, onClear }: { folder?: Folder; on
 }
 
 export function SessionAssetDeleteDialog({ target, folders, sessions, onOpenChange, onConfirm }: { target: DeleteTarget | null; folders: Folder[]; sessions: Session[]; onOpenChange: (open: boolean) => void; onConfirm: (target: DeleteTarget) => Promise<void> }) {
-  const [impact, setImpact] = useState<{ tunnels: number; history: number; recordings: number } | null>(null)
+  const [impact, setImpact] = useState<{ tunnels: number; history: number; recordings: number; transfers: number } | null>(null)
   const [pending, setPending] = useState(false)
   const [error, setError] = useState('')
   useEffect(() => {
@@ -48,6 +48,6 @@ export function SessionAssetDeleteDialog({ target, folders, sessions, onOpenChan
     finally { setPending(false) }
   }
   const folder = target?.type === 'folder' ? target.item as Folder : undefined
-  const description = folder ? t('其中 ${} 个会话和 ${} 个子分组将迁移到默认分组。', sessions.filter((session) => session.folderId === folder.id).length, folders.filter((item) => item.parentId === folder.id).length) : impact ? t('将同时影响 ${} 条隧道、${} 条命令历史和 ${} 条录制记录。', impact.tunnels, impact.history, impact.recordings) : t('正在分析关联资产影响范围。')
+  const description = folder ? t('其中 ${} 个会话和 ${} 个子分组将迁移到默认分组。', sessions.filter((session) => session.folderId === folder.id).length, folders.filter((item) => item.parentId === folder.id).length) : impact ? t('将同时影响 ${} 条隧道、${} 条命令历史、${} 条录制记录和 ${} 个进行中传输。', impact.tunnels, impact.history, impact.recordings, impact.transfers) : t('正在分析关联资产影响范围。')
   return <AlertDialog open={Boolean(target)} onOpenChange={onOpenChange}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>{t('删除“')}{target?.item.name}”？</AlertDialogTitle><AlertDialogDescription>{description}</AlertDialogDescription></AlertDialogHeader>{error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}<AlertDialogFooter><AlertDialogCancel disabled={pending}>{t('取消')}</AlertDialogCancel><AlertDialogAction variant="destructive" disabled={pending} onClick={() => { void confirm() }}>{pending ? t('删除中…') : t('确认删除')}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
 }

@@ -15,7 +15,7 @@ describe('SessionAssetDeleteDialog', () => {
   beforeEach(() => {
     useToastStore.setState({ toasts: [] })
     impact.mockReset()
-    impact.mockResolvedValue({ tunnels: 1, history: 2, recordings: 3 })
+    impact.mockResolvedValue({ tunnels: 1, history: 2, recordings: 3, transfers: 0 })
   })
 
   it('toasts impact load failures', async () => {

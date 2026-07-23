@@ -49,6 +49,7 @@ func (f *FileService) startTransfer(direction string, sessionID int64, source, t
 	ctx, cancel := context.WithCancel(context.Background())
 	f.mu.Lock()
 	f.tasks[taskID] = cancel
+	f.taskSessions[taskID] = sessionID
 	f.mu.Unlock()
 	wrapper, connID, err := f.connect(sessionID)
 	if err != nil {

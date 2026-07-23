@@ -42,3 +42,46 @@ func TestMarkInterruptedTransfers(t *testing.T) {
 	require.Equal(t, "failed", jobs[0].Status)
 	require.Contains(t, jobs[0].Error, "中断")
 }
+
+func TestCancelTransferJobsForSessions(t *testing.T) {
+	db := transferTestDB(t)
+	require.NoError(t, CreateTransferJob(db, model.TransferJob{
+		ID: "keep", SessionID: 1, SessionName: "a", Direction: "upload",
+		SourcePath: "/k", TargetPath: "/rk", Status: "running", StartedAt: time.Now(),
+	}))
+	require.NoError(t, CreateTransferJob(db, model.TransferJob{
+		ID: "drop", SessionID: 2, SessionName: "b", Direction: "download",
+		SourcePath: "/d", TargetPath: "/rd", Status: "queued", StartedAt: time.Now(),
+	}))
+	require.NoError(t, CreateTransferJob(db, model.TransferJob{
+		ID: "done", SessionID: 2, SessionName: "b", Direction: "upload",
+		SourcePath: "/x", TargetPath: "/rx", Status: "completed", StartedAt: time.Now(),
+	}))
+	require.NoError(t, CancelTransferJobsForSessions(db, []int64{2}))
+	jobs, err := ListTransferJobs(db)
+	require.NoError(t, err)
+	byID := map[string]model.TransferJob{}
+	for _, job := range jobs {
+		byID[job.ID] = job
+	}
+	require.Equal(t, "running", byID["keep"].Status)
+	require.Equal(t, "cancelled", byID["drop"].Status)
+	require.Equal(t, "会话已删除", byID["drop"].Error)
+	require.Equal(t, "completed", byID["done"].Status)
+}
+
+
+func TestFinishTransferJobDoesNotRegressCancelled(t *testing.T) {
+	db := transferTestDB(t)
+	require.NoError(t, CreateTransferJob(db, model.TransferJob{
+		ID: "race", SessionID: 3, SessionName: "s", Direction: "upload",
+		SourcePath: "/a", TargetPath: "/b", Status: "running", StartedAt: time.Now(),
+	}))
+	require.NoError(t, CancelTransferJobsForSessions(db, []int64{3}))
+	require.NoError(t, FinishTransferJob(db, "race", "failed", "connection closed"))
+	jobs, err := ListTransferJobs(db)
+	require.NoError(t, err)
+	require.Len(t, jobs, 1)
+	require.Equal(t, "cancelled", jobs[0].Status)
+	require.Equal(t, "会话已删除", jobs[0].Error)
+}

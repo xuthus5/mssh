@@ -18,6 +18,7 @@ func (s *SessionService) DeleteSession(id int64) error {
 	}()
 	s.logger.Info("deleting session", "id", id)
 	s.stopTunnelsForSessions([]int64{id})
+	s.cancelTransfersForSessions([]int64{id})
 	err := store.DeleteSession(s.db, id)
 	if err != nil {
 		s.logger.Error("delete session failed", "error", err)
@@ -41,6 +42,7 @@ func (s *SessionService) DeleteSessions(ids []int64) (int, error) {
 	}()
 	s.logger.Info("deleting sessions", "count", len(normalized))
 	s.stopTunnelsForSessions(normalized)
+	s.cancelTransfersForSessions(normalized)
 	if err := store.DeleteSessions(s.db, normalized); err != nil {
 		s.logger.Error("delete sessions failed", "error", err)
 		return 0, err
@@ -69,6 +71,7 @@ func (s *SessionService) SessionsDeleteImpact(ids []int64) (*model.SessionDelete
 		{"SELECT COUNT(*) FROM tunnels WHERE session_id IN (" + inClause + ")", &impact.Tunnels},
 		{"SELECT COUNT(*) FROM command_history WHERE session_id IN (" + inClause + ")", &impact.History},
 		{"SELECT COUNT(*) FROM session_logs WHERE session_id IN (" + inClause + ")", &impact.Recordings},
+		{"SELECT COUNT(*) FROM transfer_jobs WHERE session_id IN (" + inClause + ") AND status IN ('queued','running')", &impact.Transfers},
 	}
 	for _, item := range queries {
 		if err := s.db.QueryRow(item.query, arguments...).Scan(item.target); err != nil {
@@ -109,6 +112,7 @@ func (s *SessionService) SessionDeleteImpact(id int64) (*model.SessionDeleteImpa
 		{"SELECT COUNT(*) FROM tunnels WHERE session_id = ?", &impact.Tunnels},
 		{"SELECT COUNT(*) FROM command_history WHERE session_id = ?", &impact.History},
 		{"SELECT COUNT(*) FROM session_logs WHERE session_id = ?", &impact.Recordings},
+		{"SELECT COUNT(*) FROM transfer_jobs WHERE session_id = ? AND status IN ('queued','running')", &impact.Transfers},
 	}
 	for _, item := range queries {
 		if err := s.db.QueryRow(item.query, id).Scan(item.target); err != nil {

@@ -229,12 +229,14 @@ func newSettingService(input serviceInitialization, runtime *service.CryptoRunti
 }
 
 func assembleApp(input serviceInitialization, runtime *service.CryptoRuntime, securitySvc *service.SecurityService, sessionSvc *service.SessionService, terminalSvc *service.TerminalService, serialSvc *service.SerialService, tunnelSvc *service.TunnelService, logSvc *service.LogService, themeSvc *service.ThemeService, syncSvc *service.SyncService) *App {
+	fileSvc := service.NewFileService(sessionSvc, input.eventBus, input.logger, service.WithTransferDB(input.db))
+	sessionSvc.SetTransferCanceller(fileSvc)
 	return &App{
 		DB:             input.db,
 		Keychain:       input.keychain,
 		Session:        sessionSvc,
 		Terminal:       terminalSvc,
-		File:           service.NewFileService(sessionSvc, input.eventBus, input.logger, service.WithTransferDB(input.db)),
+		File:           fileSvc,
 		Tunnel:         tunnelSvc,
 		Key:            service.NewKeyService(input.db, runtime, input.logger),
 		Macro:          service.NewMacroService(input.db, terminalSvc, input.logger),
