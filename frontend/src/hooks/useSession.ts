@@ -50,7 +50,7 @@ export function useSession() {
   const assetCatalog = useSessionAssetCatalog({ environments, projects, setEnvironments, setProjects, setTags, setSessions, setRecentSessions, setError })
   const { listAssetCatalogs, refreshAssets } = assetCatalog
 
-  const listFolders = useCallback(async () => {
+  const listFolders = useCallback(async (options?: { silent?: boolean }) => {
     setLoading(true)
     setError('')
     try {
@@ -60,7 +60,7 @@ export function useSession() {
       const msg = err instanceof Error ? err.message : String(err)
       logger.error('listFolders error', err)
       setError(msg)
-      toast(t('加载分组失败: ${}', msg), 'error')
+      if (!options?.silent) toast(t('加载分组失败: ${}', msg), 'error')
     } finally {
       setLoading(false)
     }

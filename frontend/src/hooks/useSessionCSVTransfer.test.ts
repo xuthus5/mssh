@@ -45,8 +45,8 @@ describe('useSessionCSVTransfer', () => {
       conflict_policy: 'overwrite', header_mapping: { name: 'Session' }, default_values: { port: '22' },
     })
     await vi.waitFor(() => {
-      expect(refreshFolders).toHaveBeenCalledOnce()
-      expect(refreshAssets).toHaveBeenCalledOnce()
+      expect(refreshFolders).toHaveBeenCalledWith({ silent: true })
+      expect(refreshAssets).toHaveBeenCalledWith({ silent: true })
     })
   })
 
