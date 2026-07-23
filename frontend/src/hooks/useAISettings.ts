@@ -34,7 +34,7 @@ export function useAISettings(): AISettingsController {
   const execute = useCallback(async (name: string, success: string, action: () => Promise<unknown>, refresh = true, quiet = false) => {
     setPending(name); setError(null)
     try { await action(); if (refresh) await reload(); if (!quiet) toast(success, 'success') }
-    catch (actionError) { const message = errorMessage(actionError); setError(message); if (!quiet) toast(t('${}失败: ${}', success, message), 'error'); throw actionError }
+    catch (actionError) { const message = errorMessage(actionError); setError(message); toast(t('${}失败: ${}', success, message), 'error'); throw actionError }
     finally { setPending(null) }
   }, [reload])
   const detectAgents = useCallback(async () => {
