@@ -6,6 +6,7 @@ import { TerminalService } from '@/lib/wails'
 import { logger } from '@/lib/logger'
 import { toast } from '@/components/ui/toast'
 import { t } from '@/i18n'
+import { isTerminalGone } from '@/lib/terminalGone'
 
 interface Props {
   terminalID: string
@@ -14,11 +15,6 @@ interface Props {
 type ModemInputs = { cts: boolean; dsr: boolean; dcd: boolean; ri: boolean }
 
 const emptyInputs: ModemInputs = { cts: false, dsr: false, dcd: false, ri: false }
-
-function isTerminalGone(err: unknown): boolean {
-  const message = err instanceof Error ? err.message : String(err)
-  return /terminal not found|not found|closed|not available/i.test(message)
-}
 
 function StatusLamp({ label, on }: { label: string; on: boolean }) {
   return (
