@@ -1336,5 +1336,7 @@
   "移动会话失败: ${}": "Failed to move session: ${}",
   "加载串口配置失败: ${}": "Failed to load serial profiles: ${}",
   "加载资产分类失败: ${}": "Failed to load asset catalogs: ${}",
-  "加载快捷键失败: ${}": "Failed to load shortcuts: ${}"
+  "加载快捷键失败: ${}": "Failed to load shortcuts: ${}",
+  "加载云同步失败: ${}": "Failed to load cloud sync: ${}",
+  "加载目录失败: ${}": "Failed to load directory: ${}"
 }

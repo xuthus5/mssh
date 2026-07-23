@@ -3,6 +3,7 @@ import { ChevronDown, ChevronRight, File, Folder, FolderOpen } from 'lucide-reac
 import type { FileInfo } from '@/hooks/useFileTransfer'
 import { formatFileSize } from '@/components/file/FileListView'
 import { logger } from '@/lib/logger'
+import { toast } from '@/components/ui/toast'
 import { isTreeNavigationKey, nextTreeIndex } from '@/lib/treeKeyboard'
 import { VirtualList } from '@/components/ui/virtual-list'
 import { t } from '@/i18n'
@@ -43,6 +44,7 @@ export function FileTreeView(props: Props) {
       setChildren((current) => ({ ...current, [file.path]: loaded }))
     } catch (error) {
       logger.error('load SFTP tree directory failed', error)
+      toast(t('加载目录失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
       setExpanded((current) => withoutPath(current, file.path))
     } finally {
       setLoadingPaths((current) => withoutPath(current, file.path))
