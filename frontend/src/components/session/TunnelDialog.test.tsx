@@ -96,6 +96,17 @@ describe('TunnelDialog', () => {
   })
 })
 
+
+  it('shows remote-forward exposure warning', async () => {
+    const user = userEvent.setup()
+    const props = dialogProps()
+    render(<TunnelDialog {...props} />)
+    await user.click(screen.getByRole('button', { name: '新建隧道' }))
+    await user.click(screen.getByRole('combobox'))
+    await user.click(await screen.findByRole('option', { name: '远程转发' }))
+    expect(screen.getByText(/安全边界/)).toBeInTheDocument()
+  })
+
 function dialogProps() {
   return {
     open: true,

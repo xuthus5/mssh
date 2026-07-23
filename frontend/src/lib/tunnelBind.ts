@@ -25,3 +25,16 @@ export function validateTunnelLocalAddress(type: string, address: string): strin
   }
   return null
 }
+
+/** Warn when a remote-forward listen address may expose the remote host interfaces. */
+export function remoteTunnelExposureWarning(type: string, remoteAddress: string): string | null {
+  if (type !== 'remote') return null
+  const host = remoteAddress.trim().toLowerCase().replace(/^\[|\]$/g, '')
+  if (host === '' || host === '0.0.0.0' || host === '::' || host === '*') {
+    return '远程转发监听 0.0.0.0/:: 会在远端所有网卡上暴露端口，请确认安全边界。'
+  }
+  if (!isLoopbackHost(host)) {
+    return '远程转发监听非回环地址会在远端网卡上暴露端口，请确认仅受信网络可访问。'
+  }
+  return null
+}
