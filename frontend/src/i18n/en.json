@@ -1448,5 +1448,8 @@
   "加载录制失败": "Failed to load recording",
   "未找到录制数据": "No recording data found",
   "录制：${}": "Recording: ${}",
-  "${} 条记录可回放": "${} entries ready for playback"
+  "${} 条记录可回放": "${} entries ready for playback",
+  "留空则保留原密码": "Leave blank to keep the current password",
+  "请输入分组名称": "Please enter a folder name",
+  "请选择 SSH 密钥": "Please select an SSH key"
 }

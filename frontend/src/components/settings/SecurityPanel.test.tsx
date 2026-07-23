@@ -64,4 +64,44 @@ describe('SecurityPanel', () => {
     expect(useToastStore.getState().toasts).toHaveLength(0)
   })
 
+
+  it('keeps password validation errors panel-owned without toast', async () => {
+    useToastStore.setState({ toasts: [] })
+    const user = userEvent.setup()
+    render(<SecurityPanel />)
+    expect(await screen.findByText('应用密码')).toBeInTheDocument()
+    await user.type(screen.getByLabelText('设置应用密码'), 'short')
+    await user.type(screen.getByLabelText('确认应用密码'), 'short')
+    await user.click(screen.getByRole('button', { name: '创建应用密码' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('应用密码至少需要 12 个字符')
+    expect(security.Setup).not.toHaveBeenCalled()
+    expect(useToastStore.getState().toasts).toHaveLength(0)
+  })
+
+  it('surfaces setup failures inline without toast', async () => {
+    useToastStore.setState({ toasts: [] })
+    security.Setup.mockRejectedValueOnce(new Error('setup boom'))
+    const user = userEvent.setup()
+    render(<SecurityPanel />)
+    expect(await screen.findByText('应用密码')).toBeInTheDocument()
+    await user.type(screen.getByLabelText('设置应用密码'), 'password-1234')
+    await user.type(screen.getByLabelText('确认应用密码'), 'password-1234')
+    await user.click(screen.getByRole('button', { name: '创建应用密码' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('设置应用密码失败: setup boom')
+    expect(useToastStore.getState().toasts.filter((item) => item.type === 'error')).toHaveLength(0)
+  })
+
+  it('surfaces host fingerprint delete failures inline without toast', async () => {
+    useToastStore.setState({ toasts: [] })
+    session.DeleteHostKey.mockRejectedValueOnce(new Error('delete boom'))
+    render(<SecurityPanel />)
+    expect(await screen.findByText('example.com')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: '删除 example.com 的主机指纹' }))
+    expect(await screen.findByRole('alertdialog')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: '确认' }))
+    await waitFor(() => expect(session.DeleteHostKey).toHaveBeenCalledWith(1))
+    expect(await screen.findByText('删除主机指纹失败: delete boom')).toBeInTheDocument()
+    expect(useToastStore.getState().toasts.filter((item) => item.type === 'error')).toHaveLength(0)
+  })
+
 })
