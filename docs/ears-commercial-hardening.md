@@ -955,3 +955,12 @@
 | UX-SESSION-025 | 资产中心会话「移动到分组」失败时，hook toast 一次；菜单 onClick 不得产生 unhandled rejection。 | done |
 | UX-SESSION-026 | SessionTree 上下文「移动到」同样吞掉 rejection（toast 由上层 hook 负责）。 | done |
 
+
+## 2026-07-23 商用硬化波次（资产刷新与删除反馈）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| UX-ASSET-027 | mutation 后的 refreshAssets 失败不得重复 toast；仅独立刷新默认 toast。 | done |
+| UX-SESSION-028 | 会话/分组删除失败时 hook toast 一次，对话框仅 inline error，且对话框保持打开可重试。 | done |
+| UX-CSV-029 | CSV 导入后的 refresh 使用 silent 模式，导入对话框 toast 单一入口。 | done |
+

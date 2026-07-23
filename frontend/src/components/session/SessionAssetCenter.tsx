@@ -55,14 +55,10 @@ export function SessionAssetCenter() {
   const retry = () => { void Promise.all([state.listFolders(), state.listSessions(), state.listRecentSessions(), state.listAssetCatalogs?.()]) }
   const clearSelection = () => setSelectedIDs(new Set())
   const deleteItem = async (target: DeleteTarget) => {
-    try {
-      if (target.type === 'folder') await state.deleteFolder(target.item.id)
-      else await state.deleteSession(target.item.id)
-      if (target.type === 'session' && detailID === target.item.id) setDetailID(null)
-      setDeleteTarget(null)
-    } catch {
-      // toast already shown by workspace mutation helpers; keep dialog for retry
-    }
+    if (target.type === 'folder') await state.deleteFolder(target.item.id)
+    else await state.deleteSession(target.item.id)
+    if (target.type === 'session' && detailID === target.item.id) setDetailID(null)
+    setDeleteTarget(null)
   }
   const runFolderAction = async (action: () => Promise<unknown>) => {
     try { await action() } catch {

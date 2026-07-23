@@ -4,7 +4,7 @@ import type { SessionCSVConflictPolicy, SessionCSVExportResult, SessionCSVImport
 
 interface Refreshers {
   refreshFolders: () => Promise<unknown>
-  refreshAssets: () => Promise<unknown>
+  refreshAssets: (options?: { silent?: boolean }) => Promise<unknown>
 }
 
 export interface SessionCSVExportRequest {
@@ -40,7 +40,7 @@ export function useSessionCSVTransfer(refreshers: Refreshers) {
       header_mapping: request.headerMapping,
       default_values: request.defaultValues,
     })
-    await Promise.all([refreshers.refreshFolders(), refreshers.refreshAssets()])
+    await Promise.all([refreshers.refreshFolders(), refreshers.refreshAssets({ silent: true })])
     return summary
   }, [refreshers.refreshAssets, refreshers.refreshFolders])
 
