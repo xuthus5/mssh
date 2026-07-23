@@ -90,7 +90,11 @@ export function AISettingsPanel({ controller }: { controller: AISettingsControll
     return (
       <div className="space-y-2 p-8 text-center">
         <p className="text-sm text-destructive">{t('AI 配置加载失败')}</p>
-        {controller.error ? <p className="text-xs text-muted-foreground">{controller.error}</p> : null}
+        {controller.error ? (
+          <div className="rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive" role="alert">
+            {controller.error}
+          </div>
+        ) : null}
       </div>
     )
   }

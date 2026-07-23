@@ -56,8 +56,8 @@ export function useAISettings(): AISettingsController {
     } catch (actionError) {
       const message = errorMessage(actionError)
       const failureKey = failureLabels[name] ?? '${}失败: ${}'
-      if (failureLabels[name]) toast(t(failureKey, message), 'error')
-      else toast(t(failureKey, name, message), 'error')
+      // Settings surface owns action failures via controller.error banner.
+      setError(failureLabels[name] ? t(failureKey, message) : t(failureKey, name, message))
       throw actionError
     } finally {
       setPending(null)
