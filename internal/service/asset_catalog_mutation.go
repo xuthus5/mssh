@@ -33,6 +33,9 @@ func (s *AssetCatalogService) DeleteProject(input model.AssetDeleteInput) error 
 }
 
 func (s *AssetCatalogService) DeleteTag(id int64) error {
+	if id <= 0 {
+		return fmt.Errorf("invalid tag id")
+	}
 	tx, err := s.db.Begin()
 	if err != nil {
 		return fmt.Errorf("delete tag: %w", err)
@@ -108,6 +111,9 @@ func (s *AssetCatalogService) ReorderProjects(ids []int64) error {
 }
 
 func (s *AssetCatalogService) deleteAssignableAsset(table, column, targetType string, input model.AssetDeleteInput) error {
+	if input.ID <= 0 {
+		return fmt.Errorf("invalid %s id", targetType)
+	}
 	if input.Mode != "migrate" && input.Mode != "clear" {
 		return fmt.Errorf("invalid delete mode %q", input.Mode)
 	}
