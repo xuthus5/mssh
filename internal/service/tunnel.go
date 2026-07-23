@@ -63,6 +63,9 @@ func (t *TunnelService) Update(input model.TunnelInput) error {
 }
 
 func (t *TunnelService) Delete(id int64) error {
+	if id <= 0 {
+		return fmt.Errorf("invalid tunnel id")
+	}
 	t.logger.Info("deleting tunnel", "id", id)
 	t.mu.Lock()
 	if state, ok := t.tunnels[id]; ok {
@@ -81,6 +84,9 @@ func (t *TunnelService) Delete(id int64) error {
 }
 
 func (t *TunnelService) Stop(tunnelID int64) error {
+	if tunnelID <= 0 {
+		return fmt.Errorf("invalid tunnel id")
+	}
 	t.logger.Info("stopping tunnel", "tunnelID", tunnelID)
 	t.mu.Lock()
 	state, ok := t.tunnels[tunnelID]

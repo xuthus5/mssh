@@ -12,6 +12,9 @@ import (
 )
 
 func (t *TunnelService) Start(tunnelID int64) error {
+	if tunnelID <= 0 {
+		return fmt.Errorf("invalid tunnel id")
+	}
 	t.logger.Info("starting tunnel", "tunnelID", tunnelID)
 	reservation, err := t.reserveTunnel(tunnelID)
 	if err != nil {

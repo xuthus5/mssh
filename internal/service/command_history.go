@@ -2,6 +2,7 @@ package service
 
 import (
 	"database/sql"
+	"fmt"
 	"log/slog"
 	"strings"
 
@@ -24,6 +25,9 @@ func NewCommandHistoryService(db *sql.DB, logger *slog.Logger) *CommandHistorySe
 }
 
 func (s *CommandHistoryService) Add(sessionID int64, command string) (*model.CommandHistory, error) {
+	if sessionID <= 0 {
+		return nil, fmt.Errorf("invalid session id")
+	}
 	value := strings.TrimSpace(command)
 	// Defense-in-depth: skip empty and sensitive commands (frontend already filters).
 	if value == "" || isSensitiveCommand(value) {
@@ -39,11 +43,22 @@ func (s *CommandHistoryService) Add(sessionID int64, command string) (*model.Com
 }
 
 func (s *CommandHistoryService) List(sessionID int64, query string) ([]model.CommandHistory, error) {
+	if sessionID <= 0 {
+		return nil, fmt.Errorf("invalid session id")
+	}
 	return store.ListCommandHistory(s.db, sessionID, strings.TrimSpace(query), maxCommandHistoryList)
 }
 
-func (s *CommandHistoryService) Delete(id int64) error { return store.DeleteCommandHistory(s.db, id) }
+func (s *CommandHistoryService) Delete(id int64) error {
+	if id <= 0 {
+		return fmt.Errorf("invalid command history id")
+	}
+	return store.DeleteCommandHistory(s.db, id)
+}
 
 func (s *CommandHistoryService) Clear(sessionID int64) error {
+	if sessionID <= 0 {
+		return fmt.Errorf("invalid session id")
+	}
 	return store.ClearCommandHistory(s.db, sessionID)
 }
