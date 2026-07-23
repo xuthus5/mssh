@@ -43,6 +43,7 @@ function useTunnelStart(load: () => Promise<void>, setTunnels: Dispatch<SetState
     } catch (error) {
       logger.error('tunnel start failed', error)
       toast(t('启动隧道失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
+      throw error
     }
   }, [load, setTunnels])
 }
