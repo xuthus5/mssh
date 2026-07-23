@@ -11,6 +11,7 @@ import (
 	"github.com/xuthus5/mssh/internal/model"
 )
 
+// CI/race budgets (docs/performance-budgets.md). Local target ~250ms / ~2s without -race.
 const (
 	listThousandSessionsBudget = 750 * time.Millisecond
 	transferUpdatesBudget      = 3 * time.Second
