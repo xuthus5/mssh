@@ -43,14 +43,20 @@ export function ThemeManager({ profiles, onImport, onDeleteProfile, onDeleteDefi
   )
 
   const importFiles = async () => {
-    const selected = await Dialogs.OpenFile({
-      Title: t('导入 iTerm2 终端主题'),
-      CanChooseFiles: true,
-      CanChooseDirectories: false,
-      AllowsMultipleSelection: true,
-      Filters: [{ DisplayName: 'iTerm2 Color Schemes', Pattern: '*.itermcolors' }],
-    })
-    const paths = typeof selected === 'string' ? [selected] : selected
+    let paths: string[] = []
+    try {
+      const selected = await Dialogs.OpenFile({
+        Title: t('导入 iTerm2 终端主题'),
+        CanChooseFiles: true,
+        CanChooseDirectories: false,
+        AllowsMultipleSelection: true,
+        Filters: [{ DisplayName: 'iTerm2 Color Schemes', Pattern: '*.itermcolors' }],
+      })
+      paths = typeof selected === 'string' ? [selected] : selected ?? []
+    } catch (error) {
+      toast(t('选择主题文件失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
+      return
+    }
     if (paths.length === 0) return
     try {
       setSummary(await onImport(paths))
