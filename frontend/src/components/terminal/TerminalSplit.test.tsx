@@ -109,7 +109,7 @@ describe('TerminalSplit', () => {
     view.unmount()
   })
 
-  it('toasts when persisted split layout restore fails', async () => {
+  it('shows inline banner when persisted split layout restore fails without toast', async () => {
     useAppStore.setState({
       tabs: [{
         id: 'tab-1',
@@ -135,9 +135,16 @@ describe('TerminalSplit', () => {
       terminalPool: new Map(),
       connectionStatus: { 'primary-1': 'connected' },
     })
+    useToastStore.setState({ toasts: [] })
+    // Strict Mode can remount; keep failing until the retry path explicitly succeeds.
     vi.mocked(TerminalService.Open).mockReset().mockRejectedValue(new Error('pool full'))
-    render(<><Harness /><ToastContainer /></>)
-    expect(await screen.findByText(/恢复分屏布局失败/)).toBeInTheDocument()
+    render(<Harness />)
+    expect(await screen.findByText(/恢复分屏布局失败: pool full/)).toBeInTheDocument()
+    expect(useToastStore.getState().toasts).toHaveLength(0)
+    vi.mocked(TerminalService.Open).mockReset().mockResolvedValue('split-1' as never)
+    fireEvent.click(screen.getByRole('button', { name: '重试' }))
+    await screen.findByTestId('pane-split-1')
+    await waitFor(() => expect(screen.queryByText(/恢复分屏布局失败/)).not.toBeInTheDocument())
   })
 
   it('resizes a split with the pointer divider', async () => {

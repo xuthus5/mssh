@@ -1,4 +1,4 @@
-import { act, render, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const services = vi.hoisted(() => ({
@@ -23,7 +23,7 @@ vi.mock('@/hooks/SessionWorkspaceContext', () => ({
   useSessionWorkspace: () => ({ sessionsLoaded: true, sessions: [{ id: '7' }] }),
 }))
 
-import { WorkspacePersistence } from '@/components/layout/WorkspacePersistence'
+import { WorkspacePersistence, WorkspaceRestoreBanner } from '@/components/layout/WorkspacePersistence'
 import { useToastStore } from '@/components/ui/toast'
 import { useAppStore } from '@/store/appStore'
 import { DEFAULT_TERMINAL_BEHAVIOR, useTerminalBehaviorStore } from '@/store/terminalBehaviorStore'
@@ -39,6 +39,9 @@ describe('WorkspacePersistence', () => {
       overviewSection: 'sessions',
       connectionStatus: {},
       activePaneId: null,
+      workspaceRestoreError: '',
+      workspaceRestoreNotice: '',
+      workspaceRestoreNonce: 0,
     })
     useTerminalBehaviorStore.setState({
       ...DEFAULT_TERMINAL_BEHAVIOR,
@@ -89,10 +92,12 @@ describe('WorkspacePersistence', () => {
     })
   })
 
-  it('toasts workspace restore failures', async () => {
+  it('records workspace restore failures in store banner without toast', async () => {
     services.get.mockRejectedValueOnce(new Error('workspace restore failed'))
-    render(<WorkspacePersistence />)
-    await waitFor(() => expect(useToastStore.getState().toasts.some((item) => item.message.includes('workspace restore failed'))).toBe(true))
+    render(<><WorkspacePersistence /><WorkspaceRestoreBanner /></>)
+    await waitFor(() => expect(useAppStore.getState().workspaceRestoreError).toBe('workspace restore failed'))
+    expect(useToastStore.getState().toasts).toHaveLength(0)
+    expect(await screen.findByRole('alert')).toHaveTextContent('恢复工作区失败: workspace restore failed')
   })
 
   it('toasts workspace save failures', async () => {
@@ -122,6 +127,9 @@ describe('WorkspacePersistence', () => {
       overviewSection: 'sessions',
       connectionStatus: {},
       activePaneId: null,
+      workspaceRestoreError: '',
+      workspaceRestoreNotice: '',
+      workspaceRestoreNonce: 0,
     })
     useTerminalBehaviorStore.setState({
       ...DEFAULT_TERMINAL_BEHAVIOR,
@@ -150,5 +158,26 @@ describe('WorkspacePersistence', () => {
     expect(services.open).not.toHaveBeenCalled()
     expect(useAppStore.getState().tabs).toHaveLength(0)
     view.unmount()
+  })
+
+  it('shows non-destructive notice when serial list fails during restore without toast', async () => {
+    services.get.mockResolvedValue({
+      value: JSON.stringify({
+        version: 2,
+        tabs: [{ type: 'terminal', title: 'prod', sessionId: 7, toolPanel: 'history' }],
+        active: { type: 'tab', index: 0 },
+        workspaceTab: 'sessions',
+        overviewSection: 'keys',
+      }),
+    })
+    services.listSerial.mockReset()
+    services.listSerial.mockRejectedValue(new Error('serial list failed'))
+    render(<><WorkspacePersistence /><WorkspaceRestoreBanner /></>)
+    await waitFor(() => {
+      expect(useAppStore.getState().workspaceRestoreNotice).toContain('serial list failed')
+    })
+    expect(useToastStore.getState().toasts.some((item) => item.message.includes('serial list failed'))).toBe(false)
+    expect(screen.getByRole('alert')).toHaveTextContent('加载串口配置失败')
+    expect(useAppStore.getState().tabs[0]).toMatchObject({ terminalId: 'fresh-terminal' })
   })
 })
