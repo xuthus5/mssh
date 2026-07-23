@@ -1264,3 +1264,15 @@
 |---|---|---|
 | UX-MACRO-131 | 宏工作区删除失败仅工作区 inline alert 展示且保留列表，不得 toast；加载失败仍全页 error+重试。 | done |
 | UX-KEY-132 | 密钥查看/编辑加载失败与删除前影响分析失败仅 KeyManager 面板 inline alert，不得 error toast。 | done |
+
+## 2026-07-24 商用硬化波次（命令历史错误归属）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| UX-HIST-133 | 命令历史面板复制/清空失败仅面板 inline alert，不得 error toast；成功反馈可 toast。 | done |
+
+## 2026-07-24 商用硬化波次（主题管理错误归属）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| UX-THEME-134 | 主题导入/选择/重命名/复制/删除失败仅 ThemeManager 面板 inline alert，不得 error toast。 | done |
