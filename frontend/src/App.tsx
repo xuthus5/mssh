@@ -20,6 +20,7 @@ import { createAppSyncDataReload, hotReloadSessionWorkspace, registerSyncDataRel
 import { getClipboard } from '@/lib/clipboard'
 import { t } from '@/i18n'
 import { VaultGate } from '@/components/security/VaultGate'
+import { ConfirmDialogHost } from '@/components/confirm/ConfirmDialogHost'
 import { useShortcutStore } from '@/store/shortcutStore'
 import { useShortcutRuntimeHydration } from '@/hooks/useShortcutSettings'
 import { resolveShortcutAction } from '@/lib/shortcutRuntime'
@@ -148,6 +149,7 @@ function AppShell() {
       </div>
       <StatusBar />
       <ToastContainer />
+      <ConfirmDialogHost />
       <ConnectDialog />
       <SessionQuickSearchHost />
     </>

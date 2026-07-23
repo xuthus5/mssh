@@ -77,7 +77,7 @@ export type TerminalPoolStoreAccess = {
 }
 
 export type EnsureTerminalPoolCapacityOptions = TerminalPoolStoreAccess & {
-  confirmProtected?: (victim: TerminalPoolVictim) => boolean
+  confirmProtected?: (victim: TerminalPoolVictim) => Promise<boolean> | boolean
   reserve?: number
 }
 
@@ -85,7 +85,7 @@ export type EnsureTerminalPoolCapacityOptions = TerminalPoolStoreAccess & {
  * Ensure the frontend terminal pool has room before opening a backend terminal.
  * Orphans reclaim without confirm; open-tab victims require confirm + recovery toast.
  */
-export function ensureTerminalPoolCapacity(options: EnsureTerminalPoolCapacityOptions): boolean {
+export async function ensureTerminalPoolCapacity(options: EnsureTerminalPoolCapacityOptions): Promise<boolean> {
   const confirmProtected = options.confirmProtected
     ?? ((victim) => confirmProtectedTerminalReclaim(victim))
   const reserve = Math.max(1, options.reserve ?? 1)
@@ -105,11 +105,11 @@ export function ensureTerminalPoolCapacity(options: EnsureTerminalPoolCapacityOp
     const protectedID = selectTerminalPoolEvictionID(state, 'include-protected')
     if (!protectedID) return false
     const victim = describeTerminalPoolVictim(state, protectedID)
-    if (victim.protected && !confirmProtected(victim)) {
+    if (victim.protected && !(await confirmProtected(victim))) {
       toast(t('已取消打开新终端：终端池已满且未释放现有标签'), 'info')
       return false
     }
-    options.setState(applyTerminalPoolEviction(state, protectedID))
+    options.setState(applyTerminalPoolEviction(options.getState(), protectedID))
     announceTerminalPoolReclaim(victim)
   }
 }
@@ -119,7 +119,7 @@ export async function openTerminalWithPoolCapacity(
   store: TerminalPoolStoreAccess,
   options?: Omit<EnsureTerminalPoolCapacityOptions, keyof TerminalPoolStoreAccess>,
 ): Promise<string> {
-  if (!ensureTerminalPoolCapacity({ ...store, ...options })) {
+  if (!(await ensureTerminalPoolCapacity({ ...store, ...options }))) {
     throw new Error(t('终端池已满，用户取消释放现有终端'))
   }
   return open()
