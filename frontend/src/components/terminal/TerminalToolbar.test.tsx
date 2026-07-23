@@ -17,8 +17,22 @@ vi.mock('@/components/terminal/SessionLog', () => ({
     <button type="button" onClick={() => onDeleteDialogOpenChange(false)}>allow close</button>
   </div>,
 }))
+const loadTunnels = vi.hoisted(() => vi.fn(async () => {}))
+vi.mock('@/hooks/useTunnelManager', () => ({
+  useTunnelManager: () => ({
+    tunnels: [],
+    error: 'tunnel list boom',
+    loading: false,
+    load: loadTunnels,
+    start: vi.fn(),
+    stop: vi.fn(),
+    remove: vi.fn(),
+  }),
+}))
 vi.mock('@/components/session/TunnelDialog', () => ({
-  default: ({ open, sessionId }: { open: boolean; sessionId: string }) => <div data-testid="tunnel-dialog" data-open={open} data-session-id={sessionId} />,
+  default: ({ open, sessionId, loadError }: { open: boolean; sessionId: string; loadError?: string }) => (
+    <div data-testid="tunnel-dialog" data-open={open} data-session-id={sessionId} data-load-error={loadError ?? ''} />
+  ),
 }))
 
 import { TerminalToolbar } from '@/components/terminal/TerminalToolbar'
@@ -37,6 +51,7 @@ function terminal(selection = 'selected') {
 describe('TerminalToolbar', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    loadTunnels.mockClear()
     deleteRecording.mockResolvedValue(undefined)
     useAppStore.setState({
       tabs: [],
@@ -81,8 +96,10 @@ describe('TerminalToolbar', () => {
 
     expect(screen.getByTitle('隧道管理')).toBeInTheDocument()
     await userEvent.click(screen.getByTitle('隧道管理'))
+    expect(loadTunnels).toHaveBeenCalled()
     expect(screen.getByTestId('tunnel-dialog')).toHaveAttribute('data-open', 'true')
     expect(screen.getByTestId('tunnel-dialog')).toHaveAttribute('data-session-id', '7')
+    expect(screen.getByTestId('tunnel-dialog')).toHaveAttribute('data-load-error', 'tunnel list boom')
   })
 
   it('places compose directly after files and toggles its active state', async () => {

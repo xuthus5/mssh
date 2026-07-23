@@ -1154,3 +1154,9 @@
 | UX-SET-101 | 通用/终端设置加载失败时仅页面 error banner + 重试，不得 toast；不得把默认值伪装成已加载成功。 | done |
 | UX-SFTPSET-102 | SFTP 设置加载失败时仅页面 error banner + 重试，不得 toast。 | done |
 | UX-THEME-103 | 主题目录加载失败时仅终端设置页 error banner + 重试，不得 toast 叠加 store error。 | done |
+
+## 2026-07-24 商用硬化波次（终端工具栏隧道加载失败）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| UX-TUNNEL-104 | 终端工具栏打开隧道对话框时，必须透传 list 错误与重试；不得把加载失败伪装成「无隧道」空态。 | done |
