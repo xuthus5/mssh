@@ -1,6 +1,5 @@
-import { useEffect, useRef, useState, type Dispatch, type MutableRefObject, type SetStateAction } from 'react'
+import { useCallback, useEffect, useRef, useState, type Dispatch, type MutableRefObject, type SetStateAction } from 'react'
 import { logger } from '@/lib/logger'
-import { toast } from '@/components/ui/toast'
 import {
   closeExtraSplitPanes,
   openSplitTerminal,
@@ -23,7 +22,13 @@ type Options = {
   requestFocus: (terminalID: string) => void
 }
 
-export function useSplitLayoutRestore(options: Options): boolean {
+export type SplitLayoutRestoreState = {
+  layoutReady: boolean
+  restoreError: string
+  retryRestore: () => void
+}
+
+export function useSplitLayoutRestore(options: Options): SplitLayoutRestoreState {
   const {
     tabID, sessionId, connectionKind, serialPortId, primaryID,
     operationRef, mountedRef, setTree, setBusy, requestFocus,
@@ -33,61 +38,85 @@ export function useSplitLayoutRestore(options: Options): boolean {
     return Boolean(layout && layout.paneCount > 1)
   })()
   const [layoutReady, setLayoutReady] = useState(!initialNeedsRestore)
-  const layoutReadyRef = useRef(!initialNeedsRestore)
+  const [restoreError, setRestoreError] = useState('')
+  const [attempt, setAttempt] = useState(0)
   const primaryRef = useRef(primaryID)
+  const restoredOkRef = useRef(!initialNeedsRestore)
+  const generationRef = useRef(0)
   primaryRef.current = primaryID
 
   useEffect(() => {
-    if (layoutReadyRef.current) return
-    const markReady = () => {
-      layoutReadyRef.current = true
-      setLayoutReady(true)
-    }
     if (connectionKind === 'serial') {
-      markReady()
+      restoredOkRef.current = true
+      setRestoreError('')
+      setLayoutReady(true)
       return
     }
     const layout = readTabSplitLayout(tabID)
     if (!layout || layout.paneCount < 2) {
-      markReady()
+      restoredOkRef.current = true
+      setRestoreError('')
+      setLayoutReady(true)
       return
     }
-    let cancelled = false
+    if (restoredOkRef.current && attempt === 0) return
+
+    const generation = ++generationRef.current
+    let active = true
+    operationRef.current = true
+    setLayoutReady(false)
+    setBusy(true)
+    setRestoreError('')
+
     void (async () => {
-      if (operationRef.current) {
-        markReady()
-        return
-      }
-      operationRef.current = true
-      setBusy(true)
       try {
         const restored = await restoreSplitTreeFromLayout(
           layout,
           primaryRef.current,
           () => openSplitTerminal(sessionId, connectionKind, serialPortId, t('串口终端为设备独占，不支持分屏'), primaryRef.current),
         )
+        if (!active || generation !== generationRef.current) {
+          if (restored) closeExtraSplitPanes(restored.extraTerminalIDs, 'TerminalSplit: cancelled restore cleanup failed')
+          return
+        }
         if (!restored) return
-        if (cancelled || !mountedRef.current) {
+        if (!mountedRef.current) {
           closeExtraSplitPanes(restored.extraTerminalIDs, 'TerminalSplit: cancelled restore cleanup failed')
           return
         }
         setTree(restored.tree)
         const focusID = collectLeaves(restored.tree)[0]?.terminalID
         if (focusID) requestFocus(focusID)
+        restoredOkRef.current = true
+        setRestoreError('')
       } catch (error: unknown) {
         logger.error('TerminalSplit: restore layout failed', error)
-        const message = error instanceof Error ? error.message : String(error)
-        toast(t('恢复分屏布局失败: ${}', message), 'error')
+        if (!active || generation !== generationRef.current || !mountedRef.current) return
+        restoredOkRef.current = false
+        setRestoreError(error instanceof Error ? error.message : String(error))
       } finally {
-        operationRef.current = false
-        if (mountedRef.current) {
-          setBusy(false)
-          markReady()
+        if (generation === generationRef.current) {
+          operationRef.current = false
+          if (mountedRef.current) {
+            setBusy(false)
+            setLayoutReady(true)
+          }
         }
       }
     })()
-    return () => { cancelled = true }
-  }, [tabID, connectionKind, sessionId, serialPortId, operationRef, mountedRef, setTree, setBusy, requestFocus])
 
-  return layoutReady
+    return () => {
+      active = false
+      // Allow a remounted effect (React Strict Mode) to start a fresh restore.
+      if (generation === generationRef.current) operationRef.current = false
+    }
+  }, [tabID, connectionKind, sessionId, serialPortId, operationRef, mountedRef, setTree, setBusy, requestFocus, attempt])
+
+  const retryRestore = useCallback(() => {
+    if (operationRef.current) return
+    restoredOkRef.current = false
+    setAttempt((value) => value + 1)
+  }, [operationRef])
+
+  return { layoutReady, restoreError, retryRestore }
 }
