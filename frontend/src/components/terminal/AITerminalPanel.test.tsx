@@ -66,7 +66,8 @@ describe('AITerminalPanel', () => {
   it('shows load and chat errors inline without toast', async () => {
     ai.dashboard.mockRejectedValueOnce(new Error('dashboard failed'))
     const { unmount } = render(<AITerminalPanel terminalID="term-1" sessionID={7} onClose={vi.fn()} />)
-    expect(await screen.findByText('dashboard failed')).toBeInTheDocument()
+    expect(await screen.findByText(/加载 AI 面板失败/)).toBeInTheDocument()
+    expect(screen.getByText(/dashboard failed/)).toBeInTheDocument()
     expect(useToastStore.getState().toasts).toHaveLength(0)
     unmount()
     useToastStore.setState({ toasts: [] })
@@ -77,6 +78,16 @@ describe('AITerminalPanel', () => {
     await user.type(screen.getByPlaceholderText('描述要排查或执行的运维任务'), '失败测试')
     await user.click(screen.getByRole('button', { name: '发送问题' }))
     expect(await screen.findByText('chat failed')).toBeInTheDocument()
+    expect(useToastStore.getState().toasts).toHaveLength(0)
+  })
+
+  it('does not pretend empty history when panel load fails', async () => {
+    ai.dashboard.mockRejectedValueOnce(new Error('dashboard failed'))
+    render(<AITerminalPanel terminalID="term-1" sessionID={7} onClose={vi.fn()} />)
+    const user = userEvent.setup()
+    await user.click(await screen.findByRole('button', { name: '对话历史' }))
+    expect(screen.queryByText('暂无对话')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '重试' })).toBeInTheDocument()
     expect(useToastStore.getState().toasts).toHaveLength(0)
   })
 

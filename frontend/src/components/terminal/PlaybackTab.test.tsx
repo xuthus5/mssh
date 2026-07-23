@@ -181,11 +181,11 @@ describe('PlaybackTab terminal theme', () => {
     const loadError = new Error('recording unavailable')
     const loggerError = vi.spyOn(logger, 'error').mockImplementation(() => {})
     getRecording.mockRejectedValueOnce(loadError)
-    render(<><PlaybackTab recordingId="failed" title="demo" active /><ToastContainer /></>)
+    render(<PlaybackTab recordingId="failed" title="demo" active />)
 
     await waitFor(() => expect(terminalInstances[1].writeln).toHaveBeenCalledWith(expect.stringContaining('Failed to load recording')))
     expect(loggerError).toHaveBeenCalledWith('PlaybackTab: GetRecording error:', loadError)
-    expect(await screen.findByText(/加载回放失败/)).toBeInTheDocument()
+    expect(useToastStore.getState().toasts).toHaveLength(0)
   })
   it('pauses, changes speed, and seeks without remounting', async () => {
     getRecording.mockResolvedValue({ entries: [{ timestamp: 0, type: 0, data: 'QQ==' }, { timestamp: 1000, type: 0, data: 'Qg==' }] })
