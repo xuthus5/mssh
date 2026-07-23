@@ -25,13 +25,17 @@ function ConnectionOverlay({ terminalID, onReconnect, onClose }: { terminalID: s
   const status = useAppStore((state) => state.connectionStatus[terminalID])
   if (status === undefined || status === 'connected') return null
   const connecting = status === 'connecting' || status === 'reconnecting'
+  const title = connecting ? t('正在重新连接') : status === 'error' ? t('连接异常') : t('连接已断开')
+  const description = connecting
+    ? t('正在为当前终端创建新的连接通道。')
+    : status === 'error'
+      ? t('终端通道不可用（挂载或通信失败），可在当前终端中重新连接。')
+      : t('会话可能因空闲超时、进程退出或网络中断而结束，可在当前终端中重新连接。')
   return <div role="alert" aria-live="polite" className="absolute inset-0 z-10 grid place-items-center bg-background/70 p-6 backdrop-blur-[1px]">
     <div className="flex w-full max-w-sm flex-col items-center rounded-xl border border-border bg-card/95 p-5 text-center shadow-lg">
       {connecting ? <RefreshCw aria-hidden="true" className="mb-3 size-8 animate-spin text-primary" /> : <WifiOff aria-hidden="true" className="mb-3 size-8 text-destructive" />}
-      <h3 className="text-sm font-semibold text-foreground">{connecting ? t('正在重新连接') : t('连接已断开')}</h3>
-      <p className="mt-1 text-xs leading-5 text-muted-foreground">
-        {connecting ? t('正在为当前终端创建新的连接通道。') : t('会话可能因空闲超时、进程退出或网络中断而结束，可在当前终端中重新连接。')}
-      </p>
+      <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+      <p className="mt-1 text-xs leading-5 text-muted-foreground">{description}</p>
       <div className="mt-4 flex items-center gap-2">
         <Button type="button" size="sm" variant="outline" disabled={connecting} onClick={onClose}><X />{t('关闭终端')}</Button>
         <Button type="button" size="sm" disabled={connecting} onClick={onReconnect}><RefreshCw />{connecting ? t('正在重连') : t('重新连接')}</Button>
