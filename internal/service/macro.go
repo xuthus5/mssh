@@ -104,6 +104,9 @@ func (m *MacroService) Execute(terminalID, command string) error {
 	if strings.TrimSpace(terminalID) == "" {
 		return fmt.Errorf("invalid terminal id")
 	}
+	if strings.TrimSpace(command) == "" {
+		return fmt.Errorf("macro command is required")
+	}
 	security := m.loadMacroSecuritySettings()
 	proposal := classifyAICommand(command, security)
 	if proposal.Blocked {
