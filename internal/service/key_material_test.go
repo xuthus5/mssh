@@ -76,9 +76,11 @@ func TestKeyService_UpdateValidatesInputAndStorage(t *testing.T) {
 	publicKey, err := svc.extractPublicKey([]byte(privateKey))
 	require.NoError(t, err)
 
-	_, err = svc.Update(model.SSHKeyUpdateInput{Name: " ", PrivateKey: privateKey, PublicKey: publicKey})
+	_, err = svc.Update(model.SSHKeyUpdateInput{ID: 0, Name: " ", PrivateKey: privateKey, PublicKey: publicKey})
+	assert.ErrorContains(t, err, "invalid key id")
+	_, err = svc.Update(model.SSHKeyUpdateInput{ID: 1, Name: " ", PrivateKey: privateKey, PublicKey: publicKey})
 	assert.ErrorContains(t, err, "key name must contain")
-	_, err = svc.Update(model.SSHKeyUpdateInput{Name: "invalid", PrivateKey: "not a key", PublicKey: publicKey})
+	_, err = svc.Update(model.SSHKeyUpdateInput{ID: 1, Name: "invalid", PrivateKey: "not a key", PublicKey: publicKey})
 	assert.ErrorContains(t, err, "invalid PEM")
 	_, err = svc.Update(model.SSHKeyUpdateInput{ID: 999, Name: "missing", PrivateKey: privateKey, PublicKey: publicKey})
 	assert.ErrorContains(t, err, "get key")

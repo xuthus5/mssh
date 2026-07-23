@@ -118,6 +118,9 @@ func (s *AIService) SaveSettings(input model.AISettingsInput) error {
 }
 
 func (s *AIService) TestProvider(id int64) error {
+	if id <= 0 {
+		return fmt.Errorf("invalid provider id")
+	}
 	profile, secret, err := s.loadProvider(id)
 	if err != nil {
 		return err

@@ -275,6 +275,9 @@ func (s *SessionService) MoveSession(id int64, newFolderID *int64) error {
 }
 
 func (s *SessionService) GetSession(id int64) (*model.Session, error) {
+	if id <= 0 {
+		return nil, fmt.Errorf("invalid session id")
+	}
 	s.logger.Info("getting session", "id", id)
 	session, err := store.GetSession(s.db, id)
 	if err != nil {
