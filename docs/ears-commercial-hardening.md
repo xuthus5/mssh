@@ -651,3 +651,16 @@
 | SEC-AI-014 | SaveProvider 必须拒绝 id<0。 | done |
 | UX-ASSET-010 | refreshAssets 失败必须 toast 并写入 error。 | done |
 | UX-LOG-010 | SessionLog 加载/删除失败必须 toast。 | done |
+
+## 2026-07-23 商用硬化波次（AI 面板 / 命令历史 / 工作区 / 关于页可见错误）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| UX-AI-010 | AI 终端面板加载失败必须 toast 并保留面板内错误文案。 | done |
+| UX-AI-011 | AI 发送消息失败必须 toast。 | done |
+| UX-AI-012 | AI 对话历史加载失败必须 toast。 | done |
+| UX-AI-013 | AI 审批执行与只读自动执行失败必须 toast。 | done |
+| UX-HIST-010 | sessionID>0 时命令历史 List 失败必须 toast。 | done |
+| UX-MACRO-010 | 宏工作区 List 失败必须 toast。 | done |
+| UX-ABOUT-010 | About Info 加载失败必须 toast。 | done |
+| UX-WORKSPACE-010 | 工作区恢复/保存失败必须 toast。 | done |

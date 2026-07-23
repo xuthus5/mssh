@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { logger } from '@/lib/logger'
+import { toast } from '@/components/ui/toast'
 import { t } from '@/i18n'
 
 
@@ -23,8 +24,10 @@ export function AboutPanel() {
 
   useEffect(() => {
     AboutService.Info().then((info) => setAbout({ currentVersion: info.current_version, repositoryURL: info.repository_url })).catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error)
       logger.error('load about info failed', error)
       setAbout((current) => ({ ...current, currentVersion: t('未知') }))
+      toast(t('加载关于信息失败: ${}', message), 'error')
     })
   }, [])
 

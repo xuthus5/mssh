@@ -57,7 +57,9 @@ export function WorkspacePersistence() {
           const ports = await SerialService.List()
           serialPortIDs = new Set((ports ?? []).map((port) => Number(port.id)).filter((id) => id > 0))
         } catch (error: unknown) {
+          const message = error instanceof Error ? error.message : String(error)
           logger.error('restore workspace serial list failed', error)
+          toast(t('加载串口配置失败: ${}', message), 'error')
         }
         const result = await restoreWorkspaceSnapshot(
           snapshot,
@@ -74,7 +76,9 @@ export function WorkspacePersistence() {
         })
         if (failures > 0) toast(t('${} 个工作区标签恢复失败', failures), 'warning')
       } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
         logger.error('restore workspace failed', error)
+        toast(t('恢复工作区失败: ${}', message), 'error')
       } finally {
         if (!cancelled) initialized.current = true
       }
@@ -93,7 +97,11 @@ export function WorkspacePersistence() {
         value: JSON.stringify(snapshot),
         value_type: 'object',
         version: 1,
-      }).catch((error: unknown) => logger.error('save workspace failed', error))
+      }).catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : String(error)
+        logger.error('save workspace failed', error)
+        toast(t('保存工作区失败: ${}', message), 'error')
+      })
     }, SAVE_DELAY_MS)
     return () => window.clearTimeout(timer)
   }, [activeSurface, overviewSection, tabs, workspaceTab])

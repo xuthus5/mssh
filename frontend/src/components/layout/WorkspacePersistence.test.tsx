@@ -24,12 +24,14 @@ vi.mock('@/hooks/SessionWorkspaceContext', () => ({
 }))
 
 import { WorkspacePersistence } from '@/components/layout/WorkspacePersistence'
+import { useToastStore } from '@/components/ui/toast'
 import { useAppStore } from '@/store/appStore'
 import { DEFAULT_TERMINAL_BEHAVIOR, useTerminalBehaviorStore } from '@/store/terminalBehaviorStore'
 
 describe('WorkspacePersistence', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    useToastStore.setState({ toasts: [] })
     useAppStore.setState({
       tabs: [],
       activeSurface: null,
@@ -85,6 +87,29 @@ describe('WorkspacePersistence', () => {
       terminalId: 'fresh-local',
       connectionKind: 'local',
     })
+  })
+
+  it('toasts workspace restore failures', async () => {
+    services.get.mockRejectedValueOnce(new Error('workspace restore failed'))
+    render(<WorkspacePersistence />)
+    await waitFor(() => expect(useToastStore.getState().toasts.some((item) => item.message.includes('workspace restore failed'))).toBe(true))
+  })
+
+  it('toasts workspace save failures', async () => {
+    services.get.mockResolvedValue({
+      value: JSON.stringify({
+        version: 2,
+        tabs: [],
+        active: null,
+        workspaceTab: 'sessions',
+        overviewSection: 'sessions',
+      }),
+    })
+    services.set.mockRejectedValueOnce(new Error('workspace save failed'))
+    render(<WorkspacePersistence />)
+    await waitFor(() => expect(services.get).toHaveBeenCalled())
+    act(() => useAppStore.setState({ workspaceTab: 'macros' }))
+    await waitFor(() => expect(useToastStore.getState().toasts.some((item) => item.message.includes('workspace save failed'))).toBe(true), { timeout: 1000 })
   })
 
   it('skips restoring terminal tabs when restore-on-startup is disabled', async () => {
