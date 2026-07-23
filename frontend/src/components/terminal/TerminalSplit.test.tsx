@@ -109,6 +109,37 @@ describe('TerminalSplit', () => {
     view.unmount()
   })
 
+  it('toasts when persisted split layout restore fails', async () => {
+    useAppStore.setState({
+      tabs: [{
+        id: 'tab-1',
+        title: 'Terminal',
+        type: 'terminal',
+        terminalId: 'primary-1',
+        sessionId: 1,
+        splitLayout: {
+          paneCount: 2,
+          tree: {
+            kind: 'branch',
+            direction: 'horizontal',
+            ratio: 0.5,
+            first: { kind: 'leaf', role: 0 },
+            second: { kind: 'leaf', role: 1 },
+          },
+        },
+        splitPaneIDs: ['primary-1'],
+      }],
+      activeSurface: { type: 'terminal', id: 'tab-1' },
+      activePaneId: 'primary-1',
+      focusRequest: { id: 'tab-1', terminalId: 'primary-1', sequence: 1 },
+      terminalPool: new Map(),
+      connectionStatus: { 'primary-1': 'connected' },
+    })
+    vi.mocked(TerminalService.Open).mockReset().mockRejectedValue(new Error('pool full'))
+    render(<><Harness /><ToastContainer /></>)
+    expect(await screen.findByText(/恢复分屏布局失败/)).toBeInTheDocument()
+  })
+
   it('resizes a split with the pointer divider', async () => {
     render(<Harness />)
     fireEvent.click(screen.getByText('向右'))

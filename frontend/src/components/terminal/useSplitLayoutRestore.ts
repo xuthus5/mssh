@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type Dispatch, type MutableRefObject, type SetStateAction } from 'react'
 import { logger } from '@/lib/logger'
+import { toast } from '@/components/ui/toast'
 import {
   closeExtraSplitPanes,
   openSplitTerminal,
@@ -75,6 +76,8 @@ export function useSplitLayoutRestore(options: Options): boolean {
         if (focusID) requestFocus(focusID)
       } catch (error: unknown) {
         logger.error('TerminalSplit: restore layout failed', error)
+        const message = error instanceof Error ? error.message : String(error)
+        toast(t('恢复分屏布局失败: ${}', message), 'error')
       } finally {
         operationRef.current = false
         if (mountedRef.current) {
