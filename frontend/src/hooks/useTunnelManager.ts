@@ -31,7 +31,7 @@ function tunnelInput(tunnel: Omit<Tunnel, 'id' | 'running'> | TunnelStartInput):
 }
 
 function useTunnelStart(load: (options?: { silent?: boolean }) => Promise<void>, setTunnels: Dispatch<SetStateAction<Tunnel[]>>) {
-  return useCallback(async (tunnel: TunnelStartInput) => {
+  return useCallback(async (tunnel: TunnelStartInput, options?: { silent?: boolean }) => {
     try {
       let id = Number(tunnel.id)
       if (!Number.isFinite(id) || id <= 0) {
@@ -44,7 +44,10 @@ function useTunnelStart(load: (options?: { silent?: boolean }) => Promise<void>,
       setTunnels((items) => items.map((item) => item.id === String(id) ? { ...item, running: true } : item))
     } catch (error) {
       logger.error('tunnel start failed', error)
-      toast(t('启动隧道失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
+      // Form path uses silent + inline error; list buttons keep toast as the single owner.
+      if (!options?.silent) {
+        toast(t('启动隧道失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
+      }
       throw error
     }
   }, [load, setTunnels])

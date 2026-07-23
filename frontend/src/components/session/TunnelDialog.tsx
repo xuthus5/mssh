@@ -26,7 +26,7 @@ interface Props {
   open: boolean
   onOpenChange: (open: boolean) => void
   tunnels: Tunnel[]
-  onStart: (tunnel: Omit<Tunnel, 'id' | 'running'> & { id?: string }) => void | Promise<void>
+  onStart: (tunnel: Omit<Tunnel, 'id' | 'running'> & { id?: string }, options?: { silent?: boolean }) => void | Promise<void>
   onStop: (tunnelId: string) => void | Promise<void>
   onDelete?: (tunnelId: string) => void | Promise<void>
   sessionId: string
@@ -82,7 +82,7 @@ export default function TunnelDialog({
         localPort: parseInt(localPort, 10) || 0,
         remoteAddress: remoteAddress || '127.0.0.1',
         remotePort: parseInt(remotePort, 10) || 0,
-      })
+      }, { silent: true })
       resetForm()
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
