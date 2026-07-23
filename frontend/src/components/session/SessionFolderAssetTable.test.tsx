@@ -32,7 +32,7 @@ describe('SessionAssetDeleteDialog', () => {
     await waitFor(() => expect(useToastStore.getState().toasts.some((item) => item.message.includes('impact boom'))).toBe(true))
   })
 
-  it('toasts delete failures', async () => {
+  it('keeps inline delete failures without local toast', async () => {
     const onConfirm = vi.fn(async () => { throw new Error('delete boom') })
     render(
       <SessionAssetDeleteDialog
@@ -45,6 +45,6 @@ describe('SessionAssetDeleteDialog', () => {
     )
     await userEvent.click(screen.getByRole('button', { name: '确认删除' }))
     expect(await screen.findByText('delete boom')).toBeInTheDocument()
-    expect(useToastStore.getState().toasts.some((item) => item.message.includes('delete boom'))).toBe(true)
+    expect(useToastStore.getState().toasts.some((item) => item.message.includes('delete boom'))).toBe(false)
   })
 })
