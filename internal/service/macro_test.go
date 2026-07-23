@@ -157,3 +157,10 @@ func TestValidateMacroPayloadBounds(t *testing.T) {
 	require.Error(t, validateMacroPayload(model.Macro{Name: "ok", Command: strings.Repeat("x", maxMacroCommandBytes+1)}))
 	require.NoError(t, validateMacroPayload(model.Macro{Name: "ok", Command: "echo", Shortcut: "Ctrl+1", DelayMs: 10, SortOrder: 1}))
 }
+
+func TestMacroService_ExecuteRejectsEmptyTerminalID(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	svc := NewMacroService(db, nil, testutil.NewTestLogger())
+	require.Error(t, svc.Execute("", "ls\n"))
+	require.Error(t, svc.Execute("   ", "ls\n"))
+}

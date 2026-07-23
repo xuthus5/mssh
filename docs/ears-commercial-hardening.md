@@ -600,3 +600,10 @@
 | ID | 验收条件 | 状态 |
 |---|---|---|
 | UX-SPLIT-010 | 持久化分屏布局恢复失败必须 toast 并给出错误信息。 | done |
+
+## 2026-07-23 商用硬化波次（审计批量/宏执行输入校验）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| SEC-AUDIT-010 | RecordBatch 必须拒绝 sessionID<=0。 | done |
+| SEC-MACRO-013 | Macro Execute 必须拒绝空 terminalID。 | done |
