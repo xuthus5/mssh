@@ -39,7 +39,11 @@ function useMacroCatalog(open: boolean) {
       const items = await MacroService.List()
       if (requestID === requestRef.current) setState({ status: 'ready', items: items ?? [], error: '' })
     } catch (error: unknown) {
-      if (requestID === requestRef.current) setState({ status: 'error', items: [], error: errorMessage(error) })
+      if (requestID === requestRef.current) {
+        const message = errorMessage(error)
+        setState({ status: 'error', items: [], error: message })
+        toast(t('加载宏失败: ${}', message), 'error')
+      }
     }
   }, [])
   useEffect(() => {
