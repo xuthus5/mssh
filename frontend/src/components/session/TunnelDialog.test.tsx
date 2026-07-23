@@ -48,11 +48,16 @@ describe('TunnelDialog', () => {
     await user.type(screen.getByPlaceholderText('127.0.0.1'), '0.0.0.0')
     await user.type(screen.getByPlaceholderText('1080'), '1080')
     await user.click(screen.getByRole('button', { name: '启动' }))
+    expect(screen.getByRole('alert')).toHaveTextContent(/回环/)
+    expect(props.onStart).toHaveBeenCalledTimes(1)
 
+    await user.clear(screen.getByLabelText('本地地址'))
+    await user.type(screen.getByLabelText('本地地址'), '127.0.0.1')
+    await user.click(screen.getByRole('button', { name: '启动' }))
     expect(props.onStart).toHaveBeenLastCalledWith({
       sessionId: 'session-7',
       type: 'dynamic',
-      localAddress: '0.0.0.0',
+      localAddress: '127.0.0.1',
       localPort: 1080,
       remoteAddress: '127.0.0.1',
       remotePort: 0,
