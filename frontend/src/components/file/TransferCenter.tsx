@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { ArrowUpDown, Eraser, Files } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
@@ -11,7 +12,6 @@ import { aggregateTransferProgress, partitionTransfers } from '@/lib/transferMet
 import { cancelTransfer, retryTransfer } from '@/lib/transferActions'
 import { useAppStore, type TransferJob } from '@/store/appStore'
 import { restoreTransfers } from '@/store/eventBridge'
-import { toast } from '@/components/ui/toast'
 import { t } from '@/i18n'
 
 
@@ -23,15 +23,22 @@ export function TransferCenter() {
   const removeTransfer = useAppStore((state) => state.removeTransfer)
   const clearFinished = useAppStore((state) => state.clearFinishedTransfers)
   const setTransfersLoadError = useAppStore((state) => state.setTransfersLoadError)
+  const [actionError, setActionError] = useState('')
   const { active, recent } = partitionTransfers(transfers)
   const summary = aggregateTransferProgress(transfers)
 
   const handleCancel = (transfer: TransferJob) => {
-    void cancelTransfer(transfer.id).catch((error: unknown) => toast(t('取消传输失败: ${}', error instanceof Error ? error.message : String(error)), 'error'))
+    setActionError('')
+    void cancelTransfer(transfer.id).catch((error: unknown) => {
+      setActionError(t('取消传输失败: ${}', error instanceof Error ? error.message : String(error)))
+    })
   }
 
   const handleRetry = (transfer: TransferJob) => {
-    void retryTransfer(transfer).catch((error: unknown) => toast(t('重试失败: ${}', error instanceof Error ? error.message : String(error)), 'error'))
+    setActionError('')
+    void retryTransfer(transfer).catch((error: unknown) => {
+      setActionError(t('重试失败: ${}', error instanceof Error ? error.message : String(error)))
+    })
   }
 
   const reloadTransfers = () => {
@@ -69,6 +76,11 @@ export function TransferCenter() {
                   {t('恢复传输记录失败: ${}', loadError)}
                   <Button size="xs" variant="outline" className="ml-2" onClick={reloadTransfers}>{t('重试')}</Button>
                 </AlertDescription>
+              </Alert>
+            ) : null}
+            {actionError ? (
+              <Alert variant="destructive">
+                <AlertDescription>{actionError}</AlertDescription>
               </Alert>
             ) : null}
             {!loadError && transfers.length === 0 && <Empty className="min-h-72 border"><EmptyHeader><EmptyMedia variant="icon"><Files /></EmptyMedia><EmptyTitle>{t('暂无传输任务')}</EmptyTitle><EmptyDescription>{t('从 SFTP 文件面板开始上传或下载后，任务会显示在这里。')}</EmptyDescription></EmptyHeader></Empty>}
