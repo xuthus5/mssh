@@ -340,4 +340,18 @@ it('preserves the primary pane host when splitting', async () => {
     expect(useToastStore.getState().toasts).toHaveLength(0)
   })
 
+
+  it('marks reconnect failures as connection error without toast', async () => {
+    useToastStore.setState({ toasts: [] })
+    render(<Harness />)
+    fireEvent.click(screen.getByText('向右'))
+    await screen.findByTestId('pane-split-1')
+    act(() => useAppStore.getState().setConnectionStatus('split-1', 'disconnected'))
+    vi.mocked(TerminalService.Open).mockReset().mockRejectedValue(new Error('reconnect boom'))
+    fireEvent.click(screen.getByRole('button', { name: '重新连接' }))
+    await waitFor(() => expect(useAppStore.getState().connectionStatus['split-1']).toBe('error'))
+    expect(await screen.findByText('连接异常')).toBeInTheDocument()
+    expect(useToastStore.getState().toasts.some((item) => item.message.includes('重新连接失败'))).toBe(false)
+  })
+
 })
