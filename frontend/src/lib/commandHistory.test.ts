@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   clearCommandHistory,
   isSensitiveCommand,
@@ -7,8 +7,19 @@ import {
   trimCommandHistory,
 } from '@/lib/commandHistory'
 
+const historyService = vi.hoisted(() => ({
+  Add: vi.fn(async () => null),
+  Clear: vi.fn(async () => undefined),
+}))
+
+vi.mock('@/lib/wails', () => ({ CommandHistoryService: historyService }))
+
 describe('command history', () => {
-  beforeEach(() => localStorage.clear())
+  beforeEach(() => {
+    localStorage.clear()
+    historyService.Add.mockClear()
+    historyService.Clear.mockClear()
+  })
 
   it('records commands per session and filters sensitive values', () => {
     recordCommand(1, 'ls -la')
@@ -19,10 +30,18 @@ describe('command history', () => {
     expect(readCommandHistory(2)[0].command).toBe('pwd')
   })
 
-  it('clears a session history', () => {
+  it('clears a session history and backend for positive session ids', async () => {
     recordCommand(1, 'pwd')
-    clearCommandHistory(1)
+    await clearCommandHistory(1)
+    expect(historyService.Clear).toHaveBeenCalledWith(1)
     expect(readCommandHistory(1)).toEqual([])
+  })
+
+  it('clears only local storage for non-positive session buckets', async () => {
+    recordCommand(-2, 'echo local')
+    await clearCommandHistory(-2)
+    expect(historyService.Clear).not.toHaveBeenCalled()
+    expect(readCommandHistory(-2)).toEqual([])
   })
 
   it('trims by entry and byte budgets', () => {
