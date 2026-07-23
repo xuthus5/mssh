@@ -1,5 +1,6 @@
 import { TerminalService } from '@/lib/wails'
 import { useAppStore } from '@/store/appStore'
+import { rewriteSplitPaneIDs } from '@/store/terminalTabPanes'
 import { openTerminalWithPoolCapacity } from '@/lib/openTerminal'
 import {
   materializeSplitLayout,
@@ -101,7 +102,7 @@ export function closeInBackground(terminalID: string, context: string, isNotFoun
   })
 }
 
-export function replaceSecondaryTerminalRuntime(previousID: string, nextID: string) {
+export function replaceSecondaryTerminalRuntime(previousID: string, nextID: string, tabID?: string) {
   useAppStore.setState((state) => {
     const terminalPool = new Map(state.terminalPool)
     const terminal = terminalPool.get(previousID)
@@ -112,7 +113,15 @@ export function replaceSecondaryTerminalRuntime(previousID: string, nextID: stri
     connectionStatus[nextID] = 'connected'
     const recordingState = { ...state.recordingState }
     delete recordingState[previousID]
+    const tabs = tabID
+      ? state.tabs.map((item) => {
+        if (item.id !== tabID || item.type !== 'terminal') return item
+        const splitPaneIDs = rewriteSplitPaneIDs(item.splitPaneIDs, previousID, nextID)
+        return splitPaneIDs === undefined ? item : { ...item, splitPaneIDs }
+      })
+      : state.tabs
     return {
+      tabs,
       terminalPool,
       connectionStatus,
       recordingState,
