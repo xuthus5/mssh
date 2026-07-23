@@ -88,5 +88,8 @@ func (s *AIService) ListMessages(conversationID int64) ([]model.AIMessage, error
 }
 
 func (s *AIService) DeleteConversation(id int64) error {
+	if id <= 0 {
+		return fmt.Errorf("invalid conversation id")
+	}
 	return store.DeleteAIConversation(s.db, id)
 }

@@ -287,6 +287,9 @@ func (l *LogService) GetRecording(path string) (*ssh.Player, error) {
 }
 
 func (l *LogService) Delete(id int64) error {
+	if id <= 0 {
+		return fmt.Errorf("invalid log id")
+	}
 	l.logger.Info("deleting log", "id", id)
 	log, err := store.GetSessionLog(l.db, id)
 	if err != nil {

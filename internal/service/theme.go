@@ -65,6 +65,9 @@ func (service *ThemeService) UpdateProfile(input model.ThemeProfileInput) error 
 }
 
 func (service *ThemeService) DeleteProfile(id int64) error {
+	if id <= 0 {
+		return fmt.Errorf("invalid theme profile id")
+	}
 	tx, err := service.db.Begin()
 	if err != nil {
 		return fmt.Errorf("begin delete theme profile: %w", err)
@@ -80,6 +83,9 @@ func (service *ThemeService) DeleteProfile(id int64) error {
 }
 
 func (service *ThemeService) DeleteDefinition(id int64) error {
+	if id <= 0 {
+		return fmt.Errorf("invalid theme definition id")
+	}
 	return store.DeleteThemeDefinition(service.db, id)
 }
 
