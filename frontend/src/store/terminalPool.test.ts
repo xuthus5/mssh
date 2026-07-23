@@ -115,14 +115,14 @@ describe('describe / confirm helpers', () => {
     })
   })
 
-  it('asks the user before reclaiming a protected terminal', () => {
+  it('asks the user before reclaiming a protected terminal', async () => {
     const messages: string[] = []
-    const ok = confirmProtectedTerminalReclaim({
+    const ok = await confirmProtectedTerminalReclaim({
       terminalID: 'term-1',
       protected: true,
       owningTab: terminalTab('tab-1', 'term-1', 'prod') as never,
-    }, (message) => {
-      messages.push(message)
+    }, async (request) => {
+      messages.push(`${request.title}:${request.description}`)
       return false
     })
     expect(ok).toBe(false)
