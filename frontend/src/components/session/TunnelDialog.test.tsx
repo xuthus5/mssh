@@ -2,7 +2,10 @@ import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import TunnelDialog from '@/components/session/TunnelDialog'
+import { requestConfirm } from '@/lib/confirmDialog'
 import type { Tunnel } from '@/hooks/useSession'
+
+vi.mock('@/lib/confirmDialog', () => ({ requestConfirm: vi.fn(async () => true) }))
 
 const tunnels: Tunnel[] = [
   tunnel('local-1', 'local', true),
@@ -106,7 +109,7 @@ describe('TunnelDialog', () => {
     expect(screen.getByText(/安全边界/)).toBeInTheDocument()
   })
 
-  it('deletes existing tunnels', async () => {
+  it('deletes existing tunnels after confirm', async () => {
     const user = userEvent.setup()
     const props = dialogProps()
     props.onDelete = vi.fn()
@@ -114,7 +117,19 @@ describe('TunnelDialog', () => {
     const remoteRow = screen.getByText('远程转发').closest('tr')
     expect(remoteRow).not.toBeNull()
     await user.click(within(remoteRow!).getByRole('button', { name: '删除' }))
+    expect(requestConfirm).toHaveBeenCalled()
     expect(props.onDelete).toHaveBeenCalledWith('remote-1')
+  })
+
+  it('does not delete when confirm is cancelled', async () => {
+    vi.mocked(requestConfirm).mockResolvedValueOnce(false)
+    const user = userEvent.setup()
+    const props = dialogProps()
+    props.onDelete = vi.fn()
+    render(<TunnelDialog {...props} tunnels={tunnels} />)
+    const remoteRow = screen.getByText('远程转发').closest('tr')
+    await user.click(within(remoteRow!).getByRole('button', { name: '删除' }))
+    expect(props.onDelete).not.toHaveBeenCalled()
   })
 
   it('keeps the form when start fails', async () => {

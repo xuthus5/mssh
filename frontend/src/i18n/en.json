@@ -1387,5 +1387,10 @@
   "隧道已删除": "Tunnel deleted",
   "删除隧道失败: ${}": "Failed to delete tunnel: ${}",
   "导出会话 CSV 失败: ${}": "Failed to export sessions CSV: ${}",
-  "删除失败: ${}": "Delete failed: ${}"
+  "删除失败: ${}": "Delete failed: ${}",
+  "删除隧道": "Delete tunnel",
+  "确认删除隧道「${}」？此操作不可撤销。": "Delete tunnel \"${}\"? This cannot be undone.",
+  "主机密钥确认失败: ${}": "Host key confirmation failed: ${}",
+  "拒绝主机密钥失败: ${}": "Failed to reject host key: ${}",
+  "取消连接失败: ${}": "Failed to cancel connection: ${}"
 }

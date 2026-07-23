@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { SessionService } from '@/lib/wails'
+import { toast } from '@/components/ui/toast'
 import { t } from '@/i18n'
 
 
@@ -48,20 +49,46 @@ export const useConnectDialog = create<ConnectDialogState>((set) => ({
   setFingerprint: (attemptId, fingerprint, algorithm) => set({ attemptId, fingerprint, algorithm, state: 'awaiting-host-key' }),
   acceptHostKey: async () => {
     const { attemptId } = useConnectDialog.getState()
-    if (!attemptId) throw new Error(t('连接尝试尚未就绪'))
-    await SessionService.DecideHostKey(attemptId, true)
-    set({ state: 'connecting', fingerprint: '', algorithm: '' })
+    if (!attemptId) {
+      const message = t('连接尝试尚未就绪')
+      set({ state: 'failed', error: message })
+      toast(t('主机密钥确认失败: ${}', message), 'error')
+      throw new Error(message)
+    }
+    try {
+      await SessionService.DecideHostKey(attemptId, true)
+      set({ state: 'connecting', fingerprint: '', algorithm: '' })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      set({ state: 'failed', error: message })
+      toast(t('主机密钥确认失败: ${}', message), 'error')
+      throw error
+    }
   },
   rejectHostKey: async () => {
     const { attemptId } = useConnectDialog.getState()
-    if (attemptId) await SessionService.DecideHostKey(attemptId, false)
-    set({ open: false, state: 'idle', fingerprint: '', algorithm: '', attemptId: '' })
+    try {
+      if (attemptId) await SessionService.DecideHostKey(attemptId, false)
+      set({ open: false, state: 'idle', fingerprint: '', algorithm: '', attemptId: '', error: '' })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      set({ state: 'failed', error: message })
+      toast(t('拒绝主机密钥失败: ${}', message), 'error')
+      throw error
+    }
   },
   cancelConnection: async () => {
     const { attemptId } = useConnectDialog.getState()
     set({ state: 'cancelling' })
-    if (attemptId) await SessionService.CancelConnect(attemptId)
-    set({ open: false, state: 'idle', attemptId: '', fingerprint: '', algorithm: '' })
+    try {
+      if (attemptId) await SessionService.CancelConnect(attemptId)
+      set({ open: false, state: 'idle', attemptId: '', fingerprint: '', algorithm: '', error: '' })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      set({ state: 'failed', error: message })
+      toast(t('取消连接失败: ${}', message), 'error')
+      throw error
+    }
   },
   closeDialog: () => set({ open: false, state: 'idle', attemptId: '', fingerprint: '', algorithm: '', retry: null }),
 }))
