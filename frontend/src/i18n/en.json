@@ -1392,5 +1392,15 @@
   "确认删除隧道「${}」？此操作不可撤销。": "Delete tunnel \"${}\"? This cannot be undone.",
   "主机密钥确认失败: ${}": "Host key confirmation failed: ${}",
   "拒绝主机密钥失败: ${}": "Failed to reject host key: ${}",
-  "取消连接失败: ${}": "Failed to cancel connection: ${}"
+  "取消连接失败: ${}": "Failed to cancel connection: ${}",
+  "保存提供商配置失败: ${}": "Failed to save AI provider: ${}",
+  "删除提供商配置失败: ${}": "Failed to delete AI provider: ${}",
+  "测试提供商连接失败: ${}": "Failed to test AI provider: ${}",
+  "保存 AI 配置失败: ${}": "Failed to save AI settings: ${}",
+  "检测 Agent 失败: ${}": "Failed to detect agents: ${}",
+  "设置应用密码失败: ${}": "Failed to set app password: ${}",
+  "保存安全偏好失败: ${}": "Failed to save security preferences: ${}",
+  "轮转应用密码失败: ${}": "Failed to rotate app password: ${}",
+  "锁定失败: ${}": "Failed to lock: ${}",
+  "解锁失败: ${}": "Failed to unlock: ${}"
 }
