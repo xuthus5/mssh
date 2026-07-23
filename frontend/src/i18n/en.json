@@ -1338,5 +1338,10 @@
   "加载资产分类失败: ${}": "Failed to load asset catalogs: ${}",
   "加载快捷键失败: ${}": "Failed to load shortcuts: ${}",
   "加载云同步失败: ${}": "Failed to load cloud sync: ${}",
-  "加载目录失败: ${}": "Failed to load directory: ${}"
+  "加载目录失败: ${}": "Failed to load directory: ${}",
+  "加载文件列表失败: ${}": "Failed to load file list: ${}",
+  "删除文件失败: ${}": "Failed to delete file: ${}",
+  "重命名失败: ${}": "Failed to rename: ${}",
+  "创建目录失败: ${}": "Failed to create directory: ${}",
+  "加载 AI 设置失败: ${}": "Failed to load AI settings: ${}"
 }

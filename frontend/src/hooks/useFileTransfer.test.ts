@@ -209,3 +209,22 @@ describe('useFileTransfer', () => {
     expect(result.current.files).toHaveLength(0)
   })
 })
+
+  it('toasts deleteFile failures', async () => {
+    __registerHandler('github.com/xuthus5/mssh/internal/service.FileService.Delete', async () => {
+      throw new Error('delete denied')
+    })
+    const { result } = renderHook(() => useFileTransfer(SESSION_ID))
+    await expect(act(async () => { await result.current.deleteFile('/a.txt') })).rejects.toThrow('delete denied')
+    expect(useToastStore.getState().toasts.some((item) => item.message.includes('delete denied'))).toBe(true)
+  })
+
+  it('toasts listFiles failures', async () => {
+    __registerHandler('github.com/xuthus5/mssh/internal/service.FileService.ListDir', async () => {
+      throw new Error('list denied')
+    })
+    const { result } = renderHook(() => useFileTransfer(SESSION_ID))
+    await act(async () => { await result.current.listFiles('/') })
+    expect(result.current.error).toContain('list denied')
+    expect(useToastStore.getState().toasts.some((item) => item.message.includes('list denied'))).toBe(true)
+  })
