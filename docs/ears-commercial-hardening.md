@@ -554,3 +554,11 @@
 | SEC-SESSION-012 | ListSessions 的 folderID 若提供必须 >0。 | done |
 | SEC-SERIAL-011 | Serial Delete 必须拒绝 id<=0。 | done |
 | SEC-KEY-010 | Key Delete/UsageCount/ExportPublicKey 必须拒绝 id<=0。 | done |
+
+## 2026-07-23 商用硬化波次（宏/命令历史/隧道删除与启停 ID 校验）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| SEC-MACRO-011 | Macro Delete 必须拒绝 id<=0。 | done |
+| SEC-HIST-012 | CommandHistory Add/List/Clear 的 sessionID 与 Delete id 必须 >0。 | done |
+| SEC-TUNNEL-010 | Tunnel Delete/Start/Stop 必须拒绝 id<=0。 | done |
