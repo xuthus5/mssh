@@ -135,10 +135,9 @@ describe('KeyManager', () => {
 
     await userEvent.click(screen.getByRole('button', { name: '查看 generated' }))
     await userEvent.click(await screen.findByRole('button', { name: '复制私钥' }))
-    await waitFor(() => expect(useToastStore.getState().toasts).toContainEqual(expect.objectContaining({
-      type: 'error', message: '复制私钥失败: clipboard unavailable',
-    })))
-    expect(useToastStore.getState().toasts[0]?.message).not.toContain(material.publicKey)
+    expect(await screen.findByText('复制私钥失败: clipboard unavailable')).toBeInTheDocument()
+    expect(screen.getByText('复制私钥失败: clipboard unavailable').textContent).not.toContain(material.publicKey)
+    expect(useToastStore.getState().toasts.filter((item) => item.type === 'error')).toHaveLength(0)
   })
 
   it('keeps dialogs open when generation, loading, or updating returns no result', async () => {

@@ -89,12 +89,16 @@ export function KeyImportDialog({ open, onOpenChange, onImport, onSelectFile }: 
 
 export type KeyMaterialMode = 'generated' | 'view' | 'edit'
 
-function MaterialField({ label, value, editable, onChange }: { label: string; value: string; editable: boolean; onChange: (value: string) => void }) {
-  const copy = async () => {
-    try { await getClipboard().writeText(value); toast(t('${}已复制', label), 'success') }
-    catch (error) { toast(t('复制${}失败: ${}', label, error instanceof Error ? error.message : String(error)), 'error') }
-  }
-  return <Field><div className="flex items-center justify-between gap-2"><FieldLabel>{label}{t('内容')}</FieldLabel><Button type="button" size="xs" variant="outline" aria-label={t('复制${}', label)} onClick={() => { void copy() }}><Copy data-icon="inline-start" />{t('复制')}</Button></div>
+function MaterialField({
+  label, value, editable, onChange, onCopy,
+}: {
+  label: string
+  value: string
+  editable: boolean
+  onChange: (value: string) => void
+  onCopy: (label: string, value: string) => Promise<void>
+}) {
+  return <Field><div className="flex items-center justify-between gap-2"><FieldLabel>{label}{t('内容')}</FieldLabel><Button type="button" size="xs" variant="outline" aria-label={t('复制${}', label)} onClick={() => { void onCopy(label, value) }}><Copy data-icon="inline-start" />{t('复制')}</Button></div>
     <Textarea aria-label={t('${}内容', label)} className="min-h-36 font-mono text-xs" value={value} readOnly={!editable} onChange={(event) => onChange(event.target.value)} />
   </Field>
 }
@@ -108,26 +112,41 @@ interface MaterialProps {
 export function KeyMaterialDialog({ state, onOpenChange, onUpdate }: MaterialProps) {
   const [draft, setDraft] = useState<KeyMaterial | null>(state?.material ?? null)
   const [saving, setSaving] = useState(false)
-  useEffect(() => { setDraft(state?.material ?? null) }, [state])
+  const [copyError, setCopyError] = useState('')
+  useEffect(() => {
+    setDraft(state?.material ?? null)
+    setCopyError('')
+  }, [state])
   if (!state || !draft) return null
   const editable = state.mode === 'edit'
   const title = state.mode === 'generated' ? t('密钥已生成') : editable ? t('编辑密钥') : t('查看密钥')
+  const copyValue = async (label: string, value: string) => {
+    try {
+      await getClipboard().writeText(value)
+      setCopyError('')
+      toast(t('${}已复制', label), 'success')
+    } catch (error) {
+      setCopyError(t('复制${}失败: ${}', label, error instanceof Error ? error.message : String(error)))
+    }
+  }
   const save = async () => {
     setSaving(true)
+    setCopyError('')
     try {
       if (await onUpdate(draft)) onOpenChange(false)
     } catch {
-      // parent surfaces toast
+      // parent surfaces toast for mutation path without dialog-owned form error yet
     } finally {
       setSaving(false)
     }
   }
   return <Dialog open onOpenChange={onOpenChange}><DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-3xl"><DialogHeader><DialogTitle>{title}</DialogTitle></DialogHeader>
     <Alert><AlertDescription>{t('私钥属于敏感凭据。仅复制到可信位置，不要通过聊天、邮件或日志传输。')}</AlertDescription></Alert>
+    {copyError ? <Alert variant="destructive"><AlertDescription>{copyError}</AlertDescription></Alert> : null}
     <FieldGroup>
       <Field><FieldLabel htmlFor="key-material-name">{t('名称')}</FieldLabel><Input id="key-material-name" aria-label={t('密钥名称')} value={draft.name} readOnly={!editable} onChange={(event) => setDraft({ ...draft, name: event.target.value })} /></Field>
-      <MaterialField label={t('公钥')} value={draft.publicKey} editable={editable} onChange={(publicKey) => setDraft({ ...draft, publicKey })} />
-      <MaterialField label={t('私钥')} value={draft.privateKey} editable={editable} onChange={(privateKey) => setDraft({ ...draft, privateKey })} />
+      <MaterialField label={t('公钥')} value={draft.publicKey} editable={editable} onChange={(publicKey) => setDraft({ ...draft, publicKey })} onCopy={copyValue} />
+      <MaterialField label={t('私钥')} value={draft.privateKey} editable={editable} onChange={(privateKey) => setDraft({ ...draft, privateKey })} onCopy={copyValue} />
     </FieldGroup>
     <DialogFooter>{editable && <Button type="button" disabled={saving} onClick={() => { void save() }}>{saving ? t('保存中...') : t('保存密钥')}</Button>}</DialogFooter>
   </DialogContent></Dialog>
