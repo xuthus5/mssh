@@ -8,14 +8,23 @@ import (
 )
 
 func (s *AssetCatalogService) EnvironmentDeleteImpact(id int64) (*model.AssetDeleteImpact, error) {
+	if id <= 0 {
+		return nil, fmt.Errorf("invalid environment id")
+	}
 	return assetDeleteImpact(s.db, "asset_environments", "environment_id", id)
 }
 
 func (s *AssetCatalogService) ProjectDeleteImpact(id int64) (*model.AssetDeleteImpact, error) {
+	if id <= 0 {
+		return nil, fmt.Errorf("invalid project id")
+	}
 	return assetDeleteImpact(s.db, "asset_projects", "project_id", id)
 }
 
 func (s *AssetCatalogService) TagDeleteImpact(id int64) (*model.AssetDeleteImpact, error) {
+	if id <= 0 {
+		return nil, fmt.Errorf("invalid tag id")
+	}
 	var impact model.AssetDeleteImpact
 	err := s.db.QueryRow(`SELECT t.id, t.name, COUNT(st.session_id) FROM asset_tags t LEFT JOIN session_tags st ON st.tag_id=t.id WHERE t.id=? GROUP BY t.id`, id).Scan(&impact.ID, &impact.Name, &impact.SessionCount)
 	if err != nil {
