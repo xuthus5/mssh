@@ -135,8 +135,16 @@ func (c *ClientWrapper) startKeepAlive(interval time.Duration, logger *slog.Logg
 // but no known_hosts path was provided.
 var ErrEmptyKnownHostsPath = errors.New("known_hosts path is required for host key verification")
 
-// knownHostsWriteMu serializes create/append of the shared known_hosts file across concurrent connects.
-var knownHostsWriteMu sync.Mutex
+// knownHostsMu serializes create/append/rewrite of the shared known_hosts file.
+var knownHostsMu sync.Mutex
+
+// WithKnownHostsLock runs fn while holding the process-wide known_hosts write lock.
+// Use for any read-modify-write of the known_hosts file (accept TOFU, delete fingerprint).
+func WithKnownHostsLock(fn func() error) error {
+	knownHostsMu.Lock()
+	defer knownHostsMu.Unlock()
+	return fn()
+}
 
 // createHostKeyCallback builds a host key callback. knownHostsPath is required;
 // first-seen keys are accepted via TOFU and reported through onNewHostKey.
@@ -160,8 +168,8 @@ func createHostKeyCallback(knownHostsPath string, onNewHostKey HostKeyVerifyFunc
 }
 
 func ensureKnownHostsFile(knownHostsPath string) error {
-	knownHostsWriteMu.Lock()
-	defer knownHostsWriteMu.Unlock()
+	knownHostsMu.Lock()
+	defer knownHostsMu.Unlock()
 	if _, err := os.Stat(knownHostsPath); !os.IsNotExist(err) {
 		return nil
 	}
@@ -226,8 +234,8 @@ func handleNewHostKey(hostname string, key gossh.PublicKey, knownHostsPath strin
 
 func appendKnownHost(knownHostsPath, hostname string, key gossh.PublicKey) error {
 	entry := knownhosts.Line([]string{hostname}, key)
-	knownHostsWriteMu.Lock()
-	defer knownHostsWriteMu.Unlock()
+	knownHostsMu.Lock()
+	defer knownHostsMu.Unlock()
 	f, fErr := os.OpenFile(knownHostsPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
 	if fErr != nil {
 		return fErr
