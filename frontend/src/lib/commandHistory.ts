@@ -38,8 +38,9 @@ export function readCommandHistory(sessionID: number): CommandHistoryEntry[] {
   }
 }
 
+// Bare "-p" is intentionally not sensitive (common CLI short flags). DB tools still match below.
 const sensitiveCommandPatterns: RegExp[] = [
-  /(^|\s)(password|passwd|token|secret|--password|--passwd|-p)(=|\s|$)/i,
+  /(^|\s)(password|passwd|token|secret|--password|--passwd)(=|\s|$)/i,
   /(curl|wget).*\s(-H|--header)\s+['"]?authorization/i,
   /export\s+\w*(KEY|TOKEN|SECRET|PASSWORD|PASSWD)\w*=/i,
   /(^|\s)(mysql|psql|mongo|redis-cli)\b.*\s(-p|--password)(=|\S|$)/i,
