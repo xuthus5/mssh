@@ -1366,5 +1366,9 @@
   "选择日志目录失败: ${}": "Failed to choose log directory: ${}",
   "加载审计设置失败: ${}": "Failed to load audit settings: ${}",
   "更新审计设置失败: ${}": "Failed to update audit settings: ${}",
-  "加载审计日志失败: ${}": "Failed to load audit logs: ${}"
+  "加载审计日志失败: ${}": "Failed to load audit logs: ${}",
+  "分析删除影响失败: ${}": "Failed to analyze delete impact: ${}",
+  "预览会话 CSV 失败: ${}": "Failed to preview session CSV: ${}",
+  "导入会话 CSV 失败: ${}": "Failed to import session CSV: ${}",
+  "重连失败: ${}": "Reconnect failed: ${}"
 }

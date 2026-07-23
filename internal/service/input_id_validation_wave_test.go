@@ -101,3 +101,18 @@ func TestAuditListRejectsInvalidSessionID(t *testing.T) {
 	_, err = svc.List(model.AuditFilter{SessionID: &sessionID, Limit: 10})
 	require.Error(t, err)
 }
+
+func TestMacroExecuteRejectsEmptyCommand(t *testing.T) {
+	svc := NewMacroService(nil, nil, testutil.NewTestLogger())
+	require.Error(t, svc.Execute("term-1", "   "))
+}
+
+func TestKeyImportRejectsEmptyPrivateKey(t *testing.T) {
+	db, err := store.OpenDB(t.TempDir())
+	require.NoError(t, err)
+	require.NoError(t, store.InitializeSchema(db))
+	t.Cleanup(func() { _ = db.Close() })
+	svc := NewKeyService(db, nil, testutil.NewTestLogger())
+	_, err = svc.Import("k", "  ")
+	require.Error(t, err)
+}
