@@ -252,3 +252,20 @@
 | TUNNEL-BIND-001 | 本地/动态隧道前端创建时必须拒绝非回环本地地址（如 0.0.0.0），与后端策略一致。 | done |
 | TUNNEL-BIND-002 | 表单需展示回环绑定说明；非法地址不得调用创建/启动 API。 | done |
 
+## 2026-07-23 商用硬化波次（AI 提供商 URL / 非活动主题刷新）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| SEC-AI-URL-001 | AI Provider BaseURL 仅允许 http/https；禁止 URL userinfo 凭据。 | done |
+| SEC-AI-URL-002 | 必须拒绝链路本地/未指定/组播及云元数据主机（169.254.0.0/16、metadata.google.internal 等）。 | done |
+| SEC-AI-URL-003 | 非本机回环主机必须使用 HTTPS。 | done |
+| THEME-FIT-001 | 主题变更时非活动分屏窗格仍必须 fit 刷新视觉主题；仅活动窗格失败才标记 recoveryPending。 | done |
+
+## 2026-07-23 商用硬化波次（命令历史敏感过滤 / 锁定调度同步）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| SEC-HIST-001 | 后端 CommandHistory.Add 必须过滤空命令与敏感命令模式，与前端 isSensitiveCommand 策略对齐；敏感命令不得写入数据库。 | done |
+| SEC-HIST-002 | 敏感命令被拒绝时不得返回错误（前端静默跳过），避免刷错误日志。 | done |
+| SYNC-SCHED-001 | 定时云同步在应用 vault 锁定或未配置时必须跳过本轮，不得将运行时状态置为 error，也不得写入失败同步事件。 | done |
+| SYNC-SCHED-002 | vault 解锁后下一定时 tick 必须可继续执行同步（调度器保持运行）。 | done |
