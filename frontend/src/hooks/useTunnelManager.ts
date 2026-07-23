@@ -19,7 +19,9 @@ function mapTunnel(item: TunnelRecord, states: Record<string, 'running' | 'stopp
   }
 }
 
-function tunnelInput(tunnel: Omit<Tunnel, 'id' | 'running'>): TunnelInput {
+type TunnelStartInput = Omit<Tunnel, 'id' | 'running'> & { id?: string }
+
+function tunnelInput(tunnel: Omit<Tunnel, 'id' | 'running'> | TunnelStartInput): TunnelInput {
   return {
     id: 0, name: `${tunnel.type}-${tunnel.localPort}`, session_id: Number(tunnel.sessionId),
     type: ({ local: TunnelType.TunnelLocal, remote: TunnelType.TunnelRemote, dynamic: TunnelType.TunnelDynamic })[tunnel.type],
@@ -29,10 +31,10 @@ function tunnelInput(tunnel: Omit<Tunnel, 'id' | 'running'>): TunnelInput {
 }
 
 function useTunnelStart(load: () => Promise<void>, setTunnels: Dispatch<SetStateAction<Tunnel[]>>) {
-  return useCallback(async (tunnel: Omit<Tunnel, 'id' | 'running'>) => {
+  return useCallback(async (tunnel: TunnelStartInput) => {
     try {
-      let id = Number((tunnel as Tunnel).id)
-      if (!id) {
+      let id = Number(tunnel.id)
+      if (!Number.isFinite(id) || id <= 0) {
         const created = await TunnelService.Create(tunnelInput(tunnel))
         if (!created) throw new Error(t('创建隧道失败'))
         id = created.id

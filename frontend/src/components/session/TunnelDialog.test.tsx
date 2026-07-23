@@ -85,6 +85,7 @@ describe('TunnelDialog', () => {
 
     expect(props.onStop).toHaveBeenCalledWith('local-1')
     expect(props.onStart).toHaveBeenCalledWith({
+      id: 'remote-1',
       sessionId: 'session-7',
       type: 'remote',
       localAddress: '127.0.0.1',

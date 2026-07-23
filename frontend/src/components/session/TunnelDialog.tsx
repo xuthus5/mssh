@@ -25,7 +25,7 @@ interface Props {
   open: boolean
   onOpenChange: (open: boolean) => void
   tunnels: Tunnel[]
-  onStart: (tunnel: Omit<Tunnel, 'id' | 'running'>) => void | Promise<void>
+  onStart: (tunnel: Omit<Tunnel, 'id' | 'running'> & { id?: string }) => void | Promise<void>
   onStop: (tunnelId: string) => void | Promise<void>
   sessionId: string
 }
@@ -223,6 +223,7 @@ export default function TunnelDialog({
                           size="xs"
                           variant="ghost"
                           onClick={() => onStart({
+                            id: tunnel.id,
                             sessionId: tunnel.sessionId,
                             type: tunnel.type,
                             localAddress: tunnel.localAddress,
