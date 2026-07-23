@@ -26,6 +26,7 @@ const logger = vi.hoisted(() => ({ debug: vi.fn(), error: vi.fn() }))
 vi.mock('@/hooks/SessionWorkspaceContext', () => ({ useSessionWorkspace: () => workspace }))
 vi.mock('@/hooks/useResizablePanel', () => ({ useResizablePanel: () => ({ width: 280, collapsed: false, displayedWidth: 280, resizeHandleProps: {} }) }))
 vi.mock('@/lib/logger', () => ({ logger }))
+vi.mock('@/lib/confirmDialog', () => ({ requestConfirm: vi.fn(async () => true) }))
 vi.mock('@/lib/wails', () => ({ MacroService: macroService }))
 vi.mock('@/components/session/SessionTree', () => ({
   default: (props: any) => <div>
