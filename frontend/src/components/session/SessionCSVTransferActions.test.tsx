@@ -2,6 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { Dialogs } from '@wailsio/runtime'
+import { useToastStore } from '@/components/ui/toast'
 
 const actions = vi.hoisted(() => ({
   exportSessionsCSV: vi.fn(async () => ({ count: 2, included_passwords: true })),
@@ -25,6 +26,7 @@ import { SessionCSVTransferActions } from '@/components/session/SessionCSVTransf
 describe('SessionCSVTransferActions', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    useToastStore.setState({ toasts: [] })
     vi.spyOn(Dialogs, 'SaveFile').mockResolvedValue('/tmp/sessions')
     vi.spyOn(Dialogs, 'OpenFile').mockResolvedValue('/tmp/import.csv')
   })
@@ -85,3 +87,12 @@ describe('SessionCSVTransferActions', () => {
     expect(screen.getByRole('button', { name: '确认导入' })).not.toBeDisabled()
   })
 })
+
+  it('toasts export failures', async () => {
+    actions.exportSessionsCSV.mockRejectedValueOnce(new Error('export boom'))
+    render(<SessionCSVTransferActions selectedIDs={[]} />)
+    await userEvent.click(screen.getByRole('button', { name: '导出' }))
+    await userEvent.click(screen.getByRole('button', { name: /选择位置并导出/ }))
+    await waitFor(() => expect(useToastStore.getState().toasts.some((item) => item.message.includes('export boom'))).toBe(true))
+    expect(await screen.findByRole('alert')).toHaveTextContent('export boom')
+  })
