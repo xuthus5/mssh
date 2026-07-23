@@ -7,6 +7,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/xuthus5/mssh/internal/model"
+
 	"github.com/xuthus5/mssh/internal/service/testutil"
 	"github.com/xuthus5/mssh/internal/store"
 )
@@ -76,4 +78,26 @@ func TestLogServiceRejectsInvalidRecordingInputs(t *testing.T) {
 	_, err = logSvc.StartTerminalRecording("term-1", -1, 80, 24, "xterm")
 	require.Error(t, err)
 	require.Error(t, logSvc.StopTerminalRecordingIfActive(""))
+}
+
+func TestAISettingsRejectInvalidProviderIDs(t *testing.T) {
+	zero := int64(0)
+	neg := int64(-1)
+	settings := defaultAISettings()
+	settings.DefaultProviderID = &zero
+	require.Error(t, validateAISettings(settings))
+	settings = defaultAISettings()
+	settings.FallbackProviderID = &neg
+	require.Error(t, validateAISettings(settings))
+}
+
+func TestAuditListRejectsInvalidSessionID(t *testing.T) {
+	db, err := store.OpenDB(t.TempDir())
+	require.NoError(t, err)
+	require.NoError(t, store.InitializeSchema(db))
+	t.Cleanup(func() { _ = db.Close() })
+	svc := NewAuditService(db, testutil.NewTestLogger())
+	sessionID := int64(0)
+	_, err = svc.List(model.AuditFilter{SessionID: &sessionID, Limit: 10})
+	require.Error(t, err)
 }

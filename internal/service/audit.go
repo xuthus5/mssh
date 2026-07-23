@@ -27,6 +27,9 @@ func (a *AuditService) SetEnabled(enabled bool) error {
 }
 
 func (a *AuditService) List(filter model.AuditFilter) ([]model.AuditEvent, error) {
+	if filter.SessionID != nil && *filter.SessionID <= 0 {
+		return nil, fmt.Errorf("invalid session id")
+	}
 	return store.ListAuditEvents(a.db, filter)
 }
 
