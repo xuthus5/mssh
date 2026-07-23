@@ -101,6 +101,9 @@ func (l *LogService) StartTerminalRecording(terminalID string, sessionID int64, 
 	if err := validateTerminalID(terminalID); err != nil {
 		return 0, err
 	}
+	if sessionID < 0 {
+		return 0, fmt.Errorf("invalid session id")
+	}
 	l.logger.Info("starting terminal recording", "terminalID", terminalID, "sessionID", sessionID)
 	l.mu.Lock()
 	if l.shuttingDown {
@@ -233,6 +236,9 @@ func (l *LogService) StopTerminalRecording(terminalID string) error {
 }
 
 func (l *LogService) StopTerminalRecordingIfActive(terminalID string) error {
+	if err := validateTerminalID(terminalID); err != nil {
+		return err
+	}
 	recording, ok := l.takeRecording(terminalID)
 	if !ok {
 		return nil
