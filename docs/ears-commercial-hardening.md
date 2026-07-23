@@ -1012,3 +1012,5 @@
 | UX-SYNC-047 | 云同步热刷新调用的 folders/sessions/recent/catalogs/tunnels 列表必须 silent，由热刷新路径统一失败 toast。 | done |
 | UX-LIST-048 | 独立手动/初始加载仍 toast 列表失败；silent 模式失败需 rethrow 以便外层处理。 | done |
 
+| UX-SESSION-049 | 会话更新成功后 GetSession 失败不得 toast「更新会话失败」；本地列表至少反映用户提交的字段。 | done |
+
