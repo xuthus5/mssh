@@ -6,12 +6,19 @@ import (
 	"log/slog"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/xuthus5/mssh/internal/model"
 	"github.com/xuthus5/mssh/internal/store"
 )
 
 const maxMacroCommandBytes = 32 * 1024
+
+const (
+	maxMacroNameRunes     = 128
+	maxMacroShortcutRunes = 64
+	maxMacroSortOrder     = 1_000_000
+)
 
 type MacroService struct {
 	db        *sql.DB
@@ -46,17 +53,38 @@ func (m *MacroService) Update(input model.MacroInput) error {
 }
 
 func validateMacroPayload(macro model.Macro) error {
-	if strings.TrimSpace(macro.Name) == "" {
+	name := strings.TrimSpace(macro.Name)
+	if name == "" {
 		return fmt.Errorf("macro name is required")
 	}
-	if strings.TrimSpace(macro.Command) == "" {
+	if strings.ContainsRune(name, 0) {
+		return fmt.Errorf("macro name contains NUL")
+	}
+	if utf8.RuneCountInString(name) > maxMacroNameRunes {
+		return fmt.Errorf("macro name must not exceed %d characters", maxMacroNameRunes)
+	}
+	command := strings.TrimSpace(macro.Command)
+	if command == "" {
 		return fmt.Errorf("macro command is required")
+	}
+	if strings.ContainsRune(macro.Command, 0) {
+		return fmt.Errorf("macro command contains NUL")
 	}
 	if len(macro.Command) > maxMacroCommandBytes {
 		return fmt.Errorf("macro command exceeds size limit")
 	}
+	shortcut := strings.TrimSpace(macro.Shortcut)
+	if strings.ContainsRune(shortcut, 0) {
+		return fmt.Errorf("macro shortcut contains NUL")
+	}
+	if utf8.RuneCountInString(shortcut) > maxMacroShortcutRunes {
+		return fmt.Errorf("macro shortcut must not exceed %d characters", maxMacroShortcutRunes)
+	}
 	if macro.DelayMs < 0 || macro.DelayMs > 60_000 {
 		return fmt.Errorf("macro delay must be between 0 and 60000 ms")
+	}
+	if macro.SortOrder < 0 || macro.SortOrder > maxMacroSortOrder {
+		return fmt.Errorf("macro sort order must be between 0 and %d", maxMacroSortOrder)
 	}
 	return nil
 }
