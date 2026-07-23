@@ -70,7 +70,7 @@ export function SerialSetSignals(terminalID: string, dtr: boolean, rts: boolean)
 }
 
 /**
- * SerialSignals returns the current DTR/RTS state for an open serial terminal.
+ * SerialSignals returns DTR/RTS outputs and modem input status for an open serial terminal.
  */
 export function SerialSignals(terminalID: string): $CancellablePromise<model$0.SerialSignals> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.TerminalService.SerialSignals", terminalID).then(($result: any) => {

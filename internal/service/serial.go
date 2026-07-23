@@ -98,7 +98,7 @@ func (s *SerialService) ensureProfilesNotInUse(ids []int64) error {
 			// Missing profiles are ignored so delete remains idempotent for callers.
 			continue
 		}
-		if _, ok := active[strings.TrimSpace(port.Device)]; ok {
+		if _, ok := active[serial.CanonicalDevicePath(port.Device)]; ok {
 			return fmt.Errorf("serial profile %q is in use and cannot be deleted", port.Name)
 		}
 	}
@@ -121,7 +121,7 @@ func (s *SerialService) ActiveDeviceMap() map[string]string {
 }
 
 func (s *SerialService) reserveDevice(device, terminalID string) error {
-	device = strings.TrimSpace(device)
+	device = serial.CanonicalDevicePath(device)
 	if device == "" {
 		return fmt.Errorf("serial device is required")
 	}
@@ -135,7 +135,7 @@ func (s *SerialService) reserveDevice(device, terminalID string) error {
 }
 
 func (s *SerialService) releaseDevice(device, terminalID string) {
-	device = strings.TrimSpace(device)
+	device = serial.CanonicalDevicePath(device)
 	if device == "" {
 		return
 	}
@@ -148,7 +148,7 @@ func (s *SerialService) releaseDevice(device, terminalID string) {
 
 func normalizeSerialPort(port model.SerialPort) (model.SerialPort, error) {
 	port.Name = strings.TrimSpace(port.Name)
-	port.Device = strings.TrimSpace(port.Device)
+	port.Device = serial.CanonicalDevicePath(port.Device)
 	port.Notes = strings.TrimSpace(port.Notes)
 	port.FlowControl = strings.TrimSpace(port.FlowControl)
 	port.LineEnding = model.SerialLineEnding(strings.TrimSpace(string(port.LineEnding)))
