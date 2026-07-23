@@ -97,8 +97,13 @@ export function useKeySettings() {
     } catch (error) { keyOperationFailed(t('导入密钥'), error); return undefined }
   }, [])
   const deleteKey = useCallback(async (id: string) => {
-    try { await KeyService.Delete(Number(id)); setKeys((current) => current.filter((key) => key.id !== id)) }
-    catch (error) { logger.debug('deleteKey error', error) }
+    try {
+      await KeyService.Delete(Number(id))
+      setKeys((current) => current.filter((key) => key.id !== id))
+    } catch (error) {
+      keyOperationFailed(t('删除密钥'), error)
+      throw error
+    }
   }, [])
   const exportKey = useCallback(async (id: string) => {
     try { return await KeyService.ExportPublicKey(Number(id)) }
@@ -131,15 +136,25 @@ function useConfigTransfer() {
   const exportConfig = useCallback(async () => {
     try {
       const path = await Dialogs.SaveFile({ Title: t('导出 MSSH 加密备份'), Filename: 'mssh-backup.msshbackup', CanCreateDirectories: true, Filters: [{ DisplayName: 'MSSH Backup', Pattern: '*.msshbackup' }] })
-      if (path) await SyncService.Export(path)
-    } catch (error) { logger.debug('exportConfig error', error) }
+      if (!path) return
+      await SyncService.Export(path)
+      toast(t('本地备份已导出'), 'success')
+    } catch (error) {
+      keyOperationFailed(t('导出本地备份'), error)
+      throw error
+    }
   }, [])
   const importConfig = useCallback(async () => {
     try {
       const selected = await Dialogs.OpenFile({ Title: t('导入 MSSH 加密备份'), CanChooseFiles: true, AllowsMultipleSelection: false, Filters: [{ DisplayName: 'MSSH Backup', Pattern: '*.msshbackup' }] })
       const path = typeof selected === 'string' ? selected : selected[0]
-      if (path) await SyncService.Import(path)
-    } catch (error) { logger.debug('importConfig error', error) }
+      if (!path) return
+      await SyncService.Import(path)
+      toast(t('本地备份已导入'), 'success')
+    } catch (error) {
+      keyOperationFailed(t('导入本地备份'), error)
+      throw error
+    }
   }, [])
   return { exportConfig, importConfig }
 }

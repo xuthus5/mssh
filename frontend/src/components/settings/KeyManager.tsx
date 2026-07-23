@@ -17,13 +17,14 @@ import { KeyGenerateDialog, KeyImportDialog, KeyMaterialDialog, type KeyMaterial
 import type { KeyImportFile, KeyInfo, KeyMaterial } from '@/hooks/useSettings'
 import { KeyService } from '@/lib/wails'
 import { t } from '@/i18n'
+import { logger } from '@/lib/logger'
 
 
 interface Props {
   keys: KeyInfo[]
   onGenerate: (name: string, type: KeyInfo['type'], bits: number) => Promise<KeyMaterial | undefined>
   onImport: (name: string, privateKey: string) => Promise<KeyInfo | undefined>
-  onDelete: (id: string) => void
+  onDelete: (id: string) => void | Promise<void>
   onExport: (id: string) => Promise<string | undefined>
   onLoadMaterial: (id: string) => Promise<KeyMaterial | undefined>
   onUpdate: (material: KeyMaterial) => Promise<KeyMaterial | undefined>
@@ -84,8 +85,11 @@ export function KeyManager(props: Props) {
     if (!deleteTarget || deleting) return
     setDeleting(true)
     try {
-      props.onDelete(deleteTarget.key.id)
+      await props.onDelete(deleteTarget.key.id)
       setDeleteTarget(null)
+    } catch (error) {
+      // onDelete surfaces toast; keep dialog open for retry
+      logger.error('delete key confirmation failed', error)
     } finally {
       setDeleting(false)
     }
