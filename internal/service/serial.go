@@ -59,6 +59,9 @@ func (s *SerialService) Update(input model.SerialPortInput) error {
 }
 
 func (s *SerialService) Delete(id int64) error {
+	if id <= 0 {
+		return fmt.Errorf("invalid serial port id")
+	}
 	if err := s.ensureProfilesNotInUse([]int64{id}); err != nil {
 		return err
 	}

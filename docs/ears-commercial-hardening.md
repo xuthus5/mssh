@@ -547,3 +547,10 @@
 | UX-SESSION-021 | 断开终端失败必须 toast。 | done |
 | UX-THEME-010 | 主题目录加载失败必须 toast，并保留 store error。 | done |
 
+## 2026-07-23 商用硬化波次（列表 folder_id / 串口删除 / 密钥删除 ID 校验）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| SEC-SESSION-012 | ListSessions 的 folderID 若提供必须 >0。 | done |
+| SEC-SERIAL-011 | Serial Delete 必须拒绝 id<=0。 | done |
+| SEC-KEY-010 | Key Delete/UsageCount/ExportPublicKey 必须拒绝 id<=0。 | done |
