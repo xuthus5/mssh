@@ -71,26 +71,17 @@ function FilePanelContainer({ sessionID, terminalID, onClose }: { sessionID: num
   const loadedInitialPath = useRef(false)
   const [syncingCurrentDirectory, setSyncingCurrentDirectory] = useState(false)
 
-  const runSftpAction = useCallback((action: Promise<unknown>, failureKey: string) => {
-    void action.catch((error: unknown) => {
-      const message = error instanceof Error ? error.message : String(error)
-      toast(t(failureKey, message), 'error')
-    })
-  }, [])
-
   useEffect(() => {
+    // listFiles owns panel error state; do not wrap with toast (single-owner rule).
     if (!loadedInitialPath.current) {
       loadedInitialPath.current = true
-      runSftpAction(
-        transfer.listFiles(followTerminalDirectory && terminalDirectory ? terminalDirectory : '/'),
-        '加载文件列表失败: ${}',
-      )
+      void transfer.listFiles(followTerminalDirectory && terminalDirectory ? terminalDirectory : '/')
       return
     }
     if (followTerminalDirectory && terminalDirectory) {
-      runSftpAction(transfer.listFiles(terminalDirectory), '加载文件列表失败: ${}')
+      void transfer.listFiles(terminalDirectory)
     }
-  }, [followTerminalDirectory, runSftpAction, terminalDirectory, transfer.listFiles])
+  }, [followTerminalDirectory, terminalDirectory, transfer.listFiles])
 
   const syncCurrentDirectory = useCallback(async () => {
     if (syncingCurrentDirectory) return
@@ -111,8 +102,9 @@ function FilePanelContainer({ sessionID, terminalID, onClose }: { sessionID: num
     const files = event.data?.files ?? []
     const targetID = event.data?.details?.id
     if (files.length === 0 || targetID !== dropTargetID) return
-    runSftpAction(transfer.uploadMany(files, transfer.currentPath), '上传失败: ${}')
-  }), [dropTargetID, runSftpAction, transfer.currentPath, transfer.uploadMany])
+    // upload/uploadMany already toast on failure; no second owner here.
+    void transfer.uploadMany(files, transfer.currentPath)
+  }), [dropTargetID, transfer.currentPath, transfer.uploadMany])
 
   const handleUpload = useCallback(async () => {
     let localPath = ''

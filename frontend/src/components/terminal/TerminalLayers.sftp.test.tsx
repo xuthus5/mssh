@@ -175,21 +175,29 @@ describe('TerminalLayers SFTP isolation', () => {
     expect(transfer.download).not.toHaveBeenCalled()
   })
 
-  it('catches listFiles rejections from initial directory load', async () => {
-    transfer.listFiles.mockRejectedValueOnce(new Error('sftp offline'))
+  it('loads the initial directory without toast when listFiles fails', async () => {
+    // Matches production listFiles: sets panel error and resolves without rejecting.
+    transfer.listFiles.mockImplementationOnce(async () => {
+      transfer.error = 'sftp offline'
+    })
     render(<TerminalLayers />)
     const terminalA = (await screen.findByTestId('terminal-term-a')).closest('[data-layer-id="terminal-a"]') as HTMLElement
     fireEvent.click(within(terminalA).getByRole('button', { name: 'files' }))
-    await waitFor(() => expect(notify).toHaveBeenCalledWith('加载文件列表失败: sftp offline', 'error'))
+    await waitFor(() => expect(transfer.listFiles).toHaveBeenCalled())
+    expect(transfer.error).toBe('sftp offline')
+    expect(notify).not.toHaveBeenCalledWith(expect.stringContaining('加载文件列表失败'), 'error')
   })
 
-  it('catches drop-upload promise rejections', async () => {
+  it('forwards drop uploads without second-owner toast wrapping', async () => {
     let dropHandler: ((event: { data?: { files?: string[]; details?: { id?: string } } }) => void) | undefined
     runtime.onFilesDropped.mockImplementation((handler?: DropHandler) => {
       dropHandler = handler
       return vi.fn()
     })
-    transfer.uploadMany.mockRejectedValueOnce(new Error('drop denied'))
+    // Production uploadMany toasts internally and resolves; layers must not wrap again.
+    transfer.uploadMany.mockImplementationOnce(async () => {
+      notify('上传失败: drop denied', 'error')
+    })
     render(<TerminalLayers />)
     const terminalA = (await screen.findByTestId('terminal-term-a')).closest('[data-layer-id="terminal-a"]') as HTMLElement
     fireEvent.click(within(terminalA).getByRole('button', { name: 'files' }))
@@ -197,6 +205,7 @@ describe('TerminalLayers SFTP isolation', () => {
     expect(dropHandler).toBeTypeOf('function')
     dropHandler?.({ data: { files: ['/tmp/a.txt'], details: { id: 'sftp-drop-zone-term-a' } } })
     await waitFor(() => expect(transfer.uploadMany).toHaveBeenCalledWith(['/tmp/a.txt'], '/'))
-    await waitFor(() => expect(notify).toHaveBeenCalledWith('上传失败: drop denied', 'error'))
+    expect(notify).toHaveBeenCalledTimes(1)
+    expect(notify).toHaveBeenCalledWith('上传失败: drop denied', 'error')
   })
 })
