@@ -108,3 +108,31 @@ func TestSessionService_DisconnectForSessionsCleansResidualConns(t *testing.T) {
 	sessionSvc.DisconnectForSessions([]int64{0, -1})
 	_ = time.Second
 }
+
+func TestSessionService_DeleteSessionCancelsConnectAttempts(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	sessionSvc := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
+	session, err := sessionSvc.CreateSession(model.SessionInputFrom(model.Session{
+		Name: "connecting", Host: "127.0.0.1", Port: 22, Username: "root",
+		AuthMethod: model.AuthPassword, KeepAlive: 30, TermType: "xterm-256color",
+	}))
+	require.NoError(t, err)
+
+	cancelled := make(chan struct{})
+	sessionSvc.mu.Lock()
+	sessionSvc.attempts["attempt-live"] = &connectAttempt{
+		cancel: func() { close(cancelled) }, decision: make(chan bool, 1), sessionID: session.ID,
+	}
+	sessionSvc.mu.Unlock()
+
+	require.NoError(t, sessionSvc.DeleteSession(session.ID))
+	select {
+	case <-cancelled:
+	case <-time.After(time.Second):
+		t.Fatal("connect attempt was not cancelled")
+	}
+	sessionSvc.mu.RLock()
+	_, exists := sessionSvc.attempts["attempt-live"]
+	sessionSvc.mu.RUnlock()
+	assert.False(t, exists)
+}

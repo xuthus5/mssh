@@ -18,7 +18,7 @@ const defaultKeepAliveSettingKey = "terminal.default_keep_alive"
 func (s *SessionService) connect(ctx context.Context, sessionID int64, emitState bool) (string, error) {
 	s.logger.Info("connecting to session", "sessionID", sessionID)
 	connectCtx, cancel := context.WithCancel(ctx)
-	attemptID := s.registerConnectAttempt(cancel)
+	attemptID := s.registerConnectAttempt(sessionID, cancel)
 	defer s.finishConnectAttempt(attemptID)
 	s.eventBus.Emit(event.ConnectionAttempt, event.ConnectionStatePayload{AttemptID: attemptID, State: "connecting"})
 	sess, err := s.sessionForConnect(sessionID)
@@ -83,10 +83,10 @@ func (s *SessionService) resolveKeepAlive(session *model.Session) error {
 	return nil
 }
 
-func (s *SessionService) registerConnectAttempt(cancel context.CancelFunc) string {
+func (s *SessionService) registerConnectAttempt(sessionID int64, cancel context.CancelFunc) string {
 	attemptID := generateConnectionAttemptID()
 	s.mu.Lock()
-	s.attempts[attemptID] = &connectAttempt{cancel: cancel, decision: make(chan bool, 1)}
+	s.attempts[attemptID] = &connectAttempt{cancel: cancel, decision: make(chan bool, 1), sessionID: sessionID}
 	s.mu.Unlock()
 	return attemptID
 }
@@ -150,4 +150,40 @@ func (s *SessionService) CancelConnect(attemptID string) error {
 	}
 	attempt.cancel()
 	return nil
+}
+
+// CancelConnectForSessions aborts in-flight connect attempts for sessions about to be deleted.
+//
+//wails:ignore
+func (s *SessionService) CancelConnectForSessions(sessionIDs []int64) {
+	if s == nil || len(sessionIDs) == 0 {
+		return
+	}
+	wanted := make(map[int64]struct{}, len(sessionIDs))
+	for _, sessionID := range sessionIDs {
+		if sessionID > 0 {
+			wanted[sessionID] = struct{}{}
+		}
+	}
+	if len(wanted) == 0 {
+		return
+	}
+
+	s.mu.Lock()
+	cancels := make([]context.CancelFunc, 0)
+	for attemptID, attempt := range s.attempts {
+		if attempt == nil {
+			continue
+		}
+		if _, ok := wanted[attempt.sessionID]; !ok {
+			continue
+		}
+		cancels = append(cancels, attempt.cancel)
+		delete(s.attempts, attemptID)
+	}
+	s.mu.Unlock()
+
+	for _, cancel := range cancels {
+		cancel()
+	}
 }

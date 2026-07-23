@@ -60,8 +60,9 @@ type SessionService struct {
 }
 
 type connectAttempt struct {
-	cancel   context.CancelFunc
-	decision chan bool
+	cancel    context.CancelFunc
+	decision  chan bool
+	sessionID int64
 }
 
 func NewSessionService(db *sql.DB, eventBus EventBus, keepAlive int, dataDir string, crypto KeyCrypto, logger *slog.Logger) *SessionService {
