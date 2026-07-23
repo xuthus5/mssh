@@ -43,3 +43,11 @@ describe('useAISettings', () => {
     expect(result.current.pending).toBeNull()
   })
 })
+
+  it('toasts when dashboard load fails', async () => {
+    ai.dashboard.mockRejectedValue(new Error('ai dashboard failed'))
+    const { result } = renderHook(() => useAISettings())
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    expect(result.current.error).toBe('ai dashboard failed')
+    expect(toast).toHaveBeenCalled()
+  })

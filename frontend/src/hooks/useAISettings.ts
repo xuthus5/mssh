@@ -28,7 +28,7 @@ export function useAISettings(): AISettingsController {
   const [error, setError] = useState<string | null>(null)
   const reload = useCallback(async () => {
     try { setDashboard(await AIService.Dashboard()); setError(null) }
-    catch (loadError) { setError(errorMessage(loadError)); logger.error('load AI settings failed', loadError) }
+    catch (loadError) { const message = errorMessage(loadError); setError(message); logger.error('load AI settings failed', loadError); toast(t('加载 AI 设置失败: ${}', message), 'error') }
     finally { setLoading(false) }
   }, [])
   const execute = useCallback(async (name: string, success: string, action: () => Promise<unknown>, refresh = true, quiet = false) => {
