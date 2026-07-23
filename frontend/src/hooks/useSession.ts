@@ -250,9 +250,12 @@ export function useSession() {
     dialog.openDialog(session.host, session.port, session.username, () => { void connect(sessionId) })
     try {
       const terminalId = await openSessionTab(session)
-      await Promise.all([listRecentSessions(), listSessions()])
       dialog.setState('connected')
       logger.info('connected', { terminalId, host: session.host })
+      // Session is already open; refresh failures must not flip the dialog to failed.
+      void Promise.all([listRecentSessions(), listSessions()]).catch((refreshError: unknown) => {
+        logger.error('connect post-refresh failed', refreshError)
+      })
     } catch (err) {
       logger.error('connect error', err)
       const msg = err instanceof Error ? err.message : String(err)

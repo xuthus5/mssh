@@ -117,6 +117,19 @@ describe('useSession behavior', () => {
     expect(useAppStore.getState().tabs).toHaveLength(0)
   })
 
+  it('keeps connection success when post-connect session refresh fails', async () => {
+    registerInitial({ sessions: [bindingSession(5, 'Connect', null)] })
+    __registerHandler(service + 'TerminalService.Open', async () => 'term-ok')
+    const { result } = renderHook(() => useSession())
+    await waitFor(() => expect(result.current.sessions).toHaveLength(1))
+    __registerHandler(service + 'SessionService.ListSessions', async () => { throw new Error('refresh boom') })
+    __registerHandler(service + 'SessionService.ListRecentSessions', async () => { throw new Error('recent boom') })
+    await act(async () => result.current.connect('5'))
+    expect(useAppStore.getState().tabs).toHaveLength(1)
+    expect(useConnectDialog.getState().open).toBe(false)
+    expect(useConnectDialog.getState().state).toBe('idle')
+  })
+
   it('does not start a second session while another connection dialog is active', async () => {
     registerInitial({ sessions: [bindingSession(5, 'Connect', null)] })
     const openTerminal = vi.fn(async () => 'term-new')

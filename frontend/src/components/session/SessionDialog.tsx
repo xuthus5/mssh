@@ -138,7 +138,7 @@ export default function SessionDialog({ open, onOpenChange, session, folders, en
         </DialogHeader>
 
         <form
-          onSubmit={(e) => { e.preventDefault(); handleSubmit() }}
+          onSubmit={(e) => { e.preventDefault(); void handleSubmit() }}
           className="flex flex-col gap-3"
         >
           {submitError && <div role="alert" className="rounded-lg border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">{submitError}</div>}
