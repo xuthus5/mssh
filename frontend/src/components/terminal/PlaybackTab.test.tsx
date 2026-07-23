@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useAppStore } from '@/store/appStore'
 import { logger } from '@/lib/logger'
+import { ToastContainer, useToastStore } from '@/components/ui/toast'
 import { useTerminalBehaviorStore } from '@/store/terminalBehaviorStore'
 
 const { getRecording } = vi.hoisted(() => ({ getRecording: vi.fn(async (): Promise<any> => ({ entries: [] })) }))
@@ -61,6 +62,7 @@ describe('PlaybackTab terminal theme', () => {
   afterEach(() => vi.useRealTimers())
 
   beforeEach(() => {
+    useToastStore.setState({ toasts: [] })
     terminalInstances.length = 0
     fitInstances.length = 0
     resizeHandlers.length = 0
@@ -179,10 +181,11 @@ describe('PlaybackTab terminal theme', () => {
     const loadError = new Error('recording unavailable')
     const loggerError = vi.spyOn(logger, 'error').mockImplementation(() => {})
     getRecording.mockRejectedValueOnce(loadError)
-    render(<PlaybackTab recordingId="failed" title="demo" active />)
+    render(<><PlaybackTab recordingId="failed" title="demo" active /><ToastContainer /></>)
 
     await waitFor(() => expect(terminalInstances[1].writeln).toHaveBeenCalledWith(expect.stringContaining('Failed to load recording')))
     expect(loggerError).toHaveBeenCalledWith('PlaybackTab: GetRecording error:', loadError)
+    expect(await screen.findByText(/加载回放失败/)).toBeInTheDocument()
   })
   it('pauses, changes speed, and seeks without remounting', async () => {
     getRecording.mockResolvedValue({ entries: [{ timestamp: 0, type: 0, data: 'QQ==' }, { timestamp: 1000, type: 0, data: 'Qg==' }] })
