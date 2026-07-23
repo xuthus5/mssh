@@ -46,7 +46,7 @@ func (t *TerminalService) OpenSerial(ctx context.Context, serialPortID int64, co
 		t.logger.Error("serial open failed", "serialPortID", serialPortID, "error", err)
 		return "", fmt.Errorf("serial open: %w", err)
 	}
-	t.registerTerminal(terminalID, "", port)
+	t.registerTerminal(terminalID, "", 0, port)
 	t.logger.Info("serial terminal opened", "terminalID", terminalID, "device", profile.Device)
 	outcome = "success"
 	return terminalID, nil
