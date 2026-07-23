@@ -9,10 +9,12 @@ vi.mock('@/lib/wails', () => ({ AuditService: { Enabled: audit.enabled, SetEnabl
 vi.mock('@/hooks/SessionWorkspaceContext', () => ({ useSessionWorkspace: () => ({ sessions: [{ id: '7', name: '生产服务器' }] }) }))
 
 import { AuditPanel } from '@/components/layout/AuditPanel'
+import { useToastStore } from '@/components/ui/toast'
 
 describe('AuditPanel', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    useToastStore.setState({ toasts: [] })
     audit.enabled.mockResolvedValue(true)
     audit.list.mockResolvedValue([{ id: 1, action: 'connect', target_type: 'session', target_id: '7', session_id: 7, summary: 'SSH 连接', outcome: 'success', created_at: '2026-07-17T01:02:03Z' }])
   })
@@ -36,5 +38,22 @@ describe('AuditPanel', () => {
     await waitFor(() => expect(audit.list).toHaveBeenLastCalledWith(expect.objectContaining({ session_id: 7 })))
     await user.click(screen.getByRole('switch', { name: '启用审计日志' }))
     expect(audit.setEnabled).toHaveBeenCalledWith(false)
+  })
+
+  it('toasts audit setting load failures', async () => {
+    audit.enabled.mockRejectedValueOnce(new Error('enabled failed'))
+    render(<AuditPanel />)
+    expect(await screen.findByText('enabled failed')).toBeInTheDocument()
+    await waitFor(() => expect(useToastStore.getState().toasts.some((item) => item.message.includes('enabled failed'))).toBe(true))
+  })
+
+  it('toasts audit toggle failures', async () => {
+    const user = userEvent.setup()
+    audit.setEnabled.mockRejectedValueOnce(new Error('toggle failed'))
+    render(<AuditPanel />)
+    await screen.findAllByText('SSH 连接')
+    await user.click(screen.getByRole('switch', { name: '启用审计日志' }))
+    expect(await screen.findByText('toggle failed')).toBeInTheDocument()
+    await waitFor(() => expect(useToastStore.getState().toasts.some((item) => item.message.includes('toggle failed'))).toBe(true))
   })
 })
