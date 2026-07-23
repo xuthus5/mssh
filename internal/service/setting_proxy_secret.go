@@ -91,33 +91,19 @@ func proxyPasswordSavedSetting(saved bool) (model.Setting, error) {
 }
 
 func (s *SettingService) encryptProxyPassword(plaintext string) (string, error) {
-	if s.crypto == nil {
-		return "", fmt.Errorf("proxy password encryption is unavailable")
-	}
-	encrypted, err := s.crypto.Encrypt([]byte(plaintext))
+	sealed, err := encryptProxyPasswordValue(s.crypto, plaintext)
 	if err != nil {
 		return "", fmt.Errorf("encrypt proxy password: %w", err)
 	}
-	return proxyPasswordEncPrefix + string(encrypted), nil
+	return sealed, nil
 }
 
 func (s *SettingService) decryptProxyPassword(raw string) (string, error) {
-	raw = strings.TrimSpace(raw)
-	if raw == "" {
-		return "", nil
-	}
-	// Legacy plaintext passwords remain usable until the next save.
-	if !strings.HasPrefix(raw, proxyPasswordEncPrefix) {
-		return raw, nil
-	}
-	if s.crypto == nil {
-		return "", fmt.Errorf("proxy password decryption is unavailable")
-	}
-	plaintext, err := s.crypto.Decrypt([]byte(strings.TrimPrefix(raw, proxyPasswordEncPrefix)))
+	plaintext, err := decryptProxyPasswordValue(s.crypto, raw)
 	if err != nil {
 		return "", fmt.Errorf("decrypt proxy password: %w", err)
 	}
-	return string(plaintext), nil
+	return plaintext, nil
 }
 
 func (s *SettingService) loadProxyPassword() (string, bool) {
