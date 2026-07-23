@@ -1,9 +1,10 @@
 import { useCallback, type Dispatch, type SetStateAction } from 'react'
 import { AssetCatalogService, SessionService } from '@/lib/wails'
 import { logger } from '@/lib/logger'
+import { toast } from '@/components/ui/toast'
+import { t } from '@/i18n'
 import { mapEnvironment, mapProject, mapSession, mapTag, type AssetColorToken, type AssetEnvironment, type AssetProject, type AssetTag, type Session } from '@/lib/sessionModels'
 import type { AssetColorToken as BindingAssetColorToken, AssetDeleteInput } from '../../bindings/github.com/xuthus5/mssh/internal/model/models'
-import { t } from '@/i18n'
 
 
 interface StateSetters {
@@ -27,8 +28,10 @@ export function useSessionAssetCatalog(state: StateSetters) {
       state.setProjects((projectItems ?? []).map(mapProject))
       state.setTags((tagItems ?? []).map(mapTag))
     } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
       logger.error('listAssetCatalogs error', error)
-      state.setError(error instanceof Error ? error.message : String(error))
+      state.setError(message)
+      toast(t('加载资产分类失败: ${}', message), 'error')
     }
   }, [state.setEnvironments, state.setError, state.setProjects, state.setTags])
 

@@ -25,6 +25,7 @@ async function loadPersistedBindings(): Promise<ShortcutBindings> {
     return normalizeShortcutBindings(parsed)
   } catch (error: unknown) {
     logger.error('load shortcuts failed', error)
+    toast(t('加载快捷键失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
     return defaultShortcutBindings()
   }
 }

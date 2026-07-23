@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useSessionAssetCatalog } from '@/hooks/useSessionAssetCatalog'
 import { __clearHandlers, __registerHandler } from '@/test/__mocks__/wails-runtime'
 import type { AssetEnvironment, AssetProject, AssetTag, Session } from '@/lib/sessionModels'
+import { useToastStore } from '@/components/ui/toast'
 
 const service = 'github.com/xuthus5/mssh/internal/service.'
 
@@ -32,7 +33,7 @@ function registerLists() {
 }
 
 describe('useSessionAssetCatalog', () => {
-  beforeEach(() => { __clearHandlers(); registerLists() })
+  beforeEach(() => { __clearHandlers(); registerLists(); useToastStore.setState({ toasts: [] }) })
 
   it('loads and creates all catalog kinds', async () => {
     __registerHandler(service + 'AssetCatalogService.CreateEnvironment', async () => bindingEnvironment(5, '预发'))
@@ -77,5 +78,6 @@ describe('useSessionAssetCatalog', () => {
     const { result } = renderHook(() => useHarness())
     await act(async () => result.current.listAssetCatalogs())
     expect(result.current.error).toBe('catalog failed')
+    expect(useToastStore.getState().toasts.some((item) => item.message.includes('catalog failed'))).toBe(true)
   })
 })
