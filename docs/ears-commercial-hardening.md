@@ -512,3 +512,11 @@
 | UX-SESSION-012 | setDefaultFolder 与 listTunnels 失败必须 toast，默认分组设置失败需可感知。 | done |
 | UX-SESSION-013 | 侧栏保存分组仅在成功后关闭对话框；资产中心删除失败保持确认框。 | done |
 
+## 2026-07-23 商用硬化波次（串口/资产分类/快捷键加载错误可见）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| UX-SERIAL-010 | 串口配置列表加载失败必须 toast，并保留页面 error 状态。 | done |
+| UX-ASSET-010 | 资产分类列表加载失败必须 toast，不得仅写日志与 setError。 | done |
+| UX-SHORTCUT-010 | 快捷键设置加载失败必须 toast，并回退默认绑定。 | done |
+
