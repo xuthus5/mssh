@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"net/http"
@@ -14,13 +15,14 @@ import (
 const maxHTTPRedirects = 5
 
 // sharedHTTPClient builds an HTTP client. When manager is nil, system proxy is used via DefaultTransport.
-// All clients share a CheckRedirect policy that blocks credentialed redirects and unsafe hosts.
+// All clients share redirect and dial policies that block metadata/link-local targets and unsafe redirects.
 func sharedHTTPClient(timeout time.Duration, manager *netproxy.Manager) *http.Client {
 	var client *http.Client
 	if manager == nil {
-		client = &http.Client{Timeout: timeout}
+		client = &http.Client{Timeout: timeout, Transport: secureHTTPTransport(nil)}
 	} else {
 		client = manager.Client(timeout)
+		client.Transport = secureHTTPTransport(client.Transport)
 	}
 	client.CheckRedirect = secureHTTPRedirect
 	return client
@@ -31,6 +33,71 @@ func firstProxy(proxy ...*netproxy.Manager) *netproxy.Manager {
 		return nil
 	}
 	return proxy[0]
+}
+
+func secureHTTPTransport(base http.RoundTripper) *http.Transport {
+	var transport *http.Transport
+	switch typed := base.(type) {
+	case *http.Transport:
+		transport = typed.Clone()
+	case nil:
+		if defaultTransport, ok := http.DefaultTransport.(*http.Transport); ok {
+			transport = defaultTransport.Clone()
+		} else {
+			transport = &http.Transport{}
+		}
+	default:
+		// Unknown RoundTripper: wrap with a fresh transport that still has proxy from environment.
+		if defaultTransport, ok := http.DefaultTransport.(*http.Transport); ok {
+			transport = defaultTransport.Clone()
+		} else {
+			transport = &http.Transport{}
+		}
+	}
+	transport.DialContext = secureDialContext
+	return transport
+}
+
+func secureDialContext(ctx context.Context, network, address string) (net.Conn, error) {
+	host, port, err := net.SplitHostPort(address)
+	if err != nil {
+		return nil, fmt.Errorf("invalid dial address: %w", err)
+	}
+	host = strings.Trim(host, "[]")
+	if isBlockedOutboundHost(host) {
+		return nil, fmt.Errorf("outbound dial host is not allowed")
+	}
+
+	dialer := &net.Dialer{Timeout: 30 * time.Second, KeepAlive: 30 * time.Second}
+	// Literal IP: validate and dial directly.
+	if ip := net.ParseIP(host); ip != nil {
+		if isBlockedOutboundIP(ip) {
+			return nil, fmt.Errorf("outbound dial IP is not allowed")
+		}
+		return dialer.DialContext(ctx, network, net.JoinHostPort(ip.String(), port))
+	}
+
+	// Hostname: resolve first, skip blocked answers, dial pinned IP (mitigates DNS rebinding to metadata).
+	addrs, err := net.DefaultResolver.LookupIPAddr(ctx, host)
+	if err != nil {
+		return nil, err
+	}
+	var lastErr error
+	for _, addr := range addrs {
+		if isBlockedOutboundIP(addr.IP) {
+			lastErr = fmt.Errorf("outbound dial IP is not allowed")
+			continue
+		}
+		conn, dialErr := dialer.DialContext(ctx, network, net.JoinHostPort(addr.IP.String(), port))
+		if dialErr == nil {
+			return conn, nil
+		}
+		lastErr = dialErr
+	}
+	if lastErr == nil {
+		lastErr = fmt.Errorf("no usable addresses for %s", host)
+	}
+	return nil, lastErr
 }
 
 // secureHTTPRedirect rejects open-redirect SSRF patterns for application HTTP traffic
@@ -95,6 +162,13 @@ func isBlockedOutboundHost(host string) bool {
 		return true
 	}
 	ip := net.ParseIP(normalized)
+	if ip == nil {
+		return false
+	}
+	return isBlockedOutboundIP(ip)
+}
+
+func isBlockedOutboundIP(ip net.IP) bool {
 	if ip == nil {
 		return false
 	}
