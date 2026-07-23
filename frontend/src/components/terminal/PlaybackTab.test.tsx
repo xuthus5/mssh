@@ -175,7 +175,7 @@ describe('PlaybackTab terminal theme', () => {
   it('reports missing and failed recording loads in the terminal', async () => {
     getRecording.mockResolvedValueOnce(null)
     const missing = render(<PlaybackTab recordingId="missing" title="demo" active />)
-    await waitFor(() => expect(terminalInstances[0].writeln).toHaveBeenCalledWith(expect.stringContaining('No recording data found')))
+    await waitFor(() => expect(terminalInstances[0].writeln).toHaveBeenCalledWith(expect.stringContaining('未找到录制数据')))
     missing.unmount()
 
     const loadError = new Error('recording unavailable')
@@ -183,7 +183,7 @@ describe('PlaybackTab terminal theme', () => {
     getRecording.mockRejectedValueOnce(loadError)
     render(<PlaybackTab recordingId="failed" title="demo" active />)
 
-    await waitFor(() => expect(terminalInstances[1].writeln).toHaveBeenCalledWith(expect.stringContaining('Failed to load recording')))
+    await waitFor(() => expect(terminalInstances[1].writeln).toHaveBeenCalledWith(expect.stringContaining('加载录制失败')))
     expect(loggerError).toHaveBeenCalledWith('PlaybackTab: GetRecording error:', loadError)
     expect(useToastStore.getState().toasts).toHaveLength(0)
   })

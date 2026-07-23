@@ -1243,3 +1243,10 @@
 |---|---|---|
 | UX-ENG-126 | `TerminalSplit.tsx` 通过提取 `terminalSplitActions.ts` 保持 ≤300 行；行为回归测试通过。 | done |
 
+
+## 2026-07-24 商用硬化波次（回放组件行数与 i18n）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| UX-ENG-127 | `PlaybackTab.tsx` 通过提取 `playbackPlayerRuntime.ts` 保持 ≤300 行；行为回归测试通过。 | done |
+| UX-PLAY-128 | 回放加载失败/空数据/就绪文案使用中文源串 + en.json 翻译，终端内展示跟随语言；测试断言中文源串。 | done |
