@@ -46,7 +46,7 @@ export function useCloudSyncCenter(): CloudSyncController {
     }
   }, [])
 
-  const execute = useCallback(async (operation: { name: string; success: string; action: () => Promise<unknown>; refresh?: boolean; quiet?: boolean }) => {
+  const execute = useCallback(async (operation: { name: string; success: string; failure: string; action: () => Promise<unknown>; refresh?: boolean; quiet?: boolean }) => {
     setPending(operation.name)
     setError(null)
     try {
@@ -57,7 +57,7 @@ export function useCloudSyncCenter(): CloudSyncController {
       const message = errorMessage(actionError)
       setError(message)
       // Quiet autosave only suppresses success toasts; failures must still surface.
-      toast(t('${}失败: ${}', operation.success.replace(/成功|完成/g, ''), message), 'error')
+      toast(t(operation.failure, message), 'error')
       logger.error(`cloud sync ${operation.name} failed`, actionError)
       throw actionError
     } finally {
@@ -70,15 +70,15 @@ export function useCloudSyncCenter(): CloudSyncController {
 
   return {
     dashboard, loading, pending, error, reload,
-    saveConfig: (input, options) => execute({ name: 'save', success: t('同步配置已保存'), action: () => SyncService.SaveConfig(input), quiet: options?.quiet === true }),
-    testProvider: (input) => execute({ name: 'test', success: t('连接测试成功'), action: () => SyncService.TestProvider(input), refresh: false }),
-    syncNow: () => execute({ name: 'sync', success: t('同步完成'), action: () => SyncService.SyncNow() }),
-    pushNow: () => execute({ name: 'push', success: t('本地版本已推送'), action: () => SyncService.PushNow() }),
-    pullNow: () => execute({ name: 'pull', success: t('云端版本已拉取'), action: () => SyncService.PullNow() }),
-    resolveConflict: (choice) => execute({ name: 'resolve', success: t('同步冲突已处理'), action: () => SyncService.ResolveConflict(choice) }),
-    restoreVersion: (id) => execute({ name: 'restore', success: t('本地版本已恢复'), action: () => SyncService.RestoreVersion(id) }),
-    deleteVersion: (id) => execute({ name: 'delete', success: t('本地版本已删除'), action: () => SyncService.DeleteVersion(id) }),
-    resetLocalData: () => execute({ name: 'reset', success: t('本地业务数据已清空'), action: () => SyncService.ResetLocalData() }),
+    saveConfig: (input, options) => execute({ name: 'save', success: t('同步配置已保存'), failure: '保存同步配置失败: ${}', action: () => SyncService.SaveConfig(input), quiet: options?.quiet === true }),
+    testProvider: (input) => execute({ name: 'test', success: t('连接测试成功'), failure: '同步连接测试失败: ${}', action: () => SyncService.TestProvider(input), refresh: false }),
+    syncNow: () => execute({ name: 'sync', success: t('同步完成'), failure: '同步失败: ${}', action: () => SyncService.SyncNow() }),
+    pushNow: () => execute({ name: 'push', success: t('本地版本已推送'), failure: '推送本地版本失败: ${}', action: () => SyncService.PushNow() }),
+    pullNow: () => execute({ name: 'pull', success: t('云端版本已拉取'), failure: '拉取云端版本失败: ${}', action: () => SyncService.PullNow() }),
+    resolveConflict: (choice) => execute({ name: 'resolve', success: t('同步冲突已处理'), failure: '处理同步冲突失败: ${}', action: () => SyncService.ResolveConflict(choice) }),
+    restoreVersion: (id) => execute({ name: 'restore', success: t('本地版本已恢复'), failure: '恢复本地版本失败: ${}', action: () => SyncService.RestoreVersion(id) }),
+    deleteVersion: (id) => execute({ name: 'delete', success: t('本地版本已删除'), failure: '删除本地版本失败: ${}', action: () => SyncService.DeleteVersion(id) }),
+    resetLocalData: () => execute({ name: 'reset', success: t('本地业务数据已清空'), failure: '清空本地业务数据失败: ${}', action: () => SyncService.ResetLocalData() }),
   }
 }
 
