@@ -236,8 +236,9 @@ export const TerminalSplit = forwardRef<TerminalSplitHandle, Props>(function Ter
       bgClose(terminalID, 'TerminalSplit: old reconnect terminal cleanup failed')
       requestFocus(nextID)
     } catch (error: unknown) {
+      logger.error('TerminalSplit: failed to reconnect pane', error)
+      // ConnectionOverlay owns recovery UX for error status; avoid toast + overlay double reporting.
       useAppStore.getState().setConnectionStatus(terminalID, 'error')
-      toast(t('重新连接失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
     } finally {
       operationRef.current = false
       if (mountedRef.current) setBusy(false)
