@@ -30,6 +30,7 @@ export function CommandHistoryPanel({
   const [scrollTop, setScrollTop] = useState(0)
   const [viewportHeight, setViewportHeight] = useState(360)
   const [loadError, setLoadError] = useState('')
+  const [actionError, setActionError] = useState('')
 
   useEffect(() => {
     // Local/serial history buckets use non-positive IDs and are localStorage-only.
@@ -71,9 +72,10 @@ export function CommandHistoryPanel({
   const copy = async (command: string) => {
     try {
       await getClipboard().writeText(command)
+      setActionError('')
       toast(t('命令已复制'), 'success')
     } catch (error: unknown) {
-      toast(t('复制失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
+      setActionError(t('复制失败: ${}', error instanceof Error ? error.message : String(error)))
     }
   }
   const clear = async () => {
@@ -87,13 +89,14 @@ export function CommandHistoryPanel({
     })
     if (!ok) return
     try {
+      setActionError('')
       await clearCommandHistory(sessionID)
       setEntries([])
       toast(t('命令历史已清空'), 'success')
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error)
       logger.error('command history clear failed', error)
-      toast(t('清空命令历史失败: ${}', message), 'error')
+      setActionError(t('清空命令历史失败: ${}', message))
     }
   }
   const onScroll = (event: UIEvent<HTMLDivElement>) => {
@@ -112,6 +115,11 @@ export function CommandHistoryPanel({
         <Input placeholder={t('搜索历史命令...')} value={query} onChange={(event) => setQuery(event.target.value)} />
         <Button size="xs" variant="ghost" onClick={() => { void clear() }} disabled={entries.length === 0} title={t('清空历史')} aria-label={t('清空历史')}><Trash2 /></Button>
       </div>
+      {actionError ? (
+        <div className="border-b border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive" role="alert">
+          {actionError}
+        </div>
+      ) : null}
       <div className="min-h-0 flex-1 overflow-y-auto p-2" onScroll={onScroll}>
         {loadError ? (
           <p className="p-3 text-xs text-destructive" role="alert">{t('加载命令历史失败: ${}', loadError)}</p>

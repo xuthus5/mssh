@@ -17,7 +17,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { ThemeImportResults } from '@/components/settings/ThemeImportResults'
-import { toast } from '@/components/ui/toast'
 import type { ThemeImportSummary, ThemeProfile, ThemeProfileInput } from '../../../bindings/github.com/xuthus5/mssh/internal/model/models'
 import { t } from '@/i18n'
 
@@ -31,16 +30,28 @@ interface Props {
 }
 
 type DeleteTarget = ThemeProfile | null
+type ActionRunner = (action: () => Promise<unknown> | unknown, onSuccess?: () => void) => Promise<void>
 
 export function ThemeManager({ profiles, onImport, onDeleteProfile, onDeleteDefinition, onCreateProfile, onUpdateProfile }: Props) {
   const [query, setQuery] = useState('')
   const [summary, setSummary] = useState<ThemeImportSummary | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget>(null)
   const [deleting, setDeleting] = useState(false)
+  const [actionError, setActionError] = useState('')
   const filtered = useMemo(
     () => profiles.filter((profile) => profile.name.toLowerCase().includes(query.toLowerCase())),
     [profiles, query],
   )
+
+  const runAction: ActionRunner = async (action, onSuccess) => {
+    try {
+      setActionError('')
+      await action()
+      onSuccess?.()
+    } catch (error) {
+      setActionError(t('主题操作失败: ${}', error instanceof Error ? error.message : String(error)))
+    }
+  }
 
   const importFiles = async () => {
     let paths: string[] = []
@@ -54,14 +65,15 @@ export function ThemeManager({ profiles, onImport, onDeleteProfile, onDeleteDefi
       })
       paths = typeof selected === 'string' ? [selected] : selected ?? []
     } catch (error) {
-      toast(t('选择主题文件失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
+      setActionError(t('选择主题文件失败: ${}', error instanceof Error ? error.message : String(error)))
       return
     }
     if (paths.length === 0) return
     try {
+      setActionError('')
       setSummary(await onImport(paths))
     } catch (error) {
-      toast(t('导入主题失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
+      setActionError(t('导入主题失败: ${}', error instanceof Error ? error.message : String(error)))
     }
   }
 
@@ -69,11 +81,12 @@ export function ThemeManager({ profiles, onImport, onDeleteProfile, onDeleteDefi
     if (!deleteTarget || deleting) return
     setDeleting(true)
     try {
+      setActionError('')
       await onDeleteProfile(deleteTarget.id)
       await maybeDeleteOrphanDefinition(deleteTarget, onDeleteDefinition)
       setDeleteTarget(null)
     } catch (error) {
-      toast(t('主题操作失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
+      setActionError(t('主题操作失败: ${}', error instanceof Error ? error.message : String(error)))
     } finally {
       setDeleting(false)
     }
@@ -91,6 +104,11 @@ export function ThemeManager({ profiles, onImport, onDeleteProfile, onDeleteDefi
         </CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
+        {actionError ? (
+          <div className="rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive" role="alert">
+            {actionError}
+          </div>
+        ) : null}
         <Input
           aria-label={t('搜索终端主题')}
           placeholder={t('搜索名称或来源')}
@@ -116,6 +134,7 @@ export function ThemeManager({ profiles, onImport, onDeleteProfile, onDeleteDefi
                 onCreateProfile={onCreateProfile}
                 onUpdateProfile={onUpdateProfile}
                 onRequestDelete={setDeleteTarget}
+                runAction={runAction}
               />
             ))}
           </TableBody>
@@ -138,11 +157,13 @@ function ThemeRow({
   onCreateProfile,
   onUpdateProfile,
   onRequestDelete,
+  runAction,
 }: {
   profile: ThemeProfile
   onCreateProfile: Props['onCreateProfile']
   onUpdateProfile: Props['onUpdateProfile']
   onRequestDelete: (profile: ThemeProfile) => void
+  runAction: ActionRunner
 }) {
   const [editing, setEditing] = useState(false)
   const [name, setName] = useState(profile.name)
@@ -272,14 +293,5 @@ async function maybeDeleteOrphanDefinition(
     await onDeleteDefinition(profile.definition.id)
   } catch {
     // 仍被其他 Profile 引用时后端会拒绝，保留定义即可。
-  }
-}
-
-async function runAction(action: () => Promise<unknown> | unknown, onSuccess?: () => void) {
-  try {
-    await action()
-    onSuccess?.()
-  } catch (error) {
-    toast(t('主题操作失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
   }
 }
