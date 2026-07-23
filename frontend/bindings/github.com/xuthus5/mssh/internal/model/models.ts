@@ -2577,6 +2577,7 @@ export class SessionDeleteImpact {
     "tunnels": number;
     "history": number;
     "recordings": number;
+    "transfers": number;
 
     /** Creates a new SessionDeleteImpact instance. */
     constructor($$source: Partial<SessionDeleteImpact> = {}) {
@@ -2588,6 +2589,9 @@ export class SessionDeleteImpact {
         }
         if (!("recordings" in $$source)) {
             this["recordings"] = 0;
+        }
+        if (!("transfers" in $$source)) {
+            this["transfers"] = 0;
         }
 
         Object.assign(this, $$source);
