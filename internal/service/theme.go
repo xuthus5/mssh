@@ -250,6 +250,9 @@ func validateThemeAssignments(db themeDatabase, assignments model.ThemeAssignmen
 		checks = append(checks, assignmentCheck{label: "fixed", id: assignments.FixedProfileID})
 	}
 	for _, check := range checks {
+		if check.id <= 0 {
+			return fmt.Errorf("%s theme profile id is required", check.label)
+		}
 		if _, err := store.GetThemeProfile(db, check.id); err != nil {
 			return fmt.Errorf("%s theme profile: %w", check.label, err)
 		}
