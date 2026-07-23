@@ -346,3 +346,11 @@
 |---|---|---|
 | SEC-HOSTKEY-004 | 并发首次连接写入 known_hosts 时必须串行化 create/append，避免交叉写损坏。 | done |
 | SEC-HOSTKEY-005 | append 成功后必须 Sync 落盘，降低异常退出丢指纹风险。 | done |
+
+## 2026-07-23 商用硬化波次（known_hosts 删除与写入共享锁）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| SEC-HOSTKEY-006 | 删除主机指纹（read-modify-write）必须与 TOFU append 共用进程级锁，避免并发连接接受指纹时覆盖删除结果。 | done |
+| SEC-HOSTKEY-007 | 删除路径必须先写临时文件（0600）、Sync 后再 Rename 替换。 | done |
+| SEC-HOSTKEY-008 | 对外暴露 `WithKnownHostsLock` 供 service 层安全改写 known_hosts。 | done |

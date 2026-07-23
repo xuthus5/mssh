@@ -303,3 +303,29 @@ func TestAppendKnownHostConcurrent(t *testing.T) {
 	assert.Contains(t, string(content), "a.example.com")
 	assert.Contains(t, string(content), "b.example.com")
 }
+
+func TestWithKnownHostsLockSerializes(t *testing.T) {
+	var order []int
+	var waitGroup sync.WaitGroup
+	waitGroup.Add(2)
+	go func() {
+		defer waitGroup.Done()
+		require.NoError(t, WithKnownHostsLock(func() error {
+			order = append(order, 1)
+			time.Sleep(20 * time.Millisecond)
+			order = append(order, 2)
+			return nil
+		}))
+	}()
+	go func() {
+		defer waitGroup.Done()
+		time.Sleep(5 * time.Millisecond)
+		require.NoError(t, WithKnownHostsLock(func() error {
+			order = append(order, 3)
+			return nil
+		}))
+	}()
+	waitGroup.Wait()
+	// Second critical section must not interleave between 1 and 2.
+	assert.Equal(t, []int{1, 2, 3}, order)
+}

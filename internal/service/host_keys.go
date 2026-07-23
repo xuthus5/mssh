@@ -12,6 +12,7 @@ import (
 	gossh "golang.org/x/crypto/ssh"
 
 	"github.com/xuthus5/mssh/internal/model"
+	msshssh "github.com/xuthus5/mssh/internal/ssh"
 )
 
 func (s *SessionService) ListHostKeys() ([]model.HostKeyEntry, error) {
@@ -65,6 +66,12 @@ func (s *SessionService) DeleteHostKey(line int) error {
 		return errors.New("known_hosts line must be positive")
 	}
 	path := filepath.Join(s.dataDir, "known_hosts")
+	return msshssh.WithKnownHostsLock(func() error {
+		return s.deleteHostKeyLocked(path, line)
+	})
+}
+
+func (s *SessionService) deleteHostKeyLocked(path string, line int) error {
 	content, err := os.ReadFile(path)
 	if err != nil {
 		return fmt.Errorf("read known_hosts: %w", err)
@@ -87,6 +94,10 @@ func (s *SessionService) DeleteHostKey(line int) error {
 	if _, err := temporary.WriteString(strings.Join(lines, "\n")); err != nil {
 		_ = temporary.Close()
 		return fmt.Errorf("write known_hosts: %w", err)
+	}
+	if err := temporary.Sync(); err != nil {
+		_ = temporary.Close()
+		return fmt.Errorf("sync known_hosts temp file: %w", err)
 	}
 	if err := temporary.Close(); err != nil {
 		return fmt.Errorf("close known_hosts temp file: %w", err)
