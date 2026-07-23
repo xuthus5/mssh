@@ -68,3 +68,23 @@ func TestGetUpdateRestoreRejectInvalidIDs(t *testing.T) {
 		RemotePort: 22,
 	}))
 }
+
+func TestConnectLogListRejectInvalidSessionIDs(t *testing.T) {
+	db, err := store.OpenDB(t.TempDir())
+	require.NoError(t, err)
+	require.NoError(t, store.InitializeSchema(db))
+	t.Cleanup(func() { _ = db.Close() })
+	logger := testutil.NewTestLogger()
+
+	sessionSvc := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, logger)
+	_, err = sessionSvc.sessionForConnect(0)
+	require.Error(t, err)
+
+	logSvc := NewLogService(db, t.TempDir(), logger)
+	neg := int64(-1)
+	_, err = logSvc.List(&neg)
+	require.Error(t, err)
+	zero := int64(0)
+	_, err = logSvc.List(&zero)
+	require.NoError(t, err)
+}
