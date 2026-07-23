@@ -74,4 +74,21 @@ describe('useSerial', () => {
     })
     expect(useToastStore.getState().toasts.some((item) => item.message.includes('ports list failed'))).toBe(false)
   })
+
+  it('does not set error banner when silent mutation refresh fails', async () => {
+    __registerHandler(service + 'SerialService.Create', async (input: any) => ({ ...input, id: 12 }))
+    __registerHandler(service + 'SerialService.List', async () => [])
+    const { result } = renderHook(() => useSerial())
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    expect(result.current.error).toBe('')
+    __registerHandler(service + 'SerialService.List', async () => { throw new Error('ports list failed') })
+    await act(async () => {
+      await result.current.createPort({
+        id: 0, name: 'COM3', device: '/dev/ttyUSB2', baud_rate: 115200, data_bits: 8, parity: 'none', stop_bits: 1,
+        flow_control: 'none', line_ending: 'lf', local_echo: false, dtr_on_open: true, rts_on_open: true, notes: '', sort_order: 0,
+      } as any)
+    })
+    expect(result.current.error).toBe('')
+    expect(useToastStore.getState().toasts.some((item) => item.message.includes('ports list failed'))).toBe(false)
+  })
 })

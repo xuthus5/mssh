@@ -1029,3 +1029,10 @@
 | UX-TUNNEL-053 | 删除/批量删除会话前必须停止该会话仍在运行的隧道（关闭监听并释放底层连接），再删除隧道 DB 行。 | done |
 | UX-TUNNEL-054 | 停止后应发出 tunnel stopped 事件，前端隧道状态可收敛为 stopped，不得留下悬空运行态。 | done |
 
+## 2026-07-24 商用硬化波次（串口/SFTP 后刷新 residual）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| UX-SERIAL-055 | 串口 mutation/连接成功后，silent refresh 失败不得写入页面 error banner 或 toast「加载串口配置失败」。 | done |
+| UX-SFTP-056 | 删除/重命名/新建目录成功后的目录重载失败不得 toast「加载文件列表失败」。 | done |
+
