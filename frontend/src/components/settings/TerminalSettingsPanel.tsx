@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { Button } from '@/components/ui/button'
 import { AutoSaveStatusIndicator } from '@/components/settings/AutoSaveStatus'
 import { TerminalBehaviorSettingsSection } from '@/components/settings/TerminalBehaviorSettings'
 import { TerminalRendererSettingsSection } from '@/components/settings/TerminalRendererSettings'
@@ -52,6 +53,10 @@ interface Props {
   onDeleteThemeDefinition: (id: number) => Promise<void>
   onResetBuiltinThemes: () => Promise<BuiltinThemeResetResult>
   settingsReady?: boolean
+  loadError?: string
+  onReloadSettings?: () => void
+  themeLoadError?: string
+  onReloadThemes?: () => void
 }
 
 function createDraft(general: GeneralSettings): TerminalDraft {
@@ -108,6 +113,10 @@ export function TerminalSettingsPanel({
   onDeleteThemeDefinition,
   onResetBuiltinThemes,
   settingsReady = true,
+  loadError = '',
+  onReloadSettings,
+  themeLoadError = '',
+  onReloadThemes,
 }: Props) {
   const [draft, setDraft] = useState(() => createDraft(general))
   useEffect(() => {
@@ -124,6 +133,22 @@ export function TerminalSettingsPanel({
 
   return (
     <div className="flex flex-col gap-5 pt-2">
+      {loadError ? (
+        <div className="rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">
+          {t('加载设置失败: ${}', loadError)}
+          {onReloadSettings ? (
+            <Button type="button" size="xs" variant="outline" className="ml-2" onClick={() => { onReloadSettings() }}>{t('重试')}</Button>
+          ) : null}
+        </div>
+      ) : null}
+      {themeLoadError ? (
+        <div className="rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">
+          {t('加载主题失败: ${}', themeLoadError)}
+          {onReloadThemes ? (
+            <Button type="button" size="xs" variant="outline" className="ml-2" onClick={() => { void onReloadThemes() }}>{t('重试')}</Button>
+          ) : null}
+        </div>
+      ) : null}
       <div className="flex flex-col gap-3">
         <div className="flex items-center justify-between gap-3">
           <p className="text-xs text-muted-foreground">{t('终端连接与交互偏好会自动保存。')}</p>

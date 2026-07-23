@@ -99,7 +99,7 @@ describe('quiet SFTP autosave error feedback', () => {
     const messages = useToastStore.getState().toasts.map((item) => `${item.type}:${item.message}`)
     expect(messages.some((item) => item.startsWith('error:') && item.includes('保存 SFTP 设置失败'))).toBe(true)
   })
-  it('keeps settingsReady false when SFTP settings load fails', async () => {
+  it('keeps settingsReady false when SFTP settings load fails without toast', async () => {
     const toast = await import('@/components/ui/toast')
     const toastSpy = vi.spyOn(toast, 'toast')
     __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.GetMany', async () => {
@@ -108,7 +108,28 @@ describe('quiet SFTP autosave error feedback', () => {
     const { result } = renderHook(() => useSFTPSettings())
     await act(async () => {})
     expect(result.current.settingsReady).toBe(false)
-    expect(toastSpy).toHaveBeenCalledWith(expect.stringContaining('加载 SFTP 设置失败'), 'error')
+    expect(result.current.loadError).toBe('sftp load failed')
+    expect(toastSpy).not.toHaveBeenCalled()
+  })
+
+  it('clears SFTP loadError after a successful reload', async () => {
+    let fail = true
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.GetMany', async () => {
+      if (fail) throw new Error('sftp load failed')
+      return {
+        'sftp.show_hidden_files': setting('sftp.show_hidden_files', true),
+        'sftp.follow_terminal_directory': setting('sftp.follow_terminal_directory', false),
+        'sftp.default_view': setting('sftp.default_view', 'tree'),
+      }
+    })
+    const { result } = renderHook(() => useSFTPSettings())
+    await act(async () => {})
+    expect(result.current.loadError).toBe('sftp load failed')
+    fail = false
+    await act(async () => { await result.current.reload() })
+    expect(result.current.settingsReady).toBe(true)
+    expect(result.current.loadError).toBe('')
+    expect(result.current.settings).toEqual({ showHiddenFiles: true, followTerminalDirectory: false, defaultView: 'tree' })
   })
 
 })

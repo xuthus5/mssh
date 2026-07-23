@@ -13,9 +13,11 @@ interface Props {
   settings: SFTPSettings
   onSave: (settings: SFTPSettings) => Promise<void>
   settingsReady?: boolean
+  loadError?: string
+  onReload?: () => void
 }
 
-export function SFTPSettingsPanel({ settings, onSave, settingsReady = true }: Props) {
+export function SFTPSettingsPanel({ settings, onSave, settingsReady = true, loadError = '', onReload }: Props) {
   const [draft, setDraft] = useState(settings)
   useEffect(() => setDraft(settings), [settings])
   const update = (updates: Partial<SFTPSettings>) => setDraft((current) => ({ ...current, ...updates }))
@@ -26,6 +28,14 @@ export function SFTPSettingsPanel({ settings, onSave, settingsReady = true }: Pr
 
   return (
     <div className="flex flex-col gap-4 pt-2">
+      {loadError ? (
+        <div className="rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">
+          {t('加载 SFTP 设置失败: ${}', loadError)}
+          {onReload ? (
+            <Button type="button" size="xs" variant="outline" className="ml-2" onClick={() => { onReload() }}>{t('重试')}</Button>
+          ) : null}
+        </div>
+      ) : null}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">{t('SFTP 文件管理')}</h2>

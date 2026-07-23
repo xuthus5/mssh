@@ -238,6 +238,19 @@ describe('useThemeCatalog', () => {
     expect(messages.some((message) => message.includes('加载主题失败'))).toBe(false)
     expect(messages.some((message) => message.includes('reload boom'))).toBe(false)
   })
+
+
+  it('load failure sets error without toast', async () => {
+    useToastStore.setState({ toasts: [] })
+    __registerHandler('github.com/xuthus5/mssh/internal/service.ThemeService.InitializeDefaults', async () => {
+      throw new Error('theme catalog down')
+    })
+    const { result } = renderHook(() => useThemeCatalog())
+    await waitFor(() => expect(result.current.error).toBe('theme catalog down'))
+    expect(result.current.loaded).toBe(false)
+    expect(useToastStore.getState().toasts).toHaveLength(0)
+  })
+
 })
 
 function registerCatalogHandlers(
@@ -257,4 +270,3 @@ function registerCatalogHandlers(
 function profile(id: number, mode: 'dark' | 'light', background: string) {
   return { id, name: mode, theme_id: id, follow_global_style: true, font_family: 'monospace', font_size: 14, cursor_style: 'bar', color_overrides: '{}', created_at: '', updated_at: '', definition: { id, name: mode, mode, source_type: 'builtin', source_name: '', source_url: '', source_author: '', source_license: '', source_version: '', source_fingerprint: mode, color_payload: JSON.stringify({ background, foreground: mode === 'dark' ? '#ffffff' : '#000000', cursor: '#888888', selection: '#264f78', ansi: Array(16).fill('#111111') }), raw_payload: '', is_builtin: true, created_at: '', updated_at: '' } }
 }
-

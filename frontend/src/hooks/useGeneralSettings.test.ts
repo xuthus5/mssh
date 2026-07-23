@@ -285,7 +285,7 @@ describe('quiet autosave error feedback', () => {
     const messages = useToastStore.getState().toasts.map((item) => `${item.type}:${item.message}`)
     expect(messages.some((item) => item.startsWith('error:') && item.includes('保存设置失败'))).toBe(true)
   })
-  it('keeps settingsReady false when load fails and surfaces an error toast', async () => {
+  it('keeps settingsReady false when load fails and exposes loadError without toast', async () => {
     const toast = await import('@/components/ui/toast')
     const toastSpy = vi.spyOn(toast, 'toast')
     __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.GetMany', async () => {
@@ -294,7 +294,24 @@ describe('quiet autosave error feedback', () => {
     const { result } = renderHook(() => useGeneralSettings())
     await act(async () => {})
     expect(result.current.settingsReady).toBe(false)
-    expect(toastSpy).toHaveBeenCalledWith(expect.stringContaining('加载设置失败'), 'error')
+    expect(result.current.loadError).toBe('settings unavailable')
+    expect(toastSpy).not.toHaveBeenCalled()
+  })
+
+  it('clears loadError after a successful reload', async () => {
+    let fail = true
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.GetMany', async () => {
+      if (fail) throw new Error('settings unavailable')
+      return { 'terminal.max_pool_size': setting('terminal.max_pool_size', 12) }
+    })
+    const { result } = renderHook(() => useGeneralSettings())
+    await act(async () => {})
+    expect(result.current.loadError).toBe('settings unavailable')
+    fail = false
+    await act(async () => { await result.current.reloadGeneral() })
+    expect(result.current.settingsReady).toBe(true)
+    expect(result.current.loadError).toBe('')
+    expect(result.current.general.maxPoolSize).toBe(12)
   })
 
 })

@@ -22,15 +22,20 @@ function settingsViewProps(
   saveThemeQuiet: (configuration: ThemeConfigurationInput) => Promise<void>,
 ): SettingsViewProps {
   return {
-    general: settings.general, settingsReady: settings.settingsReady, systemFonts: settings.systemFonts, cloudSync,
+    general: settings.general, settingsReady: settings.settingsReady, loadError: settings.loadError,
+    onReloadSettings: settings.reloadGeneral, systemFonts: settings.systemFonts, cloudSync,
     themeProfiles: catalog.profiles, themeAssignments: catalog.assignments, terminalGlobalStyle: catalog.globalStyle,
-    colorMode: catalog.colorMode, onSaveGeneral: saveGeneralQuiet, onPreviewUIFont: settings.previewUIFont,
+    colorMode: catalog.colorMode, themeLoadError: catalog.error ?? undefined,
+    onReloadThemes: () => { void catalog.reload({ force: true }) },
+    onSaveGeneral: saveGeneralQuiet, onPreviewUIFont: settings.previewUIFont,
     onSaveThemeConfiguration: saveThemeQuiet,
     onImportThemes: catalog.importThemes, onCreateThemeProfile: catalog.createProfile, onUpdateThemeProfile: catalog.saveProfile,
     onDeleteThemeProfile: catalog.deleteProfile, onDeleteThemeDefinition: catalog.deleteDefinition,
     onResetBuiltinThemes: catalog.resetBuiltinStyles,
     onExportConfig: settings.exportConfig, onImportConfig: settings.importConfig,
-    sftpSettings: settings.sftpSettings, sftpSettingsReady: settings.sftpSettingsReady, onSaveSFTPSettings: saveSFTPQuiet,
+    sftpSettings: settings.sftpSettings, sftpSettingsReady: settings.sftpSettingsReady,
+    sftpLoadError: settings.sftpLoadError, onReloadSFTPSettings: settings.reloadSFTPSettings,
+    onSaveSFTPSettings: saveSFTPQuiet,
     ai,
   }
 }
