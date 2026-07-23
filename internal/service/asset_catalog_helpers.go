@@ -15,7 +15,19 @@ func normalizeAssetName(value string, limit int) (string, string, error) {
 	if name == "" || utf8.RuneCountInString(name) > limit {
 		return "", "", fmt.Errorf("asset name must contain 1-%d characters", limit)
 	}
+	if strings.ContainsRune(name, 0) {
+		return "", "", fmt.Errorf("asset name contains NUL")
+	}
 	return name, strings.ToLower(name), nil
+}
+
+const maxAssetSortOrder = 1_000_000
+
+func normalizeAssetSortOrder(value int) (int, error) {
+	if value < 0 || value > maxAssetSortOrder {
+		return 0, fmt.Errorf("sort order must be between 0 and %d", maxAssetSortOrder)
+	}
+	return value, nil
 }
 
 func normalizeProject(input model.AssetProjectInput) (string, string, string, any, string, error) {
@@ -24,10 +36,16 @@ func normalizeProject(input model.AssetProjectInput) (string, string, string, an
 		return "", "", "", nil, "", err
 	}
 	code := strings.TrimSpace(input.Code)
+	if strings.ContainsRune(code, 0) {
+		return "", "", "", nil, "", fmt.Errorf("project code contains NUL")
+	}
 	if utf8.RuneCountInString(code) > 24 {
 		return "", "", "", nil, "", fmt.Errorf("project code must not exceed 24 characters")
 	}
 	description := strings.TrimSpace(input.Description)
+	if strings.ContainsRune(description, 0) {
+		return "", "", "", nil, "", fmt.Errorf("project description contains NUL")
+	}
 	if utf8.RuneCountInString(description) > 500 {
 		return "", "", "", nil, "", fmt.Errorf("project description must not exceed 500 characters")
 	}

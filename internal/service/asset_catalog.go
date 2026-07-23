@@ -77,12 +77,16 @@ func (s *AssetCatalogService) CreateEnvironment(input model.AssetEnvironmentInpu
 	if err := validateAssetColor(input.ColorToken); err != nil {
 		return nil, err
 	}
+	sortOrder, err := normalizeAssetSortOrder(input.SortOrder)
+	if err != nil {
+		return nil, err
+	}
 	tx, err := s.db.Begin()
 	if err != nil {
 		return nil, fmt.Errorf("create environment: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
-	result, err := tx.Exec(`INSERT INTO asset_environments (name, name_key, color_token, sort_order) VALUES (?, ?, ?, ?)`, name, key, input.ColorToken, input.SortOrder)
+	result, err := tx.Exec(`INSERT INTO asset_environments (name, name_key, color_token, sort_order) VALUES (?, ?, ?, ?)`, name, key, input.ColorToken, sortOrder)
 	if err != nil {
 		return nil, fmt.Errorf("create environment: %w", err)
 	}
@@ -107,8 +111,12 @@ func (s *AssetCatalogService) UpdateEnvironment(input model.AssetEnvironmentInpu
 	if err := validateAssetColor(input.ColorToken); err != nil {
 		return err
 	}
+	sortOrder, err := normalizeAssetSortOrder(input.SortOrder)
+	if err != nil {
+		return err
+	}
 	return s.updateCatalogItem("environment", input.ID, "更新环境 "+name, func(tx *sql.Tx) (sql.Result, error) {
-		return tx.Exec(`UPDATE asset_environments SET name=?, name_key=?, color_token=?, sort_order=?, updated_at=datetime('now') WHERE id=?`, name, key, input.ColorToken, input.SortOrder, input.ID)
+		return tx.Exec(`UPDATE asset_environments SET name=?, name_key=?, color_token=?, sort_order=?, updated_at=datetime('now') WHERE id=?`, name, key, input.ColorToken, sortOrder, input.ID)
 	})
 }
 
@@ -117,12 +125,16 @@ func (s *AssetCatalogService) CreateProject(input model.AssetProjectInput) (*mod
 	if err != nil {
 		return nil, err
 	}
+	sortOrder, err := normalizeAssetSortOrder(input.SortOrder)
+	if err != nil {
+		return nil, err
+	}
 	tx, err := s.db.Begin()
 	if err != nil {
 		return nil, fmt.Errorf("create project: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
-	result, err := tx.Exec(`INSERT INTO asset_projects (name, name_key, code, code_key, description, sort_order) VALUES (?, ?, ?, ?, ?, ?)`, name, key, code, codeKey, description, input.SortOrder)
+	result, err := tx.Exec(`INSERT INTO asset_projects (name, name_key, code, code_key, description, sort_order) VALUES (?, ?, ?, ?, ?, ?)`, name, key, code, codeKey, description, sortOrder)
 	if err != nil {
 		return nil, fmt.Errorf("create project: %w", err)
 	}
@@ -144,8 +156,12 @@ func (s *AssetCatalogService) UpdateProject(input model.AssetProjectInput) error
 	if err != nil {
 		return err
 	}
+	sortOrder, err := normalizeAssetSortOrder(input.SortOrder)
+	if err != nil {
+		return err
+	}
 	return s.updateCatalogItem("project", input.ID, "更新项目 "+name, func(tx *sql.Tx) (sql.Result, error) {
-		return tx.Exec(`UPDATE asset_projects SET name=?, name_key=?, code=?, code_key=?, description=?, sort_order=?, updated_at=datetime('now') WHERE id=?`, name, key, code, codeKey, description, input.SortOrder, input.ID)
+		return tx.Exec(`UPDATE asset_projects SET name=?, name_key=?, code=?, code_key=?, description=?, sort_order=?, updated_at=datetime('now') WHERE id=?`, name, key, code, codeKey, description, sortOrder, input.ID)
 	})
 }
 

@@ -5,6 +5,8 @@ import type { Folder, Session } from '@/hooks/useSession'
 import { useSessionWorkspace } from '@/hooks/SessionWorkspaceContext'
 import { MacroService } from '@/lib/wails'
 import { logger } from '@/lib/logger'
+import { toast } from '@/components/ui/toast'
+import { t } from '@/i18n'
 import { recordCommand } from '@/lib/commandHistory'
 import { useAppStore } from '@/store/appStore'
 import type { Macro, MacroInput } from '../../bindings/github.com/xuthus5/mssh/internal/model/models'
@@ -98,8 +100,17 @@ function macroItem(macro: Macro): CommandItem {
   return { id: String(macro.id), name: macro.name, shortcut: macro.shortcut, command: macro.command }
 }
 
+function macroErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
+}
+
 async function loadMacros(setMacros: (update: CommandItem[]) => void) {
-  try { setMacros((await MacroService.List() ?? []).map(macroItem)) } catch (error: unknown) { logger.error('Sidebar: list macros error', error) }
+  try {
+    setMacros((await MacroService.List() ?? []).map(macroItem))
+  } catch (error: unknown) {
+    logger.error('Sidebar: list macros error', error)
+    toast(t('加载宏失败: ${}', macroErrorMessage(error)), 'error')
+  }
 }
 
 async function addMacro(item: Omit<CommandItem, 'id'>, update: (callback: (items: CommandItem[]) => CommandItem[]) => void) {
@@ -107,11 +118,20 @@ async function addMacro(item: Omit<CommandItem, 'id'>, update: (callback: (items
     const input = { name: item.name, command: item.command, shortcut: item.shortcut, id: 0, delay_ms: 0, sort_order: 0 } satisfies MacroInput
     const result = await MacroService.Create(input)
     update((items) => [...items, { id: String(result?.id ?? ''), name: result?.name ?? item.name, shortcut: result?.shortcut ?? item.shortcut, command: result?.command ?? item.command }])
-  } catch (error: unknown) { logger.error('Sidebar: create macro error', error) }
+  } catch (error: unknown) {
+    logger.error('Sidebar: create macro error', error)
+    toast(t('创建宏失败: ${}', macroErrorMessage(error)), 'error')
+  }
 }
 
 async function deleteMacro(id: string, update: (callback: (items: CommandItem[]) => CommandItem[]) => void) {
-  try { await MacroService.Delete(Number(id)); update((items) => items.filter((item) => item.id !== id)) } catch (error: unknown) { logger.error('Sidebar: delete macro error', error) }
+  try {
+    await MacroService.Delete(Number(id))
+    update((items) => items.filter((item) => item.id !== id))
+  } catch (error: unknown) {
+    logger.error('Sidebar: delete macro error', error)
+    toast(t('删除宏失败: ${}', macroErrorMessage(error)), 'error')
+  }
 }
 
 export function useSidebarMacros() {
@@ -123,7 +143,10 @@ export function useSidebarMacros() {
     const activeTab = state.tabs.find((tab) => tab.id === state.activeSurface?.id)
     if (!activeTab || activeTab.type !== 'terminal') return
     const terminalID = state.activePaneId ?? activeTab.terminalId
-    MacroService.Execute(terminalID, command).then(() => recordCommand(activeTab.sessionId, command)).catch((error: unknown) => logger.error('Sidebar: execute macro error', error))
+    MacroService.Execute(terminalID, command).then(() => recordCommand(activeTab.sessionId, command)).catch((error: unknown) => {
+      logger.error('Sidebar: execute macro error', error)
+      toast(t('执行宏失败: ${}', macroErrorMessage(error)), 'error')
+    })
   }, [])
   const add = useCallback((item: Omit<CommandItem, 'id'>) => addMacro(item, setMacros), [])
   const remove = useCallback((id: string) => deleteMacro(id, setMacros), [])

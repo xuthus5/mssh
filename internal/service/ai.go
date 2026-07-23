@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/xuthus5/mssh/internal/crypto"
 	"github.com/xuthus5/mssh/internal/model"
@@ -64,6 +65,9 @@ func (s *AIService) SaveProvider(input model.AIProviderProfileInput) (*model.AIP
 	input.DefaultModel = strings.TrimSpace(input.DefaultModel)
 	if input.Name == "" || input.DefaultModel == "" {
 		return nil, errors.New("provider name and default model are required")
+	}
+	if err := validateAIProviderFields(input); err != nil {
+		return nil, err
 	}
 	if err := validateProviderURL(model.AIProviderProfile{Provider: input.Provider, BaseURL: input.BaseURL}); err != nil {
 		return nil, err
@@ -135,3 +139,34 @@ func validateAIRegexSettings(settings model.AISecuritySettings) error {
 func providerSecretAccount(id int64) string { return fmt.Sprintf("provider:%d", id) }
 
 func searchSecretAccount(provider model.AISearchProvider) string { return "search:" + string(provider) }
+
+const (
+	maxAIProviderNameRunes   = 128
+	maxAIProviderModelRunes  = 256
+	maxAIProviderURLBytes    = 2048
+	maxAIProviderAPIKeyBytes = 8 * 1024
+)
+
+func validateAIProviderFields(input model.AIProviderProfileInput) error {
+	if strings.ContainsRune(input.Name, 0) || strings.ContainsRune(input.DefaultModel, 0) || strings.ContainsRune(input.BaseURL, 0) {
+		return errors.New("AI provider fields must not contain NUL")
+	}
+	if utf8.RuneCountInString(input.Name) > maxAIProviderNameRunes {
+		return fmt.Errorf("provider name must not exceed %d characters", maxAIProviderNameRunes)
+	}
+	if utf8.RuneCountInString(input.DefaultModel) > maxAIProviderModelRunes {
+		return fmt.Errorf("default model must not exceed %d characters", maxAIProviderModelRunes)
+	}
+	if len(input.BaseURL) > maxAIProviderURLBytes {
+		return fmt.Errorf("provider URL must not exceed %d bytes", maxAIProviderURLBytes)
+	}
+	if len(input.APIKey) > maxAIProviderAPIKeyBytes {
+		return fmt.Errorf("API key exceeds size limit")
+	}
+	switch input.Provider {
+	case model.AIProviderOpenAICompatible, model.AIProviderAnthropic, model.AIProviderGemini, model.AIProviderOllama:
+	default:
+		return fmt.Errorf("unsupported AI provider %s", input.Provider)
+	}
+	return nil
+}

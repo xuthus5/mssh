@@ -144,3 +144,16 @@ func TestMacroService_CreateValidatesPayload(t *testing.T) {
 	_, err = svc.Create(model.MacroInputFrom(model.Macro{Name: "x", Command: "echo", DelayMs: 70_000}))
 	require.Error(t, err)
 }
+
+func TestValidateMacroPayloadBounds(t *testing.T) {
+	require.Error(t, validateMacroPayload(model.Macro{Name: " ", Command: "echo"}))
+	require.Error(t, validateMacroPayload(model.Macro{Name: "ok", Command: " "}))
+	require.Error(t, validateMacroPayload(model.Macro{Name: string([]byte{'a', 0}), Command: "echo"}))
+	require.Error(t, validateMacroPayload(model.Macro{Name: "ok", Command: string([]byte{'e', 0})}))
+	require.Error(t, validateMacroPayload(model.Macro{Name: strings.Repeat("n", maxMacroNameRunes+1), Command: "echo"}))
+	require.Error(t, validateMacroPayload(model.Macro{Name: "ok", Command: "echo", Shortcut: strings.Repeat("s", maxMacroShortcutRunes+1)}))
+	require.Error(t, validateMacroPayload(model.Macro{Name: "ok", Command: "echo", SortOrder: -1}))
+	require.Error(t, validateMacroPayload(model.Macro{Name: "ok", Command: "echo", SortOrder: maxMacroSortOrder + 1}))
+	require.Error(t, validateMacroPayload(model.Macro{Name: "ok", Command: strings.Repeat("x", maxMacroCommandBytes+1)}))
+	require.NoError(t, validateMacroPayload(model.Macro{Name: "ok", Command: "echo", Shortcut: "Ctrl+1", DelayMs: 10, SortOrder: 1}))
+}
