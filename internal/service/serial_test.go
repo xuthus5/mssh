@@ -132,3 +132,16 @@ func TestSerialServiceDeviceReservationCanonical(t *testing.T) {
 		assert.Equal(t, "term-1", owner)
 	}
 }
+
+func TestSerialServiceRejectsUnsafeDevice(t *testing.T) {
+	db, err := store.OpenDB(t.TempDir())
+	require.NoError(t, err)
+	require.NoError(t, store.InitializeSchema(db))
+	t.Cleanup(func() { _ = db.Close() })
+	svc := NewSerialService(db, slog.Default())
+	_, err = svc.Create(model.SerialPortInput{Name: "bad", Device: "/etc/passwd"})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "allowed device prefix")
+	_, err = svc.Create(model.SerialPortInput{Name: "nul", Device: "x" + string(rune(0)) + "y"})
+	require.Error(t, err)
+}
