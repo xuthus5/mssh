@@ -562,3 +562,13 @@
 | SEC-MACRO-011 | Macro Delete 必须拒绝 id<=0。 | done |
 | SEC-HIST-012 | CommandHistory Add/List/Clear 的 sessionID 与 Delete id 必须 >0。 | done |
 | SEC-TUNNEL-010 | Tunnel Delete/Start/Stop 必须拒绝 id<=0。 | done |
+
+## 2026-07-23 商用硬化波次（资产/AI/主题/日志/同步版本删除 ID 校验）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| SEC-ASSET-011 | DeleteTag/Environment/Project 必须拒绝 id<=0。 | done |
+| SEC-AI-010 | DeleteProvider/DeleteConversation 必须拒绝 id<=0。 | done |
+| SEC-THEME-010 | DeleteProfile/DeleteDefinition 必须拒绝 id<=0。 | done |
+| SEC-LOG-010 | LogService.Delete 必须拒绝 id<=0。 | done |
+| SEC-SYNC-010 | Sync DeleteVersion 必须拒绝 id<=0。 | done |

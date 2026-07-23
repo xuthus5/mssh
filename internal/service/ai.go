@@ -87,6 +87,9 @@ func (s *AIService) SaveProvider(input model.AIProviderProfileInput) (*model.AIP
 }
 
 func (s *AIService) DeleteProvider(id int64) error {
+	if id <= 0 {
+		return fmt.Errorf("invalid provider id")
+	}
 	if err := store.DeleteAIProviderProfile(s.db, id); err != nil {
 		return err
 	}
