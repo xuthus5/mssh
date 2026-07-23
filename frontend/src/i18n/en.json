@@ -1343,5 +1343,10 @@
   "删除文件失败: ${}": "Failed to delete file: ${}",
   "重命名失败: ${}": "Failed to rename: ${}",
   "创建目录失败: ${}": "Failed to create directory: ${}",
-  "加载 AI 设置失败: ${}": "Failed to load AI settings: ${}"
+  "加载 AI 设置失败: ${}": "Failed to load AI settings: ${}",
+  "加载分组失败: ${}": "Failed to load folders: ${}",
+  "加载会话失败: ${}": "Failed to load sessions: ${}",
+  "加载最近会话失败: ${}": "Failed to load recent sessions: ${}",
+  "断开连接失败: ${}": "Failed to disconnect: ${}",
+  "加载主题失败: ${}": "Failed to load themes: ${}"
 }

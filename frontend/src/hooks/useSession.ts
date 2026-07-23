@@ -57,8 +57,10 @@ export function useSession() {
       const result = await SessionService.ListFolders()
       setFolders((result ?? []).map(mapFolder))
     } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
       logger.error('listFolders error', err)
-      setError(err instanceof Error ? err.message : String(err))
+      setError(msg)
+      toast(t('加载分组失败: ${}', msg), 'error')
     } finally {
       setLoading(false)
     }
@@ -124,8 +126,10 @@ export function useSession() {
       const result = await SessionService.ListSessions(null)
       setSessions((result ?? []).map(mapSession))
     } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
       logger.error('listSessions error', err)
-      setError(err instanceof Error ? err.message : String(err))
+      setError(msg)
+      toast(t('加载会话失败: ${}', msg), 'error')
     } finally {
       setLoading(false)
       setSessionsLoaded(true)
@@ -137,8 +141,10 @@ export function useSession() {
       const result = await SessionService.ListRecentSessions(10)
       setRecentSessions((result ?? []).map(mapSession))
     } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
       logger.error('listRecentSessions error', err)
-      setError(err instanceof Error ? err.message : String(err))
+      setError(msg)
+      toast(t('加载最近会话失败: ${}', msg), 'error')
     }
   }, [])
   const csvTransfer = useSessionCSVTransfer({ refreshFolders: listFolders, refreshAssets })
@@ -270,7 +276,9 @@ export function useSession() {
       await TerminalService.Close(terminalId)
       useAppStore.getState().setConnectionStatus(terminalId, 'disconnected')
     } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
       logger.error('disconnect error', err)
+      toast(t('断开连接失败: ${}', msg), 'error')
     }
   }, [])
   const reconnect = useCallback((tabId: string) => reconnectSessionTab(tabId, sessions), [sessions])
