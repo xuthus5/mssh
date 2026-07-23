@@ -49,3 +49,25 @@ func TestSignalsClosedPort(t *testing.T) {
 	assert.False(t, signals.RTS)
 	assert.False(t, signals.CTS)
 }
+
+func TestValidateDevicePath(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		got, err := ValidateDevicePath("com3")
+		require.NoError(t, err)
+		assert.Equal(t, `\\.\COM3`, got)
+		_, err = ValidateDevicePath(`C:\Windows\System32\cmd.exe`)
+		require.Error(t, err)
+		return
+	}
+	got, err := ValidateDevicePath("/dev/ttyUSB0")
+	require.NoError(t, err)
+	assert.Equal(t, filepath.Clean("/dev/ttyUSB0"), got)
+	_, err = ValidateDevicePath("")
+	require.Error(t, err)
+	_, err = ValidateDevicePath("a" + string(rune(0)) + "b")
+	require.Error(t, err)
+	_, err = ValidateDevicePath("/etc/passwd")
+	require.Error(t, err)
+	_, err = ValidateDevicePath("ttyUSB0")
+	require.Error(t, err)
+}

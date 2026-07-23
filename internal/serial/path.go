@@ -1,6 +1,7 @@
 package serial
 
 import (
+	"fmt"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -17,6 +18,73 @@ func CanonicalDevicePath(device string) string {
 		return canonicalWindowsDevice(device)
 	}
 	return canonicalUnixDevice(device)
+}
+
+// ValidateDevicePath rejects empty, NUL-containing, or otherwise unsafe serial device paths.
+func ValidateDevicePath(device string) (string, error) {
+	device = strings.TrimSpace(device)
+	if device == "" {
+		return "", fmt.Errorf("serial device is required")
+	}
+	if strings.ContainsRune(device, 0) {
+		return "", fmt.Errorf("serial device path contains NUL")
+	}
+	if len(device) > 4096 {
+		return "", fmt.Errorf("serial device path is too long")
+	}
+	canonical := CanonicalDevicePath(device)
+	if canonical == "" {
+		return "", fmt.Errorf("serial device is required")
+	}
+	if runtime.GOOS == "windows" {
+		if !isWindowsSerialDevice(canonical) {
+			return "", fmt.Errorf("serial device must be a COM port")
+		}
+		return canonical, nil
+	}
+	if !filepath.IsAbs(canonical) {
+		return "", fmt.Errorf("serial device path must be absolute")
+	}
+	if !isUnixSerialDevice(canonical) {
+		return "", fmt.Errorf("serial device path is not under an allowed device prefix")
+	}
+	return canonical, nil
+}
+
+func isWindowsSerialDevice(device string) bool {
+	upper := strings.ToUpper(device)
+	if strings.HasPrefix(upper, `\\.\COM`) {
+		suffix := upper[len(`\\.\COM`):]
+		return isDigits(suffix)
+	}
+	if strings.HasPrefix(upper, "COM") {
+		return isDigits(upper[3:])
+	}
+	return false
+}
+
+func isUnixSerialDevice(device string) bool {
+	prefixes := []string{
+		"/dev/tty", "/dev/cu.", "/dev/serial/", "/dev/pts/", "/dev/rfcomm",
+	}
+	for _, prefix := range prefixes {
+		if strings.HasPrefix(device, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
+func isDigits(value string) bool {
+	if value == "" {
+		return false
+	}
+	for _, r := range value {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return true
 }
 
 func canonicalWindowsDevice(device string) string {

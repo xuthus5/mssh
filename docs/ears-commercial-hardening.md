@@ -416,3 +416,11 @@
 | TERM-SPLIT-POOL-001 | 标签分屏树中的全部 live 终端 ID（含本地 Shell 次级窗格）必须纳入 protectedTerminalIDs，不得被终端池当作 orphan 静默回收。 | done |
 | TERM-SPLIT-POOL-002 | persistTabSplitLayout 必须同步写入 splitPaneIDs，随树变化更新。 | done |
 | TERM-SPLIT-POOL-003 | 分屏槽位 reparent 后必须触发 xterm fit/renderer 恢复，避免旧窗格空白不可操作。 | done |
+
+## 2026-07-23 商用硬化波次（串口设备路径校验）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| SEC-SERIAL-001 | 创建/更新串口配置时必须拒绝空路径、NUL、超长路径。 | done |
+| SEC-SERIAL-002 | Unix 串口设备路径必须为绝对路径且位于允许前缀（/dev/tty*、/dev/cu.*、/dev/serial/、/dev/pts/、/dev/rfcomm*）。 | done |
+| SEC-SERIAL-003 | Windows 串口设备必须规范为 COM 端口形式。 | done |
