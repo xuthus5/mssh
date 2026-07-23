@@ -11,6 +11,25 @@ import type { SerialPort, SerialPortInput } from '../../bindings/github.com/xuth
 
 export type { SerialPort, SerialPortInput }
 
+
+async function closeSerialTabsForPorts(portIDs: Iterable<number>) {
+  const targets = new Set([...portIDs].map(Number).filter((id) => id > 0))
+  if (targets.size === 0) return
+  const store = useAppStore.getState()
+  const tabs = store.tabs.filter((tab) => (
+    tab.type === 'terminal'
+    && tab.connectionKind === 'serial'
+    && targets.has(Number(tab.serialPortId))
+  ))
+  for (const tab of tabs) {
+    try {
+      await store.closeTab(tab.id)
+    } catch (error) {
+      logger.error('close serial terminal tab failed', tab.id, error)
+    }
+  }
+}
+
 export function useSerial() {
   const [ports, setPorts] = useState<SerialPort[]>([])
   const [devices, setDevices] = useState<string[]>([])
@@ -83,12 +102,14 @@ export function useSerial() {
   const deletePort = useCallback(async (id: number) => {
     await SerialService.Delete(id)
     setError('')
+    await closeSerialTabsForPorts([id])
     await refresh({ silent: true })
   }, [refresh])
 
   const deleteMany = useCallback(async (ids: number[]) => {
     await SerialService.DeleteMany(ids)
     setError('')
+    await closeSerialTabsForPorts(ids)
     await refresh({ silent: true })
   }, [refresh])
 
