@@ -129,15 +129,15 @@ describe('KeyManager', () => {
     render(<KeyManager {...view} />)
 
     await userEvent.click(screen.getByRole('button', { name: '复制 generated 公钥' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('复制公钥失败: clipboard unavailable')
+    expect(screen.getByRole('alert').textContent).not.toContain(material.publicKey)
+    expect(useToastStore.getState().toasts.filter((item) => item.type === 'error')).toHaveLength(0)
+
     await userEvent.click(screen.getByRole('button', { name: '查看 generated' }))
     await userEvent.click(await screen.findByRole('button', { name: '复制私钥' }))
-
     await waitFor(() => expect(useToastStore.getState().toasts).toContainEqual(expect.objectContaining({
-      type: 'error', message: '复制公钥失败: clipboard unavailable',
-    })))
-    expect(useToastStore.getState().toasts).toContainEqual(expect.objectContaining({
       type: 'error', message: '复制私钥失败: clipboard unavailable',
-    }))
+    })))
     expect(useToastStore.getState().toasts[0]?.message).not.toContain(material.publicKey)
   })
 
