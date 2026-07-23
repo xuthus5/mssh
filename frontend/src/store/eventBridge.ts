@@ -75,6 +75,9 @@ function handleTunnelState(event: EventEnvelope<ConnectionPayload>) {
 function handleFileProgress(event: EventEnvelope<TransferPayload>) {
   const payload = event.data
   if (!payload?.task_id) return
+  const current = useAppStore.getState().transfers.find((job) => job.id === payload.task_id)
+  // Ignore progress after a terminal status (session-delete cancel races).
+  if (current && (current.status === 'cancelled' || current.status === 'completed' || current.status === 'failed')) return
   useAppStore.getState().updateTransfer(payload.task_id, {
     transferredBytes: payload.transferred ?? 0,
     totalBytes: payload.total ?? 0,
@@ -87,10 +90,14 @@ function handleFileProgress(event: EventEnvelope<TransferPayload>) {
 function handleFileComplete(event: EventEnvelope<TransferPayload>) {
   const payload = event.data
   if (!payload?.task_id) return
+  const current = useAppStore.getState().transfers.find((job) => job.id === payload.task_id)
+  const nextStatus = payload.status === 'cancelled' ? 'cancelled' : 'completed'
+  // Keep session-delete cancelled over a late completed/failed-complete race.
+  if (current?.status === 'cancelled' && nextStatus === 'completed') return
   useAppStore.getState().updateTransfer(payload.task_id, {
-    transferredBytes: payload.transferred ?? 0,
-    totalBytes: payload.total ?? 0,
-    status: payload.status === 'cancelled' ? 'cancelled' : 'completed',
+    transferredBytes: payload.transferred ?? current?.transferredBytes ?? 0,
+    totalBytes: payload.total ?? current?.totalBytes ?? 0,
+    status: nextStatus,
     completedAt: Date.now(),
   })
 }

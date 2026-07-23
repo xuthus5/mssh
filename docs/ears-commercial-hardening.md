@@ -1072,3 +1072,10 @@
 | UX-CONN-066 | 连接对话框需绑定 sessionId；删除/批量删除该会话后对话框必须关闭并回到 idle，不得残留 connecting/host-key/failed。 | done |
 | UX-CONN-067 | dismiss 仅影响匹配 sessionId 的对话框，不误关其他会话连接流程。 | done |
 
+## 2026-07-24 商用硬化波次（传输事件终态保护）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| UX-TRANSFER-068 | 传输任务进入 cancelled/completed/failed 后，后续 progress 事件不得把状态改回 running。 | done |
+| UX-TRANSFER-069 | cancelled 任务不得被后续 completed 事件覆盖。 | done |
+
