@@ -43,11 +43,12 @@ describe('AboutPanel', () => {
     expect(useToastStore.getState().toasts.filter((item) => item.type === 'error')).toHaveLength(0)
   })
 
-  it('toasts external link open failures', async () => {
+  it('shows external link open failures as panel message without toast', async () => {
     useToastStore.setState({ toasts: [] })
     openURL.mockRejectedValueOnce(new Error('open blocked'))
     render(<AboutPanel />)
     await userEvent.click(await screen.findByRole('button', { name: 'GitHub 社区' }))
-    await waitFor(() => expect(useToastStore.getState().toasts.some((item) => item.message.includes('open blocked') && item.type === 'error')).toBe(true))
+    expect(await screen.findByText(/open blocked/)).toBeInTheDocument()
+    expect(useToastStore.getState().toasts.filter((item) => item.type === 'error')).toHaveLength(0)
   })
 })

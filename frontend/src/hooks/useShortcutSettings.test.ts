@@ -60,4 +60,17 @@ describe('useShortcutSettings', () => {
     expect(result.current.error).toBe('shortcut load failed')
     expect(useToastStore.getState().toasts).toHaveLength(0)
   })
+
+  it('quiet saveBindings surfaces errors without toast', async () => {
+    useToastStore.setState({ toasts: [] })
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.Set', async () => {
+      throw new Error('shortcut save failed')
+    })
+    const { result } = renderHook(() => useShortcutSettings())
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    await act(async () => {
+      await expect(result.current.saveBindings(result.current.bindings, { quiet: true })).rejects.toThrow('shortcut save failed')
+    })
+    expect(useToastStore.getState().toasts.filter((item) => item.type === 'error')).toHaveLength(0)
+  })
 })

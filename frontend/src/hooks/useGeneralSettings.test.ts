@@ -270,7 +270,7 @@ describe('resolveProxyPasswordWrite', () => {
 })
 
 describe('quiet autosave error feedback', () => {
-  it('still toasts errors when quiet is true', async () => {
+  it('does not toast errors when quiet is true', async () => {
     const { useToastStore } = await import('@/components/ui/toast')
     useToastStore.setState({ toasts: [] })
     __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.GetMany', async () => ({
@@ -282,8 +282,7 @@ describe('quiet autosave error feedback', () => {
     const { result } = renderHook(() => useGeneralSettings())
     await waitFor(() => expect(result.current.general.maxPoolSize).toBe(10))
     await expect(result.current.saveGeneral({ ...result.current.general }, { quiet: true })).rejects.toThrow('persist failed')
-    const messages = useToastStore.getState().toasts.map((item) => `${item.type}:${item.message}`)
-    expect(messages.some((item) => item.startsWith('error:') && item.includes('保存设置失败'))).toBe(true)
+    expect(useToastStore.getState().toasts.filter((item) => item.type === 'error')).toHaveLength(0)
   })
   it('keeps settingsReady false when load fails and exposes loadError without toast', async () => {
     const toast = await import('@/components/ui/toast')

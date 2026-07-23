@@ -65,7 +65,7 @@ export function useShortcutSettings() {
     return () => { stop() }
   }, [reload])
 
-  const saveBindings = useCallback(async (next: ShortcutBindings) => {
+  const saveBindings = useCallback(async (next: ShortcutBindings, options?: { quiet?: boolean }) => {
     const normalized = normalizeShortcutBindings(next)
     try {
       await persistBindings(normalized)
@@ -76,7 +76,10 @@ export function useShortcutSettings() {
       })
     } catch (error: unknown) {
       logger.error('save shortcuts failed', error)
-      toast(t('保存快捷键失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
+      // Settings shortcut panel owns failures via AutoSaveStatusIndicator when quiet.
+      if (!options?.quiet) {
+        toast(t('保存快捷键失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
+      }
       throw error
     }
   }, [])
