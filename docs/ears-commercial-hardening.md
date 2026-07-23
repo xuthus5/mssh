@@ -339,3 +339,10 @@
 |---|---|---|
 | SEC-HIST-003 | 敏感命令过滤不得把通用短选项 `-p`（如 `ps -p`、`pacman -Syu`）误判为敏感。 | done |
 | SEC-HIST-004 | 仍必须拦截 `--password`、mysql/psql `-psecret`、sshpass `-p`、Bearer/export KEY 等明确凭据形态。 | done |
+
+## 2026-07-23 商用硬化波次（known_hosts 并发写）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| SEC-HOSTKEY-004 | 并发首次连接写入 known_hosts 时必须串行化 create/append，避免交叉写损坏。 | done |
+| SEC-HOSTKEY-005 | append 成功后必须 Sync 落盘，降低异常退出丢指纹风险。 | done |
