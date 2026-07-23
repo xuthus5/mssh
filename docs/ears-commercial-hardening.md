@@ -157,3 +157,10 @@
 | UI-CONFIRM-001 | 终端池回收保护标签确认必须使用 shadcn AlertDialog（Promise 通道），不得使用 `window.confirm`。 | done |
 | UI-CONFIRM-002 | 云同步热更新失败后的硬刷新确认必须使用 shadcn AlertDialog，不得使用 `window.confirm`。 | done |
 
+## 2026-07-23 商用硬化波次（本地 Shell 安全）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| LOCAL-006 | 本地 Shell 路径必须属于允许列表（Unix：`/etc/shells` ∪ 常见 shell；Windows：ComSpec/PowerShell 族），拒绝任意可执行文件。 | done |
+| LOCAL-007 | 本地 Shell 启动参数必须支持引号分组解析，不得因空格错误拆分参数。 | done |
+

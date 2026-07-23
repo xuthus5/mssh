@@ -97,6 +97,9 @@ func resolveShell(raw string) (string, error) {
 	if runtime.GOOS != "windows" && info.Mode().Perm()&0o111 == 0 {
 		return "", fmt.Errorf("local shell path is not executable: %s", shell)
 	}
+	if err := ensureShellAllowed(shell); err != nil {
+		return "", err
+	}
 	return shell, nil
 }
 
@@ -190,15 +193,6 @@ func ensureEnv(env []string, key, value string) []string {
 		}
 	}
 	return append(env, prefix+value)
-}
-
-// ParseArgs splits a simple shell-args string by whitespace (no quote expansion).
-func ParseArgs(raw string) []string {
-	raw = strings.TrimSpace(raw)
-	if raw == "" {
-		return nil
-	}
-	return strings.Fields(raw)
 }
 
 func execLookPath(file string) (string, error) {

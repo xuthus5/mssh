@@ -1303,5 +1303,6 @@
   "终端池已满": "Terminal pool is full",
   "继续将关闭标签「${}」并断开对应连接，之后可从会话列表重新连接。是否继续？": "Continuing will close tab \"${}\" and disconnect it. You can reconnect from the session list. Continue?",
   "继续": "Continue",
-  "同步数据已变更": "Sync data changed"
+  "同步数据已变更": "Sync data changed",
+  "仅允许系统认可的 Shell（Unix 参考 /etc/shells）。": "Only system-approved shells are allowed (Unix uses /etc/shells)."
 }

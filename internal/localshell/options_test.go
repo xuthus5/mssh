@@ -62,3 +62,20 @@ func TestResolveShellRejectsNonExecutable(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "not executable")
 }
+
+func TestParseArgsQuoted(t *testing.T) {
+	assert.Equal(t, []string{"-c", "echo hello"}, ParseArgs(`-c "echo hello"`))
+	assert.Equal(t, []string{"-c", "echo hello"}, ParseArgs(`-c 'echo hello'`))
+	assert.Equal(t, []string{"path with space"}, ParseArgs(`"path with space"`))
+	assert.Equal(t, []string{`say "hi"`}, ParseArgs(`"say \"hi\""`))
+}
+
+func TestResolveShellRejectsDisallowedBinary(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	path := filepath.Join(dir, "evil-bin")
+	require.NoError(t, os.WriteFile(path, []byte("#!/bin/sh\n"), 0o700))
+	_, err := resolveShell(path)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "allowed shell list")
+}
