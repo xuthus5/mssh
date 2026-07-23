@@ -675,3 +675,11 @@
 | SEC-ASSET-013 | Environment/Project/Tag DeleteImpact 必须拒绝 id<=0。 | done |
 | SEC-SETTING-010 | Setting Get/Delete 必须拒绝空 key。 | done |
 | UX-LOG-011 | 选择应用日志目录失败必须 toast。 | done |
+
+## 2026-07-23 商用硬化波次（录制 sessionID / SerialBreak 时长 / StopIfActive）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| SEC-LOG-014 | StartTerminalRecording 必须拒绝 sessionID<0；0 表示本地/无会话录制。 | done |
+| SEC-LOG-015 | StopTerminalRecordingIfActive 必须拒绝空 terminalID。 | done |
+| SEC-SERIAL-015 | SerialBreak 必须拒绝 durationMs<0。 | done |
