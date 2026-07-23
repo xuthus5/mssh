@@ -6,6 +6,7 @@ import type { SessionCSVExportRequest } from '@/hooks/useSessionCSVTransfer'
 import { SessionCSVImportDialog } from './SessionCSVImportDialog'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Spinner } from '@/components/ui/spinner'
@@ -38,6 +39,7 @@ interface ExportDialogProps {
 function SessionCSVExportDialog(props: ExportDialogProps) {
   const [scope, setScope] = useState<'all' | 'selected'>('all')
   const [includePasswords, setIncludePasswords] = useState(false)
+  const [confirmPassword, setConfirmPassword] = useState('')
   const [pending, setPending] = useState(false)
   const [error, setError] = useState('')
   const selectedAvailable = props.selectedIDs.length > 0
@@ -45,7 +47,7 @@ function SessionCSVExportDialog(props: ExportDialogProps) {
 
   const changeOpen = (open: boolean) => {
     if (pending) return
-    if (!open) { setScope('all'); setIncludePasswords(false); setError('') }
+    if (!open) { setScope('all'); setIncludePasswords(false); setConfirmPassword(''); setError('') }
     props.onOpenChange(open)
   }
 
@@ -54,7 +56,7 @@ function SessionCSVExportDialog(props: ExportDialogProps) {
     try {
       const path = await Dialogs.SaveFile({ Title: t('导出 SSH 会话 CSV'), Filename: sessionCSVFileName(), CanCreateDirectories: true, Filters: [{ DisplayName: 'CSV', Pattern: '*.csv' }] })
       if (!path) return
-      const result = await props.onExport({ path: ensureCSVExtension(path), sessionIDs: effectiveScope === 'selected' ? props.selectedIDs : [], includePasswords })
+      const result = await props.onExport({ path: ensureCSVExtension(path), sessionIDs: effectiveScope === 'selected' ? props.selectedIDs : [], includePasswords, confirmPassword: includePasswords ? confirmPassword : undefined })
       toast(t('已导出 ${} 个会话', result.count), 'success'); changeOpen(false)
     } catch (reason) { setError(errorMessage(reason)) } finally { setPending(false) }
   }
@@ -63,8 +65,9 @@ function SessionCSVExportDialog(props: ExportDialogProps) {
     <div className="flex flex-col gap-4"><SegmentedControl label={t('导出范围')} options={[{ value: 'all', label: t('全部会话') }, ...(selectedAvailable ? [{ value: 'selected', label: t('已选 ${} 项', props.selectedIDs.length) } as const] : [])]} value={effectiveScope} onChange={(value) => setScope(value as 'all' | 'selected')} />
       <label className="flex items-start gap-3 rounded-xl border border-border p-3 text-sm"><Checkbox checked={includePasswords} onCheckedChange={(checked) => setIncludePasswords(checked === true)} /><span><span className="block font-medium">{t('包含已保存密码')}</span><span className="mt-0.5 block text-xs text-muted-foreground">{t('默认关闭。密钥认证仅导出公钥标识，不导出私钥。')}</span></span></label>
       {includePasswords && <Alert variant="destructive"><TriangleAlert /><AlertDescription>{t('密码将以明文写入 CSV。请仅保存到可信位置，并在使用后妥善删除。')}</AlertDescription></Alert>}
+      {includePasswords && <div className="grid gap-2"><label className="text-sm font-medium" htmlFor="export-confirm-password">{t('应用密码确认')}</label><Input id="export-confirm-password" type="password" autoComplete="current-password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} placeholder={t('导出含密码时需验证应用密码')} aria-label={t('应用密码确认')} /><p className="text-xs text-muted-foreground">{t('二次验证可防止已解锁设备被他人直接导出明文密码。')}</p></div>}
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-    </div><DialogFooter><Button type="button" variant="outline" disabled={pending} onClick={() => changeOpen(false)}>{t('取消')}</Button><Button type="button" disabled={pending} onClick={() => { void runExport() }}>{pending ? <><Spinner data-icon="inline-start" />{t('导出中...')}</> : <><FileDown data-icon="inline-start" />{t('选择位置并导出')}</>}</Button></DialogFooter>
+    </div><DialogFooter><Button type="button" variant="outline" disabled={pending} onClick={() => changeOpen(false)}>{t('取消')}</Button><Button type="button" disabled={pending || (includePasswords && confirmPassword.trim() === '')} onClick={() => { void runExport() }}>{pending ? <><Spinner data-icon="inline-start" />{t('导出中...')}</> : <><FileDown data-icon="inline-start" />{t('选择位置并导出')}</>}</Button></DialogFooter>
   </DialogContent></Dialog>
 }
 

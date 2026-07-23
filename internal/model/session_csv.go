@@ -10,6 +10,8 @@ const (
 type SessionCSVExportOptions struct {
 	SessionIDs       []int64 `json:"session_ids"`
 	IncludePasswords bool    `json:"include_passwords"`
+	// ConfirmPassword is required when IncludePasswords is true (step-up auth).
+	ConfirmPassword string `json:"confirm_password,omitempty"`
 }
 
 type SessionCSVExportResult struct {
