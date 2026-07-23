@@ -1402,5 +1402,14 @@
   "保存安全偏好失败: ${}": "Failed to save security preferences: ${}",
   "轮转应用密码失败: ${}": "Failed to rotate app password: ${}",
   "锁定失败: ${}": "Failed to lock: ${}",
-  "解锁失败: ${}": "Failed to unlock: ${}"
+  "解锁失败: ${}": "Failed to unlock: ${}",
+  "保存同步配置失败: ${}": "Failed to save sync config: ${}",
+  "同步连接测试失败: ${}": "Sync connection test failed: ${}",
+  "同步失败: ${}": "Sync failed: ${}",
+  "推送本地版本失败: ${}": "Failed to push local version: ${}",
+  "拉取云端版本失败: ${}": "Failed to pull cloud version: ${}",
+  "处理同步冲突失败: ${}": "Failed to resolve sync conflict: ${}",
+  "恢复本地版本失败: ${}": "Failed to restore local version: ${}",
+  "删除本地版本失败: ${}": "Failed to delete local version: ${}",
+  "清空本地业务数据失败: ${}": "Failed to reset local data: ${}"
 }
