@@ -332,3 +332,10 @@
 | SEC-HTTP-004 | 共享 HTTP Transport 必须使用安全 DialContext：阻断链路本地/未指定/组播/169.254 元数据 IP。 | done |
 | SEC-HTTP-005 | 主机名解析后必须对每个候选 IP 再次校验；全部被阻断时不得建立连接（缓解 DNS rebinding 到元数据）。 | done |
 | SEC-HTTP-006 | 代理场景下仍保留 proxy Transport，并叠加 DialContext 与 CheckRedirect 策略。 | done |
+
+## 2026-07-23 商用硬化波次（命令历史敏感规则误杀）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| SEC-HIST-003 | 敏感命令过滤不得把通用短选项 `-p`（如 `ps -p`、`pacman -Syu`）误判为敏感。 | done |
+| SEC-HIST-004 | 仍必须拦截 `--password`、mysql/psql `-psecret`、sshpass `-p`、Bearer/export KEY 等明确凭据形态。 | done |

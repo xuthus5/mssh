@@ -7,8 +7,11 @@ import (
 
 // sensitiveCommandPatterns mirrors frontend command-history filtering so direct
 // backend/API writes cannot persist common secret-bearing commands.
+//
+// Note: bare "-p" is intentionally NOT treated as sensitive (common in pacman/ps/etc.).
+// Database CLIs still match via the mysql/psql/mongo/redis-cli rule.
 var sensitiveCommandPatterns = []*regexp.Regexp{
-	regexp.MustCompile(`(?i)(^|\s)(password|passwd|token|secret|--password|--passwd|-p)(=|\s|$)`),
+	regexp.MustCompile(`(?i)(^|\s)(password|passwd|token|secret|--password|--passwd)(=|\s|$)`),
 	regexp.MustCompile(`(?i)(curl|wget).*\s(-H|--header)\s+['"]?authorization`),
 	regexp.MustCompile(`(?i)export\s+\w*(KEY|TOKEN|SECRET|PASSWORD|PASSWD)\w*=`),
 	regexp.MustCompile(`(?i)(^|\s)(mysql|psql|mongo|redis-cli)\b.*\s(-p|--password)(=|\S|$)`),

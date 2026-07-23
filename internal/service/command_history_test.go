@@ -74,4 +74,8 @@ func TestIsSensitiveCommand(t *testing.T) {
 	require.False(t, isSensitiveCommand("git status"))
 	require.False(t, isSensitiveCommand("echo hello"))
 	require.False(t, isSensitiveCommand(""))
+	require.False(t, isSensitiveCommand("pacman -Syu"))
+	require.False(t, isSensitiveCommand("ps -p 1"))
+	require.False(t, isSensitiveCommand("docker ps -p"))
+	require.True(t, isSensitiveCommand("mysql -uroot -psecret"))
 }
