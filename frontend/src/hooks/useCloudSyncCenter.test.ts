@@ -42,7 +42,7 @@ describe('useCloudSyncCenter', () => {
     const { result } = renderHook(() => useCloudSyncCenter())
     await waitFor(() => expect(result.current.dashboard).not.toBeNull())
     await act(async () => { await result.current.syncNow().catch(() => undefined) })
-    expect(result.current.error).toBe('network failed')
+    expect(result.current.error).toBeNull()
     expect(result.current.pending).toBeNull()
   })
 
@@ -70,7 +70,7 @@ describe('useCloudSyncCenter', () => {
     expect(result.current.error).toBeNull()
   })
 
-  it('quiet saveConfig still surfaces error toasts', async () => {
+  it('quiet saveConfig still surfaces error toasts and does not set page error', async () => {
     const { useToastStore } = await import('@/components/ui/toast')
     useToastStore.setState({ toasts: [] })
     __registerHandler('github.com/xuthus5/mssh/internal/service.SyncService.SaveConfig', async () => {
@@ -81,13 +81,13 @@ describe('useCloudSyncCenter', () => {
     await act(async () => {
       await result.current.saveConfig(createSyncInput(dashboard.config as any), { quiet: true }).catch(() => undefined)
     })
-    expect(result.current.error).toBe('save config failed')
+    expect(result.current.error).toBeNull()
     const messages = useToastStore.getState().toasts.map((item) => `${item.type}:${item.message}`)
     expect(messages.some((item) => item.startsWith('error:') && item.includes('失败'))).toBe(true)
   })
 })
 
-  it('toasts when dashboard load fails', async () => {
+  it('sets page error when dashboard load fails without toast', async () => {
     const { useToastStore } = await import('@/components/ui/toast')
     useToastStore.setState({ toasts: [] })
     __registerHandler('github.com/xuthus5/mssh/internal/service.SyncService.Dashboard', async () => {
@@ -96,5 +96,5 @@ describe('useCloudSyncCenter', () => {
     const { result } = renderHook(() => useCloudSyncCenter())
     await waitFor(() => expect(result.current.loading).toBe(false))
     expect(result.current.error).toBe('dashboard load failed')
-    expect(useToastStore.getState().toasts.some((item) => item.message.includes('dashboard load failed'))).toBe(true)
+    expect(useToastStore.getState().toasts).toHaveLength(0)
   })

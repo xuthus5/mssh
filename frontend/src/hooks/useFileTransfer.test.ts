@@ -218,14 +218,14 @@ describe('useFileTransfer', () => {
     expect(useToastStore.getState().toasts.some((item) => item.message.includes('delete denied'))).toBe(true)
   })
 
-  it('toasts listFiles failures', async () => {
+  it('sets panel error for listFiles failures without toast', async () => {
     __registerHandler('github.com/xuthus5/mssh/internal/service.FileService.ListDir', async () => {
       throw new Error('list denied')
     })
     const { result } = renderHook(() => useFileTransfer(SESSION_ID))
     await act(async () => { await result.current.listFiles('/') })
     expect(result.current.error).toContain('list denied')
-    expect(useToastStore.getState().toasts.some((item) => item.message.includes('list denied'))).toBe(true)
+    expect(useToastStore.getState().toasts.some((item) => item.message.includes('list denied'))).toBe(false)
   })
 
   it('keeps mutation success free of list reload toast', async () => {

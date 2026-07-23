@@ -126,7 +126,8 @@ describe('TerminalComposePanel', () => {
     render(<TerminalComposePanel open terminalID="term-1" sessionID={7} onClose={onClose} />)
 
     expect(await screen.findByText('宏加载失败: load failed')).toBeInTheDocument()
-    await waitFor(() => expect(notify).toHaveBeenCalledWith('加载宏失败: load failed', 'error'))
+    await waitFor(() => expect(screen.getByText(/宏加载失败/)).toBeInTheDocument())
+    expect(notify).not.toHaveBeenCalledWith('加载宏失败: load failed', 'error')
     await userEvent.click(screen.getByRole('button', { name: '重试' }))
     expect(await screen.findByText('暂无可用宏')).toBeInTheDocument()
 

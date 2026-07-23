@@ -23,7 +23,7 @@ describe('SessionAssetCatalogDialogs', () => {
     tagImpact.mockResolvedValue({ name: '核心', session_count: 2 })
   })
 
-  it('toasts catalog save failures', async () => {
+  it('shows catalog save failures inline without toast', async () => {
     const onCreateEnvironment = vi.fn(async () => {
       throw new Error('save catalog failed')
     })
@@ -42,10 +42,10 @@ describe('SessionAssetCatalogDialogs', () => {
     await userEvent.type(screen.getByRole('textbox'), '生产')
     await userEvent.click(screen.getByRole('button', { name: '保存' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('save catalog failed')
-    expect(useToastStore.getState().toasts.some((item) => item.message.includes('save catalog failed'))).toBe(true)
+    expect(useToastStore.getState().toasts).toHaveLength(0)
   })
 
-  it('toasts delete impact load failures', async () => {
+  it('shows delete impact load failures inline without toast', async () => {
     environmentImpact.mockRejectedValueOnce(new Error('impact failed'))
     render(
       <SessionAssetCatalogDeleteDialog
@@ -58,11 +58,11 @@ describe('SessionAssetCatalogDialogs', () => {
         onDeleteTag={vi.fn()}
       />,
     )
-    await waitFor(() => expect(useToastStore.getState().toasts.some((item) => item.message.includes('impact failed'))).toBe(true))
     expect(await screen.findByRole('alert')).toHaveTextContent('impact failed')
+    expect(useToastStore.getState().toasts).toHaveLength(0)
   })
 
-  it('toasts delete failures for tags', async () => {
+  it('shows delete failures for tags inline without toast', async () => {
     const onDeleteTag = vi.fn(async () => {
       throw new Error('delete failed')
     })
@@ -80,6 +80,6 @@ describe('SessionAssetCatalogDialogs', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: /确认处理/ })).not.toBeDisabled())
     await userEvent.click(screen.getByRole('button', { name: /确认处理/ }))
     expect(await screen.findByRole('alert')).toHaveTextContent('delete failed')
-    expect(useToastStore.getState().toasts.some((item) => item.message.includes('delete failed'))).toBe(true)
+    expect(useToastStore.getState().toasts).toHaveLength(0)
   })
 })

@@ -57,7 +57,6 @@ function BulkAssetDialog({ kind, selectedIDs, environments, projects, tags, onSe
     } catch (reason) {
       const message = reason instanceof Error ? reason.message : String(reason)
       setError(message)
-      toast(t('批量更新资产失败: ${}', message), 'error')
     }
     finally { setPending(false) }
   }

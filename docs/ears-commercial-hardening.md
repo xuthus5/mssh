@@ -1099,3 +1099,25 @@
 | UX-SERIAL-073 | 删除/批量删除串口配置后，必须关闭关联 serial 终端标签并释放后端终端；不得留下悬空串口标签。 | done |
 | UX-TUNNEL-074 | 隧道创建表单失败时仅展示 inline error，不得叠加 toast「启动隧道失败」；列表内启动按钮失败仍 toast 一次。 | done |
 
+## 2026-07-24 商用硬化波次（可见面板/表单错误单归属）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| UX-AI-075 | AI 终端面板加载/发送/历史/审批执行失败时仅展示面板内 inline error，不得叠加 toast。 | done |
+| UX-FORM-076 | 串口配置对话框、资产分类编辑/删除对话框、资产快速创建对话框失败时仅 inline error，不得叠加 toast。 | done |
+| UX-FORM-077 | 会话删除影响分析、Vault 门禁加载/安全操作、CSV 导入预览/导入失败、CSV 导出失败时仅 inline/表单 error，不得叠加 toast；成功反馈仍可 toast。 | done |
+| UX-AUDIT-078 | 审计面板设置加载/切换/日志加载失败时仅页面 inline error，不得叠加 toast。 | done |
+| UX-LOG-079 | 会话录制列表加载/删除失败时仅面板/对话框 inline error，不得叠加 toast。 | done |
+| UX-CONN-080 | 连接对话框主机密钥确认/拒绝/取消失败时仅对话框 failed 状态与 error 文案，不得叠加 toast。 | done |
+| UX-MACRO-081 | 宏工作区加载失败时仅页面错误态，不得叠加 toast；删除宏失败仍 toast。 | done |
+| UX-BULK-082 | 批量资产更新对话框失败时仅 dialog alert，不得叠加 toast；成功可 toast。 | done |
+
+| UX-SYNC-083 | 云同步 dashboard 加载失败仅页面 error banner；动作失败仅 toast，不再写入 page error。 | done |
+| UX-SERIAL-084 | 串口配置列表加载失败仅页面 error banner，不得叠加 toast；设备/占用探测失败仍 toast（无 banner）。 | done |
+| UX-SESSION-085 | 会话/分组/最近会话加载失败仅 workspace error banner，不得叠加 toast。 | done |
+| UX-SFTP-086 | SFTP 目录加载失败仅 FilePanel error，不得叠加 toast。 | done |
+| UX-COMPOSE-087 | 终端撰写面板宏列表加载失败仅面板内错误态，不得叠加 toast。 | done |
+| UX-RECONN-088 | 重连最终失败仅连接对话框 failed+error，不得叠加 toast。 | done |
+| UX-ASSET-089 | 资产分类 list/refresh 失败仅 workspace error banner，不得叠加 toast。 | done |
+
+| UX-AISET-090 | AI 设置 dashboard 加载失败仅页面 error 文案；动作失败仅 toast，不写 controller.error。 | done |

@@ -134,10 +134,11 @@ describe('VaultGate', () => {
   })
 
 
-  it('toasts security status load failures', async () => {
+  it('shows security status load failures inline without toast', async () => {
     security.Status.mockRejectedValueOnce(new Error('status failed'))
     render(<VaultGate><div>app-ready</div></VaultGate>)
     expect(await screen.findByText('status failed')).toBeInTheDocument()
-    await waitFor(() => expect(useToastStore.getState().toasts.some((item) => item.message.includes('status failed'))).toBe(true))
+    expect(await screen.findByRole('alert')).toHaveTextContent('status failed')
+    expect(useToastStore.getState().toasts).toHaveLength(0)
   })
 })

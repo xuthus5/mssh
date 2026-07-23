@@ -13,7 +13,6 @@ import { LabeledSelect } from '@/components/ui/labeled-select'
 import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
 import type { SerialPort, SerialPortInput } from '@/hooks/useSerial'
-import { toast } from '@/components/ui/toast'
 import { SerialLineEnding, SerialParity, SerialStopBits } from '../../../bindings/github.com/xuthus5/mssh/internal/model/models'
 import { t } from '@/i18n'
 
@@ -128,7 +127,6 @@ export function SerialPortDialog({ open, onOpenChange, port, devices, onSave }: 
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
       setError(message)
-      toast(t('保存串口配置失败: ${}', message), 'error')
     } finally {
       setPending(false)
     }

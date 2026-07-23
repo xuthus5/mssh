@@ -61,7 +61,6 @@ function SessionCSVExportDialog(props: ExportDialogProps) {
     } catch (reason) {
       const message = errorMessage(reason)
       setError(message)
-      toast(t('导出会话 CSV 失败: ${}', message), 'error')
     } finally { setPending(false) }
   }
 
