@@ -83,4 +83,24 @@ describe('TransferCenter', () => {
     render(<TransferCenter />)
     expect(screen.getByRole('button', { name: '打开传输中心，传输记录加载失败' })).toBeInTheDocument()
   })
+
+  it('surfaces cancel and retry failures panel-owned without toast', async () => {
+    const { useToastStore } = await import('@/components/ui/toast')
+    useToastStore.setState({ toasts: [] })
+    const running = { ...baseJob, id: 'running', fileName: 'app.tar.gz', direction: 'upload', status: 'running' } satisfies TransferJob
+    const failed = { ...baseJob, id: 'failed', fileName: 'backup.sql', direction: 'download', sourcePath: '/remote/backup.sql', targetPath: '/local/backup.sql', status: 'failed', error: 'denied', completedAt: 2 } satisfies TransferJob
+    __registerHandler('github.com/xuthus5/mssh/internal/service.FileService.CancelTransfer', async () => {
+      throw new Error('cancel boom')
+    })
+    __registerHandler('github.com/xuthus5/mssh/internal/service.FileService.Download', async () => {
+      throw new Error('retry boom')
+    })
+    useAppStore.setState({ transfers: [running, failed], transfersLoadError: '', transferCenterOpen: true })
+    render(<TransferCenter />)
+    await userEvent.click(screen.getByRole('button', { name: '取消 app.tar.gz' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('取消传输失败: cancel boom')
+    await userEvent.click(screen.getByRole('button', { name: '重试 backup.sql' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('重试失败: retry boom')
+    expect(useToastStore.getState().toasts.filter((item) => item.type === 'error')).toHaveLength(0)
+  })
 })

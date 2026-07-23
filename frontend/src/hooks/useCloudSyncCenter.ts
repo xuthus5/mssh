@@ -54,8 +54,8 @@ export function useCloudSyncCenter(): CloudSyncController {
       if (!operation.quiet) toast(operation.success, 'success')
     } catch (actionError) {
       const message = errorMessage(actionError)
-      // Action failures use toast; load failures use page banner (setError in reload).
-      toast(t(operation.failure, message), 'error')
+      // Settings surface owns failures via page banner (error prop on tabs).
+      setError(t(operation.failure, message))
       logger.error(`cloud sync ${operation.name} failed`, actionError)
       throw actionError
     } finally {
