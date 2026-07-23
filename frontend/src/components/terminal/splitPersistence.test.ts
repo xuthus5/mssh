@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { insertSplit, splitLeaf, terminalIDs } from '@/components/terminal/splitTree'
 import { serializeSplitLayout } from '@/components/terminal/splitLayout'
 import {
+  closeExtraSplitPanes,
   openExtraSplitPanes,
   persistTabSplitLayout,
   restoreSplitTreeFromLayout,
@@ -49,9 +50,10 @@ describe('splitPersistence', () => {
       'primary',
     )
     expect(layout).toBeTruthy()
-    const tree = await restoreSplitTreeFromLayout(layout!, 'primary', openOne)
+    const restored = await restoreSplitTreeFromLayout(layout!, 'primary', openOne)
     expect(openOne).toHaveBeenCalledTimes(1)
-    expect(tree && terminalIDs(tree)).toEqual(['primary', 'extra-1'])
+    expect(restored && terminalIDs(restored.tree)).toEqual(['primary', 'extra-1'])
+    expect(restored?.extraTerminalIDs).toEqual(['extra-1'])
   })
 
   it('cleans partial opens when a later open fails', async () => {
@@ -63,5 +65,12 @@ describe('splitPersistence', () => {
       return `extra-${calls}`
     })
     await expect(openExtraSplitPanes(2, openOne)).rejects.toThrow('boom')
+  })
+
+  it('closes provided extra panes for cancelled restores', async () => {
+    const close = vi.fn(async () => undefined)
+    __registerHandler(terminal + 'Close', close)
+    closeExtraSplitPanes(['extra-a', 'extra-b'], 'test cleanup')
+    await vi.waitFor(() => expect(close).toHaveBeenCalledTimes(2))
   })
 })

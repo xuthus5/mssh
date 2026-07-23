@@ -26,11 +26,10 @@ import {
   ensurePaneHost,
   openSplitTerminal,
   persistTabSplitLayout,
-  readTabSplitLayout,
   replaceSecondaryTerminalRuntime,
-  restoreSplitTreeFromLayout,
 } from '@/components/terminal/splitPersistence'
 import { t } from '@/i18n'
+import { useSplitLayoutRestore } from '@/components/terminal/useSplitLayoutRestore'
 
 const MAX_PANES = 8
 const noFocusRequest: TerminalFocusRequest = { sequence: 0, targetTerminalID: null }
@@ -71,7 +70,6 @@ export const TerminalSplit = forwardRef<TerminalSplitHandle, Props>(function Ter
   const mountedRef = useRef(true)
   const primaryRef = useRef(primaryID)
   const operationRef = useRef(false)
-  const [layoutReady, setLayoutReady] = useState(false)
   const hostsRef = useRef(new Map<string, HTMLDivElement>())
   const stagingRef = useRef<HTMLDivElement | null>(null)
   const activePaneID = useAppStore((state) => state.activePaneId)
@@ -81,46 +79,12 @@ export const TerminalSplit = forwardRef<TerminalSplitHandle, Props>(function Ter
   const paneCount = leaves.length
   const requestFocus = (terminalID: string) => useAppStore.getState().requestTerminalFocus(tabID, terminalID)
   const lastUsed = (terminalID: string) => useAppStore.getState().terminalPool.get(terminalID)?.lastUsed ?? 0
+  const layoutReady = useSplitLayoutRestore({
+    tabID, sessionId, connectionKind, serialPortId, primaryID,
+    operationRef, mountedRef, setTree, setBusy, requestFocus,
+  })
 
   useEffect(() => { onStateChange?.({ paneCount, busy }) }, [busy, onStateChange, paneCount])
-
-  useEffect(() => {
-    if (layoutReady || connectionKind === 'serial') {
-      if (!layoutReady) setLayoutReady(true)
-      return
-    }
-    const layout = readTabSplitLayout(tabID)
-    if (!layout || layout.paneCount < 2) {
-      setLayoutReady(true)
-      return
-    }
-    let cancelled = false
-    void (async () => {
-      if (operationRef.current) {
-        setLayoutReady(true)
-        return
-      }
-      operationRef.current = true
-      setBusy(true)
-      try {
-        const restored = await restoreSplitTreeFromLayout(layout, primaryRef.current, () => openPane(sessionId, connectionKind, serialPortId))
-        if (!cancelled && restored && mountedRef.current) {
-          setTree(restored)
-          const focusID = collectLeaves(restored)[0]?.terminalID
-          if (focusID) requestFocus(focusID)
-        }
-      } catch (error: unknown) {
-        logger.error('TerminalSplit: restore layout failed', error)
-      } finally {
-        operationRef.current = false
-        if (mountedRef.current) {
-          setBusy(false)
-          setLayoutReady(true)
-        }
-      }
-    })()
-    return () => { cancelled = true }
-  }, [tabID, connectionKind, sessionId, serialPortId, layoutReady])
 
   useEffect(() => {
     if (!layoutReady) return

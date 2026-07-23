@@ -6,9 +6,11 @@ import {
   eventMatchesChord,
   findShortcutConflicts,
   formatChordDisplay,
+  isReservedShortcutChord,
   matchShortcutAction,
   normalizeShortcutBindings,
   parseChord,
+  reservedShortcutReason,
   serializeChord,
   serializeShortcutBindings,
 } from '@/lib/shortcuts'
@@ -71,5 +73,22 @@ describe('shortcuts', () => {
       { ctrl: true, meta: false, alt: false, shift: false, key: 'n' },
       { ctrl: false, meta: true, alt: false, shift: false, key: 'n' },
     )).toBe(true)
+  })
+})
+
+describe('reserved shortcut chords', () => {
+  it('flags OS-reserved combinations', () => {
+    expect(isReservedShortcutChord({ ctrl: true, meta: false, alt: false, shift: false, key: 'q' })).toBe(true)
+    expect(isReservedShortcutChord({ ctrl: true, meta: false, alt: false, shift: false, key: 'n' })).toBe(false)
+    expect(reservedShortcutReason({ ctrl: false, meta: false, alt: true, shift: false, key: 'f4' })).toContain('系统保留')
+  })
+
+  it('strips reserved chords during normalize', () => {
+    const normalized = normalizeShortcutBindings({
+      'new-session': 'Mod+Q',
+      'close-tab': 'Mod+W',
+    })
+    expect(normalized['new-session']).toBeNull()
+    expect(normalized['close-tab']).toMatchObject({ key: 'w' })
   })
 })
