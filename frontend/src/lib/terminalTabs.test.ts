@@ -49,7 +49,6 @@ describe('createTerminalTab', () => {
 
     expect(createTerminalTab({ sessionID: 7, sessionName: '生产服务器', terminalID: 'term-new', tabs }).terminalInstance).toBe(1)
   })
-})
 
   it('creates serial terminal tabs with independent instance counters', () => {
     const first = createTerminalTab({
@@ -86,4 +85,4 @@ describe('createTerminalTab', () => {
       terminalInstance: 1,
     })
   })
-
+})

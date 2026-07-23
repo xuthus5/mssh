@@ -1202,3 +1202,10 @@
 | UX-SPLIT-114 | 分屏布局恢复失败时仅在终端分屏区域展示 error banner + 重试，不得 toast；失败时不得覆盖已持久化的多窗格布局。 | done |
 | UX-WS-115 | 启动工作区恢复失败时仅主内容区 banner + 重试，不得 toast；串口列表失败/部分标签失败以非破坏 notice 展示，可关闭。 | done |
 
+## 2026-07-24 商用硬化波次（测试门禁与系统监控重试）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| UX-TEST-116 | 测试文件中的 `it` 必须位于 `describe` 内；修复遗漏的孤儿用例（SystemPanel/TransferCenter/SessionTree/CSV/Proxy/CloudSync/Tabs/Coalescer）。 | done |
+| UX-SYS-117 | 系统监控概览/进程采集失败时仅面板 inline error + 重试，不得 toast；重试后可恢复展示。 | done |
+

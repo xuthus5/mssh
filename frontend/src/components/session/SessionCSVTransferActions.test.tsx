@@ -86,7 +86,6 @@ describe('SessionCSVTransferActions', () => {
     await userEvent.click(screen.getByRole('button', { name: /MobaXterm/ }))
     expect(screen.getByRole('button', { name: '确认导入' })).not.toBeDisabled()
   })
-})
 
   it('shows export failures inline without toast', async () => {
     actions.exportSessionsCSV.mockRejectedValueOnce(new Error('export boom'))
@@ -96,3 +95,4 @@ describe('SessionCSVTransferActions', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('export boom')
     expect(useToastStore.getState().toasts).toHaveLength(0)
   })
+})

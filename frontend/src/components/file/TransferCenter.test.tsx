@@ -61,7 +61,6 @@ describe('TransferCenter', () => {
     await userEvent.click(await screen.findByRole('button', { name: '移除 backup.sql' }))
     expect(useAppStore.getState().transfers.some((item) => item.id === 'retry-1')).toBe(false)
   })
-})
 
   it('shows restore failure instead of empty list and allows retry', async () => {
     useAppStore.setState({ transferCenterOpen: true, transfers: [], transfersLoadError: 'list transfers failed' })
@@ -84,3 +83,4 @@ describe('TransferCenter', () => {
     render(<TransferCenter />)
     expect(screen.getByRole('button', { name: '打开传输中心，传输记录加载失败' })).toBeInTheDocument()
   })
+})
