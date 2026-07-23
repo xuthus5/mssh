@@ -71,17 +71,13 @@ func (t *TunnelService) Delete(id int64) error {
 	}
 	t.logger.Info("deleting tunnel", "id", id)
 	t.mu.Lock()
-	if state, ok := t.tunnels[id]; ok {
+	state, ok := t.tunnels[id]
+	if ok {
 		delete(t.tunnels, id)
-		t.mu.Unlock()
-		if state.closed != nil {
-			_ = state.closed()
-		}
-		if state.connID != "" {
-			_ = t.sessions.disconnect(state.connID, false)
-		}
-	} else {
-		t.mu.Unlock()
+	}
+	t.mu.Unlock()
+	if ok {
+		t.finalizeStoppedTunnel(state, false)
 	}
 	return store.DeleteTunnel(t.db, id)
 }
@@ -100,18 +96,7 @@ func (t *TunnelService) Stop(tunnelID int64) error {
 	delete(t.tunnels, tunnelID)
 	t.mu.Unlock()
 
-	if state.closed != nil {
-		_ = state.closed()
-	}
-	if state.connID != "" {
-		_ = t.sessions.disconnect(state.connID, false)
-	}
-
-	t.eventBus.Emit(event.TunnelState, event.ConnectionStatePayload{
-		TerminalID: fmt.Sprintf("tunnel-%d", tunnelID),
-		State:      "stopped",
-	})
-
+	t.finalizeStoppedTunnel(state, true)
 	return nil
 }
 
@@ -124,12 +109,57 @@ func (t *TunnelService) StopAll() {
 	}
 	t.mu.Unlock()
 	for _, state := range states {
-		if state.closed != nil {
-			_ = state.closed()
+		t.finalizeStoppedTunnel(state, false)
+	}
+}
+
+// StopForSessions stops in-memory tunnels owned by the given sessions before DB rows are deleted.
+//
+//wails:ignore
+func (t *TunnelService) StopForSessions(sessionIDs []int64) {
+	if len(sessionIDs) == 0 {
+		return
+	}
+	wanted := make(map[int64]struct{}, len(sessionIDs))
+	for _, sessionID := range sessionIDs {
+		if sessionID > 0 {
+			wanted[sessionID] = struct{}{}
 		}
-		if state.connID != "" {
-			_ = t.sessions.disconnect(state.connID, false)
+	}
+	if len(wanted) == 0 {
+		return
+	}
+	tunnels, err := store.ListTunnels(t.db)
+	if err != nil {
+		t.logger.Error("list tunnels before session delete failed", "error", err)
+		return
+	}
+	for _, tunnel := range tunnels {
+		if _, ok := wanted[tunnel.SessionID]; !ok {
+			continue
 		}
+		if err := t.Stop(tunnel.ID); err != nil {
+			// not running is expected for most tunnels
+			t.logger.Debug("stop tunnel for deleted session", "tunnelID", tunnel.ID, "error", err)
+		}
+	}
+}
+
+func (t *TunnelService) finalizeStoppedTunnel(state *TunnelState, emit bool) {
+	if state == nil {
+		return
+	}
+	if state.closed != nil {
+		_ = state.closed()
+	}
+	if state.connID != "" {
+		_ = t.sessions.disconnect(state.connID, false)
+	}
+	if emit {
+		t.eventBus.Emit(event.TunnelState, event.ConnectionStatePayload{
+			TerminalID: fmt.Sprintf("tunnel-%d", state.ID),
+			State:      "stopped",
+		})
 	}
 }
 
