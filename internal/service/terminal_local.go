@@ -17,6 +17,9 @@ import (
 // OpenLocal opens a terminal attached to a local interactive shell.
 func (t *TerminalService) OpenLocal(ctx context.Context, cols, rows int) (string, error) {
 	_ = ctx
+	if err := validateTerminalSize(cols, rows); err != nil {
+		return "", err
+	}
 	outcome := "failed"
 	defer func() {
 		if t.sessionSvc != nil {
