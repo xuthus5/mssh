@@ -87,15 +87,24 @@ function useTunnelRemove(setTunnels: Dispatch<SetStateAction<Tunnel[]>>) {
 export function useTunnelManager(sessionID?: number) {
   const states = useAppStore((state) => state.tunnelState)
   const [tunnels, setTunnels] = useState<Tunnel[]>([])
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
   const load = useCallback(async (options?: { silent?: boolean }) => {
+    if (!options?.silent) setLoading(true)
     try {
       const result = await TunnelService.List()
       setTunnels((result ?? []).filter((item) => sessionID === undefined || item.session_id === sessionID).map((item) => mapTunnel(item, states)))
+      if (!options?.silent) setError('')
     } catch (error) {
       logger.error('load tunnels failed', error)
-      if (!options?.silent) toast(t('加载隧道失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
+      // Non-silent loads own a page/panel error so empty table is not mistaken for "no tunnels".
+      if (!options?.silent) {
+        setError(error instanceof Error ? error.message : String(error))
+      }
+    } finally {
+      if (!options?.silent) setLoading(false)
     }
   }, [sessionID, states])
   useEffect(() => { setTunnels((items) => items.map((item) => ({ ...item, running: states[item.id] === 'running' }))) }, [states])
-  return { tunnels, load, start: useTunnelStart(load, setTunnels), stop: useTunnelStop(setTunnels), remove: useTunnelRemove(setTunnels) }
+  return { tunnels, error, loading, load, start: useTunnelStart(load, setTunnels), stop: useTunnelStop(setTunnels), remove: useTunnelRemove(setTunnels) }
 }
