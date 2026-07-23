@@ -3,6 +3,8 @@ package store
 import (
 	"database/sql"
 	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -265,4 +267,24 @@ func TestDeleteSessionsRemovesTunnels(t *testing.T) {
 	tunnels, err := ListTunnels(db)
 	require.NoError(t, err)
 	assert.Len(t, tunnels, 0)
+}
+
+func TestDeleteSessionsRemovesRecordingFiles(t *testing.T) {
+	db := setupTestDB(t)
+	session, err := CreateSession(db, model.Session{
+		Name: "with-recording", Host: "127.0.0.1", Port: 22, Username: "root",
+		AuthMethod: model.AuthPassword, KeepAlive: 30, TermType: "xterm",
+	})
+	require.NoError(t, err)
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, "rec.msshlog")
+	require.NoError(t, os.WriteFile(path, []byte("recording"), 0o600))
+	_, err = db.Exec("INSERT INTO session_logs (session_id, started_at, data_path) VALUES (?, datetime('now'), ?)", session.ID, path)
+	require.NoError(t, err)
+
+	require.NoError(t, DeleteSessions(db, []int64{session.ID}))
+	_, err = os.Stat(path)
+	require.Error(t, err)
+	assert.True(t, os.IsNotExist(err))
 }
