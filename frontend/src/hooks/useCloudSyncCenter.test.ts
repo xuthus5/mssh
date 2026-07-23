@@ -86,3 +86,15 @@ describe('useCloudSyncCenter', () => {
     expect(messages.some((item) => item.startsWith('error:') && item.includes('失败'))).toBe(true)
   })
 })
+
+  it('toasts when dashboard load fails', async () => {
+    const { useToastStore } = await import('@/components/ui/toast')
+    useToastStore.setState({ toasts: [] })
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SyncService.Dashboard', async () => {
+      throw new Error('dashboard load failed')
+    })
+    const { result } = renderHook(() => useCloudSyncCenter())
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    expect(result.current.error).toBe('dashboard load failed')
+    expect(useToastStore.getState().toasts.some((item) => item.message.includes('dashboard load failed'))).toBe(true)
+  })
