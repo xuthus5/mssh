@@ -262,4 +262,34 @@ it('preserves the primary pane host when splitting', async () => {
     expect(TerminalService.OpenLocal).toHaveBeenCalled()
     expect(TerminalService.Open).not.toHaveBeenCalled()
   })
+  it('tracks live split pane IDs for pool protection after local split', async () => {
+    vi.mocked(TerminalService.OpenLocal).mockResolvedValue('local-split-1')
+    useAppStore.setState({
+      tabs: [{ id: 'tab-local', title: '本地终端', type: 'terminal', terminalId: 'primary-local', sessionId: 0, connectionKind: 'local' }],
+      activeSurface: { type: 'terminal', id: 'tab-local' },
+      activePaneId: 'primary-local',
+      connectionStatus: { 'primary-local': 'connected' },
+      terminalPool: new Map(),
+    })
+    const splitRef = createRef<TerminalSplitHandle>()
+    render(
+      <TerminalSplit
+        ref={splitRef}
+        tabID="tab-local"
+        primaryID="primary-local"
+        sessionId={0}
+        connectionKind="local"
+        active
+        focusRequest={focusRequest}
+        onStateChange={splitStateChange}
+        onCloseTerminal={closeTerminal}
+      />,
+    )
+    act(() => splitRef.current?.split('horizontal'))
+    await screen.findByTestId('pane-local-split-1')
+    const tab = useAppStore.getState().tabs.find((item) => item.id === 'tab-local')
+    expect(tab?.type === 'terminal' && tab.splitPaneIDs).toEqual(expect.arrayContaining(['primary-local', 'local-split-1']))
+    expect(useAppStore.getState().connectionStatus['primary-local']).toBe('connected')
+  })
+
 })

@@ -10,12 +10,16 @@ export interface TerminalPoolVictim {
   owningTab?: TerminalTab
 }
 
-/** Terminals currently bound to open tabs or the active pane. */
+/** Terminals currently bound to open tabs, active pane, or live split panes. */
 export function protectedTerminalIDs(state: Pick<AppState, 'tabs' | 'activePaneId' | 'activeSurface'>): Set<string> {
   const protectedIDs = new Set<string>()
   if (state.activePaneId) protectedIDs.add(state.activePaneId)
   for (const tab of state.tabs) {
-    if (tab.type === 'terminal') protectedIDs.add(tab.terminalId)
+    if (tab.type !== 'terminal') continue
+    protectedIDs.add(tab.terminalId)
+    for (const paneID of tab.splitPaneIDs ?? []) {
+      if (paneID) protectedIDs.add(paneID)
+    }
   }
   if (state.activeSurface?.type === 'terminal') {
     const activeTab = state.tabs.find((tab) => tab.id === state.activeSurface?.id)

@@ -40,6 +40,24 @@ describe('protectedTerminalIDs', () => {
     })
     expect([...protectedTerminalIDs(state)].sort()).toEqual(['term-a', 'term-b', 'term-split'])
   })
+
+  it('protects live secondary split panes for commercial pool reclamation', () => {
+    const tab = terminalTab('tab-local', 'primary-local') as AppState['tabs'][number]
+    if (tab.type === 'terminal') tab.splitPaneIDs = ['primary-local', 'local-split-1']
+    const state = baseState({
+      tabs: [tab],
+      terminalPool: new Map([
+        ['primary-local', entry(1)],
+        ['local-split-1', entry(2)],
+        ['orphan', entry(0)],
+      ]),
+    })
+    const protectedIDs = protectedTerminalIDs(state)
+    expect(protectedIDs.has('primary-local')).toBe(true)
+    expect(protectedIDs.has('local-split-1')).toBe(true)
+    expect(protectedIDs.has('orphan')).toBe(false)
+    expect(selectTerminalPoolEvictionID(state, 'orphan-only')).toBe('orphan')
+  })
 })
 
 describe('selectTerminalPoolEvictionID', () => {
