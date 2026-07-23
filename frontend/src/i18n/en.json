@@ -1370,5 +1370,7 @@
   "分析删除影响失败: ${}": "Failed to analyze delete impact: ${}",
   "预览会话 CSV 失败: ${}": "Failed to preview session CSV: ${}",
   "导入会话 CSV 失败: ${}": "Failed to import session CSV: ${}",
-  "重连失败: ${}": "Reconnect failed: ${}"
+  "重连失败: ${}": "Reconnect failed: ${}",
+  "加载串口设备失败: ${}": "Failed to load serial devices: ${}",
+  "加载串口占用状态失败: ${}": "Failed to load serial device usage: ${}"
 }

@@ -2,7 +2,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import SessionDialog from '@/components/session/SessionDialog'
+import { useToastStore } from '@/components/ui/toast'
 import type { AssetColorToken } from '@/lib/sessionModels'
+
+const listKeys = vi.fn(async () => [])
+vi.mock('@/lib/wails', () => ({ KeyService: { List: () => listKeys() } }))
 
 describe('SessionDialog', () => {
   const defaultProps = {
@@ -22,6 +26,9 @@ describe('SessionDialog', () => {
     defaultProps.onOpenChange = vi.fn()
     defaultProps.onSave = vi.fn()
     defaultProps.session = undefined
+    listKeys.mockReset()
+    listKeys.mockResolvedValue([])
+    useToastStore.setState({ toasts: [] })
   })
 
   it('renders all form fields', () => {
@@ -168,5 +175,11 @@ describe('SessionDialog', () => {
     const folderSelect = screen.getByRole('combobox', { name: '分组' })
     expect(within(folderSelect).getByText('默认分组（默认）')).toBeInTheDocument()
     expect(within(folderSelect).queryByText('1')).not.toBeInTheDocument()
+  })
+
+  it('toasts key list failures', async () => {
+    listKeys.mockRejectedValueOnce(new Error('key list failed'))
+    render(<SessionDialog {...defaultProps} />)
+    await waitFor(() => expect(useToastStore.getState().toasts.some((item) => item.message.includes('key list failed'))).toBe(true))
   })
 })
