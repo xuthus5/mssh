@@ -101,6 +101,7 @@ describe('eventBridge', () => {
 describe('restoreTransfers', () => {
   beforeEach(() => {
     useToastStore.setState({ toasts: [] })
+    useAppStore.setState({ transfers: [], transfersLoadError: '' })
   })
 
   it('restores persisted backend transfer history', async () => {
@@ -108,12 +109,14 @@ describe('restoreTransfers', () => {
     __registerHandler('github.com/xuthus5/mssh/internal/service.FileService.ListTransfers', async () => [{ id: 'saved', session_id: 3, session_name: 'server', direction: 'upload', source_path: '/tmp/a.txt', target_path: '/a.txt', total_bytes: 10, transferred_bytes: 10, speed: 2, eta: 0, status: 'completed', error: '', started_at: '2026-07-17T00:00:00Z', completed_at: '2026-07-17T00:00:05Z' }])
     await restoreTransfers()
     expect(useAppStore.getState().transfers).toEqual([expect.objectContaining({ id: 'saved', fileName: 'a.txt', status: 'completed', sessionId: 3 })])
+    expect(useAppStore.getState().transfersLoadError).toBe('')
   })
-})
 
-  it('toasts restoreTransfers failures', async () => {
+  it('records restoreTransfers failures without toast', async () => {
     __clearHandlers()
     __registerHandler('github.com/xuthus5/mssh/internal/service.FileService.ListTransfers', async () => { throw new Error('list transfers failed') })
     await restoreTransfers()
-    expect(useToastStore.getState().toasts.some((item) => item.message.includes('list transfers failed'))).toBe(true)
+    expect(useAppStore.getState().transfersLoadError).toBe('list transfers failed')
+    expect(useToastStore.getState().toasts).toHaveLength(0)
   })
+})

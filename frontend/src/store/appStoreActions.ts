@@ -20,7 +20,7 @@ import { rewriteSplitPaneIDs, scrubTerminalRuntime, terminalTabPaneIDs } from '@
 
 type StoreSet = StoreApi<AppState>['setState']
 type StoreGet = StoreApi<AppState>['getState']
-type TransferActions = Pick<AppState, 'addTransfer' | 'removeTransfer' | 'updateTransfer' | 'clearFinishedTransfers' | 'setTransferCenterOpen'>
+type TransferActions = Pick<AppState, 'addTransfer' | 'removeTransfer' | 'updateTransfer' | 'clearFinishedTransfers' | 'setTransfersLoadError' | 'setTransferCenterOpen'>
 type TabActions = Pick<AppState, 'openTab' | 'closeTab' | 'removeTabLocal' | 'replaceTerminalConnection' | 'promoteTerminalConnection' | 'updateTerminalWorkspace'>
 type NavigationActions = Pick<AppState, 'activateWorkspace' | 'setOverviewSection' | 'leaveOverview' | 'activateTab' | 'requestTerminalFocus' | 'toggleNavigation' | 'setSidebarWidth'>
 type PoolActions = Pick<AppState, 'registerTerminal' | 'unregisterTerminal' | 'forgetTerminal' | 'updateLastUsed' | 'evictLRU'>
@@ -146,10 +146,11 @@ function requestTerminalFocusState(state: AppState, tabID: string, terminalID: s
 
 export function createTransferActions(set: StoreSet): TransferActions {
   return {
-    addTransfer: (job) => set((state) => ({ transfers: [...state.transfers, job], transferCenterOpen: true })),
+    addTransfer: (job) => set((state) => ({ transfers: [...state.transfers, job], transferCenterOpen: true, transfersLoadError: '' })),
     removeTransfer: (id) => set((state) => ({ transfers: state.transfers.filter((transfer) => transfer.id !== id) })),
     updateTransfer: (id, updates) => set((state) => ({ transfers: state.transfers.map((transfer) => transfer.id === id ? { ...transfer, ...updates } : transfer) })),
     clearFinishedTransfers: () => set((state) => ({ transfers: state.transfers.filter((transfer) => transfer.status === 'queued' || transfer.status === 'running') })),
+    setTransfersLoadError: (transfersLoadError) => set({ transfersLoadError }),
     setTransferCenterOpen: (transferCenterOpen) => set({ transferCenterOpen }),
   }
 }

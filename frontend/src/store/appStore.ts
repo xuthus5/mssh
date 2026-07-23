@@ -120,6 +120,7 @@ export interface AppState {
   appStatus: string
   terminalTheme: TerminalTheme
   transfers: TransferJob[]
+  transfersLoadError: string
   transferCenterOpen: boolean
   activePaneId: string | null
   recordingState: Record<string, 'idle' | 'starting' | 'recording' | 'stopping' | 'error'>
@@ -128,6 +129,7 @@ export interface AppState {
   removeTransfer: (id: string) => void
   updateTransfer: (id: string, updates: Partial<Pick<TransferJob, 'transferredBytes' | 'speed' | 'totalBytes' | 'eta' | 'status' | 'error' | 'completedAt'>>) => void
   clearFinishedTransfers: () => void
+  setTransfersLoadError: (error: string) => void
   setTransferCenterOpen: (open: boolean) => void
   openTab: (tab: Tab) => void
   closeTab: (id: string) => Promise<void>
@@ -172,6 +174,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   appStatus: t('就绪'),
   terminalTheme: DEFAULT_THEME,
   transfers: [],
+  transfersLoadError: '',
   transferCenterOpen: false,
   activePaneId: null,
   recordingState: {},
