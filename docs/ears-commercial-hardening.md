@@ -449,3 +449,11 @@
 | UX-SETTINGS-002 | 导出/导入本地加密备份失败时必须 toast 错误；成功时给出明确成功反馈。 | done |
 | UX-SETTINGS-003 | KeyManager 确认删除必须 await onDelete；失败时保持对话框可重试。 | done |
 
+## 2026-07-23 商用硬化波次（终端 Write/Resize 边界）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| TERM-IO-001 | TerminalService.Write 必须拒绝超过 1MiB 的单次写入载荷，防止 IPC 粘贴洪泛与内存放大。 | done |
+| TERM-IO-002 | TerminalService.Write 必须拒绝非法 UTF-8 载荷。 | done |
+| TERM-IO-003 | TerminalService.Resize 必须将 cols/rows 限制在 [1,1000]/[1,500]，非法几何拒绝且不触达 PTY。 | done |
+
