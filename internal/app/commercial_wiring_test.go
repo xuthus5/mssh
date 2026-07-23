@@ -52,14 +52,15 @@ func (wiringEventBus) Emit(string, interface{}) {}
 func TestNewSettingServiceWithAndWithoutLogManager(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	logger := testutil.NewTestLogger()
+	runtime := service.NewCryptoRuntime()
 	input := serviceInitialization{db: db, logger: logger, opts: Options{}}
-	assert.NotNil(t, newSettingService(input))
+	assert.NotNil(t, newSettingService(input, runtime))
 
 	manager := applog.New(applog.Options{Dir: t.TempDir(), RetentionDays: 7})
 	require.NotNil(t, manager)
 	t.Cleanup(func() { _ = manager.Close() })
 	input.opts.LogManager = manager
-	assert.NotNil(t, newSettingService(input))
+	assert.NotNil(t, newSettingService(input, runtime))
 }
 
 func TestNewSyncServiceWiresOptions(t *testing.T) {

@@ -26,11 +26,20 @@ func (s *SettingService) applyProxySettings(entries []model.Setting) error {
 	if s.proxy == nil || len(entries) == 0 {
 		return nil
 	}
-	config, changed, err := s.resolveProxySettings(entries)
-	if err != nil || !changed {
-		return err
+	// Detect whether any proxy-related key was written (including password_saved).
+	changed := false
+	for _, entry := range entries {
+		switch entry.Key {
+		case applicationProxyModeSetting, applicationProxyURLSetting, applicationProxyNoProxySetting,
+			applicationProxyUsernameSetting, applicationProxyPasswordSetting, applicationProxyPasswordSavedSetting:
+			changed = true
+		}
 	}
-	if err := s.proxy.Configure(config); err != nil {
+	if !changed {
+		return nil
+	}
+	// Rebuild from storage so encrypted password is decrypted via loadProxyPassword.
+	if err := s.proxy.Configure(s.currentProxyConfig()); err != nil {
 		return fmt.Errorf("apply proxy settings: %w", err)
 	}
 	return nil
@@ -92,10 +101,8 @@ func applyProxySettingValue(current *netproxy.Config, key, value string) {
 }
 
 func (s *SettingService) currentProxyConfig() netproxy.Config {
+	// Always rebuild from storage so cleared secrets do not stick in the live manager.
 	config := netproxy.DefaultConfig()
-	if s.proxy != nil {
-		config = s.proxy.Config()
-	}
 	if mode, ok := s.readProxyString(applicationProxyModeSetting); ok {
 		config.Mode = netproxy.NormalizeMode(netproxy.Mode(mode))
 	}
@@ -108,8 +115,8 @@ func (s *SettingService) currentProxyConfig() netproxy.Config {
 	if value, ok := s.readProxyString(applicationProxyUsernameSetting); ok {
 		config.Username = value
 	}
-	if value, ok := s.readProxyString(applicationProxyPasswordSetting); ok {
-		config.Password = value
+	if password, ok := s.loadProxyPassword(); ok {
+		config.Password = password
 	}
 	return netproxy.Normalize(config)
 }

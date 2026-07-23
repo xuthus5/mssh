@@ -190,10 +190,11 @@ func newSyncService(input serviceInitialization, runtime *service.CryptoRuntime,
 		service.WithSyncProxy(input.opts.ProxyManager))
 }
 
-func newSettingService(input serviceInitialization) *service.SettingService {
+func newSettingService(input serviceInitialization, runtime *service.CryptoRuntime) *service.SettingService {
 	return service.NewSettingService(input.db, input.logger, service.SettingServiceOptions{
-		Log:   input.opts.LogManager,
-		Proxy: input.opts.ProxyManager,
+		Log:    input.opts.LogManager,
+		Proxy:  input.opts.ProxyManager,
+		Crypto: runtime,
 	})
 }
 
@@ -211,7 +212,7 @@ func assembleApp(input serviceInitialization, runtime *service.CryptoRuntime, se
 		Theme:          themeSvc,
 		Log:            logSvc,
 		Sync:           syncSvc,
-		Setting:        newSettingService(input),
+		Setting:        newSettingService(input, runtime),
 		About:          service.NewAboutService(input.opts.ProxyManager),
 		Font:           service.NewFontService(input.logger),
 		Audit:          service.NewAuditService(input.db, input.logger),

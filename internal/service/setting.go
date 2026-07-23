@@ -10,16 +10,22 @@ import (
 )
 
 type SettingService struct {
-	db    *sql.DB
-	log   LogConfigurer
-	proxy ProxyConfigurer
+	db     *sql.DB
+	log    LogConfigurer
+	proxy  ProxyConfigurer
+	crypto KeyCrypto
 }
 
 func (s *SettingService) Get(key string) (*model.Setting, error) {
 	if err := rejectBlockedSettingKey(key); err != nil {
 		return nil, err
 	}
-	return store.GetSettingEntry(s.db, key)
+	setting, err := store.GetSettingEntry(s.db, key)
+	if err != nil {
+		return nil, err
+	}
+	redactProxyPasswordSetting(setting)
+	return setting, nil
 }
 
 func (s *SettingService) GetMany(keys []string) (map[string]model.Setting, error) {
@@ -32,7 +38,9 @@ func (s *SettingService) GetMany(keys []string) (map[string]model.Setting, error
 	if err != nil {
 		return nil, err
 	}
-	return filterBlockedSettings(settings), nil
+	filtered := filterBlockedSettings(settings)
+	redactProxyPasswordSettings(filtered)
+	return filtered, nil
 }
 
 func (s *SettingService) List(namespace string) ([]model.Setting, error) {
@@ -45,7 +53,9 @@ func (s *SettingService) List(namespace string) ([]model.Setting, error) {
 		if settingBlocked(setting.Key) {
 			continue
 		}
-		filtered = append(filtered, setting)
+		item := setting
+		redactProxyPasswordSetting(&item)
+		filtered = append(filtered, item)
 	}
 	return filtered, nil
 }
@@ -55,16 +65,22 @@ func (s *SettingService) Set(setting model.SettingInput) error {
 	if err := rejectBlockedSettingKey(entry.Key); err != nil {
 		return err
 	}
-	if err := s.validateRuntimeSettings([]model.Setting{entry}); err != nil {
+	entries, err := s.prepareProxyPasswordWrites([]model.Setting{entry})
+	if err != nil {
 		return err
 	}
-	if err := store.SetSettings(s.db, []model.Setting{entry}); err != nil {
+	if err := s.validateRuntimeSettings(entries); err != nil {
 		return err
 	}
-	if err := s.applyLogSettings([]model.Setting{entry}); err != nil {
+	if len(entries) > 0 {
+		if err := store.SetSettings(s.db, entries); err != nil {
+			return err
+		}
+	}
+	if err := s.applyLogSettings(entries); err != nil {
 		return err
 	}
-	return s.applyProxySettings([]model.Setting{entry})
+	return s.applyProxySettings(entries)
 }
 
 func (s *SettingService) SetMany(settings []model.SettingInput) error {
@@ -75,11 +91,17 @@ func (s *SettingService) SetMany(settings []model.SettingInput) error {
 	if err := rejectBlockedSettings(entries); err != nil {
 		return err
 	}
+	entries, err := s.prepareProxyPasswordWrites(entries)
+	if err != nil {
+		return err
+	}
 	if err := s.validateRuntimeSettings(entries); err != nil {
 		return err
 	}
-	if err := store.SetSettings(s.db, entries); err != nil {
-		return err
+	if len(entries) > 0 {
+		if err := store.SetSettings(s.db, entries); err != nil {
+			return err
+		}
 	}
 	if err := s.applyLogSettings(entries); err != nil {
 		return err
@@ -95,32 +117,48 @@ func (s *SettingService) Delete(key string) error {
 }
 
 type SettingServiceOptions struct {
-	Log   LogConfigurer
-	Proxy ProxyConfigurer
+	Log    LogConfigurer
+	Proxy  ProxyConfigurer
+	Crypto KeyCrypto
 }
 
 func NewSettingService(db *sql.DB, _ *slog.Logger, options ...any) *SettingService {
 	service := &SettingService{db: db}
 	for _, option := range options {
-		switch value := option.(type) {
-		case LogConfigurer:
-			if !isNilLogConfigurer(value) {
-				service.log = value
-			}
-		case ProxyConfigurer:
-			if value != nil {
-				service.proxy = value
-			}
-		case SettingServiceOptions:
-			if !isNilLogConfigurer(value.Log) {
-				service.log = value.Log
-			}
-			if value.Proxy != nil {
-				service.proxy = value.Proxy
-			}
-		}
+		applySettingServiceOption(service, option)
 	}
 	return service
+}
+
+func applySettingServiceOption(service *SettingService, option any) {
+	switch value := option.(type) {
+	case LogConfigurer:
+		if !isNilLogConfigurer(value) {
+			service.log = value
+		}
+	case ProxyConfigurer:
+		if value != nil {
+			service.proxy = value
+		}
+	case KeyCrypto:
+		if value != nil {
+			service.crypto = value
+		}
+	case SettingServiceOptions:
+		applySettingServiceOptionsStruct(service, value)
+	}
+}
+
+func applySettingServiceOptionsStruct(service *SettingService, value SettingServiceOptions) {
+	if !isNilLogConfigurer(value.Log) {
+		service.log = value.Log
+	}
+	if value.Proxy != nil {
+		service.proxy = value.Proxy
+	}
+	if value.Crypto != nil {
+		service.crypto = value.Crypto
+	}
 }
 
 func isNilLogConfigurer(log LogConfigurer) bool {

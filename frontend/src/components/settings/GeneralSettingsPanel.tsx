@@ -22,6 +22,8 @@ interface GeneralDraft {
   proxyNoProxy: string
   proxyUsername: string
   proxyPassword: string
+  proxyPasswordSaved: boolean
+  clearProxyPassword: boolean
   language: GeneralSettings['language']
 }
 
@@ -44,7 +46,9 @@ function createDraft(general: GeneralSettings): GeneralDraft {
     proxyURL: general.proxyURL,
     proxyNoProxy: general.proxyNoProxy,
     proxyUsername: general.proxyUsername,
-    proxyPassword: general.proxyPassword,
+    proxyPassword: '',
+    proxyPasswordSaved: general.proxyPasswordSaved,
+    clearProxyPassword: false,
     language: general.language,
   }
 }
@@ -62,7 +66,9 @@ function buildSavePayload(general: GeneralSettings, draft: GeneralDraft): Genera
     proxyURL: draft.proxyURL.trim(),
     proxyNoProxy: draft.proxyNoProxy.trim(),
     proxyUsername: draft.proxyUsername.trim(),
-    proxyPassword: draft.proxyPassword,
+    proxyPassword: draft.clearProxyPassword ? '' : draft.proxyPassword,
+    proxyPasswordSaved: draft.clearProxyPassword ? false : (draft.proxyPasswordSaved || draft.proxyPassword.trim() !== ''),
+    clearProxyPassword: draft.clearProxyPassword,
     language: draft.language,
   }
 }
@@ -219,11 +225,18 @@ export function GeneralSettingsPanel({ general, systemFonts, onSave, onPreviewUI
         proxyNoProxy={draft.proxyNoProxy}
         proxyUsername={draft.proxyUsername}
         proxyPassword={draft.proxyPassword}
+        proxyPasswordSaved={draft.proxyPasswordSaved}
+        clearProxyPassword={draft.clearProxyPassword}
         onProxyModeChange={(value) => setDraft({ ...draft, proxyMode: value })}
         onProxyURLChange={(value) => setDraft({ ...draft, proxyURL: value })}
         onProxyNoProxyChange={(value) => setDraft({ ...draft, proxyNoProxy: value })}
         onProxyUsernameChange={(value) => setDraft({ ...draft, proxyUsername: value })}
-        onProxyPasswordChange={(value) => setDraft({ ...draft, proxyPassword: value })}
+        onProxyPasswordChange={(value) => setDraft({ ...draft, proxyPassword: value, clearProxyPassword: false })}
+        onClearProxyPasswordChange={(value) => setDraft({
+          ...draft,
+          clearProxyPassword: value,
+          proxyPassword: value ? '' : draft.proxyPassword,
+        })}
       />
     </div>
   )

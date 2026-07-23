@@ -47,3 +47,29 @@ describe('ApplicationNetworkProxySettingsSection', () => {
     expect(screen.getByText(/HTTP\(S\)_PROXY/)).toBeInTheDocument()
   })
 })
+
+  it('shows clear control for saved proxy password', async () => {
+    const onClear = vi.fn()
+    const user = userEvent.setup()
+    render(
+      <ApplicationNetworkProxySettingsSection
+        proxyMode="manual"
+        proxyURL="http://127.0.0.1:1080"
+        proxyNoProxy=""
+        proxyUsername=""
+        proxyPassword=""
+        proxyPasswordSaved
+        clearProxyPassword={false}
+        onProxyModeChange={vi.fn()}
+        onProxyURLChange={vi.fn()}
+        onProxyNoProxyChange={vi.fn()}
+        onProxyUsernameChange={vi.fn()}
+        onProxyPasswordChange={vi.fn()}
+        onClearProxyPasswordChange={onClear}
+      />,
+    )
+    expect(screen.getByPlaceholderText('已安全保存，留空保持不变')).toBeInTheDocument()
+    await user.click(screen.getByTestId('clear-proxy-password'))
+    expect(onClear).toHaveBeenCalledWith(true)
+  })
+
