@@ -59,7 +59,15 @@ export function KeyManager(props: Props) {
     setLoadingID(id)
     try {
       const material = await props.onLoadMaterial(id)
-      if (material && request === materialRequest.current) setMaterialState({ mode, material })
+      if (request !== materialRequest.current) return
+      if (material) {
+        setMaterialState({ mode, material })
+        return
+      }
+      toast(t('读取密钥失败: ${}', t('密钥不存在或无法读取')), 'error')
+    } catch (error) {
+      if (request !== materialRequest.current) return
+      toast(t('读取密钥失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
     } finally {
       if (request === materialRequest.current) setLoadingID(null)
     }
@@ -106,10 +114,10 @@ export function KeyManager(props: Props) {
         {props.keys.length === 0 ? <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground">{t('无密钥')}</TableCell></TableRow> : props.keys.map((key) => <TableRow key={key.id}>
           <TableCell>{key.name}</TableCell><TableCell>{keyTypeText(key)}</TableCell><TableCell className="text-xs">{key.createdAt}</TableCell>
           <TableCell className="text-right"><div className="flex justify-end gap-1">
-            <Button size="xs" variant="ghost" aria-label={t('查看 ${}', key.name)} disabled={loadingID === key.id} onClick={() => { void openMaterial(key.id, 'view') }}>{t('查看')}</Button>
-            <Button size="xs" variant="ghost" aria-label={t('编辑 ${}', key.name)} disabled={loadingID === key.id} onClick={() => { void openMaterial(key.id, 'edit') }}>{t('编辑')}</Button>
-            <Button size="xs" variant="ghost" aria-label={t('复制 ${} 公钥', key.name)} onClick={() => { void copyPublicKey(key.id) }}>{t('复制公钥')}</Button>
-            <Button size="xs" variant="ghost" className="text-destructive" aria-label={t('删除 ${}', key.name)} onClick={() => { void deleteKey(key) }}>{t('删除')}</Button>
+            <Button size="xs" variant="ghost" aria-label={t('查看 ${}', key.name)} disabled={loadingID === key.id} onClick={() => { void openMaterial(key.id, 'view').catch(() => undefined) }}>{t('查看')}</Button>
+            <Button size="xs" variant="ghost" aria-label={t('编辑 ${}', key.name)} disabled={loadingID === key.id} onClick={() => { void openMaterial(key.id, 'edit').catch(() => undefined) }}>{t('编辑')}</Button>
+            <Button size="xs" variant="ghost" aria-label={t('复制 ${} 公钥', key.name)} onClick={() => { void copyPublicKey(key.id).catch(() => undefined) }}>{t('复制公钥')}</Button>
+            <Button size="xs" variant="ghost" className="text-destructive" aria-label={t('删除 ${}', key.name)} onClick={() => { void deleteKey(key).catch(() => undefined) }}>{t('删除')}</Button>
           </div></TableCell>
         </TableRow>)}
       </TableBody>
@@ -130,7 +138,7 @@ export function KeyManager(props: Props) {
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel disabled={deleting}>{t('取消')}</AlertDialogCancel>
-          <AlertDialogAction type="button" variant="destructive" disabled={deleting} onClick={() => { void confirmDeleteKey() }}>
+          <AlertDialogAction type="button" variant="destructive" disabled={deleting} onClick={() => { void confirmDeleteKey().catch(() => undefined) }}>
             {deleting ? t('删除中…') : t('确认删除')}
           </AlertDialogAction>
         </AlertDialogFooter>

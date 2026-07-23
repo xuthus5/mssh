@@ -199,4 +199,22 @@ describe('KeyManager', () => {
     expect(view.onImport).toHaveBeenCalledWith('custom-name', 'custom private key')
     expect(screen.getByRole('heading', { name: '导入密钥' })).toBeInTheDocument()
   })
+
+  it('surfaces key material load failures without unhandled rejections', async () => {
+    const view = props()
+    view.onLoadMaterial = vi.fn(async () => { throw new Error('vault locked') })
+    render(<KeyManager {...view} />)
+    await userEvent.click(screen.getByRole('button', { name: '查看 generated' }))
+    await waitFor(() => expect(useToastStore.getState().toasts.some((item) => item.message.includes('读取密钥失败') && item.message.includes('vault locked') && item.type === 'error')).toBe(true))
+  })
+
+  it('surfaces empty key material as a visible failure', async () => {
+    const view = props()
+    view.onLoadMaterial = vi.fn(async () => undefined)
+    render(<KeyManager {...view} />)
+    await userEvent.click(screen.getByRole('button', { name: '编辑 generated' }))
+    await waitFor(() => expect(useToastStore.getState().toasts.some((item) => item.message.includes('读取密钥失败') && item.type === 'error')).toBe(true))
+    expect(screen.queryByRole('heading', { name: '编辑密钥' })).not.toBeInTheDocument()
+  })
+
 })

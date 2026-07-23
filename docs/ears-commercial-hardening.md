@@ -902,3 +902,11 @@
 | UX-AI-018 | AI Agent 检测按钮与初始加载的 Promise 拒绝不得未处理。 | done |
 | UX-KEY-011 | 密钥编辑对话框保存动作的 Promise 拒绝不得未处理。 | done |
 
+## 2026-07-23 商用硬化波次（密钥读取 / 快捷键重置 Promise）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| UX-KEY-012 | 查看/编辑密钥时若材料加载失败或为空，必须 toast 明确失败文案，且 Promise 拒绝不得未处理。 | done |
+| UX-SHORTCUT-011 | 恢复默认快捷键触发的持久化 Promise 拒绝不得未处理。 | done |
+| UX-AI-019 | AI 终端面板加载/发送/历史/审批执行的 Promise 拒绝不得未处理。 | done |
+
