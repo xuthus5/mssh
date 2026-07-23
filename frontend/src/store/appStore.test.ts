@@ -404,6 +404,74 @@ describe('appStore', () => {
 
     expect(useAppStore.getState().transfers.map((item) => item.id)).toEqual(['running'])
   })
+  it('closes all split panes when closing a tab', async () => {
+    const close = vi.fn(async () => {})
+    __registerHandler('github.com/xuthus5/mssh/internal/service.TerminalService.Close', close)
+    const primary = { dispose: vi.fn() } as unknown as import('@xterm/xterm').Terminal
+    const split = { dispose: vi.fn() } as unknown as import('@xterm/xterm').Terminal
+    const store = useAppStore.getState()
+    store.openTab({
+      id: 'tab-split',
+      title: 'split',
+      type: 'terminal',
+      terminalId: 'primary-1',
+      sessionId: 1,
+      splitPaneIDs: ['primary-1', 'split-1'],
+    } as never)
+    store.registerTerminal('primary-1', primary)
+    store.registerTerminal('split-1', split)
+    store.setConnectionStatus('primary-1', 'connected')
+    store.setConnectionStatus('split-1', 'connected')
+    store.setActivePane('split-1')
+
+    await store.closeTab('tab-split')
+
+    expect(close).toHaveBeenCalledWith('primary-1')
+    expect(close).toHaveBeenCalledWith('split-1')
+    const state = useAppStore.getState()
+    expect(state.tabs).toHaveLength(0)
+    expect(state.terminalPool.has('primary-1')).toBe(false)
+    expect(state.terminalPool.has('split-1')).toBe(false)
+    expect(state.connectionStatus['split-1']).toBeUndefined()
+    expect(state.activePaneId).toBeNull()
+  })
+
+  it('rewrites splitPaneIDs when replacing or promoting the primary terminal', () => {
+    const store = useAppStore.getState()
+    store.openTab({
+      id: 'tab-1',
+      title: 'A',
+      type: 'terminal',
+      terminalId: 'primary-1',
+      sessionId: 1,
+      splitPaneIDs: ['primary-1', 'split-1'],
+    } as never)
+    store.registerTerminal('primary-1', { dispose: vi.fn() } as never)
+    store.registerTerminal('split-1', { dispose: vi.fn() } as never)
+
+    expect(store.replaceTerminalConnection('tab-1', 'primary-1', 'primary-2')).toBe(true)
+    expect(useAppStore.getState().tabs[0]).toMatchObject({
+      terminalId: 'primary-2',
+      splitPaneIDs: ['primary-2', 'split-1'],
+    })
+
+    useAppStore.setState({
+      tabs: [{
+        id: 'tab-1',
+        title: 'A',
+        type: 'terminal',
+        terminalId: 'primary-2',
+        sessionId: 1,
+        splitPaneIDs: ['primary-2', 'split-1'],
+      }],
+    } as never)
+    expect(store.promoteTerminalConnection('tab-1', 'primary-2', 'split-1')).toBe(true)
+    expect(useAppStore.getState().tabs[0]).toMatchObject({
+      terminalId: 'split-1',
+      splitPaneIDs: ['split-1'],
+    })
+  })
+
 })
 
 describe('connection state machine', () => {

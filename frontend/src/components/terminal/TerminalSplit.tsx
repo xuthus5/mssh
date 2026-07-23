@@ -214,7 +214,7 @@ export const TerminalSplit = forwardRef<TerminalSplitHandle, Props>(function Ter
         primaryRef.current = nextID
         useAppStore.getState().replaceTerminalConnection(tabID, terminalID, nextID)
       } else {
-        replaceSecondaryTerminalRuntime(terminalID, nextID)
+        replaceSecondaryTerminalRuntime(terminalID, nextID, tabID)
       }
       useAppStore.getState().setConnectionStatus(nextID, 'connected')
       onPaneReplaced?.(terminalID, nextID)

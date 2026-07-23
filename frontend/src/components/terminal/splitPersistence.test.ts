@@ -75,7 +75,6 @@ describe('splitPersistence', () => {
     closeExtraSplitPanes(['extra-a', 'extra-b'], 'test cleanup')
     await vi.waitFor(() => expect(close).toHaveBeenCalledTimes(2))
   })
-})
 
   it('inherits open size from preferred terminal', async () => {
     const open = vi.fn(async (_sessionId: number, cols: number, rows: number) => {
@@ -93,4 +92,31 @@ describe('splitPersistence', () => {
     await openSplitTerminal(7, 'ssh', undefined, 'serial blocked', 'primary')
     expect(open).toHaveBeenCalled()
   })
+
+  it('rewrites secondary splitPaneIDs when reconnecting a non-primary pane', async () => {
+    const { replaceSecondaryTerminalRuntime } = await import('@/components/terminal/splitPersistence')
+    useAppStore.setState({
+      tabs: [{
+        id: 'tab-1',
+        title: 'prod',
+        type: 'terminal',
+        terminalId: 'primary',
+        sessionId: 1,
+        splitPaneIDs: ['primary', 'second'],
+      }],
+      terminalPool: new Map([
+        ['primary', { terminal: { cols: 80, rows: 24 }, lastUsed: 1 }],
+        ['second', { terminal: { cols: 80, rows: 24 }, lastUsed: 2 }],
+      ]),
+      connectionStatus: { primary: 'connected', second: 'connected' },
+      activePaneId: 'second',
+    } as never)
+    replaceSecondaryTerminalRuntime('second', 'second-next', 'tab-1')
+    const state = useAppStore.getState()
+    expect(state.tabs[0]).toMatchObject({ splitPaneIDs: ['primary', 'second-next'] })
+    expect(state.terminalPool.has('second')).toBe(false)
+    expect(state.terminalPool.has('second-next')).toBe(true)
+    expect(state.activePaneId).toBe('second-next')
+  })
+})
 
