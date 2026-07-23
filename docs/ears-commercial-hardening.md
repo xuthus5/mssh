@@ -877,3 +877,9 @@
 |---|---|---|
 | UX-I18N-023 | en.json 进度/中态文案不得出现 medium 粘连（如 Importmedium... / Executemedium...）。 | done |
 
+## 2026-07-23 商用硬化波次（英文粘连词条二次清理）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| UX-I18N-024 | en.json 中剩余粘连词条（Importkey/Executemacro/Searchsession 等）必须拆分，并有回归测试看护。 | done |
+
