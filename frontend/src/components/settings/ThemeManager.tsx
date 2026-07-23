@@ -195,7 +195,7 @@ function ThemeRow({
               void runAction(() => onCreateProfile({
                 ...input(),
                 id: 0,
-                name: `${profile.name} 副本`,
+                name: t('${} 副本', profile.name),
               } as ThemeProfileInput))
             }}
           >
