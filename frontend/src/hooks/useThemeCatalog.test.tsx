@@ -1,5 +1,6 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { useToastStore } from '@/components/ui/toast'
 import { __clearHandlers, __emitEvent, __registerHandler } from '@/test/__mocks__/wails-runtime'
 import { changeColorMode, useThemeCatalog, useThemeCatalogStore } from '@/hooks/useThemeCatalog'
 import { useAppStore } from '@/store/appStore'
@@ -226,6 +227,18 @@ describe('useThemeCatalog', () => {
     expect(useThemeCatalogStore.getState().profiles[1].definition?.color_payload).toContain('#f5f5f5')
     expect(useAppStore.getState().terminalTheme.background).toBe('#f5f5f5')
   })
+
+  it('keeps mutation failure toast free of nested catalog load toast on silent refresh', async () => {
+    useToastStore.setState({ toasts: [] })
+    registerCatalogHandlers('dark')
+    __registerHandler('github.com/xuthus5/mssh/internal/service.ThemeService.DeleteProfile', async () => undefined)
+    const { result } = renderHook(() => useThemeCatalog())
+    await waitFor(() => expect(result.current.loaded).toBe(true))
+    __registerHandler('github.com/xuthus5/mssh/internal/service.ThemeService.ListProfiles', async () => { throw new Error('reload boom') })
+    await expect(act(async () => { await result.current.deleteProfile(3) })).rejects.toThrow()
+    const messages = useToastStore.getState().toasts.map((item) => item.message)
+    expect(messages.some((message) => message.includes('加载主题失败'))).toBe(false)
+  })
 })
 
 function registerCatalogHandlers(
@@ -245,3 +258,4 @@ function registerCatalogHandlers(
 function profile(id: number, mode: 'dark' | 'light', background: string) {
   return { id, name: mode, theme_id: id, follow_global_style: true, font_family: 'monospace', font_size: 14, cursor_style: 'bar', color_overrides: '{}', created_at: '', updated_at: '', definition: { id, name: mode, mode, source_type: 'builtin', source_name: '', source_url: '', source_author: '', source_license: '', source_version: '', source_fingerprint: mode, color_payload: JSON.stringify({ background, foreground: mode === 'dark' ? '#ffffff' : '#000000', cursor: '#888888', selection: '#264f78', ansi: Array(16).fill('#111111') }), raw_payload: '', is_builtin: true, created_at: '', updated_at: '' } }
 }
+

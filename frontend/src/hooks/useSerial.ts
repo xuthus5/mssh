@@ -18,7 +18,7 @@ export function useSerial() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (options?: { silent?: boolean }) => {
     setLoading(true)
     setError('')
     try {
@@ -27,13 +27,13 @@ export function useSerial() {
         SerialService.ListDevices().catch((err: unknown) => {
           const message = err instanceof Error ? err.message : String(err)
           logger.error('list serial devices failed', err)
-          toast(t('加载串口设备失败: ${}', message), 'error')
+          if (!options?.silent) toast(t('加载串口设备失败: ${}', message), 'error')
           return [] as string[]
         }),
         SerialService.ActiveDeviceMap().catch((err: unknown) => {
           const message = err instanceof Error ? err.message : String(err)
           logger.error('list active serial devices failed', err)
-          toast(t('加载串口占用状态失败: ${}', message), 'error')
+          if (!options?.silent) toast(t('加载串口占用状态失败: ${}', message), 'error')
           return {} as Record<string, string>
         }),
       ])
@@ -44,6 +44,7 @@ export function useSerial() {
       const message = err instanceof Error ? err.message : String(err)
       setError(message)
       logger.error('list serial ports failed', err)
+      // Primary list failures always surface; silent only suppresses device discovery noise.
       toast(t('加载串口配置失败: ${}', message), 'error')
     } finally {
       setLoading(false)
@@ -65,23 +66,23 @@ export function useSerial() {
 
   const createPort = useCallback(async (input: SerialPortInput) => {
     const created = await SerialService.Create(input)
-    await refresh()
+    await refresh({ silent: true })
     return created
   }, [refresh])
 
   const updatePort = useCallback(async (input: SerialPortInput) => {
     await SerialService.Update(input)
-    await refresh()
+    await refresh({ silent: true })
   }, [refresh])
 
   const deletePort = useCallback(async (id: number) => {
     await SerialService.Delete(id)
-    await refresh()
+    await refresh({ silent: true })
   }, [refresh])
 
   const deleteMany = useCallback(async (ids: number[]) => {
     await SerialService.DeleteMany(ids)
-    await refresh()
+    await refresh({ silent: true })
   }, [refresh])
 
   const duplicatePort = useCallback(async (port: SerialPort) => {
@@ -101,7 +102,7 @@ export function useSerial() {
       notes: port.notes,
       sort_order: port.sort_order,
     })
-    await refresh()
+    await refresh({ silent: true })
   }, [refresh])
 
   const connectPort = useCallback(async (port: SerialPort) => {
@@ -121,7 +122,7 @@ export function useSerial() {
       })
       store.setConnectionStatus(terminalId, 'connected')
       store.openTab(tab)
-      await refresh()
+      await refresh({ silent: true })
       return terminalId
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
