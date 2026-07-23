@@ -51,6 +51,22 @@ async function closeTerminalTabsForSessions(sessionIDs: Iterable<string>) {
   }
 }
 
+
+function cancelTransfersForSessions(sessionIDs: Iterable<string>) {
+  const targets = new Set([...sessionIDs].map(String).filter(Boolean))
+  if (targets.size === 0) return
+  const store = useAppStore.getState()
+  for (const transfer of store.transfers) {
+    if (!targets.has(String(transfer.sessionId))) continue
+    if (transfer.status !== 'queued' && transfer.status !== 'running') continue
+    store.updateTransfer(transfer.id, {
+      status: 'cancelled',
+      error: t('会话已删除'),
+      completedAt: Date.now(),
+    })
+  }
+}
+
 export function useSession() {
   const [folders, setFolders] = useState<Folder[]>([])
   const [sessions, setSessions] = useState<Session[]>([])
@@ -250,6 +266,7 @@ export function useSession() {
       setSessions((prev) => prev.filter((s) => s.id !== id))
       setRecentSessions((prev) => prev.filter((s) => s.id !== id))
       useConnectDialog.getState().dismissForSessions([id])
+      cancelTransfersForSessions([id])
       await closeTerminalTabsForSessions([id])
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
@@ -314,6 +331,7 @@ export function useSession() {
       setSessions((prev) => prev.filter((session) => !succeeded.has(session.id)))
       setRecentSessions((prev) => prev.filter((session) => !succeeded.has(session.id)))
       useConnectDialog.getState().dismissForSessions(succeeded)
+      cancelTransfersForSessions(succeeded)
       await closeTerminalTabsForSessions(succeeded)
     }
     // Local delete results already applied; silent refresh reconciles without aborting the results dialog.

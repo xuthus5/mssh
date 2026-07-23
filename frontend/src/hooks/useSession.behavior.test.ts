@@ -377,6 +377,23 @@ describe('useSession behavior', () => {
     expect(useConnectDialog.getState()).toMatchObject({ open: false, state: 'idle', sessionId: '' })
   })
 
+  it('cancels in-memory transfers when session is deleted', async () => {
+    __registerHandler(service + 'SessionService.DeleteSession', async () => undefined)
+    useAppStore.setState({
+      transfers: [{
+        id: 'job-1', fileName: 'a.txt', direction: 'upload', sessionId: 5, sessionName: 's',
+        sourcePath: '/a', targetPath: '/b', totalBytes: 10, transferredBytes: 2, speed: 1, eta: 1,
+        status: 'running', startedAt: 1,
+      }],
+      tabs: [],
+      activeSurface: null,
+      connectionStatus: {},
+    })
+    const { result } = renderHook(() => useSession())
+    await act(async () => { await result.current.deleteSession('5') })
+    expect(useAppStore.getState().transfers[0]).toMatchObject({ status: 'cancelled', error: '会话已删除' })
+  })
+
 })
 
 function registerInitial({ folders = [], sessions = [], recent = [] }: { folders?: any[]; sessions?: any[]; recent?: any[] }) {

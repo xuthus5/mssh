@@ -1079,3 +1079,10 @@
 | UX-TRANSFER-068 | 传输任务进入 cancelled/completed/failed 后，后续 progress 事件不得把状态改回 running。 | done |
 | UX-TRANSFER-069 | cancelled 任务不得被后续 completed 事件覆盖。 | done |
 
+## 2026-07-24 商用硬化波次（删除会话收敛传输中心）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| UX-TRANSFER-070 | 删除/批量删除会话后，前端传输中心对应会话的 queued/running 任务立即收敛为 cancelled（原因：会话已删除）。 | done |
+| UX-TRANSFER-071 | 因会话删除而取消的传输不得提供重试；重试 API 必须拒绝。 | done |
+
