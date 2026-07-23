@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { TerminalSplit, type TerminalSplitHandle } from '@/components/terminal/TerminalSplit'
 import { TerminalToolbar } from '@/components/terminal/TerminalToolbar'
 import { useAppStore, type TerminalTab as TerminalTabState } from '@/store/appStore'
@@ -13,6 +13,7 @@ import { TerminalComposePanel } from '@/components/terminal/TerminalComposePanel
 import { AITerminalPanel } from '@/components/terminal/AITerminalPanel'
 import { localHistoryBucket } from '@/hooks/terminalInputRuntime'
 import { t } from '@/i18n'
+import { TERMINAL_SEARCH_TOGGLE_EVENT } from '@/lib/terminalSearchEvents'
 
 
 interface Props {
@@ -75,6 +76,12 @@ export function TerminalTab({ terminalID, sessionId, onOpenFiles, active, focusR
   const [splitState, setSplitState] = useState({ paneCount: 1, busy: false })
   const [searchOpen, setSearchOpen] = useState(false)
   const [composeOpen, setComposeOpen] = useState(false)
+  useEffect(() => {
+    if (!active) return
+    const onToggle = () => setSearchOpen((value) => !value)
+    window.addEventListener(TERMINAL_SEARCH_TOGGLE_EVENT, onToggle)
+    return () => window.removeEventListener(TERMINAL_SEARCH_TOGGLE_EVENT, onToggle)
+  }, [active])
   const activeTerminalID = activePaneID ?? terminalID
   const updateWorkspace = (updates: Parameters<typeof updateTerminalWorkspace>[1]) => {
     if (currentTab) updateTerminalWorkspace(currentTab.id, updates)
