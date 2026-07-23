@@ -66,6 +66,10 @@ func (f *FileService) startTransfer(direction string, sessionID int64, source, t
 		defer f.clearStart(taskID)
 		sftpClient, sftpErr := ssh.OpenSFTP(wrapper)
 		if sftpErr != nil {
+			if transferAborted(ctx, sftpErr) {
+				f.emitTransferCancelled(taskID)
+				return
+			}
 			f.emitTransferError(taskID, sftpErr)
 			return
 		}
@@ -83,7 +87,7 @@ func (f *FileService) runUpload(ctx context.Context, taskID string, sftpClient *
 	})
 	if uploadErr != nil {
 		_ = ssh.RemoveFile(sftpClient, temporaryPath)
-		if errors.Is(uploadErr, context.Canceled) {
+		if transferAborted(ctx, uploadErr) {
 			f.emitTransferCancelled(taskID)
 			return
 		}
@@ -92,6 +96,10 @@ func (f *FileService) runUpload(ctx context.Context, taskID string, sftpClient *
 	}
 	if renameErr := ssh.Rename(sftpClient, temporaryPath, remotePath); renameErr != nil {
 		_ = ssh.RemoveFile(sftpClient, temporaryPath)
+		if transferAborted(ctx, renameErr) {
+			f.emitTransferCancelled(taskID)
+			return
+		}
 		f.emitTransferError(taskID, renameErr)
 		return
 	}
@@ -107,7 +115,7 @@ func (f *FileService) runDownload(ctx context.Context, taskID string, sftpClient
 	})
 	if downloadErr != nil {
 		_ = os.Remove(partialPath)
-		if errors.Is(downloadErr, context.Canceled) {
+		if transferAborted(ctx, downloadErr) {
 			f.emitTransferCancelled(taskID)
 			return
 		}
@@ -116,6 +124,10 @@ func (f *FileService) runDownload(ctx context.Context, taskID string, sftpClient
 	}
 	if renameErr := os.Rename(partialPath, localPath); renameErr != nil {
 		_ = os.Remove(partialPath)
+		if transferAborted(ctx, renameErr) {
+			f.emitTransferCancelled(taskID)
+			return
+		}
 		f.emitTransferError(taskID, fmt.Errorf("finalize download: %w", renameErr))
 		return
 	}
@@ -150,4 +162,11 @@ func (f *FileService) CancelAll() {
 	for _, cancel := range cancels {
 		cancel()
 	}
+}
+
+func transferAborted(ctx context.Context, err error) bool {
+	if ctx != nil && ctx.Err() != nil {
+		return true
+	}
+	return errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)
 }
