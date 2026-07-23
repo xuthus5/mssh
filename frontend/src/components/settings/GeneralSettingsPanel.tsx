@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { LabeledSelect } from '@/components/ui/labeled-select'
 import { SearchableSelect } from '@/components/ui/searchable-select'
@@ -33,6 +34,8 @@ interface Props {
   onSave: (settings: GeneralSettings) => Promise<void>
   onPreviewUIFont: (fontFamily: string, fallbackFamily: string, fontSize: number) => void
   settingsReady?: boolean
+  loadError?: string
+  onReload?: () => void
 }
 
 function createDraft(general: GeneralSettings): GeneralDraft {
@@ -183,7 +186,7 @@ function LanguageSettings({
   )
 }
 
-export function GeneralSettingsPanel({ general, systemFonts, onSave, onPreviewUIFont, settingsReady = true }: Props) {
+export function GeneralSettingsPanel({ general, systemFonts, onSave, onPreviewUIFont, settingsReady = true, loadError = '', onReload }: Props) {
   const [draft, setDraft] = useState(() => createDraft(general))
   useEffect(() => {
     setDraft(createDraft(general))
@@ -204,6 +207,14 @@ export function GeneralSettingsPanel({ general, systemFonts, onSave, onPreviewUI
 
   return (
     <div className="flex flex-col gap-3 pt-2">
+      {loadError ? (
+        <div className="rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">
+          {t('加载设置失败: ${}', loadError)}
+          {onReload ? (
+            <Button type="button" size="xs" variant="outline" className="ml-2" onClick={() => { onReload() }}>{t('重试')}</Button>
+          ) : null}
+        </div>
+      ) : null}
       <div className="flex items-center justify-between gap-3">
         <p className="text-xs text-muted-foreground">{t('通用设置包含界面外观与应用级偏好。')}</p>
         <AutoSaveStatusIndicator status={autoSave.status} error={autoSave.error} />

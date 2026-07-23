@@ -78,7 +78,6 @@ export async function loadThemeCatalog(options?: { force?: boolean; silent?: boo
     const message = error instanceof Error ? error.message : String(error)
     useThemeCatalogStore.setState({ loading: false, error: message })
     logger.error('load theme catalog failed', error)
-    if (!options?.silent) toast(t('加载主题失败: ${}', message), 'error')
     return false
   }
 }

@@ -1146,3 +1146,11 @@
 | UX-KEY-098 | 密钥列表加载失败时展示错误与重试，不得显示「无密钥」空态；不得 toast 叠加。 | done |
 | UX-SHORTCUT-099 | 快捷键设置加载失败时展示页面 error 与重试，可回退默认绑定；不得 toast。 | done |
 | UX-MACRO-100 | 侧边栏宏列表加载失败时展示 inline error 与重试，不得 toast 伪装空列表。 | done |
+
+## 2026-07-24 商用硬化波次（设置页加载失败错误归属）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| UX-SET-101 | 通用/终端设置加载失败时仅页面 error banner + 重试，不得 toast；不得把默认值伪装成已加载成功。 | done |
+| UX-SFTPSET-102 | SFTP 设置加载失败时仅页面 error banner + 重试，不得 toast。 | done |
+| UX-THEME-103 | 主题目录加载失败时仅终端设置页 error banner + 重试，不得 toast 叠加 store error。 | done |
