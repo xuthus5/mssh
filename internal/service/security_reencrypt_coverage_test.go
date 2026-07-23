@@ -1,6 +1,7 @@
 package service
 
 import (
+	"database/sql"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -34,6 +35,14 @@ func TestSecurityRotateReencryptsKeysAndPasswords(t *testing.T) {
 	require.NotNil(t, material)
 	assert.NotEmpty(t, material.PrivateKey)
 
+	settingSvc := NewSettingService(db, testutil.NewTestLogger(), SettingServiceOptions{Crypto: runtime})
+	require.NoError(t, settingSvc.Set(model.SettingInputFrom(model.Setting{
+		Key: applicationProxyPasswordSetting, Namespace: "application", Value: `"proxy-secret"`, ValueType: "string", Version: 1,
+	})))
+	require.NoError(t, writeSyncSetting(db, syncGistTokenSetting, string(mustEncrypt(t, runtime, "gist-token"))))
+	require.NoError(t, writeSyncSetting(db, syncWebDAVPasswordSetting, string(mustEncrypt(t, runtime, "webdav-pass"))))
+	require.NoError(t, writeSyncSetting(db, syncS3SecretSetting, string(mustEncrypt(t, runtime, "s3-secret"))))
+
 	status, err := svc.Rotate(model.SecurityRotateInput{CurrentPassword: "initial-pass-12", NewPassword: "rotated-pass-12"})
 	require.NoError(t, err)
 	assert.True(t, status.Unlocked)
@@ -47,6 +56,30 @@ func TestSecurityRotateReencryptsKeysAndPasswords(t *testing.T) {
 	plain, err := runtime.Decrypt([]byte(stored.PrivateKey))
 	require.NoError(t, err)
 	assert.NotEmpty(t, plain)
+
+	proxy, saved := settingSvc.loadProxyPassword()
+	assert.True(t, saved)
+	assert.Equal(t, "proxy-secret", proxy)
+
+	assert.Equal(t, "gist-token", mustLoadSyncSecret(t, db, runtime, syncGistTokenSetting))
+	assert.Equal(t, "webdav-pass", mustLoadSyncSecret(t, db, runtime, syncWebDAVPasswordSetting))
+	assert.Equal(t, "s3-secret", mustLoadSyncSecret(t, db, runtime, syncS3SecretSetting))
+}
+
+func mustEncrypt(t *testing.T, crypto KeyCrypto, value string) []byte {
+	t.Helper()
+	sealed, err := crypto.Encrypt([]byte(value))
+	require.NoError(t, err)
+	return sealed
+}
+
+func mustLoadSyncSecret(t *testing.T, db *sql.DB, crypto KeyCrypto, key string) string {
+	t.Helper()
+	var encrypted string
+	require.NoError(t, readSyncSetting(db, key, &encrypted))
+	plain, err := crypto.Decrypt([]byte(encrypted))
+	require.NoError(t, err)
+	return string(plain)
 }
 
 func TestTunnelHandleAcceptLoopExitCleansActiveReservation(t *testing.T) {
