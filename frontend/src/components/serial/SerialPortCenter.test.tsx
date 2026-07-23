@@ -81,23 +81,26 @@ describe('SerialPortCenter', () => {
     })
   })
 
-  it('toasts duplicate and delete failures with explicit templates', async () => {
+  it('surfaces duplicate and delete failures panel-owned without toast', async () => {
     const user = userEvent.setup()
     useToastStore.setState({ toasts: [] })
     __registerHandler(serial + 'Create', async () => { throw new Error('dup failed') })
     render(<SerialPortCenter />)
     await waitFor(() => expect(screen.getByText('ESP32')).toBeInTheDocument())
     await user.click(screen.getByRole('button', { name: /复制/ }))
-    await waitFor(() => {
-      expect(useToastStore.getState().toasts.some((item) => item.message === '复制串口配置失败: dup failed')).toBe(true)
-    })
+    await waitFor(() => expect(screen.getByText('复制串口配置失败: dup failed')).toBeInTheDocument())
+    expect(useToastStore.getState().toasts.filter((item) => item.type === 'error')).toHaveLength(0)
 
     useToastStore.setState({ toasts: [] })
-    __registerHandler(serial + 'Delete', async () => { throw new Error('del failed') })
+    const deleteCalls: number[] = []
+    __registerHandler(serial + 'Delete', async (id: number) => {
+      deleteCalls.push(id)
+      throw new Error('del failed')
+    })
     await user.click(screen.getByRole('button', { name: /删除/ }))
     await user.click(await screen.findByRole('button', { name: '确认删除' }))
-    await waitFor(() => {
-      expect(useToastStore.getState().toasts.some((item) => item.message === '删除串口配置失败: del failed')).toBe(true)
-    })
+    await waitFor(() => expect(deleteCalls).toEqual([1]))
+    await waitFor(() => expect(screen.getByText('删除串口配置失败: del failed')).toBeInTheDocument())
+    expect(useToastStore.getState().toasts.filter((item) => item.type === 'error')).toHaveLength(0)
   })
 })
