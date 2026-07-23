@@ -78,7 +78,7 @@ describe('useSessionAssetCatalog', () => {
     const { result } = renderHook(() => useHarness())
     await act(async () => result.current.listAssetCatalogs())
     expect(result.current.error).toBe('catalog failed')
-    expect(useToastStore.getState().toasts.some((item) => item.message.includes('catalog failed'))).toBe(true)
+    expect(useToastStore.getState().toasts.some((item) => item.message.includes('catalog failed'))).toBe(false)
   })
 
   it('keeps mutation success when post-mutation silent refresh fails', async () => {
@@ -90,11 +90,12 @@ describe('useSessionAssetCatalog', () => {
     expect(useToastStore.getState().toasts.some((item) => item.message.includes('refresh failed'))).toBe(false)
   })
 
-  it('toasts standalone refresh failures by default', async () => {
+  it('sets page error on standalone refresh failures without toast', async () => {
     __registerHandler(service + 'AssetCatalogService.ListEnvironments', async () => { throw new Error('refresh only failed') })
     const { result } = renderHook(() => useHarness())
-    await expect(act(async () => result.current.refreshAssets())).rejects.toThrow('refresh only failed')
-    expect(useToastStore.getState().toasts.some((item) => item.message.includes('refresh only failed'))).toBe(true)
+    await act(async () => { await result.current.refreshAssets() })
+    expect(result.current.error).toBe('refresh only failed')
+    expect(useToastStore.getState().toasts.some((item) => item.message.includes('refresh only failed'))).toBe(false)
   })
 })
 

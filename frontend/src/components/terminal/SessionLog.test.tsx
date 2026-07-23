@@ -78,7 +78,7 @@ describe('SessionLog', () => {
     render(<><SessionLog sessionId={1} onPlayback={vi.fn()} onDeleteRecording={vi.fn(async () => {})} onClose={vi.fn()} /><ToastContainer /></>)
 
     expect(await screen.findByText('list failed')).toBeInTheDocument()
-    expect(await screen.findByText(/加载会话录制失败/)).toBeInTheDocument()
+    expect(useToastStore.getState().toasts).toHaveLength(0)
     expect(loggerError).toHaveBeenCalledWith('SessionLog: load recordings error:', loadError)
     await userEvent.click(screen.getByRole('button', { name: '重试' }))
 
@@ -106,7 +106,7 @@ describe('SessionLog', () => {
     deletion.reject(new Error('delete failed'))
 
     expect(await screen.findByText('delete failed')).toBeInTheDocument()
-    expect(await screen.findByText(/删除会话录制失败/)).toBeInTheDocument()
+    expect(useToastStore.getState().toasts).toHaveLength(0)
     expect(screen.getByText('1 条')).toBeInTheDocument()
     expect(screen.getByText('录制 #7')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '删除' })).toBeEnabled()

@@ -42,7 +42,6 @@ export function useAISettings(): AISettingsController {
       const message = errorMessage(loadError)
       setError(message)
       logger.error('load AI settings failed', loadError)
-      toast(t('加载 AI 设置失败: ${}', message), 'error')
     } finally {
       setLoading(false)
     }
@@ -56,7 +55,6 @@ export function useAISettings(): AISettingsController {
       if (!quiet) toast(success, 'success')
     } catch (actionError) {
       const message = errorMessage(actionError)
-      setError(message)
       const failureKey = failureLabels[name] ?? '${}失败: ${}'
       if (failureLabels[name]) toast(t(failureKey, message), 'error')
       else toast(t(failureKey, name, message), 'error')

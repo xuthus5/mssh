@@ -9,7 +9,7 @@ describe('SerialPortDialog', () => {
     useToastStore.setState({ toasts: [] })
   })
 
-  it('toasts save failures and keeps dialog open', async () => {
+  it('shows save failures inline without toast and keeps dialog open', async () => {
     const onSave = vi.fn(async () => {
       throw new Error('serial save failed')
     })
@@ -26,8 +26,8 @@ describe('SerialPortDialog', () => {
     await userEvent.clear(name)
     await userEvent.type(name, 'COM-A')
     await userEvent.click(screen.getByRole('button', { name: '添加配置' }))
-    await waitFor(() => expect(useToastStore.getState().toasts.some((item) => item.message.includes('serial save failed'))).toBe(true))
+    expect(await screen.findByText('serial save failed')).toBeInTheDocument()
+    expect(useToastStore.getState().toasts).toHaveLength(0)
     expect(screen.getByRole('dialog')).toBeInTheDocument()
-    expect(screen.getByText('serial save failed')).toBeInTheDocument()
   })
 })

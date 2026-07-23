@@ -40,20 +40,20 @@ describe('AuditPanel', () => {
     expect(audit.setEnabled).toHaveBeenCalledWith(false)
   })
 
-  it('toasts audit setting load failures', async () => {
+  it('shows audit setting load failures inline without toast', async () => {
     audit.enabled.mockRejectedValueOnce(new Error('enabled failed'))
     render(<AuditPanel />)
     expect(await screen.findByText('enabled failed')).toBeInTheDocument()
-    await waitFor(() => expect(useToastStore.getState().toasts.some((item) => item.message.includes('enabled failed'))).toBe(true))
+    expect(useToastStore.getState().toasts).toHaveLength(0)
   })
 
-  it('toasts audit toggle failures', async () => {
+  it('shows audit toggle failures inline without toast', async () => {
     const user = userEvent.setup()
     audit.setEnabled.mockRejectedValueOnce(new Error('toggle failed'))
     render(<AuditPanel />)
     await screen.findAllByText('SSH 连接')
     await user.click(screen.getByRole('switch', { name: '启用审计日志' }))
     expect(await screen.findByText('toggle failed')).toBeInTheDocument()
-    await waitFor(() => expect(useToastStore.getState().toasts.some((item) => item.message.includes('toggle failed'))).toBe(true))
+    expect(useToastStore.getState().toasts).toHaveLength(0)
   })
 })

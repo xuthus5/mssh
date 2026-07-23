@@ -95,8 +95,8 @@ export function useSession() {
       const msg = err instanceof Error ? err.message : String(err)
       logger.error('listFolders error', err)
       setError(msg)
-      if (!options?.silent) toast(t('加载分组失败: ${}', msg), 'error')
-      else throw err
+      // page banner owns load failures; silent path rethrows for nested refresh.
+      if (options?.silent) throw err
     } finally {
       setLoading(false)
     }
@@ -165,8 +165,8 @@ export function useSession() {
       const msg = err instanceof Error ? err.message : String(err)
       logger.error('listSessions error', err)
       setError(msg)
-      if (!options?.silent) toast(t('加载会话失败: ${}', msg), 'error')
-      else throw err
+      // page banner owns load failures; silent path rethrows for nested refresh.
+      if (options?.silent) throw err
     } finally {
       setLoading(false)
       setSessionsLoaded(true)
@@ -181,8 +181,8 @@ export function useSession() {
       const msg = err instanceof Error ? err.message : String(err)
       logger.error('listRecentSessions error', err)
       setError(msg)
-      if (!options?.silent) toast(t('加载最近会话失败: ${}', msg), 'error')
-      else throw err
+      // page banner owns load failures; silent path rethrows for nested refresh.
+      if (options?.silent) throw err
     }
   }, [])
   const csvTransfer = useSessionCSVTransfer({ refreshFolders: listFolders, refreshAssets })
