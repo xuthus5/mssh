@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/xuthus5/mssh/internal/model"
@@ -28,14 +29,36 @@ func (m *MacroService) List() ([]model.Macro, error) {
 
 func (m *MacroService) Create(input model.MacroInput) (*model.Macro, error) {
 	macro := input.Macro()
+	if err := validateMacroPayload(macro); err != nil {
+		return nil, err
+	}
 	m.logger.Info("creating macro", "name", macro.Name)
 	return store.CreateMacro(m.db, macro)
 }
 
 func (m *MacroService) Update(input model.MacroInput) error {
 	macro := input.Macro()
+	if err := validateMacroPayload(macro); err != nil {
+		return err
+	}
 	m.logger.Info("updating macro", "id", macro.ID, "name", macro.Name)
 	return store.UpdateMacro(m.db, macro)
+}
+
+func validateMacroPayload(macro model.Macro) error {
+	if strings.TrimSpace(macro.Name) == "" {
+		return fmt.Errorf("macro name is required")
+	}
+	if strings.TrimSpace(macro.Command) == "" {
+		return fmt.Errorf("macro command is required")
+	}
+	if len(macro.Command) > maxMacroCommandBytes {
+		return fmt.Errorf("macro command exceeds size limit")
+	}
+	if macro.DelayMs < 0 || macro.DelayMs > 60_000 {
+		return fmt.Errorf("macro delay must be between 0 and 60000 ms")
+	}
+	return nil
 }
 
 func (m *MacroService) Delete(id int64) error {
