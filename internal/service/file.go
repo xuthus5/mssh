@@ -70,6 +70,9 @@ func (f *FileService) ListTransfers() ([]model.TransferJob, error) {
 
 // ListDir lists remote directory entries via SFTP.
 func (f *FileService) ListDir(sessionID int64, path string) ([]ssh.FileEntry, error) {
+	if err := validateRemotePath(path); err != nil {
+		return nil, fmt.Errorf("list dir: %w", err)
+	}
 	f.logger.Info("listing directory", "sessionID", sessionID, "path", path)
 	wrapper, connID, err := f.connect(sessionID)
 	if err != nil {
@@ -90,6 +93,9 @@ func (f *FileService) ListDir(sessionID int64, path string) ([]ssh.FileEntry, er
 
 // Upload starts an async file upload and returns a task ID.
 func (f *FileService) Delete(sessionID int64, path string) error {
+	if err := validateRemotePath(path); err != nil {
+		return fmt.Errorf("delete: %w", err)
+	}
 	wrapper, connID, err := f.connect(sessionID)
 	if err != nil {
 		return fmt.Errorf("delete: %w", err)
@@ -107,6 +113,9 @@ func (f *FileService) Delete(sessionID int64, path string) error {
 
 // Mkdir creates a remote directory via SFTP.
 func (f *FileService) Mkdir(sessionID int64, path string) error {
+	if err := validateRemotePath(path); err != nil {
+		return fmt.Errorf("mkdir: %w", err)
+	}
 	wrapper, connID, err := f.connect(sessionID)
 	if err != nil {
 		return fmt.Errorf("mkdir: %w", err)
@@ -124,6 +133,12 @@ func (f *FileService) Mkdir(sessionID int64, path string) error {
 
 // Rename renames a remote file via SFTP.
 func (f *FileService) Rename(sessionID int64, oldPath, newPath string) error {
+	if err := validateRemotePath(oldPath); err != nil {
+		return fmt.Errorf("rename: %w", err)
+	}
+	if err := validateRemotePath(newPath); err != nil {
+		return fmt.Errorf("rename: %w", err)
+	}
 	wrapper, connID, err := f.connect(sessionID)
 	if err != nil {
 		return fmt.Errorf("rename: %w", err)
