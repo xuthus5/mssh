@@ -175,3 +175,21 @@ func TestCloneTerminalOutputCapsAndCopies(t *testing.T) {
 	assert.Equal(t, maxPendingTerminalOutput, len(capped))
 	assert.Nil(t, cloneTerminalOutput(nil))
 }
+
+func TestRequireHTTPSUnlessLoopbackBlocksMetadataAndCredentials(t *testing.T) {
+	cred, err := url.Parse("https://user:pass@example.com/dav")
+	require.NoError(t, err)
+	require.Error(t, requireHTTPSUnlessLoopback(cred))
+
+	meta, err := url.Parse("https://169.254.169.254/latest")
+	require.NoError(t, err)
+	require.Error(t, requireHTTPSUnlessLoopback(meta))
+
+	mdns, err := url.Parse("https://metadata.google.internal/")
+	require.NoError(t, err)
+	require.Error(t, requireHTTPSUnlessLoopback(mdns))
+
+	fileURL, err := url.Parse("file:///etc/passwd")
+	require.NoError(t, err)
+	require.Error(t, requireHTTPSUnlessLoopback(fileURL))
+}
