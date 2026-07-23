@@ -42,8 +42,8 @@ export interface SettingsViewProps {
   onDeleteThemeProfile: (id: number) => Promise<void>
   onDeleteThemeDefinition: (id: number) => Promise<void>
   onResetBuiltinThemes: () => Promise<BuiltinThemeResetResult>
-  onExportConfig: () => void
-  onImportConfig: () => void
+  onExportConfig: () => void | Promise<void>
+  onImportConfig: () => void | Promise<void>
   sftpSettings: SFTPSettings
   sftpSettingsReady?: boolean
   onSaveSFTPSettings: (settings: SFTPSettings) => Promise<void>
