@@ -178,3 +178,12 @@
 | UI-CONFIRM-003 | 设置窗口必须挂载 `ConfirmDialogHost`，与主窗口共用 Promise 确认通道。 | done |
 | UI-CONFIRM-004 | 当确认宿主未挂载时，`requestConfirm` 必须立即 fail-closed 返回 false，不得永久挂起调用方。 | done |
 
+## 2026-07-23 商用硬化波次（i18n 完整度 / 串口信号轮询）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| I18N-001 | 英文目录不得残留中文值；生产 UI 字符串切换英文后展示英文。 | done |
+| I18N-002 | 明显错误的粘连英文（如 Opensettings、searchname）必须修正为可读英文。 | done |
+| I18N-003 | 运行时拼接与模板字面量中的中文提示必须走 `t()` 通道。 | done |
+| SERIAL-010 | 当串口终端不存在或已关闭时，信号工具栏必须停止轮询并禁用控制，避免日志刷屏。 | done |
+

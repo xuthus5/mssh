@@ -171,7 +171,7 @@ function MacrosWorkspace() {
           onAdd={() => {}}
           onDelete={(id) => {
             void MacroService.Delete(Number(id)).then(reload).catch((error: unknown) => {
-              toast(`删除宏失败: ${error instanceof Error ? error.message : String(error)}`, 'error')
+              toast(t('删除宏失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
             })
           }}
         />
