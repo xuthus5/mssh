@@ -30,6 +30,9 @@ func settingBlocked(key string) bool {
 }
 
 func rejectBlockedSettingKey(key string) error {
+	if strings.TrimSpace(key) == "" {
+		return fmt.Errorf("setting key is required")
+	}
 	if settingBlocked(key) {
 		return fmt.Errorf("setting %q cannot be accessed through the generic settings API", key)
 	}

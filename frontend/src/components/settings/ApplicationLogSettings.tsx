@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Field, FieldContent, FieldDescription, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { logger } from '@/lib/logger'
+import { toast } from '@/components/ui/toast'
 import { t } from '@/i18n'
 
 export const DEFAULT_APP_LOG_DIR_PLACEHOLDER = '~/.mssh/logs'
@@ -32,7 +33,9 @@ export function ApplicationLogSettingsSection({
       const path = Array.isArray(selected) ? selected[0] : selected
       if (path) onLogDirChange(path)
     } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
       logger.error('pick log directory failed', error)
+      toast(t('选择日志目录失败: ${}', message), 'error')
     }
   }
 

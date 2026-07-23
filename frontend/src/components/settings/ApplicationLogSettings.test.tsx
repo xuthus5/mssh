@@ -1,12 +1,18 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApplicationLogSettingsSection } from '@/components/settings/ApplicationLogSettings'
+import { useToastStore } from '@/components/ui/toast'
 
 const openFile = vi.fn()
 vi.mock('@wailsio/runtime', () => ({ Dialogs: { OpenFile: (...args: unknown[]) => openFile(...args) } }))
 
 describe('ApplicationLogSettingsSection', () => {
+  beforeEach(() => {
+    openFile.mockReset()
+    useToastStore.setState({ toasts: [] })
+  })
+
   it('edits retention and picks a directory', async () => {
     const onLogDirChange = vi.fn()
     const onLogRetentionDaysChange = vi.fn()
@@ -26,5 +32,20 @@ describe('ApplicationLogSettingsSection', () => {
     await user.click(screen.getByRole('button', { name: /浏览/ }))
     expect(openFile).toHaveBeenCalledWith(expect.objectContaining({ CanChooseDirectories: true, CanChooseFiles: false }))
     expect(onLogDirChange).toHaveBeenCalledWith('/home/user/mssh-logs')
+  })
+
+  it('toasts directory picker failures', async () => {
+    openFile.mockRejectedValueOnce(new Error('picker failed'))
+    const user = userEvent.setup()
+    render(
+      <ApplicationLogSettingsSection
+        logDir=""
+        logRetentionDays="30"
+        onLogDirChange={vi.fn()}
+        onLogRetentionDaysChange={vi.fn()}
+      />,
+    )
+    await user.click(screen.getByRole('button', { name: /浏览/ }))
+    await waitFor(() => expect(useToastStore.getState().toasts.some((item) => item.message.includes('picker failed'))).toBe(true))
   })
 })
