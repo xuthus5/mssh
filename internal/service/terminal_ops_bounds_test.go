@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"strings"
 	"testing"
 	"time"
@@ -115,4 +116,11 @@ func TestTerminalService_RejectsEmptyTerminalID(t *testing.T) {
 	require.Error(t, svc.Resize("   ", 80, 24))
 	require.Error(t, svc.Close(""))
 	require.Error(t, svc.Attach(""))
+}
+
+func TestTerminalService_OpenRejectsInvalidSessionID(t *testing.T) {
+	svc := &TerminalService{logger: testutil.NewTestLogger()}
+	_, err := svc.Open(context.Background(), 0, 80, 24)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "invalid session id")
 }

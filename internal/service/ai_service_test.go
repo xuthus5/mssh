@@ -342,3 +342,13 @@ func TestAIServiceClampsTerminalContext(t *testing.T) {
 	assert.LessOrEqual(t, strings.Count(seenContext, "x"), 32+100) // body includes JSON framing
 	assert.NotContains(t, seenContext, strings.Repeat("x", 200))
 }
+
+func TestAIServiceExecuteCommandRejectsInvalidIDs(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	service := NewAIService(db, nil, nil, testutil.NewTestLogger())
+	service.terminals = &aiTerminalStub{}
+	err := service.ExecuteCommand(model.AICommandExecutionInput{SessionID: 0, TerminalID: "term", Command: "echo 1", Approved: true})
+	require.Error(t, err)
+	err = service.ExecuteCommand(model.AICommandExecutionInput{SessionID: 1, TerminalID: "  ", Command: "echo 1", Approved: true})
+	require.Error(t, err)
+}

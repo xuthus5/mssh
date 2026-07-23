@@ -216,3 +216,10 @@ func TestTerminalServiceProcessInfoErrors(t *testing.T) {
 	_, err = service.ProcessInfo("term-1")
 	require.ErrorContains(t, err, "process probe failed")
 }
+
+func TestSystemInfoRejectsEmptyTerminalID(t *testing.T) {
+	svc := &TerminalService{logger: testutil.NewTestLogger(), connIDs: map[string]string{}}
+	_, err := svc.SystemInfo("")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "invalid terminal id")
+}
