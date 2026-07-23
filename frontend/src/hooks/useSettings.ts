@@ -75,7 +75,10 @@ export function useKeySettings() {
   const [keys, setKeys] = useState<KeyInfo[]>([])
   const listKeys = useCallback(async () => {
     try { setKeys((await KeyService.List() ?? []).map((key) => keyInfo(key, 0))) }
-    catch (error) { logger.debug('listKeys error', error) }
+    catch (error) {
+      logger.error('listKeys error', error)
+      toast(t('加载密钥列表失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
+    }
   }, [])
   const generateKey = useCallback(async (name: string, type: KeyInfo['type'], bits: number) => {
     try {
@@ -169,7 +172,9 @@ export function useSettings() {
     ...general,
     ...keys,
     ...config,
-    sftpSettings: sftp.settings, saveSFTPSettings: sftp.save,
+    sftpSettings: sftp.settings,
+    sftpSettingsReady: sftp.settingsReady,
+    saveSFTPSettings: sftp.save,
     systemFonts,
   }
 }

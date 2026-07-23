@@ -457,3 +457,12 @@
 | TERM-IO-002 | TerminalService.Write 必须拒绝非法 UTF-8 载荷。 | done |
 | TERM-IO-003 | TerminalService.Resize 必须将 cols/rows 限制在 [1,1000]/[1,500]，非法几何拒绝且不触达 PTY。 | done |
 
+## 2026-07-23 商用硬化波次（设置加载门禁防默认值覆盖）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| UX-SETTINGS-004 | 通用设置加载失败时必须 toast 错误，并将 `settingsReady=false`，禁止自动保存用默认值覆盖远端配置。 | done |
+| UX-SETTINGS-005 | SFTP 设置加载失败时必须 toast 错误，并将 `settingsReady=false`，禁止自动保存覆盖。 | done |
+| UX-SETTINGS-006 | 通用/终端/SFTP 面板 autosave 必须以 settingsReady 为 isReady 门禁；加载成功前不得触发 onSave。 | done |
+| UX-SETTINGS-007 | 密钥列表加载失败必须 toast 错误，不得静默为空列表。 | done |
+

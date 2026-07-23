@@ -26,6 +26,7 @@ import { t } from '@/i18n'
 
 export interface SettingsViewProps {
   general: GeneralSettings
+  settingsReady?: boolean
   systemFonts: string[]
   themeProfiles: ThemeProfile[]
   themeAssignments: ThemeAssignments
@@ -44,6 +45,7 @@ export interface SettingsViewProps {
   onExportConfig: () => void
   onImportConfig: () => void
   sftpSettings: SFTPSettings
+  sftpSettingsReady?: boolean
   onSaveSFTPSettings: (settings: SFTPSettings) => Promise<void>
   ai?: AISettingsController
 }
@@ -57,6 +59,7 @@ function SettingsTabPanels(props: SettingsViewProps) {
           systemFonts={props.systemFonts}
           onSave={props.onSaveGeneral}
           onPreviewUIFont={props.onPreviewUIFont}
+          settingsReady={props.settingsReady}
         />
       </TabsContent>
       <TabsContent value="terminal" className="min-h-0 min-w-0 overflow-y-auto overscroll-contain pr-2">
@@ -74,6 +77,7 @@ function SettingsTabPanels(props: SettingsViewProps) {
           onDeleteThemeProfile={props.onDeleteThemeProfile}
           onDeleteThemeDefinition={props.onDeleteThemeDefinition}
           onResetBuiltinThemes={props.onResetBuiltinThemes}
+          settingsReady={props.settingsReady}
         />
       </TabsContent>
       <TabsContent value="ai" className="min-h-0 min-w-0 overflow-y-auto overscroll-contain pr-2">
@@ -90,7 +94,7 @@ function SettingsTabPanels(props: SettingsViewProps) {
         <SecurityPanel />
       </TabsContent>
       <TabsContent value="sftp" className="min-h-0 min-w-0 overflow-y-auto overscroll-contain pr-2">
-        <SFTPSettingsPanel settings={props.sftpSettings} onSave={props.onSaveSFTPSettings} />
+        <SFTPSettingsPanel settings={props.sftpSettings} onSave={props.onSaveSFTPSettings} settingsReady={props.sftpSettingsReady} />
       </TabsContent>
       <TabsContent value="shortcuts" className="min-h-0 min-w-0 overflow-y-auto overscroll-contain pr-2">
         <ShortcutSettingsPanel />
