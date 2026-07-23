@@ -22,6 +22,7 @@ func (t *TerminalService) evictLRU() {
 	delete(t.systemSamples, victimID)
 	delete(t.outputSequences, victimID)
 	delete(t.connIDs, victimID)
+	delete(t.sessionIDs, victimID)
 	closeHandler := t.closeHandler
 	t.outputMu.Unlock()
 

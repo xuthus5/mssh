@@ -19,6 +19,7 @@ type TerminalService struct {
 	outputMu        sync.Mutex
 	ptys            map[string]terminalIO
 	connIDs         map[string]string
+	sessionIDs      map[string]int64
 	attached        map[string]bool
 	pendingOutput   map[string][]byte
 	outputSequences map[string]uint64
@@ -61,6 +62,7 @@ func NewTerminalService(sessionSvc *SessionService, eventBus EventBus, maxSize i
 	return &TerminalService{
 		ptys:            make(map[string]terminalIO),
 		connIDs:         make(map[string]string),
+		sessionIDs:      make(map[string]int64),
 		attached:        make(map[string]bool),
 		pendingOutput:   make(map[string][]byte),
 		outputSequences: make(map[string]uint64),
@@ -106,7 +108,7 @@ func (t *TerminalService) openTerminalSession(ctx context.Context, sessionID int
 		_ = t.sessionSvc.disconnect(connID, false)
 		return "", err
 	}
-	t.registerTerminal(terminalID, connID, pty)
+	t.registerTerminal(terminalID, connID, sessionID, pty)
 	return terminalID, nil
 }
 
@@ -132,13 +134,14 @@ func (t *TerminalService) prepareTerminalConnection(ctx context.Context, session
 	return connID, wrapper, termType, nil
 }
 
-func (t *TerminalService) registerTerminal(terminalID, connID string, pty terminalIO) {
+func (t *TerminalService) registerTerminal(terminalID, connID string, sessionID int64, pty terminalIO) {
 	t.mu.Lock()
 	if len(t.ptys) >= t.maxSize {
 		t.evictLRU()
 	}
 	t.ptys[terminalID] = pty
 	t.connIDs[terminalID] = connID
+	t.sessionIDs[terminalID] = sessionID
 	t.lastUsed[terminalID] = time.Now()
 	t.mu.Unlock()
 	pty.SetReadCallback(func(data []byte) { t.handlePTYOutput(terminalID, data) })
@@ -168,6 +171,7 @@ func (t *TerminalService) handlePTYExit(terminalID string, exitedPTY terminalIO,
 	}
 	connID := t.connIDs[terminalID]
 	delete(t.connIDs, terminalID)
+	delete(t.sessionIDs, terminalID)
 	delete(t.outputSequences, terminalID)
 	delete(t.systemSamples, terminalID)
 	closeHandler := t.closeHandler

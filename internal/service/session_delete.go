@@ -17,8 +17,10 @@ func (s *SessionService) DeleteSession(id int64) error {
 		recordAudit(s.db, s.logger, model.AuditEvent{Action: "delete", TargetType: "session", TargetID: fmt.Sprint(id), SessionID: &id, Summary: "删除 SSH 会话", Outcome: outcome})
 	}()
 	s.logger.Info("deleting session", "id", id)
+	s.closeTerminalsForSessions([]int64{id})
 	s.stopTunnelsForSessions([]int64{id})
 	s.cancelTransfersForSessions([]int64{id})
+	s.DisconnectForSessions([]int64{id})
 	err := store.DeleteSession(s.db, id)
 	if err != nil {
 		s.logger.Error("delete session failed", "error", err)
@@ -41,8 +43,10 @@ func (s *SessionService) DeleteSessions(ids []int64) (int, error) {
 		})
 	}()
 	s.logger.Info("deleting sessions", "count", len(normalized))
+	s.closeTerminalsForSessions(normalized)
 	s.stopTunnelsForSessions(normalized)
 	s.cancelTransfersForSessions(normalized)
+	s.DisconnectForSessions(normalized)
 	if err := store.DeleteSessions(s.db, normalized); err != nil {
 		s.logger.Error("delete sessions failed", "error", err)
 		return 0, err

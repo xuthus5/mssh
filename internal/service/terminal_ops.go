@@ -151,6 +151,7 @@ func (t *TerminalService) detachTerminal(terminalID string) (terminalIO, string,
 	delete(t.pendingOutput, terminalID)
 	connID := t.connIDs[terminalID]
 	delete(t.connIDs, terminalID)
+	delete(t.sessionIDs, terminalID)
 	delete(t.outputSequences, terminalID)
 	delete(t.systemSamples, terminalID)
 	closeHandler := t.closeHandler

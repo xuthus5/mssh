@@ -51,7 +51,7 @@ func (s *SessionService) connect(ctx context.Context, sessionID int64, emitState
 	}
 	terminalID := generateTerminalID()
 	s.mu.Lock()
-	s.conns[terminalID] = &managedConn{wrapper: wrapper, cleanup: cleanup}
+	s.conns[terminalID] = &managedConn{wrapper: wrapper, cleanup: cleanup, sessionID: sessionID}
 	s.mu.Unlock()
 	if err := store.MarkSessionConnected(s.db, sessionID); err != nil {
 		s.logger.Error("mark session connected failed", "sessionID", sessionID, "error", err)

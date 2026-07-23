@@ -33,8 +33,9 @@ type hostKeyAutoAccepter interface {
 const DefaultKeepAliveSeconds = 60
 
 type managedConn struct {
-	wrapper *ssh.ClientWrapper
-	cleanup func()
+	wrapper   *ssh.ClientWrapper
+	cleanup   func()
+	sessionID int64
 }
 
 // PasswordVerifier confirms the application password for step-up actions.
@@ -55,6 +56,7 @@ type SessionService struct {
 	passwords PasswordVerifier
 	tunnels   SessionTunnelStopper
 	transfers SessionTransferCanceller
+	terminals SessionTerminalCloser
 }
 
 type connectAttempt struct {

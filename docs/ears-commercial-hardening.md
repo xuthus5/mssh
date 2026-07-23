@@ -1044,3 +1044,11 @@
 | UX-TRANSFER-058 | 对应 transfer_jobs 中 queued/running 任务标记为 cancelled（原因：会话已删除），前端传输中心可通过 complete 事件收敛为 cancelled。 | done |
 | UX-TRANSFER-059 | 会话删除影响分析需统计进行中传输数量，并在删除确认文案中展示。 | done |
 
+## 2026-07-24 商用硬化波次（删除会话关闭后端终端）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| UX-TERM-060 | 删除/批量删除会话前，后端必须关闭该会话仍在运行的 SSH 终端 PTY，并释放对应 SSH 连接。 | done |
+| UX-TERM-061 | 关闭后应发出 terminal closed 事件；即使前端未先关标签，后端也不得留下悬空 PTY/连接。 | done |
+| UX-TERM-062 | 删除会话时对无终端映射的残余 session 连接也必须 disconnect 清理。 | done |
+
