@@ -204,18 +204,24 @@ export function useSession() {
         folder_id: session.folderId ? Number(session.folderId) : null,
         sort_order: 0,
       } satisfies SessionInput)
-      const refreshed = await SessionService.GetSession(Number(session.id))
-      if (refreshed) setSessions((prev) => prev.map((item) => (item.id === session.id ? mapSession(refreshed) : item)))
-      try {
-        await listAssetCatalogs({ silent: true })
-      } catch (refreshError) {
-        logger.error('updateSession catalog refresh failed', refreshError)
-      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       logger.error('updateSession error', err)
       toast(t('更新会话失败: ${}', msg), 'error')
       throw err
+    }
+    // Persist already succeeded; hydrate list from payload, then best-effort server refresh.
+    setSessions((prev) => prev.map((item) => (item.id === session.id ? { ...item, ...session, password: undefined } : item)))
+    try {
+      const refreshed = await SessionService.GetSession(Number(session.id))
+      if (refreshed) setSessions((prev) => prev.map((item) => (item.id === session.id ? mapSession(refreshed) : item)))
+    } catch (refreshError) {
+      logger.error('updateSession getSession refresh failed', refreshError)
+    }
+    try {
+      await listAssetCatalogs({ silent: true })
+    } catch (refreshError) {
+      logger.error('updateSession catalog refresh failed', refreshError)
     }
   }, [listAssetCatalogs])
 
