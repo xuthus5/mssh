@@ -635,3 +635,10 @@
 | SEC-IO-010 | Sync Export/Import/ImportWithPassword 必须拒绝空/无效本地路径。 | done |
 | SEC-IO-011 | Session CSV Export/Import/Preview 必须拒绝空/无效本地路径。 | done |
 | SEC-IO-012 | Theme ImportFiles 必须拒绝空/无效本地路径。 | done |
+
+## 2026-07-23 商用硬化波次（录制回放路径限制 + 加载可见）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| SEC-LOG-013 | GetRecording 必须拒绝空路径，且仅允许 dataDir/recordings 下文件。 | done |
+| UX-PLAYBACK-010 | 回放加载失败必须 toast 并在终端提示失败。 | done |

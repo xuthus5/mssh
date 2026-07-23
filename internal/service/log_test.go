@@ -267,3 +267,15 @@ func TestLogService_StartTerminalRecordingWithoutSession(t *testing.T) {
 	require.Len(t, logs, 1)
 	assert.Nil(t, logs[0].SessionID)
 }
+
+func TestLogService_GetRecordingRejectsUnsafePaths(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	dataDir := t.TempDir()
+	svc := NewLogService(db, dataDir, testutil.NewTestLogger())
+
+	_, err := svc.GetRecording("")
+	require.Error(t, err)
+	_, err = svc.GetRecording(filepath.Join(t.TempDir(), "outside.msshlog"))
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "outside recordings directory")
+}

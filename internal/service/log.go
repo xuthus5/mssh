@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/xuthus5/mssh/internal/model"
@@ -292,7 +293,30 @@ func (l *LogService) HandleOutput(terminalID string, data []byte) {
 }
 
 func (l *LogService) GetRecording(path string) (*ssh.Player, error) {
-	return ssh.NewPlayer(path)
+	cleaned, err := validateLocalFilePath(path)
+	if err != nil {
+		return nil, fmt.Errorf("get recording: %w", err)
+	}
+	if err := l.ensureRecordingPath(cleaned); err != nil {
+		return nil, err
+	}
+	return ssh.NewPlayer(cleaned)
+}
+
+func (l *LogService) ensureRecordingPath(path string) error {
+	recordingsDir, err := filepath.Abs(filepath.Join(l.dataDir, "recordings"))
+	if err != nil {
+		return fmt.Errorf("get recording: resolve recordings directory: %w", err)
+	}
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		return fmt.Errorf("get recording: resolve path: %w", err)
+	}
+	rel, err := filepath.Rel(recordingsDir, absPath)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return fmt.Errorf("get recording: path outside recordings directory")
+	}
+	return nil
 }
 
 func (l *LogService) Delete(id int64) error {
