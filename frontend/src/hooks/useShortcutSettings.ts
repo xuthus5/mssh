@@ -17,16 +17,18 @@ import { t } from '@/i18n'
 
 interface EventEnvelope<T> { data?: T }
 
-async function loadPersistedBindings(): Promise<ShortcutBindings> {
+async function loadPersistedBindings(): Promise<{ bindings: ShortcutBindings; error: string }> {
   try {
     const entry = await SettingService.Get(SHORTCUT_SETTING_KEY)
-    if (!entry?.value) return defaultShortcutBindings()
+    if (!entry?.value) return { bindings: defaultShortcutBindings(), error: '' }
     const parsed = JSON.parse(entry.value) as unknown
-    return normalizeShortcutBindings(parsed)
+    return { bindings: normalizeShortcutBindings(parsed), error: '' }
   } catch (error: unknown) {
     logger.error('load shortcuts failed', error)
-    toast(t('加载快捷键失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
-    return defaultShortcutBindings()
+    return {
+      bindings: defaultShortcutBindings(),
+      error: error instanceof Error ? error.message : String(error),
+    }
   }
 }
 
@@ -42,11 +44,13 @@ function applyBindings(bindings: ShortcutBindings) {
 export function useShortcutSettings() {
   const [bindings, setBindings] = useState<ShortcutBindings>(() => useShortcutStore.getState().bindings)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
   const reload = useCallback(async () => {
     const next = await loadPersistedBindings()
-    setBindings(next)
-    applyBindings(next)
+    setBindings(next.bindings)
+    applyBindings(next.bindings)
+    setError(next.error)
     setLoading(false)
   }, [])
 
@@ -77,16 +81,16 @@ export function useShortcutSettings() {
     }
   }, [])
 
-  return { bindings, loading, saveBindings, reload }
+  return { bindings, loading, error, saveBindings, reload }
 }
 
 /** Hydrate shortcuts in the main window runtime (no UI). */
 export function useShortcutRuntimeHydration() {
   useEffect(() => {
     let cancelled = false
-    void loadPersistedBindings().then((bindings) => {
+    void loadPersistedBindings().then((next) => {
       if (cancelled) return
-      applyBindings(bindings)
+      applyBindings(next.bindings)
     })
     const stop = Events.On(SHORTCUTS_CHANGED_EVENT, (event: EventEnvelope<ShortcutBindings>) => {
       if (!event.data) return

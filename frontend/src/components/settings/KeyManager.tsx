@@ -22,6 +22,9 @@ import { logger } from '@/lib/logger'
 
 interface Props {
   keys: KeyInfo[]
+  loadError?: string
+  loading?: boolean
+  onReload?: () => void | Promise<void>
   onGenerate: (name: string, type: KeyInfo['type'], bits: number) => Promise<KeyMaterial | undefined>
   onImport: (name: string, privateKey: string) => Promise<KeyInfo | undefined>
   onDelete: (id: string) => void | Promise<void>
@@ -111,7 +114,22 @@ export function KeyManager(props: Props) {
     <Table>
       <TableHeader><TableRow><TableHead>{t('名称')}</TableHead><TableHead>{t('类型')}</TableHead><TableHead>{t('创建时间')}</TableHead><TableHead className="text-right">{t('操作')}</TableHead></TableRow></TableHeader>
       <TableBody>
-        {props.keys.length === 0 ? <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground">{t('无密钥')}</TableCell></TableRow> : props.keys.map((key) => <TableRow key={key.id}>
+        {props.loadError ? (
+          <TableRow>
+            <TableCell colSpan={4} className="text-center">
+              <div className="flex flex-col items-center gap-2 py-2 text-sm text-destructive" role="alert">
+                <span>{t('加载密钥列表失败: ${}', props.loadError)}</span>
+                {props.onReload ? (
+                  <Button size="xs" variant="outline" disabled={props.loading} onClick={() => { void Promise.resolve(props.onReload?.()).catch(() => undefined) }}>{t('重试')}</Button>
+                ) : null}
+              </div>
+            </TableCell>
+          </TableRow>
+        ) : props.loading && props.keys.length === 0 ? (
+          <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground">{t('正在加载密钥...')}</TableCell></TableRow>
+        ) : props.keys.length === 0 ? (
+          <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground">{t('无密钥')}</TableCell></TableRow>
+        ) : props.keys.map((key) => <TableRow key={key.id}>
           <TableCell>{key.name}</TableCell><TableCell>{keyTypeText(key)}</TableCell><TableCell className="text-xs">{key.createdAt}</TableCell>
           <TableCell className="text-right"><div className="flex justify-end gap-1">
             <Button size="xs" variant="ghost" aria-label={t('查看 ${}', key.name)} disabled={loadingID === key.id} onClick={() => { void openMaterial(key.id, 'view').catch(() => undefined) }}>{t('查看')}</Button>

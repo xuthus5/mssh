@@ -76,7 +76,7 @@ function ShortcutRecorder({
 }
 
 export function ShortcutSettingsPanel() {
-  const { bindings, loading, saveBindings } = useShortcutSettings()
+  const { bindings, loading, error, saveBindings, reload } = useShortcutSettings()
   const [draft, setDraft] = useState<ShortcutBindings>(bindings)
   const [recordingId, setRecordingId] = useState<ShortcutActionId | null>(null)
 
@@ -145,6 +145,12 @@ export function ShortcutSettingsPanel() {
         </div>
       </div>
 
+      {error ? (
+        <div className="rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">
+          {t('加载快捷键失败: ${}', error)}
+          <Button type="button" size="xs" variant="outline" className="ml-2" onClick={() => { void reload() }}>{t('重试')}</Button>
+        </div>
+      ) : null}
       {conflicts.length > 0 ? (
         <div className="rounded-xl border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive">
           {t('存在快捷键冲突，已暂停自动保存。请先消除冲突后再继续。')}

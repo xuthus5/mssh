@@ -73,11 +73,18 @@ function useSystemFonts() {
 
 export function useKeySettings() {
   const [keys, setKeys] = useState<KeyInfo[]>([])
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(true)
   const listKeys = useCallback(async () => {
-    try { setKeys((await KeyService.List() ?? []).map((key) => keyInfo(key, 0))) }
-    catch (error) {
+    setLoading(true)
+    try {
+      setKeys((await KeyService.List() ?? []).map((key) => keyInfo(key, 0)))
+      setError('')
+    } catch (error) {
       logger.error('listKeys error', error)
-      toast(t('加载密钥列表失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
+      setError(error instanceof Error ? error.message : String(error))
+    } finally {
+      setLoading(false)
     }
   }, [])
   const generateKey = useCallback(async (name: string, type: KeyInfo['type'], bits: number) => {
@@ -138,7 +145,7 @@ export function useKeySettings() {
     } catch (error) { keyOperationFailed(t('读取私钥文件'), error); return undefined }
   }, [])
   useEffect(() => { void listKeys() }, [listKeys])
-  return { keys, listKeys, generateKey, importKey, deleteKey, exportKey, loadKeyMaterial, updateKey, selectKeyImportFile }
+  return { keys, error, loading, listKeys, generateKey, importKey, deleteKey, exportKey, loadKeyMaterial, updateKey, selectKeyImportFile }
 }
 
 function useConfigTransfer() {
