@@ -35,3 +35,15 @@ describe('i18n', () => {
     expect(t('CPU')).toBe('CPU')
   })
 })
+
+  it('rejects CJK leftovers and glued English catalog values', async () => {
+    const catalog = (await import('@/i18n/en.json')).default as Record<string, string>
+    const cjkKeys = Object.entries(catalog).filter(([, value]) => /[\u4e00-\u9fff]/.test(value)).map(([key]) => key)
+    expect(cjkKeys).toEqual([])
+    expect(catalog['打开设置']).toBe('Open settings')
+    expect(catalog['批量设置环境']).toBe('Batch set environment')
+    expect(catalog['安全配置']).toBe('Security configuration')
+    expect(catalog['加载隧道失败: ${}']).toBe('Failed to load tunnels: ${}')
+    expect(catalog['输入SSH密码']).toBe('Enter SSH password')
+  })
+
