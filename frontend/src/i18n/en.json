@@ -1381,5 +1381,7 @@
   "删除资产分类失败: ${}": "Failed to delete asset category: ${}",
   "批量更新资产失败: ${}": "Failed to bulk-update assets: ${}",
   "保存会话失败: ${}": "Failed to save session: ${}",
-  "保存串口配置失败: ${}": "Failed to save serial port: ${}"
+  "保存串口配置失败: ${}": "Failed to save serial port: ${}",
+  "启动中…": "Starting…",
+  "恢复传输记录失败: ${}": "Failed to restore transfers: ${}"
 }

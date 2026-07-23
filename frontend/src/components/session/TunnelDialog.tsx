@@ -25,8 +25,8 @@ interface Props {
   open: boolean
   onOpenChange: (open: boolean) => void
   tunnels: Tunnel[]
-  onStart: (tunnel: Omit<Tunnel, 'id' | 'running'>) => void
-  onStop: (tunnelId: string) => void
+  onStart: (tunnel: Omit<Tunnel, 'id' | 'running'>) => void | Promise<void>
+  onStop: (tunnelId: string) => void | Promise<void>
   sessionId: string
 }
 
@@ -51,6 +51,7 @@ export default function TunnelDialog({
   const [remoteAddress, setRemoteAddress] = useState('')
   const [remotePort, setRemotePort] = useState('')
   const [error, setError] = useState('')
+  const [pending, setPending] = useState(false)
 
   const resetForm = () => {
     setLocalAddress('')
@@ -61,22 +62,31 @@ export default function TunnelDialog({
     setShowAdd(false)
   }
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
     const bindError = validateTunnelLocalAddress(type, localAddress)
     if (bindError) {
       setError(t(bindError))
       return
     }
-    onStart({
-      sessionId: _sessionId,
-      type: type as Tunnel['type'],
-      localAddress: normalizeTunnelLocalAddress(type, localAddress),
-      localPort: parseInt(localPort, 10) || 0,
-      remoteAddress: remoteAddress || '127.0.0.1',
-      remotePort: parseInt(remotePort, 10) || 0,
-    })
-    resetForm()
+    setPending(true)
+    setError('')
+    try {
+      await onStart({
+        sessionId: _sessionId,
+        type: type as Tunnel['type'],
+        localAddress: normalizeTunnelLocalAddress(type, localAddress),
+        localPort: parseInt(localPort, 10) || 0,
+        remoteAddress: remoteAddress || '127.0.0.1',
+        remotePort: parseInt(remotePort, 10) || 0,
+      })
+      resetForm()
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      setError(message)
+    } finally {
+      setPending(false)
+    }
   }
 
   const typeLabel = (value: string) => {
@@ -177,7 +187,7 @@ export default function TunnelDialog({
               )}
               {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
               <DialogFooter showCloseButton>
-                <Button type="submit">{t('启动')}</Button>
+                <Button type="submit" disabled={pending}>{pending ? t('启动中…') : t('启动')}</Button>
               </DialogFooter>
             </form>
           )}

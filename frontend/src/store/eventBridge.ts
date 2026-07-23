@@ -3,8 +3,9 @@ import { useAppStore } from '@/store/appStore'
 import { useConnectDialog } from '@/store/connectDialog'
 import { FileService } from '@/lib/wails'
 import { logger } from '@/lib/logger'
-import { mapBackendTransferJobs } from '@/lib/transferDTO'
+import { toast } from '@/components/ui/toast'
 import { t } from '@/i18n'
+import { mapBackendTransferJobs } from '@/lib/transferDTO'
 import { maybeAutoReconnectTerminal, type ReconnectSession } from '@/hooks/sessionReconnect'
 
 
@@ -129,5 +130,6 @@ export async function restoreTransfers() {
     useAppStore.setState({ transfers: jobs })
   } catch (error: unknown) {
     logger.error('restoreTransfers failed', error)
+    toast(t('恢复传输记录失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
   }
 }
