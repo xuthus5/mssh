@@ -39,6 +39,7 @@ export function SerialPortCenter() {
   const [selected, setSelected] = useState<Set<number>>(new Set())
   const [batchBusy, setBatchBusy] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget>(null)
+  const [actionError, setActionError] = useState('')
 
   const filtered = useMemo(() => {
     const keyword = query.trim().toLowerCase()
@@ -74,7 +75,7 @@ export function SerialPortCenter() {
       toast(t('串口已连接: ${}', port.name || port.device), 'success')
       await refresh({ silent: true })
     } catch {
-      // toast handled in hook
+      // error banner handled in hook via setError
     } finally {
       setConnectingID(null)
     }
@@ -82,10 +83,11 @@ export function SerialPortCenter() {
 
   const duplicate = async (port: SerialPort) => {
     try {
+      setActionError('')
       await duplicatePort(port)
       toast(t('串口配置已复制'), 'success')
     } catch (err) {
-      toast(t('复制串口配置失败: ${}', err instanceof Error ? err.message : String(err)), 'error')
+      setActionError(t('复制串口配置失败: ${}', err instanceof Error ? err.message : String(err)))
     }
   }
 
@@ -95,6 +97,7 @@ export function SerialPortCenter() {
       const id = Number(deleteTarget.port.id)
       setDeletingID(id)
       try {
+        setActionError('')
         await deletePort(id)
         setSelected((prev) => {
           const next = new Set(prev)
@@ -104,7 +107,8 @@ export function SerialPortCenter() {
         setDeleteTarget(null)
         toast(t('串口配置已删除'), 'success')
       } catch (err) {
-        toast(t('删除串口配置失败: ${}', err instanceof Error ? err.message : String(err)), 'error')
+        setDeleteTarget(null)
+        setActionError(t('删除串口配置失败: ${}', err instanceof Error ? err.message : String(err)))
       } finally {
         setDeletingID(null)
       }
@@ -112,12 +116,14 @@ export function SerialPortCenter() {
     }
     setBatchBusy(true)
     try {
+      setActionError('')
       await deleteMany(deleteTarget.ids)
       setSelected(new Set())
       setDeleteTarget(null)
       toast(t('已删除 ${} 个串口配置', String(deleteTarget.count)), 'success')
     } catch (err) {
-      toast(t('批量删除串口配置失败: ${}', err instanceof Error ? err.message : String(err)), 'error')
+      setDeleteTarget(null)
+      setActionError(t('批量删除串口配置失败: ${}', err instanceof Error ? err.message : String(err)))
     } finally {
       setBatchBusy(false)
     }
@@ -167,6 +173,11 @@ export function SerialPortCenter() {
             {t('加载串口占用状态失败: ${}', activeMapError)}
             <Button size="xs" variant="outline" className="ml-3" onClick={() => void refresh()}>{t('重试')}</Button>
           </AlertDescription>
+        </Alert>
+      ) : null}
+      {actionError ? (
+        <Alert variant="destructive" className="mb-4">
+          <AlertDescription>{actionError}</AlertDescription>
         </Alert>
       ) : null}
 

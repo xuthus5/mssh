@@ -1306,3 +1306,9 @@
 | ID | 验收条件 | 状态 |
 |---|---|---|
 | UX-SYNC-139 | 云同步设置页动作失败（保存/测试/同步/推拉/冲突/版本/重置）仅页面 banner（controller.error）展示，不得 error toast；成功可 toast。 | done |
+
+## 2026-07-24 商用硬化波次（串口中心动作错误归属）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| UX-SERIAL-140 | 串口中心复制/删除/批量删除失败仅中心 banner 展示，不得 error toast；连接失败由 useSerial error banner 承接，不得 toast。 | done |
