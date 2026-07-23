@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { isLoopbackHost, normalizeTunnelLocalAddress, validateTunnelLocalAddress } from '@/lib/tunnelBind'
+import {
+  isLoopbackHost,
+  normalizeTunnelLocalAddress,
+  remoteTunnelExposureWarning,
+  validateTunnelLocalAddress,
+} from '@/lib/tunnelBind'
 
 describe('tunnelBind', () => {
   it('accepts loopback hosts and rejects public binds for local/dynamic', () => {
@@ -16,5 +21,13 @@ describe('tunnelBind', () => {
     expect(validateTunnelLocalAddress('local', '')).toBeNull()
     expect(validateTunnelLocalAddress('remote', '0.0.0.0')).toBeNull()
     expect(normalizeTunnelLocalAddress('dynamic', '  ')).toBe('127.0.0.1')
+  })
+
+  it('warns on wildcard and non-loopback remote listens', () => {
+    expect(remoteTunnelExposureWarning('local', '0.0.0.0')).toBeNull()
+    expect(remoteTunnelExposureWarning('remote', '127.0.0.1')).toBeNull()
+    expect(remoteTunnelExposureWarning('remote', '0.0.0.0')).toMatch(/0\.0\.0\.0/)
+    expect(remoteTunnelExposureWarning('remote', '::')).toMatch(/0\.0\.0\.0/)
+    expect(remoteTunnelExposureWarning('remote', '192.168.1.10')).toMatch(/非回环/)
   })
 })

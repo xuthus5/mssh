@@ -18,7 +18,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import type { Tunnel } from '@/hooks/useSession'
-import { normalizeTunnelLocalAddress, validateTunnelLocalAddress } from '@/lib/tunnelBind'
+import { normalizeTunnelLocalAddress, remoteTunnelExposureWarning, validateTunnelLocalAddress } from '@/lib/tunnelBind'
 import { t } from '@/i18n'
 
 interface Props {
@@ -168,6 +168,12 @@ export default function TunnelDialog({
               )}
               {(type === 'local' || type === 'dynamic') && (
                 <p className="text-xs text-muted-foreground">{t('本地/动态隧道仅允许绑定回环地址，避免意外对局域网暴露服务。')}</p>
+              )}
+              {type === 'remote' && (
+                <p className="text-xs text-amber-600 dark:text-amber-400">
+                  {t(remoteTunnelExposureWarning('remote', remoteAddress)
+                    ?? '远程转发会在 SSH 服务端打开监听端口；绑定非回环地址时请确认安全边界。')}
+                </p>
               )}
               {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
               <DialogFooter showCloseButton>
