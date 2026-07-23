@@ -19,7 +19,7 @@ interface Props {
   onDeleteSession?: (sessionId: string) => void
   onEditFolder?: (folder: Folder) => void
   onDeleteFolder?: (folderId: string) => void
-  onMoveToFolder?: (sessionId: string, folderId: string | null) => void
+  onMoveToFolder?: (sessionId: string, folderId: string | null) => void | Promise<void>
   onSelectFolder?: (folderId: string) => void
   navigationOnly?: boolean
   revealAll?: boolean
@@ -140,7 +140,7 @@ function TreeRow(props: {
   onDeleteSession?: (sessionId: string) => void
   onEditFolder?: (folder: Folder) => void
   onDeleteFolder?: (folderId: string) => void
-  onMoveToFolder?: (sessionId: string, folderId: string | null) => void
+  onMoveToFolder?: (sessionId: string, folderId: string | null) => void | Promise<void>
 }) {
   if (props.node.kind === 'folder') {
     const folder = props.node.folder
@@ -209,9 +209,9 @@ function TreeRow(props: {
             <ContextMenuSub>
               <ContextMenuSubTrigger>{t('移动到')}</ContextMenuSubTrigger>
               <ContextMenuSubContent>
-                <ContextMenuItem onClick={() => props.onMoveToFolder?.(session.id, null)}>{t('根目录')}</ContextMenuItem>
+                <ContextMenuItem onClick={() => { void Promise.resolve(props.onMoveToFolder?.(session.id, null)).catch(() => undefined) }}>{t('根目录')}</ContextMenuItem>
                 {props.folders.map((folder) => (
-                  <ContextMenuItem key={folder.id} onClick={() => props.onMoveToFolder?.(session.id, folder.id)}>{folder.name}</ContextMenuItem>
+                  <ContextMenuItem key={folder.id} onClick={() => { void Promise.resolve(props.onMoveToFolder?.(session.id, folder.id)).catch(() => undefined) }}>{folder.name}</ContextMenuItem>
                 ))}
               </ContextMenuSubContent>
             </ContextMenuSub>

@@ -114,14 +114,15 @@ export default function SessionDialog({ open, onOpenChange, session, folders, en
         password: needsPassword ? password : undefined, keyId: authMethod === 'key' ? keyId : undefined,
         keepAlive: Math.max(0, Number.parseInt(keepAlive, 10) || 0), termType: termType.trim() || 'xterm-256color', folderId: folderId || null,
       })
+      onOpenChange(false)
     } catch (err) {
+      // workspace create/update already toast; keep inline error for dialog context
       const message = err instanceof Error ? err.message : String(err)
       setSubmitError(message)
-      toast(t('保存会话失败: ${}', message), 'error')
     } finally {
       setPending(false)
     }
-  }, [name, host, port, username, notes, environmentId, projectId, tagIds, assetTags, authMethod, password, keyId, keepAlive, termType, folderId, onSave])
+  }, [name, host, port, username, notes, environmentId, projectId, tagIds, assetTags, authMethod, password, keyId, keepAlive, termType, folderId, onSave, onOpenChange])
 
   const isEditing = !!session
 
