@@ -4,6 +4,7 @@ import { serializeSplitLayout } from '@/components/terminal/splitLayout'
 import {
   closeExtraSplitPanes,
   openExtraSplitPanes,
+  openSplitTerminal,
   persistTabSplitLayout,
   restoreSplitTreeFromLayout,
 } from '@/components/terminal/splitPersistence'
@@ -74,3 +75,21 @@ describe('splitPersistence', () => {
     await vi.waitFor(() => expect(close).toHaveBeenCalledTimes(2))
   })
 })
+
+  it('inherits open size from preferred terminal', async () => {
+    const open = vi.fn(async (_sessionId: number, cols: number, rows: number) => {
+      expect(cols).toBe(132)
+      expect(rows).toBe(43)
+      return 'split-1'
+    })
+    __registerHandler(terminal + 'Open', open)
+    useAppStore.setState({
+      terminalPool: new Map([
+        ['primary', { terminal: { cols: 132, rows: 43 }, lastUsed: 1 }],
+      ]),
+      activePaneId: 'primary',
+    } as never)
+    await openSplitTerminal(7, 'ssh', undefined, 'serial blocked', 'primary')
+    expect(open).toHaveBeenCalled()
+  })
+
