@@ -147,11 +147,22 @@ func applyStartupSettings(appInstance *App, logger *slog.Logger) {
 		return
 	}
 	settingSvc := appInstance.Setting
+	syncSvc := appInstance.Sync
 	appInstance.Security.SetAfterUnlock(func() {
 		if err := settingSvc.ApplyStoredProxySettings(); err != nil {
 			logger.Warn("apply proxy settings after unlock failed", "error", err)
 		}
+		if syncSvc != nil {
+			// Catch up after vault unlock (covers manual unlock and late auto-unlock races).
+			syncSvc.NotifyVaultUnlocked()
+		}
 	})
+	// If vault already unlocked during service init (auto-unlock), trigger catch-up once.
+	if syncSvc != nil && appInstance.Security != nil {
+		if status, err := appInstance.Security.Status(); err == nil && status.Unlocked {
+			syncSvc.NotifyVaultUnlocked()
+		}
+	}
 }
 
 func initializeServices(input serviceInitialization) (*App, error) {
