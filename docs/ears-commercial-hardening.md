@@ -704,3 +704,12 @@
 | UX-BATCH-011 | 批量删除影响分析失败必须 toast。 | done |
 | UX-CSV-010 | 会话 CSV 预览/导入失败必须 toast 并保留对话框错误。 | done |
 | UX-RECONNECT-010 | SSH 自动重连最终失败必须 toast。 | done |
+
+## 2026-07-23 商用硬化波次（密钥更新校验 + 会话/串口可见错误）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| SEC-KEY-013 | Key Update 必须拒绝空白 private key。 | done |
+| UX-SESSION-010 | 会话对话框加载密钥列表失败必须 toast。 | done |
+| UX-SERIAL-010 | 串口设备列表失败必须 toast。 | done |
+| UX-SERIAL-011 | 串口占用状态查询失败必须 toast。 | done |
