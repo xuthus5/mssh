@@ -54,7 +54,8 @@ export function useCloudSyncCenter(): CloudSyncController {
     } catch (actionError) {
       const message = errorMessage(actionError)
       setError(message)
-      if (!operation.quiet) toast(t('${}失败: ${}', operation.success.replace(/成功|完成/g, ''), message), 'error')
+      // Quiet autosave only suppresses success toasts; failures must still surface.
+      toast(t('${}失败: ${}', operation.success.replace(/成功|完成/g, ''), message), 'error')
       logger.error(`cloud sync ${operation.name} failed`, actionError)
       throw actionError
     } finally {

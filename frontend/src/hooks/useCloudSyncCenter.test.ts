@@ -69,4 +69,20 @@ describe('useCloudSyncCenter', () => {
     expect(result.current.pending).toBeNull()
     expect(result.current.error).toBeNull()
   })
+
+  it('quiet saveConfig still surfaces error toasts', async () => {
+    const { useToastStore } = await import('@/components/ui/toast')
+    useToastStore.setState({ toasts: [] })
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SyncService.SaveConfig', async () => {
+      throw new Error('save config failed')
+    })
+    const { result } = renderHook(() => useCloudSyncCenter())
+    await waitFor(() => expect(result.current.dashboard).not.toBeNull())
+    await act(async () => {
+      await result.current.saveConfig(createSyncInput(dashboard.config as any), { quiet: true }).catch(() => undefined)
+    })
+    expect(result.current.error).toBe('save config failed')
+    const messages = useToastStore.getState().toasts.map((item) => `${item.type}:${item.message}`)
+    expect(messages.some((item) => item.startsWith('error:') && item.includes('失败'))).toBe(true)
+  })
 })

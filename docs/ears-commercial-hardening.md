@@ -354,3 +354,10 @@
 | SEC-HOSTKEY-006 | 删除主机指纹（read-modify-write）必须与 TOFU append 共用进程级锁，避免并发连接接受指纹时覆盖删除结果。 | done |
 | SEC-HOSTKEY-007 | 删除路径必须先写临时文件（0600）、Sync 后再 Rename 替换。 | done |
 | SEC-HOSTKEY-008 | 对外暴露 `WithKnownHostsLock` 供 service 层安全改写 known_hosts。 | done |
+
+## 2026-07-23 商用硬化波次（静默自动保存错误提示）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| UX-AUTOSAVE-001 | quiet 自动保存仅抑制成功 toast，失败时仍必须弹出错误 toast。 | done |
+| UX-AUTOSAVE-002 | 通用设置、SFTP、AI 设置、云同步配置保存路径均遵守上述错误可见性。 | done |
