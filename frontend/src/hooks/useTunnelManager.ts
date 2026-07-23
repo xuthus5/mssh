@@ -30,7 +30,7 @@ function tunnelInput(tunnel: Omit<Tunnel, 'id' | 'running'> | TunnelStartInput):
   }
 }
 
-function useTunnelStart(load: () => Promise<void>, setTunnels: Dispatch<SetStateAction<Tunnel[]>>) {
+function useTunnelStart(load: (options?: { silent?: boolean }) => Promise<void>, setTunnels: Dispatch<SetStateAction<Tunnel[]>>) {
   return useCallback(async (tunnel: TunnelStartInput) => {
     try {
       let id = Number(tunnel.id)
@@ -40,7 +40,7 @@ function useTunnelStart(load: () => Promise<void>, setTunnels: Dispatch<SetState
         id = created.id
       }
       await TunnelService.Start(id)
-      await load()
+      await load({ silent: true })
       setTunnels((items) => items.map((item) => item.id === String(id) ? { ...item, running: true } : item))
     } catch (error) {
       logger.error('tunnel start failed', error)
@@ -84,12 +84,13 @@ function useTunnelRemove(setTunnels: Dispatch<SetStateAction<Tunnel[]>>) {
 export function useTunnelManager(sessionID?: number) {
   const states = useAppStore((state) => state.tunnelState)
   const [tunnels, setTunnels] = useState<Tunnel[]>([])
-  const load = useCallback(async () => {
+  const load = useCallback(async (options?: { silent?: boolean }) => {
     try {
       const result = await TunnelService.List()
       setTunnels((result ?? []).filter((item) => sessionID === undefined || item.session_id === sessionID).map((item) => mapTunnel(item, states)))
     } catch (error) {
-      toast(t('加载隧道失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
+      logger.error('load tunnels failed', error)
+      if (!options?.silent) toast(t('加载隧道失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
     }
   }, [sessionID, states])
   useEffect(() => { setTunnels((items) => items.map((item) => ({ ...item, running: states[item.id] === 'running' }))) }, [states])

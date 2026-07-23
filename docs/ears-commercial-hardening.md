@@ -989,3 +989,14 @@
 | UX-CONN-035 | SSH 连接成功后，会话列表/最近连接刷新失败不得把连接对话框置为 failed；终端标签保持已连接。 | done |
 | UX-FOLDER-036 | 侧边栏新建/编辑分组时名称为空必须提示用户，不得静默无反馈。 | done |
 
+## 2026-07-24 商用硬化波次（批量/资产/主题/串口/CSV 后刷新隔离）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| UX-BATCH-037 | 批量连接/宏执行/删除成功后，资产静默刷新失败不得中断结果对话框，也不得冒充为「批量操作失败」。 | done |
+| UX-ASSET-038 | 环境/项目/标签更新删除/重排/批量写会话后，静默 refresh 失败不得冒充 mutation 失败；独立 refresh 仍 toast。 | done |
+| UX-THEME-039 | 主题配置/配置档 mutation 成功后，catalog 静默重载失败不得拒绝 mutation Promise 或 toast 加载失败。 | done |
+| UX-SERIAL-040 | 串口 mutation 后的 silent refresh 对主列表失败也不得 toast；独立加载仍提示。 | done |
+| UX-TUNNEL-041 | 隧道启动成功后的列表重载失败不得 toast「加载隧道失败」。 | done |
+| UX-CSV-042 | CSV 导入成功后的 folders/assets 刷新失败不得拒绝 import Promise。 | done |
+

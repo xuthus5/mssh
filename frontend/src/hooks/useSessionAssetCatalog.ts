@@ -18,6 +18,15 @@ interface StateSetters {
   setError: Dispatch<SetStateAction<string>>
 }
 
+
+async function silentRefreshAssets(refreshAssets: (options?: { silent?: boolean }) => Promise<void>, context: string) {
+  try {
+    await refreshAssets({ silent: true })
+  } catch (refreshError) {
+    logger.error(`${context} post-refresh failed`, refreshError)
+  }
+}
+
 export function useSessionAssetCatalog(state: StateSetters) {
   const listAssetCatalogs = useCallback(async () => {
     try {
@@ -81,32 +90,50 @@ export function useSessionAssetCatalog(state: StateSetters) {
 
   const updateEnvironment = useCallback(async (item: AssetEnvironment) => {
     await AssetCatalogService.UpdateEnvironment({ id: Number(item.id), name: item.name, color_token: item.colorToken as unknown as BindingAssetColorToken, sort_order: item.sortOrder })
-    await refreshAssets({ silent: true })
+    await silentRefreshAssets(refreshAssets, 'updateEnvironment')
   }, [refreshAssets])
   const updateProject = useCallback(async (item: AssetProject) => {
     await AssetCatalogService.UpdateProject({ id: Number(item.id), name: item.name, code: item.code, description: item.description, sort_order: item.sortOrder })
-    await refreshAssets({ silent: true })
+    await silentRefreshAssets(refreshAssets, 'updateProject')
   }, [refreshAssets])
   const updateTag = useCallback(async (item: AssetTag) => {
     await AssetCatalogService.UpdateTag({ id: Number(item.id), name: item.name, color_token: item.colorToken as unknown as BindingAssetColorToken })
-    await refreshAssets({ silent: true })
+    await silentRefreshAssets(refreshAssets, 'updateTag')
   }, [refreshAssets])
-  const deleteEnvironment = useCallback(async (input: AssetDeleteInput) => { await AssetCatalogService.DeleteEnvironment(input); await refreshAssets({ silent: true }) }, [refreshAssets])
-  const deleteProject = useCallback(async (input: AssetDeleteInput) => { await AssetCatalogService.DeleteProject(input); await refreshAssets({ silent: true }) }, [refreshAssets])
-  const deleteTag = useCallback(async (id: string) => { await AssetCatalogService.DeleteTag(Number(id)); await refreshAssets({ silent: true }) }, [refreshAssets])
-  const reorderEnvironments = useCallback(async (ids: string[]) => { await AssetCatalogService.ReorderEnvironments(ids.map(Number)); await refreshAssets({ silent: true }) }, [refreshAssets])
-  const reorderProjects = useCallback(async (ids: string[]) => { await AssetCatalogService.ReorderProjects(ids.map(Number)); await refreshAssets({ silent: true }) }, [refreshAssets])
+  const deleteEnvironment = useCallback(async (input: AssetDeleteInput) => {
+    await AssetCatalogService.DeleteEnvironment(input)
+    await silentRefreshAssets(refreshAssets, 'deleteEnvironment')
+  }, [refreshAssets])
+  const deleteProject = useCallback(async (input: AssetDeleteInput) => {
+    await AssetCatalogService.DeleteProject(input)
+    await silentRefreshAssets(refreshAssets, 'deleteProject')
+  }, [refreshAssets])
+  const deleteTag = useCallback(async (id: string) => {
+    await AssetCatalogService.DeleteTag(Number(id))
+    await silentRefreshAssets(refreshAssets, 'deleteTag')
+  }, [refreshAssets])
+  const reorderEnvironments = useCallback(async (ids: string[]) => {
+    await AssetCatalogService.ReorderEnvironments(ids.map(Number))
+    await silentRefreshAssets(refreshAssets, 'reorderEnvironments')
+  }, [refreshAssets])
+  const reorderProjects = useCallback(async (ids: string[]) => {
+    await AssetCatalogService.ReorderProjects(ids.map(Number))
+    await silentRefreshAssets(refreshAssets, 'reorderProjects')
+  }, [refreshAssets])
   const bulkSetEnvironment = useCallback(async (sessionIDs: string[], targetID: string | null) => {
     const count = await AssetCatalogService.BulkSetEnvironment({ session_ids: sessionIDs.map(Number), target_id: targetID ? Number(targetID) : null })
-    await refreshAssets({ silent: true }); return count
+    await silentRefreshAssets(refreshAssets, 'bulkSetEnvironment')
+    return count
   }, [refreshAssets])
   const bulkSetProject = useCallback(async (sessionIDs: string[], targetID: string | null) => {
     const count = await AssetCatalogService.BulkSetProject({ session_ids: sessionIDs.map(Number), target_id: targetID ? Number(targetID) : null })
-    await refreshAssets({ silent: true }); return count
+    await silentRefreshAssets(refreshAssets, 'bulkSetProject')
+    return count
   }, [refreshAssets])
   const bulkUpdateTags = useCallback(async (sessionIDs: string[], tagIDs: string[], operation: 'add' | 'remove' | 'replace') => {
     const count = await AssetCatalogService.BulkUpdateTags({ session_ids: sessionIDs.map(Number), tag_ids: tagIDs.map(Number), operation })
-    await refreshAssets({ silent: true }); return count
+    await silentRefreshAssets(refreshAssets, 'bulkUpdateTags')
+    return count
   }, [refreshAssets])
 
   return { listAssetCatalogs, createEnvironment, createProject, createTag, updateEnvironment, updateProject, updateTag, deleteEnvironment, deleteProject, deleteTag, reorderEnvironments, reorderProjects, bulkSetEnvironment, bulkSetProject, bulkUpdateTags, refreshAssets }

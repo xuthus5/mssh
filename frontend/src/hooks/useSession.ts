@@ -266,9 +266,12 @@ export function useSession() {
   const runBatch = useCallback(async (sessionIDs: string[], command?: string) => {
     const selected = sessionIDs.map((id) => sessions.find((session) => session.id === id)).filter((session): session is Session => session !== undefined)
     const results = await runBatchSessions(selected, command)
-    await Promise.all([listRecentSessions(), listSessions()])
+    // Batch outcomes are already final; silent refresh must not block or rebrand success as failure.
+    void refreshAssets({ silent: true }).catch((refreshError: unknown) => {
+      logger.error('batch post-refresh failed', refreshError)
+    })
     return results
-  }, [listRecentSessions, listSessions, sessions])
+  }, [refreshAssets, sessions])
   const batchConnect = useCallback((sessionIDs: string[]) => runBatch(sessionIDs), [runBatch])
   const batchExecuteMacro = useCallback((sessionIDs: string[], command: string) => runBatch(sessionIDs, command), [runBatch])
   const batchDeleteSessions = useCallback(async (sessionIDs: string[]) => {
@@ -279,9 +282,12 @@ export function useSession() {
       setSessions((prev) => prev.filter((session) => !succeeded.has(session.id)))
       setRecentSessions((prev) => prev.filter((session) => !succeeded.has(session.id)))
     }
-    await Promise.all([listRecentSessions(), listSessions(), listAssetCatalogs()])
+    // Local delete results already applied; silent refresh reconciles without aborting the results dialog.
+    void refreshAssets({ silent: true }).catch((refreshError: unknown) => {
+      logger.error('batch delete post-refresh failed', refreshError)
+    })
     return results
-  }, [listAssetCatalogs, listRecentSessions, listSessions, sessions])
+  }, [refreshAssets, sessions])
 
   const disconnect = useCallback(async (terminalId: string) => {
     try {
