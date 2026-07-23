@@ -1276,3 +1276,9 @@
 | ID | 验收条件 | 状态 |
 |---|---|---|
 | UX-THEME-134 | 主题导入/选择/重命名/复制/删除失败仅 ThemeManager 面板 inline alert，不得 error toast。 | done |
+
+## 2026-07-24 商用硬化波次（密钥列表复制错误归属）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| UX-KEY-135 | 密钥列表复制公钥失败仅 KeyManager 面板 inline alert，不得 error toast；成功可 toast。 | done |

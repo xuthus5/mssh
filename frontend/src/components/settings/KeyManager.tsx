@@ -78,13 +78,17 @@ export function KeyManager(props: Props) {
     }
   }
   const copyPublicKey = async (id: string) => {
+    setRowActionError('')
     const publicKey = await props.onExport(id)
-    if (!publicKey) return
+    if (!publicKey) {
+      setRowActionError(t('读取密钥失败: ${}', t('密钥不存在或无法读取')))
+      return
+    }
     try {
       await getClipboard().writeText(publicKey)
       toast(t('公钥已复制'), 'success')
     } catch (error) {
-      toast(t('复制公钥失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
+      setRowActionError(t('复制公钥失败: ${}', error instanceof Error ? error.message : String(error)))
     }
   }
   const deleteKey = async (key: KeyInfo) => {
