@@ -483,3 +483,11 @@
 | SEC-TUNNEL-004 | local/remote 端口范围必须合法；非 dynamic 隧道 remote_port ∈ [1,65535] 且 remote_host 必填。 | done |
 | SEC-TUNNEL-005 | host 字段禁止 NUL 与超长；local/dynamic 仍强制 loopback 绑定。 | done |
 
+## 2026-07-23 商用硬化波次（分组名与密钥参数校验）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| SEC-FOLDER-001 | Create/UpdateFolder 必须 trim 并校验名称非空、长度 ≤128、无 NUL；parent_id 若提供必须 >0。 | done |
+| SEC-KEY-001 | 密钥名称必须非空、长度 ≤128、无 NUL。 | done |
+| SEC-KEY-002 | RSA 位数默认 3072；显式 bits 必须在 2048–8192 且为 8 的倍数。 | done |
+
