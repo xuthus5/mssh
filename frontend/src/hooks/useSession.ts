@@ -72,7 +72,9 @@ export function useSession() {
       }
       return result ? mapFolder(result) : undefined
     } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
       logger.error('createFolder error', err)
+      toast(t('创建分组失败: ${}', msg), 'error')
       throw err
     }
   }, [])
@@ -84,7 +86,9 @@ export function useSession() {
       setFolders(remapped.folders)
       setSessions(remapped.sessions)
     } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
       logger.error('deleteFolder error', err)
+      toast(t('删除分组失败: ${}', msg), 'error')
       throw err
     }
   }, [])
@@ -94,14 +98,23 @@ export function useSession() {
       await SessionService.UpdateFolder(Number(id), name)
       setFolders((prev) => prev.map((f) => (f.id === id ? { ...f, name } : f)))
     } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
       logger.error('updateFolder error', err)
+      toast(t('更新分组失败: ${}', msg), 'error')
       throw err
     }
   }, [])
 
   const setDefaultFolder = useCallback(async (id: string) => {
-    await SessionService.SetDefaultFolder(Number(id))
-    setFolders((prev) => prev.map((folder) => ({ ...folder, isDefault: folder.id === id })))
+    try {
+      await SessionService.SetDefaultFolder(Number(id))
+      setFolders((prev) => prev.map((folder) => ({ ...folder, isDefault: folder.id === id })))
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      logger.error('setDefaultFolder error', err)
+      toast(t('设置默认分组失败: ${}', msg), 'error')
+      throw err
+    }
   }, [])
 
   const listSessions = useCallback(async () => {
@@ -194,7 +207,10 @@ export function useSession() {
       await SessionService.DeleteSession(Number(id))
       setSessions((prev) => prev.filter((s) => s.id !== id))
     } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
       logger.error('deleteSession error', err)
+      toast(t('删除会话失败: ${}', msg), 'error')
+      throw err
     }
   }, [])
 
@@ -203,7 +219,10 @@ export function useSession() {
       await SessionService.MoveSession(Number(id), folderId ? Number(folderId) : null)
       setSessions((prev) => prev.map((s) => (s.id === id ? { ...s, folderId } : s)))
     } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
       logger.error('moveSession error', err)
+      toast(t('移动会话失败: ${}', msg), 'error')
+      throw err
     }
   }, [])
 
@@ -260,7 +279,9 @@ export function useSession() {
       const result = await TunnelService.List()
       setTunnels((result ?? []).map(mapTunnel))
     } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
       logger.error('listTunnels error', err)
+      toast(t('加载隧道失败: ${}', msg), 'error')
     }
   }, [])
 

@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"strings"
 	"sync"
+	"unicode/utf8"
 
 	"github.com/xuthus5/mssh/internal/model"
 	"github.com/xuthus5/mssh/internal/serial"
@@ -146,6 +147,12 @@ func (s *SerialService) releaseDevice(device, terminalID string) {
 	}
 }
 
+const (
+	maxSerialNameRunes  = 128
+	maxSerialNotesRunes = 2000
+	maxSerialSortOrder  = 1_000_000
+)
+
 func normalizeSerialPort(port model.SerialPort) (model.SerialPort, error) {
 	port.Name = strings.TrimSpace(port.Name)
 	device, err := serial.ValidateDevicePath(port.Device)
@@ -158,6 +165,21 @@ func normalizeSerialPort(port model.SerialPort) (model.SerialPort, error) {
 	port.LineEnding = model.SerialLineEnding(strings.TrimSpace(string(port.LineEnding)))
 	if port.Name == "" {
 		return model.SerialPort{}, fmt.Errorf("serial port name is required")
+	}
+	if strings.ContainsRune(port.Name, 0) {
+		return model.SerialPort{}, fmt.Errorf("serial port name contains NUL")
+	}
+	if utf8.RuneCountInString(port.Name) > maxSerialNameRunes {
+		return model.SerialPort{}, fmt.Errorf("serial port name must not exceed %d characters", maxSerialNameRunes)
+	}
+	if strings.ContainsRune(port.Notes, 0) {
+		return model.SerialPort{}, fmt.Errorf("serial notes contain NUL")
+	}
+	if utf8.RuneCountInString(port.Notes) > maxSerialNotesRunes {
+		return model.SerialPort{}, fmt.Errorf("serial notes must not exceed %d characters", maxSerialNotesRunes)
+	}
+	if port.SortOrder < 0 || port.SortOrder > maxSerialSortOrder {
+		return model.SerialPort{}, fmt.Errorf("serial sort order must be between 0 and %d", maxSerialSortOrder)
 	}
 	baud, err := normalizeBaudRate(port.BaudRate)
 	if err != nil {

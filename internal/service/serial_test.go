@@ -2,6 +2,7 @@ package service
 
 import (
 	"log/slog"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -144,4 +145,27 @@ func TestSerialServiceRejectsUnsafeDevice(t *testing.T) {
 	assert.Contains(t, err.Error(), "allowed device prefix")
 	_, err = svc.Create(model.SerialPortInput{Name: "nul", Device: "x" + string(rune(0)) + "y"})
 	require.Error(t, err)
+}
+
+func TestSerialServiceRejectsNameNotesSortBounds(t *testing.T) {
+	db, err := store.OpenDB(t.TempDir())
+	require.NoError(t, err)
+	require.NoError(t, store.InitializeSchema(db))
+	t.Cleanup(func() { _ = db.Close() })
+	svc := NewSerialService(db, slog.Default())
+
+	_, err = svc.Create(model.SerialPortInput{Name: strings.Repeat("n", maxSerialNameRunes+1), Device: "/dev/ttyUSB0"})
+	require.Error(t, err)
+	_, err = svc.Create(model.SerialPortInput{Name: string([]byte{'a', 0}), Device: "/dev/ttyUSB0"})
+	require.Error(t, err)
+	_, err = svc.Create(model.SerialPortInput{Name: "ok", Device: "/dev/ttyUSB0", Notes: strings.Repeat("n", maxSerialNotesRunes+1)})
+	require.Error(t, err)
+	_, err = svc.Create(model.SerialPortInput{Name: "ok", Device: "/dev/ttyUSB0", SortOrder: -1})
+	require.Error(t, err)
+	_, err = svc.Create(model.SerialPortInput{Name: "ok", Device: "/dev/ttyUSB0", SortOrder: maxSerialSortOrder + 1})
+	require.Error(t, err)
+
+	created, err := svc.Create(model.SerialPortInput{Name: "ok", Device: "/dev/ttyUSB0", Notes: "fine", SortOrder: 3})
+	require.NoError(t, err)
+	require.Equal(t, 3, created.SortOrder)
 }
