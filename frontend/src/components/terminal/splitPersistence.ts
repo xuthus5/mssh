@@ -6,7 +6,7 @@ import {
   serializeSplitLayout,
   type SplitLayoutSnapshot,
 } from '@/components/terminal/splitLayout'
-import { splitLeaf, type SplitNode } from '@/components/terminal/splitTree'
+import { splitLeaf, terminalIDs, type SplitNode } from '@/components/terminal/splitTree'
 import { logger } from '@/lib/logger'
 import { resolveOpenTerminalSize } from '@/lib/terminalOpenSize'
 
@@ -17,12 +17,13 @@ export function readTabSplitLayout(tabID: string): SplitLayoutSnapshot | null {
 }
 
 export function persistTabSplitLayout(tabID: string, tree: SplitNode, primaryID: string, connectionKind?: string) {
+  const paneIDs = terminalIDs(tree)
   if (connectionKind === 'serial') {
-    useAppStore.getState().updateTerminalWorkspace(tabID, { splitLayout: null })
+    useAppStore.getState().updateTerminalWorkspace(tabID, { splitLayout: null, splitPaneIDs: paneIDs })
     return
   }
   const snapshot = serializeSplitLayout(tree, primaryID)
-  useAppStore.getState().updateTerminalWorkspace(tabID, { splitLayout: snapshot })
+  useAppStore.getState().updateTerminalWorkspace(tabID, { splitLayout: snapshot, splitPaneIDs: paneIDs })
 }
 
 type OpenFn = () => Promise<string>

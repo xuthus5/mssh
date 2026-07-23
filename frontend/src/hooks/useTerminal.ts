@@ -225,6 +225,21 @@ function initializeTerminal(containerRef: RefObject<HTMLDivElement | null>, refs
   }, reportRuntimeError)
   const resizeObserver = observeResize({ term, fitAddon, containerRef, refs, reportRuntimeError })
   if (container) resizeObserver.observe(container)
+  const onHostMoved = (event: Event) => {
+    const detail = (event as CustomEvent<{ terminalID?: string }>).detail
+    if (!detail?.terminalID || detail.terminalID !== refs.terminalIDRef.current) return
+    runTerminalRuntime(reportRuntimeError, 'terminal host reparent', () => {
+      // WebGL contexts can be lost when the host is reparented across split slots.
+      rendererController.apply(useTerminalBehaviorStore.getState().renderer)
+      if (!fitAndRefresh(term, fitAddon, containerRef.current)) {
+        refs.recoveryPendingRef.current = true
+        return
+      }
+      refs.recoveryPendingRef.current = false
+      scheduleBackendResize(term, refs)
+    })
+  }
+  window.addEventListener('mssh:terminal-host-moved', onHostMoved)
 
   return () => {
     if (disposed) return
@@ -245,6 +260,7 @@ function initializeTerminal(containerRef: RefObject<HTMLDivElement | null>, refs
     safelyDisposeTerminalResource('renderer subscription', unsubscribeRenderer)
     safelyDisposeTerminalResource('renderer addon', () => rendererController.dispose())
     safelyDisposeTerminalResource('resize observer', () => resizeObserver.disconnect())
+    window.removeEventListener('mssh:terminal-host-moved', onHostMoved)
     if (cleanupCopyOnSelect) safelyDisposeTerminalResource('copy-on-select subscription', cleanupCopyOnSelect)
     unregisterTerminalSearch(refs.registeredTerminalIDRef.current)
     if (!addonOwnedByTerminal) safelyDisposeTerminalResource('fit addon', () => fitAddon.dispose())
