@@ -87,6 +87,9 @@ func (s *SessionService) MoveFolder(id int64, newParentID *int64) error {
 }
 
 func (s *SessionService) ListSessions(folderID *int64) ([]model.Session, error) {
+	if err := validateOptionalAssetID("folder", folderID); err != nil {
+		return nil, err
+	}
 	s.logger.Info("listing sessions", "folderID", folderID)
 	sessions, err := store.ListSessions(s.db, folderID)
 	if err != nil {

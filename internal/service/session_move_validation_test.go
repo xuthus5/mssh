@@ -24,4 +24,7 @@ func TestSessionServiceMoveAndDefaultRejectInvalidIDs(t *testing.T) {
 	require.Error(t, svc.MoveSession(1, &zero))
 	require.Error(t, svc.DeleteFolder(0))
 	require.Error(t, svc.DeleteSession(0))
+	zeroFolder := int64(0)
+	_, err = svc.ListSessions(&zeroFolder)
+	require.Error(t, err)
 }

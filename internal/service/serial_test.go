@@ -169,3 +169,13 @@ func TestSerialServiceRejectsNameNotesSortBounds(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 3, created.SortOrder)
 }
+
+func TestSerialServiceDeleteRejectsInvalidID(t *testing.T) {
+	db, err := store.OpenDB(t.TempDir())
+	require.NoError(t, err)
+	require.NoError(t, store.InitializeSchema(db))
+	t.Cleanup(func() { _ = db.Close() })
+	svc := NewSerialService(db, slog.Default())
+	require.Error(t, svc.Delete(0))
+	require.Error(t, svc.Delete(-1))
+}

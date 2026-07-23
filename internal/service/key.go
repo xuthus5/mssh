@@ -131,6 +131,9 @@ func (k *KeyService) Import(name, privateKeyPEM string) (*model.SSHKey, error) {
 }
 
 func (k *KeyService) Delete(id int64) error {
+	if id <= 0 {
+		return fmt.Errorf("invalid key id")
+	}
 	outcome := "failed"
 	defer func() {
 		recordAudit(k.db, k.logger, model.AuditEvent{Action: "delete", TargetType: "key", TargetID: fmt.Sprint(id), Summary: "删除 SSH 密钥", Outcome: outcome})
@@ -144,6 +147,9 @@ func (k *KeyService) Delete(id int64) error {
 }
 
 func (k *KeyService) UsageCount(id int64) (int, error) {
+	if id <= 0 {
+		return 0, fmt.Errorf("invalid key id")
+	}
 	var count int
 	if err := k.db.QueryRow("SELECT COUNT(*) FROM sessions WHERE key_id = ?", id).Scan(&count); err != nil {
 		return 0, fmt.Errorf("key usage count: %w", err)
@@ -152,6 +158,9 @@ func (k *KeyService) UsageCount(id int64) (int, error) {
 }
 
 func (k *KeyService) ExportPublicKey(id int64) (string, error) {
+	if id <= 0 {
+		return "", fmt.Errorf("invalid key id")
+	}
 	key, err := store.GetKey(k.db, id)
 	if err != nil {
 		return "", fmt.Errorf("export public key: %w", err)
