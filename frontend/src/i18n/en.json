@@ -1430,5 +1430,8 @@
   "清空": "Clear",
   "选择上传文件失败: ${}": "Failed to choose upload file: ${}",
   "选择下载位置失败: ${}": "Failed to choose download location: ${}",
-  "选择主题文件失败: ${}": "Failed to choose theme file: ${}"
+  "选择主题文件失败: ${}": "Failed to choose theme file: ${}",
+  "删除提供商": "Delete Provider",
+  "确认删除提供商「${}」？此操作不可撤销。": "Delete provider \"${}\"? This cannot be undone.",
+  "未命名提供商": "Unnamed provider"
 }
