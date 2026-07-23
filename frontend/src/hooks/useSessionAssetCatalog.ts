@@ -36,16 +36,24 @@ export function useSessionAssetCatalog(state: StateSetters) {
   }, [state.setEnvironments, state.setError, state.setProjects, state.setTags])
 
   const refreshAssets = useCallback(async () => {
-    const [environmentItems, projectItems, tagItems, sessionItems, recentItems] = await Promise.all([
-      AssetCatalogService.ListEnvironments(), AssetCatalogService.ListProjects(), AssetCatalogService.ListTags(),
-      SessionService.ListSessions(null), SessionService.ListRecentSessions(10),
-    ])
-    state.setEnvironments((environmentItems ?? []).map(mapEnvironment))
-    state.setProjects((projectItems ?? []).map(mapProject))
-    state.setTags((tagItems ?? []).map(mapTag))
-    state.setSessions((sessionItems ?? []).map(mapSession))
-    state.setRecentSessions((recentItems ?? []).map(mapSession))
-  }, [state.setEnvironments, state.setProjects, state.setRecentSessions, state.setSessions, state.setTags])
+    try {
+      const [environmentItems, projectItems, tagItems, sessionItems, recentItems] = await Promise.all([
+        AssetCatalogService.ListEnvironments(), AssetCatalogService.ListProjects(), AssetCatalogService.ListTags(),
+        SessionService.ListSessions(null), SessionService.ListRecentSessions(10),
+      ])
+      state.setEnvironments((environmentItems ?? []).map(mapEnvironment))
+      state.setProjects((projectItems ?? []).map(mapProject))
+      state.setTags((tagItems ?? []).map(mapTag))
+      state.setSessions((sessionItems ?? []).map(mapSession))
+      state.setRecentSessions((recentItems ?? []).map(mapSession))
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      logger.error('refreshAssets error', error)
+      state.setError(message)
+      toast(t('刷新资产数据失败: ${}', message), 'error')
+      throw error
+    }
+  }, [state.setEnvironments, state.setError, state.setProjects, state.setRecentSessions, state.setSessions, state.setTags])
 
   const createEnvironment = useCallback(async (name: string, colorToken: AssetColorToken) => {
     const result = await AssetCatalogService.CreateEnvironment({ id: 0, name, color_token: colorToken as unknown as BindingAssetColorToken, sort_order: state.environments.length })
