@@ -195,7 +195,33 @@ describe('useSession', () => {
     expect(useToastStore.getState().toasts.some((item) => item.message.includes('加载资产分类失败'))).toBe(false)
   })
 
+  it('keeps updateSession success when GetSession refresh fails', async () => {
+    useToastStore.setState({ toasts: [] })
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SessionService.ListFolders', async () => [])
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SessionService.ListSessions', async () => [{
+      id: 7, name: 'old', host: '1.1.1.1', port: 22, username: 'root', auth_method: 'password',
+      keep_alive: 30, term_type: 'xterm', folder_id: null, notes: '', tags: [],
+    }])
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SessionService.UpdateSession', async () => undefined)
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SessionService.GetSession', async () => { throw new Error('get boom') })
+    __registerHandler('github.com/xuthus5/mssh/internal/service.AssetCatalogService.ListEnvironments', async () => [])
+    __registerHandler('github.com/xuthus5/mssh/internal/service.AssetCatalogService.ListProjects', async () => [])
+    __registerHandler('github.com/xuthus5/mssh/internal/service.AssetCatalogService.ListTags', async () => [])
+    const { result } = renderHook(() => useSession())
+    await act(async () => { await result.current.listSessions() })
+    useToastStore.setState({ toasts: [] })
+    await act(async () => {
+      await result.current.updateSession({
+        id: '7', name: 'new', host: '1.1.1.1', port: 2222, username: 'root',
+        authMethod: 'password', keepAlive: 30, termType: 'xterm', folderId: null,
+      } as any)
+    })
+    expect(result.current.sessions.find((item) => item.id === '7')?.name).toBe('new')
+    expect(useToastStore.getState().toasts.some((item) => item.message.includes('更新会话失败'))).toBe(false)
+  })
+
   it('handles createSession error gracefully', async () => {
+
     __registerHandler('github.com/xuthus5/mssh/internal/service.SessionService.ListFolders', async () => [])
     __registerHandler('github.com/xuthus5/mssh/internal/service.SessionService.ListSessions', async () => [])
     __registerHandler('github.com/xuthus5/mssh/internal/service.SessionService.CreateSession', async () => { throw new Error('db error') })
