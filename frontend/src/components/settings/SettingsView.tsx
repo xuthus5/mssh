@@ -27,6 +27,10 @@ import { t } from '@/i18n'
 export interface SettingsViewProps {
   general: GeneralSettings
   settingsReady?: boolean
+  loadError?: string
+  onReloadSettings?: () => void
+  themeLoadError?: string
+  onReloadThemes?: () => void
   systemFonts: string[]
   themeProfiles: ThemeProfile[]
   themeAssignments: ThemeAssignments
@@ -46,6 +50,8 @@ export interface SettingsViewProps {
   onImportConfig: () => void | Promise<void>
   sftpSettings: SFTPSettings
   sftpSettingsReady?: boolean
+  sftpLoadError?: string
+  onReloadSFTPSettings?: () => void
   onSaveSFTPSettings: (settings: SFTPSettings) => Promise<void>
   ai?: AISettingsController
 }
@@ -60,6 +66,8 @@ function SettingsTabPanels(props: SettingsViewProps) {
           onSave={props.onSaveGeneral}
           onPreviewUIFont={props.onPreviewUIFont}
           settingsReady={props.settingsReady}
+          loadError={props.loadError}
+          onReload={props.onReloadSettings}
         />
       </TabsContent>
       <TabsContent value="terminal" className="min-h-0 min-w-0 overflow-y-auto overscroll-contain pr-2">
@@ -78,6 +86,10 @@ function SettingsTabPanels(props: SettingsViewProps) {
           onDeleteThemeDefinition={props.onDeleteThemeDefinition}
           onResetBuiltinThemes={props.onResetBuiltinThemes}
           settingsReady={props.settingsReady}
+          loadError={props.loadError}
+          onReloadSettings={props.onReloadSettings}
+          themeLoadError={props.themeLoadError}
+          onReloadThemes={props.onReloadThemes}
         />
       </TabsContent>
       <TabsContent value="ai" className="min-h-0 min-w-0 overflow-y-auto overscroll-contain pr-2">
@@ -94,7 +106,13 @@ function SettingsTabPanels(props: SettingsViewProps) {
         <SecurityPanel />
       </TabsContent>
       <TabsContent value="sftp" className="min-h-0 min-w-0 overflow-y-auto overscroll-contain pr-2">
-        <SFTPSettingsPanel settings={props.sftpSettings} onSave={props.onSaveSFTPSettings} settingsReady={props.sftpSettingsReady} />
+        <SFTPSettingsPanel
+          settings={props.sftpSettings}
+          onSave={props.onSaveSFTPSettings}
+          settingsReady={props.sftpSettingsReady}
+          loadError={props.sftpLoadError}
+          onReload={props.onReloadSFTPSettings}
+        />
       </TabsContent>
       <TabsContent value="shortcuts" className="min-h-0 min-w-0 overflow-y-auto overscroll-contain pr-2">
         <ShortcutSettingsPanel />
