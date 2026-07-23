@@ -17,7 +17,7 @@ const generalSettingKeys = [
   'appearance.ui_font_fallback_family', 'appearance.ui_font_size',
   'application.close_button_action', 'application.log_dir', 'application.log_retention_days',
   'application.proxy_mode', 'application.proxy_url', 'application.proxy_no_proxy',
-  'application.proxy_username', 'application.proxy_password',
+  'application.proxy_username', 'application.proxy_password', 'application.proxy_password_saved',
   LANGUAGE_SETTING_KEY,
 ]
 
@@ -50,6 +50,8 @@ export interface GeneralSettings {
   proxyNoProxy: string
   proxyUsername: string
   proxyPassword: string
+  proxyPasswordSaved: boolean
+  clearProxyPassword: boolean
   language: AppLanguage
 }
 
@@ -74,6 +76,8 @@ const defaultGeneralSettings: GeneralSettings = {
   proxyNoProxy: '',
   proxyUsername: '',
   proxyPassword: '',
+  proxyPasswordSaved: false,
+  clearProxyPassword: false,
   language: 'zh-CN',
 }
 
@@ -138,6 +142,8 @@ function normalizeGeneral(settings: GeneralSettings): GeneralSettings {
     proxyNoProxy: normalizeProxyText(settings.proxyNoProxy),
     proxyUsername: normalizeProxyText(settings.proxyUsername),
     proxyPassword: typeof settings.proxyPassword === 'string' ? settings.proxyPassword : '',
+    proxyPasswordSaved: settings.proxyPasswordSaved === true,
+    clearProxyPassword: settings.clearProxyPassword === true,
     language: settings.language === 'en' ? 'en' : 'zh-CN',
   }
 }
@@ -168,7 +174,9 @@ function parseGeneral(settings: { [_ in string]?: Setting }): GeneralSettings {
     proxyURL: settingValue(settings, 'application.proxy_url', ''),
     proxyNoProxy: settingValue(settings, 'application.proxy_no_proxy', ''),
     proxyUsername: settingValue(settings, 'application.proxy_username', ''),
-    proxyPassword: settingValue(settings, 'application.proxy_password', ''),
+    proxyPassword: '',
+    proxyPasswordSaved: Boolean(settingValue(settings, 'application.proxy_password_saved', false)),
+    clearProxyPassword: false,
     language: (settingValue<string>(settings, LANGUAGE_SETTING_KEY, 'zh-CN') === 'en' ? 'en' : 'zh-CN'),
   })
 }
@@ -207,10 +215,17 @@ async function persistGeneral(settings: GeneralSettings) {
     settingEntry('application.proxy_url', settings.proxyURL),
     settingEntry('application.proxy_no_proxy', settings.proxyNoProxy),
     settingEntry('application.proxy_username', settings.proxyUsername),
-    settingEntry('application.proxy_password', settings.proxyPassword),
+    settingEntry('application.proxy_password', resolveProxyPasswordWrite(settings)),
     settingEntry(LANGUAGE_SETTING_KEY, settings.language),
   ]), TerminalService.SetMaxSize(settings.maxPoolSize)])
 }
+
+/** Empty keeps existing secret; clear sentinel deletes; non-empty stores a new encrypted password. */
+export function resolveProxyPasswordWrite(settings: Pick<GeneralSettings, 'proxyPassword' | 'clearProxyPassword'>): string {
+  if (settings.clearProxyPassword) return '__clear_proxy_password__'
+  return typeof settings.proxyPassword === 'string' ? settings.proxyPassword : ''
+}
+
 
 function useGeneralEvents(load: () => Promise<void>, setGeneral: Dispatch<SetStateAction<GeneralSettings>>) {
   useEffect(() => {
@@ -247,9 +262,17 @@ export function useGeneralSettings() {
     try {
       await persistGeneral(normalized)
       revision.current++
-      applyGeneral(normalized)
-      setGeneral(normalized)
-      emitSettingsEvent(SETTINGS_GENERAL_CHANGED_EVENT, normalized)
+      const persisted = normalizeGeneral({
+        ...normalized,
+        proxyPassword: '',
+        clearProxyPassword: false,
+        proxyPasswordSaved: normalized.clearProxyPassword
+          ? false
+          : (normalized.proxyPasswordSaved || normalized.proxyPassword.trim() !== ''),
+      })
+      applyGeneral(persisted)
+      setGeneral(persisted)
+      emitSettingsEvent(SETTINGS_GENERAL_CHANGED_EVENT, persisted)
       if (!options?.quiet) toast(t('通用设置已保存'), 'success')
     } catch (error) {
       applyGeneral(general)

@@ -1,7 +1,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { Events } from '@wailsio/runtime'
-import { useGeneralSettings } from '@/hooks/useGeneralSettings'
+import { resolveProxyPasswordWrite, useGeneralSettings } from '@/hooks/useGeneralSettings'
 import { useAppStore } from '@/store/appStore'
 import { __clearHandlers, __emitEvent, __registerHandler } from '@/test/__mocks__/wails-runtime'
 import { SETTINGS_GENERAL_CHANGED_EVENT, SETTINGS_GENERAL_PREVIEW_EVENT, SETTINGS_PREVIEW_CANCELLED_EVENT } from '@/lib/settingsWindowEvents'
@@ -23,7 +23,7 @@ const savedGeneral = {
   proxyURL: '',
   proxyNoProxy: '',
   proxyUsername: '',
-  proxyPassword: '',
+  proxyPassword: '', proxyPasswordSaved: false, clearProxyPassword: false,
   language: 'zh-CN' as const,
 }
 
@@ -146,7 +146,7 @@ describe('useGeneralSettings cross-window sync', () => {
         proxyURL: ' http://127.0.0.1:7890 ',
         proxyNoProxy: ' 127.0.0.1 ',
         proxyUsername: ' u ',
-        proxyPassword: 'secret',
+        proxyPassword: 'secret', proxyPasswordSaved: false, clearProxyPassword: false,
       })
     })
     expect(savedEntries).toContainEqual(expect.objectContaining({ key: 'application.proxy_mode', value: '"manual"' }))
@@ -261,3 +261,12 @@ describe('useGeneralSettings cross-window sync', () => {
     ]))
   })
 
+
+
+describe('resolveProxyPasswordWrite', () => {
+  it('keeps empty writes, clears with sentinel, and passes new secrets', () => {
+    expect(resolveProxyPasswordWrite({ proxyPassword: '', clearProxyPassword: false })).toBe('')
+    expect(resolveProxyPasswordWrite({ proxyPassword: 'x', clearProxyPassword: true })).toBe('__clear_proxy_password__')
+    expect(resolveProxyPasswordWrite({ proxyPassword: 'new-secret', clearProxyPassword: false })).toBe('new-secret')
+  })
+})
