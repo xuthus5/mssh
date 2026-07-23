@@ -1,7 +1,10 @@
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import QuickCommands from '@/components/session/QuickCommands'
+import { requestConfirm } from '@/lib/confirmDialog'
+
+vi.mock('@/lib/confirmDialog', () => ({ requestConfirm: vi.fn(async () => true) }))
 
 const commands = [
   { id: 'list', name: 'List files', shortcut: 'Ctrl+L', command: 'ls -la' },
@@ -49,7 +52,7 @@ describe('QuickCommands', () => {
     expect(screen.queryByPlaceholderText('名称')).not.toBeInTheDocument()
   })
 
-  it('executes, deletes, and exposes commands through drag data', async () => {
+  it('executes, deletes after confirm, and exposes commands through drag data', async () => {
     const user = userEvent.setup()
     const onExecute = vi.fn()
     const onDelete = vi.fn()
@@ -64,22 +67,29 @@ describe('QuickCommands', () => {
     await user.click(row!)
     expect(onExecute).toHaveBeenCalledWith('ls -la')
 
-    await user.click(within(row!).getByRole('button'))
-    expect(onDelete).toHaveBeenCalledWith('list')
+    await user.click(within(row!).getByRole('button', { name: '删除 List files' }))
+    await waitFor(() => expect(requestConfirm).toHaveBeenCalled())
+    await waitFor(() => expect(onDelete).toHaveBeenCalledWith('list'))
     expect(onExecute).toHaveBeenCalledTimes(1)
     expect(screen.getByText('Ctrl+L')).toBeInTheDocument()
-    expect(screen.queryByText('Ctrl+P')).not.toBeInTheDocument()
   })
-})
+
+  it('does not delete when confirmation is cancelled', async () => {
+    vi.mocked(requestConfirm).mockResolvedValueOnce(false)
+    const user = userEvent.setup()
+    const onDelete = vi.fn()
+    render(<QuickCommands commands={commands} onExecute={vi.fn()} onAdd={vi.fn()} onDelete={onDelete} />)
+    const row = screen.getByText('List files').closest<HTMLElement>('[draggable="true"]')
+    await user.click(within(row!).getByRole('button', { name: '删除 List files' }))
+    await waitFor(() => expect(requestConfirm).toHaveBeenCalled())
+    expect(onDelete).not.toHaveBeenCalled()
+  })
 
   it('keeps delete actions keyboard-discoverable via focus-within styles', () => {
     render(<QuickCommands commands={commands} onExecute={vi.fn()} onAdd={vi.fn()} onDelete={vi.fn()} />)
-    const deleteButton = screen.getAllByRole('button')[0]
-    // In the list row, delete is the only nested button.
     const row = screen.getByText('List files').closest<HTMLElement>('[draggable="true"]')
-    const button = within(row!).getByRole('button')
+    const button = within(row!).getByRole('button', { name: '删除 List files' })
     expect(button.className).toContain('group-focus-within:opacity-100')
     expect(button.className).toContain('sm:opacity-0')
-    void deleteButton
   })
-
+})

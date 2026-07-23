@@ -1420,5 +1420,7 @@
   "删除串口配置失败: ${}": "Failed to delete serial profile: ${}",
   "批量删除串口配置失败: ${}": "Failed to batch delete serial profiles: ${}",
   "调整资产排序失败: ${}": "Failed to reorder assets: ${}",
-  "${}: ${}": "${}: ${}"
+  "${}: ${}": "${}: ${}",
+  "删除宏": "Delete macro",
+  "确认删除宏「${}」？此操作不可撤销。": "Delete macro “${}”? This cannot be undone."
 }
