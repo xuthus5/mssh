@@ -68,7 +68,7 @@ export function TransferItem({ transfer, onCancel, onRetry, onRemove }: Transfer
         </div>
       </div>
       {active && <Button size="icon-xs" variant="ghost" aria-label={t('取消 ${}', transfer.fileName)} onClick={() => onCancel(transfer)}><X /></Button>}
-      {transfer.status === 'failed' && <Button size="icon-xs" variant="outline" aria-label={t('重试 ${}', transfer.fileName)} onClick={() => onRetry(transfer)}><RotateCcw /></Button>}
+      {transfer.status === 'failed' && transfer.error !== t('会话已删除') && transfer.error !== '会话已删除' && <Button size="icon-xs" variant="outline" aria-label={t('重试 ${}', transfer.fileName)} onClick={() => onRetry(transfer)}><RotateCcw /></Button>}
       {!active && <Button size="icon-xs" variant="ghost" aria-label={t('移除 ${}', transfer.fileName)} onClick={() => onRemove(transfer)}><Trash2 /></Button>}
     </CardHeader>
     <CardContent className="flex flex-col gap-2 px-3">

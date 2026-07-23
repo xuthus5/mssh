@@ -45,4 +45,14 @@ describe('transferActions', () => {
     expect(cancelled).toBe('running-1')
     expect(useAppStore.getState().transfers).toHaveLength(1)
   })
+
+  it('refuses retry for session-deleted transfers', async () => {
+    const cancelled: TransferJob = {
+      id: 'c1', fileName: 'a.txt', direction: 'upload', sessionId: 9, sessionName: 'gone',
+      sourcePath: '/a', targetPath: '/b', totalBytes: 1, transferredBytes: 0, speed: 0, eta: 0,
+      status: 'cancelled', error: '会话已删除', startedAt: 1, completedAt: 2,
+    }
+    await expect(retryTransfer(cancelled)).rejects.toThrow('会话已删除，无法重试传输')
+    expect(useAppStore.getState().transfers).toEqual([])
+  })
 })

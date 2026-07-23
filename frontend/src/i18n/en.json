@@ -173,6 +173,8 @@
   "会话可能因空闲超时、进程退出或网络中断而结束，可在当前终端中重新连接。": "The session may have ended due to idle timeout, process exit, or network interruption. You can reconnect in the current terminal.",
   "会话名称": "Session Name",
   "会话导入完成：新增 ${}，更新 ${}": "Session import finished: added ${}, updated ${}",
+  "会话已删除": "Session deleted",
+  "会话已删除，无法重试传输": "Session was deleted; cannot retry transfer",
   "会话录制": "Session Recording",
   "会话搜索结果": "Session search results",
   "会话资产": "Session assets",
