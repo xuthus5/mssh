@@ -1294,3 +1294,15 @@
 | ID | 验收条件 | 状态 |
 |---|---|---|
 | UX-ENG-137 | `appStoreActions.ts` 提取 `appStoreStatusActions.ts` 保持 ≤300 行，并为 workspaceSaveError 提供空间。 | done |
+
+## 2026-07-24 商用硬化波次（传输中心动作错误归属）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| UX-TRANSFER-138 | 传输中心取消/重试失败仅 Sheet 内 inline alert 展示，不得 error toast；加载失败仍走既有 banner+重试。 | done |
+
+## 2026-07-24 商用硬化波次（云同步动作错误归属）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| UX-SYNC-139 | 云同步设置页动作失败（保存/测试/同步/推拉/冲突/版本/重置）仅页面 banner（controller.error）展示，不得 error toast；成功可 toast。 | done |
