@@ -1,6 +1,8 @@
 package service
 
 import (
+	"context"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -88,4 +90,28 @@ func mustURL(t *testing.T, raw string) *url.URL {
 	parsed, err := url.Parse(raw)
 	require.NoError(t, err)
 	return parsed
+}
+
+func TestIsBlockedOutboundIP(t *testing.T) {
+	assert.True(t, isBlockedOutboundIP(net.ParseIP("169.254.169.254")))
+	assert.True(t, isBlockedOutboundIP(net.ParseIP("0.0.0.0")))
+	assert.True(t, isBlockedOutboundIP(net.ParseIP("ff02::1")))
+	assert.False(t, isBlockedOutboundIP(net.ParseIP("127.0.0.1")))
+	assert.False(t, isBlockedOutboundIP(net.ParseIP("1.1.1.1")))
+	assert.False(t, isBlockedOutboundIP(net.ParseIP("10.0.0.1")))
+}
+
+func TestSecureDialContextBlocksMetadataIP(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	_, err := secureDialContext(ctx, "tcp", "169.254.169.254:80")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "not allowed")
+}
+
+func TestSharedHTTPClientTransportHasSecureDial(t *testing.T) {
+	client := sharedHTTPClient(2*time.Second, nil)
+	transport, ok := client.Transport.(*http.Transport)
+	require.True(t, ok)
+	require.NotNil(t, transport.DialContext)
 }

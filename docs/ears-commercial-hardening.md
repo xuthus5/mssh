@@ -324,3 +324,11 @@
 | SEC-HOSTKEY-001 | 当 known_hosts 中已有指纹且远端呈现不同密钥时，连接必须被阻断（不得 TOFU 覆盖）。 | done |
 | SEC-HOSTKEY-002 | 变更错误信息必须包含主机名、期望指纹与呈现指纹，并提示可在安全设置删除旧指纹。 | done |
 | SEC-HOSTKEY-003 | 连接失败对话框必须对 host-key change 错误追加本地化商业提示（中英）。 | done |
+
+## 2026-07-23 商用硬化波次（HTTP dial-time SSRF）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| SEC-HTTP-004 | 共享 HTTP Transport 必须使用安全 DialContext：阻断链路本地/未指定/组播/169.254 元数据 IP。 | done |
+| SEC-HTTP-005 | 主机名解析后必须对每个候选 IP 再次校验；全部被阻断时不得建立连接（缓解 DNS rebinding 到元数据）。 | done |
+| SEC-HTTP-006 | 代理场景下仍保留 proxy Transport，并叠加 DialContext 与 CheckRedirect 策略。 | done |
