@@ -41,14 +41,20 @@ export function AboutPanel() {
       setReleaseURL(update.release_url)
       setMessage(update.update_available ? t('发现新版本，可前往发布页下载。') : t('当前已是最新版本。'))
     } catch (error) {
-      setMessage(t('检查更新失败：${}', error instanceof Error ? error.message : String(error)))
+      const message = error instanceof Error ? error.message : String(error)
+      setMessage(t('检查更新失败：${}', message))
+      toast(t('检查更新失败：${}', message), 'error')
     } finally {
       setChecking(false)
     }
   }
 
   const openURL = (url: string) => {
-    void Browser.OpenURL(url).catch((error: unknown) => logger.error('open URL failed', error))
+    void Browser.OpenURL(url).catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error)
+      logger.error('open URL failed', error)
+      toast(t('打开链接失败: ${}', message), 'error')
+    })
   }
 
   return <div className="flex flex-col gap-4 pt-2">

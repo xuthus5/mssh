@@ -1411,5 +1411,6 @@
   "处理同步冲突失败: ${}": "Failed to resolve sync conflict: ${}",
   "恢复本地版本失败: ${}": "Failed to restore local version: ${}",
   "删除本地版本失败: ${}": "Failed to delete local version: ${}",
-  "清空本地业务数据失败: ${}": "Failed to reset local data: ${}"
+  "清空本地业务数据失败: ${}": "Failed to reset local data: ${}",
+  "打开链接失败: ${}": "Failed to open link: ${}"
 }
