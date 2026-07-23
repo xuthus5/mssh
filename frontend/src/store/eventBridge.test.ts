@@ -9,7 +9,7 @@ describe('eventBridge', () => {
   beforeEach(() => {
     __clearHandlers()
     useAppStore.setState({ tabs: [], transfers: [], tunnelState: {}, connectionStatus: {} })
-    useConnectDialog.setState({ open: false, state: 'idle', attemptId: '', fingerprint: '', algorithm: '', error: '' })
+    useConnectDialog.setState({ open: false, state: 'idle', attemptId: '', sessionId: '', fingerprint: '', algorithm: '', error: '' })
   })
 
   it('maps host-key attempt and fingerprint events', () => {

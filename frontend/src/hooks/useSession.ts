@@ -249,6 +249,7 @@ export function useSession() {
       await SessionService.DeleteSession(Number(id))
       setSessions((prev) => prev.filter((s) => s.id !== id))
       setRecentSessions((prev) => prev.filter((s) => s.id !== id))
+      useConnectDialog.getState().dismissForSessions([id])
       await closeTerminalTabsForSessions([id])
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
@@ -275,7 +276,7 @@ export function useSession() {
     if (!session) return
     const dialog = useConnectDialog.getState()
     if (dialog.open) return void toast(t('已有 SSH 连接正在处理，请先完成或关闭当前连接窗口'), 'info')
-    dialog.openDialog(session.host, session.port, session.username, () => { void connect(sessionId) })
+    dialog.openDialog(session.host, session.port, session.username, () => { void connect(sessionId) }, sessionId)
     try {
       const terminalId = await openSessionTab(session)
       dialog.setState('connected')
@@ -312,6 +313,7 @@ export function useSession() {
     if (succeeded.size > 0) {
       setSessions((prev) => prev.filter((session) => !succeeded.has(session.id)))
       setRecentSessions((prev) => prev.filter((session) => !succeeded.has(session.id)))
+      useConnectDialog.getState().dismissForSessions(succeeded)
       await closeTerminalTabsForSessions(succeeded)
     }
     // Local delete results already applied; silent refresh reconciles without aborting the results dialog.

@@ -12,7 +12,7 @@ describe('useSession behavior', () => {
   beforeEach(() => {
     __clearHandlers()
     useAppStore.setState({ tabs: [], activeSurface: null, connectionStatus: {} })
-    useConnectDialog.setState({ open: false, state: 'idle', attemptId: '', error: '', fingerprint: '', algorithm: '' })
+    useConnectDialog.setState({ open: false, state: 'idle', attemptId: '', sessionId: '', error: '', fingerprint: '', algorithm: '' })
   })
 
   it('remaps folder children and sessions while updating defaults', async () => {
@@ -368,6 +368,15 @@ describe('useSession behavior', () => {
     expect(useAppStore.getState().connectionStatus['term-old']).toBe('error')
     expect(useConnectDialog.getState()).toMatchObject({ state: 'failed', error: 'network unavailable' })
   })
+  it('dismisses connect dialog when the target session is deleted', async () => {
+    __registerHandler(service + 'SessionService.DeleteSession', async () => undefined)
+    const { result } = renderHook(() => useSession())
+    useConnectDialog.getState().openDialog('example.com', 22, 'root', vi.fn(), '5')
+    expect(useConnectDialog.getState().open).toBe(true)
+    await act(async () => { await result.current.deleteSession('5') })
+    expect(useConnectDialog.getState()).toMatchObject({ open: false, state: 'idle', sessionId: '' })
+  })
+
 })
 
 function registerInitial({ folders = [], sessions = [], recent = [] }: { folders?: any[]; sessions?: any[]; recent?: any[] }) {

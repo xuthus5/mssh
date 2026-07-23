@@ -35,7 +35,7 @@ describe('reconnectSessionTab', () => {
     __clearHandlers()
     seedDisconnectedTab()
     useAppStore.setState({ replaceTerminalConnection })
-    useConnectDialog.setState({ open: false, state: 'idle', attemptId: '', error: '', fingerprint: '', algorithm: '' })
+    useConnectDialog.setState({ open: false, state: 'idle', attemptId: '', sessionId: '', error: '', fingerprint: '', algorithm: '' })
     useTerminalBehaviorStore.setState({ ...DEFAULT_TERMINAL_BEHAVIOR, autoReconnect: false })
     useToastStore.setState({ toasts: [] })
   })
@@ -163,7 +163,7 @@ describe('maybeAutoReconnectTerminal', () => {
     __clearHandlers()
     seedDisconnectedTab()
     useAppStore.setState({ replaceTerminalConnection })
-    useConnectDialog.setState({ open: false, state: 'idle', attemptId: '', error: '', fingerprint: '', algorithm: '' })
+    useConnectDialog.setState({ open: false, state: 'idle', attemptId: '', sessionId: '', error: '', fingerprint: '', algorithm: '' })
     useTerminalBehaviorStore.setState({ ...DEFAULT_TERMINAL_BEHAVIOR, autoReconnect: false })
   })
 

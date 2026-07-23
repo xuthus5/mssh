@@ -119,7 +119,7 @@ export async function reconnectSessionTab(tabId: string, sessions: ReconnectSess
   if (!skipHostDialog) {
     dialog.openDialog(session.host, session.port, session.username, () => {
       void reconnectSessionTab(tabId, sessions)
-    })
+    }, String(session.id))
   }
   const controller = new AbortController()
   reconnectControllers.set(tabId, controller)
