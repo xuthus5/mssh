@@ -39,7 +39,7 @@ func (t *TerminalService) OpenLocal(ctx context.Context, cols, rows int) (string
 		return "", fmt.Errorf("local shell open: %w", err)
 	}
 	terminalID := uuid.New().String()
-	t.registerTerminal(terminalID, "", session)
+	t.registerTerminal(terminalID, "", 0, session)
 	t.logger.Info("local shell terminal opened", "terminalID", terminalID, "shell", opts.Shell)
 	outcome = "success"
 	return terminalID, nil
