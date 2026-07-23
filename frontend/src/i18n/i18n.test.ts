@@ -70,4 +70,20 @@ describe('i18n', () => {
     expect(hits).toEqual([])
   })
 
+
+  it("rejects known glued English patterns", () => {
+    const patterns = [
+      /Importkey/i, /Copypublic/i, /Trusthost/i, /Starttime/i, /Fileshow/i,
+      /Newfolder/i, /Newtunnel/i, /Localport/i, /Modelname/i, /Removetag/i,
+      /Selecttag/i, /Highrisk/i, /Executemacro/i, /Searchsession/i,
+      /Searchhistorycommand/i, /Selectkey/i, /Resetbuilt-interminaltheme/i,
+      /Importmedium/i, /Exportmedium/i, /Executemedium/i, /Resetmedium/i,
+      /Cancelconnect/i, /successconnectsession/i,
+    ]
+    const hits = Object.entries(enCatalog).filter(([, value]) =>
+      typeof value === "string" && patterns.some((pattern) => pattern.test(value)),
+    )
+    expect(hits).toEqual([])
+  })
+
 })
