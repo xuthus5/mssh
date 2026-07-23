@@ -722,3 +722,14 @@
 | UX-VAULT-011 | 安全操作（setup/unlock/lock/rotate 等）失败必须 toast。 | done |
 | UX-ASSET-011 | 会话资产快速创建失败必须 toast 并保留行内错误。 | done |
 | SEC-THEME-012 | validateThemeAssignments 必须拒绝 profile id<=0。 | done |
+
+## 2026-07-23 商用硬化波次（会话资产对话框 + 串口保存 toast）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| UX-ASSET-012 | 资产分类保存失败必须 toast 并保留对话框错误。 | done |
+| UX-ASSET-013 | 资产分类删除影响加载失败必须 toast 并保留错误。 | done |
+| UX-ASSET-014 | 资产分类删除失败必须 toast 并保留对话框错误。 | done |
+| UX-ASSET-015 | 批量更新会话资产失败必须 toast 并保留对话框错误。 | done |
+| UX-SESSION-011 | 会话保存失败必须 toast 并保留对话框错误。 | done |
+| UX-SERIAL-012 | 串口配置保存失败必须 toast 并保留对话框错误。 | done |
