@@ -285,3 +285,10 @@
 | SYNC-SCHED-003 | 应用 vault 解锁成功后必须触发一次 best-effort 定时策略同步（NotifyVaultUnlocked），不得阻塞解锁主路径。 | done |
 | SYNC-SCHED-004 | 当同步未启用或 vault 仍不可用时，解锁追赶必须静默跳过，不得将状态置为 error。 | done |
 | SYNC-SCHED-005 | 启动时若 vault 已自动解锁，必须在注册 afterUnlock 钩子后立即执行一次追赶，覆盖钩子注册时序竞态。 | done |
+
+## 2026-07-23 商用硬化波次（SFTP 远程路径校验）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| SFTP-PATH-001 | ListDir/Delete/Mkdir/Rename 必须拒绝空远程路径与含 NUL 的路径，与上传/下载策略对齐。 | done |
+| SFTP-PATH-002 | 非法远程路径必须在建立 SSH/SFTP 连接前失败返回。 | done |
