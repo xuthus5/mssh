@@ -14,8 +14,15 @@ func (s *SessionService) ListFolders() ([]model.SessionFolder, error) {
 }
 
 func (s *SessionService) CreateFolder(name string, parentID *int64) (*model.SessionFolder, error) {
-	s.logger.Info("creating folder", "name", name, "parentID", parentID)
-	result, err := store.CreateFolder(s.db, name, parentID)
+	normalized, err := validateFolderName(name)
+	if err != nil {
+		return nil, err
+	}
+	if err := validateOptionalParentFolderID(parentID); err != nil {
+		return nil, err
+	}
+	s.logger.Info("creating folder", "name", normalized, "parentID", parentID)
+	result, err := store.CreateFolder(s.db, normalized, parentID)
 	if err != nil {
 		s.logger.Error("create folder failed", "error", err)
 	}
@@ -23,8 +30,15 @@ func (s *SessionService) CreateFolder(name string, parentID *int64) (*model.Sess
 }
 
 func (s *SessionService) UpdateFolder(id int64, name string) error {
-	s.logger.Info("updating folder", "id", id, "name", name)
-	err := store.UpdateFolder(s.db, id, name)
+	if id <= 0 {
+		return fmt.Errorf("invalid folder id")
+	}
+	normalized, err := validateFolderName(name)
+	if err != nil {
+		return err
+	}
+	s.logger.Info("updating folder", "id", id, "name", normalized)
+	err = store.UpdateFolder(s.db, id, normalized)
 	if err != nil {
 		s.logger.Error("update folder failed", "error", err)
 	}
