@@ -1,71 +1,20 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { useAppStore } from '@/store/appStore'
-import { SessionService, TerminalService, TunnelService } from '@/lib/wails'
+import { SessionService } from '@/lib/wails'
 import { useConnectDialog } from '@/store/connectDialog'
 import { toast } from '@/components/ui/toast'
 import { logger } from '@/lib/logger'
-import { createTerminalTab } from '@/lib/terminalTabs'
 import type { SessionInput } from '../../bindings/github.com/xuthus5/mssh/internal/model/models'
-import { markIntentionalDisconnect, reconnectSessionTab } from '@/hooks/sessionReconnect'
-import { runBatchDeleteSessions, runBatchSessions } from '@/lib/sessionBatch'
-import { mapFolder, mapSession, mapTunnel, type AssetEnvironment, type AssetProject, type AssetTag, type Folder, type Session, type Tunnel } from '@/lib/sessionModels'
+import { mapFolder, mapSession, type AssetEnvironment, type AssetProject, type AssetTag, type Folder, type Session } from '@/lib/sessionModels'
 import { useSessionAssetCatalog } from '@/hooks/useSessionAssetCatalog'
 import { useSessionCSVTransfer } from '@/hooks/useSessionCSVTransfer'
 import { remapAfterFolderDelete } from '@/lib/sessionFolderDelete'
-import { openTerminalWithPoolCapacity } from '@/lib/openTerminal'
-import { resolveOpenTerminalSize } from '@/lib/terminalOpenSize'
+import { useSessionConnectionActions } from '@/hooks/useSessionConnectionActions'
+import { cancelTransfersForSessions, closeTerminalTabsForSessions } from '@/hooks/sessionTabLifecycle'
 import { t } from '@/i18n'
 
 
 export type { BatchSessionResult } from '@/lib/sessionBatch'
 export type { AssetColorToken, AssetEnvironment, AssetProject, AssetTag, Folder, Session, Tunnel } from '@/lib/sessionModels'
-
-async function openSessionTab(session: Session): Promise<string> {
-  const size = resolveOpenTerminalSize()
-  const terminalId = await openTerminalWithPoolCapacity(
-    () => TerminalService.Open(Number(session.id), size.cols, size.rows),
-  )
-  const store = useAppStore.getState()
-  const tab = createTerminalTab({ sessionID: Number(session.id), sessionName: session.name, terminalID: terminalId, tabs: store.tabs })
-  store.setConnectionStatus(terminalId, 'connected')
-  store.openTab(tab)
-  return terminalId
-}
-
-
-async function closeTerminalTabsForSessions(sessionIDs: Iterable<string>) {
-  const targets = new Set([...sessionIDs].map(String))
-  if (targets.size === 0) return
-  const store = useAppStore.getState()
-  const tabs = store.tabs.filter((tab) => (
-    tab.type === 'terminal'
-    && (tab.connectionKind ?? 'ssh') === 'ssh'
-    && targets.has(String(tab.sessionId))
-  ))
-  for (const tab of tabs) {
-    try {
-      await store.closeTab(tab.id)
-    } catch (error) {
-      logger.error('close session terminal tab failed', tab.id, error)
-    }
-  }
-}
-
-
-function cancelTransfersForSessions(sessionIDs: Iterable<string>) {
-  const targets = new Set([...sessionIDs].map(String).filter(Boolean))
-  if (targets.size === 0) return
-  const store = useAppStore.getState()
-  for (const transfer of store.transfers) {
-    if (!targets.has(String(transfer.sessionId))) continue
-    if (transfer.status !== 'queued' && transfer.status !== 'running') continue
-    store.updateTransfer(transfer.id, {
-      status: 'cancelled',
-      error: t('会话已删除'),
-      completedAt: Date.now(),
-    })
-  }
-}
 
 export function useSession() {
   const [folders, setFolders] = useState<Folder[]>([])
@@ -75,7 +24,6 @@ export function useSession() {
   foldersRef.current = folders
   sessionsRef.current = sessions
   const [recentSessions, setRecentSessions] = useState<Session[]>([])
-  const [tunnels, setTunnels] = useState<Tunnel[]>([])
   const [environments, setEnvironments] = useState<AssetEnvironment[]>([])
   const [projects, setProjects] = useState<AssetProject[]>([])
   const [tags, setTags] = useState<AssetTag[]>([])
@@ -288,82 +236,14 @@ export function useSession() {
     }
   }, [])
 
-  const connect = useCallback(async (sessionId: string) => {
-    const session = sessions.find((s) => s.id === sessionId)
-    if (!session) return
-    const dialog = useConnectDialog.getState()
-    if (dialog.open) return void toast(t('已有 SSH 连接正在处理，请先完成或关闭当前连接窗口'), 'info')
-    dialog.openDialog(session.host, session.port, session.username, () => { void connect(sessionId) }, sessionId)
-    try {
-      const terminalId = await openSessionTab(session)
-      dialog.setState('connected')
-      logger.info('connected', { terminalId, host: session.host })
-      // Session is already open; refresh failures must not flip the dialog to failed.
-      void Promise.all([
-        listRecentSessions({ silent: true }),
-        listSessions({ silent: true }),
-      ]).catch((refreshError: unknown) => {
-        logger.error('connect post-refresh failed', refreshError)
-      })
-    } catch (err) {
-      logger.error('connect error', err)
-      const msg = err instanceof Error ? err.message : String(err)
-      dialog.setError(msg)
-    }
-  }, [listRecentSessions, listSessions, sessions])
-
-  const runBatch = useCallback(async (sessionIDs: string[], command?: string) => {
-    const selected = sessionIDs.map((id) => sessions.find((session) => session.id === id)).filter((session): session is Session => session !== undefined)
-    const results = await runBatchSessions(selected, command)
-    // Batch outcomes are already final; silent refresh must not block or rebrand success as failure.
-    void refreshAssets({ silent: true }).catch((refreshError: unknown) => {
-      logger.error('batch post-refresh failed', refreshError)
-    })
-    return results
-  }, [refreshAssets, sessions])
-  const batchConnect = useCallback((sessionIDs: string[]) => runBatch(sessionIDs), [runBatch])
-  const batchExecuteMacro = useCallback((sessionIDs: string[], command: string) => runBatch(sessionIDs, command), [runBatch])
-  const batchDeleteSessions = useCallback(async (sessionIDs: string[]) => {
-    const selected = sessionIDs.map((id) => sessions.find((session) => session.id === id)).filter((session): session is Session => session !== undefined)
-    const results = await runBatchDeleteSessions(selected)
-    const succeeded = new Set(results.filter((result) => result.success).map((result) => result.sessionId))
-    if (succeeded.size > 0) {
-      setSessions((prev) => prev.filter((session) => !succeeded.has(session.id)))
-      setRecentSessions((prev) => prev.filter((session) => !succeeded.has(session.id)))
-      useConnectDialog.getState().dismissForSessions(succeeded)
-      cancelTransfersForSessions(succeeded)
-      await closeTerminalTabsForSessions(succeeded)
-    }
-    // Local delete results already applied; silent refresh reconciles without aborting the results dialog.
-    void refreshAssets({ silent: true }).catch((refreshError: unknown) => {
-      logger.error('batch delete post-refresh failed', refreshError)
-    })
-    return results
-  }, [refreshAssets, sessions])
-
-  const disconnect = useCallback(async (terminalId: string) => {
-    try {
-      markIntentionalDisconnect(terminalId)
-      await TerminalService.Close(terminalId)
-      useAppStore.getState().setConnectionStatus(terminalId, 'disconnected')
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err)
-      logger.error('disconnect error', err)
-      toast(t('断开连接失败: ${}', msg), 'error')
-    }
-  }, [])
-  const reconnect = useCallback((tabId: string) => reconnectSessionTab(tabId, sessions), [sessions])
-  const listTunnels = useCallback(async (options?: { silent?: boolean }) => {
-    try {
-      const result = await TunnelService.List()
-      setTunnels((result ?? []).map(mapTunnel))
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err)
-      logger.error('listTunnels error', err)
-      if (!options?.silent) toast(t('加载隧道失败: ${}', msg), 'error')
-      else throw err
-    }
-  }, [])
+  const connection = useSessionConnectionActions({
+    sessions,
+    setSessions,
+    setRecentSessions,
+    listSessions,
+    listRecentSessions,
+    refreshAssets,
+  })
 
   useEffect(() => {
     listFolders()
@@ -373,10 +253,10 @@ export function useSession() {
   }, [listAssetCatalogs, listFolders, listRecentSessions, listSessions])
 
   return {
-    folders, sessions, recentSessions, tunnels, environments, projects, tags, loading, sessionsLoaded, error,
+    folders, sessions, recentSessions, environments, projects, tags, loading, sessionsLoaded, error,
     listFolders, createFolder, deleteFolder, updateFolder, setDefaultFolder,
     listSessions, listRecentSessions, createSession, updateSession, deleteSession, moveSession,
-    connect, batchConnect, batchExecuteMacro, batchDeleteSessions, reconnect, disconnect, listTunnels,
+    ...connection,
     ...csvTransfer,
     ...assetCatalog,
   }

@@ -68,13 +68,10 @@ describe('useSession behavior', () => {
     expect(result.current.sessions.find((item) => item.id === '8')?.folderId).toBe('1')
   })
 
-  it('loads recent sessions and tunnels, including fallback values', async () => {
+  it('loads recent sessions and surfaces list errors on the page banner', async () => {
     registerInitial({ recent: [bindingSession(8, 'Recent', null)] })
-    __registerHandler(service + 'TunnelService.List', async () => [{ id: 9, session_id: 8, type: 'dynamic', local_host: null, local_port: 1080, remote_host: null, remote_port: 0 }])
     const { result } = renderHook(() => useSession())
     await waitFor(() => expect(result.current.recentSessions).toHaveLength(1))
-    await act(async () => result.current.listTunnels())
-    expect(result.current.tunnels[0]).toEqual({ id: '9', sessionId: '8', type: 'dynamic', localAddress: '', localPort: 1080, remoteAddress: '', remotePort: 0, running: false })
 
     __registerHandler(service + 'SessionService.ListSessions', async () => { throw 'sessions failed' })
     await act(async () => result.current.listSessions())
@@ -82,9 +79,6 @@ describe('useSession behavior', () => {
     __registerHandler(service + 'SessionService.ListRecentSessions', async () => { throw new Error('recent failed') })
     await act(async () => result.current.listRecentSessions())
     expect(result.current.error).toBe('recent failed')
-    __registerHandler(service + 'TunnelService.List', async () => { throw new Error('tunnel failed') })
-    await act(async () => result.current.listTunnels())
-    expect(result.current.tunnels).toHaveLength(1)
   })
 
   it('moves sessions and preserves state when mutations fail', async () => {
