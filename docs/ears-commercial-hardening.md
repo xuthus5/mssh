@@ -400,3 +400,11 @@
 | SEC-MACRO-001 | 宏执行必须加载当前 AI 安全策略（deny/allow/auto-readonly 默认值），不得使用空 security 配置绕过自定义 deny。 | done |
 | SEC-MACRO-002 | 宏写入终端必须复用 AI 命令超时与 32KiB 长度上界，超时/超限记录审计并失败。 | done |
 | SEC-MACRO-003 | 创建/更新宏时必须校验名称非空、命令非空、命令长度上界、DelayMs ∈ [0,60000]。 | done |
+
+## 2026-07-23 商用硬化波次（AI 上下文 MaxOutputBytes）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| AI-CTX-001 | 前端 `captureTerminalContext` 必须在行数截断后，再按 `security.max_output_bytes` 做 UTF-8 字节截断（保留尾部上下文）。 | done |
+| AI-CTX-002 | 后端 `Chat` 在脱敏后必须对终端上下文应用 `clampAITextBytes`，并在拼接会话/系统摘要后再次截断，防止绕过。 | done |
+| AI-CTX-003 | 字节截断不得拆分 UTF-8 码点；超预算时从头部丢弃整 rune。 | done |

@@ -81,3 +81,10 @@ func TestValidateAISettings(t *testing.T) {
 		})
 	}
 }
+
+func TestClampAITextBytes(t *testing.T) {
+	assert.Equal(t, "abcdef", clampAITextBytes("abcdef", 0))
+	assert.Equal(t, "cdef", clampAITextBytes("abcdef", 4))
+	assert.Equal(t, "世界", clampAITextBytes("你好世界", 6))
+	assert.Equal(t, "短", clampAITextBytes("短", 10))
+}

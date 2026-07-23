@@ -25,7 +25,10 @@ func (s *AIService) Chat(request model.AIChatRequest) (model.AIChatResponse, err
 	}
 	prompt := redactAIText(request.Prompt, settings.Security.RedactionPatterns)
 	terminalContext := redactAIText(request.TerminalContext, settings.Security.RedactionPatterns)
+	terminalContext = clampAITextBytes(terminalContext, settings.Security.MaxOutputBytes)
 	terminalContext = s.appendAIContext(request, settings, terminalContext)
+	// Re-clamp after metadata/system summary may have expanded context.
+	terminalContext = clampAITextBytes(terminalContext, settings.Security.MaxOutputBytes)
 	citations, searchContext, err := s.chatSearchContext(request, settings, prompt)
 	if err != nil {
 		return model.AIChatResponse{}, err
