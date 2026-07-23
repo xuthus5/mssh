@@ -59,7 +59,6 @@ type assertErr string
 
 func (e assertErr) Error() string { return string(e) }
 
-
 func TestPortSessionWriteAndBreakAfterClose(t *testing.T) {
 	session := NewTestPortSession("/dev/ttyTEST")
 	require.NoError(t, session.Close())

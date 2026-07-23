@@ -1,8 +1,9 @@
 import type { AppState, ConnectionStatus, Tab, TerminalTab } from '@/store/appStore'
 import type { ActiveSurface, OverviewSection, WorkspaceID } from '@/store/tabNavigation'
+import { isSplitLayoutSnapshot, type SplitLayoutSnapshot } from '@/components/terminal/splitLayout'
 
 export const WORKSPACE_LAYOUT_SETTING = 'workspace.layout'
-export const WORKSPACE_LAYOUT_VERSION = 2
+export const WORKSPACE_LAYOUT_VERSION = 3
 
 export type TerminalConnectionKind = 'ssh' | 'serial' | 'local'
 
@@ -21,12 +22,13 @@ type TerminalIntent = {
   toolPanel?: TerminalTab['toolPanel']
   connectionKind?: TerminalConnectionKind
   serialPortId?: number
+  splitLayout?: SplitLayoutSnapshot | null
 }
 type PlaybackIntent = { type: 'playback'; title: string; recordingPath: string }
 type TabIntent = TerminalIntent | PlaybackIntent
 
 export interface WorkspaceSnapshot {
-  version: 2
+  version: 3
   tabs: TabIntent[]
   active: { type: 'workspace'; id: WorkspaceID } | { type: 'tab'; index: number } | null
   workspaceTab: WorkspaceID
@@ -85,6 +87,10 @@ function tabIntent(tab: Tab): TabIntent {
   if (tab.connectionKind === 'serial' && tab.serialPortId) {
     intent.serialPortId = tab.serialPortId
   }
+  // Serial is device-exclusive: never persist multi-pane layouts.
+  if (tab.connectionKind !== 'serial' && tab.splitLayout && tab.splitLayout.paneCount > 1) {
+    intent.splitLayout = tab.splitLayout
+  }
   return intent
 }
 
@@ -113,7 +119,12 @@ function isTabIntent(value: unknown): value is TabIntent {
   const kind = value.connectionKind
   if (kind === undefined || kind === 'ssh') return Number(value.sessionId) > 0
   if (kind === 'local') return Number(value.sessionId) === 0
+  if (value.splitLayout !== undefined && value.splitLayout !== null && !isSplitLayoutSnapshot(value.splitLayout)) {
+    return false
+  }
   if (kind === 'serial') {
+    // Serial tabs must remain single-pane.
+    if (value.splitLayout) return false
     return Number(value.sessionId) === 0
       && Number.isSafeInteger(value.serialPortId)
       && Number(value.serialPortId) > 0
@@ -212,6 +223,9 @@ async function restoreTabIntent(
     if (kind === 'serial') {
       tab.connectionKind = 'serial'
       tab.serialPortId = intent.serialPortId
+    }
+    if (kind !== 'serial' && intent.splitLayout && isSplitLayoutSnapshot(intent.splitLayout)) {
+      tab.splitLayout = intent.splitLayout
     }
     return tab
   } catch {

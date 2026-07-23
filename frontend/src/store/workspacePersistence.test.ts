@@ -66,12 +66,12 @@ describe('workspace persistence', () => {
 
   it('rejects obsolete or malformed layouts instead of maintaining compatibility code', () => {
     expect(() => parseWorkspaceSnapshot('{"version":0,"tabs":[]}')).toThrow('workspace layout is invalid')
-    expect(() => parseWorkspaceSnapshot('{"version":2,"tabs":[],"active":null,"workspaceTab":"bad","overviewSection":"sessions"}')).toThrow('workspace layout is invalid')
+    expect(() => parseWorkspaceSnapshot('{"version":3,"tabs":[],"active":null,"workspaceTab":"bad","overviewSection":"sessions"}')).toThrow('workspace layout is invalid')
   })
 
   it('reconnects valid session intents with new terminal IDs and restores active layout state', async () => {
     const snapshot: WorkspaceSnapshot = {
-      version: 2,
+      version: 3,
       tabs: [
         { type: 'terminal', title: 'prod', sessionId: 7, terminalInstance: 1, toolPanel: 'files' },
         { type: 'terminal', title: 'missing', sessionId: 8, toolPanel: null },
@@ -99,7 +99,7 @@ describe('workspace persistence', () => {
 
   it('restores local and serial tabs through the kind-aware opener', async () => {
     const snapshot: WorkspaceSnapshot = {
-      version: 2,
+      version: 3,
       tabs: [
         { type: 'terminal', title: '本地终端', sessionId: 0, connectionKind: 'local' },
         { type: 'terminal', title: 'COM1', sessionId: 0, connectionKind: 'serial', serialPortId: 9 },
@@ -121,6 +121,52 @@ describe('workspace persistence', () => {
     ])
   })
 
+  it('persists ssh/local split layout roles without terminal ids', () => {
+    const snapshot = createWorkspaceSnapshot({
+      tabs: [{
+        id: 'terminal-a',
+        title: 'prod',
+        type: 'terminal',
+        terminalId: 't1',
+        sessionId: 3,
+        splitLayout: {
+          paneCount: 2,
+          tree: { kind: 'branch', direction: 'horizontal', ratio: 40, first: { kind: 'leaf', role: 0 }, second: { kind: 'leaf', role: 1 } },
+        },
+      }],
+      activeSurface: { type: 'terminal', id: 'terminal-a' },
+      workspaceTab: 'sessions',
+      overviewSection: 'sessions',
+    })
+    expect(snapshot.version).toBe(3)
+    expect(snapshot.tabs[0]).toMatchObject({ splitLayout: { paneCount: 2 } })
+    expect(JSON.stringify(snapshot)).not.toContain('t1')
+    expect(parseWorkspaceSnapshot(JSON.stringify(snapshot)).tabs[0]).toMatchObject({
+      type: 'terminal',
+      splitLayout: { paneCount: 2 },
+    })
+  })
+
+  it('rejects serial tabs that claim multi-pane split layouts', () => {
+    expect(() => parseWorkspaceSnapshot(JSON.stringify({
+      version: 3,
+      tabs: [{
+        type: 'terminal',
+        title: 'COM',
+        sessionId: 0,
+        connectionKind: 'serial',
+        serialPortId: 1,
+        splitLayout: {
+          paneCount: 2,
+          tree: { kind: 'branch', direction: 'horizontal', ratio: 50, first: { kind: 'leaf', role: 0 }, second: { kind: 'leaf', role: 1 } },
+        },
+      }],
+      active: null,
+      workspaceTab: 'sessions',
+      overviewSection: 'serial',
+    }))).toThrow('workspace layout is invalid')
+  })
+
   it('limits simultaneous reconnects to four workers', async () => {
     let active = 0
     let peak = 0
@@ -133,7 +179,7 @@ describe('workspace persistence', () => {
       return `fresh-${intent.sessionId}`
     })
     const snapshot: WorkspaceSnapshot = {
-      version: 2,
+      version: 3,
       tabs: Array.from({ length: 8 }, (_, index) => ({ type: 'terminal' as const, title: `s${index}`, sessionId: index + 1 })),
       active: null,
       workspaceTab: 'sessions',

@@ -21,6 +21,15 @@ import {
   type SplitDirection,
   type SplitNode,
 } from '@/components/terminal/splitTree'
+import {
+  closeInBackground,
+  ensurePaneHost,
+  openSplitTerminal,
+  persistTabSplitLayout,
+  readTabSplitLayout,
+  replaceSecondaryTerminalRuntime,
+  restoreSplitTreeFromLayout,
+} from '@/components/terminal/splitPersistence'
 import { t } from '@/i18n'
 
 const MAX_PANES = 8
@@ -44,44 +53,12 @@ interface Props {
   onCloseTerminal?: () => void
 }
 
-function closeInBackground(terminalID: string, context: string) {
-  void TerminalService.Close(terminalID).catch((error: unknown) => {
-    if (!isTerminalNotFoundError(error)) logger.error(context, error)
-  })
+function bgClose(terminalID: string, context: string) {
+  closeInBackground(terminalID, context, isTerminalNotFoundError)
 }
 
-function replaceSecondaryTerminalRuntime(previousID: string, nextID: string) {
-  useAppStore.setState((state) => {
-    const terminalPool = new Map(state.terminalPool)
-    const terminal = terminalPool.get(previousID)
-    terminalPool.delete(previousID)
-    if (terminal) terminalPool.set(nextID, terminal)
-    const connectionStatus = { ...state.connectionStatus }
-    delete connectionStatus[previousID]
-    connectionStatus[nextID] = 'connected'
-    const recordingState = { ...state.recordingState }
-    delete recordingState[previousID]
-    return { terminalPool, connectionStatus, recordingState, activePaneId: state.activePaneId === previousID ? nextID : state.activePaneId }
-  })
-}
-
-function openSplitTerminal(sessionId: number, connectionKind: 'ssh' | 'serial' | 'local' | undefined, serialPortId: number | undefined) {
-  if (connectionKind === 'local') return TerminalService.OpenLocal(80, 24)
-  if (connectionKind === 'serial') throw new Error(t('串口终端为设备独占，不支持分屏'))
-  return TerminalService.Open(sessionId, 80, 24)
-}
-
-function ensurePaneHost(hosts: Map<string, HTMLDivElement>, leafID: string, terminalID: string): HTMLDivElement {
-  const existing = hosts.get(leafID)
-  if (existing) {
-    existing.dataset.testid = `pane-host-${terminalID}`
-    return existing
-  }
-  const host = document.createElement('div')
-  host.dataset.testid = `pane-host-${terminalID}`
-  host.className = 'h-full w-full min-h-0 min-w-0'
-  hosts.set(leafID, host)
-  return host
+function openPane(sessionId: number, connectionKind: Props['connectionKind'], serialPortId?: number) {
+  return openSplitTerminal(sessionId, connectionKind, serialPortId, t('串口终端为设备独占，不支持分屏'))
 }
 
 export const TerminalSplit = forwardRef<TerminalSplitHandle, Props>(function TerminalSplit({
@@ -94,6 +71,7 @@ export const TerminalSplit = forwardRef<TerminalSplitHandle, Props>(function Ter
   const mountedRef = useRef(true)
   const primaryRef = useRef(primaryID)
   const operationRef = useRef(false)
+  const [layoutReady, setLayoutReady] = useState(false)
   const hostsRef = useRef(new Map<string, HTMLDivElement>())
   const stagingRef = useRef<HTMLDivElement | null>(null)
   const activePaneID = useAppStore((state) => state.activePaneId)
@@ -101,9 +79,54 @@ export const TerminalSplit = forwardRef<TerminalSplitHandle, Props>(function Ter
   primaryRef.current = primaryID
   const leaves = useMemo(() => collectLeaves(tree), [tree])
   const paneCount = leaves.length
+  const requestFocus = (terminalID: string) => useAppStore.getState().requestTerminalFocus(tabID, terminalID)
+  const lastUsed = (terminalID: string) => useAppStore.getState().terminalPool.get(terminalID)?.lastUsed ?? 0
 
   useEffect(() => { onStateChange?.({ paneCount, busy }) }, [busy, onStateChange, paneCount])
-  // Tab-level reconnect/promote updates primaryID without going through reconnectPane.
+
+  useEffect(() => {
+    if (layoutReady || connectionKind === 'serial') {
+      if (!layoutReady) setLayoutReady(true)
+      return
+    }
+    const layout = readTabSplitLayout(tabID)
+    if (!layout || layout.paneCount < 2) {
+      setLayoutReady(true)
+      return
+    }
+    let cancelled = false
+    void (async () => {
+      if (operationRef.current) {
+        setLayoutReady(true)
+        return
+      }
+      operationRef.current = true
+      setBusy(true)
+      try {
+        const restored = await restoreSplitTreeFromLayout(layout, primaryRef.current, () => openPane(sessionId, connectionKind, serialPortId))
+        if (!cancelled && restored && mountedRef.current) {
+          setTree(restored)
+          const focusID = collectLeaves(restored)[0]?.terminalID
+          if (focusID) requestFocus(focusID)
+        }
+      } catch (error: unknown) {
+        logger.error('TerminalSplit: restore layout failed', error)
+      } finally {
+        operationRef.current = false
+        if (mountedRef.current) {
+          setBusy(false)
+          setLayoutReady(true)
+        }
+      }
+    })()
+    return () => { cancelled = true }
+  }, [tabID, connectionKind, sessionId, serialPortId, layoutReady])
+
+  useEffect(() => {
+    if (!layoutReady) return
+    persistTabSplitLayout(tabID, tree, primaryID, connectionKind)
+  }, [tabID, tree, primaryID, connectionKind, layoutReady])
+
   useEffect(() => {
     if (!primaryID) return
     setTree((current) => {
@@ -112,17 +135,17 @@ export const TerminalSplit = forwardRef<TerminalSplitHandle, Props>(function Ter
       if (previousPrimary && previousPrimary !== primaryID && hasTerminal(current, previousPrimary)) {
         return replaceTerminal(current, previousPrimary, primaryID)
       }
-      // Fallback: replace the first leaf when topology lost the old primary id.
-      const leaves = collectLeaves(current)
-      if (leaves.length === 0) return splitLeaf(primaryID)
-      return replaceTerminal(current, leaves[0].terminalID, primaryID)
+      const currentLeaves = collectLeaves(current)
+      if (currentLeaves.length === 0) return splitLeaf(primaryID)
+      return replaceTerminal(current, currentLeaves[0].terminalID, primaryID)
     })
     primaryRef.current = primaryID
   }, [primaryID])
+
   useEffect(() => () => {
     mountedRef.current = false
     for (const terminalID of terminalIDs(treeRef.current)) {
-      if (terminalID !== primaryRef.current) closeInBackground(terminalID, 'TerminalSplit: cleanup failed')
+      if (terminalID !== primaryRef.current) bgClose(terminalID, 'TerminalSplit: cleanup failed')
     }
   }, [])
 
@@ -137,9 +160,6 @@ export const TerminalSplit = forwardRef<TerminalSplitHandle, Props>(function Ter
     }
   }, [leaves])
 
-  const requestFocus = (terminalID: string) => useAppStore.getState().requestTerminalFocus(tabID, terminalID)
-  const lastUsed = (terminalID: string) => useAppStore.getState().terminalPool.get(terminalID)?.lastUsed ?? 0
-
   const registerSlot = useCallback((leafID: string, terminalID: string, slot: HTMLDivElement | null) => {
     const host = ensurePaneHost(hostsRef.current, leafID, terminalID)
     if (slot) {
@@ -151,7 +171,10 @@ export const TerminalSplit = forwardRef<TerminalSplitHandle, Props>(function Ter
   }, [])
 
   const split = async (direction: SplitDirection) => {
-    if (operationRef.current) return
+    if (operationRef.current || connectionKind === 'serial') {
+      if (connectionKind === 'serial') toast(t('串口终端为设备独占，不支持分屏'), 'warning')
+      return
+    }
     if (terminalIDs(treeRef.current).length >= MAX_PANES) {
       toast(t('每个标签最多支持 8 个终端窗格'), 'warning')
       return
@@ -160,8 +183,8 @@ export const TerminalSplit = forwardRef<TerminalSplitHandle, Props>(function Ter
     operationRef.current = true
     setBusy(true)
     try {
-      const terminalID = await openTerminalWithPoolCapacity(() => openSplitTerminal(sessionId, connectionKind, serialPortId))
-      if (!mountedRef.current) return closeInBackground(terminalID, 'TerminalSplit: cancelled split cleanup failed')
+      const terminalID = await openTerminalWithPoolCapacity(() => openPane(sessionId, connectionKind, serialPortId))
+      if (!mountedRef.current) return bgClose(terminalID, 'TerminalSplit: cancelled split cleanup failed')
       setTree((current) => insertSplit(current, targetID, terminalID, direction, crypto.randomUUID()))
       useAppStore.getState().setConnectionStatus(terminalID, 'connected')
       requestFocus(terminalID)
@@ -204,13 +227,13 @@ export const TerminalSplit = forwardRef<TerminalSplitHandle, Props>(function Ter
   }
 
   const reconnectPane = async (terminalID: string) => {
-    if (operationRef.current) return
+    if (operationRef.current || connectionKind === 'serial') return
     operationRef.current = true
     useAppStore.getState().setConnectionStatus(terminalID, 'reconnecting')
     setBusy(true)
     try {
-      const nextID = await openTerminalWithPoolCapacity(() => openSplitTerminal(sessionId, connectionKind, serialPortId))
-      if (!mountedRef.current) return closeInBackground(nextID, 'TerminalSplit: cancelled reconnect cleanup failed')
+      const nextID = await openTerminalWithPoolCapacity(() => openPane(sessionId, connectionKind, serialPortId))
+      if (!mountedRef.current) return bgClose(nextID, 'TerminalSplit: cancelled reconnect cleanup failed')
       setTree((current) => replaceTerminal(current, terminalID, nextID))
       if (terminalID === primaryID) {
         primaryRef.current = nextID
@@ -220,7 +243,7 @@ export const TerminalSplit = forwardRef<TerminalSplitHandle, Props>(function Ter
       }
       useAppStore.getState().setConnectionStatus(nextID, 'connected')
       onPaneReplaced?.(terminalID, nextID)
-      closeInBackground(terminalID, 'TerminalSplit: old reconnect terminal cleanup failed')
+      bgClose(terminalID, 'TerminalSplit: old reconnect terminal cleanup failed')
       requestFocus(nextID)
     } catch (error: unknown) {
       useAppStore.getState().setConnectionStatus(terminalID, 'error')
