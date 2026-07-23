@@ -169,7 +169,12 @@ export function useSession() {
       } satisfies SessionInput)
       if (result) {
         setSessions((prev) => [...prev, mapSession(result)])
-        await listAssetCatalogs()
+        try {
+          await listAssetCatalogs()
+        } catch (refreshError) {
+          // session already persisted; refresh toast/error is owned by listAssetCatalogs
+          logger.error('createSession catalog refresh failed', refreshError)
+        }
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
@@ -199,7 +204,12 @@ export function useSession() {
       } satisfies SessionInput)
       const refreshed = await SessionService.GetSession(Number(session.id))
       if (refreshed) setSessions((prev) => prev.map((item) => (item.id === session.id ? mapSession(refreshed) : item)))
-      await listAssetCatalogs()
+      try {
+        await listAssetCatalogs()
+      } catch (refreshError) {
+        // session already updated; refresh toast/error is owned by listAssetCatalogs
+        logger.error('updateSession catalog refresh failed', refreshError)
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       logger.error('updateSession error', err)
