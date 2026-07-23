@@ -102,7 +102,11 @@ export default function TunnelDialog({
       destructive: true,
     })
     if (!ok) return
-    await onDelete(tunnelId)
+    try {
+      await onDelete(tunnelId)
+    } catch {
+      // toast already shown by tunnel manager
+    }
   }
 
   const typeLabel = (value: string) => {
@@ -234,12 +238,12 @@ export default function TunnelDialog({
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
                         {tunnel.running ? (
-                          <Button size="xs" variant="ghost" onClick={() => { void onStop(tunnel.id) }}>{t('停止')}</Button>
+                          <Button size="xs" variant="ghost" onClick={() => { void Promise.resolve(onStop(tunnel.id)).catch(() => undefined) }}>{t('停止')}</Button>
                         ) : (
                           <Button
                             size="xs"
                             variant="ghost"
-                            onClick={() => { void onStart({
+                            onClick={() => { void Promise.resolve(onStart({
                               id: tunnel.id,
                               sessionId: tunnel.sessionId,
                               type: tunnel.type,
@@ -247,13 +251,13 @@ export default function TunnelDialog({
                               localPort: tunnel.localPort,
                               remoteAddress: tunnel.remoteAddress,
                               remotePort: tunnel.remotePort,
-                            }) }}
+                            })).catch(() => undefined) }}
                           >
                             {t('启动')}
                           </Button>
                         )}
                         {onDelete ? (
-                          <Button size="xs" variant="ghost" className="text-destructive" onClick={() => { void handleDelete(tunnel.id, `${typeLabel(tunnel.type)} ${tunnel.localAddress}:${tunnel.localPort}`) }}>{t('删除')}</Button>
+                          <Button size="xs" variant="ghost" className="text-destructive" onClick={() => { void handleDelete(tunnel.id, `${typeLabel(tunnel.type)} ${tunnel.localAddress}:${tunnel.localPort}`).catch(() => undefined) }}>{t('删除')}</Button>
                         ) : null}
                       </div>
                     </TableCell>
