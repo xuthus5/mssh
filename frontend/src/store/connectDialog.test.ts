@@ -20,6 +20,7 @@ describe('connectDialog', () => {
       fingerprint: '',
       algorithm: '',
       attemptId: '',
+      sessionId: '',
       retry: null,
     })
   })
@@ -124,4 +125,16 @@ describe('connectDialog', () => {
     expect(useConnectDialog.getState()).toMatchObject({ state: 'failed', error: 'host key failed' })
     expect(useToastStore.getState().toasts.some((item) => item.message.includes('host key failed'))).toBe(true)
   })
+
+  it('tracks session id and dismisses only matching connect dialogs', () => {
+    const retry = vi.fn()
+    useConnectDialog.getState().openDialog('example.com', 22, 'root', retry, '42')
+    expect(useConnectDialog.getState()).toMatchObject({ open: true, sessionId: '42', state: 'connecting' })
+    useConnectDialog.getState().dismissForSessions(['99'])
+    expect(useConnectDialog.getState().open).toBe(true)
+    useConnectDialog.getState().dismissForSessions(['42'])
+    expect(useConnectDialog.getState()).toMatchObject({ open: false, state: 'idle', sessionId: '', attemptId: '' })
+  })
+
+
 })
