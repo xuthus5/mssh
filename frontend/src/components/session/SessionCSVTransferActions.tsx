@@ -60,7 +60,7 @@ function SessionCSVExportDialog(props: ExportDialogProps) {
   }
 
   return <Dialog open={props.open} onOpenChange={changeOpen}><DialogContent className="sm:max-w-lg"><DialogHeader><DialogTitle>{t('导出会话 CSV')}</DialogTitle><DialogDescription>{t('仅导出 SSH 会话、分组和资产归属，不包含 MSSH 应用设置。')}</DialogDescription></DialogHeader>
-    <div className="flex flex-col gap-4"><SegmentedControl label={t('导出范围')} options={[{ value: 'all', label: t('全部会话') }, ...(selectedAvailable ? [{ value: 'selected', label: `已选 ${props.selectedIDs.length} 项` } as const] : [])]} value={effectiveScope} onChange={(value) => setScope(value as 'all' | 'selected')} />
+    <div className="flex flex-col gap-4"><SegmentedControl label={t('导出范围')} options={[{ value: 'all', label: t('全部会话') }, ...(selectedAvailable ? [{ value: 'selected', label: t('已选 ${} 项', props.selectedIDs.length) } as const] : [])]} value={effectiveScope} onChange={(value) => setScope(value as 'all' | 'selected')} />
       <label className="flex items-start gap-3 rounded-xl border border-border p-3 text-sm"><Checkbox checked={includePasswords} onCheckedChange={(checked) => setIncludePasswords(checked === true)} /><span><span className="block font-medium">{t('包含已保存密码')}</span><span className="mt-0.5 block text-xs text-muted-foreground">{t('默认关闭。密钥认证仅导出公钥标识，不导出私钥。')}</span></span></label>
       {includePasswords && <Alert variant="destructive"><TriangleAlert /><AlertDescription>{t('密码将以明文写入 CSV。请仅保存到可信位置，并在使用后妥善删除。')}</AlertDescription></Alert>}
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}

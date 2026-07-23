@@ -191,9 +191,9 @@ function TreeRow(props: {
     >
       <Server className="size-3.5 shrink-0 text-muted-foreground" />
       <span className="truncate">{session.name}</span>
-      <span className="sr-only">{`主机：${session.host}`}</span>
-      <span className="sr-only">{`端口：${session.port}`}</span>
-      <span className="sr-only">{`用户：${session.username}`}</span>
+      <span className="sr-only">{t('主机：${}', session.host)}</span>
+      <span className="sr-only">{t('端口：${}', session.port)}</span>
+      <span className="sr-only">{t('用户：${}', session.username)}</span>
     </div>
   )
   if (props.navigationOnly) return row
