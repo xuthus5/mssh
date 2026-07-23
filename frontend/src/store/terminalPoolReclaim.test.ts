@@ -87,27 +87,27 @@ describe('ensureTerminalPoolCapacity', () => {
     __registerHandler('github.com/xuthus5/mssh/internal/service.TerminalService.Close', async () => {})
   })
 
-  it('reclaims orphans without prompting', () => {
+  it('reclaims orphans without prompting', async () => {
     const dispose = vi.fn()
     const store = createStore({
       maxPoolSize: 1,
       terminalPool: new Map([['orphan', entry(1, dispose)]]),
     })
-    const ok = ensureTerminalPoolCapacity(store)
+    const ok = await ensureTerminalPoolCapacity(store)
     expect(ok).toBe(true)
     expect(dispose).toHaveBeenCalledOnce()
     expect(store.getState().terminalPool.size).toBe(0)
     expect(toast).toHaveBeenCalledWith('已释放空闲终端实例以腾出连接池', 'info')
   })
 
-  it('prompts before reclaiming an open tab and announces recovery path', () => {
+  it('prompts before reclaiming an open tab and announces recovery path', async () => {
     const store = createStore({
       maxPoolSize: 1,
       tabs: [terminalTab('tab-old', 'term-old', '生产')],
       terminalPool: new Map([['term-old', entry(1)]]),
     })
-    const confirmProtected = vi.fn(() => true)
-    const ok = ensureTerminalPoolCapacity({ ...store, confirmProtected })
+    const confirmProtected = vi.fn(async () => true)
+    const ok = await ensureTerminalPoolCapacity({ ...store, confirmProtected })
     expect(ok).toBe(true)
     expect(confirmProtected).toHaveBeenCalledOnce()
     expect(store.getState().tabs).toEqual([])
@@ -117,13 +117,13 @@ describe('ensureTerminalPoolCapacity', () => {
     )
   })
 
-  it('aborts when the user declines reclaiming a protected terminal', () => {
+  it('aborts when the user declines reclaiming a protected terminal', async () => {
     const store = createStore({
       maxPoolSize: 1,
       tabs: [terminalTab('tab-old', 'term-old', '生产')],
       terminalPool: new Map([['term-old', entry(1)]]),
     })
-    const ok = ensureTerminalPoolCapacity({ ...store, confirmProtected: () => false })
+    const ok = await ensureTerminalPoolCapacity({ ...store, confirmProtected: async () => false })
     expect(ok).toBe(false)
     expect(store.getState().tabs).toHaveLength(1)
     expect(store.getState().terminalPool.has('term-old')).toBe(true)

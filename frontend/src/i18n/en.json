@@ -1298,5 +1298,10 @@
   "波特率预设": "Baud preset",
   "波特率需在 300 到 4000000 之间": "Baud rate must be between 300 and 4,000,000",
   "连接时应用到底层串口。DSR/DTR 在 Windows 启用硬件握手；Linux/macOS 仅保持 DTR/RTS 电平，不提供完整 DSR 握手。": "Applied to the native serial port. DSR/DTR enables hardware handshake on Windows; on Linux/macOS only DTR/RTS levels are kept (no full DSR handshake).",
-  "串口使用中，请先关闭终端再删除": "Serial port is in use. Close the terminal before deleting."
+  "串口使用中，请先关闭终端再删除": "Serial port is in use. Close the terminal before deleting.",
+  "热更新失败。是否重新加载应用？": "Hot reload failed. Reload the application?",
+  "终端池已满": "Terminal pool is full",
+  "继续将关闭标签「${}」并断开对应连接，之后可从会话列表重新连接。是否继续？": "Continuing will close tab \"${}\" and disconnect it. You can reconnect from the session list. Continue?",
+  "继续": "Continue",
+  "同步数据已变更": "Sync data changed"
 }

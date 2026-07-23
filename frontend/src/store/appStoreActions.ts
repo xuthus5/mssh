@@ -13,7 +13,7 @@ import {
 } from '@/store/tabNavigation'
 import type { AppState, Tab } from '@/store/appStore'
 import { selectTerminalPoolEvictionID } from '@/store/terminalPool'
-import { applyTerminalPoolEviction, ensureTerminalPoolCapacity } from '@/store/terminalPoolReclaim'
+import { applyTerminalPoolEviction } from '@/store/terminalPoolReclaim'
 import { canTransitionConnection } from '@/store/connectionStatus'
 import { markIntentionalDisconnect } from '@/hooks/sessionReconnect'
 
@@ -231,11 +231,8 @@ export function createPoolActions(set: StoreSet, get: StoreGet): PoolActions {
       const current = get()
       if (!current.terminalPool.has(id) && current.terminalPool.size >= current.maxPoolSize) {
         // Defensive only: Open path already reserved capacity. Force reclaim if races left the pool full.
-        if (!ensureTerminalPoolCapacity({
-          getState: get,
-          setState: (partial) => set(partial),
-          confirmProtected: () => true,
-        })) return
+        const victimID = selectTerminalPoolEvictionID(current)
+        if (victimID) set(applyTerminalPoolEviction(current, victimID))
       }
       set((state) => {
         const terminalPool = new Map(state.terminalPool)

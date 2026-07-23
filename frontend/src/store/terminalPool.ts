@@ -94,12 +94,24 @@ export function findTabByTerminalID(tabs: Tab[], terminalID: string): Tab | unde
   return tabs.find((tab) => tab.type === 'terminal' && tab.terminalId === terminalID)
 }
 
-export function confirmProtectedTerminalReclaim(
+export async function confirmProtectedTerminalReclaim(
   victim: TerminalPoolVictim,
-  confirm: (message: string) => boolean = (message) => window.confirm(message),
-): boolean {
+  confirm: (request: { title: string; description: string }) => Promise<boolean> | boolean = defaultProtectedConfirm,
+): Promise<boolean> {
   const title = victim.owningTab?.title ?? victim.terminalID
-  return confirm(
-    t('终端池已满。继续将关闭标签「${}」并断开对应连接，之后可从会话列表重新连接。是否继续？', title),
-  )
+  return confirm({
+    title: t('终端池已满'),
+    description: t('继续将关闭标签「${}」并断开对应连接，之后可从会话列表重新连接。是否继续？', title),
+  })
+}
+
+async function defaultProtectedConfirm(request: { title: string; description: string }): Promise<boolean> {
+  const { requestConfirm } = await import('@/lib/confirmDialog')
+  return requestConfirm({
+    title: request.title,
+    description: request.description,
+    confirmLabel: t('继续'),
+    cancelLabel: t('取消'),
+    destructive: true,
+  })
 }
