@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -57,7 +58,22 @@ func validateProviderURL(profile model.AIProviderProfile) error {
 	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
 		return fmt.Errorf("invalid AI provider URL")
 	}
-	if parsed.Scheme != "https" && !isLocalProviderHost(parsed.Hostname()) {
+	scheme := strings.ToLower(parsed.Scheme)
+	if scheme != "http" && scheme != "https" {
+		return fmt.Errorf("AI provider URL must use HTTP or HTTPS")
+	}
+	if parsed.User != nil {
+		return fmt.Errorf("AI provider URL must not include credentials")
+	}
+	host := strings.TrimSpace(parsed.Hostname())
+	if host == "" {
+		return fmt.Errorf("invalid AI provider URL")
+	}
+	if isBlockedProviderHost(host) {
+		return fmt.Errorf("AI provider URL host is not allowed")
+	}
+	local := isLocalProviderHost(host)
+	if scheme != "https" && !local {
 		return fmt.Errorf("AI provider URL must use HTTPS unless it is local")
 	}
 	return nil
@@ -80,7 +96,37 @@ func providerBaseURL(profile model.AIProviderProfile) string {
 }
 
 func isLocalProviderHost(host string) bool {
-	return host == "localhost" || host == "127.0.0.1" || host == "::1"
+	normalized := strings.Trim(strings.ToLower(strings.TrimSpace(host)), "[]")
+	if normalized == "localhost" {
+		return true
+	}
+	ip := net.ParseIP(normalized)
+	return ip != nil && ip.IsLoopback()
+}
+
+func isBlockedProviderHost(host string) bool {
+	normalized := strings.Trim(strings.ToLower(strings.TrimSpace(host)), "[]")
+	if _, blocked := blockedAIProviderHostnames[normalized]; blocked {
+		return true
+	}
+	ip := net.ParseIP(normalized)
+	if ip == nil {
+		return false
+	}
+	if ip.IsUnspecified() || ip.IsMulticast() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() {
+		return true
+	}
+	// Cloud metadata commonly lives on link-local; also block IPv4 169.254.0.0/16 explicitly.
+	if ip4 := ip.To4(); ip4 != nil && ip4[0] == 169 && ip4[1] == 254 {
+		return true
+	}
+	return false
+}
+
+var blockedAIProviderHostnames = map[string]struct{}{
+	"metadata":                 {},
+	"metadata.google.internal": {},
+	"metadata.goog":            {},
 }
 
 func chatOpenAI(ctx context.Context, client *http.Client, profile model.AIProviderProfile, apiKey string, input aiChatInput) (string, error) {
