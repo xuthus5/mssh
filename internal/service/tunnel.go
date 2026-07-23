@@ -55,6 +55,9 @@ func (t *TunnelService) Create(input model.TunnelInput) (*model.Tunnel, error) {
 
 func (t *TunnelService) Update(input model.TunnelInput) error {
 	tunnel := input.Tunnel()
+	if tunnel.ID <= 0 {
+		return fmt.Errorf("invalid tunnel id")
+	}
 	if err := validateTunnelBind(tunnel); err != nil {
 		return err
 	}
