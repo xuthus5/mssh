@@ -39,7 +39,6 @@ vi.mock('@/hooks/SessionWorkspaceContext', () => ({
     listSessions: vi.fn(async () => {}),
     listRecentSessions: vi.fn(async () => {}),
     listAssetCatalogs: vi.fn(async () => {}),
-    listTunnels: vi.fn(async () => {}),
   }),
 }))
 vi.mock('@/components/terminal/TerminalTab', async () => {
