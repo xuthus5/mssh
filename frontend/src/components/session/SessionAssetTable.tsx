@@ -19,7 +19,7 @@ interface Props {
   onOpenDetail: (session: Session) => void
   onEdit: (session: Session) => void
   onDelete: (session: Session) => void
-  onMove: (id: string, folderID: string | null) => void
+  onMove: (id: string, folderID: string | null) => void | Promise<void>
 }
 
 export function SessionAssetTable(props: Props) {
@@ -40,7 +40,7 @@ function AssetRow({ session, folders, selectedIDs, recent, onSelectionChange, on
     <TableCell>{session.project ? <Badge variant="secondary">{session.project.code || session.project.name}</Badge> : <span className="text-xs text-muted-foreground">{t('未关联')}</span>}</TableCell>
     <TableCell><div className="flex max-w-48 items-center gap-1">{tags.slice(0, 2).map((tag) => <Badge key={tag.id} variant="outline" data-asset-color={tag.colorToken} className="asset-color-badge max-w-20 truncate">{tag.name}</Badge>)}{tags.length > 2 && <span className="text-xs text-muted-foreground">+{tags.length - 2}</span>}{tags.length === 0 && <span className="text-xs text-muted-foreground">{t('无')}</span>}</div></TableCell>
     <TableCell>{folders.find((folder) => folder.id === session.folderId)?.name ?? t('未分组')}</TableCell>{recent && <TableCell>{formatRecent(session)}</TableCell>}
-    <TableCell onClick={(event) => event.stopPropagation()} onDoubleClick={(event) => event.stopPropagation()}><div className="flex justify-end gap-1"><Button size="xs" onClick={() => onConnect(session.id)}>{t('连接')}</Button><DropdownMenu><DropdownMenuTrigger render={<Button size="icon-xs" variant="ghost" aria-label={t('${} 更多操作', session.name)} />}><MoreHorizontal /></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuGroup><DropdownMenuItem onClick={() => onEdit(session)}>{t('编辑')}</DropdownMenuItem><DropdownMenuSub><DropdownMenuSubTrigger>{t('移动到分组')}</DropdownMenuSubTrigger><DropdownMenuSubContent><DropdownMenuGroup>{folders.map((folder) => <DropdownMenuItem key={folder.id} disabled={folder.id === session.folderId} onClick={() => onMove(session.id, folder.id)}>{folder.name}</DropdownMenuItem>)}</DropdownMenuGroup></DropdownMenuSubContent></DropdownMenuSub><DropdownMenuItem variant="destructive" onClick={() => onDelete(session)}>{t('删除')}</DropdownMenuItem></DropdownMenuGroup></DropdownMenuContent></DropdownMenu></div></TableCell>
+    <TableCell onClick={(event) => event.stopPropagation()} onDoubleClick={(event) => event.stopPropagation()}><div className="flex justify-end gap-1"><Button size="xs" onClick={() => onConnect(session.id)}>{t('连接')}</Button><DropdownMenu><DropdownMenuTrigger render={<Button size="icon-xs" variant="ghost" aria-label={t('${} 更多操作', session.name)} />}><MoreHorizontal /></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuGroup><DropdownMenuItem onClick={() => onEdit(session)}>{t('编辑')}</DropdownMenuItem><DropdownMenuSub><DropdownMenuSubTrigger>{t('移动到分组')}</DropdownMenuSubTrigger><DropdownMenuSubContent><DropdownMenuGroup>{folders.map((folder) => <DropdownMenuItem key={folder.id} disabled={folder.id === session.folderId} onClick={() => { void Promise.resolve(onMove(session.id, folder.id)).catch(() => undefined) }}>{folder.name}</DropdownMenuItem>)}</DropdownMenuGroup></DropdownMenuSubContent></DropdownMenuSub><DropdownMenuItem variant="destructive" onClick={() => onDelete(session)}>{t('删除')}</DropdownMenuItem></DropdownMenuGroup></DropdownMenuContent></DropdownMenu></div></TableCell>
   </TableRow>
 }
 
