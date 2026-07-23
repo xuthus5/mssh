@@ -1058,3 +1058,10 @@
 |---|---|---|
 | UX-CONN-063 | 删除/批量删除会话前，必须取消该会话仍在进行中的 SSH 连接 attempt（含 host key 等待）。 | done |
 
+## 2026-07-24 商用硬化波次（传输取消 UI 收敛）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| UX-TRANSFER-064 | 会话删除取消传输时，传输中心应收敛为 cancelled，不得被后续 I/O 错误事件改写为 failed。 | done |
+| UX-TRANSFER-065 | worker 在 ctx 已取消时，OpenSFTP/上传/下载/收尾错误统一按 cancelled 处理并 emit cancelled。 | done |
+

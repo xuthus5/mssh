@@ -30,9 +30,9 @@ describe('eventBridge', () => {
     __emitEvent('file:complete', { data: { task_id: 'task-1', status: 'cancelled', transferred: 5, total: 10 } })
     expect(useAppStore.getState().transfers[0].status).toBe('cancelled')
     expect(useAppStore.getState().transfers[0].completedAt).toEqual(expect.any(Number))
+    // Late I/O error after session-delete cancel must not regress cancelled jobs.
     __emitEvent('file:error', { data: { task_id: 'task-1', error: 'denied' } })
-    expect(useAppStore.getState().transfers[0]).toMatchObject({ status: 'failed', error: 'denied' })
-    expect(useAppStore.getState().transfers[0].completedAt).toEqual(expect.any(Number))
+    expect(useAppStore.getState().transfers[0]).toMatchObject({ status: 'cancelled' })
     stop()
   })
 
@@ -85,7 +85,11 @@ describe('eventBridge', () => {
     __emitEvent('file:complete', { data: { task_id: 'task-2' } })
     expect(useAppStore.getState().transfers[0]).toMatchObject({ transferredBytes: 0, totalBytes: 0, status: 'completed' })
     __emitEvent('file:error', { data: { task_id: 'task-2' } })
-    expect(useAppStore.getState().transfers[0]).toMatchObject({ status: 'failed', error: '文件传输失败' })
+    expect(useAppStore.getState().transfers[0]).toMatchObject({ status: 'completed' })
+    // Still allow failed when transfer is non-terminal.
+    useAppStore.getState().updateTransfer('task-2', { status: 'running', error: '' })
+    __emitEvent('file:error', { data: { task_id: 'task-2', error: 'denied' } })
+    expect(useAppStore.getState().transfers[0]).toMatchObject({ status: 'failed', error: 'denied' })
     stop()
   })
 })
