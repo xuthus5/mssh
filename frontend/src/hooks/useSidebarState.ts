@@ -59,9 +59,17 @@ export function useSidebarDialogs(workspace: Workspace) {
   }, [editingSession, workspace])
   const saveFolder = () => {
     if (!folderName.trim()) return
-    if (editingFolder) void workspace.updateFolder(editingFolder.id, folderName.trim())
-    else void workspace.createFolder(folderName.trim(), null)
-    setFolderName(''); setEditingFolder(null); setFolderDialogOpen(false)
+    const name = folderName.trim()
+    const action = editingFolder
+      ? workspace.updateFolder(editingFolder.id, name)
+      : workspace.createFolder(name, null)
+    void Promise.resolve(action).then(() => {
+      setFolderName('')
+      setEditingFolder(null)
+      setFolderDialogOpen(false)
+    }).catch(() => {
+      // toast already shown by workspace mutation helpers
+    })
   }
   const editSession = (session: Session) => {
     logger.debug('Sidebar: openEditSession', { id: session.id, name: session.name })
