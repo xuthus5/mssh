@@ -1237,3 +1237,9 @@
 |---|---|---|
 | UX-SPLIT-125 | 分屏窗格手动重连失败时仅 connectionStatus=error + pane overlay，不得 toast 叠加。 | done |
 
+## 2026-07-24 商用硬化波次（分屏组件行数防超标）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| UX-ENG-126 | `TerminalSplit.tsx` 通过提取 `terminalSplitActions.ts` 保持 ≤300 行；行为回归测试通过。 | done |
+
