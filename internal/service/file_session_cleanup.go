@@ -32,6 +32,7 @@ func (f *FileService) CancelForSessions(sessionIDs []int64) {
 
 	f.mu.Lock()
 	cancels := make([]context.CancelFunc, 0)
+	taskIDs := make([]string, 0)
 	for taskID, cancel := range f.tasks {
 		sessionID, ok := f.taskSessions[taskID]
 		if !ok {
@@ -41,10 +42,15 @@ func (f *FileService) CancelForSessions(sessionIDs []int64) {
 			continue
 		}
 		cancels = append(cancels, cancel)
+		taskIDs = append(taskIDs, taskID)
 	}
 	f.mu.Unlock()
 
 	for _, cancel := range cancels {
 		cancel()
+	}
+	// Emit cancelled immediately so transfer center converges even if workers exit with I/O noise.
+	for _, taskID := range taskIDs {
+		f.emitTransferCancelled(taskID)
 	}
 }
