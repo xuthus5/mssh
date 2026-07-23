@@ -54,7 +54,11 @@ function BulkAssetDialog({ kind, selectedIDs, environments, projects, tags, onSe
           : await onUpdateTags(selectedIDs, tagIDs, operation)
       toast(t('已更新 ${} 个会话的资产信息', count), 'success')
       onClearSelection(); onOpenChange(false); setTargetID(''); setTagIDs([]); setOperation('add')
-    } catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)) }
+    } catch (reason) {
+      const message = reason instanceof Error ? reason.message : String(reason)
+      setError(message)
+      toast(t('批量更新资产失败: ${}', message), 'error')
+    }
     finally { setPending(false) }
   }
   const title = kind === 'environment' ? t('批量设置环境') : kind === 'project' ? t('批量设置项目') : t('批量更新标签')
