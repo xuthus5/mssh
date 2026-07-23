@@ -89,6 +89,9 @@ func (s *SyncService) saveCurrentVersion(provider model.SyncProvider, source str
 }
 
 func (s *SyncService) DeleteVersion(id int64) error {
+	if id <= 0 {
+		return errors.New("invalid sync version id")
+	}
 	version, err := store.GetSyncVersion(s.db, id)
 	if err != nil {
 		return err
