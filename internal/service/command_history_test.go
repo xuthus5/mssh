@@ -1,6 +1,7 @@
 package service
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -78,4 +79,26 @@ func TestIsSensitiveCommand(t *testing.T) {
 	require.False(t, isSensitiveCommand("ps -p 1"))
 	require.False(t, isSensitiveCommand("docker ps -p"))
 	require.True(t, isSensitiveCommand("mysql -uroot -psecret"))
+}
+
+func TestCommandHistoryService_SkipsOversizedAndNUL(t *testing.T) {
+	db, err := store.OpenDB(t.TempDir())
+	require.NoError(t, err)
+	require.NoError(t, store.InitializeSchema(db))
+	t.Cleanup(func() { _ = db.Close() })
+	session, err := store.CreateSession(db, model.Session{Name: "history-bound", Host: "localhost", Port: 22, Username: "root", AuthMethod: model.AuthPassword, TermType: "xterm"})
+	require.NoError(t, err)
+	service := NewCommandHistoryService(db, testutil.NewTestLogger())
+
+	created, err := service.Add(session.ID, strings.Repeat("a", maxCommandHistoryBytes+1))
+	require.NoError(t, err)
+	require.Nil(t, created)
+
+	created, err = service.Add(session.ID, string([]byte{'o', 'k', 0, 'c'}))
+	require.NoError(t, err)
+	require.Nil(t, created)
+
+	created, err = service.Add(session.ID, strings.Repeat("b", maxCommandHistoryBytes))
+	require.NoError(t, err)
+	require.NotNil(t, created)
 }
