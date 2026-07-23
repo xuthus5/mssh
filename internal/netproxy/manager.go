@@ -2,6 +2,7 @@ package netproxy
 
 import (
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -86,7 +87,37 @@ func Validate(config Config) error {
 	if parsed.Host == "" {
 		return fmt.Errorf("proxy URL host is required")
 	}
+	// Credentials belong in Username/Password fields, not the proxy URL.
+	if parsed.User != nil {
+		return fmt.Errorf("proxy URL must not include credentials; use username/password fields")
+	}
+	host := strings.TrimSpace(parsed.Hostname())
+	if host == "" {
+		return fmt.Errorf("proxy URL host is required")
+	}
+	if isBlockedProxyHost(host) {
+		return fmt.Errorf("proxy URL host is not allowed")
+	}
 	return nil
+}
+
+func isBlockedProxyHost(host string) bool {
+	normalized := strings.Trim(strings.ToLower(strings.TrimSpace(host)), "[]")
+	switch normalized {
+	case "metadata", "metadata.google.internal", "metadata.goog":
+		return true
+	}
+	ip := net.ParseIP(normalized)
+	if ip == nil {
+		return false
+	}
+	if ip.IsUnspecified() || ip.IsMulticast() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() {
+		return true
+	}
+	if ip4 := ip.To4(); ip4 != nil && ip4[0] == 169 && ip4[1] == 254 {
+		return true
+	}
+	return false
 }
 
 // Configure replaces the active proxy configuration.

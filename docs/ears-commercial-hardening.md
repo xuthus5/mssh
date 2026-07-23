@@ -308,3 +308,11 @@
 | SYNC-URL-004 | 保存同步配置时，S3 自定义 Endpoint 与 WebDAV URL 必须通过 HTTPS/主机策略校验。 | done |
 | SYNC-URL-005 | 创建 S3 provider 时必须再次校验 Endpoint（防御直接构造路径）。 | done |
 | SYNC-URL-006 | 空 S3 Endpoint（使用 AWS 默认）必须允许。 | done |
+
+## 2026-07-23 商用硬化波次（应用代理 URL 校验）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| PROXY-URL-001 | 手动代理 URL 不得包含 userinfo 凭据；认证必须使用独立 username/password 字段。 | done |
+| PROXY-URL-002 | 手动代理 URL 必须拒绝链路本地/未指定/组播及云元数据主机。 | done |
+| PROXY-URL-003 | 仍允许 http/https/socks5/socks5h 与局域网/公网代理主机（企业场景）。 | done |
