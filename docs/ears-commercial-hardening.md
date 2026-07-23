@@ -538,3 +538,12 @@
 | UX-AI-010 | AI 设置 Dashboard 加载失败必须 toast。 | done |
 | SEC-SESSION-010 | MoveSession/MoveFolder/SetDefaultFolder 必须拒绝 id<=0 与非法 folder/parent id。 | done |
 
+## 2026-07-23 商用硬化波次（删除 ID 校验 + 会话/主题列表加载可见）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| SEC-SESSION-011 | DeleteSession/DeleteFolder 必须拒绝 id<=0。 | done |
+| UX-SESSION-020 | 加载分组/会话/最近会话失败必须 toast，并写入 error。 | done |
+| UX-SESSION-021 | 断开终端失败必须 toast。 | done |
+| UX-THEME-010 | 主题目录加载失败必须 toast，并保留 store error。 | done |
+

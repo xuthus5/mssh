@@ -46,6 +46,9 @@ func (s *SessionService) UpdateFolder(id int64, name string) error {
 }
 
 func (s *SessionService) DeleteFolder(id int64) error {
+	if id <= 0 {
+		return fmt.Errorf("invalid folder id")
+	}
 	outcome := "failed"
 	defer func() {
 		recordAudit(s.db, s.logger, model.AuditEvent{Action: "delete", TargetType: "folder", TargetID: fmt.Sprint(id), Summary: "删除会话分组", Outcome: outcome})
@@ -149,6 +152,9 @@ func (s *SessionService) UpdateSession(input model.SessionInput) error {
 }
 
 func (s *SessionService) DeleteSession(id int64) error {
+	if id <= 0 {
+		return fmt.Errorf("invalid session id")
+	}
 	outcome := "failed"
 	defer func() {
 		recordAudit(s.db, s.logger, model.AuditEvent{Action: "delete", TargetType: "session", TargetID: fmt.Sprint(id), SessionID: &id, Summary: "删除 SSH 会话", Outcome: outcome})
