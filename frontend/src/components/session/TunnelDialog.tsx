@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/table'
 import type { Tunnel } from '@/hooks/useSession'
 import { normalizeTunnelLocalAddress, remoteTunnelExposureWarning, validateTunnelLocalAddress } from '@/lib/tunnelBind'
+import { requestConfirm } from '@/lib/confirmDialog'
 import { t } from '@/i18n'
 
 interface Props {
@@ -89,6 +90,19 @@ export default function TunnelDialog({
     } finally {
       setPending(false)
     }
+  }
+
+  const handleDelete = async (tunnelId: string, label: string) => {
+    if (!onDelete) return
+    const ok = await requestConfirm({
+      title: t('删除隧道'),
+      description: t('确认删除隧道「${}」？此操作不可撤销。', label),
+      confirmLabel: t('删除'),
+      cancelLabel: t('取消'),
+      destructive: true,
+    })
+    if (!ok) return
+    await onDelete(tunnelId)
   }
 
   const typeLabel = (value: string) => {
@@ -239,7 +253,7 @@ export default function TunnelDialog({
                           </Button>
                         )}
                         {onDelete ? (
-                          <Button size="xs" variant="ghost" className="text-destructive" onClick={() => { void onDelete(tunnel.id) }}>{t('删除')}</Button>
+                          <Button size="xs" variant="ghost" className="text-destructive" onClick={() => { void handleDelete(tunnel.id, `${typeLabel(tunnel.type)} ${tunnel.localAddress}:${tunnel.localPort}`) }}>{t('删除')}</Button>
                         ) : null}
                       </div>
                     </TableCell>
