@@ -352,3 +352,10 @@ func TestAIServiceExecuteCommandRejectsInvalidIDs(t *testing.T) {
 	err = service.ExecuteCommand(model.AICommandExecutionInput{SessionID: 1, TerminalID: "  ", Command: "echo 1", Approved: true})
 	require.Error(t, err)
 }
+
+func TestAIServiceChatRejectsBlankTerminalID(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	service := NewAIService(db, nil, nil, testutil.NewTestLogger())
+	_, err := service.Chat(model.AIChatRequest{SessionID: 1, TerminalID: "  ", Prompt: "hi"})
+	require.Error(t, err)
+}

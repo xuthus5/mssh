@@ -108,6 +108,9 @@ func byteRate(previous, current uint64, elapsed float64) uint64 {
 }
 
 func (t *TerminalService) ProcessInfo(terminalID string) ([]model.ProcessInfo, error) {
+	if err := validateTerminalID(terminalID); err != nil {
+		return nil, err
+	}
 	wrapper, err := t.systemInfoClient(terminalID)
 	if err != nil {
 		return nil, err
