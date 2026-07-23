@@ -98,6 +98,9 @@ function handleFileComplete(event: EventEnvelope<TransferPayload>) {
 function handleFileError(event: EventEnvelope<TransferErrorPayload>) {
   const payload = event.data
   if (!payload?.task_id) return
+  const current = useAppStore.getState().transfers.find((job) => job.id === payload.task_id)
+  // Session-delete cancel may race a late I/O error; keep cancelled terminal.
+  if (current?.status === 'cancelled' || current?.status === 'completed') return
   useAppStore.getState().updateTransfer(payload.task_id, {
     status: 'failed', error: payload.error ?? t('文件传输失败'), completedAt: Date.now(),
   })
