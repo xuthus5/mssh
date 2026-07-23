@@ -1383,5 +1383,7 @@
   "保存会话失败: ${}": "Failed to save session: ${}",
   "保存串口配置失败: ${}": "Failed to save serial port: ${}",
   "启动中…": "Starting…",
-  "恢复传输记录失败: ${}": "Failed to restore transfers: ${}"
+  "恢复传输记录失败: ${}": "Failed to restore transfers: ${}",
+  "隧道已删除": "Tunnel deleted",
+  "删除隧道失败: ${}": "Failed to delete tunnel: ${}"
 }

@@ -233,6 +233,6 @@ export function TerminalToolbar(props: TerminalToolbarProps) {
     <ToolbarActions {...props} onOpenSystem={props.onOpenSystem ?? (() => {})} onOpenHistory={props.onOpenHistory ?? (() => {})} onOpenAI={props.onOpenAI ?? (() => {})} onOpenTunnels={() => { setTunnelOpen(true); void tunnels.load() }} clipboard={clipboard} logOpen={showSessionLog} setLogOpen={setShowSessionLog}
       setLogBlocked={setSessionLogBlocked} onLogOpenChange={handleSessionLogOpenChange} />
     <TunnelDialog open={tunnelOpen} onOpenChange={setTunnelOpen} tunnels={tunnels.tunnels}
-      onStart={tunnels.start} onStop={tunnels.stop} sessionId={String(props.sessionId)} />
+      onStart={tunnels.start} onStop={tunnels.stop} onDelete={tunnels.remove} sessionId={String(props.sessionId)} />
   </div>
 }
