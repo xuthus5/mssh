@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 vi.mock('@/lib/wails', () => ({
   MacroService: { List: vi.fn(async () => [{ id: 3, name: '巡检', command: 'uptime\n' }]) },
   SessionService: {
-    SessionsDeleteImpact: vi.fn(async () => ({ tunnels: 2, history: 4, recordings: 1 })),
+    SessionsDeleteImpact: vi.fn(async () => ({ tunnels: 2, history: 4, recordings: 1, transfers: 0 })),
   },
 }))
 
@@ -17,7 +17,7 @@ describe('SessionBatchActions', () => {
   beforeEach(() => {
     useToastStore.setState({ toasts: [] })
     vi.mocked(MacroService.List).mockResolvedValue([{ id: 3, name: '巡检', command: 'uptime\n' }] as never)
-    vi.mocked(SessionService.SessionsDeleteImpact).mockResolvedValue({ tunnels: 2, history: 4, recordings: 1 } as never)
+    vi.mocked(SessionService.SessionsDeleteImpact).mockResolvedValue({ tunnels: 2, history: 4, recordings: 1, transfers: 0 } as never)
   })
 
   it('confirms macro execution and reports each node result', async () => {

@@ -3,6 +3,7 @@ package store
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/xuthus5/mssh/internal/model"
@@ -32,7 +33,17 @@ func updateTransferProgressOnce(db *sql.DB, id string, transferred, total, speed
 
 func FinishTransferJob(db *sql.DB, id, status, errorMessage string) error {
 	return withBusyRetry(func() error {
-		_, err := db.Exec(`UPDATE transfer_jobs SET status=?, error=?, completed_at=? WHERE id=?`, status, errorMessage, time.Now().UTC().Format(time.RFC3339Nano), id)
+		completedAt := time.Now().UTC().Format(time.RFC3339Nano)
+		// Preserve session-delete cancel reasons when the transfer goroutine finishes with an empty message.
+		if status == "cancelled" && errorMessage == "" {
+			_, err := db.Exec(`UPDATE transfer_jobs SET status=?, completed_at=? WHERE id=? AND status IN ('queued','running','cancelled')`, status, completedAt, id)
+			if err != nil {
+				return fmt.Errorf("finish transfer job: %w", err)
+			}
+			return nil
+		}
+		// Do not regress an already terminal cancelled/completed row (e.g. session delete race).
+		_, err := db.Exec(`UPDATE transfer_jobs SET status=?, error=?, completed_at=? WHERE id=? AND status IN ('queued','running')`, status, errorMessage, completedAt, id)
 		if err != nil {
 			return fmt.Errorf("finish transfer job: %w", err)
 		}
@@ -67,4 +78,30 @@ func ListTransferJobs(db *sql.DB) ([]model.TransferJob, error) {
 		result = append(result, job)
 	}
 	return result, rows.Err()
+}
+
+func CancelTransferJobsForSessions(db *sql.DB, sessionIDs []int64) error {
+	if db == nil || len(sessionIDs) == 0 {
+		return nil
+	}
+	return withBusyRetry(func() error {
+		placeholders := make([]string, 0, len(sessionIDs))
+		args := make([]any, 0, len(sessionIDs)+1)
+		args = append(args, time.Now().UTC().Format(time.RFC3339Nano))
+		for _, id := range sessionIDs {
+			if id <= 0 {
+				continue
+			}
+			placeholders = append(placeholders, "?")
+			args = append(args, id)
+		}
+		if len(placeholders) == 0 {
+			return nil
+		}
+		query := "UPDATE transfer_jobs SET status='cancelled', error='会话已删除', completed_at=? WHERE status IN ('queued','running') AND session_id IN (" + strings.Join(placeholders, ",") + ")"
+		if _, err := db.Exec(query, args...); err != nil {
+			return fmt.Errorf("cancel transfer jobs for sessions: %w", err)
+		}
+		return nil
+	})
 }

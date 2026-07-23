@@ -27,7 +27,7 @@ const state = {
 
 vi.mock('@/hooks/SessionWorkspaceContext', () => ({ useSessionWorkspace: () => state }))
 vi.mock('@/lib/wails', () => ({
-  SessionService: { SessionDeleteImpact: vi.fn(async () => ({ tunnels: 0, history: 0, recordings: 0 })), SessionsDeleteImpact: vi.fn(async () => ({ tunnels: 1, history: 0, recordings: 0 })) },
+  SessionService: { SessionDeleteImpact: vi.fn(async () => ({ tunnels: 0, history: 0, recordings: 0, transfers: 0 })), SessionsDeleteImpact: vi.fn(async () => ({ tunnels: 1, history: 0, recordings: 0, transfers: 0 })) },
   AssetCatalogService: { EnvironmentDeleteImpact: vi.fn(), ProjectDeleteImpact: vi.fn(), TagDeleteImpact: vi.fn() },
   MacroService: { List: vi.fn(async () => [{ id: 9, name: '巡检', command: 'uptime\n' }]) },
 }))

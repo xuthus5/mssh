@@ -22,6 +22,7 @@ type FileService struct {
 	eventBus            EventBus
 	mu                  sync.Mutex
 	tasks               map[string]context.CancelFunc
+	taskSessions        map[string]int64
 	progress            sync.Mutex
 	startsAt            map[string]time.Time
 	lastProgressPersist map[string]time.Time
@@ -47,6 +48,7 @@ func NewFileService(sessions *SessionService, eventBus EventBus, logger *slog.Lo
 		sessions:            sessions,
 		eventBus:            eventBus,
 		tasks:               make(map[string]context.CancelFunc),
+		taskSessions:        make(map[string]int64),
 		startsAt:            make(map[string]time.Time),
 		lastProgressPersist: make(map[string]time.Time),
 		lastProgressBytes:   make(map[string]int64),
@@ -179,6 +181,7 @@ func (f *FileService) disconnect(connID string) {
 func (f *FileService) removeTask(taskID string) {
 	f.mu.Lock()
 	delete(f.tasks, taskID)
+	delete(f.taskSessions, taskID)
 	f.mu.Unlock()
 }
 

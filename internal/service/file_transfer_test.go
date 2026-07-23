@@ -148,7 +148,8 @@ func TestFileService_reportProgress(t *testing.T) {
 	b := newMockEventBus()
 	svc := &FileService{logger: testutil.NewTestLogger(),
 		eventBus: b,
-		tasks:    make(map[string]context.CancelFunc),
+		tasks:         make(map[string]context.CancelFunc),
+		taskSessions: make(map[string]int64),
 	}
 
 	svc.reportProgress("task-1", 50, 100)
@@ -161,7 +162,8 @@ func TestFileService_reportProgressNoTotal(t *testing.T) {
 	b := newMockEventBus()
 	svc := &FileService{logger: testutil.NewTestLogger(),
 		eventBus: b,
-		tasks:    make(map[string]context.CancelFunc),
+		tasks:         make(map[string]context.CancelFunc),
+		taskSessions: make(map[string]int64),
 	}
 
 	svc.reportProgress("task-1", 50, 0)
@@ -228,7 +230,8 @@ func TestFileService_ReportProgressWithSpeedAndETA(t *testing.T) {
 	svc := &FileService{
 		logger:   testutil.NewTestLogger(),
 		eventBus: b,
-		tasks:    make(map[string]context.CancelFunc),
+		tasks:         make(map[string]context.CancelFunc),
+		taskSessions: make(map[string]int64),
 		startsAt: make(map[string]time.Time),
 	}
 
@@ -248,7 +251,8 @@ func TestFileService_EmitTransferError(t *testing.T) {
 	svc := &FileService{
 		logger:   testutil.NewTestLogger(),
 		eventBus: b,
-		tasks:    make(map[string]context.CancelFunc),
+		tasks:         make(map[string]context.CancelFunc),
+		taskSessions: make(map[string]int64),
 		startsAt: make(map[string]time.Time),
 	}
 
