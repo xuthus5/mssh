@@ -58,7 +58,11 @@ function SessionCSVExportDialog(props: ExportDialogProps) {
       if (!path) return
       const result = await props.onExport({ path: ensureCSVExtension(path), sessionIDs: effectiveScope === 'selected' ? props.selectedIDs : [], includePasswords, confirmPassword: includePasswords ? confirmPassword : undefined })
       toast(t('已导出 ${} 个会话', result.count), 'success'); changeOpen(false)
-    } catch (reason) { setError(errorMessage(reason)) } finally { setPending(false) }
+    } catch (reason) {
+      const message = errorMessage(reason)
+      setError(message)
+      toast(t('导出会话 CSV 失败: ${}', message), 'error')
+    } finally { setPending(false) }
   }
 
   return <Dialog open={props.open} onOpenChange={changeOpen}><DialogContent className="sm:max-w-lg"><DialogHeader><DialogTitle>{t('导出会话 CSV')}</DialogTitle><DialogDescription>{t('仅导出 SSH 会话、分组和资产归属，不包含 MSSH 应用设置。')}</DialogDescription></DialogHeader>
