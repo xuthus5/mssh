@@ -1216,3 +1216,11 @@
 | UX-TERM-118 | 终端 Attach 失败时仅通过连接状态进入 pane overlay（error）并支持重连，不得 toast 叠加。 | done |
 | UX-TERM-119 | 终端 Write 失败时仅将连接状态置为 disconnected 并由 pane overlay 承接，不得 toast 叠加；仅记录一次日志。 | done |
 
+## 2026-07-24 商用硬化波次（分屏 reparent 恢复与连接对话框错误归属）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| UX-SPLIT-120 | 分屏 reparent 后非活动窗格也必须多帧 fit/refresh/resize 恢复，避免旧 Shell 空白不可操作。 | done |
+| UX-CONN-121 | 主机指纹接受/拒绝与取消连接失败仅连接对话框 failed+error 展示，不得 toast。 | done |
+| UX-MACRO-122 | 宏工作区列表加载失败仅工作区内 error+重试，不得 toast；测试与实现一致。 | done |
+

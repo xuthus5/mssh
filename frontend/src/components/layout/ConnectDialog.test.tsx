@@ -27,7 +27,7 @@ describe('ConnectDialog', () => {
     })
   })
 
-  it('swallows host key accept rejections after toasting', async () => {
+  it('surfaces host key accept failures in dialog without toast', async () => {
     __registerHandler(decideHostKey, async () => { throw new Error('host key boom') })
     useConnectDialog.setState({
       open: true,
@@ -41,11 +41,13 @@ describe('ConnectDialog', () => {
     })
     render(<ConnectDialog />)
     await userEvent.click(screen.getByRole('button', { name: '信任并连接' }))
-    await waitFor(() => expect(useToastStore.getState().toasts.some((item) => item.message.includes('host key boom') && item.type === 'error')).toBe(true))
-    expect(useConnectDialog.getState().state).toBe('failed')
+    await waitFor(() => expect(useConnectDialog.getState()).toMatchObject({ state: 'failed', error: 'host key boom' }))
+    expect(useToastStore.getState().toasts).toHaveLength(0)
+    expect(await screen.findByText('连接失败')).toBeInTheDocument()
+    expect(screen.getByText('host key boom')).toBeInTheDocument()
   })
 
-  it('swallows cancel connection rejections after toasting', async () => {
+  it('surfaces cancel connection failures in dialog without toast', async () => {
     __registerHandler(cancelConnect, async () => { throw new Error('cancel boom') })
     useConnectDialog.setState({
       open: true,
@@ -57,11 +59,12 @@ describe('ConnectDialog', () => {
     })
     render(<ConnectDialog />)
     await userEvent.click(screen.getByRole('button', { name: '取消连接' }))
-    await waitFor(() => expect(useToastStore.getState().toasts.some((item) => item.message.includes('cancel boom') && item.type === 'error')).toBe(true))
-    expect(useConnectDialog.getState().state).toBe('failed')
+    await waitFor(() => expect(useConnectDialog.getState()).toMatchObject({ state: 'failed', error: 'cancel boom' }))
+    expect(useToastStore.getState().toasts).toHaveLength(0)
+    expect(await screen.findByText('连接失败')).toBeInTheDocument()
   })
 
-  it('swallows host key reject rejections after toasting', async () => {
+  it('surfaces host key reject failures in dialog without toast', async () => {
     __registerHandler(decideHostKey, async () => { throw new Error('reject boom') })
     useConnectDialog.setState({
       open: true,
@@ -75,7 +78,8 @@ describe('ConnectDialog', () => {
     })
     render(<ConnectDialog />)
     await userEvent.click(screen.getByRole('button', { name: '拒绝' }))
-    await waitFor(() => expect(useToastStore.getState().toasts.some((item) => item.message.includes('reject boom') && item.type === 'error')).toBe(true))
-    expect(useConnectDialog.getState().state).toBe('failed')
+    await waitFor(() => expect(useConnectDialog.getState()).toMatchObject({ state: 'failed', error: 'reject boom' }))
+    expect(useToastStore.getState().toasts).toHaveLength(0)
+    expect(await screen.findByText('连接失败')).toBeInTheDocument()
   })
 })
