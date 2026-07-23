@@ -131,3 +131,16 @@ func TestMacroService_ExecuteRejectsOversizedCommand(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "size limit")
 }
+
+func TestMacroService_CreateValidatesPayload(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	svc := NewMacroService(db, nil, testutil.NewTestLogger())
+	_, err := svc.Create(model.MacroInputFrom(model.Macro{Name: "", Command: "echo"}))
+	require.Error(t, err)
+	_, err = svc.Create(model.MacroInputFrom(model.Macro{Name: "x", Command: ""}))
+	require.Error(t, err)
+	_, err = svc.Create(model.MacroInputFrom(model.Macro{Name: "x", Command: strings.Repeat("a", maxMacroCommandBytes+1)}))
+	require.Error(t, err)
+	_, err = svc.Create(model.MacroInputFrom(model.Macro{Name: "x", Command: "echo", DelayMs: 70_000}))
+	require.Error(t, err)
+}
