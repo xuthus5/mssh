@@ -10,7 +10,6 @@ import { Textarea } from '@/components/ui/textarea'
 import type { AssetColorToken, AssetEnvironment, AssetProject, AssetTag } from '@/hooks/useSession'
 import { ASSET_COLOR_OPTIONS } from '@/lib/assetColors'
 import { AssetCatalogService } from '@/lib/wails'
-import { toast } from '@/components/ui/toast'
 import { t } from '@/i18n'
 
 
@@ -54,7 +53,6 @@ export function SessionAssetCatalogEditor(props: EditorProps) {
     } catch (reason) {
       const message = reason instanceof Error ? reason.message : String(reason)
       setError(message)
-      toast(t('保存资产分类失败: ${}', message), 'error')
     }
     finally { setPending(false) }
   }
@@ -106,7 +104,6 @@ export function SessionAssetCatalogDeleteDialog(props: DeleteProps) {
     void load(Number(props.target.item.id)).then((value) => setImpact(value ? { name: value.name, session_count: value.session_count } : null)).catch((reason) => {
       const message = reason instanceof Error ? reason.message : String(reason)
       setError(message)
-      toast(t('加载删除影响失败: ${}', message), 'error')
     })
   }, [props.target])
   const submit = async () => {
@@ -120,7 +117,6 @@ export function SessionAssetCatalogDeleteDialog(props: DeleteProps) {
     } catch (reason) {
       const message = reason instanceof Error ? reason.message : String(reason)
       setError(message)
-      toast(t('删除资产分类失败: ${}', message), 'error')
     }
     finally { setPending(false) }
   }

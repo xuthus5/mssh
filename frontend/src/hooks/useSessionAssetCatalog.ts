@@ -1,7 +1,6 @@
 import { useCallback, type Dispatch, type SetStateAction } from 'react'
 import { AssetCatalogService, SessionService } from '@/lib/wails'
 import { logger } from '@/lib/logger'
-import { toast } from '@/components/ui/toast'
 import { t } from '@/i18n'
 import { mapEnvironment, mapProject, mapSession, mapTag, type AssetColorToken, type AssetEnvironment, type AssetProject, type AssetTag, type Session } from '@/lib/sessionModels'
 import type { AssetColorToken as BindingAssetColorToken, AssetDeleteInput } from '../../bindings/github.com/xuthus5/mssh/internal/model/models'
@@ -40,8 +39,7 @@ export function useSessionAssetCatalog(state: StateSetters) {
       const message = error instanceof Error ? error.message : String(error)
       logger.error('listAssetCatalogs error', error)
       state.setError(message)
-      if (!options?.silent) toast(t('加载资产分类失败: ${}', message), 'error')
-      else throw error
+      if (options?.silent) throw error
     }
   }, [state.setEnvironments, state.setError, state.setProjects, state.setTags])
 
@@ -60,8 +58,8 @@ export function useSessionAssetCatalog(state: StateSetters) {
       const message = error instanceof Error ? error.message : String(error)
       logger.error('refreshAssets error', error)
       state.setError(message)
-      if (!options?.silent) toast(t('刷新资产数据失败: ${}', message), 'error')
-      throw error
+      if (options?.silent) throw error
+      // non-silent: page banner owns the failure
     }
   }, [state.setEnvironments, state.setError, state.setProjects, state.setRecentSessions, state.setSessions, state.setTags])
 

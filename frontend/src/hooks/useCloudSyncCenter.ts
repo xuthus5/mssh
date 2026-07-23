@@ -40,7 +40,6 @@ export function useCloudSyncCenter(): CloudSyncController {
       const message = errorMessage(loadError)
       setError(message)
       logger.error('load cloud sync dashboard failed', loadError)
-      toast(t('加载云同步失败: ${}', message), 'error')
     } finally {
       setLoading(false)
     }
@@ -55,8 +54,7 @@ export function useCloudSyncCenter(): CloudSyncController {
       if (!operation.quiet) toast(operation.success, 'success')
     } catch (actionError) {
       const message = errorMessage(actionError)
-      setError(message)
-      // Quiet autosave only suppresses success toasts; failures must still surface.
+      // Action failures use toast; load failures use page banner (setError in reload).
       toast(t(operation.failure, message), 'error')
       logger.error(`cloud sync ${operation.name} failed`, actionError)
       throw actionError

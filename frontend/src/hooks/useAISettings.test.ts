@@ -53,21 +53,21 @@ describe('useAISettings', () => {
     expect(toast).toHaveBeenCalled()
   })
 
-  it('exposes backend errors without leaving pending state', async () => {
-    ai.dashboard.mockRejectedValueOnce(new Error('load failed'))
+  it('exposes backend action errors via toast without leaving pending state', async () => {
     const { result } = renderHook(() => useAISettings())
-    await waitFor(() => expect(result.current.error).toBe('load failed'))
+    await waitFor(() => expect(result.current.loading).toBe(false))
     ai.deleteProvider.mockRejectedValueOnce(new Error('delete failed'))
     await expect(act(async () => result.current.deleteProvider(1))).rejects.toThrow('delete failed')
     expect(result.current.pending).toBeNull()
+    expect(result.current.error).toBeNull()
     expect(toast).toHaveBeenCalledWith(expect.stringContaining('delete failed'), 'error')
   })
 
-  it('toasts when dashboard load fails', async () => {
+  it('sets page error when dashboard load fails without toast', async () => {
     ai.dashboard.mockRejectedValue(new Error('ai dashboard failed'))
     const { result } = renderHook(() => useAISettings())
     await waitFor(() => expect(result.current.loading).toBe(false))
     expect(result.current.error).toBe('ai dashboard failed')
-    expect(toast).toHaveBeenCalledWith(expect.stringContaining('ai dashboard failed'), 'error')
+    expect(toast).not.toHaveBeenCalledWith(expect.stringContaining('ai dashboard failed'), 'error')
   })
 })

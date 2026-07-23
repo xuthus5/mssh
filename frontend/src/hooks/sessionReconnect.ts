@@ -158,7 +158,6 @@ export async function reconnectSessionTab(tabId: string, sessions: ReconnectSess
           const message = error instanceof Error ? error.message : String(error)
           state.setConnectionStatus(terminalId, 'error')
           dialog.setError(message)
-          toast(t('重连失败: ${}', message), 'error')
           return
         }
         state.setConnectionStatus(terminalId, 'reconnecting')

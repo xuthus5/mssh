@@ -18,7 +18,7 @@ describe('SessionAssetDeleteDialog', () => {
     impact.mockResolvedValue({ tunnels: 1, history: 2, recordings: 3, transfers: 0 })
   })
 
-  it('toasts impact load failures', async () => {
+  it('shows impact load failures inline without toast', async () => {
     impact.mockRejectedValueOnce(new Error('impact boom'))
     render(
       <SessionAssetDeleteDialog
@@ -29,7 +29,8 @@ describe('SessionAssetDeleteDialog', () => {
         onConfirm={vi.fn()}
       />,
     )
-    await waitFor(() => expect(useToastStore.getState().toasts.some((item) => item.message.includes('impact boom'))).toBe(true))
+    expect(await screen.findByRole('alert')).toHaveTextContent('impact boom')
+    expect(useToastStore.getState().toasts).toHaveLength(0)
   })
 
   it('keeps inline delete failures without local toast', async () => {

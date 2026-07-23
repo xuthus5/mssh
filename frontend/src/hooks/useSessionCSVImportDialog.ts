@@ -42,7 +42,6 @@ export function useSessionCSVImportDialog(
     } catch (reason) {
       const message = errorMessage(reason)
       setError(message)
-      toast(t('预览会话 CSV 失败: ${}', message), 'error')
     } finally { setPending(false) }
   }
   const applyProvider = (nextProvider: SessionCSVProvider) => {
@@ -58,7 +57,6 @@ export function useSessionCSVImportDialog(
     } catch (reason) {
       const message = errorMessage(reason)
       setError(message)
-      toast(t('导入会话 CSV 失败: ${}', message), 'error')
     } finally { setPending(false) }
   }
   const reset = () => {

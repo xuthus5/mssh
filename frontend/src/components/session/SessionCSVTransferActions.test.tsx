@@ -88,11 +88,11 @@ describe('SessionCSVTransferActions', () => {
   })
 })
 
-  it('toasts export failures', async () => {
+  it('shows export failures inline without toast', async () => {
     actions.exportSessionsCSV.mockRejectedValueOnce(new Error('export boom'))
     render(<SessionCSVTransferActions selectedIDs={[]} />)
     await userEvent.click(screen.getByRole('button', { name: '导出' }))
     await userEvent.click(screen.getByRole('button', { name: /选择位置并导出/ }))
-    await waitFor(() => expect(useToastStore.getState().toasts.some((item) => item.message.includes('export boom'))).toBe(true))
     expect(await screen.findByRole('alert')).toHaveTextContent('export boom')
+    expect(useToastStore.getState().toasts).toHaveLength(0)
   })

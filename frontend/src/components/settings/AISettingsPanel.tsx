@@ -87,7 +87,12 @@ export function AISettingsPanel({ controller }: { controller: AISettingsControll
     return <p className="p-8 text-center text-sm text-muted-foreground">{t('正在加载 AI 配置...')}</p>
   }
   if (!dashboard || !draft) {
-    return <p className="p-8 text-center text-sm text-destructive">{t('AI 配置加载失败')}</p>
+    return (
+      <div className="space-y-2 p-8 text-center">
+        <p className="text-sm text-destructive">{t('AI 配置加载失败')}</p>
+        {controller.error ? <p className="text-xs text-muted-foreground">{controller.error}</p> : null}
+      </div>
+    )
   }
 
   const update = (changes: Partial<AISettingsInput>) => setDraft({ ...draft, ...changes })

@@ -12,7 +12,6 @@ import { Switch } from '@/components/ui/switch'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useAsyncAction } from '@/hooks/useAsyncAction'
 import { AsyncState } from '@/components/ui/async-state'
-import { toast } from '@/components/ui/toast'
 import { t } from '@/i18n'
 
 
@@ -43,7 +42,6 @@ export function AuditPanel() {
     } catch (loadError: unknown) {
       const message = loadError instanceof Error ? loadError.message : String(loadError)
       setError(message)
-      toast(t('加载审计日志失败: ${}', message), 'error')
       throw loadError
     }
   }, [action, enabled, from, query.reset, query.run, sessionID, to])
@@ -57,7 +55,6 @@ export function AuditPanel() {
     } catch (loadError: unknown) {
       const message = loadError instanceof Error ? loadError.message : String(loadError)
       setError(message)
-      toast(t('加载审计设置失败: ${}', message), 'error')
     } finally {
       setInitializing(false)
     }
@@ -74,7 +71,6 @@ export function AuditPanel() {
     } catch (toggleError) {
       const message = toggleError instanceof Error ? toggleError.message : String(toggleError)
       setError(message)
-      toast(t('更新审计设置失败: ${}', message), 'error')
     }
   }
 
