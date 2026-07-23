@@ -49,14 +49,15 @@ describe('useShortcutSettings', () => {
     })
     await waitFor(() => expect(useShortcutStore.getState().bindings['close-tab']).toBeNull())
   })
-})
 
-  it('falls back to defaults when load fails and toasts error', async () => {
+  it('falls back to defaults and surfaces load error without toast', async () => {
     __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.Get', async () => {
       throw new Error('shortcut load failed')
     })
     const { result } = renderHook(() => useShortcutSettings())
     await waitFor(() => expect(result.current.loading).toBe(false))
     expect(result.current.bindings['new-session']).toEqual(defaultShortcutBindings()['new-session'])
-    expect(useToastStore.getState().toasts.some((item) => item.message.includes('shortcut load failed'))).toBe(true)
+    expect(result.current.error).toBe('shortcut load failed')
+    expect(useToastStore.getState().toasts).toHaveLength(0)
   })
+})

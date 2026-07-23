@@ -114,12 +114,17 @@ function macroErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
 
-async function loadMacros(setMacros: (update: CommandItem[]) => void) {
+async function loadMacros(
+  setMacros: (update: CommandItem[]) => void,
+  setError: (message: string) => void,
+) {
   try {
     setMacros((await MacroService.List() ?? []).map(macroItem))
+    setError('')
   } catch (error: unknown) {
     logger.error('Sidebar: list macros error', error)
-    toast(t('加载宏失败: ${}', macroErrorMessage(error)), 'error')
+    setMacros([])
+    setError(macroErrorMessage(error))
   }
 }
 
@@ -146,11 +151,15 @@ async function deleteMacro(id: string, update: (callback: (items: CommandItem[])
 
 export function useSidebarMacros() {
   const [macros, setMacros] = useState<CommandItem[]>([])
-  useEffect(() => { void loadMacros(setMacros) }, [])
+  const [error, setError] = useState('')
+  const reload = useCallback(async () => {
+    await loadMacros(setMacros, setError)
+  }, [])
+  useEffect(() => { void reload() }, [reload])
   const execute = useCallback((command: string) => {
     void executeMacroOnActiveTerminal(command, { requireTerminalSurface: true })
   }, [])
   const add = useCallback((item: Omit<CommandItem, 'id'>) => addMacro(item, setMacros), [])
   const remove = useCallback((id: string) => deleteMacro(id, setMacros), [])
-  return { macros, execute, add, remove }
+  return { macros, error, reload, execute, add, remove }
 }
