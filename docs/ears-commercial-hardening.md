@@ -617,3 +617,11 @@
 | SEC-SFTP-011 | CancelTransfer 必须拒绝空 taskID。 | done |
 | SEC-SESSION-015 | DecideHostKey/CancelConnect 必须拒绝空 attemptID。 | done |
 | UX-TERM-020 | 终端 Attach 失败必须 toast。 | done |
+
+## 2026-07-23 商用硬化波次（终端 Open / SystemInfo / AI Execute ID）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| SEC-TERM-021 | Terminal Open 必须拒绝 sessionID<=0。 | done |
+| SEC-TERM-022 | SystemInfo 必须拒绝空 terminalID。 | done |
+| SEC-AI-012 | ExecuteCommand 必须拒绝 sessionID<=0 与空 terminalID。 | done |

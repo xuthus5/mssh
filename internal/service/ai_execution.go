@@ -12,6 +12,12 @@ import (
 const maxAICommandBytes = 32 * 1024
 
 func (s *AIService) ExecuteCommand(input model.AICommandExecutionInput) error {
+	if input.SessionID <= 0 {
+		return fmt.Errorf("invalid session id")
+	}
+	if strings.TrimSpace(input.TerminalID) == "" {
+		return fmt.Errorf("invalid terminal id")
+	}
 	settings, err := store.LoadAISettings(s.db, defaultAISettings())
 	if err != nil {
 		return err
@@ -25,7 +31,7 @@ func (s *AIService) ExecuteCommand(input model.AICommandExecutionInput) error {
 		s.recordAIExecution(input, proposal.Risk, "blocked", "command approval is required")
 		return fmt.Errorf("AI command approval is required")
 	}
-	if s.terminals == nil || input.TerminalID == "" {
+	if s.terminals == nil {
 		s.recordAIExecution(input, proposal.Risk, "failed", "active terminal is unavailable")
 		return fmt.Errorf("active terminal is unavailable")
 	}
