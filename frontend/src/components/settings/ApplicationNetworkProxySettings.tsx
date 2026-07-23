@@ -2,6 +2,7 @@ import { Field, FieldContent, FieldDescription, FieldLabel } from '@/components/
 import { Input } from '@/components/ui/input'
 import { LabeledSelect } from '@/components/ui/labeled-select'
 import { Switch } from '@/components/ui/switch'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   normalizeProxyMode,
   type NetworkProxyMode,
@@ -22,11 +23,14 @@ interface Props {
   proxyNoProxy: string
   proxyUsername: string
   proxyPassword: string
+  proxyPasswordSaved?: boolean
+  clearProxyPassword?: boolean
   onProxyModeChange: (value: NetworkProxyMode) => void
   onProxyURLChange: (value: string) => void
   onProxyNoProxyChange: (value: string) => void
   onProxyUsernameChange: (value: string) => void
   onProxyPasswordChange: (value: string) => void
+  onClearProxyPasswordChange?: (value: boolean) => void
 }
 
 export function ApplicationNetworkProxySettingsSection({
@@ -35,11 +39,14 @@ export function ApplicationNetworkProxySettingsSection({
   proxyNoProxy,
   proxyUsername,
   proxyPassword,
+  proxyPasswordSaved = false,
+  clearProxyPassword = false,
   onProxyModeChange,
   onProxyURLChange,
   onProxyNoProxyChange,
   onProxyUsernameChange,
   onProxyPasswordChange,
+  onClearProxyPasswordChange,
 }: Props) {
   const manual = proxyMode === 'manual'
   return (
@@ -106,9 +113,21 @@ export function ApplicationNetworkProxySettingsSection({
                   aria-label={t('代理密码')}
                   type="password"
                   value={proxyPassword}
+                  placeholder={proxyPasswordSaved && !clearProxyPassword ? t('已安全保存，留空保持不变') : ''}
+                  disabled={clearProxyPassword}
                   autoComplete="new-password"
                   onChange={(event) => onProxyPasswordChange(event.target.value)}
                 />
+                {proxyPasswordSaved && onClearProxyPasswordChange && (
+                  <label className="mt-1.5 flex items-center gap-2 text-xs text-muted-foreground">
+                    <Checkbox
+                      checked={clearProxyPassword}
+                      onCheckedChange={(checked) => onClearProxyPasswordChange(checked === true)}
+                      data-testid="clear-proxy-password"
+                    />
+                    <span>{t('清除已保存代理密码')}</span>
+                  </label>
+                )}
               </div>
             </div>
           </>

@@ -1309,5 +1309,6 @@
   "Secure Shell Client & Session Manager": "Secure Shell Client & Session Manager",
   "配置 AI 可调用的网络搜索能力与凭据。": "Configure web search capabilities and credentials available to AI.",
   "自动": "Automatic",
-  "主机：${}\n端口：${}\n用户：${}": "Host: ${}\nPort: ${}\nUser: ${}"
+  "主机：${}\n端口：${}\n用户：${}": "Host: ${}\nPort: ${}\nUser: ${}",
+  "清除已保存代理密码": "Clear saved proxy password"
 }

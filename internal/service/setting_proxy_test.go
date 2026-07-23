@@ -30,10 +30,17 @@ func (s *stubProxyConfigurer) Configure(config netproxy.Config) error {
 
 func (s *stubProxyConfigurer) Config() netproxy.Config { return s.config }
 
+func testProxyCrypto(t *testing.T) *CryptoRuntime {
+	t.Helper()
+	runtime := NewCryptoRuntime()
+	runtime.SetDEK(make([]byte, 32))
+	return runtime
+}
+
 func TestSettingProxySettingsApply(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	proxy := &stubProxyConfigurer{config: netproxy.DefaultConfig()}
-	svc := NewSettingService(db, testutil.NewTestLogger(), SettingServiceOptions{Proxy: proxy})
+	svc := NewSettingService(db, testutil.NewTestLogger(), SettingServiceOptions{Proxy: proxy, Crypto: testProxyCrypto(t)})
 
 	require.NoError(t, svc.SetMany([]model.SettingInput{
 		model.SettingInputFrom(model.Setting{Key: applicationProxyModeSetting, Namespace: "application", Value: `"manual"`, ValueType: "string", Version: 1}),
@@ -71,7 +78,7 @@ func TestSettingProxyPartialUpdateKeepsOtherFields(t *testing.T) {
 			Key: key, Namespace: "application", Value: string(payload), ValueType: "string", Version: 1,
 		}}))
 	}
-	svc := NewSettingService(db, testutil.NewTestLogger(), SettingServiceOptions{Proxy: proxy})
+	svc := NewSettingService(db, testutil.NewTestLogger(), SettingServiceOptions{Proxy: proxy, Crypto: testProxyCrypto(t)})
 	require.NoError(t, svc.Set(model.SettingInputFrom(model.Setting{
 		Key: applicationProxyURLSetting, Namespace: "application", Value: `"http://new:8080"`, ValueType: "string", Version: 1,
 	})))
@@ -84,4 +91,41 @@ func TestApplyStoredProxySettingsWithoutConfigurer(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	svc := NewSettingService(db, testutil.NewTestLogger())
 	require.NoError(t, svc.ApplyStoredProxySettings())
+}
+
+func TestSettingProxyPasswordEncryptedAndRedacted(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	proxy := &stubProxyConfigurer{config: netproxy.DefaultConfig()}
+	svc := NewSettingService(db, testutil.NewTestLogger(), SettingServiceOptions{Proxy: proxy, Crypto: testProxyCrypto(t)})
+
+	require.NoError(t, svc.SetMany([]model.SettingInput{
+		model.SettingInputFrom(model.Setting{Key: applicationProxyModeSetting, Namespace: "application", Value: `"manual"`, ValueType: "string", Version: 1}),
+		model.SettingInputFrom(model.Setting{Key: applicationProxyURLSetting, Namespace: "application", Value: `"http://127.0.0.1:1080"`, ValueType: "string", Version: 1}),
+		model.SettingInputFrom(model.Setting{Key: applicationProxyPasswordSetting, Namespace: "application", Value: `"s3cret-pass"`, ValueType: "string", Version: 1}),
+	}))
+	assert.Equal(t, "s3cret-pass", proxy.config.Password)
+
+	got, err := svc.Get(applicationProxyPasswordSetting)
+	require.NoError(t, err)
+	require.NotNil(t, got)
+	assert.Equal(t, `""`, got.Value)
+
+	many, err := svc.GetMany([]string{applicationProxyPasswordSetting, applicationProxyPasswordSavedSetting})
+	require.NoError(t, err)
+	assert.Equal(t, `""`, many[applicationProxyPasswordSetting].Value)
+	assert.Contains(t, many[applicationProxyPasswordSavedSetting].Value, "true")
+
+	// Empty password keeps previous secret.
+	require.NoError(t, svc.Set(model.SettingInputFrom(model.Setting{
+		Key: applicationProxyPasswordSetting, Namespace: "application", Value: `""`, ValueType: "string", Version: 1,
+	})))
+	assert.Equal(t, "s3cret-pass", proxy.config.Password)
+
+	// Clear sentinel removes secret.
+	clearPayload, err := json.Marshal(proxyPasswordClearSentinel)
+	require.NoError(t, err)
+	require.NoError(t, svc.Set(model.SettingInputFrom(model.Setting{
+		Key: applicationProxyPasswordSetting, Namespace: "application", Value: string(clearPayload), ValueType: "string", Version: 1,
+	})))
+	assert.Equal(t, "", proxy.config.Password)
 }

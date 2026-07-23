@@ -30,6 +30,8 @@ const general = {
   proxyNoProxy: '',
   proxyUsername: '',
   proxyPassword: '',
+  proxyPasswordSaved: false,
+  clearProxyPassword: false,
   language: 'zh-CN' as const,
 }
 
