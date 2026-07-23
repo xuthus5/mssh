@@ -92,7 +92,6 @@ describe('SessionTree behavior', () => {
     }
   })
 
-})
 
   it('swallows moveToFolder rejections from context actions', async () => {
     const user = userEvent.setup()
@@ -101,4 +100,4 @@ describe('SessionTree behavior', () => {
     await user.click(screen.getByRole('button', { name: '生产环境' }))
     expect(onMoveToFolder).toHaveBeenCalledWith('s1', 'f1')
   })
-
+})

@@ -42,11 +42,25 @@ describe('SystemPanel', () => {
     expect(screen.getAllByText('vim').length).toBeGreaterThan(0)
   })
 
-  it('shows collection errors without throwing', async () => {
-    terminalService.SystemInfo.mockRejectedValueOnce(new Error('probe failed'))
+  it('shows collection errors without throwing and supports retry', async () => {
+    terminalService.SystemInfo
+      .mockRejectedValueOnce(new Error('probe failed'))
+      .mockResolvedValueOnce(systemInfo)
     render(<SystemPanel terminalID="term-3" onClose={vi.fn()} />)
-    expect(await screen.findByText('系统信息采集失败')).toBeInTheDocument()
-    await waitFor(() => expect(terminalService.SystemInfo).toHaveBeenCalled())
+    expect(await screen.findByRole('alert')).toHaveTextContent('系统信息采集失败')
+    await userEvent.click(screen.getByRole('button', { name: '重试' }))
+    expect(await screen.findByText('42% (8c)')).toBeInTheDocument()
+  })
+
+  it('shows process collection errors with retry', async () => {
+    terminalService.ProcessInfo
+      .mockRejectedValueOnce(new Error('process failed'))
+      .mockResolvedValueOnce(processInfo)
+    render(<SystemPanel terminalID="term-process-err" onClose={vi.fn()} />)
+    await userEvent.click(screen.getByRole('tab', { name: '进程' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('进程信息采集失败')
+    await userEvent.click(screen.getByRole('button', { name: '重试' }))
+    expect((await screen.findAllByText('tmux')).length).toBeGreaterThan(0)
   })
 
   it('closes through the supplied callback', async () => {
@@ -55,7 +69,6 @@ describe('SystemPanel', () => {
     await userEvent.click(screen.getByRole('button', { name: '关闭系统监控' }))
     expect(onClose).toHaveBeenCalledOnce()
   })
-})
 
   it('stops polling when the terminal is gone', async () => {
     vi.useFakeTimers()
@@ -75,4 +88,4 @@ describe('SystemPanel', () => {
     expect(calls).toBe(after)
     vi.useRealTimers()
   })
-
+})

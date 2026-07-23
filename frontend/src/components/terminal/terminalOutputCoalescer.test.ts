@@ -63,7 +63,6 @@ describe('TerminalOutputCoalescer', () => {
     expect(write).toHaveBeenCalledOnce()
     expect(Array.from(write.mock.calls[0][0])).toEqual([9])
   })
-})
 
   it('exposes pass-through and batch metrics', () => {
     const write = vi.fn()
@@ -90,4 +89,4 @@ describe('TerminalOutputCoalescer', () => {
       flushedBytes: 2,
     })
   })
-
+})

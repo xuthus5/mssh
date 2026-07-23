@@ -46,7 +46,6 @@ describe('ApplicationNetworkProxySettingsSection', () => {
     expect(screen.queryByLabelText('代理地址')).not.toBeInTheDocument()
     expect(screen.getByText(/HTTP\(S\)_PROXY/)).toBeInTheDocument()
   })
-})
 
   it('shows clear control for saved proxy password', async () => {
     const onClear = vi.fn()
@@ -72,4 +71,4 @@ describe('ApplicationNetworkProxySettingsSection', () => {
     await user.click(screen.getByTestId('clear-proxy-password'))
     expect(onClear).toHaveBeenCalledWith(true)
   })
-
+})
