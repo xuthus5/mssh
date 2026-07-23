@@ -96,7 +96,7 @@ export function ShortcutSettingsPanel() {
   }, [conflicts])
 
   const persist = useCallback(async (next: ShortcutBindings) => {
-    await saveBindings(next)
+    await saveBindings(next, { quiet: true })
   }, [saveBindings])
 
   const autoSave = useAutoSave({
