@@ -614,6 +614,28 @@ describe('useTerminal', () => {
     vi.useRealTimers()
   })
 
+  it('fits and resizes inactive panes when the split layout changes', () => {
+    vi.useFakeTimers()
+    const containerRef = createRef<HTMLDivElement>()
+    const container = document.createElement('div')
+    Object.defineProperty(container, 'clientWidth', { value: 400 })
+    Object.defineProperty(container, 'clientHeight', { value: 500 })
+    containerRef.current = container
+    const hook = renderHook(() => useTerminal('term-inactive-split', containerRef, {
+      active: false,
+      focusRequest: { sequence: 0 },
+    }))
+
+    calls.length = 0
+    act(() => resizeHandlers[0]([], {} as ResizeObserver))
+    expect(calls).toEqual(['fit', 'refresh'])
+
+    act(() => { vi.advanceTimersByTime(80) })
+    expect(TerminalService.Resize).toHaveBeenCalledWith('term-inactive-split', 80, 24)
+    act(() => hook.unmount())
+    vi.useRealTimers()
+  })
+
   it('reports fit failures from the resize observer callback', () => {
     const containerRef = createRef<HTMLDivElement>()
     const container = document.createElement('div')
