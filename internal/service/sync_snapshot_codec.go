@@ -28,13 +28,13 @@ func encodeEncryptedSnapshot(data ExportData, masterKey string) ([]byte, error) 
 	return content, nil
 }
 
+// writePrivateFileAtomic writes content with mode 0600 via temp+rename.
+// Parent directories are created as 0700 when missing, but existing user-chosen
+// directories (e.g. Desktop CSV export) are never re-chmod'ed.
 func writePrivateFileAtomic(path string, content []byte) error {
 	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0o700); err != nil {
-		return fmt.Errorf("create parent directory: %w", err)
-	}
-	if err := os.Chmod(dir, 0o700); err != nil {
-		return fmt.Errorf("secure parent directory: %w", err)
+	if err := ensurePrivateParentDir(dir); err != nil {
+		return err
 	}
 	temporary, err := os.CreateTemp(dir, ".mssh-backup-*.tmp")
 	if err != nil {
@@ -57,7 +57,30 @@ func writePrivateFileAtomic(path string, content []byte) error {
 	if err := temporary.Close(); err != nil {
 		return err
 	}
-	return os.Rename(temporaryPath, path)
+	if err := os.Rename(temporaryPath, path); err != nil {
+		return err
+	}
+	if err := os.Chmod(path, 0o600); err != nil {
+		return fmt.Errorf("secure export file: %w", err)
+	}
+	return nil
+}
+
+func ensurePrivateParentDir(dir string) error {
+	info, err := os.Stat(dir)
+	if err == nil {
+		if !info.IsDir() {
+			return fmt.Errorf("parent path is not a directory")
+		}
+		return nil
+	}
+	if !os.IsNotExist(err) {
+		return fmt.Errorf("stat parent directory: %w", err)
+	}
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return fmt.Errorf("create parent directory: %w", err)
+	}
+	return nil
 }
 
 func (s *SyncService) writeRecoveryPoint(masterKey string) error {
