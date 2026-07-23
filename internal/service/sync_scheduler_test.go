@@ -5,6 +5,7 @@ import (
 	"errors"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -75,6 +76,36 @@ func TestRunScheduledSyncSkipsWhenVaultLocked(t *testing.T) {
 	require.NoError(t, err)
 	// State must not flip to error just because vault is locked on a scheduled tick.
 	assert.NotEqual(t, model.SyncStateError, dashboard.State)
+}
+
+func TestRunScheduledSyncSkipsWhenDisabled(t *testing.T) {
+	var secretCalls atomic.Int32
+	db := testutil.NewTestDB(t)
+	service := NewSyncService(db, testutil.NewTestLogger(),
+		WithSyncSecretSource(func() (string, error) {
+			secretCalls.Add(1)
+			return "ready-secret", nil
+		}),
+	)
+	// Default config is disabled.
+	service.runScheduledSync(context.Background())
+	assert.GreaterOrEqual(t, secretCalls.Load(), int32(1))
+	dashboard, err := service.Dashboard()
+	require.NoError(t, err)
+	assert.Equal(t, model.SyncStateDisabled, dashboard.State)
+}
+
+func TestNotifyVaultUnlockedIsNilSafe(t *testing.T) {
+	var service *SyncService
+	assert.NotPanics(t, func() { service.NotifyVaultUnlocked() })
+
+	// Non-nil service with locked vault should not panic either.
+	locked := NewSyncService(testutil.NewTestDB(t), testutil.NewTestLogger(),
+		WithSyncSecretSource(func() (string, error) { return "", errors.New("locked") }),
+	)
+	locked.NotifyVaultUnlocked()
+	// Give the goroutine a moment to exit.
+	time.Sleep(20 * time.Millisecond)
 }
 
 func TestCloseAllTerminalsHandlesNilAndActiveEntries(t *testing.T) {
