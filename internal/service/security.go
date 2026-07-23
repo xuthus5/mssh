@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 
 	"github.com/xuthus5/mssh/internal/crypto"
 	"github.com/xuthus5/mssh/internal/model"
@@ -71,6 +72,31 @@ func (s *SecurityService) RequireUnlocked() error {
 		return ErrVaultLocked
 	}
 	return s.runtime.RequireUnlocked()
+}
+
+// VerifyPassword confirms the application password without changing unlock state.
+// Failed attempts consume the unlock rate limiter.
+func (s *SecurityService) VerifyPassword(password string) error {
+	if err := s.unlock.allow(); err != nil {
+		return err
+	}
+	if strings.TrimSpace(password) == "" {
+		s.unlock.failure()
+		return errors.New("application password is required")
+	}
+	if !crypto.VaultExists(s.dataDir) {
+		return errors.New("application password is not configured")
+	}
+	vault, err := crypto.LoadVaultFile(crypto.VaultPath(s.dataDir))
+	if err != nil {
+		return fmt.Errorf("load vault: %w", err)
+	}
+	if _, err := crypto.UnlockVault(password, vault); err != nil {
+		s.unlock.failure()
+		return err
+	}
+	s.unlock.success()
+	return nil
 }
 
 func (s *SecurityService) Status() (model.SecurityStatus, error) {
