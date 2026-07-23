@@ -17,8 +17,8 @@ import { t } from '@/i18n'
 
 interface Props {
   controller: CloudSyncController
-  onExport: () => void
-  onImport: () => void
+  onExport: () => void | Promise<void>
+  onImport: () => void | Promise<void>
 }
 
 export function SyncPanel({ controller, onExport, onImport }: Props) {
@@ -58,11 +58,11 @@ export function SyncPanel({ controller, onExport, onImport }: Props) {
           <AutoSaveStatusIndicator status={autoSave.status} error={autoSave.error} />
           {!input.enabled && (
             <>
-              <Button type="button" size="sm" variant="ghost" disabled={!dashboard?.config.master_key_saved} onClick={onExport}>
+              <Button type="button" size="sm" variant="ghost" disabled={!dashboard?.config.master_key_saved} onClick={() => { void Promise.resolve(onExport()).catch(() => undefined) }}>
                 <Upload data-icon="inline-start" />
                 {t('导出')}
               </Button>
-              <Button type="button" size="sm" variant="ghost" disabled={!dashboard?.config.master_key_saved} onClick={onImport}>
+              <Button type="button" size="sm" variant="ghost" disabled={!dashboard?.config.master_key_saved} onClick={() => { void Promise.resolve(onImport()).catch(() => undefined) }}>
                 <Download data-icon="inline-start" />
                 {t('导入')}
               </Button>
