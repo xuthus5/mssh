@@ -35,17 +35,18 @@ describe('FileTreeView', () => {
     await user.click(screen.getByRole('button', { name: '收起 src' }))
     expect(screen.getByRole('button', { name: '展开 src' })).toBeInTheDocument()
   })
-  it('toasts when directory load fails and collapses node', async () => {
+
+  it('shows inline error when directory load fails and collapses node without toast', async () => {
     const user = userEvent.setup()
     useToastStore.setState({ toasts: [] })
     const onLoadDirectory = vi.fn(async () => { throw new Error('tree load failed') })
     render(<FileTreeView currentPath="/" files={rootFiles} loading={false} showHiddenFiles={false} selected={null} onSelect={vi.fn()} onNavigate={vi.fn()} onDownload={vi.fn()} onLoadDirectory={onLoadDirectory} />)
     await user.click(screen.getByRole('button', { name: '展开 src' }))
     expect(onLoadDirectory).toHaveBeenCalledWith('/src')
-    expect(useToastStore.getState().toasts.some((item) => item.message.includes('tree load failed'))).toBe(true)
+    expect(await screen.findByRole('alert')).toHaveTextContent('加载失败')
+    expect(screen.getByRole('button', { name: '展开 src' })).toBeInTheDocument()
+    expect(useToastStore.getState().toasts).toHaveLength(0)
   })
-
-})
 
   it('virtualizes large flattened trees above the threshold', () => {
     const files = Array.from({ length: 90 }, (_, index) => ({
@@ -74,4 +75,4 @@ describe('FileTreeView', () => {
     expect(treeItems.length).toBeLessThan(90)
     expect(screen.getByRole('tree')).toBeInTheDocument()
   })
-
+})

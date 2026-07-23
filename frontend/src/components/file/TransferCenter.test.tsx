@@ -10,7 +10,7 @@ const baseJob = { sessionId: 1, sessionName: '生产服务器', sourcePath: '/lo
 describe('TransferCenter', () => {
   beforeEach(() => {
     __clearHandlers()
-    useAppStore.setState({ transfers: [], transferCenterOpen: false })
+    useAppStore.setState({ transfers: [], transfersLoadError: '', transferCenterOpen: false })
   })
 
   it('shows aggregate status and opens the sheet', async () => {
@@ -62,3 +62,25 @@ describe('TransferCenter', () => {
     expect(useAppStore.getState().transfers.some((item) => item.id === 'retry-1')).toBe(false)
   })
 })
+
+  it('shows restore failure instead of empty list and allows retry', async () => {
+    useAppStore.setState({ transferCenterOpen: true, transfers: [], transfersLoadError: 'list transfers failed' })
+    let calls = 0
+    __registerHandler('github.com/xuthus5/mssh/internal/service.FileService.ListTransfers', async () => {
+      calls += 1
+      return [{ id: 'saved', session_id: 3, session_name: 'server', direction: 'upload', source_path: '/tmp/a.txt', target_path: '/a.txt', total_bytes: 10, transferred_bytes: 10, speed: 2, eta: 0, status: 'completed', error: '', started_at: '2026-07-17T00:00:00Z', completed_at: '2026-07-17T00:00:05Z' }]
+    })
+    render(<TransferCenter />)
+    expect(screen.queryByText('暂无传输任务')).not.toBeInTheDocument()
+    expect(screen.getByText(/恢复传输记录失败/)).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: '重试' }))
+    await waitFor(() => expect(useAppStore.getState().transfersLoadError).toBe(''))
+    expect(calls).toBe(1)
+    expect(useAppStore.getState().transfers[0]).toMatchObject({ id: 'saved' })
+  })
+
+  it('shows transfer trigger when only load error is present', () => {
+    useAppStore.setState({ transfers: [], transfersLoadError: 'boom', transferCenterOpen: false })
+    render(<TransferCenter />)
+    expect(screen.getByRole('button', { name: '打开传输中心，传输记录加载失败' })).toBeInTheDocument()
+  })

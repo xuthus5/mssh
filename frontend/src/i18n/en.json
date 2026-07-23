@@ -1440,5 +1440,7 @@
   "（默认）": " (default)",
   "主机指纹暂不可用，请先修复上方加载错误。": "Host fingerprints are unavailable. Fix the load error above first.",
   "即将删除 ${} 个会话。分析关联资产影响失败：${}。仍可继续删除，但影响范围未知。此操作不可撤销。": "About to delete ${} sessions. Impact analysis failed: ${}. You can still delete, but the impact scope is unknown. This cannot be undone.",
-  "正在加载密钥...": "Loading keys..."
+  "正在加载密钥...": "Loading keys...",
+  "打开传输中心，传输记录加载失败": "Open transfer center; failed to load transfer history",
+  "加载失败": "Load failed"
 }

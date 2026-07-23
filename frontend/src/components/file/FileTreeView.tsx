@@ -3,7 +3,6 @@ import { ChevronDown, ChevronRight, File, Folder, FolderOpen } from 'lucide-reac
 import type { FileInfo } from '@/hooks/useFileTransfer'
 import { formatFileSize } from '@/components/file/FileListView'
 import { logger } from '@/lib/logger'
-import { toast } from '@/components/ui/toast'
 import { isTreeNavigationKey, nextTreeIndex } from '@/lib/treeKeyboard'
 import { VirtualList } from '@/components/ui/virtual-list'
 import { t } from '@/i18n'
@@ -30,8 +29,9 @@ export function FileTreeView(props: Props) {
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set())
   const [children, setChildren] = useState<Record<string, FileInfo[]>>({})
   const [loadingPaths, setLoadingPaths] = useState<Set<string>>(() => new Set())
+  const [errorPaths, setErrorPaths] = useState<Record<string, string>>({})
   const [activeIndex, setActiveIndex] = useState(0)
-  useEffect(() => { setExpanded(new Set()); setChildren({}); setLoadingPaths(new Set()); setActiveIndex(0) }, [props.currentPath])
+  useEffect(() => { setExpanded(new Set()); setChildren({}); setLoadingPaths(new Set()); setErrorPaths({}); setActiveIndex(0) }, [props.currentPath])
 
   const toggle = async (file: FileInfo) => {
     if (!file.isDir) return
@@ -42,9 +42,16 @@ export function FileTreeView(props: Props) {
     try {
       const loaded = await props.onLoadDirectory(file.path)
       setChildren((current) => ({ ...current, [file.path]: loaded }))
+      setErrorPaths((current) => {
+        if (!(file.path in current)) return current
+        const next = { ...current }
+        delete next[file.path]
+        return next
+      })
     } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
       logger.error('load SFTP tree directory failed', error)
-      toast(t('加载目录失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
+      setErrorPaths((current) => ({ ...current, [file.path]: message }))
       setExpanded((current) => withoutPath(current, file.path))
     } finally {
       setLoadingPaths((current) => withoutPath(current, file.path))
@@ -98,6 +105,11 @@ export function FileTreeView(props: Props) {
         <span className="truncate">{node.file.name}</span>
         {!node.file.isDir ? <span className="ml-auto text-xs text-muted-foreground">{formatFileSize(node.file.size)}</span> : null}
         {loadingPaths.has(node.file.path) ? <span className="ml-2 text-xs text-muted-foreground">...</span> : null}
+        {errorPaths[node.file.path] ? (
+          <span className="ml-auto max-w-[12rem] truncate text-xs text-destructive" title={errorPaths[node.file.path]} role="alert">
+            {t('加载失败')}
+          </span>
+        ) : null}
       </div>
     )
   }
