@@ -3,6 +3,7 @@ package service
 import (
 	"database/sql"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -312,4 +313,32 @@ func TestAIServiceExecuteCommandRejectsOversizedCommand(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "size limit")
 	assert.Empty(t, service.terminals.(*aiTerminalStub).writes)
+}
+
+func TestAIServiceClampsTerminalContext(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	session := createAIServiceSession(t, db)
+	var seenContext string
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		body, _ := io.ReadAll(request.Body)
+		seenContext = string(body)
+		_, _ = writer.Write([]byte(`{"choices":[{"message":{"content":"ok"}}]}`))
+	}))
+	defer server.Close()
+	service := NewAIService(db, nil, nil, testutil.NewTestLogger())
+	service.httpClient = server.Client()
+	provider, err := service.SaveProvider(model.AIProviderProfileInput{Name: "ctx", Provider: model.AIProviderOpenAICompatible, BaseURL: server.URL, DefaultModel: "model", Enabled: true, APIKey: "secret"})
+	require.NoError(t, err)
+	settings := defaultAISettings()
+	settings.DefaultProviderID = &provider.ID
+	settings.Security.MaxOutputBytes = 32
+	settings.Interaction.IncludeSessionMetadata = false
+	settings.Interaction.IncludeSystemSummary = false
+	require.NoError(t, store.SaveAISettings(db, settings))
+	huge := strings.Repeat("x", 10_000)
+	_, err = service.Chat(model.AIChatRequest{SessionID: session.ID, TerminalID: "term-1", Prompt: "ping", TerminalContext: huge})
+	require.NoError(t, err)
+	require.NotEmpty(t, seenContext)
+	assert.LessOrEqual(t, strings.Count(seenContext, "x"), 32+100) // body includes JSON framing
+	assert.NotContains(t, seenContext, strings.Repeat("x", 200))
 }
