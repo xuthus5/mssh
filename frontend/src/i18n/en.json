@@ -1327,5 +1327,11 @@
   "本地备份已导入": "Local backup imported",
   "加载设置失败: ${}": "Failed to load settings: ${}",
   "加载 SFTP 设置失败: ${}": "Failed to load SFTP settings: ${}",
-  "加载密钥列表失败: ${}": "Failed to load key list: ${}"
+  "加载密钥列表失败: ${}": "Failed to load key list: ${}",
+  "创建分组失败: ${}": "Failed to create folder: ${}",
+  "删除分组失败: ${}": "Failed to delete folder: ${}",
+  "更新分组失败: ${}": "Failed to update folder: ${}",
+  "设置默认分组失败: ${}": "Failed to set default folder: ${}",
+  "删除会话失败: ${}": "Failed to delete session: ${}",
+  "移动会话失败: ${}": "Failed to move session: ${}"
 }

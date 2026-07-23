@@ -502,3 +502,13 @@
 | SEC-AI-PROV-010 | AI 提供商名称/模型/URL/APIKey 长度与 Provider 枚举必须校验，拒绝 NUL 与未知类型。 | done |
 | UX-MACRO-010 | 侧栏宏加载/创建/删除/执行失败必须 toast 错误，不得仅写日志。 | done |
 
+## 2026-07-23 商用硬化波次（串口文本边界 + 会话分组操作错误可见）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| SEC-SERIAL-010 | 串口配置 Name/Notes 必须有长度上限并拒绝 NUL；SortOrder ∈ [0, 1_000_000]。 | done |
+| UX-SESSION-010 | create/update/delete 分组失败必须 toast，并向上抛错供调用方保持对话框可重试。 | done |
+| UX-SESSION-011 | delete/move 会话失败必须 toast 并抛错，不得仅写日志。 | done |
+| UX-SESSION-012 | setDefaultFolder 与 listTunnels 失败必须 toast，默认分组设置失败需可感知。 | done |
+| UX-SESSION-013 | 侧栏保存分组仅在成功后关闭对话框；资产中心删除失败保持确认框。 | done |
+
