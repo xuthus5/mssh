@@ -10,7 +10,6 @@ import QuickCommands from '@/components/session/QuickCommands'
 import { useEffect, useState } from 'react'
 import { MacroService } from '@/lib/wails'
 import { logger } from '@/lib/logger'
-import { toast } from '@/components/ui/toast'
 import { t } from '@/i18n'
 import { executeMacroOnActiveTerminal } from '@/lib/executeMacro'
 
@@ -90,9 +89,11 @@ function MacrosWorkspace() {
   const [macros, setMacros] = useState<Array<{ id: string; name: string; shortcut: string; command: string }>>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [actionError, setActionError] = useState('')
   const reload = async () => {
     setLoading(true)
     setError('')
+    setActionError('')
     try {
       const items = await MacroService.List()
       setMacros((items ?? []).map((item: { id: number | string; name: string; shortcut?: string; command: string }) => ({
@@ -145,20 +146,28 @@ function MacrosWorkspace() {
         <h2 className="text-sm font-medium">{t('宏工作区')}</h2>
         <Button size="sm" variant="outline" onClick={() => { void reload() }}>{t('刷新')}</Button>
       </div>
+      {actionError ? (
+        <div className="mb-3 rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive" role="alert">
+          {actionError}
+        </div>
+      ) : null}
       <div className="min-h-0 flex-1 overflow-hidden rounded-xl border border-border">
         <QuickCommands
           commands={macros}
           showAddForm={false}
           onExecute={(command) => { void executeMacroOnActiveTerminal(command) }}
           onAdd={() => {}}
-          onDelete={(id) => {
-            void MacroService.Delete(Number(id)).then(() => {
-              void reload().catch((error: unknown) => {
-                logger.error('reload macros after delete failed', error)
-              })
-            }).catch((error: unknown) => {
-              toast(t('删除宏失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
-            })
+          onDelete={async (id) => {
+            try {
+              setActionError('')
+              await MacroService.Delete(Number(id))
+              await reload()
+            } catch (error: unknown) {
+              const message = error instanceof Error ? error.message : String(error)
+              setActionError(t('删除宏失败: ${}', message))
+              logger.error('delete macro failed', error)
+              throw error instanceof Error ? error : new Error(message)
+            }
           }}
         />
       </div>
