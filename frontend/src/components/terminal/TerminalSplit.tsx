@@ -80,7 +80,7 @@ export const TerminalSplit = forwardRef<TerminalSplitHandle, Props>(function Ter
   const paneCount = leaves.length
   const requestFocus = (terminalID: string) => useAppStore.getState().requestTerminalFocus(tabID, terminalID)
   const lastUsed = (terminalID: string) => useAppStore.getState().terminalPool.get(terminalID)?.lastUsed ?? 0
-  const layoutReady = useSplitLayoutRestore({
+  const { layoutReady, restoreError, retryRestore } = useSplitLayoutRestore({
     tabID, sessionId, connectionKind, serialPortId, primaryID,
     operationRef, mountedRef, setTree, setBusy, requestFocus,
   })
@@ -88,9 +88,10 @@ export const TerminalSplit = forwardRef<TerminalSplitHandle, Props>(function Ter
   useEffect(() => { onStateChange?.({ paneCount, busy }) }, [busy, onStateChange, paneCount])
 
   useEffect(() => {
-    if (!layoutReady) return
+    // Keep the saved multi-pane snapshot until restore succeeds; otherwise retry is impossible.
+    if (!layoutReady || restoreError) return
     persistTabSplitLayout(tabID, tree, primaryID, connectionKind)
-  }, [tabID, tree, primaryID, connectionKind, layoutReady])
+  }, [tabID, tree, primaryID, connectionKind, layoutReady, restoreError])
 
   const reconnectPaneRef = useRef<(terminalID: string) => Promise<void>>(async () => {})
 
@@ -253,7 +254,16 @@ export const TerminalSplit = forwardRef<TerminalSplitHandle, Props>(function Ter
 
   reconnectPaneRef.current = reconnectPane
 
-  return <div className="relative flex h-full w-full min-h-0 min-w-0 flex-1">
+  return <div className="relative flex h-full w-full min-h-0 min-w-0 flex-1 flex-col">
+    {restoreError ? (
+      <div role="alert" className="z-20 flex shrink-0 items-center justify-between gap-2 border-b border-destructive/30 bg-destructive/10 px-3 py-1.5 text-xs text-destructive">
+        <span className="min-w-0 truncate">{t('恢复分屏布局失败: ${}', restoreError)}</span>
+        <button type="button" aria-label={t('重试')} className="shrink-0 rounded-md border border-border bg-background px-2 py-0.5 text-foreground hover:bg-muted" onClick={retryRestore} disabled={busy}>
+          {t('重试')}
+        </button>
+      </div>
+    ) : null}
+    <div className="relative flex min-h-0 min-w-0 flex-1">
     <div ref={stagingRef} className="pointer-events-none absolute h-0 w-0 overflow-hidden opacity-0" aria-hidden="true" />
     <SplitTreeView
       node={tree}
@@ -283,5 +293,6 @@ export const TerminalSplit = forwardRef<TerminalSplitHandle, Props>(function Ter
         leaf.id,
       )
     })}
+    </div>
   </div>
 })
