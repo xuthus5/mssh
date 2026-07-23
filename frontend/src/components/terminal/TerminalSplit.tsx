@@ -126,12 +126,23 @@ export const TerminalSplit = forwardRef<TerminalSplitHandle, Props>(function Ter
 
   const registerSlot = useCallback((leafID: string, terminalID: string, slot: HTMLDivElement | null) => {
     const host = ensurePaneHost(hostsRef.current, leafID, terminalID)
+    let moved = false
     if (slot) {
-      if (host.parentElement !== slot) slot.appendChild(host)
-      return
+      if (host.parentElement !== slot) {
+        slot.appendChild(host)
+        moved = true
+      }
+    } else {
+      const staging = stagingRef.current
+      if (staging && host.parentElement !== staging) {
+        staging.appendChild(host)
+        moved = true
+      }
     }
-    const staging = stagingRef.current
-    if (staging && host.parentElement !== staging) staging.appendChild(host)
+    // Reparenting can leave xterm/WebGL at zero size or with a lost GL context.
+    if (moved) {
+      window.dispatchEvent(new CustomEvent('mssh:terminal-host-moved', { detail: { terminalID } }))
+    }
   }, [])
 
   const split = async (direction: SplitDirection) => {

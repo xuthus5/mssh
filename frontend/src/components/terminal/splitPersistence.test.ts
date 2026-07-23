@@ -35,9 +35,10 @@ describe('splitPersistence', () => {
     persistTabSplitLayout('tab-1', tree, 'primary', 'ssh')
     expect(useAppStore.getState().tabs[0]).toMatchObject({
       splitLayout: { paneCount: 2 },
+      splitPaneIDs: ['primary', 'second'],
     })
     persistTabSplitLayout('tab-1', tree, 'primary', 'serial')
-    expect(useAppStore.getState().tabs[0]).toMatchObject({ splitLayout: null })
+    expect(useAppStore.getState().tabs[0]).toMatchObject({ splitLayout: null, splitPaneIDs: ['primary', 'second'] })
   })
 
   it('opens extra panes then materializes roles', async () => {

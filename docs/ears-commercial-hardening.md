@@ -408,3 +408,11 @@
 | AI-CTX-001 | 前端 `captureTerminalContext` 必须在行数截断后，再按 `security.max_output_bytes` 做 UTF-8 字节截断（保留尾部上下文）。 | done |
 | AI-CTX-002 | 后端 `Chat` 在脱敏后必须对终端上下文应用 `clampAITextBytes`，并在拼接会话/系统摘要后再次截断，防止绕过。 | done |
 | AI-CTX-003 | 字节截断不得拆分 UTF-8 码点；超预算时从头部丢弃整 rune。 | done |
+
+## 2026-07-23 商用硬化波次（分屏次级窗格池保护与 reparent 恢复）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| TERM-SPLIT-POOL-001 | 标签分屏树中的全部 live 终端 ID（含本地 Shell 次级窗格）必须纳入 protectedTerminalIDs，不得被终端池当作 orphan 静默回收。 | done |
+| TERM-SPLIT-POOL-002 | persistTabSplitLayout 必须同步写入 splitPaneIDs，随树变化更新。 | done |
+| TERM-SPLIT-POOL-003 | 分屏槽位 reparent 后必须触发 xterm fit/renderer 恢复，避免旧窗格空白不可操作。 | done |

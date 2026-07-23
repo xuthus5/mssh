@@ -18,6 +18,8 @@ export interface TerminalTab {
   toolPanel?: 'files' | 'history' | 'system' | 'ai' | null
   /** Durable split topology (roles only); runtime terminal IDs stay out of persistence. */
   splitLayout?: import('@/components/terminal/splitLayout').SplitLayoutSnapshot | null
+  /** Live secondary/primary terminal IDs currently mounted in this tab's split tree. */
+  splitPaneIDs?: string[]
 }
 
 export interface PlaybackTab {
@@ -132,7 +134,7 @@ export interface AppState {
   removeTabLocal: (id: string) => void
   replaceTerminalConnection: (tabID: string, previousTerminalID: string, nextTerminalID: string) => boolean
   promoteTerminalConnection: (tabID: string, previousTerminalID: string, nextTerminalID: string) => boolean
-  updateTerminalWorkspace: (tabID: string, updates: Pick<Partial<TerminalTab>, 'toolPanel' | 'splitLayout'>) => void
+  updateTerminalWorkspace: (tabID: string, updates: Pick<Partial<TerminalTab>, 'toolPanel' | 'splitLayout' | 'splitPaneIDs'>) => void
   activateWorkspace: (id: WorkspaceID) => void
   setOverviewSection: (section: OverviewSection) => void
   leaveOverview: () => void
