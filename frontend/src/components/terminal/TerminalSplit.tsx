@@ -30,6 +30,7 @@ import {
 } from '@/components/terminal/splitPersistence'
 import { t } from '@/i18n'
 import { useSplitLayoutRestore } from '@/components/terminal/useSplitLayoutRestore'
+import { RECONNECT_SPLIT_PANE_EVENT, type ReconnectSplitPaneDetail } from '@/hooks/sessionReconnect'
 
 const MAX_PANES = 8
 const noFocusRequest: TerminalFocusRequest = { sequence: 0, targetTerminalID: null }
@@ -90,6 +91,19 @@ export const TerminalSplit = forwardRef<TerminalSplitHandle, Props>(function Ter
     if (!layoutReady) return
     persistTabSplitLayout(tabID, tree, primaryID, connectionKind)
   }, [tabID, tree, primaryID, connectionKind, layoutReady])
+
+  const reconnectPaneRef = useRef<(terminalID: string) => Promise<void>>(async () => {})
+
+  useEffect(() => {
+    const onReconnectSplit = (event: Event) => {
+      const detail = (event as CustomEvent<ReconnectSplitPaneDetail>).detail
+      if (!detail || detail.tabID !== tabID) return
+      if (!hasTerminal(treeRef.current, detail.terminalID)) return
+      void reconnectPaneRef.current(detail.terminalID)
+    }
+    window.addEventListener(RECONNECT_SPLIT_PANE_EVENT, onReconnectSplit)
+    return () => window.removeEventListener(RECONNECT_SPLIT_PANE_EVENT, onReconnectSplit)
+  }, [tabID])
 
   useEffect(() => {
     if (!primaryID) return
@@ -236,6 +250,8 @@ export const TerminalSplit = forwardRef<TerminalSplitHandle, Props>(function Ter
     }
     void closePane(terminalID)
   }
+
+  reconnectPaneRef.current = reconnectPane
 
   return <div className="relative flex h-full w-full min-h-0 min-w-0 flex-1">
     <div ref={stagingRef} className="pointer-events-none absolute h-0 w-0 overflow-hidden opacity-0" aria-hidden="true" />
