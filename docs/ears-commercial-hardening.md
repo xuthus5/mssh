@@ -594,3 +594,9 @@
 | SEC-SESSION-014 | sessionForConnect 必须拒绝 id<=0。 | done |
 | SEC-SFTP-010 | FileService.connect 必须拒绝 sessionID<=0。 | done |
 | SEC-LOG-011 | LogService.List(sessionID) 若提供必须 >=0（0=本地/无会话日志，负值拒绝）。 | done |
+
+## 2026-07-23 商用硬化波次（分屏布局恢复可见错误）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| UX-SPLIT-010 | 持久化分屏布局恢复失败必须 toast 并给出错误信息。 | done |
