@@ -372,3 +372,25 @@ func TestSecurityService_SavePreferencesAndAutoUnlock(t *testing.T) {
 	require.NoError(t, svc.TryAutoUnlock())
 	require.NoError(t, runtime.RequireUnlocked())
 }
+
+func TestSecurityAfterUnlockHook(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	dir := t.TempDir()
+	runtime := NewCryptoRuntime()
+	svc := NewSecurityService(db, dir, runtime, &memoryKeychain{}, testutil.NewTestLogger())
+	calls := 0
+	svc.SetAfterUnlock(func() { calls++ })
+	_, err := svc.Setup(model.SecuritySetupInput{Password: "initial-pass-12", RememberUnlock: false})
+	require.NoError(t, err)
+	assert.Equal(t, 1, calls)
+
+	_, err = svc.Lock()
+	require.NoError(t, err)
+	_, err = svc.Unlock(model.SecurityUnlockInput{Password: "initial-pass-12", RememberUnlock: false})
+	require.NoError(t, err)
+	assert.Equal(t, 2, calls)
+
+	_, err = svc.Rotate(model.SecurityRotateInput{CurrentPassword: "initial-pass-12", NewPassword: "rotated-pass-12"})
+	require.NoError(t, err)
+	assert.Equal(t, 3, calls)
+}
