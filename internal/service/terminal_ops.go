@@ -3,11 +3,46 @@ package service
 import (
 	"fmt"
 	"time"
+	"unicode/utf8"
 
 	"github.com/xuthus5/mssh/pkg/event"
 )
 
+// Single Write payload bound for user input / paste via IPC. Matches pending output cap.
+const maxTerminalWriteBytes = 1 << 20
+
+// PTY geometry bounds accepted from the frontend Resize path.
+const (
+	minTerminalCols = 1
+	minTerminalRows = 1
+	maxTerminalCols = 1000
+	maxTerminalRows = 500
+)
+
+func validateTerminalWrite(data string) error {
+	if len(data) > maxTerminalWriteBytes {
+		return fmt.Errorf("terminal write exceeds %d bytes", maxTerminalWriteBytes)
+	}
+	if !utf8.ValidString(data) {
+		return fmt.Errorf("terminal write must be valid UTF-8")
+	}
+	return nil
+}
+
+func validateTerminalSize(cols, rows int) error {
+	if cols < minTerminalCols || cols > maxTerminalCols {
+		return fmt.Errorf("terminal cols must be between %d and %d", minTerminalCols, maxTerminalCols)
+	}
+	if rows < minTerminalRows || rows > maxTerminalRows {
+		return fmt.Errorf("terminal rows must be between %d and %d", minTerminalRows, maxTerminalRows)
+	}
+	return nil
+}
+
 func (t *TerminalService) Write(terminalID string, data string) (int, error) {
+	if err := validateTerminalWrite(data); err != nil {
+		return 0, err
+	}
 	t.logger.Debug("writing to terminal", "terminalID", terminalID, "len", len(data))
 	t.mu.RLock()
 	pty, ok := t.ptys[terminalID]
@@ -24,6 +59,9 @@ func (t *TerminalService) Write(terminalID string, data string) (int, error) {
 }
 
 func (t *TerminalService) Resize(terminalID string, cols, rows int) error {
+	if err := validateTerminalSize(cols, rows); err != nil {
+		return err
+	}
 	t.logger.Info("resizing terminal", "terminalID", terminalID, "cols", cols, "rows", rows)
 	t.mu.RLock()
 	pty, ok := t.ptys[terminalID]
