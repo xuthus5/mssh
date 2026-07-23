@@ -2,6 +2,7 @@ import { useCallback } from 'react'
 import { SettingsView, type SettingsViewProps } from '@/components/settings/SettingsView'
 import { SettingsWindowTitleBar } from '@/components/settings/SettingsWindowTitleBar'
 import { ToastContainer } from '@/components/ui/toast'
+import { ConfirmDialogHost } from '@/components/confirm/ConfirmDialogHost'
 import { useSettings } from '@/hooks/useSettings'
 import { useCloudSyncCenter } from '@/hooks/useCloudSyncCenter'
 import { useThemeCatalog } from '@/hooks/useThemeCatalog'
@@ -58,6 +59,7 @@ function SettingsWindowContent() {
       <SettingsWindowTitleBar />
       <SettingsView {...settingsViewProps(settings, catalog, cloudSync, ai, saveGeneralQuiet, saveSFTPQuiet, saveThemeQuiet)} />
       <ToastContainer />
+      <ConfirmDialogHost />
     </div>
   )
 }
