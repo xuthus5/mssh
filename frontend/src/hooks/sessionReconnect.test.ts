@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { markIntentionalDisconnect, maybeAutoReconnectTerminal, reconnectSessionTab } from '@/hooks/sessionReconnect'
 import { DEFAULT_TERMINAL_BEHAVIOR, useTerminalBehaviorStore } from '@/store/terminalBehaviorStore'
 import { logger } from '@/lib/logger'
+import { useToastStore } from '@/components/ui/toast'
 import { useConnectDialog } from '@/store/connectDialog'
 import { useAppStore } from '@/store/appStore'
 import { __clearHandlers, __registerHandler } from '@/test/__mocks__/wails-runtime'
@@ -36,6 +37,7 @@ describe('reconnectSessionTab', () => {
     useAppStore.setState({ replaceTerminalConnection })
     useConnectDialog.setState({ open: false, state: 'idle', attemptId: '', error: '', fingerprint: '', algorithm: '' })
     useTerminalBehaviorStore.setState({ ...DEFAULT_TERMINAL_BEHAVIOR, autoReconnect: false })
+    useToastStore.setState({ toasts: [] })
   })
 
   it('ignores missing and already connecting terminal targets', async () => {
@@ -145,6 +147,14 @@ describe('reconnectSessionTab', () => {
     const tab = useAppStore.getState().tabs.find((item) => item.id === 'tab-local')
     expect(tab).toMatchObject({ terminalId: 'term-local-new', connectionKind: 'local' })
     expect(useAppStore.getState().connectionStatus['term-local-new']).toBe('connected')
+  })
+
+  it('toasts after final reconnect failure', async () => {
+    const open = vi.fn(async () => { throw new Error('reconnect boom') })
+    __registerHandler(service + 'Open', open)
+    await reconnectSessionTab('tab-1', sessions)
+    expect(useAppStore.getState().connectionStatus['term-old']).toBe('error')
+    expect(useToastStore.getState().toasts.some((item) => item.message.includes('reconnect boom'))).toBe(true)
   })
 })
 

@@ -33,7 +33,10 @@ export function SessionBatchActions({ selectedIDs, onBatchConnect, onBatchExecut
   useEffect(() => {
     let current = true
     void MacroService.List().then((items) => { if (current) setMacros(items ?? []) })
-      .catch((error) => { if (current) loggerSafe(error) })
+      .catch((error) => {
+        if (!current) return
+        toast(t('加载宏失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
+      })
     return () => { current = false }
   }, [])
 
@@ -45,7 +48,11 @@ export function SessionBatchActions({ selectedIDs, onBatchConnect, onBatchExecut
     let current = true
     void SessionService.SessionsDeleteImpact(selectedIDs.map(Number))
       .then((value) => { if (current) setDeleteImpact(value ? { tunnels: value.tunnels, history: value.history, recordings: value.recordings } : { tunnels: 0, history: 0, recordings: 0 }) })
-      .catch(() => { if (current) setDeleteImpact({ tunnels: 0, history: 0, recordings: 0 }) })
+      .catch((error) => {
+        if (!current) return
+        setDeleteImpact({ tunnels: 0, history: 0, recordings: 0 })
+        toast(t('分析删除影响失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
+      })
     return () => { current = false }
   }, [pendingAction, selectedIDs])
 
@@ -81,10 +88,6 @@ export function SessionBatchActions({ selectedIDs, onBatchConnect, onBatchExecut
   </>
 }
 
-function loggerSafe(error: unknown) {
-  // Macro list failure should not block other batch actions.
-  void error
-}
 
 function BatchConfirmation({ action, count, executing, deleteImpact, onOpenChange, onConfirm }: { action: PendingAction | null; count: number; executing: boolean; deleteImpact: { tunnels: number; history: number; recordings: number } | null; onOpenChange: (open: boolean) => void; onConfirm: () => void }) {
   const operation = action?.type === 'macro'

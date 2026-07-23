@@ -39,7 +39,11 @@ export function useSessionCSVImportDialog(
       const nextProvider = detectSessionCSVProvider(nextPreview.headers)
       setPath(selectedPath); setPreview(nextPreview); setProvider(nextProvider)
       setMapping(buildSessionCSVMapping(nextProvider, nextPreview.headers)); setDefaults(sessionCSVDefaults())
-    } catch (reason) { setError(errorMessage(reason)) } finally { setPending(false) }
+    } catch (reason) {
+      const message = errorMessage(reason)
+      setError(message)
+      toast(t('预览会话 CSV 失败: ${}', message), 'error')
+    } finally { setPending(false) }
   }
   const applyProvider = (nextProvider: SessionCSVProvider) => {
     if (!preview) return
@@ -51,7 +55,11 @@ export function useSessionCSVImportDialog(
     try {
       const result = await onImport({ path, conflictPolicy: policy, headerMapping: mapping, defaultValues: defaults })
       setSummary(result); toast(t('会话导入完成：新增 ${}，更新 ${}', result.imported, result.updated), result.failed > 0 ? 'info' : 'success')
-    } catch (reason) { setError(errorMessage(reason)) } finally { setPending(false) }
+    } catch (reason) {
+      const message = errorMessage(reason)
+      setError(message)
+      toast(t('导入会话 CSV 失败: ${}', message), 'error')
+    } finally { setPending(false) }
   }
   const reset = () => {
     setPolicy(SessionCSVConflictPolicy.SessionCSVConflictSkip); setProvider('custom'); setPath(''); setPreview(null)

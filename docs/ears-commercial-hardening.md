@@ -693,3 +693,14 @@
 | UX-AUDIT-010 | 审计设置加载失败必须 toast，并在面板中展示错误。 | done |
 | UX-AUDIT-011 | 审计开关切换失败必须 toast。 | done |
 | UX-AUDIT-012 | 审计日志加载失败必须 toast。 | done |
+
+## 2026-07-23 商用硬化波次（宏/密钥输入 + 批量/CSV/重连可见错误）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| SEC-MACRO-014 | Macro Execute 必须拒绝空白 command。 | done |
+| SEC-KEY-012 | Key Import 必须拒绝空白 private key。 | done |
+| UX-BATCH-010 | 批量操作宏列表失败必须 toast。 | done |
+| UX-BATCH-011 | 批量删除影响分析失败必须 toast。 | done |
+| UX-CSV-010 | 会话 CSV 预览/导入失败必须 toast 并保留对话框错误。 | done |
+| UX-RECONNECT-010 | SSH 自动重连最终失败必须 toast。 | done |

@@ -11,6 +11,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"log/slog"
+	"strings"
 
 	gossh "golang.org/x/crypto/ssh"
 
@@ -106,6 +107,9 @@ func (k *KeyService) Import(name, privateKeyPEM string) (*model.SSHKey, error) {
 	name, err := normalizedKeyName(name)
 	if err != nil {
 		return nil, fmt.Errorf("import key: %w", err)
+	}
+	if strings.TrimSpace(privateKeyPEM) == "" {
+		return nil, fmt.Errorf("import key: private key is required")
 	}
 	k.logger.Info("importing key", "name", name)
 	keyType, pubKey, err := k.extractPublicKeyWithType([]byte(privateKeyPEM))

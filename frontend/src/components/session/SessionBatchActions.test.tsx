@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/lib/wails', () => ({
   MacroService: { List: vi.fn(async () => [{ id: 3, name: '巡检', command: 'uptime\n' }]) },
@@ -10,9 +10,16 @@ vi.mock('@/lib/wails', () => ({
 }))
 
 import { SessionBatchActions } from '@/components/session/SessionBatchActions'
-import { SessionService } from '@/lib/wails'
+import { useToastStore } from '@/components/ui/toast'
+import { MacroService, SessionService } from '@/lib/wails'
 
 describe('SessionBatchActions', () => {
+  beforeEach(() => {
+    useToastStore.setState({ toasts: [] })
+    vi.mocked(MacroService.List).mockResolvedValue([{ id: 3, name: '巡检', command: 'uptime\n' }] as never)
+    vi.mocked(SessionService.SessionsDeleteImpact).mockResolvedValue({ tunnels: 2, history: 4, recordings: 1 } as never)
+  })
+
   it('confirms macro execution and reports each node result', async () => {
     const executeMacro = vi.fn(async () => [
       { sessionId: '1', name: 'one', success: true },
@@ -67,5 +74,35 @@ describe('SessionBatchActions', () => {
     expect(onBatchDelete).toHaveBeenCalledWith(['1', '2'])
     expect(onComplete).toHaveBeenCalled()
     expect(await screen.findByText('成功 2 项，失败 0 项。')).toBeInTheDocument()
+  })
+
+  it('toasts macro list failures', async () => {
+    vi.mocked(MacroService.List).mockRejectedValueOnce(new Error('macro list failed'))
+    render(
+      <SessionBatchActions
+        selectedIDs={['1']}
+        onBatchConnect={vi.fn(async () => [])}
+        onBatchExecuteMacro={vi.fn(async () => [])}
+        onBatchDelete={vi.fn(async () => [])}
+        onComplete={vi.fn()}
+      />,
+    )
+    await waitFor(() => expect(useToastStore.getState().toasts.some((item) => item.message.includes('macro list failed'))).toBe(true))
+  })
+
+  it('toasts delete impact failures', async () => {
+    vi.mocked(SessionService.SessionsDeleteImpact).mockRejectedValueOnce(new Error('impact failed'))
+    const user = userEvent.setup()
+    render(
+      <SessionBatchActions
+        selectedIDs={['1', '2']}
+        onBatchConnect={vi.fn(async () => [])}
+        onBatchExecuteMacro={vi.fn(async () => [])}
+        onBatchDelete={vi.fn(async () => [])}
+        onComplete={vi.fn()}
+      />,
+    )
+    await user.click(screen.getByRole('button', { name: /批量删除/ }))
+    await waitFor(() => expect(useToastStore.getState().toasts.some((item) => item.message.includes('impact failed'))).toBe(true))
   })
 })
