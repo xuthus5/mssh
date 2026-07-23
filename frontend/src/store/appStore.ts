@@ -122,6 +122,9 @@ export interface AppState {
   transfers: TransferJob[]
   transfersLoadError: string
   transferCenterOpen: boolean
+  workspaceRestoreError: string
+  workspaceRestoreNotice: string
+  workspaceRestoreNonce: number
   activePaneId: string | null
   recordingState: Record<string, 'idle' | 'starting' | 'recording' | 'stopping' | 'error'>
   tunnelState: Record<string, 'running' | 'stopped'>
@@ -131,6 +134,9 @@ export interface AppState {
   clearFinishedTransfers: () => void
   setTransfersLoadError: (error: string) => void
   setTransferCenterOpen: (open: boolean) => void
+  setWorkspaceRestoreError: (error: string) => void
+  setWorkspaceRestoreNotice: (notice: string) => void
+  retryWorkspaceRestore: () => void
   openTab: (tab: Tab) => void
   closeTab: (id: string) => Promise<void>
   removeTabLocal: (id: string) => void
@@ -176,6 +182,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   transfers: [],
   transfersLoadError: '',
   transferCenterOpen: false,
+  workspaceRestoreError: '',
+  workspaceRestoreNotice: '',
+  workspaceRestoreNonce: 0,
   activePaneId: null,
   recordingState: {},
   tunnelState: {},

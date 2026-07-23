@@ -15,7 +15,7 @@ import { SESSION_QUICK_SEARCH_EVENT } from '@/lib/sessionQuickSearch'
 import { APP_NEW_LOCAL_TERMINAL_EVENT, APP_NEW_SESSION_EVENT, emitAppEvent, onAppEvent } from '@/lib/appEvents'
 import { openLocalTerminal } from '@/lib/openLocalTerminal'
 import { GeneralSettingsRuntime } from '@/components/layout/GeneralSettingsRuntime'
-import { WorkspacePersistence } from '@/components/layout/WorkspacePersistence'
+import { WorkspacePersistence, WorkspaceRestoreBanner } from '@/components/layout/WorkspacePersistence'
 import { createAppSyncDataReload, hotReloadSessionWorkspace, registerSyncDataReload } from '@/lib/syncDataReload'
 import { getClipboard } from '@/lib/clipboard'
 import { t } from '@/i18n'
@@ -143,6 +143,7 @@ function AppShell() {
       <div className="flex min-h-0 flex-1">
         <div className={activeSurface === null ? 'hidden' : 'contents'}><Sidebar /></div>
         <main className="relative flex min-w-0 flex-1 flex-col">
+          <WorkspaceRestoreBanner />
           <WorkspaceContent />
           <TerminalLayers />
         </main>
