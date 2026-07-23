@@ -103,8 +103,9 @@ function subscribeToTheme({ term, fitAddon, containerRef, refs, reportRuntimeErr
     if (state.terminalTheme !== previous.terminalTheme) {
       runTerminalRuntime(reportRuntimeError, 'terminal theme update', () => {
         applyTerminalTheme(term.options, state.terminalTheme)
-        if (!refs.activeRef.current || !fitAndRefresh(term, fitAddon, containerRef.current)) {
-          refs.recoveryPendingRef.current = true
+        // Inactive split panes still need a visual refresh after theme changes.
+        if (!fitAndRefresh(term, fitAddon, containerRef.current)) {
+          if (refs.activeRef.current) refs.recoveryPendingRef.current = true
           return
         }
         refs.recoveryPendingRef.current = false
