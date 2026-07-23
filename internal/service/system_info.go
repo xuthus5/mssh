@@ -54,6 +54,9 @@ func waitSystemProbe(run func() ([]byte, error), cancel func() error) ([]byte, e
 }
 
 func (t *TerminalService) SystemInfo(terminalID string) (*model.SystemInfo, error) {
+	if err := validateTerminalID(terminalID); err != nil {
+		return nil, err
+	}
 	wrapper, err := t.systemInfoClient(terminalID)
 	if err != nil {
 		return nil, err

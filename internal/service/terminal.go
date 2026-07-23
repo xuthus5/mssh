@@ -74,6 +74,9 @@ func NewTerminalService(sessionSvc *SessionService, eventBus EventBus, maxSize i
 }
 
 func (t *TerminalService) Open(ctx context.Context, sessionID int64, cols, rows int) (string, error) {
+	if sessionID <= 0 {
+		return "", fmt.Errorf("invalid session id")
+	}
 	if err := validateTerminalSize(cols, rows); err != nil {
 		return "", err
 	}
