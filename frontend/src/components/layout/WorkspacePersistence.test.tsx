@@ -40,8 +40,10 @@ describe('WorkspacePersistence', () => {
       connectionStatus: {},
       activePaneId: null,
       workspaceRestoreError: '',
+      workspaceSaveError: '',
       workspaceRestoreNotice: '',
       workspaceRestoreNonce: 0,
+      
     })
     useTerminalBehaviorStore.setState({
       ...DEFAULT_TERMINAL_BEHAVIOR,
@@ -100,7 +102,7 @@ describe('WorkspacePersistence', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('恢复工作区失败: workspace restore failed')
   })
 
-  it('toasts workspace save failures', async () => {
+  it('surfaces workspace save failures in banner without toast', async () => {
     services.get.mockResolvedValue({
       value: JSON.stringify({
         version: 2,
@@ -111,10 +113,12 @@ describe('WorkspacePersistence', () => {
       }),
     })
     services.set.mockRejectedValueOnce(new Error('workspace save failed'))
-    render(<WorkspacePersistence />)
+    render(<><WorkspacePersistence /><WorkspaceRestoreBanner /></>)
     await waitFor(() => expect(services.get).toHaveBeenCalled())
     act(() => useAppStore.setState({ workspaceTab: 'macros' }))
-    await waitFor(() => expect(useToastStore.getState().toasts.some((item) => item.message.includes('workspace save failed'))).toBe(true), { timeout: 1000 })
+    await waitFor(() => expect(useAppStore.getState().workspaceSaveError).toBe('workspace save failed'), { timeout: 1000 })
+    expect(await screen.findByRole('alert')).toHaveTextContent('保存工作区失败: workspace save failed')
+    expect(useToastStore.getState().toasts.filter((item) => item.type === 'error')).toHaveLength(0)
   })
 
   it('skips restoring terminal tabs when restore-on-startup is disabled', async () => {
@@ -128,8 +132,10 @@ describe('WorkspacePersistence', () => {
       connectionStatus: {},
       activePaneId: null,
       workspaceRestoreError: '',
+      workspaceSaveError: '',
       workspaceRestoreNotice: '',
       workspaceRestoreNonce: 0,
+      
     })
     useTerminalBehaviorStore.setState({
       ...DEFAULT_TERMINAL_BEHAVIOR,

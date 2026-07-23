@@ -1282,3 +1282,15 @@
 | ID | 验收条件 | 状态 |
 |---|---|---|
 | UX-KEY-135 | 密钥列表复制公钥失败仅 KeyManager 面板 inline alert，不得 error toast；成功可 toast。 | done |
+
+## 2026-07-24 商用硬化波次（工作区保存错误归属）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| UX-WS-136 | 工作区布局自动保存失败时仅主内容区 banner 展示（可关闭），不得 toast；与恢复失败 banner 同一固定表面。 | done |
+
+## 2026-07-24 商用硬化波次（appStore 状态动作拆分）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| UX-ENG-137 | `appStoreActions.ts` 提取 `appStoreStatusActions.ts` 保持 ≤300 行，并为 workspaceSaveError 提供空间。 | done |
