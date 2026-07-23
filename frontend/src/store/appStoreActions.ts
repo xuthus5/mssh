@@ -16,6 +16,7 @@ import { selectTerminalPoolEvictionID } from '@/store/terminalPool'
 import { applyTerminalPoolEviction } from '@/store/terminalPoolReclaim'
 import { canTransitionConnection } from '@/store/connectionStatus'
 import { markIntentionalDisconnect } from '@/hooks/sessionReconnect'
+import { rewriteSplitPaneIDs, scrubTerminalRuntime, terminalTabPaneIDs } from '@/store/terminalTabPanes'
 
 type StoreSet = StoreApi<AppState>['setState']
 type StoreGet = StoreApi<AppState>['getState']
@@ -35,44 +36,35 @@ function openTabState(state: AppState, tab: Tab): Partial<AppState> {
   return { tabs: [...state.tabs, tab], activeSurface: surfaceForTab(tab) }
 }
 
+async function closeTerminalPane(terminalID: string) {
+  try {
+    await TerminalService.Close(terminalID)
+  } catch (error: unknown) {
+    if (!isTerminalNotFoundError(error)) {
+      logger.error('closeTab: close terminal error', error)
+      throw error
+    }
+  }
+}
+
 async function closeTab(get: StoreGet, id: string) {
   const tab = get().tabs.find((item) => item.id === id)
   if (tab?.type === 'terminal') {
-    markIntentionalDisconnect(tab.terminalId)
-    try {
-      await TerminalService.Close(tab.terminalId)
-    } catch (error: unknown) {
-      if (!isTerminalNotFoundError(error)) {
-        logger.error('closeTab: close terminal error', error)
-        throw error
-      }
-    }
+    const paneIDs = terminalTabPaneIDs(tab)
+    for (const paneID of paneIDs) markIntentionalDisconnect(paneID)
+    for (const paneID of paneIDs) await closeTerminalPane(paneID)
   }
   get().removeTabLocal(id)
 }
 
 function removeTabState(state: AppState, id: string): Partial<AppState> {
   const tab = state.tabs.find((item) => item.id === id)
-  const terminalID = tab?.type === 'terminal' ? tab.terminalId : undefined
+  const paneIDs = tab?.type === 'terminal' ? terminalTabPaneIDs(tab) : []
   const activeSurface = state.activeSurface?.id === id ? fallbackAfterClose(state.tabs, id) : state.activeSurface
   const workspaceTab = workspaceTabForSurface(activeSurface, state.workspaceTab)
   const tabs = state.tabs.filter((item) => item.id !== id)
-  if (!terminalID) return { tabs, activeSurface, workspaceTab }
-  const terminalPool = new Map(state.terminalPool)
-  terminalPool.delete(terminalID)
-  const connectionStatus = { ...state.connectionStatus }
-  delete connectionStatus[terminalID]
-  const recordingState = { ...state.recordingState }
-  delete recordingState[terminalID]
-  return {
-    tabs,
-    terminalPool,
-    connectionStatus,
-    recordingState,
-    activePaneId: state.activePaneId === terminalID ? null : state.activePaneId,
-    activeSurface,
-    workspaceTab,
-  }
+  if (paneIDs.length === 0) return { tabs, activeSurface, workspaceTab }
+  return { tabs, ...scrubTerminalRuntime(state, paneIDs), activeSurface, workspaceTab }
 }
 
 function replaceTerminalConnectionState(state: AppState, tabID: string, previousTerminalID: string, nextTerminalID: string): Partial<AppState> {
@@ -88,8 +80,11 @@ function replaceTerminalConnectionState(state: AppState, tabID: string, previous
   const recordingState = { ...state.recordingState }
   delete recordingState[previousTerminalID]
   const active = state.activeSurface?.type === 'terminal' && state.activeSurface.id === tabID
+  const splitPaneIDs = rewriteSplitPaneIDs(tab.splitPaneIDs, previousTerminalID, nextTerminalID)
   return {
-    tabs: state.tabs.map((item) => item.id === tabID && item.type === 'terminal' ? { ...item, terminalId: nextTerminalID } : item),
+    tabs: state.tabs.map((item) => item.id === tabID && item.type === 'terminal'
+      ? { ...item, terminalId: nextTerminalID, ...(splitPaneIDs !== undefined ? { splitPaneIDs } : {}) }
+      : item),
     terminalPool,
     connectionStatus,
     recordingState,
@@ -109,8 +104,11 @@ function promoteTerminalConnectionState(state: AppState, tabID: string, previous
   delete connectionStatus[previousTerminalID]
   const recordingState = { ...state.recordingState }
   delete recordingState[previousTerminalID]
+  const splitPaneIDs = rewriteSplitPaneIDs(tab.splitPaneIDs, previousTerminalID, nextTerminalID)
   return {
-    tabs: state.tabs.map((item) => item.id === tabID && item.type === 'terminal' ? { ...item, terminalId: nextTerminalID } : item),
+    tabs: state.tabs.map((item) => item.id === tabID && item.type === 'terminal'
+      ? { ...item, terminalId: nextTerminalID, ...(splitPaneIDs !== undefined ? { splitPaneIDs } : {}) }
+      : item),
     terminalPool,
     connectionStatus,
     recordingState,

@@ -424,3 +424,12 @@
 | SEC-SERIAL-001 | 创建/更新串口配置时必须拒绝空路径、NUL、超长路径。 | done |
 | SEC-SERIAL-002 | Unix 串口设备路径必须为绝对路径且位于允许前缀（/dev/tty*、/dev/cu.*、/dev/serial/、/dev/pts/、/dev/rfcomm*）。 | done |
 | SEC-SERIAL-003 | Windows 串口设备必须规范为 COM 端口形式。 | done |
+
+## 2026-07-23 商用硬化波次（分屏 pane 生命周期闭环）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| TERM-SPLIT-POOL-004 | 关闭标签时必须关闭并清理全部 splitPaneIDs（含次级窗格），不得只关闭 primary 导致后端会话泄漏。 | done |
+| TERM-SPLIT-POOL-005 | replace/promote primary 与次级窗格 reconnect 时必须同步 rewrite splitPaneIDs，避免 protected 集合残留 stale ID 或漏保护新 ID。 | done |
+| TERM-SPLIT-POOL-006 | removeTabLocal 必须 scrub 全部 pane 的 terminalPool/connectionStatus/recordingState/activePane。 | done |
+
