@@ -115,7 +115,9 @@ export default function SessionDialog({ open, onOpenChange, session, folders, en
         keepAlive: Math.max(0, Number.parseInt(keepAlive, 10) || 0), termType: termType.trim() || 'xterm-256color', folderId: folderId || null,
       })
     } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : String(err))
+      const message = err instanceof Error ? err.message : String(err)
+      setSubmitError(message)
+      toast(t('保存会话失败: ${}', message), 'error')
     } finally {
       setPending(false)
     }

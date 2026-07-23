@@ -10,6 +10,7 @@ import { Textarea } from '@/components/ui/textarea'
 import type { AssetColorToken, AssetEnvironment, AssetProject, AssetTag } from '@/hooks/useSession'
 import { ASSET_COLOR_OPTIONS } from '@/lib/assetColors'
 import { AssetCatalogService } from '@/lib/wails'
+import { toast } from '@/components/ui/toast'
 import { t } from '@/i18n'
 
 
@@ -50,7 +51,11 @@ export function SessionAssetCatalogEditor(props: EditorProps) {
     try {
       await saveCatalog(props, target, { name: name.trim(), code: code.trim(), description: description.trim(), color })
       props.onOpenChange(false)
-    } catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)) }
+    } catch (reason) {
+      const message = reason instanceof Error ? reason.message : String(reason)
+      setError(message)
+      toast(t('保存资产分类失败: ${}', message), 'error')
+    }
     finally { setPending(false) }
   }
   const noun = target?.kind === 'environment' ? t('环境') : target?.kind === 'project' ? t('项目') : t('标签')
@@ -98,7 +103,11 @@ export function SessionAssetCatalogDeleteDialog(props: DeleteProps) {
     setMode(props.target.kind === 'tag' || alternatives.length === 0 ? 'clear' : 'migrate')
     const load = props.target.kind === 'environment' ? AssetCatalogService.EnvironmentDeleteImpact
       : props.target.kind === 'project' ? AssetCatalogService.ProjectDeleteImpact : AssetCatalogService.TagDeleteImpact
-    void load(Number(props.target.item.id)).then((value) => setImpact(value ? { name: value.name, session_count: value.session_count } : null)).catch((reason) => setError(reason instanceof Error ? reason.message : String(reason)))
+    void load(Number(props.target.item.id)).then((value) => setImpact(value ? { name: value.name, session_count: value.session_count } : null)).catch((reason) => {
+      const message = reason instanceof Error ? reason.message : String(reason)
+      setError(message)
+      toast(t('加载删除影响失败: ${}', message), 'error')
+    })
   }, [props.target])
   const submit = async () => {
     if (!props.target) return
@@ -108,7 +117,11 @@ export function SessionAssetCatalogDeleteDialog(props: DeleteProps) {
       else if (props.target.kind === 'project') await props.onDeleteProject(props.target.item.id, mode, replacementID || null)
       else await props.onDeleteTag(props.target.item.id)
       props.onOpenChange(false)
-    } catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)) }
+    } catch (reason) {
+      const message = reason instanceof Error ? reason.message : String(reason)
+      setError(message)
+      toast(t('删除资产分类失败: ${}', message), 'error')
+    }
     finally { setPending(false) }
   }
   const isTag = props.target?.kind === 'tag'

@@ -1,9 +1,14 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { SessionAssetBulkBar } from '@/components/session/SessionAssetBulkBar'
+import { useToastStore } from '@/components/ui/toast'
 
 describe('SessionAssetBulkBar', () => {
+  beforeEach(() => {
+    useToastStore.setState({ toasts: [] })
+  })
+
   it('confirms the target count and clears environments transactionally', async () => {
     const setEnvironment = vi.fn(async () => 2)
     const clear = vi.fn()
@@ -22,6 +27,7 @@ describe('SessionAssetBulkBar', () => {
     await userEvent.click(screen.getByRole('button', { name: '项目' }))
     await userEvent.click(screen.getByRole('button', { name: '确认更新 1 个会话' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('事务回滚')
+    expect(useToastStore.getState().toasts.some((item) => item.message.includes('事务回滚'))).toBe(true)
     expect(clear).not.toHaveBeenCalled()
   })
 
