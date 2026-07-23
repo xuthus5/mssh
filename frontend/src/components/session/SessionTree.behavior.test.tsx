@@ -93,3 +93,12 @@ describe('SessionTree behavior', () => {
   })
 
 })
+
+  it('swallows moveToFolder rejections from context actions', async () => {
+    const user = userEvent.setup()
+    const onMoveToFolder = vi.fn(async () => { throw new Error('move failed') })
+    render(<SessionTree folders={folders} sessions={[sessions[0]]} onConnect={vi.fn()} onMoveToFolder={onMoveToFolder} revealAll />)
+    await user.click(screen.getByRole('button', { name: '生产环境' }))
+    expect(onMoveToFolder).toHaveBeenCalledWith('s1', 'f1')
+  })
+

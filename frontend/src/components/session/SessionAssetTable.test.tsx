@@ -1,9 +1,21 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import React from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { SessionAssetDetailPanel } from '@/components/session/SessionAssetDetailPanel'
 import { SessionAssetTable } from '@/components/session/SessionAssetTable'
 import type { Session } from '@/hooks/useSession'
+
+vi.mock('@/components/ui/dropdown-menu', () => ({
+  DropdownMenu: ({ children }: any) => <div>{children}</div>,
+  DropdownMenuTrigger: ({ render, children }: any) => React.cloneElement(render, {}, children),
+  DropdownMenuContent: ({ children }: any) => <div>{children}</div>,
+  DropdownMenuGroup: ({ children }: any) => <div>{children}</div>,
+  DropdownMenuItem: ({ children, onClick, disabled }: any) => <button type="button" disabled={disabled} onClick={onClick}>{children}</button>,
+  DropdownMenuSub: ({ children }: any) => <div>{children}</div>,
+  DropdownMenuSubContent: ({ children }: any) => <div>{children}</div>,
+  DropdownMenuSubTrigger: ({ children }: any) => <span>{children}</span>,
+}))
 
 const session: Session = {
   id: '1', name: '生产数据库', host: 'db.internal', port: 22, username: 'root', authMethod: 'agent', keepAlive: 30,
@@ -31,7 +43,7 @@ describe('SessionAssetTable', () => {
     expect(screen.getByText('生产')).toBeInTheDocument()
     expect(screen.getByText('PAY')).toBeInTheDocument()
     expect(screen.getByText('+1')).toBeInTheDocument()
-    expect(screen.getByText('核心分组')).toBeInTheDocument()
+    expect(screen.getAllByText('核心分组').length).toBeGreaterThan(0)
     const row = screen.getByRole('row', { name: /生产数据库/ })
     await userEvent.click(row)
     expect(props.onOpenDetail).toHaveBeenCalledWith(session)
@@ -48,6 +60,18 @@ describe('SessionAssetTable', () => {
     expect(props.onSelectionChange).toHaveBeenCalledWith(new Set(['1']))
     expect(props.onOpenDetail).not.toHaveBeenCalled()
     expect(props.onConnect).not.toHaveBeenCalled()
+  })
+
+  it('swallows move promise rejections so menu handlers stay clean', async () => {
+    const props = tableProps()
+    props.onMove = vi.fn(async () => { throw new Error('move failed') })
+    props.folders = [
+      { id: 'folder', name: '核心分组', parentId: null, isDefault: true },
+      { id: 'other', name: '备用分组', parentId: null, isDefault: false },
+    ]
+    render(<SessionAssetTable {...props} />)
+    await userEvent.click(screen.getByRole('button', { name: '备用分组' }))
+    await waitFor(() => expect(props.onMove).toHaveBeenCalledWith('1', 'other'))
   })
 })
 

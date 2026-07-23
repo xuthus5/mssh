@@ -939,3 +939,19 @@
 | UX-MACRO-021 | 侧边栏与宏工作区执行宏时，无活动终端/未连接必须 toast；成功/失败 toast 文案一致。 | done |
 | UX-MACRO-022 | 分屏场景必须向 activePane（若属于当前标签）发送宏，不得总是落到主终端。 | done |
 
+
+## 2026-07-23 商用硬化波次（会话保存失败提示去重）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| UX-SESSION-023 | 新建/编辑会话保存失败时，workspace 层 toast 一次；对话框仅展示 inline error，不重复 toast。 | done |
+| UX-SESSION-024 | 会话保存成功后必须关闭对话框，输入失败时保留表单内容便于重试。 | done |
+
+
+## 2026-07-23 商用硬化波次（会话移动 promise 安全）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| UX-SESSION-025 | 资产中心会话「移动到分组」失败时，hook toast 一次；菜单 onClick 不得产生 unhandled rejection。 | done |
+| UX-SESSION-026 | SessionTree 上下文「移动到」同样吞掉 rejection（toast 由上层 hook 负责）。 | done |
+
