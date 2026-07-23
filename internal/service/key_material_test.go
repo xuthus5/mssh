@@ -77,7 +77,7 @@ func TestKeyService_UpdateValidatesInputAndStorage(t *testing.T) {
 	require.NoError(t, err)
 
 	_, err = svc.Update(model.SSHKeyUpdateInput{Name: " ", PrivateKey: privateKey, PublicKey: publicKey})
-	assert.ErrorContains(t, err, "key name is required")
+	assert.ErrorContains(t, err, "key name must contain")
 	_, err = svc.Update(model.SSHKeyUpdateInput{Name: "invalid", PrivateKey: "not a key", PublicKey: publicKey})
 	assert.ErrorContains(t, err, "invalid PEM")
 	_, err = svc.Update(model.SSHKeyUpdateInput{ID: 999, Name: "missing", PrivateKey: privateKey, PublicKey: publicKey})
@@ -191,7 +191,7 @@ func TestKeyService_SelectImportFileErrors(t *testing.T) {
 
 func TestKeyMaterialValidationHelpers(t *testing.T) {
 	_, err := normalizedKeyName(" ")
-	assert.ErrorContains(t, err, "required")
+	assert.Error(t, err)
 	assert.Equal(t, "key name", requireNormalizedKeyName(t, " key name "))
 
 	privateKey := generateTestPrivateKeyPEM(t)
@@ -211,4 +211,27 @@ func requireNormalizedKeyName(t *testing.T, name string) string {
 	normalized, err := normalizedKeyName(name)
 	require.NoError(t, err)
 	return normalized
+}
+
+func TestNormalizedKeyNameLengthAndNUL(t *testing.T) {
+	_, err := normalizedKeyName(strings.Repeat("k", keyNameLimit+1))
+	assert.Error(t, err)
+	_, err = normalizedKeyName(string([]byte{'k', 0}))
+	assert.Error(t, err)
+	name, err := normalizedKeyName("  deploy ")
+	require.NoError(t, err)
+	assert.Equal(t, "deploy", name)
+}
+
+func TestNormalizeRSABits(t *testing.T) {
+	bits, err := normalizeRSABits(0)
+	require.NoError(t, err)
+	assert.Equal(t, defaultRSABits, bits)
+	_, err = normalizeRSABits(1024)
+	assert.Error(t, err)
+	_, err = normalizeRSABits(2049)
+	assert.Error(t, err)
+	bits, err = normalizeRSABits(4096)
+	require.NoError(t, err)
+	assert.Equal(t, 4096, bits)
 }

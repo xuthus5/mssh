@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"unicode/utf8"
 
 	gossh "golang.org/x/crypto/ssh"
 
@@ -125,10 +126,15 @@ func readPrivateKeyFile(path string) (*model.SSHKeyImportFile, error) {
 	return &model.SSHKeyImportFile{Name: filepath.Base(path), PrivateKey: string(content)}, nil
 }
 
+const keyNameLimit = 128
+
 func normalizedKeyName(name string) (string, error) {
 	name = strings.TrimSpace(name)
-	if name == "" {
-		return "", fmt.Errorf("key name is required")
+	if name == "" || utf8.RuneCountInString(name) > keyNameLimit {
+		return "", fmt.Errorf("key name must contain between 1 and %d characters", keyNameLimit)
+	}
+	if strings.ContainsRune(name, 0) {
+		return "", fmt.Errorf("key name contains NUL")
 	}
 	return name, nil
 }
@@ -157,4 +163,23 @@ func keyMaterial(key *model.SSHKey, privateKey string) *model.SSHKeyMaterial {
 		ID: key.ID, Name: key.Name, Type: key.Type, PrivateKey: privateKey,
 		PublicKey: key.PublicKey, CreatedAt: key.CreatedAt,
 	}
+}
+
+const (
+	defaultRSABits = 3072
+	minRSABits     = 2048
+	maxRSABits     = 8192
+)
+
+func normalizeRSABits(bits int) (int, error) {
+	if bits <= 0 {
+		return defaultRSABits, nil
+	}
+	if bits < minRSABits || bits > maxRSABits {
+		return 0, fmt.Errorf("rsa bits must be between %d and %d", minRSABits, maxRSABits)
+	}
+	if bits%8 != 0 {
+		return 0, fmt.Errorf("rsa bits must be a multiple of 8")
+	}
+	return bits, nil
 }
