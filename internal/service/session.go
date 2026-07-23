@@ -53,6 +53,7 @@ type SessionService struct {
 	crypto    KeyCrypto
 	logger    *slog.Logger
 	passwords PasswordVerifier
+	tunnels   SessionTunnelStopper
 }
 
 type connectAttempt struct {
