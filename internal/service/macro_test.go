@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -110,4 +111,23 @@ func TestMacroService_CreateWithShortcut(t *testing.T) {
 	assert.Equal(t, "Ctrl+Shift+C", created.Shortcut)
 	assert.Equal(t, 50, created.DelayMs)
 	assert.Equal(t, 1, created.SortOrder)
+}
+
+func TestMacroService_ExecuteBlocksDangerous(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	sessionSvc := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
+	termSvc := NewTerminalService(sessionSvc, newMockEventBus(), 32, testutil.NewTestLogger())
+	svc := NewMacroService(db, termSvc, testutil.NewTestLogger())
+	err := svc.Execute("term", "rm -rf /\n")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "blocked")
+}
+
+func TestMacroService_ExecuteRejectsOversizedCommand(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	svc := NewMacroService(db, NewTerminalService(nil, newMockEventBus(), 32, testutil.NewTestLogger()), testutil.NewTestLogger())
+	huge := strings.Repeat("a", maxMacroCommandBytes+1)
+	err := svc.Execute("term", huge)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "size limit")
 }
