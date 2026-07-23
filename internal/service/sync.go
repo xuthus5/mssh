@@ -73,6 +73,11 @@ type ExportData struct {
 }
 
 func (s *SyncService) Export(path string) error {
+	cleaned, err := validateLocalFilePath(path)
+	if err != nil {
+		return fmt.Errorf("export: %w", err)
+	}
+	path = cleaned
 	outcome := "failed"
 	defer func() {
 		recordAudit(s.db, s.logger, model.AuditEvent{Action: "export", TargetType: "backup", Summary: "导出加密配置", Outcome: outcome})
@@ -111,6 +116,11 @@ func (s *SyncService) Export(path string) error {
 }
 
 func (s *SyncService) Import(path string) error {
+	cleaned, err := validateLocalFilePath(path)
+	if err != nil {
+		return fmt.Errorf("import: %w", err)
+	}
+	path = cleaned
 	outcome := "failed"
 	defer func() {
 		recordAudit(s.db, s.logger, model.AuditEvent{Action: "import", TargetType: "backup", Summary: "导入加密配置", Outcome: outcome})

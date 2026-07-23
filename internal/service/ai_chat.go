@@ -16,7 +16,7 @@ COMMAND: <完整命令> | PURPOSE: <用途>
 不要假设命令已执行，不要输出密钥、密码或令牌。`
 
 func (s *AIService) Chat(request model.AIChatRequest) (model.AIChatResponse, error) {
-	if strings.TrimSpace(request.Prompt) == "" || request.SessionID <= 0 || request.TerminalID == "" {
+	if strings.TrimSpace(request.Prompt) == "" || request.SessionID <= 0 || strings.TrimSpace(request.TerminalID) == "" {
 		return model.AIChatResponse{}, errors.New("session, terminal and prompt are required")
 	}
 	settings, err := store.LoadAISettings(s.db, defaultAISettings())

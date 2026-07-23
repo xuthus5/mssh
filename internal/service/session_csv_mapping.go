@@ -16,6 +16,11 @@ import (
 const maxSessionCSVPreviewRows = 20
 
 func (s *SessionService) PreviewCSV(path string) (model.SessionCSVPreview, error) {
+	cleaned, err := validateLocalFilePath(path)
+	if err != nil {
+		return model.SessionCSVPreview{}, fmt.Errorf("preview session csv: %w", err)
+	}
+	path = cleaned
 	records, err := readSessionCSVRecords(path)
 	if err != nil {
 		return model.SessionCSVPreview{}, fmt.Errorf("preview session csv: %w", err)

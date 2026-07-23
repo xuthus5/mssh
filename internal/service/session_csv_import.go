@@ -18,6 +18,11 @@ type parsedSessionCSVRow struct {
 
 func (s *SessionService) ImportCSV(path string, options model.SessionCSVImportOptions) (model.SessionCSVImportSummary, error) {
 	summary := model.SessionCSVImportSummary{Results: []model.SessionCSVImportResult{}}
+	cleaned, pathErr := validateLocalFilePath(path)
+	if pathErr != nil {
+		return summary, fmt.Errorf("import session csv: %w", pathErr)
+	}
+	path = cleaned
 	outcome := "failed"
 	defer func() {
 		recordAudit(s.db, s.logger, model.AuditEvent{
