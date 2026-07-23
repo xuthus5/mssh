@@ -60,6 +60,9 @@ func (s *AIService) Dashboard() (model.AISettingsDashboard, error) {
 }
 
 func (s *AIService) SaveProvider(input model.AIProviderProfileInput) (*model.AIProviderProfile, error) {
+	if input.ID < 0 {
+		return nil, fmt.Errorf("invalid provider id")
+	}
 	input.Name = strings.TrimSpace(input.Name)
 	input.BaseURL = strings.TrimSpace(input.BaseURL)
 	input.DefaultModel = strings.TrimSpace(input.DefaultModel)

@@ -642,3 +642,12 @@
 |---|---|---|
 | SEC-LOG-013 | GetRecording 必须拒绝空路径，且仅允许 dataDir/recordings 下文件。 | done |
 | UX-PLAYBACK-010 | 回放加载失败必须 toast 并在终端提示失败。 | done |
+
+## 2026-07-23 商用硬化波次（连接 wrapper / AI provider / 资产刷新 / 会话录制可见）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| SEC-SESSION-016 | GetClientWrapper 必须拒绝空 connID。 | done |
+| SEC-AI-014 | SaveProvider 必须拒绝 id<0。 | done |
+| UX-ASSET-010 | refreshAssets 失败必须 toast 并写入 error。 | done |
+| UX-LOG-010 | SessionLog 加载/删除失败必须 toast。 | done |

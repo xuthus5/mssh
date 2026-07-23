@@ -359,3 +359,10 @@ func TestAIServiceChatRejectsBlankTerminalID(t *testing.T) {
 	_, err := service.Chat(model.AIChatRequest{SessionID: 1, TerminalID: "  ", Prompt: "hi"})
 	require.Error(t, err)
 }
+
+func TestAIServiceSaveProviderRejectsNegativeID(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	service := NewAIService(db, nil, nil, testutil.NewTestLogger())
+	_, err := service.SaveProvider(model.AIProviderProfileInput{ID: -1, Name: "x", Provider: model.AIProviderOpenAICompatible, BaseURL: "https://example.com/v1", DefaultModel: "m", Enabled: true})
+	require.Error(t, err)
+}
