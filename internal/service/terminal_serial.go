@@ -14,6 +14,9 @@ import (
 // OpenSerial opens a terminal attached to a configured serial port profile.
 func (t *TerminalService) OpenSerial(ctx context.Context, serialPortID int64, cols, rows int) (string, error) {
 	_ = ctx
+	if serialPortID <= 0 {
+		return "", fmt.Errorf("invalid serial port id")
+	}
 	if err := validateTerminalSize(cols, rows); err != nil {
 		return "", err
 	}
@@ -65,6 +68,9 @@ func (t *TerminalService) serialPortSession(terminalID string) (*serial.PortSess
 
 // SerialSetSignals updates DTR/RTS for an open serial terminal.
 func (t *TerminalService) SerialSetSignals(terminalID string, dtr, rts bool) error {
+	if err := validateTerminalID(terminalID); err != nil {
+		return err
+	}
 	port, err := t.serialPortSession(terminalID)
 	if err != nil {
 		return err
@@ -74,6 +80,9 @@ func (t *TerminalService) SerialSetSignals(terminalID string, dtr, rts bool) err
 
 // SerialSignals returns DTR/RTS outputs and modem input status for an open serial terminal.
 func (t *TerminalService) SerialSignals(terminalID string) (model.SerialSignals, error) {
+	if err := validateTerminalID(terminalID); err != nil {
+		return model.SerialSignals{}, err
+	}
 	port, err := t.serialPortSession(terminalID)
 	if err != nil {
 		return model.SerialSignals{}, err
@@ -83,6 +92,9 @@ func (t *TerminalService) SerialSignals(terminalID string) (model.SerialSignals,
 
 // SerialBreak sends a break signal on an open serial terminal.
 func (t *TerminalService) SerialBreak(terminalID string, durationMs int) error {
+	if err := validateTerminalID(terminalID); err != nil {
+		return err
+	}
 	port, err := t.serialPortSession(terminalID)
 	if err != nil {
 		return err
