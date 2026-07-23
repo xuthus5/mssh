@@ -153,3 +153,22 @@ func TestIsNilLogConfigurerVariants(t *testing.T) {
 	assert.True(t, isNilLogConfigurer(log))
 	assert.False(t, isNilLogConfigurer(&stubLogConfigurer{}))
 }
+
+func TestSettingServiceRejectsInvalidLogDir(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	log := &stubLogConfigurer{}
+	svc := NewSettingService(db, testutil.NewTestLogger(), log)
+	payload, err := json.Marshal("dir" + string(rune(0)) + "bad")
+	require.NoError(t, err)
+	err = svc.Set(model.SettingInputFrom(model.Setting{
+		Key: "application.log_dir", Namespace: "application", Value: string(payload), ValueType: "string", Version: 1,
+	}))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "NUL")
+	assert.Equal(t, 0, log.calls)
+
+	// Invalid path must not be persisted.
+	stored, getErr := store.GetSettingEntry(db, "application.log_dir")
+	require.NoError(t, getErr)
+	assert.Nil(t, stored)
+}

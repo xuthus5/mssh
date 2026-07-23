@@ -51,6 +51,40 @@ func TestNormalizeHelpers(t *testing.T) {
 	assert.Equal(t, "/tmp/mssh-logs", NormalizeDir(" /tmp/mssh-logs "))
 }
 
+func TestValidateDir(t *testing.T) {
+	got, err := ValidateDir("")
+	require.NoError(t, err)
+	assert.Equal(t, DefaultDir(), got)
+
+	got, err = ValidateDir(" /var/log/mssh ")
+	require.NoError(t, err)
+	assert.Equal(t, "/var/log/mssh", got)
+
+	_, err = ValidateDir("a" + string(rune(0)) + "b")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "NUL")
+
+	_, err = ValidateDir(".")
+	require.Error(t, err)
+	_, err = ValidateDir("..")
+	require.Error(t, err)
+
+	buf := make([]byte, 4100)
+	for i := range buf {
+		buf[i] = 'a'
+	}
+	_, err = ValidateDir("/" + string(buf))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "too long")
+}
+
+func TestConfigureRejectsInvalidDir(t *testing.T) {
+	manager := New(Options{})
+	t.Cleanup(func() { _ = manager.Close() })
+	err := manager.Configure("bad"+string(rune(0))+"dir", 7)
+	require.Error(t, err)
+}
+
 func TestManagerWriteCreatesDailyFile(t *testing.T) {
 	dir := t.TempDir()
 	manager := New(Options{Dir: dir, RetentionDays: 30, Now: func() time.Time {
