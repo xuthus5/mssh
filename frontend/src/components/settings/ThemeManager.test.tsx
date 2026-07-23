@@ -4,6 +4,8 @@ import { describe, expect, it, vi } from 'vitest'
 
 const { openFile } = vi.hoisted(() => ({ openFile: vi.fn(async () => ['/tmp/a.itermcolors', '/tmp/b.itermcolors']) }))
 vi.mock('@wailsio/runtime', () => ({ Dialogs: { OpenFile: openFile } }))
+const notify = vi.hoisted(() => vi.fn())
+vi.mock('@/components/ui/toast', () => ({ toast: (...args: unknown[]) => notify(...args) }))
 
 import { ThemeManager } from '@/components/settings/ThemeManager'
 
@@ -107,6 +109,25 @@ describe('ThemeManager', () => {
     await userEvent.click(screen.getByRole('button', { name: '确认删除' }))
     expect(deleteProfile).toHaveBeenCalledWith(1)
     expect(deleteDefinition).not.toHaveBeenCalled()
+  })
+
+
+  it('surfaces theme file picker failures without unhandled rejections', async () => {
+    openFile.mockRejectedValueOnce(new Error('picker unavailable'))
+    const onImport = vi.fn(async () => ({ results: [] }))
+    render(
+      <ThemeManager
+        profiles={profiles as never}
+        onImport={onImport as never}
+        onDeleteProfile={vi.fn()}
+        onDeleteDefinition={vi.fn()}
+        onCreateProfile={vi.fn()}
+        onUpdateProfile={vi.fn()}
+      />,
+    )
+    await userEvent.click(screen.getByRole('button', { name: '导入 iTerm2 主题' }))
+    expect(notify).toHaveBeenCalledWith('选择主题文件失败: picker unavailable', 'error')
+    expect(onImport).not.toHaveBeenCalled()
   })
 
   it('ignores orphan definition cleanup failures after profile delete', async () => {
