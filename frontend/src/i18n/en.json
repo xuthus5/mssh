@@ -1433,5 +1433,7 @@
   "选择主题文件失败: ${}": "Failed to choose theme file: ${}",
   "删除提供商": "Delete Provider",
   "确认删除提供商「${}」？此操作不可撤销。": "Delete provider \"${}\"? This cannot be undone.",
-  "未命名提供商": "Unnamed provider"
+  "未命名提供商": "Unnamed provider",
+  "读取密钥失败: ${}": "Failed to read key: ${}",
+  "密钥不存在或无法读取": "Key not found or unreadable"
 }

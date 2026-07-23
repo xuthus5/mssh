@@ -113,8 +113,14 @@ export function useKeySettings() {
     catch (error) { keyOperationFailed(t('复制公钥'), error); return undefined }
   }, [])
   const loadKeyMaterial = useCallback(async (id: string) => {
-    try { const result = await KeyService.GetMaterial(Number(id)); return result ? keyMaterial(result, 0) : undefined }
-    catch (error) { keyOperationFailed(t('读取密钥'), error); return undefined }
+    try {
+      const result = await KeyService.GetMaterial(Number(id))
+      if (!result) throw new Error(t('密钥不存在或无法读取'))
+      return keyMaterial(result, 0)
+    } catch (error) {
+      logger.error('loadKeyMaterial failed', error)
+      throw error
+    }
   }, [])
   const updateKey = useCallback(async (material: KeyMaterial) => {
     try {

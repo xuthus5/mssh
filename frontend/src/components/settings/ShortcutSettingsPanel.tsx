@@ -121,7 +121,7 @@ export function ShortcutSettingsPanel() {
     const next = defaultShortcutBindings()
     setDraft(next)
     setRecordingId(null)
-    void persist(next)
+    void persist(next).catch(() => undefined)
   }
 
   return (
