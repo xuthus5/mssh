@@ -19,7 +19,7 @@ func TestSessionServiceHostKeyDecisionAccept(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	attemptID := svc.registerConnectAttempt(cancel)
+	attemptID := svc.registerConnectAttempt(1, cancel)
 	defer svc.finishConnectAttempt(attemptID)
 
 	result := make(chan bool, 1)
@@ -40,7 +40,7 @@ func TestSessionServiceHostKeyDecisionReject(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	attemptID := svc.registerConnectAttempt(cancel)
+	attemptID := svc.registerConnectAttempt(1, cancel)
 	defer svc.finishConnectAttempt(attemptID)
 
 	result := make(chan bool, 1)
@@ -57,7 +57,7 @@ func TestSessionServiceCancelConnect(t *testing.T) {
 	svc := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
 
 	cancelled := make(chan struct{})
-	attemptID := svc.registerConnectAttempt(func() { close(cancelled) })
+	attemptID := svc.registerConnectAttempt(1, func() { close(cancelled) })
 	require.NoError(t, svc.CancelConnect(attemptID))
 	select {
 	case <-cancelled:
