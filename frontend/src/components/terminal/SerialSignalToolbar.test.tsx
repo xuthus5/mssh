@@ -2,7 +2,10 @@ import { render, screen, waitFor, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { SerialSignalToolbar } from '@/components/terminal/SerialSignalToolbar'
+import { toast } from '@/components/ui/toast'
 import { __clearHandlers, __registerHandler } from '@/test/__mocks__/wails-runtime'
+
+vi.mock('@/components/ui/toast', () => ({ toast: vi.fn() }))
 
 const terminal = 'github.com/xuthus5/mssh/internal/service.TerminalService.'
 
@@ -53,5 +56,20 @@ describe('SerialSignalToolbar', () => {
     expect(calls).toBe(afterGone)
     expect(screen.getByRole('button', { name: 'Break' })).toBeDisabled()
     vi.useRealTimers()
+  })
+
+  it('toasts serial signal and break failures with explicit templates', async () => {
+    const user = userEvent.setup()
+    vi.mocked(toast).mockClear()
+    __registerHandler(terminal + 'SerialSetSignals', async () => { throw new Error('set failed') })
+    __registerHandler(terminal + 'SerialBreak', async () => { throw new Error('break failed') })
+    render(<SerialSignalToolbar terminalID="term-1" />)
+    await waitFor(() => expect(screen.getByText('DTR')).toBeInTheDocument())
+    // toggle DTR via switch - first switch
+    const switches = screen.getAllByRole('switch')
+    await user.click(switches[0])
+    await waitFor(() => expect(toast).toHaveBeenCalledWith('设置串口信号失败: set failed', 'error'))
+    await user.click(screen.getByRole('button', { name: 'Break' }))
+    await waitFor(() => expect(toast).toHaveBeenCalledWith('发送 Break 失败: break failed', 'error'))
   })
 })

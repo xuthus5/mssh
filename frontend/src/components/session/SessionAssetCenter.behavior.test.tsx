@@ -170,7 +170,7 @@ describe('SessionAssetCenter behavior', () => {
     await user.click(screen.getByRole('tab', { name: /分组/ }))
     const prodRow = screen.getByRole('button', { name: '生产环境' }).closest('tr')
     await user.click(within(prodRow!).getByRole('button', { name: '设为默认' }))
-    await waitFor(() => expect(toast).toHaveBeenCalledWith('default failed', 'error'))
+    await waitFor(() => expect(toast).toHaveBeenCalledWith('设置默认分组失败: default failed', 'error'))
   })
 })
 

@@ -63,6 +63,7 @@ export function SerialSignalToolbar({ terminalID }: Props) {
         return
       }
       logger.error('load serial signals failed', err)
+      // Polling path: avoid toast spam; user actions still toast below.
     }
   }, [stopPolling, terminalID])
 
@@ -86,7 +87,7 @@ export function SerialSignalToolbar({ terminalID }: Props) {
         setAlive(false)
         stopPolling()
       } else {
-        toast(err instanceof Error ? err.message : String(err), 'error')
+        toast(t('设置串口信号失败: ${}', err instanceof Error ? err.message : String(err)), 'error')
         await load()
       }
     } finally {
@@ -105,7 +106,7 @@ export function SerialSignalToolbar({ terminalID }: Props) {
         setAlive(false)
         stopPolling()
       } else {
-        toast(err instanceof Error ? err.message : String(err), 'error')
+        toast(t('发送 Break 失败: ${}', err instanceof Error ? err.message : String(err)), 'error')
       }
     } finally {
       setBusy(false)

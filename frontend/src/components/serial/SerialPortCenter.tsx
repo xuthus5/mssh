@@ -85,7 +85,7 @@ export function SerialPortCenter() {
       await duplicatePort(port)
       toast(t('串口配置已复制'), 'success')
     } catch (err) {
-      toast(err instanceof Error ? err.message : String(err), 'error')
+      toast(t('复制串口配置失败: ${}', err instanceof Error ? err.message : String(err)), 'error')
     }
   }
 
@@ -104,7 +104,7 @@ export function SerialPortCenter() {
         setDeleteTarget(null)
         toast(t('串口配置已删除'), 'success')
       } catch (err) {
-        toast(err instanceof Error ? err.message : String(err), 'error')
+        toast(t('删除串口配置失败: ${}', err instanceof Error ? err.message : String(err)), 'error')
       } finally {
         setDeletingID(null)
       }
@@ -117,7 +117,7 @@ export function SerialPortCenter() {
       setDeleteTarget(null)
       toast(t('已删除 ${} 个串口配置', String(deleteTarget.count)), 'success')
     } catch (err) {
-      toast(err instanceof Error ? err.message : String(err), 'error')
+      toast(t('批量删除串口配置失败: ${}', err instanceof Error ? err.message : String(err)), 'error')
     } finally {
       setBatchBusy(false)
     }

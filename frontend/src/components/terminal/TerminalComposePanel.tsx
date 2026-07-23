@@ -65,7 +65,7 @@ function useAsyncGate() {
     try {
       await action()
     } catch (error: unknown) {
-      toast(`${errorPrefix}: ${errorMessage(error)}`, 'error')
+      toast(t('${}: ${}', errorPrefix, errorMessage(error)), 'error')
     } finally {
       activeRef.current = false
       setBusy(false)
