@@ -9,20 +9,24 @@ export const syncDataChangedEvent = 'sync:data-changed'
 export type SyncDataReloadHandler = () => void | Promise<void>
 
 /** Hot-reload session workspace after cloud sync without hard page reload. */
+type SilentList = (options?: { silent?: boolean }) => Promise<unknown>
+
 export async function hotReloadSessionWorkspace(workspace: {
-  listFolders: () => Promise<unknown>
-  listSessions: () => Promise<unknown>
-  listRecentSessions?: () => Promise<unknown>
-  listAssetCatalogs?: () => Promise<unknown>
-  listTunnels?: () => Promise<unknown>
+  listFolders: SilentList
+  listSessions: SilentList
+  listRecentSessions?: SilentList
+  listAssetCatalogs?: SilentList
+  listTunnels?: SilentList
 }): Promise<void> {
+  // Nested list loaders must stay silent so this path owns a single failure toast.
+  const silent = { silent: true as const }
   const tasks: Array<Promise<unknown>> = [
-    workspace.listFolders(),
-    workspace.listSessions(),
+    workspace.listFolders(silent),
+    workspace.listSessions(silent),
   ]
-  if (workspace.listRecentSessions) tasks.push(workspace.listRecentSessions())
-  if (workspace.listAssetCatalogs) tasks.push(workspace.listAssetCatalogs())
-  if (workspace.listTunnels) tasks.push(workspace.listTunnels())
+  if (workspace.listRecentSessions) tasks.push(workspace.listRecentSessions(silent))
+  if (workspace.listAssetCatalogs) tasks.push(workspace.listAssetCatalogs(silent))
+  if (workspace.listTunnels) tasks.push(workspace.listTunnels(silent))
   await Promise.all(tasks)
 }
 

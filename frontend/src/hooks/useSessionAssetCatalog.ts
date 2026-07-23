@@ -28,7 +28,7 @@ async function silentRefreshAssets(refreshAssets: (options?: { silent?: boolean 
 }
 
 export function useSessionAssetCatalog(state: StateSetters) {
-  const listAssetCatalogs = useCallback(async () => {
+  const listAssetCatalogs = useCallback(async (options?: { silent?: boolean }) => {
     try {
       const [environmentItems, projectItems, tagItems] = await Promise.all([
         AssetCatalogService.ListEnvironments(), AssetCatalogService.ListProjects(), AssetCatalogService.ListTags(),
@@ -40,7 +40,8 @@ export function useSessionAssetCatalog(state: StateSetters) {
       const message = error instanceof Error ? error.message : String(error)
       logger.error('listAssetCatalogs error', error)
       state.setError(message)
-      toast(t('加载资产分类失败: ${}', message), 'error')
+      if (!options?.silent) toast(t('加载资产分类失败: ${}', message), 'error')
+      else throw error
     }
   }, [state.setEnvironments, state.setError, state.setProjects, state.setTags])
 
