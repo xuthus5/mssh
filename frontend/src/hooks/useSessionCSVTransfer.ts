@@ -4,7 +4,7 @@ import { SessionService } from '@/lib/wails'
 import type { SessionCSVConflictPolicy, SessionCSVExportResult, SessionCSVImportSummary, SessionCSVPreview } from '../../bindings/github.com/xuthus5/mssh/internal/model/models'
 
 interface Refreshers {
-  refreshFolders: () => Promise<unknown>
+  refreshFolders: (options?: { silent?: boolean }) => Promise<unknown>
   refreshAssets: (options?: { silent?: boolean }) => Promise<unknown>
 }
 
@@ -43,7 +43,7 @@ export function useSessionCSVTransfer(refreshers: Refreshers) {
     })
     // Import already completed; refresh noise must not rebrand success as import failure.
     void Promise.all([
-      refreshers.refreshFolders().catch((error: unknown) => {
+      refreshers.refreshFolders({ silent: true }).catch((error: unknown) => {
         logger.error('csv import folder refresh failed', error)
       }),
       refreshers.refreshAssets({ silent: true }).catch((error: unknown) => {

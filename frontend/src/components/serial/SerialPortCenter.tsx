@@ -72,7 +72,7 @@ export function SerialPortCenter() {
     try {
       await connectPort(port)
       toast(t('串口已连接: ${}', port.name || port.device), 'success')
-      await refresh()
+      await refresh({ silent: true })
     } catch {
       // toast handled in hook
     } finally {
