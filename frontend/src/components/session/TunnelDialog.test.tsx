@@ -106,6 +106,17 @@ describe('TunnelDialog', () => {
     expect(screen.getByText(/安全边界/)).toBeInTheDocument()
   })
 
+  it('deletes existing tunnels', async () => {
+    const user = userEvent.setup()
+    const props = dialogProps()
+    props.onDelete = vi.fn()
+    render(<TunnelDialog {...props} tunnels={tunnels} />)
+    const remoteRow = screen.getByText('远程转发').closest('tr')
+    expect(remoteRow).not.toBeNull()
+    await user.click(within(remoteRow!).getByRole('button', { name: '删除' }))
+    expect(props.onDelete).toHaveBeenCalledWith('remote-1')
+  })
+
   it('keeps the form when start fails', async () => {
     const user = userEvent.setup()
     const props = dialogProps()
@@ -127,6 +138,7 @@ function dialogProps() {
     tunnels: [] as Tunnel[],
     onStart: vi.fn(),
     onStop: vi.fn(),
+    onDelete: vi.fn(),
     sessionId: 'session-7',
   }
 }

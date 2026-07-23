@@ -27,6 +27,7 @@ interface Props {
   tunnels: Tunnel[]
   onStart: (tunnel: Omit<Tunnel, 'id' | 'running'> & { id?: string }) => void | Promise<void>
   onStop: (tunnelId: string) => void | Promise<void>
+  onDelete?: (tunnelId: string) => void | Promise<void>
   sessionId: string
 }
 
@@ -42,6 +43,7 @@ export default function TunnelDialog({
   tunnels,
   onStart,
   onStop,
+  onDelete,
   sessionId: _sessionId,
 }: Props) {
   const [showAdd, setShowAdd] = useState(false)
@@ -216,25 +218,30 @@ export default function TunnelDialog({
                     </TableCell>
                     <TableCell>{tunnel.running ? t('运行中') : t('已停止')}</TableCell>
                     <TableCell className="text-right">
-                      {tunnel.running ? (
-                        <Button size="xs" variant="ghost" onClick={() => onStop(tunnel.id)}>{t('停止')}</Button>
-                      ) : (
-                        <Button
-                          size="xs"
-                          variant="ghost"
-                          onClick={() => onStart({
-                            id: tunnel.id,
-                            sessionId: tunnel.sessionId,
-                            type: tunnel.type,
-                            localAddress: tunnel.localAddress,
-                            localPort: tunnel.localPort,
-                            remoteAddress: tunnel.remoteAddress,
-                            remotePort: tunnel.remotePort,
-                          })}
-                        >
-                          {t('启动')}
-                        </Button>
-                      )}
+                      <div className="flex justify-end gap-1">
+                        {tunnel.running ? (
+                          <Button size="xs" variant="ghost" onClick={() => { void onStop(tunnel.id) }}>{t('停止')}</Button>
+                        ) : (
+                          <Button
+                            size="xs"
+                            variant="ghost"
+                            onClick={() => { void onStart({
+                              id: tunnel.id,
+                              sessionId: tunnel.sessionId,
+                              type: tunnel.type,
+                              localAddress: tunnel.localAddress,
+                              localPort: tunnel.localPort,
+                              remoteAddress: tunnel.remoteAddress,
+                              remotePort: tunnel.remotePort,
+                            }) }}
+                          >
+                            {t('启动')}
+                          </Button>
+                        )}
+                        {onDelete ? (
+                          <Button size="xs" variant="ghost" className="text-destructive" onClick={() => { void onDelete(tunnel.id) }}>{t('删除')}</Button>
+                        ) : null}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))

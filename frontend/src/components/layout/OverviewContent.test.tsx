@@ -13,7 +13,7 @@ vi.mock('@/hooks/useSettings', () => ({
   }),
 }))
 vi.mock('@/hooks/useTunnelManager', () => ({
-  useTunnelManager: () => ({ tunnels: [], load: vi.fn(async () => {}), start: vi.fn(), stop: vi.fn() }),
+  useTunnelManager: () => ({ tunnels: [], load: vi.fn(async () => {}), start: vi.fn(), stop: vi.fn(), remove: vi.fn() }),
 }))
 vi.mock('@/hooks/SessionWorkspaceContext', () => ({
   useSessionWorkspace: () => ({ sessions: [{ id: '1', name: 'Production' }] }),
