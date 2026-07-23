@@ -12,6 +12,9 @@ import { MacroService } from '@/lib/wails'
 import { logger } from '@/lib/logger'
 import { toast } from '@/components/ui/toast'
 import { t } from '@/i18n'
+import { executeMacroOnActiveTerminal } from '@/lib/executeMacro'
+
+export { executeMacroOnActiveTerminal }
 import { useShortcutStore } from '@/store/shortcutStore'
 import { SHORTCUT_DEFINITIONS, formatChordDisplay } from '@/lib/shortcuts'
 
@@ -82,27 +85,6 @@ function Feature({ icon: Icon, label }: { icon: typeof Terminal; label: string }
 }
 
 
-export async function executeMacroOnActiveTerminal(command: string) {
-  const state = useAppStore.getState()
-  const surface = state.activeSurface
-  const tab = surface && surface.type === 'terminal'
-    ? state.tabs.find((item) => item.id === surface.id)
-    : state.tabs.find((item) => item.type === 'terminal')
-  if (!tab || tab.type !== 'terminal') {
-    toast(t('请先连接终端后再执行宏'), 'info')
-    return
-  }
-  if (state.connectionStatus[tab.terminalId] !== 'connected') {
-    toast(t('当前终端未连接，无法执行宏'), 'warning')
-    return
-  }
-  try {
-    await MacroService.Execute(tab.terminalId, command)
-    toast(t('宏已发送到活动终端'), 'success')
-  } catch (error: unknown) {
-    toast(t('执行宏失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
-  }
-}
 
 function MacrosWorkspace() {
   const [macros, setMacros] = useState<Array<{ id: string; name: string; shortcut: string; command: string }>>([])
