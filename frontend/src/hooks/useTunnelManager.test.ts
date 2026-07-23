@@ -83,4 +83,49 @@ describe('useTunnelManager', () => {
     expect(del).toHaveBeenCalledWith(42)
     expect(useToastStore.getState().toasts.some((item) => item.message.includes('隧道已删除') || item.type === 'success')).toBe(true)
   })
+
+  it('silent start failures do not toast (form path owns inline error)', async () => {
+    start.mockRejectedValueOnce(new Error('bind failed'))
+    const { result } = renderHook(() => useTunnelManager(7))
+    let caught: unknown
+    await act(async () => {
+      try {
+        await result.current.start({
+          sessionId: '7',
+          type: 'local',
+          localAddress: '127.0.0.1',
+          localPort: 1,
+          remoteAddress: '127.0.0.1',
+          remotePort: 22,
+        }, { silent: true })
+      } catch (error) {
+        caught = error
+      }
+    })
+    expect(caught).toBeTruthy()
+    expect(useToastStore.getState().toasts).toHaveLength(0)
+  })
+
+  it('non-silent start failures toast once', async () => {
+    start.mockRejectedValueOnce(new Error('bind failed'))
+    const { result } = renderHook(() => useTunnelManager(7))
+    let caught: unknown
+    await act(async () => {
+      try {
+        await result.current.start({
+          id: '42',
+          sessionId: '7',
+          type: 'local',
+          localAddress: '127.0.0.1',
+          localPort: 1,
+          remoteAddress: '127.0.0.1',
+          remotePort: 22,
+        })
+      } catch (error) {
+        caught = error
+      }
+    })
+    expect(caught).toBeTruthy()
+    expect(useToastStore.getState().toasts.some((item) => item.message.includes('bind failed'))).toBe(true)
+  })
 })
