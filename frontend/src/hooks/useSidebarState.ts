@@ -57,7 +57,10 @@ export function useSidebarDialogs(workspace: Workspace) {
     setEditingSession(null)
   }, [editingSession, workspace])
   const saveFolder = () => {
-    if (!folderName.trim()) return
+    if (!folderName.trim()) {
+      toast(t('请输入分组名称'), 'warning')
+      return
+    }
     const name = folderName.trim()
     const action = editingFolder
       ? workspace.updateFolder(editingFolder.id, name)

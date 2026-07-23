@@ -1,4 +1,5 @@
 import { act, render, screen, waitFor, within } from '@testing-library/react'
+import { useToastStore } from '@/components/ui/toast'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -103,8 +104,10 @@ describe('Sidebar behavior', () => {
     render(<Sidebar />)
 
     act(() => window.dispatchEvent(new CustomEvent('mssh:new-folder')))
+    useToastStore.setState({ toasts: [] })
     await user.click(screen.getByRole('button', { name: 'folder-submit' }))
     expect(workspace.createFolder).not.toHaveBeenCalled()
+    expect(useToastStore.getState().toasts.some((item) => item.message.includes('请输入分组名称'))).toBe(true)
     await user.type(screen.getByLabelText('mock-folder-name'), '  Ops  ')
     await user.click(screen.getByRole('button', { name: 'folder-submit' }))
     expect(workspace.createFolder).toHaveBeenCalledWith('Ops', null)
