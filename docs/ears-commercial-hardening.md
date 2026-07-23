@@ -378,3 +378,10 @@
 |---|---|---|
 | SEC-HOSTKEY-009 | `ListHostKeys` 必须在 `WithKnownHostsLock` 下读取，避免与 TOFU append/delete 并发产生撕裂读。 | done |
 | SEC-HOSTKEY-010 | known_hosts 扫描单行缓冲必须有上界（64KiB），超长行按读错误失败而非无限扩容。 | done |
+
+## 2026-07-23 商用硬化波次（AI 命令写入超时）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| AI-EXEC-001 | `ExecuteCommand` 写入终端必须受 `security.command_timeout_seconds` 约束；超时返回明确错误并记录 failed 审计。 | done |
+| AI-EXEC-002 | AI 注入终端的命令字节长度必须有上界（32KiB），超限拒绝执行。 | done |
