@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const listMacros = vi.fn()
 const executeMacro = vi.fn()
+const deleteMacro = vi.fn()
 const toast = vi.fn()
 
 vi.mock('@/components/layout/OverviewContent', () => ({
@@ -14,7 +15,7 @@ vi.mock('@/lib/wails', () => ({
   MacroService: {
     List: (...args: unknown[]) => listMacros(...args),
     Execute: (...args: unknown[]) => executeMacro(...args),
-    Delete: vi.fn(),
+    Delete: (...args: unknown[]) => deleteMacro(...args),
   },
   CommandHistoryService: {
     Add: vi.fn(async () => {}),
@@ -26,6 +27,8 @@ vi.mock('@/components/ui/toast', () => ({
   toast: (...args: unknown[]) => toast(...args),
 }))
 
+vi.mock('@/lib/confirmDialog', () => ({ requestConfirm: vi.fn(async () => true) }))
+
 import { executeMacroOnActiveTerminal, WorkspaceContent } from '@/components/layout/WorkspaceContent'
 import { useAppStore } from '@/store/appStore'
 
@@ -34,6 +37,7 @@ describe('WorkspaceContent accessibility', () => {
     toast.mockReset()
     listMacros.mockReset()
     executeMacro.mockReset()
+    deleteMacro.mockReset().mockResolvedValue(undefined)
     useAppStore.setState({
       activeSurface: { type: 'workspace', id: 'sessions' },
       workspaceTab: 'sessions',
@@ -116,6 +120,7 @@ describe('MacrosWorkspace execute path', () => {
     toast.mockReset()
     listMacros.mockReset()
     executeMacro.mockReset()
+    deleteMacro.mockReset().mockResolvedValue(undefined)
     listMacros.mockResolvedValue([{ id: 7, name: 'Uptime', shortcut: '', command: 'uptime' }])
     executeMacro.mockResolvedValue(undefined)
     useAppStore.setState({
@@ -143,4 +148,17 @@ describe('MacrosWorkspace execute path', () => {
     expect(await screen.findByText('宏加载失败')).toBeInTheDocument()
     expect(toast).not.toHaveBeenCalled()
   })
+
+  it('shows macro delete failures inline without toast', async () => {
+    listMacros.mockResolvedValueOnce([{ id: 1, name: 'Uptime', shortcut: '', command: 'uptime' }])
+    deleteMacro.mockRejectedValueOnce(new Error('delete macros failed'))
+    const user = userEvent.setup()
+    render(<WorkspaceContent />)
+    expect(await screen.findByText('Uptime')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: '删除 Uptime' }))
+    expect(await screen.findByText('删除宏失败: delete macros failed')).toBeInTheDocument()
+    expect(await screen.findByText('Uptime')).toBeInTheDocument()
+    expect(toast).not.toHaveBeenCalled()
+  })
+
 })

@@ -53,7 +53,7 @@ export default function QuickCommands({
     try {
       await onDelete(item.id)
     } catch {
-      // parent surfaces toast
+      // parent surfaces fixed-surface error
     }
   }
 

@@ -200,21 +200,37 @@ describe('KeyManager', () => {
     expect(screen.getByRole('heading', { name: '导入密钥' })).toBeInTheDocument()
   })
 
-  it('surfaces key material load failures without unhandled rejections', async () => {
+  it('surfaces key material load failures panel-owned without toast', async () => {
+    useToastStore.setState({ toasts: [] })
     const view = props()
     view.onLoadMaterial = vi.fn(async () => { throw new Error('vault locked') })
     render(<KeyManager {...view} />)
     await userEvent.click(screen.getByRole('button', { name: '查看 generated' }))
-    await waitFor(() => expect(useToastStore.getState().toasts.some((item) => item.message.includes('读取密钥失败') && item.message.includes('vault locked') && item.type === 'error')).toBe(true))
+    expect(await screen.findByRole('alert')).toHaveTextContent('读取密钥失败: vault locked')
+    expect(useToastStore.getState().toasts.filter((item) => item.type === 'error')).toHaveLength(0)
   })
 
-  it('surfaces empty key material as a visible failure', async () => {
+  it('surfaces empty key material as a panel-owned visible failure', async () => {
+    useToastStore.setState({ toasts: [] })
     const view = props()
     view.onLoadMaterial = vi.fn(async () => undefined)
     render(<KeyManager {...view} />)
     await userEvent.click(screen.getByRole('button', { name: '编辑 generated' }))
-    await waitFor(() => expect(useToastStore.getState().toasts.some((item) => item.message.includes('读取密钥失败') && item.type === 'error')).toBe(true))
+    expect(await screen.findByRole('alert')).toHaveTextContent('读取密钥失败')
     expect(screen.queryByRole('heading', { name: '编辑密钥' })).not.toBeInTheDocument()
+    expect(useToastStore.getState().toasts.filter((item) => item.type === 'error')).toHaveLength(0)
+  })
+
+  it('surfaces key usage analysis failures panel-owned without toast', async () => {
+    useToastStore.setState({ toasts: [] })
+    __registerHandler('github.com/xuthus5/mssh/internal/service.KeyService.UsageCount', async () => {
+      throw new Error('usage boom')
+    })
+    const view = props()
+    render(<KeyManager {...view} />)
+    await userEvent.click(screen.getByRole('button', { name: '删除 generated' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('分析密钥影响失败: usage boom')
+    expect(useToastStore.getState().toasts.filter((item) => item.type === 'error')).toHaveLength(0)
   })
 
 
