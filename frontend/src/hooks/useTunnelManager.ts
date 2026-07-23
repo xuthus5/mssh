@@ -57,6 +57,26 @@ function useTunnelStop(setTunnels: Dispatch<SetStateAction<Tunnel[]>>) {
       setTunnels((items) => items.map((item) => item.id === id ? { ...item, running: false } : item))
     } catch (error) {
       toast(t('停止隧道失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
+      throw error
+    }
+  }, [setTunnels])
+}
+
+function useTunnelRemove(setTunnels: Dispatch<SetStateAction<Tunnel[]>>) {
+  return useCallback(async (id: string) => {
+    try {
+      // Best-effort stop if currently running; Delete also closes active tunnels server-side.
+      try {
+        await TunnelService.Stop(Number(id))
+      } catch {
+        // ignore stop-not-running
+      }
+      await TunnelService.Delete(Number(id))
+      setTunnels((items) => items.filter((item) => item.id !== id))
+      toast(t('隧道已删除'), 'success')
+    } catch (error) {
+      toast(t('删除隧道失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
+      throw error
     }
   }, [setTunnels])
 }
@@ -73,5 +93,5 @@ export function useTunnelManager(sessionID?: number) {
     }
   }, [sessionID, states])
   useEffect(() => { setTunnels((items) => items.map((item) => ({ ...item, running: states[item.id] === 'running' }))) }, [states])
-  return { tunnels, load, start: useTunnelStart(load, setTunnels), stop: useTunnelStop(setTunnels) }
+  return { tunnels, load, start: useTunnelStart(load, setTunnels), stop: useTunnelStop(setTunnels), remove: useTunnelRemove(setTunnels) }
 }
