@@ -277,3 +277,11 @@
 | SEC-HTTP-001 | 应用共享 HTTP 客户端（AI/同步/检查更新）必须限制重定向次数（<=5）。 | done |
 | SEC-HTTP-002 | 重定向目标必须拒绝非 http(s)、URL 凭据、链路本地/元数据主机，且非回环主机强制 HTTPS。 | done |
 | SEC-HTTP-003 | 跨主机重定向必须剥离 Authorization 与常见 API Key 头，防止密钥泄漏。 | done |
+
+## 2026-07-23 商用硬化波次（解锁后同步追赶）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| SYNC-SCHED-003 | 应用 vault 解锁成功后必须触发一次 best-effort 定时策略同步（NotifyVaultUnlocked），不得阻塞解锁主路径。 | done |
+| SYNC-SCHED-004 | 当同步未启用或 vault 仍不可用时，解锁追赶必须静默跳过，不得将状态置为 error。 | done |
+| SYNC-SCHED-005 | 启动时若 vault 已自动解锁，必须在注册 afterUnlock 钩子后立即执行一次追赶，覆盖钩子注册时序竞态。 | done |
