@@ -1180,3 +1180,10 @@
 | ID | 验收条件 | 状态 |
 |---|---|---|
 | UX-ENG-109 | 生产 Go 源文件必须满足 ≤300 行门禁；`log.go`/`security_reencrypt.go` 超标文件完成拆分且测试通过。 | done |
+
+## 2026-07-24 商用硬化波次（前端源码行数门禁与隧道死路径）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| UX-ENG-110 | 前端生产源文件必须满足 ≤300 行门禁；`useSession.ts`/`useTerminal.ts` 超标完成拆分。 | done |
+| UX-TUNNEL-111 | 移除无 UI 消费的 `useSession.listTunnels` 死状态与 toast 路径；隧道列表仅由 `useTunnelManager` 承载。 | done |
