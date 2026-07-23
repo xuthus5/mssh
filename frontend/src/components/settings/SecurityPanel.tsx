@@ -60,15 +60,15 @@ export function SecurityPanel() {
 
   useEffect(() => { void load() }, [load])
 
-  const run = async (action: string, operation: () => Promise<unknown>) => {
+  const run = async (success: string, failure: string, operation: () => Promise<unknown>) => {
     setBusy(true)
     try {
       await operation()
       await load()
-      toast(action, 'success')
+      toast(success, 'success')
       setPassword(''); setConfirmPassword(''); setCurrentPassword(''); setNewPassword(''); setConfirmNewPassword('')
     } catch (error) {
-      toast(t('${}失败: ${}', action, error instanceof Error ? error.message : String(error)), 'error')
+      toast(t(failure, error instanceof Error ? error.message : String(error)), 'error')
     } finally {
       setBusy(false)
     }
@@ -77,7 +77,7 @@ export function SecurityPanel() {
   const setupPassword = () => {
     if (password.length < 12) return toast(t('应用密码至少需要 12 个字符'), 'error')
     if (password !== confirmPassword) return toast(t('两次输入的密码不一致'), 'error')
-    void run(t('应用密码已设置'), () => SecurityService.Setup({
+    void run(t('应用密码已设置'), '设置应用密码失败: ${}', () => SecurityService.Setup({
       password, require_password_on_launch: requireLaunch, remember_unlock: rememberUnlock,
     }))
   }
@@ -92,7 +92,7 @@ export function SecurityPanel() {
     setRequireLaunch(nextRequireLaunch)
     setRememberUnlock(nextRememberUnlock)
     if (!status.configured) return
-    void run(t('安全偏好已保存'), () => SecurityService.SavePreferences({
+    void run(t('安全偏好已保存'), '保存安全偏好失败: ${}', () => SecurityService.SavePreferences({
       require_password_on_launch: nextRequireLaunch, remember_unlock: nextRememberUnlock,
     }))
   }
@@ -105,7 +105,7 @@ export function SecurityPanel() {
     if (!confirmAction) return
     if (confirmAction.type === 'rotate') {
       setConfirmAction(null)
-      void run(t('应用密码已轮转'), () => SecurityService.Rotate({
+      void run(t('应用密码已轮转'), '轮转应用密码失败: ${}', () => SecurityService.Rotate({
         current_password: currentPassword, new_password: newPassword,
       }))
       return
@@ -162,9 +162,9 @@ export function SecurityPanel() {
               <div className="flex flex-wrap gap-2">
                 <Button size="sm" disabled={busy} onClick={rotatePassword}>{t('轮转密码并重加密')}</Button>
                 {status.unlocked ? (
-                  <Button size="sm" variant="outline" disabled={busy} onClick={() => void run(t('已锁定'), () => SecurityService.Lock())}>{t('锁定')}</Button>
+                  <Button size="sm" variant="outline" disabled={busy} onClick={() => void run(t('已锁定'), '锁定失败: ${}', () => SecurityService.Lock())}>{t('锁定')}</Button>
                 ) : (
-                  <Button size="sm" variant="outline" disabled={busy || !currentPassword} onClick={() => void run(t('已解锁'), () => SecurityService.Unlock({ password: currentPassword, remember_unlock: rememberUnlock }))}>{t('解锁')}</Button>
+                  <Button size="sm" variant="outline" disabled={busy || !currentPassword} onClick={() => void run(t('已解锁'), '解锁失败: ${}', () => SecurityService.Unlock({ password: currentPassword, remember_unlock: rememberUnlock }))}>{t('解锁')}</Button>
                 )}
               </div>
             </div>
