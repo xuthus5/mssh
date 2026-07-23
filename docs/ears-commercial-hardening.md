@@ -793,3 +793,15 @@
 | UX-ABOUT-011 | 检查更新失败必须 toast，并保留面板提示。 | done |
 | UX-ABOUT-012 | 打开外部链接失败必须 toast。 | done |
 | UX-MACRO-011 | 终端组合面板加载宏失败必须 toast，并保留面板错误。 | done |
+
+
+## 2026-07-23 商用硬化波次（失败 toast 模板统一）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| UX-SERIAL-013 | 串口信号设置/Break 失败 toast 必须使用明确失败模板。 | done |
+| UX-SERIAL-014 | 串口配置复制/删除/批量删除失败 toast 必须使用明确失败模板。 | done |
+| UX-ASSET-016 | 资产排序失败 toast 必须使用明确失败模板。 | done |
+| UX-ASSET-017 | 设置默认分组失败 toast 必须使用明确失败模板。 | done |
+| UX-MACRO-012 | 宏执行失败 toast 必须使用 i18n 模板（含撰写面板/工作区）。 | done |
+| UX-AI-015 | AI 只读命令自动执行失败 toast 不得双重包装文案。 | done |

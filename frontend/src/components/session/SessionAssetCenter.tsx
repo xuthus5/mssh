@@ -66,7 +66,7 @@ export function SessionAssetCenter() {
     }
   }
   const runFolderAction = async (action: () => Promise<unknown>) => {
-    try { await action() } catch (error) { toast(error instanceof Error ? error.message : String(error), 'error') }
+    try { await action() } catch (error) { toast(t('设置默认分组失败: ${}', error instanceof Error ? error.message : String(error)), 'error') }
   }
 
   return <section className="relative flex min-h-0 flex-1 flex-col bg-background p-5">
