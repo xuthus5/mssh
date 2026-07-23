@@ -80,4 +80,24 @@ describe('SerialPortCenter', () => {
       expect(useToastStore.getState().toasts.some((item) => item.message.includes('串口配置已删除'))).toBe(true)
     })
   })
+
+  it('toasts duplicate and delete failures with explicit templates', async () => {
+    const user = userEvent.setup()
+    useToastStore.setState({ toasts: [] })
+    __registerHandler(serial + 'Create', async () => { throw new Error('dup failed') })
+    render(<SerialPortCenter />)
+    await waitFor(() => expect(screen.getByText('ESP32')).toBeInTheDocument())
+    await user.click(screen.getByRole('button', { name: /复制/ }))
+    await waitFor(() => {
+      expect(useToastStore.getState().toasts.some((item) => item.message === '复制串口配置失败: dup failed')).toBe(true)
+    })
+
+    useToastStore.setState({ toasts: [] })
+    __registerHandler(serial + 'Delete', async () => { throw new Error('del failed') })
+    await user.click(screen.getByRole('button', { name: /删除/ }))
+    await user.click(await screen.findByRole('button', { name: '确认删除' }))
+    await waitFor(() => {
+      expect(useToastStore.getState().toasts.some((item) => item.message === '删除串口配置失败: del failed')).toBe(true)
+    })
+  })
 })

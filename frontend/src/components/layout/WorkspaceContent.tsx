@@ -100,7 +100,7 @@ export async function executeMacroOnActiveTerminal(command: string) {
     await MacroService.Execute(tab.terminalId, command)
     toast(t('宏已发送到活动终端'), 'success')
   } catch (error: unknown) {
-    toast(`${t('执行宏失败')}: ${error instanceof Error ? error.message : String(error)}`, 'error')
+    toast(t('执行宏失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
   }
 }
 
