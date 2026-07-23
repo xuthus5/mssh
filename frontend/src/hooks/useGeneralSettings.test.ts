@@ -285,5 +285,17 @@ describe('quiet autosave error feedback', () => {
     const messages = useToastStore.getState().toasts.map((item) => `${item.type}:${item.message}`)
     expect(messages.some((item) => item.startsWith('error:') && item.includes('保存设置失败'))).toBe(true)
   })
+  it('keeps settingsReady false when load fails and surfaces an error toast', async () => {
+    const toast = await import('@/components/ui/toast')
+    const toastSpy = vi.spyOn(toast, 'toast')
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.GetMany', async () => {
+      throw new Error('settings unavailable')
+    })
+    const { result } = renderHook(() => useGeneralSettings())
+    await act(async () => {})
+    expect(result.current.settingsReady).toBe(false)
+    expect(toastSpy).toHaveBeenCalledWith(expect.stringContaining('加载设置失败'), 'error')
+  })
+
 })
 

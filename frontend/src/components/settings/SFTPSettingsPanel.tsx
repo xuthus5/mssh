@@ -12,16 +12,17 @@ import { t } from '@/i18n'
 interface Props {
   settings: SFTPSettings
   onSave: (settings: SFTPSettings) => Promise<void>
+  settingsReady?: boolean
 }
 
-export function SFTPSettingsPanel({ settings, onSave }: Props) {
+export function SFTPSettingsPanel({ settings, onSave, settingsReady = true }: Props) {
   const [draft, setDraft] = useState(settings)
   useEffect(() => setDraft(settings), [settings])
   const update = (updates: Partial<SFTPSettings>) => setDraft((current) => ({ ...current, ...updates }))
   const persist = useCallback(async (next: SFTPSettings) => {
     await onSave(next)
   }, [onSave])
-  const autoSave = useAutoSave({ value: draft, onSave: persist, delayMs: 350 })
+  const autoSave = useAutoSave({ value: draft, onSave: persist, isReady: settingsReady, delayMs: 350 })
 
   return (
     <div className="flex flex-col gap-4 pt-2">

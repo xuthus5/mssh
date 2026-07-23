@@ -22,7 +22,7 @@ function settingsViewProps(
   saveThemeQuiet: (configuration: ThemeConfigurationInput) => Promise<void>,
 ): SettingsViewProps {
   return {
-    general: settings.general, systemFonts: settings.systemFonts, cloudSync,
+    general: settings.general, settingsReady: settings.settingsReady, systemFonts: settings.systemFonts, cloudSync,
     themeProfiles: catalog.profiles, themeAssignments: catalog.assignments, terminalGlobalStyle: catalog.globalStyle,
     colorMode: catalog.colorMode, onSaveGeneral: saveGeneralQuiet, onPreviewUIFont: settings.previewUIFont,
     onSaveThemeConfiguration: saveThemeQuiet,
@@ -30,7 +30,7 @@ function settingsViewProps(
     onDeleteThemeProfile: catalog.deleteProfile, onDeleteThemeDefinition: catalog.deleteDefinition,
     onResetBuiltinThemes: catalog.resetBuiltinStyles,
     onExportConfig: settings.exportConfig, onImportConfig: settings.importConfig,
-    sftpSettings: settings.sftpSettings, onSaveSFTPSettings: saveSFTPQuiet,
+    sftpSettings: settings.sftpSettings, sftpSettingsReady: settings.sftpSettingsReady, onSaveSFTPSettings: saveSFTPQuiet,
     ai,
   }
 }
