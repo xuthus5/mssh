@@ -466,3 +466,12 @@
 | UX-SETTINGS-006 | 通用/终端/SFTP 面板 autosave 必须以 settingsReady 为 isReady 门禁；加载成功前不得触发 onSave。 | done |
 | UX-SETTINGS-007 | 密钥列表加载失败必须 toast 错误，不得静默为空列表。 | done |
 
+## 2026-07-23 商用硬化波次（会话核心字段校验）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| SEC-SESSION-001 | Create/UpdateSession 必须校验 name/host/username 非空与长度上限，并拒绝 NUL。 | done |
+| SEC-SESSION-002 | Port 必须在 1–65535；KeepAlive 必须在 0–86400。 | done |
+| SEC-SESSION-003 | AuthMethod 必须为 password/key/agent/keyboard-interactive；key 认证必须提供有效 key_id。 | done |
+| SEC-SESSION-004 | term_type 若提供必须满足长度上限；folder/key/environment/project 可选 ID 必须 >0。 | done |
+
