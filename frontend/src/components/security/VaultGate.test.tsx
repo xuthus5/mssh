@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { Events } from '@wailsio/runtime'
 import { VaultGate } from '@/components/security/VaultGate'
+import { useToastStore } from '@/components/ui/toast'
 
 const security = vi.hoisted(() => ({
   Status: vi.fn(),
@@ -28,6 +29,7 @@ vi.mock('@wailsio/runtime', async (importOriginal) => {
 describe('VaultGate', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    useToastStore.setState({ toasts: [] })
   })
 
   it('forces setup when vault is not configured', async () => {
@@ -131,4 +133,11 @@ describe('VaultGate', () => {
     expect(await screen.findByText('app-ready')).toBeInTheDocument()
   })
 
+
+  it('toasts security status load failures', async () => {
+    security.Status.mockRejectedValueOnce(new Error('status failed'))
+    render(<VaultGate><div>app-ready</div></VaultGate>)
+    expect(await screen.findByText('status failed')).toBeInTheDocument()
+    await waitFor(() => expect(useToastStore.getState().toasts.some((item) => item.message.includes('status failed'))).toBe(true))
+  })
 })

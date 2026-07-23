@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { SecurityService, SyncService } from '@/lib/wails'
+import { toast } from '@/components/ui/toast'
 import { t } from '@/i18n'
 import type { SecurityStatus } from '../../../bindings/github.com/xuthus5/mssh/internal/model/models'
 
@@ -47,8 +48,10 @@ export function VaultGate({ children }: { children: ReactNode }) {
     try {
       applyStatus(await SecurityService.Status())
     } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
       setMode('error')
-      setError(err instanceof Error ? err.message : String(err))
+      setError(message)
+      toast(t('加载安全状态失败: ${}', message), 'error')
     }
   }, [applyStatus])
 
@@ -90,7 +93,9 @@ export function VaultGate({ children }: { children: ReactNode }) {
       setRestoreMode(false)
       await refresh()
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
+      const message = err instanceof Error ? err.message : String(err)
+      setError(message)
+      toast(t('安全操作失败: ${}', message), 'error')
     } finally {
       setBusy(false)
     }
@@ -149,7 +154,9 @@ export function VaultGate({ children }: { children: ReactNode }) {
       setRestoreMode(false)
       await refresh()
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
+      const message = err instanceof Error ? err.message : String(err)
+      setError(message)
+      toast(t('安全操作失败: ${}', message), 'error')
     } finally {
       setBusy(false)
     }

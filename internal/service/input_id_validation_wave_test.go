@@ -126,3 +126,17 @@ func TestKeyUpdateRejectsEmptyPrivateKey(t *testing.T) {
 	_, err = svc.Update(model.SSHKeyUpdateInput{ID: 1, Name: "k", PrivateKey: "  ", PublicKey: "y"})
 	require.Error(t, err)
 }
+
+func TestThemeAssignmentsRejectInvalidProfileIDs(t *testing.T) {
+	db, err := store.OpenDB(t.TempDir())
+	require.NoError(t, err)
+	require.NoError(t, store.InitializeSchema(db))
+	t.Cleanup(func() { _ = db.Close() })
+	svc := NewThemeService(db, testutil.NewTestLogger())
+	require.Error(t, svc.SaveAssignments(model.ThemeAssignmentsInput{
+		FollowInterfaceMode: true,
+		DarkProfileID:       0,
+		LightProfileID:      0,
+		FixedProfileID:      0,
+	}))
+}

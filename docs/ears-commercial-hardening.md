@@ -713,3 +713,12 @@
 | UX-SESSION-010 | 会话对话框加载密钥列表失败必须 toast。 | done |
 | UX-SERIAL-010 | 串口设备列表失败必须 toast。 | done |
 | UX-SERIAL-011 | 串口占用状态查询失败必须 toast。 | done |
+
+## 2026-07-23 商用硬化波次（Vault/资产创建 toast + 主题分配 ID）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| UX-VAULT-010 | 安全状态 Status 加载失败必须 toast 并保留面板错误。 | done |
+| UX-VAULT-011 | 安全操作（setup/unlock/lock/rotate 等）失败必须 toast。 | done |
+| UX-ASSET-011 | 会话资产快速创建失败必须 toast 并保留行内错误。 | done |
+| SEC-THEME-012 | validateThemeAssignments 必须拒绝 profile id<=0。 | done |
