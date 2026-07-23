@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { renderHook, act } from '@testing-library/react'
+import { act, renderHook } from '@testing-library/react'
 import { useFileTransfer } from '@/hooks/useFileTransfer'
 import { __registerHandler, __clearHandlers } from '@/test/__mocks__/wails-runtime'
 import { useAppStore } from '@/store/appStore'
@@ -208,7 +208,6 @@ describe('useFileTransfer', () => {
 
     expect(result.current.files).toHaveLength(0)
   })
-})
 
   it('toasts deleteFile failures', async () => {
     __registerHandler('github.com/xuthus5/mssh/internal/service.FileService.Delete', async () => {
@@ -228,3 +227,22 @@ describe('useFileTransfer', () => {
     expect(result.current.error).toContain('list denied')
     expect(useToastStore.getState().toasts.some((item) => item.message.includes('list denied'))).toBe(true)
   })
+
+  it('keeps mutation success free of list reload toast', async () => {
+    useToastStore.setState({ toasts: [] })
+    __registerHandler('github.com/xuthus5/mssh/internal/service.FileService.Mkdir', async () => undefined)
+    let listed = 0
+    __registerHandler('github.com/xuthus5/mssh/internal/service.FileService.ListDir', async () => {
+      listed += 1
+      if (listed > 1) throw new Error('reload boom')
+      return []
+    })
+    const { result } = renderHook(() => useFileTransfer(SESSION_ID))
+    await act(async () => { await result.current.listFiles('/home') })
+    useToastStore.setState({ toasts: [] })
+    await act(async () => { await result.current.makeDir('logs') })
+    await act(async () => { await Promise.resolve() })
+    expect(listed).toBeGreaterThan(1)
+    expect(useToastStore.getState().toasts.some((item) => item.message.includes('reload boom') || item.message.includes('加载文件列表失败'))).toBe(false)
+  })
+})

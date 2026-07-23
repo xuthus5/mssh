@@ -20,7 +20,7 @@ export function useSerial() {
 
   const refresh = useCallback(async (options?: { silent?: boolean }) => {
     setLoading(true)
-    setError('')
+    if (!options?.silent) setError('')
     try {
       const [list, deviceList, active] = await Promise.all([
         SerialService.List(),
@@ -40,12 +40,15 @@ export function useSerial() {
       setPorts(list ?? [])
       setDevices(deviceList ?? [])
       setActiveDevices(active ?? {})
+      setError('')
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
-      setError(message)
       logger.error('list serial ports failed', err)
-      // Standalone refresh surfaces list failures; nested mutation refresh stays silent.
-      if (!options?.silent) toast(t('加载串口配置失败: ${}', message), 'error')
+      // Nested mutation refresh must not paint a failure banner over a successful save/connect.
+      if (!options?.silent) {
+        setError(message)
+        toast(t('加载串口配置失败: ${}', message), 'error')
+      }
     } finally {
       setLoading(false)
     }
@@ -66,22 +69,26 @@ export function useSerial() {
 
   const createPort = useCallback(async (input: SerialPortInput) => {
     const created = await SerialService.Create(input)
+    setError('')
     await refresh({ silent: true })
     return created
   }, [refresh])
 
   const updatePort = useCallback(async (input: SerialPortInput) => {
     await SerialService.Update(input)
+    setError('')
     await refresh({ silent: true })
   }, [refresh])
 
   const deletePort = useCallback(async (id: number) => {
     await SerialService.Delete(id)
+    setError('')
     await refresh({ silent: true })
   }, [refresh])
 
   const deleteMany = useCallback(async (ids: number[]) => {
     await SerialService.DeleteMany(ids)
+    setError('')
     await refresh({ silent: true })
   }, [refresh])
 
@@ -102,6 +109,7 @@ export function useSerial() {
       notes: port.notes,
       sort_order: port.sort_order,
     })
+    setError('')
     await refresh({ silent: true })
   }, [refresh])
 
@@ -122,6 +130,7 @@ export function useSerial() {
       })
       store.setConnectionStatus(terminalId, 'connected')
       store.openTab(tab)
+      setError('')
       await refresh({ silent: true })
       return terminalId
     } catch (err) {
