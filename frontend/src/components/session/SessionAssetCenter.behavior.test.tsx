@@ -163,14 +163,19 @@ describe('SessionAssetCenter behavior', () => {
     window.removeEventListener('mssh:new-folder', newFolder)
   })
 
-  it('reports action failures through toast', async () => {
+  it('swallows set-default rejections after workspace toasts', async () => {
     const user = userEvent.setup()
-    state.setDefaultFolder.mockRejectedValueOnce(new Error('default failed'))
+    state.setDefaultFolder.mockImplementationOnce(async () => {
+      toast('设置默认分组失败: default failed', 'error')
+      throw new Error('default failed')
+    })
     render(<SessionAssetCenter />)
     await user.click(screen.getByRole('tab', { name: /分组/ }))
     const prodRow = screen.getByRole('button', { name: '生产环境' }).closest('tr')
     await user.click(within(prodRow!).getByRole('button', { name: '设为默认' }))
-    await waitFor(() => expect(toast).toHaveBeenCalledWith('设置默认分组失败: default failed', 'error'))
+    await waitFor(() => expect(state.setDefaultFolder).toHaveBeenCalledWith('prod'))
+    expect(toast).toHaveBeenCalledWith('设置默认分组失败: default failed', 'error')
+    expect(toast).toHaveBeenCalledTimes(1)
   })
 })
 
