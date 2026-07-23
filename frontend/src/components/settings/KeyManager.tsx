@@ -55,11 +55,13 @@ export function KeyManager(props: Props) {
   const [loadingID, setLoadingID] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<{ key: KeyInfo; usage: number } | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [rowActionError, setRowActionError] = useState('')
   const materialRequest = useRef(0)
 
   const openMaterial = async (id: string, mode: KeyMaterialMode) => {
     const request = ++materialRequest.current
     setLoadingID(id)
+    setRowActionError('')
     try {
       const material = await props.onLoadMaterial(id)
       if (request !== materialRequest.current) return
@@ -67,10 +69,10 @@ export function KeyManager(props: Props) {
         setMaterialState({ mode, material })
         return
       }
-      toast(t('读取密钥失败: ${}', t('密钥不存在或无法读取')), 'error')
+      setRowActionError(t('读取密钥失败: ${}', t('密钥不存在或无法读取')))
     } catch (error) {
       if (request !== materialRequest.current) return
-      toast(t('读取密钥失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
+      setRowActionError(t('读取密钥失败: ${}', error instanceof Error ? error.message : String(error)))
     } finally {
       if (request === materialRequest.current) setLoadingID(null)
     }
@@ -86,10 +88,13 @@ export function KeyManager(props: Props) {
     }
   }
   const deleteKey = async (key: KeyInfo) => {
+    setRowActionError('')
     try {
       const usage = await KeyService.UsageCount(Number(key.id))
       setDeleteTarget({ key, usage })
-    } catch (error) { toast(t('分析密钥影响失败: ${}', error instanceof Error ? error.message : String(error)), 'error') }
+    } catch (error) {
+      setRowActionError(t('分析密钥影响失败: ${}', error instanceof Error ? error.message : String(error)))
+    }
   }
 
   const confirmDeleteKey = async () => {
@@ -111,6 +116,11 @@ export function KeyManager(props: Props) {
       <Button size="sm" variant="outline" onClick={() => setGenerateOpen(true)}>{t('生成')}</Button>
       <Button size="sm" variant="outline" onClick={() => setImportOpen(true)}>{t('导入')}</Button>
     </div>
+    {rowActionError ? (
+      <div className="rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive" role="alert">
+        {rowActionError}
+      </div>
+    ) : null}
     <Table>
       <TableHeader><TableRow><TableHead>{t('名称')}</TableHead><TableHead>{t('类型')}</TableHead><TableHead>{t('创建时间')}</TableHead><TableHead className="text-right">{t('操作')}</TableHead></TableRow></TableHeader>
       <TableBody>

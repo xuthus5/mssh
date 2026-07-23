@@ -1257,3 +1257,10 @@
 |---|---|---|
 | UX-SEC-129 | 安全设置面板内密码校验/设置/轮转/删除主机指纹失败仅面板 inline alert 展示，不得 error toast 叠加；成功反馈可 toast。 | done |
 | UX-I18N-130 | 会话编辑「留空则保留原密码」、密钥认证「请选择 SSH 密钥」、侧栏新建分组「请输入分组名称」必须具备 en.json 翻译。 | done |
+
+## 2026-07-24 商用硬化波次（宏工作区/密钥管理错误归属）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| UX-MACRO-131 | 宏工作区删除失败仅工作区 inline alert 展示且保留列表，不得 toast；加载失败仍全页 error+重试。 | done |
+| UX-KEY-132 | 密钥查看/编辑加载失败与删除前影响分析失败仅 KeyManager 面板 inline alert，不得 error toast。 | done |
