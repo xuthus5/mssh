@@ -95,8 +95,6 @@ describe('TunnelDialog', () => {
     })
     expect(screen.getByText('-')).toBeInTheDocument()
   })
-})
-
 
   it('shows remote-forward exposure warning', async () => {
     const user = userEvent.setup()
@@ -107,6 +105,20 @@ describe('TunnelDialog', () => {
     await user.click(await screen.findByRole('option', { name: '远程转发' }))
     expect(screen.getByText(/安全边界/)).toBeInTheDocument()
   })
+
+  it('keeps the form when start fails', async () => {
+    const user = userEvent.setup()
+    const props = dialogProps()
+    props.onStart = vi.fn(async () => { throw new Error('start failed') })
+    render(<TunnelDialog {...props} />)
+    await user.click(screen.getByRole('button', { name: '新建隧道' }))
+    await user.type(screen.getByPlaceholderText('8080'), '2200')
+    await user.type(screen.getByPlaceholderText('80'), '22')
+    await user.click(screen.getByRole('button', { name: '启动' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('start failed')
+    expect(screen.getByPlaceholderText('8080')).toBeInTheDocument()
+  })
+})
 
 function dialogProps() {
   return {
@@ -131,16 +143,3 @@ function tunnel(id: string, type: Tunnel['type'], running: boolean): Tunnel {
     running,
   }
 }
-
-  it('keeps the form when start fails', async () => {
-    const user = userEvent.setup()
-    const props = dialogProps()
-    props.onStart = vi.fn(async () => { throw new Error('start failed') })
-    render(<TunnelDialog {...props} />)
-    await user.click(screen.getByRole('button', { name: '新建隧道' }))
-    await user.type(screen.getByPlaceholderText('8080'), '2200')
-    await user.type(screen.getByPlaceholderText('80'), '22')
-    await user.click(screen.getByRole('button', { name: '启动' }))
-    expect(await screen.findByRole('alert')).toHaveTextContent('start failed')
-    expect(screen.getByPlaceholderText('8080')).toBeInTheDocument()
-  })
