@@ -2,9 +2,12 @@ package ssh
 
 import (
 	"context"
+	"crypto/ed25519"
+	"crypto/rand"
 	"log/slog"
 	"net"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -14,6 +17,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	gossh "golang.org/x/crypto/ssh"
+	"golang.org/x/crypto/ssh/knownhosts"
 
 	"github.com/xuthus5/mssh/internal/model"
 	"github.com/xuthus5/mssh/internal/ssh/testutil"
@@ -223,4 +227,48 @@ func TestRemoteFileSizeNotFound(t *testing.T) {
 
 	_, err := RemoteFileSize(sftpClient, "/nonexistent_file")
 	assert.Error(t, err)
+}
+
+func TestHostKeyChangedErrorIncludesFingerprints(t *testing.T) {
+	pubA, _, err := ed25519.GenerateKey(rand.Reader)
+	require.NoError(t, err)
+	pubB, _, err := ed25519.GenerateKey(rand.Reader)
+	require.NoError(t, err)
+	keyA, err := gossh.NewPublicKey(pubA)
+	require.NoError(t, err)
+	keyB, err := gossh.NewPublicKey(pubB)
+	require.NoError(t, err)
+
+	err = hostKeyChangedError("example.com", keyB, &knownhosts.KeyError{
+		Want: []knownhosts.KnownKey{{Key: keyA}},
+	})
+	require.Error(t, err)
+	msg := err.Error()
+	assert.Contains(t, msg, "example.com")
+	assert.Contains(t, msg, "changed")
+	assert.Contains(t, msg, gossh.FingerprintSHA256(keyA))
+	assert.Contains(t, msg, gossh.FingerprintSHA256(keyB))
+	assert.Contains(t, msg, "Security settings")
+}
+
+func TestVerifyHostKeyBlocksChangedKey(t *testing.T) {
+	dir := t.TempDir()
+	knownHostsPath := filepath.Join(dir, "known_hosts")
+	pubA, _, err := ed25519.GenerateKey(rand.Reader)
+	require.NoError(t, err)
+	pubB, _, err := ed25519.GenerateKey(rand.Reader)
+	require.NoError(t, err)
+	keyA, err := gossh.NewPublicKey(pubA)
+	require.NoError(t, err)
+	keyB, err := gossh.NewPublicKey(pubB)
+	require.NoError(t, err)
+	require.NoError(t, appendKnownHost(knownHostsPath, "example.com", keyA))
+
+	cb, err := createHostKeyCallback(knownHostsPath, nil, slog.Default())
+	require.NoError(t, err)
+	err = cb("example.com:22", &net.TCPAddr{IP: net.IPv4(1, 2, 3, 4), Port: 22}, keyB)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "changed")
+	assert.Contains(t, err.Error(), gossh.FingerprintSHA256(keyA))
+	assert.Contains(t, err.Error(), gossh.FingerprintSHA256(keyB))
 }
