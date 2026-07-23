@@ -25,6 +25,17 @@ func (s *SyncService) StopScheduler() {
 	s.schedulerWG.Wait()
 }
 
+// NotifyVaultUnlocked triggers a best-effort catch-up sync after the vault DEK becomes available.
+// Safe to call when sync is disabled; skips quietly when vault/secret is still unavailable.
+//
+//wails:ignore
+func (s *SyncService) NotifyVaultUnlocked() {
+	if s == nil {
+		return
+	}
+	go s.runScheduledSync(context.Background())
+}
+
 func (s *SyncService) restartScheduler() {
 	s.StopScheduler()
 	config, err := s.LoadConfig()
@@ -61,6 +72,10 @@ func (s *SyncService) runScheduledSync(ctx context.Context) {
 		if s.logger != nil {
 			s.logger.Debug("scheduled sync skipped", "reason", err.Error())
 		}
+		return
+	}
+	config, err := s.LoadConfig()
+	if err != nil || !config.Enabled {
 		return
 	}
 	_, _ = s.runSync(ctx, syncDirectionStrategy, "scheduled")
