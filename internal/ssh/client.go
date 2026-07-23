@@ -178,10 +178,32 @@ func verifyHostKey(baseCb gossh.HostKeyCallback, hostname string, remote net.Add
 		return nil
 	}
 	var keyErr *knownhosts.KeyError
-	if !errors.As(err, &keyErr) || len(keyErr.Want) != 0 {
+	if !errors.As(err, &keyErr) {
 		return err
 	}
+	// Want non-empty: known host key changed (possible MITM). Block and surface fingerprints.
+	if len(keyErr.Want) != 0 {
+		return hostKeyChangedError(hostname, key, keyErr)
+	}
 	return handleNewHostKey(hostname, key, knownHostsPath, onNewHostKey, logger)
+}
+
+// hostKeyChangedError builds a commercial, actionable mismatch error with expected vs presented fingerprints.
+func hostKeyChangedError(hostname string, presented gossh.PublicKey, keyErr *knownhosts.KeyError) error {
+	presentedFP := gossh.FingerprintSHA256(presented)
+	expected := make([]string, 0, len(keyErr.Want))
+	for _, known := range keyErr.Want {
+		if known.Key == nil {
+			continue
+		}
+		expected = append(expected, known.Key.Type()+" "+gossh.FingerprintSHA256(known.Key))
+	}
+	if len(expected) == 0 {
+		return fmt.Errorf("host key for %s changed (presented %s %s); connection blocked. Remove the old fingerprint in Security settings if the change is expected",
+			hostname, presented.Type(), presentedFP)
+	}
+	return fmt.Errorf("host key for %s changed (possible MITM). expected [%s]; presented %s %s. connection blocked. remove the old fingerprint in Security settings if the change is expected",
+		hostname, strings.Join(expected, ", "), presented.Type(), presentedFP)
 }
 
 func handleNewHostKey(hostname string, key gossh.PublicKey, knownHostsPath string, onNewHostKey HostKeyVerifyFunc, logger *slog.Logger) error {

@@ -8,6 +8,7 @@ import {
 } from '@/components/ui/dialog'
 import { useConnectDialog } from '@/store/connectDialog'
 import { t } from '@/i18n'
+import { formatConnectError } from '@/lib/connectError'
 
 
 export function ConnectDialog() {
@@ -89,8 +90,8 @@ export function ConnectDialog() {
               <XCircle className="h-10 w-10 text-destructive" />
               <div className="text-sm text-center max-w-xs">
                 <p className="font-medium text-destructive">{t('连接失败')}</p>
-                <p className="text-xs text-muted-foreground mt-2 break-all">
-                  {error}
+                <p className="text-xs text-muted-foreground mt-2 break-all whitespace-pre-wrap">
+                  {formatConnectError(error, t)}
                 </p>
               </div>
               <Button

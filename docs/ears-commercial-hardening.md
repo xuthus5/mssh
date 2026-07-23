@@ -316,3 +316,11 @@
 | PROXY-URL-001 | 手动代理 URL 不得包含 userinfo 凭据；认证必须使用独立 username/password 字段。 | done |
 | PROXY-URL-002 | 手动代理 URL 必须拒绝链路本地/未指定/组播及云元数据主机。 | done |
 | PROXY-URL-003 | 仍允许 http/https/socks5/socks5h 与局域网/公网代理主机（企业场景）。 | done |
+
+## 2026-07-23 商用硬化波次（主机密钥变更错误 UX）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| SEC-HOSTKEY-001 | 当 known_hosts 中已有指纹且远端呈现不同密钥时，连接必须被阻断（不得 TOFU 覆盖）。 | done |
+| SEC-HOSTKEY-002 | 变更错误信息必须包含主机名、期望指纹与呈现指纹，并提示可在安全设置删除旧指纹。 | done |
+| SEC-HOSTKEY-003 | 连接失败对话框必须对 host-key change 错误追加本地化商业提示（中英）。 | done |
