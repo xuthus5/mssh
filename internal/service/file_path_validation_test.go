@@ -32,3 +32,10 @@ func TestFileServiceRejectsInvalidSessionID(t *testing.T) {
 	require.Error(t, svc.Mkdir(0, "/tmp/x"))
 	require.Error(t, svc.Rename(0, "/tmp/a", "/tmp/b"))
 }
+
+func TestFileServiceCancelTransferRejectsEmptyTaskID(t *testing.T) {
+	svc := NewFileService(nil, newMockEventBus(), testutil.NewTestLogger())
+	err := svc.CancelTransfer("")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "invalid task id")
+}

@@ -118,6 +118,9 @@ func (s *SessionService) awaitHostKeyDecision(ctx context.Context, attemptID, ho
 }
 
 func (s *SessionService) DecideHostKey(attemptID string, accept bool) error {
+	if strings.TrimSpace(attemptID) == "" {
+		return fmt.Errorf("invalid connection attempt id")
+	}
 	s.mu.RLock()
 	attempt, ok := s.attempts[attemptID]
 	s.mu.RUnlock()
@@ -133,6 +136,9 @@ func (s *SessionService) DecideHostKey(attemptID string, accept bool) error {
 }
 
 func (s *SessionService) CancelConnect(attemptID string) error {
+	if strings.TrimSpace(attemptID) == "" {
+		return fmt.Errorf("invalid connection attempt id")
+	}
 	s.mu.Lock()
 	attempt, ok := s.attempts[attemptID]
 	if ok {

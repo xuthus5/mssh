@@ -102,3 +102,17 @@ func TestTerminalService_OpenRejectsInvalidGeometry(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "cols")
 }
+
+func TestTerminalService_RejectsEmptyTerminalID(t *testing.T) {
+	svc := &TerminalService{
+		logger:   testutil.NewTestLogger(),
+		ptys:     map[string]terminalIO{},
+		lastUsed: map[string]time.Time{},
+	}
+	_, err := svc.Write("", "x")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "invalid terminal id")
+	require.Error(t, svc.Resize("   ", 80, 24))
+	require.Error(t, svc.Close(""))
+	require.Error(t, svc.Attach(""))
+}

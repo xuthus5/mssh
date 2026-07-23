@@ -2,6 +2,7 @@ package service
 
 import (
 	"fmt"
+	"strings"
 	"time"
 	"unicode/utf8"
 
@@ -18,6 +19,13 @@ const (
 	maxTerminalCols = 1000
 	maxTerminalRows = 500
 )
+
+func validateTerminalID(terminalID string) error {
+	if strings.TrimSpace(terminalID) == "" {
+		return fmt.Errorf("invalid terminal id")
+	}
+	return nil
+}
 
 func validateTerminalWrite(data string) error {
 	if len(data) > maxTerminalWriteBytes {
@@ -40,6 +48,9 @@ func validateTerminalSize(cols, rows int) error {
 }
 
 func (t *TerminalService) Write(terminalID string, data string) (int, error) {
+	if err := validateTerminalID(terminalID); err != nil {
+		return 0, err
+	}
 	if err := validateTerminalWrite(data); err != nil {
 		return 0, err
 	}
@@ -59,6 +70,9 @@ func (t *TerminalService) Write(terminalID string, data string) (int, error) {
 }
 
 func (t *TerminalService) Resize(terminalID string, cols, rows int) error {
+	if err := validateTerminalID(terminalID); err != nil {
+		return err
+	}
 	if err := validateTerminalSize(cols, rows); err != nil {
 		return err
 	}
@@ -78,6 +92,9 @@ func (t *TerminalService) Resize(terminalID string, cols, rows int) error {
 }
 
 func (t *TerminalService) Close(terminalID string) error {
+	if err := validateTerminalID(terminalID); err != nil {
+		return err
+	}
 	t.logger.Info("closing terminal", "terminalID", terminalID)
 	if t.clearBufferedTerminal(terminalID) {
 		return nil

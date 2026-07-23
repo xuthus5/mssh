@@ -607,3 +607,13 @@
 |---|---|---|
 | SEC-AUDIT-010 | RecordBatch 必须拒绝 sessionID<=0。 | done |
 | SEC-MACRO-013 | Macro Execute 必须拒绝空 terminalID。 | done |
+
+## 2026-07-23 商用硬化波次（终端/录制/传输/连接 attempt 空 ID 校验 + attach 可见）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| SEC-TERM-020 | Terminal Write/Resize/Close/Attach 必须拒绝空 terminalID。 | done |
+| SEC-LOG-012 | Start/StopTerminalRecording 必须拒绝空 terminalID。 | done |
+| SEC-SFTP-011 | CancelTransfer 必须拒绝空 taskID。 | done |
+| SEC-SESSION-015 | DecideHostKey/CancelConnect 必须拒绝空 attemptID。 | done |
+| UX-TERM-020 | 终端 Attach 失败必须 toast。 | done |

@@ -13,6 +13,9 @@ const (
 )
 
 func (t *TerminalService) Attach(terminalID string) error {
+	if err := validateTerminalID(terminalID); err != nil {
+		return err
+	}
 	t.mu.Lock()
 	_, active := t.ptys[terminalID]
 	_, buffered := t.pendingOutput[terminalID]
