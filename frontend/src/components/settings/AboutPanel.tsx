@@ -23,11 +23,14 @@ export function AboutPanel() {
   const [message, setMessage] = useState('')
 
   useEffect(() => {
-    AboutService.Info().then((info) => setAbout({ currentVersion: info.current_version, repositoryURL: info.repository_url })).catch((error: unknown) => {
+    AboutService.Info().then((info) => {
+      setAbout({ currentVersion: info.current_version, repositoryURL: info.repository_url })
+      setMessage('')
+    }).catch((error: unknown) => {
       const message = error instanceof Error ? error.message : String(error)
       logger.error('load about info failed', error)
       setAbout((current) => ({ ...current, currentVersion: t('未知') }))
-      toast(t('加载关于信息失败: ${}', message), 'error')
+      setMessage(t('加载关于信息失败: ${}', message))
     })
   }, [])
 
@@ -43,7 +46,6 @@ export function AboutPanel() {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       setMessage(t('检查更新失败：${}', message))
-      toast(t('检查更新失败：${}', message), 'error')
     } finally {
       setChecking(false)
     }
@@ -65,7 +67,7 @@ export function AboutPanel() {
         <div className="flex items-center justify-between gap-4"><span className="text-muted-foreground">{t('社区最新版本')}</span><span className="font-mono">{latestVersion}</span></div>
       </CardContent>
     </Card>
-    {message && <Alert><AlertDescription>{message}</AlertDescription></Alert>}
+    {message && <Alert variant={/失败/.test(message) ? 'destructive' : 'default'}><AlertDescription>{message}</AlertDescription></Alert>}
     <div className="flex flex-wrap gap-2">
       <Button onClick={() => { void checkUpdate() }} disabled={checking}><RefreshCw className={checking ? 'animate-spin' : ''} />{checking ? t('检查中…') : t('检查更新')}</Button>
       {releaseURL && <Button variant="outline" onClick={() => openURL(releaseURL)}><ExternalLink />{t('查看发布页')}</Button>}

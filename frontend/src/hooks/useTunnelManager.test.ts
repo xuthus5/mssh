@@ -128,4 +128,25 @@ describe('useTunnelManager', () => {
     expect(caught).toBeTruthy()
     expect(useToastStore.getState().toasts.some((item) => item.message.includes('bind failed'))).toBe(true)
   })
+
+  it('sets load error without toast so empty list is not assumed', async () => {
+    list.mockRejectedValueOnce(new Error('list boom'))
+    const { result } = renderHook(() => useTunnelManager(7))
+    await act(async () => {
+      await result.current.load()
+    })
+    expect(result.current.error).toBe('list boom')
+    expect(result.current.tunnels).toEqual([])
+    expect(useToastStore.getState().toasts).toHaveLength(0)
+  })
+
+  it('silent load failures do not set panel error', async () => {
+    list.mockRejectedValueOnce(new Error('silent boom'))
+    const { result } = renderHook(() => useTunnelManager(7))
+    await act(async () => {
+      await result.current.load({ silent: true })
+    })
+    expect(result.current.error).toBe('')
+    expect(useToastStore.getState().toasts).toHaveLength(0)
+  })
 })

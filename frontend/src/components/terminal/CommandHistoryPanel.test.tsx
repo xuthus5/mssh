@@ -42,10 +42,11 @@ describe('CommandHistoryPanel', () => {
     expect(listHistory).not.toHaveBeenCalled()
   })
 
-  it('toasts remote history list failures', async () => {
+  it('shows remote history list failures inline without toast', async () => {
     listHistory.mockRejectedValueOnce(new Error('history list failed'))
     render(<CommandHistoryPanel sessionID={9} onClose={vi.fn()} onFill={vi.fn()} />)
-    await waitFor(() => expect(useToastStore.getState().toasts.some((item) => item.message.includes('history list failed'))).toBe(true))
+    expect(await screen.findByRole('alert')).toHaveTextContent('history list failed')
+    expect(useToastStore.getState().toasts).toHaveLength(0)
   })
 
   it('clears remote and local history after confirmation', async () => {

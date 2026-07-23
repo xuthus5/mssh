@@ -34,14 +34,14 @@ describe('TunnelDialog', () => {
     await user.type(screen.getByPlaceholderText('80'), '22')
     await user.click(screen.getByRole('button', { name: '启动' }))
 
-    expect(props.onStart).toHaveBeenCalledWith({
+    expect(props.onStart).toHaveBeenCalledWith(expect.objectContaining({
       sessionId: 'session-7',
       type: 'local',
       localAddress: '127.0.0.1',
       localPort: 2200,
       remoteAddress: '127.0.0.1',
       remotePort: 22,
-    })
+    }), expect.objectContaining({ silent: true }))
     expect(screen.queryByPlaceholderText('8080')).not.toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: '新建隧道' }))
@@ -57,14 +57,14 @@ describe('TunnelDialog', () => {
     await user.clear(screen.getByLabelText('本地地址'))
     await user.type(screen.getByLabelText('本地地址'), '127.0.0.1')
     await user.click(screen.getByRole('button', { name: '启动' }))
-    expect(props.onStart).toHaveBeenLastCalledWith({
+    expect(props.onStart).toHaveBeenLastCalledWith(expect.objectContaining({
       sessionId: 'session-7',
       type: 'dynamic',
       localAddress: '127.0.0.1',
       localPort: 1080,
       remoteAddress: '127.0.0.1',
       remotePort: 0,
-    })
+    }), expect.objectContaining({ silent: true }))
   })
 
   it('labels tunnel types and starts or stops existing tunnels', async () => {
@@ -87,7 +87,7 @@ describe('TunnelDialog', () => {
     await user.click(within(remoteRow!).getByRole('button', { name: '启动' }))
 
     expect(props.onStop).toHaveBeenCalledWith('local-1')
-    expect(props.onStart).toHaveBeenCalledWith({
+    expect(props.onStart).toHaveBeenCalledWith(expect.objectContaining({
       id: 'remote-1',
       sessionId: 'session-7',
       type: 'remote',
@@ -95,7 +95,7 @@ describe('TunnelDialog', () => {
       localPort: 8080,
       remoteAddress: 'example.com',
       remotePort: 80,
-    })
+    }))
     expect(screen.getByText('-')).toBeInTheDocument()
   })
 
@@ -143,6 +143,15 @@ describe('TunnelDialog', () => {
     await user.click(screen.getByRole('button', { name: '启动' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('start failed')
     expect(screen.getByPlaceholderText('8080')).toBeInTheDocument()
+  })
+
+  it('shows load failures instead of empty tunnels', async () => {
+    const onReload = vi.fn(async () => {})
+    render(<TunnelDialog {...dialogProps()} tunnels={[]} loadError="list boom" onReload={onReload} />)
+    expect(screen.getByRole('alert')).toHaveTextContent('list boom')
+    expect(screen.queryByText('无隧道')).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: '重试' }))
+    expect(onReload).toHaveBeenCalled()
   })
 })
 

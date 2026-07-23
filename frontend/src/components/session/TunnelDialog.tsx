@@ -26,6 +26,8 @@ interface Props {
   open: boolean
   onOpenChange: (open: boolean) => void
   tunnels: Tunnel[]
+  loadError?: string
+  onReload?: () => void | Promise<void>
   onStart: (tunnel: Omit<Tunnel, 'id' | 'running'> & { id?: string }, options?: { silent?: boolean }) => void | Promise<void>
   onStop: (tunnelId: string) => void | Promise<void>
   onDelete?: (tunnelId: string) => void | Promise<void>
@@ -42,6 +44,8 @@ export default function TunnelDialog({
   open,
   onOpenChange,
   tunnels,
+  loadError = '',
+  onReload,
   onStart,
   onStop,
   onDelete,
@@ -222,7 +226,16 @@ export default function TunnelDialog({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {tunnels.length === 0 ? (
+              {loadError ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center">
+                    <div className="flex flex-col items-center gap-2 py-2 text-sm text-destructive" role="alert">
+                      <span>{t('加载隧道失败: ${}', loadError)}</span>
+                      {onReload ? <Button size="xs" variant="outline" onClick={() => { void Promise.resolve(onReload()).catch(() => undefined) }}>{t('重试')}</Button> : null}
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ) : tunnels.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={5} className="text-center text-muted-foreground">{t('无隧道')}</TableCell>
                 </TableRow>
