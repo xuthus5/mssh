@@ -1,7 +1,10 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { AIProviderPanel } from '@/components/settings/AIProviderPanel'
+import { requestConfirm } from '@/lib/confirmDialog'
+
+vi.mock('@/lib/confirmDialog', () => ({ requestConfirm: vi.fn(async () => true) }))
 
 describe('AIProviderPanel', () => {
   it('edits, tests, deletes and changes provider priority', async () => {
@@ -19,12 +22,24 @@ describe('AIProviderPanel', () => {
     expect(controller.saveProvider).toHaveBeenCalledWith(expect.objectContaining({ name: 'local', provider: 'ollama', default_model: 'qwen', enabled: false }))
     await user.click(screen.getByRole('button', { name: '测试连接' }))
     await user.click(screen.getByRole('button', { name: '删除' }))
+    await waitFor(() => expect(requestConfirm).toHaveBeenCalled())
     expect(controller.testProvider).toHaveBeenCalledWith(1)
     expect(controller.deleteProvider).toHaveBeenCalledWith(1)
     await selectOption(user, '默认提供商', '未设置')
     await selectOption(user, '故障回退', 'main')
     expect(controller.saveSettings).toHaveBeenCalledWith(expect.objectContaining({ default_provider_id: null }))
     expect(controller.saveSettings).toHaveBeenCalledWith(expect.objectContaining({ fallback_provider_id: 1 }))
+  })
+
+  it('does not delete provider when confirmation is cancelled', async () => {
+    vi.mocked(requestConfirm).mockResolvedValueOnce(false)
+    const controller = providerController()
+    const user = userEvent.setup()
+    render(<AIProviderPanel controller={controller as never} />)
+    await user.click(screen.getByRole('button', { name: /main/ }))
+    await user.click(screen.getByRole('button', { name: '删除' }))
+    await waitFor(() => expect(requestConfirm).toHaveBeenCalled())
+    expect(controller.deleteProvider).not.toHaveBeenCalled()
   })
 
   it('creates a new provider from the empty editor', async () => {
