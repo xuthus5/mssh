@@ -95,6 +95,9 @@ func (t *TerminalService) SerialBreak(terminalID string, durationMs int) error {
 	if err := validateTerminalID(terminalID); err != nil {
 		return err
 	}
+	if durationMs < 0 {
+		return fmt.Errorf("invalid break duration")
+	}
 	port, err := t.serialPortSession(terminalID)
 	if err != nil {
 		return err

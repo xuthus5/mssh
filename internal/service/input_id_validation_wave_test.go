@@ -59,3 +59,21 @@ func TestSettingServiceRejectEmptyKey(t *testing.T) {
 	require.Error(t, err)
 	require.Error(t, svc.Delete(""))
 }
+
+func TestSerialBreakRejectsNegativeDuration(t *testing.T) {
+	term := NewTerminalService(nil, discardEventBus{}, 8, slog.Default())
+	require.Error(t, term.SerialBreak("term-1", -1))
+}
+
+func TestLogServiceRejectsInvalidRecordingInputs(t *testing.T) {
+	db, err := store.OpenDB(t.TempDir())
+	require.NoError(t, err)
+	require.NoError(t, store.InitializeSchema(db))
+	t.Cleanup(func() { _ = db.Close() })
+	logSvc := NewLogService(db, t.TempDir(), testutil.NewTestLogger())
+	_, err = logSvc.StartTerminalRecording("", 1, 80, 24, "xterm")
+	require.Error(t, err)
+	_, err = logSvc.StartTerminalRecording("term-1", -1, 80, 24, "xterm")
+	require.Error(t, err)
+	require.Error(t, logSvc.StopTerminalRecordingIfActive(""))
+}
