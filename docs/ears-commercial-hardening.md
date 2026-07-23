@@ -871,3 +871,9 @@
 |---|---|---|
 | UX-I18N-022 | en.json 中中文多词 UI 文案的英文翻译不得出现无空格粘连词（如 Executemacro / Commandhistory）。 | done |
 
+## 2026-07-23 商用硬化波次（英文进度文案 medium 粘连）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| UX-I18N-023 | en.json 进度/中态文案不得出现 medium 粘连（如 Importmedium... / Executemedium...）。 | done |
+

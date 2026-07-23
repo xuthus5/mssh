@@ -63,4 +63,11 @@ describe('i18n', () => {
     })
     expect(glued).toEqual([])
   })
+
+  it('rejects medium-glued progress labels', () => {
+    const glued = Object.entries(enCatalog).filter(([, value]) => typeof value === 'string' && /medium\.?\.?\.?$/i.test(value.replace(/\.+$/, '')) || (typeof value === 'string' && /medium\./i.test(value)))
+    const hits = Object.entries(enCatalog).filter(([, value]) => typeof value === 'string' && /medium/i.test(value))
+    expect(hits).toEqual([])
+  })
+
 })
