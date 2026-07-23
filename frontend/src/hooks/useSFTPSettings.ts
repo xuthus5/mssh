@@ -45,13 +45,22 @@ function emitSFTPSettings(settings: SFTPSettings) {
 
 export function useSFTPSettings() {
   const [settings, setSettings] = useState<SFTPSettings>(DEFAULT_SFTP_SETTINGS)
+  const [settingsReady, setSettingsReady] = useState(false)
   const revision = useRef(0)
   const load = useCallback(async () => {
     const currentRevision = revision.current
     try {
       const persisted = parseSFTPSettings(await SettingService.GetMany(sftpSettingKeys))
-      if (currentRevision === revision.current) { setSettings(persisted); useSFTPSettingsStore.getState().setSettings(persisted) }
-    } catch (error) { logger.debug('loadSFTPSettings error', error) }
+      if (currentRevision === revision.current) {
+        setSettings(persisted)
+        useSFTPSettingsStore.getState().setSettings(persisted)
+        setSettingsReady(true)
+      }
+    } catch (error) {
+      logger.error('loadSFTPSettings error', error)
+      toast(t('加载 SFTP 设置失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
+      setSettingsReady(false)
+    }
   }, [])
   const save = useCallback(async (next: SFTPSettings, options?: { quiet?: boolean }) => {
     const normalized = normalizeSFTPSettings(next)
@@ -77,5 +86,5 @@ export function useSFTPSettings() {
   useEffect(() => Events.On(SETTINGS_SFTP_CHANGED_EVENT, (event: EventEnvelope<SFTPSettings>) => {
     if (event.data) { const normalized = normalizeSFTPSettings(event.data); setSettings(normalized); useSFTPSettingsStore.getState().setSettings(normalized) }
   }), [])
-  return { settings, save, reload: load }
+  return { settings, settingsReady, save, reload: load }
 }

@@ -243,6 +243,7 @@ function useGeneralEvents(load: () => Promise<void>, setGeneral: Dispatch<SetSta
 
 export function useGeneralSettings() {
   const [general, setGeneral] = useState<GeneralSettings>(defaultGeneralSettings)
+  const [settingsReady, setSettingsReady] = useState(false)
   const revision = useRef(0)
   const loadGeneral = useCallback(async () => {
     const currentRevision = revision.current
@@ -251,8 +252,11 @@ export function useGeneralSettings() {
       if (currentRevision !== revision.current) return
       applyGeneral(loaded)
       setGeneral(loaded)
+      setSettingsReady(true)
     } catch (error) {
-      logger.debug('loadGeneral error', error)
+      logger.error('loadGeneral error', error)
+      toast(t('加载设置失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
+      setSettingsReady(false)
     } finally {
       useTerminalBehaviorStore.getState().markSettingsHydrated()
     }
@@ -289,5 +293,5 @@ export function useGeneralSettings() {
   }, [])
   useEffect(() => { void loadGeneral() }, [loadGeneral])
   useGeneralEvents(loadGeneral, setGeneral)
-  return { general, saveGeneral, previewUIFont, reloadGeneral: loadGeneral }
+  return { general, settingsReady, saveGeneral, previewUIFont, reloadGeneral: loadGeneral }
 }

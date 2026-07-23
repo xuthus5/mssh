@@ -67,4 +67,34 @@ describe('useAutoSave', () => {
     expect(result.current.status).toBe('error')
     expect(result.current.error).toBe('network')
   })
+  it('does not save while isReady is false, then arms baseline when ready', async () => {
+    const onSave = vi.fn(async () => {})
+    const { result, rerender } = renderHook(
+      ({ value, isReady }) => useAutoSave({ value, onSave, isReady, delayMs: 100 }),
+      { initialProps: { value: { name: 'defaults' }, isReady: false } },
+    )
+    rerender({ value: { name: 'edited-before-ready' }, isReady: false })
+    await act(async () => {
+      vi.advanceTimersByTime(200)
+      await Promise.resolve()
+    })
+    expect(onSave).not.toHaveBeenCalled()
+    expect(result.current.status).toBe('idle')
+
+    rerender({ value: { name: 'loaded' }, isReady: true })
+    await act(async () => {
+      vi.advanceTimersByTime(200)
+      await Promise.resolve()
+    })
+    expect(onSave).not.toHaveBeenCalled()
+
+    rerender({ value: { name: 'user-edit' }, isReady: true })
+    await act(async () => {
+      vi.advanceTimersByTime(100)
+      await Promise.resolve()
+    })
+    expect(onSave).toHaveBeenCalledTimes(1)
+    expect(onSave).toHaveBeenCalledWith({ name: 'user-edit' })
+  })
+
 })
