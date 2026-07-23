@@ -41,6 +41,7 @@ export function SecurityPanel() {
   const [requireLaunch, setRequireLaunch] = useState(false)
   const [rememberUnlock, setRememberUnlock] = useState(true)
   const [busy, setBusy] = useState(false)
+  const [loadError, setLoadError] = useState('')
   const [confirmAction, setConfirmAction] = useState<null | { type: 'rotate' } | { type: 'host'; entry: HostKeyEntry }>(null)
 
   const load = useCallback(async () => {
@@ -51,8 +52,9 @@ export function SecurityPanel() {
       setRequireLaunch(next.require_password_on_launch)
       setRememberUnlock(next.remember_unlock)
       setEntries(await SessionService.ListHostKeys())
+      setLoadError('')
     } catch (error) {
-      toast(t('加载安全设置失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
+      setLoadError(error instanceof Error ? error.message : String(error))
     } finally {
       setLoading(false)
     }
@@ -122,6 +124,12 @@ export function SecurityPanel() {
 
   return (
     <div className="space-y-4 pt-2">
+      {loadError ? (
+        <div className="rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive" role="alert">
+          {t('加载安全设置失败: ${}', loadError)}
+          <Button size="xs" variant="outline" className="ml-2" onClick={() => { void load() }}>{t('重试')}</Button>
+        </div>
+      ) : null}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2"><KeyRound className="size-4" />{t('应用密码')}</CardTitle>
@@ -182,6 +190,9 @@ export function SecurityPanel() {
         </CardHeader>
         <CardContent className="space-y-2">
           {loading ? <p className="text-sm text-muted-foreground">{t('正在加载主机指纹...')}</p>
+            : loadError ? (
+              <p className="text-sm text-muted-foreground">{t('主机指纹暂不可用，请先修复上方加载错误。')}</p>
+            )
             : entries.length === 0 ? <p className="text-sm text-muted-foreground">{t('尚未信任任何 SSH 主机。')}</p>
               : entries.map((entry) => (
                 <div key={`${entry.line}-${entry.fingerprint}`} className="flex items-center gap-3 rounded-xl border border-border p-3">
