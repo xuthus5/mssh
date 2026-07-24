@@ -79,12 +79,12 @@ export function KeyManager(props: Props) {
   }
   const copyPublicKey = async (id: string) => {
     setRowActionError('')
-    const publicKey = await props.onExport(id)
-    if (!publicKey) {
-      setRowActionError(t('读取密钥失败: ${}', t('密钥不存在或无法读取')))
-      return
-    }
     try {
+      const publicKey = await props.onExport(id)
+      if (!publicKey) {
+        setRowActionError(t('读取密钥失败: ${}', t('密钥不存在或无法读取')))
+        return
+      }
       await getClipboard().writeText(publicKey)
       toast(t('公钥已复制'), 'success')
     } catch (error) {
@@ -104,12 +104,14 @@ export function KeyManager(props: Props) {
   const confirmDeleteKey = async () => {
     if (!deleteTarget || deleting) return
     setDeleting(true)
+    setRowActionError('')
     try {
       await props.onDelete(deleteTarget.key.id)
       setDeleteTarget(null)
     } catch (error) {
-      // onDelete surfaces toast; keep dialog open for retry
       logger.error('delete key confirmation failed', error)
+      setRowActionError(t('删除密钥失败: ${}', error instanceof Error ? error.message : String(error)))
+      setDeleteTarget(null)
     } finally {
       setDeleting(false)
     }
