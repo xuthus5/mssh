@@ -43,3 +43,14 @@ func TestRotateVaultPasswordNilReencrypt(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, newDEK, unlocked)
 }
+
+func TestSaveVaultFileRejectsInvalid(t *testing.T) {
+	err := SaveVaultFile(filepath.Join(t.TempDir(), "vault.json"), VaultFile{})
+	require.Error(t, err)
+}
+
+
+func TestUnlockVaultInvalidFile(t *testing.T) {
+	_, err := UnlockVault("twelve chars!", VaultFile{})
+	require.Error(t, err)
+}
