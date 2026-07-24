@@ -180,18 +180,22 @@ describe('TerminalSplit', () => {
   it('keeps the layout when opening or closing a pane fails', async () => {
     const openError = new Error('open failed')
     vi.mocked(TerminalService.Open).mockReset().mockRejectedValueOnce(openError)
+    useToastStore.setState({ toasts: [] })
     render(<><Harness /><ToastContainer /></>)
 
     fireEvent.click(screen.getByText('向右'))
     expect(await screen.findByRole('alert')).toHaveTextContent('创建分屏失败: open failed')
+    expect(useToastStore.getState().toasts.filter((item) => item.type === 'error')).toHaveLength(0)
     expect(screen.getByTestId('pane-primary-1')).toBeInTheDocument()
 
     vi.mocked(TerminalService.Open).mockResolvedValueOnce('split-1')
     fireEvent.click(screen.getByText('向右'))
     await screen.findByTestId('pane-split-1')
+    useToastStore.setState({ toasts: [] })
     vi.mocked(TerminalService.Close).mockRejectedValueOnce(new Error('close failed'))
     fireEvent.click(screen.getAllByTitle('关闭当前窗格')[1])
     await waitFor(() => expect(screen.getAllByRole('alert').at(-1)).toHaveTextContent('关闭分屏失败: close failed'))
+    expect(useToastStore.getState().toasts.filter((item) => item.type === 'error')).toHaveLength(0)
     expect(screen.getByTestId('pane-split-1')).toBeInTheDocument()
   })
 

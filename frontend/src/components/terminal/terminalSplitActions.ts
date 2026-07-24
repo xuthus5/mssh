@@ -49,6 +49,7 @@ type SplitActionContext = {
   setTree: (updater: (current: SplitNode) => SplitNode) => void
   setBusy: (busy: boolean) => void
   setClosingID?: (id: string | null) => void
+  setActionError?: (message: string) => void
   requestFocus: (terminalID: string) => void
   lastUsed: (terminalID: string) => number
   onPaneClosed?: (terminalID: string) => void
@@ -69,6 +70,7 @@ export async function splitPane(direction: SplitDirection, ctx: SplitActionConte
     : ctx.primaryID
   ctx.operationRef.current = true
   ctx.setBusy(true)
+  ctx.setActionError?.('')
   try {
     const terminalID = await openTerminalWithPoolCapacity(() => openSplitPane(
       ctx.sessionId, ctx.connectionKind, ctx.serialPortId, ctx.primaryRef.current,
@@ -82,7 +84,7 @@ export async function splitPane(direction: SplitDirection, ctx: SplitActionConte
     ctx.requestFocus(terminalID)
   } catch (error: unknown) {
     logger.error('TerminalSplit: failed to open split', error)
-    toast(t('创建分屏失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
+    ctx.setActionError?.(t('创建分屏失败: ${}', error instanceof Error ? error.message : String(error)))
   } finally {
     ctx.operationRef.current = false
     if (ctx.mountedRef.current) ctx.setBusy(false)
@@ -94,6 +96,7 @@ export async function closeSplitPane(terminalID: string, ctx: SplitActionContext
   ctx.operationRef.current = true
   ctx.setBusy(true)
   ctx.setClosingID?.(terminalID)
+  ctx.setActionError?.('')
   try {
     await TerminalService.Close(terminalID).catch((error: unknown) => {
       if (!isTerminalNotFoundError(error)) throw error
@@ -111,7 +114,7 @@ export async function closeSplitPane(terminalID: string, ctx: SplitActionContext
     ctx.requestFocus(result.focusID)
   } catch (error: unknown) {
     logger.error('TerminalSplit: failed to close pane', error)
-    toast(t('关闭分屏失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
+    ctx.setActionError?.(t('关闭分屏失败: ${}', error instanceof Error ? error.message : String(error)))
   } finally {
     ctx.operationRef.current = false
     if (ctx.mountedRef.current) ctx.setBusy(false)
