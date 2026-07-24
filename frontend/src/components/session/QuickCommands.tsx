@@ -15,7 +15,7 @@ export interface CommandItem {
 interface Props {
   commands: CommandItem[]
   onExecute: (command: string) => void
-  onAdd: (item: Omit<CommandItem, 'id'>) => void
+  onAdd: (item: Omit<CommandItem, 'id'>) => void | Promise<void>
   onDelete: (id: string) => void | Promise<void>
   showAddForm?: boolean
 }
@@ -32,13 +32,17 @@ export default function QuickCommands({
   const [shortcut, setShortcut] = useState('')
   const [command, setCommand] = useState('')
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     if (!name.trim() || !command.trim()) return
-    onAdd({ name: name.trim(), shortcut: shortcut.trim(), command: command.trim() })
-    setName('')
-    setShortcut('')
-    setCommand('')
-    setShowAdd(false)
+    try {
+      await onAdd({ name: name.trim(), shortcut: shortcut.trim(), command: command.trim() })
+      setName('')
+      setShortcut('')
+      setCommand('')
+      setShowAdd(false)
+    } catch {
+      // parent surfaces fixed-surface error; keep form open for retry
+    }
   }
 
   const handleDelete = async (item: CommandItem) => {
@@ -74,7 +78,7 @@ export default function QuickCommands({
           <Input placeholder={t('命令')} value={command} onChange={(e) => setCommand(e.target.value)} className="h-7 text-xs" />
           <div className="flex justify-end gap-1">
             <Button size="xs" variant="ghost" onClick={() => setShowAdd(false)}>{t('取消')}</Button>
-            <Button size="xs" onClick={handleAdd}>{t('添加')}</Button>
+            <Button size="xs" onClick={() => { void handleAdd() }}>{t('添加')}</Button>
           </div>
         </div>
       )}

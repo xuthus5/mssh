@@ -128,24 +128,37 @@ async function loadMacros(
   }
 }
 
-async function addMacro(item: Omit<CommandItem, 'id'>, update: (callback: (items: CommandItem[]) => CommandItem[]) => void) {
+async function addMacro(
+  item: Omit<CommandItem, 'id'>,
+  update: (callback: (items: CommandItem[]) => CommandItem[]) => void,
+  setError: (message: string) => void,
+) {
   try {
     const input = { name: item.name, command: item.command, shortcut: item.shortcut, id: 0, delay_ms: 0, sort_order: 0 } satisfies MacroInput
     const result = await MacroService.Create(input)
     update((items) => [...items, { id: String(result?.id ?? ''), name: result?.name ?? item.name, shortcut: result?.shortcut ?? item.shortcut, command: result?.command ?? item.command }])
+    setError('')
   } catch (error: unknown) {
     logger.error('Sidebar: create macro error', error)
-    toast(t('创建宏失败: ${}', macroErrorMessage(error)), 'error')
+    // Sidebar macro panel owns create failures via fixed banner.
+    setError(t('创建宏失败: ${}', macroErrorMessage(error)))
+    throw error instanceof Error ? error : new Error(macroErrorMessage(error))
   }
 }
 
-async function deleteMacro(id: string, update: (callback: (items: CommandItem[]) => CommandItem[]) => void) {
+async function deleteMacro(
+  id: string,
+  update: (callback: (items: CommandItem[]) => CommandItem[]) => void,
+  setError: (message: string) => void,
+) {
   try {
     await MacroService.Delete(Number(id))
     update((items) => items.filter((item) => item.id !== id))
+    setError('')
   } catch (error: unknown) {
     logger.error('Sidebar: delete macro error', error)
-    toast(t('删除宏失败: ${}', macroErrorMessage(error)), 'error')
+    setError(t('删除宏失败: ${}', macroErrorMessage(error)))
+    throw error instanceof Error ? error : new Error(macroErrorMessage(error))
   }
 }
 
@@ -159,7 +172,7 @@ export function useSidebarMacros() {
   const execute = useCallback((command: string) => {
     void executeMacroOnActiveTerminal(command, { requireTerminalSurface: true })
   }, [])
-  const add = useCallback((item: Omit<CommandItem, 'id'>) => addMacro(item, setMacros), [])
-  const remove = useCallback((id: string) => deleteMacro(id, setMacros), [])
+  const add = useCallback((item: Omit<CommandItem, 'id'>) => addMacro(item, setMacros, setError), [])
+  const remove = useCallback((id: string) => deleteMacro(id, setMacros, setError), [])
   return { macros, error, reload, execute, add, remove }
 }

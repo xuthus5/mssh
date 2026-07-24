@@ -1363,3 +1363,10 @@
 | UX-TRANSFER-154 | 传输取消失败仅 TransferCenter Sheet banner 展示，`useFileTransfer.cancelTransfer` 不得再 error toast（避免双 owner）。 | done |
 | UX-SFTP-155 | SFTP 删除/重命名/新建目录失败仅 FilePanel inline alert 展示，不得 error toast。 | done |
 | UX-SFTP-156 | 同步当前目录失败与选择上传/下载路径失败仅 FilePanel actionError banner 展示，不得 error toast；同步成功可 toast。 | done |
+
+## 2026-07-24 商用硬化波次（侧栏宏创建/删除错误归属）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| UX-MACRO-157 | 侧栏宏创建失败仅侧栏 banner 展示（创建宏失败），不得 error toast；表单保持打开可重试。 | done |
+| UX-MACRO-158 | 侧栏宏删除失败仅侧栏 banner 展示（删除宏失败），不得 error toast；列表项保留。 | done |
