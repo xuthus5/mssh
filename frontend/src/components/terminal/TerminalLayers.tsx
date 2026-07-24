@@ -37,8 +37,9 @@ function useLayerFocusRequest(tab: Tab, active: boolean, focusRequest: AppState[
   return resolvedRequestRef.current
 }
 
-function FilePanelView({ transfer, onClose, onUpload, onDownload, dropTargetID, showHiddenFiles, defaultView, onLoadDirectory, onSyncCurrentDirectory, syncingCurrentDirectory }: {
+function FilePanelView({ transfer, actionError, onClose, onUpload, onDownload, dropTargetID, showHiddenFiles, defaultView, onLoadDirectory, onSyncCurrentDirectory, syncingCurrentDirectory }: {
   transfer: FileTransfer
+  actionError: string
   onClose: () => void
   onUpload: () => void
   onDownload: (path: string) => void
@@ -52,7 +53,7 @@ function FilePanelView({ transfer, onClose, onUpload, onDownload, dropTargetID, 
   return (
     <Suspense fallback={<div className="grid w-[340px] place-items-center border-l"><Spinner /></div>}>
       <FilePanel open onClose={onClose} files={transfer.files} currentPath={transfer.currentPath}
-        loading={transfer.loading} error={transfer.error} onNavigateTo={transfer.navigateTo}
+        loading={transfer.loading} error={transfer.error} actionError={actionError} onNavigateTo={transfer.navigateTo}
         onNavigateUp={transfer.navigateUp} onDelete={transfer.deleteFile} onRename={transfer.renameFile}
         onMakeDir={transfer.makeDir} onUpload={onUpload} onDownload={onDownload} dropTargetId={dropTargetID}
         showHiddenFiles={showHiddenFiles} defaultView={defaultView} onLoadDirectory={onLoadDirectory}
@@ -70,6 +71,7 @@ function FilePanelContainer({ sessionID, terminalID, onClose }: { sessionID: num
   const dropTargetID = `sftp-drop-zone-${terminalID}`
   const loadedInitialPath = useRef(false)
   const [syncingCurrentDirectory, setSyncingCurrentDirectory] = useState(false)
+  const [actionError, setActionError] = useState('')
 
   useEffect(() => {
     // listFiles owns panel error state; do not wrap with toast (single-owner rule).
@@ -86,6 +88,7 @@ function FilePanelContainer({ sessionID, terminalID, onClose }: { sessionID: num
   const syncCurrentDirectory = useCallback(async () => {
     if (syncingCurrentDirectory) return
     setSyncingCurrentDirectory(true)
+    setActionError('')
     const previousRevision = useTerminalDirectoryStore.getState().revisions[terminalID] ?? 0
     try {
       await TerminalService.Write(terminalID, MANUAL_TERMINAL_DIRECTORY_REPORT)
@@ -93,7 +96,7 @@ function FilePanelContainer({ sessionID, terminalID, onClose }: { sessionID: num
       if (!followTerminalDirectory || path === transfer.currentPath) await transfer.listFiles(path)
       toast(t('已同步当前目录: ${}', path), 'success')
     } catch (error) {
-      toast(t('同步当前目录失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
+      setActionError(t('同步当前目录失败: ${}', error instanceof Error ? error.message : String(error)))
     } finally {
       setSyncingCurrentDirectory(false)
     }
@@ -108,11 +111,12 @@ function FilePanelContainer({ sessionID, terminalID, onClose }: { sessionID: num
 
   const handleUpload = useCallback(async () => {
     let localPath = ''
+    setActionError('')
     try {
       const selected = await Dialogs.OpenFile({ Title: t('选择要上传的文件'), CanChooseFiles: true, CanChooseDirectories: false, AllowsMultipleSelection: false })
       localPath = typeof selected === 'string' ? selected : selected?.[0] ?? ''
     } catch (error) {
-      toast(t('选择上传文件失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
+      setActionError(t('选择上传文件失败: ${}', error instanceof Error ? error.message : String(error)))
       return
     }
     if (localPath) await transfer.upload(localPath, transfer.currentPath)
@@ -120,16 +124,17 @@ function FilePanelContainer({ sessionID, terminalID, onClose }: { sessionID: num
 
   const handleDownload = useCallback(async (remotePath: string) => {
     let localPath = ''
+    setActionError('')
     try {
       localPath = await Dialogs.SaveFile({ Title: t('选择下载位置'), Filename: remotePath.split('/').pop() ?? 'download', CanCreateDirectories: true }) ?? ''
     } catch (error) {
-      toast(t('选择下载位置失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
+      setActionError(t('选择下载位置失败: ${}', error instanceof Error ? error.message : String(error)))
       return
     }
     if (localPath) await transfer.download(remotePath, localPath)
   }, [transfer.download])
 
-  return <FilePanelView transfer={transfer} onClose={onClose} onUpload={() => { void handleUpload() }}
+  return <FilePanelView transfer={transfer} actionError={actionError} onClose={onClose} onUpload={() => { void handleUpload() }}
     onDownload={(path) => { void handleDownload(path) }} dropTargetID={dropTargetID} showHiddenFiles={showHiddenFiles}
     defaultView={defaultView} onLoadDirectory={transfer.loadDirectory} onSyncCurrentDirectory={() => { void syncCurrentDirectory() }}
     syncingCurrentDirectory={syncingCurrentDirectory} />
