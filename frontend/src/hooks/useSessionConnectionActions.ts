@@ -81,9 +81,9 @@ export function useSessionConnectionActions(options: {
       await TerminalService.Close(terminalId)
       useAppStore.getState().setConnectionStatus(terminalId, 'disconnected')
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err)
       logger.error('disconnect error', err)
-      toast(t('断开连接失败: ${}', msg), 'error')
+      // Close path is tab close with its own owner; keep disconnect as throw-through API for tests/callers.
+      throw err
     }
   }, [])
   const reconnect = useCallback((tabId: string) => reconnectSessionTab(tabId, sessions), [sessions])

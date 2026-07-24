@@ -149,10 +149,12 @@ export function WorkspaceRestoreBanner() {
   const error = useAppStore((state) => state.workspaceRestoreError)
   const notice = useAppStore((state) => state.workspaceRestoreNotice)
   const saveError = useAppStore((state) => state.workspaceSaveError)
+  const shellActionError = useAppStore((state) => state.shellActionError)
   const retry = useAppStore((state) => state.retryWorkspaceRestore)
   const dismissNotice = useAppStore((state) => state.setWorkspaceRestoreNotice)
   const dismissSaveError = useAppStore((state) => state.setWorkspaceSaveError)
-  if (!error && !notice && !saveError) return null
+  const dismissShellError = useAppStore((state) => state.setShellActionError)
+  if (!error && !notice && !saveError && !shellActionError) return null
   if (error) {
     return (
       <Alert variant="destructive" className="rounded-none border-x-0 border-t-0">
@@ -169,6 +171,16 @@ export function WorkspaceRestoreBanner() {
         <AlertDescription className="flex flex-wrap items-center justify-between gap-2">
           <span>{t('保存工作区失败: ${}', saveError)}</span>
           <Button type="button" size="xs" variant="outline" onClick={() => dismissSaveError('')}>{t('关闭')}</Button>
+        </AlertDescription>
+      </Alert>
+    )
+  }
+  if (shellActionError) {
+    return (
+      <Alert variant="destructive" className="rounded-none border-x-0 border-t-0">
+        <AlertDescription className="flex flex-wrap items-center justify-between gap-2">
+          <span>{shellActionError}</span>
+          <Button type="button" size="xs" variant="outline" onClick={() => dismissShellError('')}>{t('关闭')}</Button>
         </AlertDescription>
       </Alert>
     )
