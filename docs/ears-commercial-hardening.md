@@ -1387,3 +1387,12 @@
 | UX-REC-163 | 终端开始/停止录制失败仅终端工具栏 inline alert 展示，不得 error toast。 | done |
 | UX-BATCH-164 | 会话批量操作执行失败仅确认对话框 inline alert 展示，不得 error toast；对话框保持打开可重试。 | done |
 | UX-ASSET-165 | 资产分类排序失败仅分类表上方 inline alert 展示，不得 error toast。 | done |
+
+## 2026-07-24 商用硬化波次（会话/分组 CRUD 错误归属）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| UX-SESSION-166 | 会话新建/编辑失败仅 SessionDialog inline alert 展示，`useSession` 不得 error toast。 | done |
+| UX-SESSION-167 | 会话/分组删除失败仅删除确认对话框 inline alert 展示，不得 error toast。 | done |
+| UX-SESSION-168 | 侧栏分组新建/编辑失败与空名称校验仅分组对话框 inline alert 展示，不得 toast。 | done |
+| UX-SESSION-169 | 会话资产中心设为默认/移动会话失败仅中心 banner 展示，不得 error toast。 | done |

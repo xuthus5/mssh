@@ -43,6 +43,7 @@ vi.mock('@/components/layout/SidebarDialogs', () => ({
     <button type="button" onClick={() => props.onSessionOpenChange(false)}>session-close</button>
     <span data-testid="folder-dialog">folder:{String(props.folderDialogOpen)}:{props.editingFolder?.name ?? 'new'}</span>
     <input aria-label="mock-folder-name" value={props.folderName} onChange={(event) => props.setFolderName(event.target.value)} />
+    {props.folderError ? <p role="alert">{props.folderError}</p> : null}
     <button type="button" onClick={props.onCreateOrUpdateFolder}>folder-submit</button>
     <button type="button" onClick={() => props.onFolderOpenChange(false)}>folder-close</button>
   </div>,
@@ -107,7 +108,8 @@ describe('Sidebar behavior', () => {
     useToastStore.setState({ toasts: [] })
     await user.click(screen.getByRole('button', { name: 'folder-submit' }))
     expect(workspace.createFolder).not.toHaveBeenCalled()
-    expect(useToastStore.getState().toasts.some((item) => item.message.includes('请输入分组名称'))).toBe(true)
+    expect(screen.getByRole('alert')).toHaveTextContent('请输入分组名称')
+    expect(useToastStore.getState().toasts).toHaveLength(0)
     await user.type(screen.getByLabelText('mock-folder-name'), '  Ops  ')
     await user.click(screen.getByRole('button', { name: 'folder-submit' }))
     expect(workspace.createFolder).toHaveBeenCalledWith('Ops', null)
