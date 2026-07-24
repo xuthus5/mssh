@@ -1449,3 +1449,9 @@
 | UX-SET-185 | 通用/SFTP/快捷键保存失败永不 error toast；调用方（AutoSaveStatusIndicator 或显式 await）承接错误。 | done |
 | UX-TAB-186 | 无确认对话框的关标签失败（快捷键/批量）仅应用壳 shellActionError banner 展示，不得 error toast。 | done |
 
+## 2026-07-24 商用硬化波次（AI 提供商选择 quiet 保存）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| UX-AI-187 | 默认/回退提供商下拉变更以 quiet 保存，失败由 AI 面板 error banner 承接，不得 success/error toast 干扰。 | done |
+
