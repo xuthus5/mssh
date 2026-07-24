@@ -225,4 +225,27 @@ describe('TerminalToolbar', () => {
     await userEvent.keyboard('{Escape}')
     await waitFor(() => expect(screen.queryByTestId('session-log')).not.toBeInTheDocument())
   })
+
+  it('surfaces clipboard failures on the toolbar banner without toast', async () => {
+    const writeText = vi.fn(async () => { throw new Error('clipboard denied') })
+    const readText = vi.fn(async () => { throw new Error('paste denied') })
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText, readText } })
+    const term = terminal('selected text')
+    useAppStore.setState({
+      activePaneId: null,
+      terminalPool: new Map([['primary-1', { terminal: term as never, lastUsed: 0 }]]),
+    })
+    const { useToastStore } = await import('@/components/ui/toast')
+    useToastStore.setState({ toasts: [] })
+    render(<TerminalToolbar terminalID="primary-1" sessionId={1} isRecording={false} recordingLogId={null}
+      onToggleRecording={vi.fn()} hostname="server" onOpenFiles={vi.fn()} onSplit={vi.fn()} splitDisabled={false} paneCount={1} searchOpen={false} onToggleSearch={vi.fn()} />)
+
+    await userEvent.click(screen.getByTitle('复制 (Ctrl+Shift+C)'))
+    expect(await screen.findByRole('alert')).toHaveTextContent('复制失败: clipboard denied')
+    expect(useToastStore.getState().toasts.filter((item) => item.type === 'error')).toHaveLength(0)
+
+    await userEvent.click(screen.getByTitle('粘贴 (Ctrl+Shift+V)'))
+    expect(await screen.findByRole('alert')).toHaveTextContent('粘贴失败: paste denied')
+    expect(useToastStore.getState().toasts.filter((item) => item.type === 'error')).toHaveLength(0)
+  })
 })

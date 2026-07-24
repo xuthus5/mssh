@@ -60,30 +60,49 @@ function useTerminalAccess(terminalID: string) {
   return { getTerminal, restoreFocus }
 }
 
-function useClipboardActions(getTerminal: () => ToolbarTerminal | null, restoreFocus: () => void) {
+function useClipboardActions(
+  getTerminal: () => ToolbarTerminal | null,
+  restoreFocus: () => void,
+  setActionError: (message: string) => void,
+) {
   const copy = useCallback(async () => {
     const terminal = getTerminal()
     if (!terminal) return
     const selection = terminal.getSelection()
     logger.debug('TerminalToolbar: copy:', selection ? selection.length : 0, 'chars')
-    if (selection) await getClipboard().writeText(selection)
-    restoreFocus()
-  }, [getTerminal, restoreFocus])
+    setActionError('')
+    try {
+      if (selection) await getClipboard().writeText(selection)
+    } catch (error: unknown) {
+      logger.error('TerminalToolbar: copy failed', error)
+      setActionError(t('复制失败: ${}', error instanceof Error ? error.message : String(error)))
+    } finally {
+      restoreFocus()
+    }
+  }, [getTerminal, restoreFocus, setActionError])
   const paste = useCallback(async () => {
     const terminal = getTerminal()
     if (!terminal) return
-    const text = await getClipboard().readText()
-    logger.debug('TerminalToolbar: paste:', text.length, 'chars')
-    terminal.paste(text)
-    restoreFocus()
-  }, [getTerminal, restoreFocus])
+    setActionError('')
+    try {
+      const text = await getClipboard().readText()
+      logger.debug('TerminalToolbar: paste:', text.length, 'chars')
+      terminal.paste(text)
+    } catch (error: unknown) {
+      logger.error('TerminalToolbar: paste failed', error)
+      setActionError(t('粘贴失败: ${}', error instanceof Error ? error.message : String(error)))
+    } finally {
+      restoreFocus()
+    }
+  }, [getTerminal, restoreFocus, setActionError])
   const clear = useCallback(() => {
     const terminal = getTerminal()
     if (!terminal) return
     logger.debug('TerminalToolbar: clear')
+    setActionError('')
     terminal.clear()
     restoreFocus()
-  }, [getTerminal, restoreFocus])
+  }, [getTerminal, restoreFocus, setActionError])
   return { copy, paste, clear }
 }
 
@@ -221,13 +240,15 @@ export function TerminalToolbar(props: TerminalToolbarProps) {
   const [showSessionLog, setShowSessionLog] = useState(false)
   const [sessionLogBlocked, setSessionLogBlocked] = useState(false)
   const [tunnelOpen, setTunnelOpen] = useState(false)
+  const [clipboardError, setClipboardError] = useState('')
   const tunnels = useTunnelManager(props.sessionId)
   const terminal = useTerminalAccess(props.terminalID)
-  const clipboard = useClipboardActions(terminal.getTerminal, terminal.restoreFocus)
+  const clipboard = useClipboardActions(terminal.getTerminal, terminal.restoreFocus, setClipboardError)
   const handleSessionLogOpenChange = useCallback((open: boolean) => {
     if (!open && sessionLogBlocked) return
     setShowSessionLog(open)
   }, [sessionLogBlocked])
+  const bannerError = props.recordingError || clipboardError
   return <div className="relative flex flex-shrink-0 flex-col bg-muted/30">
     <div className="flex h-8 items-center gap-1 px-2">
       <span className="mr-2 truncate text-xs text-muted-foreground">{props.hostname ?? 'Terminal'}</span>
@@ -235,7 +256,7 @@ export function TerminalToolbar(props: TerminalToolbarProps) {
       <ToolbarActions {...props} onOpenSystem={props.onOpenSystem ?? (() => {})} onOpenHistory={props.onOpenHistory ?? (() => {})} onOpenAI={props.onOpenAI ?? (() => {})} onOpenTunnels={() => { setTunnelOpen(true); void tunnels.load() }} clipboard={clipboard} logOpen={showSessionLog} setLogOpen={setShowSessionLog}
         setLogBlocked={setSessionLogBlocked} onLogOpenChange={handleSessionLogOpenChange} />
     </div>
-    {props.recordingError ? <p role="alert" className="px-2 pb-1 text-[11px] text-destructive">{props.recordingError}</p> : null}
+    {bannerError ? <p role="alert" className="px-2 pb-1 text-[11px] text-destructive">{bannerError}</p> : null}
     <TunnelDialog open={tunnelOpen} onOpenChange={setTunnelOpen} tunnels={tunnels.tunnels}
       loadError={tunnels.error} onReload={() => tunnels.load()}
       onStart={tunnels.start} onStop={tunnels.stop} onDelete={tunnels.remove} sessionId={String(props.sessionId)} />
