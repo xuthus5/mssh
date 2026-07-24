@@ -54,6 +54,7 @@ export const TerminalSplit = forwardRef<TerminalSplitHandle, Props>(function Ter
   const [tree, setTree] = useState<SplitNode>(() => splitLeaf(primaryID))
   const [busy, setBusy] = useState(false)
   const [closingID, setClosingID] = useState<string | null>(null)
+  const [actionError, setActionError] = useState('')
   const treeRef = useRef(tree)
   const mountedRef = useRef(true)
   const primaryRef = useRef(primaryID)
@@ -73,7 +74,7 @@ export const TerminalSplit = forwardRef<TerminalSplitHandle, Props>(function Ter
   })
   const actionCtx = {
     tabID, primaryID, sessionId, connectionKind, serialPortId, activePaneID,
-    treeRef, primaryRef, operationRef, mountedRef, setTree, setBusy, setClosingID,
+    treeRef, primaryRef, operationRef, mountedRef, setTree, setBusy, setClosingID, setActionError,
     requestFocus, lastUsed, onPaneClosed, onPaneReplaced,
   }
 
@@ -172,6 +173,14 @@ export const TerminalSplit = forwardRef<TerminalSplitHandle, Props>(function Ter
         <span className="min-w-0 truncate">{t('恢复分屏布局失败: ${}', restoreError)}</span>
         <button type="button" aria-label={t('重试')} className="shrink-0 rounded-md border border-border bg-background px-2 py-0.5 text-foreground hover:bg-muted" onClick={retryRestore} disabled={busy}>
           {t('重试')}
+        </button>
+      </div>
+    ) : null}
+    {actionError ? (
+      <div role="alert" className="z-20 flex shrink-0 items-center justify-between gap-2 border-b border-destructive/30 bg-destructive/10 px-3 py-1.5 text-xs text-destructive">
+        <span className="min-w-0 truncate">{actionError}</span>
+        <button type="button" aria-label={t('关闭')} className="shrink-0 rounded-md border border-border bg-background px-2 py-0.5 text-foreground hover:bg-muted" onClick={() => setActionError('')}>
+          {t('关闭')}
         </button>
       </div>
     ) : null}

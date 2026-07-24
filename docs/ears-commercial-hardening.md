@@ -1396,3 +1396,9 @@
 | UX-SESSION-167 | 会话/分组删除失败仅删除确认对话框 inline alert 展示，不得 error toast。 | done |
 | UX-SESSION-168 | 侧栏分组新建/编辑失败与空名称校验仅分组对话框 inline alert 展示，不得 toast。 | done |
 | UX-SESSION-169 | 会话资产中心设为默认/移动会话失败仅中心 banner 展示，不得 error toast。 | done |
+
+## 2026-07-24 商用硬化波次（分屏创建/关闭错误归属）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| UX-SPLIT-170 | 创建/关闭分屏失败仅 TerminalSplit 顶栏 banner 展示，不得 error toast；串口/上限仍可用 warning toast。 | done |
