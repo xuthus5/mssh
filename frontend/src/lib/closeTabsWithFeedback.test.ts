@@ -39,4 +39,15 @@ describe('closeTabsWithFeedback', () => {
     expect(closeTab).toHaveBeenNthCalledWith(1, 'a')
     expect(closeTab).toHaveBeenNthCalledWith(2, 'b')
   })
+
+  it('prefers custom error owner over toast', async () => {
+    const closeTab = vi.fn(async () => { throw new Error('connection lost') })
+    const onError = vi.fn()
+
+    closeTabsWithFeedback(['terminal-1'], closeTab, onError)
+
+    await vi.waitFor(() => expect(onError).toHaveBeenCalled())
+    expect(onError).toHaveBeenCalledWith('terminal-1', expect.any(Error))
+    expect(showToast).not.toHaveBeenCalled()
+  })
 })

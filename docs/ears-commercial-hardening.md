@@ -1409,3 +1409,10 @@
 |---|---|---|
 | UX-SFTP-171 | 上传/下载启动失败（含拖放）仅 FilePanel actionError banner 展示，`useFileTransfer` 不得 error toast。 | done |
 | UX-MACRO-172 | 侧栏/宏工作区执行宏失败仅对应固定 banner 展示，`executeMacroOnActiveTerminal` 不得 error toast；前置条件 info/warning 与成功 toast 可保留。 | done |
+
+## 2026-07-24 商用硬化波次（工具栏剪贴板与关标签确认错误归属）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| UX-CLIP-173 | 终端工具栏复制/粘贴失败仅工具栏 banner 展示，不得 error toast；不得产生未处理 rejection。 | done |
+| UX-TAB-174 | 已确认关闭活动连接时 closeTab 失败仅确认对话框 inline alert 展示，不得 error toast；对话框保持打开可重试。无确认表面的关闭仍可 toast。 | done |
