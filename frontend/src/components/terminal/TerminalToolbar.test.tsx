@@ -248,4 +248,20 @@ describe('TerminalToolbar', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('粘贴失败: paste denied')
     expect(useToastStore.getState().toasts.filter((item) => item.type === 'error')).toHaveLength(0)
   })
+  it('surfaces external clipboard error events on the toolbar banner without toast', async () => {
+    const { useToastStore } = await import('@/components/ui/toast')
+    useToastStore.setState({ toasts: [] })
+    useAppStore.setState({
+      activePaneId: null,
+      terminalPool: new Map([['primary-1', { terminal: terminal('selected') as never, lastUsed: 0 }]]),
+    })
+    render(<TerminalToolbar terminalID="primary-1" sessionId={1} isRecording={false} recordingLogId={null}
+      onToggleRecording={vi.fn()} hostname="server" onOpenFiles={vi.fn()} onSplit={vi.fn()} splitDisabled={false} paneCount={1} searchOpen={false} onToggleSearch={vi.fn()} />)
+    window.dispatchEvent(new CustomEvent('mssh:terminal-clipboard-error', {
+      detail: { terminalID: 'primary-1', message: '复制失败: write denied' },
+    }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('复制失败: write denied')
+    expect(useToastStore.getState().toasts.filter((item) => item.type === 'error')).toHaveLength(0)
+  })
+
 })

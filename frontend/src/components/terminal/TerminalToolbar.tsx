@@ -1,4 +1,4 @@
-import { useCallback, useState, type Dispatch, type SetStateAction } from 'react'
+import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from 'react'
 import { Activity, Bot, ChevronDown, Circle, ClipboardPaste, Columns2, Copy, FolderOpen, History, Network, PenLine, Rows2, Search, Split, Square, Trash2 } from 'lucide-react'
 import SessionLog from '@/components/terminal/SessionLog'
 import TunnelDialog from '@/components/session/TunnelDialog'
@@ -13,6 +13,7 @@ import { getClipboard } from '@/lib/clipboard'
 import { useShortcutStore } from '@/store/shortcutStore'
 import { formatChordDisplay } from '@/lib/shortcuts'
 import { t } from '@/i18n'
+import { TERMINAL_CLIPBOARD_ERROR_EVENT, type TerminalClipboardErrorDetail } from '@/lib/terminalClipboardEvents'
 import { SerialSignalToolbar } from '@/components/terminal/SerialSignalToolbar'
 
 
@@ -244,6 +245,16 @@ export function TerminalToolbar(props: TerminalToolbarProps) {
   const tunnels = useTunnelManager(props.sessionId)
   const terminal = useTerminalAccess(props.terminalID)
   const clipboard = useClipboardActions(terminal.getTerminal, terminal.restoreFocus, setClipboardError)
+  useEffect(() => {
+    const onClipboardError = (event: Event) => {
+      const detail = (event as CustomEvent<TerminalClipboardErrorDetail>).detail
+      if (!detail?.message) return
+      if (detail.terminalID && detail.terminalID !== props.terminalID) return
+      setClipboardError(detail.message)
+    }
+    window.addEventListener(TERMINAL_CLIPBOARD_ERROR_EVENT, onClipboardError)
+    return () => window.removeEventListener(TERMINAL_CLIPBOARD_ERROR_EVENT, onClipboardError)
+  }, [props.terminalID])
   const handleSessionLogOpenChange = useCallback((open: boolean) => {
     if (!open && sessionLogBlocked) return
     setShowSessionLog(open)

@@ -1426,3 +1426,11 @@
 | UX-DEL-177 | SFTP 删除文件失败时确认对话框保持打开，仅 dialog inline alert 展示错误，不得 error toast。 | done |
 | UX-DEL-178 | 主题 Profile 删除失败时确认对话框保持打开，仅 dialog inline alert 展示错误，不得 error toast。 | done |
 
+## 2026-07-24 商用硬化波次（终端剪贴板错误单一归属）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| UX-CLIP-179 | 终端快捷键复制/粘贴失败仅路由到工具栏 banner（经 `mssh:terminal-clipboard-error`），不得 error toast。 | done |
+| UX-CLIP-180 | 终端右键菜单复制/粘贴失败仅路由到工具栏 banner，不得 error toast。 | done |
+| UX-CLIP-181 | 工具栏复制/粘贴失败继续仅工具栏 banner 展示；同一失败不得出现 toast + banner 双 owner。 | done |
+
