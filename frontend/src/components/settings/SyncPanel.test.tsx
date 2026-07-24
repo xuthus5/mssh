@@ -50,24 +50,28 @@ describe('SyncPanel', () => {
     expect(screen.getByRole('button', { name: '清空本地业务数据' })).toBeInTheDocument()
   })
 
-  it('swallows export/import promise rejections from header actions', async () => {
+  it('shows export/import header failures as panel banner without toast', async () => {
     const onExport = vi.fn(async () => { throw new Error('export boom') })
     const onImport = vi.fn(async () => { throw new Error('import boom') })
     render(<SyncPanel controller={controller()} onExport={onExport} onImport={onImport} />)
     await userEvent.click(screen.getByRole('button', { name: '导出' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('导出本地备份失败: export boom')
     await userEvent.click(screen.getByRole('button', { name: '导入' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('导入本地备份失败: import boom')
     expect(onExport).toHaveBeenCalled()
     expect(onImport).toHaveBeenCalled()
   })
 
-  it('swallows export/import promise rejections from danger actions', async () => {
+  it('shows export/import danger-action failures as panel banner', async () => {
     const onExport = vi.fn(async () => { throw new Error('export boom') })
     const onImport = vi.fn(async () => { throw new Error('import boom') })
     const sync = controller({ dashboard: { ...controller().dashboard, config: { ...controller().dashboard.config, enabled: true }, state: SyncState.SyncStateSynced } })
     render(<SyncPanel controller={sync} onExport={onExport} onImport={onImport} />)
     await userEvent.click(screen.getByRole('tab', { name: '同步状态与配置' }))
     await userEvent.click(screen.getByRole('button', { name: '导出本地备份' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('导出本地备份失败: export boom')
     await userEvent.click(screen.getByRole('button', { name: '导入本地备份' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('导入本地备份失败: import boom')
     expect(onExport).toHaveBeenCalled()
     expect(onImport).toHaveBeenCalled()
   })

@@ -23,9 +23,18 @@ interface Props {
 
 export function SyncPanel({ controller, onExport, onImport }: Props) {
   const [input, setInput] = useState<SyncConfigInput>(() => createSyncInput(controller.dashboard?.config))
+  const [transferError, setTransferError] = useState('')
   useEffect(() => {
     if (controller.dashboard) setInput(createSyncInput(controller.dashboard.config))
   }, [controller.dashboard])
+  const runTransfer = useCallback(async (action: () => void | Promise<void>, failure: string) => {
+    setTransferError('')
+    try {
+      await action()
+    } catch (error) {
+      setTransferError(t(failure, error instanceof Error ? error.message : String(error)))
+    }
+  }, [])
   const dirty = useMemo(() => hasUnsavedSyncChanges(input, controller.dashboard?.config), [input, controller.dashboard])
   const persist = useCallback(async (next: SyncConfigInput) => {
     await controller.saveConfig(next, { quiet: true })
@@ -58,11 +67,11 @@ export function SyncPanel({ controller, onExport, onImport }: Props) {
           <AutoSaveStatusIndicator status={autoSave.status} error={autoSave.error} />
           {!input.enabled && (
             <>
-              <Button type="button" size="sm" variant="ghost" disabled={!dashboard?.config.master_key_saved} onClick={() => { void Promise.resolve(onExport()).catch(() => undefined) }}>
+              <Button type="button" size="sm" variant="ghost" disabled={!dashboard?.config.master_key_saved} onClick={() => { void runTransfer(onExport, '导出本地备份失败: ${}') }}>
                 <Upload data-icon="inline-start" />
                 {t('导出')}
               </Button>
-              <Button type="button" size="sm" variant="ghost" disabled={!dashboard?.config.master_key_saved} onClick={() => { void Promise.resolve(onImport()).catch(() => undefined) }}>
+              <Button type="button" size="sm" variant="ghost" disabled={!dashboard?.config.master_key_saved} onClick={() => { void runTransfer(onImport, '导入本地备份失败: ${}') }}>
                 <Download data-icon="inline-start" />
                 {t('导入')}
               </Button>
@@ -74,6 +83,11 @@ export function SyncPanel({ controller, onExport, onImport }: Props) {
           </label>
         </div>
       </div>
+      {transferError ? (
+        <div className="rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">
+          {transferError}
+        </div>
+      ) : null}
       {input.enabled && (
         <Card>
           <CardHeader>
@@ -111,8 +125,8 @@ export function SyncPanel({ controller, onExport, onImport }: Props) {
                     onRestore={controller.restoreVersion}
                     onDelete={controller.deleteVersion}
                     onReset={controller.resetLocalData}
-                    onExport={onExport}
-                    onImport={onImport}
+                    onExport={() => runTransfer(onExport, '导出本地备份失败: ${}')}
+                    onImport={() => runTransfer(onImport, '导入本地备份失败: ${}')}
                   />
                 </TabsContent>
               )}

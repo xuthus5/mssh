@@ -1339,3 +1339,11 @@
 | UX-SFTP-145 | SFTP 设置 quiet autosave 失败仅由 AutoSaveStatusIndicator 展示，不得 error toast。 | done |
 | UX-SHORTCUT-146 | 快捷键 quiet 保存失败仅由 AutoSaveStatusIndicator 展示，不得 error toast；加载失败仍走 banner。 | done |
 | UX-ABOUT-147 | 关于页打开外链失败仅 panel message/Alert 展示，不得 error toast。 | done |
+
+## 2026-07-24 商用硬化波次（密钥与备份动作错误归属）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| UX-KEY-148 | 密钥生成/导入/更新失败仅对应对话框 inline alert 展示，不得 error toast。 | done |
+| UX-KEY-149 | 密钥删除/复制公钥失败仅 KeyManager 面板 banner 展示，不得 error toast。 | done |
+| UX-SYNC-150 | 本地备份导出/导入失败仅同步页 transfer banner 展示，不得 error toast；成功可 toast。 | done |

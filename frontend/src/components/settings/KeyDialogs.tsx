@@ -33,17 +33,24 @@ export function KeyGenerateDialog({ open, onOpenChange, onGenerate, onGenerated 
   const [type, setType] = useState<KeyInfo['type']>('ed25519')
   const [bits, setBits] = useState('256')
   const [saving, setSaving] = useState(false)
+  const [formError, setFormError] = useState('')
   const options = useMemo(() => bitsOptions[type], [type])
+  useEffect(() => {
+    if (!open) { setName(''); setFormError(''); setType('ed25519'); setBits('256') }
+  }, [open])
   const submit = async (event: FormEvent) => {
-    event.preventDefault(); setSaving(true)
+    event.preventDefault(); setSaving(true); setFormError('')
     try {
       const material = await onGenerate(name, type, Number(bits))
       if (!material) return
       onOpenChange(false); setName(''); onGenerated(material)
+    } catch (error) {
+      setFormError(t('生成密钥失败: ${}', error instanceof Error ? error.message : String(error)))
     } finally { setSaving(false) }
   }
   return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent className="sm:max-w-md"><DialogHeader><DialogTitle>{t('生成密钥')}</DialogTitle></DialogHeader>
     <form onSubmit={submit}><FieldGroup>
+      {formError ? <Alert variant="destructive"><AlertDescription>{formError}</AlertDescription></Alert> : null}
       <Field><FieldLabel htmlFor="generate-key-name">{t('名称')}</FieldLabel><Input id="generate-key-name" aria-label={t('密钥名称')} value={name} onChange={(event) => setName(event.target.value)} required /></Field>
       <Field><FieldLabel>{t('类型')}</FieldLabel><LabeledSelect ariaLabel={t('密钥类型')} value={type} options={keyTypes} onValueChange={(value) => { const next = value as KeyInfo['type']; setType(next); setBits(defaultBits[next]) }} /></Field>
       <Field><FieldLabel>{t('位数')}</FieldLabel><LabeledSelect ariaLabel={t('密钥位数')} value={bits} options={options} onValueChange={setBits} /></Field>
@@ -62,22 +69,33 @@ export function KeyImportDialog({ open, onOpenChange, onImport, onSelectFile }: 
   const [name, setName] = useState('')
   const [privateKey, setPrivateKey] = useState('')
   const [saving, setSaving] = useState(false)
+  const [formError, setFormError] = useState('')
   const onSelectFileRef = useRef(onSelectFile)
   onSelectFileRef.current = onSelectFile
   const browse = async () => {
-    const file = await onSelectFileRef.current()
-    if (file) { setName(file.name); setPrivateKey(file.privateKey) }
+    setFormError('')
+    try {
+      const file = await onSelectFileRef.current()
+      if (file) { setName(file.name); setPrivateKey(file.privateKey) }
+    } catch (error) {
+      setFormError(t('读取私钥文件失败: ${}', error instanceof Error ? error.message : String(error)))
+    }
   }
   useEffect(() => {
-    if (!open) { setName(''); setPrivateKey(''); return }
+    if (!open) { setName(''); setPrivateKey(''); setFormError(''); return }
     void browse()
   }, [open])
   const submit = async (event: FormEvent) => {
-    event.preventDefault(); setSaving(true)
-    try { if (await onImport(name, privateKey)) onOpenChange(false) } finally { setSaving(false) }
+    event.preventDefault(); setSaving(true); setFormError('')
+    try {
+      if (await onImport(name, privateKey)) onOpenChange(false)
+    } catch (error) {
+      setFormError(t('导入密钥失败: ${}', error instanceof Error ? error.message : String(error)))
+    } finally { setSaving(false) }
   }
   return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent className="sm:max-w-2xl"><DialogHeader><DialogTitle>{t('导入密钥')}</DialogTitle></DialogHeader>
     <form onSubmit={submit}><FieldGroup>
+      {formError ? <Alert variant="destructive"><AlertDescription>{formError}</AlertDescription></Alert> : null}
       <Field><FieldLabel htmlFor="import-key-name">{t('名称')}</FieldLabel><Input id="import-key-name" aria-label={t('导入名称')} value={name} onChange={(event) => setName(event.target.value)} required /></Field>
       <Field><div className="flex items-center justify-between gap-2"><FieldLabel htmlFor="import-private-key">{t('私钥内容')}</FieldLabel><Button type="button" size="xs" variant="outline" onClick={() => { void browse() }}><FileKey data-icon="inline-start" />{t('选择文件')}</Button></div>
         <Textarea id="import-private-key" aria-label={t('导入私钥内容')} className="min-h-48 font-mono text-xs" value={privateKey} onChange={(event) => setPrivateKey(event.target.value)} required />
@@ -113,9 +131,11 @@ export function KeyMaterialDialog({ state, onOpenChange, onUpdate }: MaterialPro
   const [draft, setDraft] = useState<KeyMaterial | null>(state?.material ?? null)
   const [saving, setSaving] = useState(false)
   const [copyError, setCopyError] = useState('')
+  const [formError, setFormError] = useState('')
   useEffect(() => {
     setDraft(state?.material ?? null)
     setCopyError('')
+    setFormError('')
   }, [state])
   if (!state || !draft) return null
   const editable = state.mode === 'edit'
@@ -132,16 +152,18 @@ export function KeyMaterialDialog({ state, onOpenChange, onUpdate }: MaterialPro
   const save = async () => {
     setSaving(true)
     setCopyError('')
+    setFormError('')
     try {
       if (await onUpdate(draft)) onOpenChange(false)
-    } catch {
-      // parent surfaces toast for mutation path without dialog-owned form error yet
+    } catch (error) {
+      setFormError(t('更新密钥失败: ${}', error instanceof Error ? error.message : String(error)))
     } finally {
       setSaving(false)
     }
   }
   return <Dialog open onOpenChange={onOpenChange}><DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-3xl"><DialogHeader><DialogTitle>{title}</DialogTitle></DialogHeader>
     <Alert><AlertDescription>{t('私钥属于敏感凭据。仅复制到可信位置，不要通过聊天、邮件或日志传输。')}</AlertDescription></Alert>
+    {formError ? <Alert variant="destructive"><AlertDescription>{formError}</AlertDescription></Alert> : null}
     {copyError ? <Alert variant="destructive"><AlertDescription>{copyError}</AlertDescription></Alert> : null}
     <FieldGroup>
       <Field><FieldLabel htmlFor="key-material-name">{t('名称')}</FieldLabel><Input id="key-material-name" aria-label={t('密钥名称')} value={draft.name} readOnly={!editable} onChange={(event) => setDraft({ ...draft, name: event.target.value })} /></Field>

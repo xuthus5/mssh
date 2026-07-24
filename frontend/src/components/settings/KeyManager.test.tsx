@@ -233,6 +233,65 @@ describe('KeyManager', () => {
   })
 
 
+
+  it('surfaces delete failures panel-owned without toast', async () => {
+    useToastStore.setState({ toasts: [] })
+    const view = props()
+    view.onDelete = vi.fn(async () => { throw new Error('delete boom') })
+    render(<KeyManager {...view} />)
+    await userEvent.click(screen.getByRole('button', { name: '删除 generated' }))
+    await userEvent.click(await screen.findByRole('button', { name: '确认删除' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('删除密钥失败: delete boom')
+    expect(useToastStore.getState().toasts.filter((item) => item.type === 'error')).toHaveLength(0)
+  })
+
+  it('surfaces export failures panel-owned without toast', async () => {
+    useToastStore.setState({ toasts: [] })
+    const view = props()
+    view.onExport = vi.fn(async () => { throw new Error('export boom') })
+    render(<KeyManager {...view} />)
+    await userEvent.click(screen.getByRole('button', { name: '复制 generated 公钥' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('复制公钥失败: export boom')
+    expect(useToastStore.getState().toasts.filter((item) => item.type === 'error')).toHaveLength(0)
+  })
+
+  it('surfaces generate failures dialog-owned without toast', async () => {
+    useToastStore.setState({ toasts: [] })
+    const view = props()
+    view.onGenerate = vi.fn(async () => { throw new Error('gen boom') })
+    render(<KeyManager {...view} />)
+    await userEvent.click(screen.getByRole('button', { name: '生成' }))
+    await userEvent.type(screen.getByLabelText('密钥名称'), 'x')
+    await userEvent.click(screen.getByRole('button', { name: '生成密钥' }))
+    expect(await screen.findByText('生成密钥失败: gen boom')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '生成密钥' })).toBeInTheDocument()
+    expect(useToastStore.getState().toasts.filter((item) => item.type === 'error')).toHaveLength(0)
+  })
+
+  it('surfaces import failures dialog-owned without toast', async () => {
+    useToastStore.setState({ toasts: [] })
+    const view = props()
+    view.onImport = vi.fn(async () => { throw new Error('import boom') })
+    render(<KeyManager {...view} />)
+    await userEvent.click(screen.getByRole('button', { name: '导入' }))
+    await waitFor(() => expect(view.onSelectImportFile).toHaveBeenCalled())
+    await userEvent.click(screen.getByRole('button', { name: '确认导入' }))
+    expect(await screen.findByText('导入密钥失败: import boom')).toBeInTheDocument()
+    expect(useToastStore.getState().toasts.filter((item) => item.type === 'error')).toHaveLength(0)
+  })
+
+  it('surfaces update failures dialog-owned without toast', async () => {
+    useToastStore.setState({ toasts: [] })
+    const view = props()
+    view.onUpdate = vi.fn(async () => { throw new Error('update boom') })
+    render(<KeyManager {...view} />)
+    await userEvent.click(screen.getByRole('button', { name: '编辑 generated' }))
+    await userEvent.click(await screen.findByRole('button', { name: '保存密钥' }))
+    expect(await screen.findByText('更新密钥失败: update boom')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '编辑密钥' })).toBeInTheDocument()
+    expect(useToastStore.getState().toasts.filter((item) => item.type === 'error')).toHaveLength(0)
+  })
+
   it('shows load failures instead of empty keys', async () => {
     const onReload = vi.fn(async () => {})
     render(<KeyManager {...props()} keys={[]} loadError="list boom" loading={false} onReload={onReload} />)
