@@ -39,9 +39,9 @@ export function SessionAssetDeleteDialog({ target, folders, sessions, onOpenChan
     if (!target) return
     setPending(true); setError('')
     try { await onConfirm(target) } catch (reason) {
-      // workspace delete helpers already toast; keep inline error for retry
+      // dialog owns delete failures via inline alert; workspace no longer toasts
       const message = reason instanceof Error ? reason.message : String(reason)
-      setError(message)
+      setError(target.type === 'folder' ? t('删除分组失败: ${}', message) : t('删除会话失败: ${}', message))
     }
     finally { setPending(false) }
   }

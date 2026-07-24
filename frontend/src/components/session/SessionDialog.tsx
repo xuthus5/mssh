@@ -123,13 +123,13 @@ export default function SessionDialog({ open, onOpenChange, session, folders, en
       })
       onOpenChange(false)
     } catch (err) {
-      // workspace create/update already toast; keep inline error for dialog context
+      // dialog owns save failures via submitError; workspace no longer toasts
       const message = err instanceof Error ? err.message : String(err)
-      setSubmitError(message)
+      setSubmitError(session ? t('更新会话失败: ${}', message) : t('创建会话失败: ${}', message))
     } finally {
       setPending(false)
     }
-  }, [name, host, port, username, notes, environmentId, projectId, tagIds, assetTags, authMethod, password, keyId, keepAlive, termType, folderId, onSave, onOpenChange])
+  }, [name, host, port, username, notes, environmentId, projectId, tagIds, assetTags, authMethod, password, keyId, keepAlive, termType, folderId, onSave, onOpenChange, session])
 
   const isEditing = !!session
 

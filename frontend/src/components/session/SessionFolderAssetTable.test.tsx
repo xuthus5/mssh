@@ -45,7 +45,7 @@ describe('SessionAssetDeleteDialog', () => {
       />,
     )
     await userEvent.click(screen.getByRole('button', { name: '确认删除' }))
-    expect(await screen.findByText('delete boom')).toBeInTheDocument()
+    expect(await screen.findByRole('alert')).toHaveTextContent('删除分组失败: delete boom')
     expect(useToastStore.getState().toasts.some((item) => item.message.includes('delete boom'))).toBe(false)
   })
 })

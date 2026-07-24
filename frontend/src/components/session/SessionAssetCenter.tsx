@@ -36,6 +36,7 @@ export function SessionAssetCenter() {
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null)
   const [selectedIDs, setSelectedIDs] = useState<Set<string>>(() => new Set())
   const [detailID, setDetailID] = useState<string | null>(null)
+  const [actionError, setActionError] = useState('')
   const environments = state.environments ?? []
   const projects = state.projects ?? []
   const tags = state.tags ?? []
@@ -60,22 +61,34 @@ export function SessionAssetCenter() {
     if (target.type === 'session' && detailID === target.item.id) setDetailID(null)
     setDeleteTarget(null)
   }
-  const runFolderAction = async (action: () => Promise<unknown>) => {
-    try { await action() } catch {
-      // toast already shown by workspace mutation helpers
+  const runFolderAction = async (action: () => Promise<unknown>, failureTemplate: string) => {
+    setActionError('')
+    try {
+      await action()
+    } catch (error) {
+      setActionError(t(failureTemplate, error instanceof Error ? error.message : String(error)))
+    }
+  }
+  const moveSession = async (id: string, folderID: string | null) => {
+    setActionError('')
+    try {
+      await state.moveSession(id, folderID)
+    } catch (error) {
+      setActionError(t('移动会话失败: ${}', error instanceof Error ? error.message : String(error)))
     }
   }
 
   return <section className="relative flex min-h-0 flex-1 flex-col bg-background p-5">
     <header className="flex shrink-0 items-start justify-between gap-4"><div><h1 className="text-xl font-semibold text-foreground">{t('会话资产')}</h1><p className="text-sm text-muted-foreground">{t('集中管理连接、分组、节点与资产分类')}</p></div><div className="flex flex-wrap justify-end gap-2"><SessionCSVTransferActions selectedIDs={[...selectedIDs]} /><CreateMenu /></div></header>
     {state.error && <Alert variant="destructive" className="mt-4"><AlertDescription>{state.error}<Button size="xs" variant="outline" className="ml-3" onClick={retry}>{t('重试')}</Button></AlertDescription></Alert>}
+    {actionError ? <Alert variant="destructive" className="mt-4" role="alert"><AlertDescription>{actionError}</AlertDescription></Alert> : null}
     <Tabs value={tab} onValueChange={(value) => setTab(value as AssetTab)} className="mt-4 min-h-0 flex-1"><TabsList variant="line"><TabsTrigger value="recent">{t('最近连接')} <Badge variant="secondary">{state.recentSessions.length}</Badge></TabsTrigger><TabsTrigger value="folders">{t('分组')} <Badge variant="secondary">{state.folders.length}</Badge></TabsTrigger><TabsTrigger value="nodes">{t('所有节点')} <Badge variant="secondary">{state.sessions.length}</Badge></TabsTrigger><TabsTrigger value="catalog">{t('分类管理')} <Badge variant="secondary">{environments.length + projects.length + tags.length}</Badge></TabsTrigger></TabsList>
-      <TabsContent value="recent" className="min-h-0 overflow-auto pt-4">{state.loading ? <LoadingRows /> : <SessionAssetTable sessions={state.recentSessions} folders={state.folders} selectedIDs={selectedIDs} onSelectionChange={setSelectedIDs} onConnect={state.connect} onOpenDetail={(session) => setDetailID(session.id)} onEdit={editSession} onDelete={(session) => setDeleteTarget({ type: 'session', item: session })} onMove={state.moveSession} recent />}</TabsContent>
-      <TabsContent value="folders" className="min-h-0 overflow-auto pt-4"><SessionFolderAssetTable folders={state.folders} sessions={state.sessions} onOpen={(id) => { setFolderID(id); setTab('nodes') }} onRename={editFolder} onSetDefault={(id) => { void runFolderAction(() => state.setDefaultFolder(id)) }} onDelete={(folder) => setDeleteTarget({ type: 'folder', item: folder })} /></TabsContent>
+      <TabsContent value="recent" className="min-h-0 overflow-auto pt-4">{state.loading ? <LoadingRows /> : <SessionAssetTable sessions={state.recentSessions} folders={state.folders} selectedIDs={selectedIDs} onSelectionChange={setSelectedIDs} onConnect={state.connect} onOpenDetail={(session) => setDetailID(session.id)} onEdit={editSession} onDelete={(session) => setDeleteTarget({ type: 'session', item: session })} onMove={moveSession} recent />}</TabsContent>
+      <TabsContent value="folders" className="min-h-0 overflow-auto pt-4"><SessionFolderAssetTable folders={state.folders} sessions={state.sessions} onOpen={(id) => { setFolderID(id); setTab('nodes') }} onRename={editFolder} onSetDefault={(id) => { void runFolderAction(() => state.setDefaultFolder(id), '设置默认分组失败: ${}') }} onDelete={(folder) => setDeleteTarget({ type: 'folder', item: folder })} /></TabsContent>
       <TabsContent value="nodes" className="min-h-0 overflow-auto pt-4"><div className="flex flex-col gap-3"><SessionNodeBreadcrumb folder={selectedFolder} onClear={() => setFolderID(null)} /><SessionAssetFilterBar filters={filters} environments={environments} projects={projects} tags={tags} onChange={setFilters} onReset={resetFilters} />
         <SessionAssetBulkBar selectedIDs={[...selectedIDs]} environments={environments} projects={projects} tags={tags} onSetEnvironment={state.bulkSetEnvironment} onSetProject={state.bulkSetProject} onUpdateTags={state.bulkUpdateTags} onClearSelection={clearSelection} />
         <SessionBatchActions selectedIDs={[...selectedIDs]} onBatchConnect={state.batchConnect} onBatchExecuteMacro={state.batchExecuteMacro} onBatchDelete={state.batchDeleteSessions} onComplete={clearSelection} />
-        <SessionAssetTable sessions={filteredSessions} folders={state.folders} selectedIDs={selectedIDs} onSelectionChange={setSelectedIDs} onConnect={state.connect} onOpenDetail={(session) => setDetailID(session.id)} onEdit={editSession} onDelete={(session) => setDeleteTarget({ type: 'session', item: session })} onMove={state.moveSession} /></div></TabsContent>
+        <SessionAssetTable sessions={filteredSessions} folders={state.folders} selectedIDs={selectedIDs} onSelectionChange={setSelectedIDs} onConnect={state.connect} onOpenDetail={(session) => setDetailID(session.id)} onEdit={editSession} onDelete={(session) => setDeleteTarget({ type: 'session', item: session })} onMove={moveSession} /></div></TabsContent>
       <TabsContent value="catalog" className="min-h-0 overflow-auto pt-4"><SessionAssetCatalogManager environments={environments} projects={projects} tags={tags} onCreateEnvironment={state.createEnvironment} onCreateProject={state.createProject} onCreateTag={state.createTag} onUpdateEnvironment={state.updateEnvironment} onUpdateProject={state.updateProject} onUpdateTag={state.updateTag} onDeleteEnvironment={(id, mode, replacementID) => state.deleteEnvironment({ id: Number(id), mode, replacement_id: replacementID ? Number(replacementID) : null })} onDeleteProject={(id, mode, replacementID) => state.deleteProject({ id: Number(id), mode, replacement_id: replacementID ? Number(replacementID) : null })} onDeleteTag={state.deleteTag} onReorderEnvironments={state.reorderEnvironments} onReorderProjects={state.reorderProjects} /></TabsContent>
     </Tabs>
     <SessionAssetDetailPanel session={detailSession} folders={state.folders} activeTerminalCount={activeTerminalCount} onClose={() => setDetailID(null)} onConnect={state.connect} onEdit={editSession} onDelete={(session) => setDeleteTarget({ type: 'session', item: session })} onDuplicateTerminal={(session) => state.connect(session.id)} />
