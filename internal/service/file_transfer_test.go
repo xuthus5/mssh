@@ -147,8 +147,8 @@ func TestFileService_RenameSessionNotFound(t *testing.T) {
 func TestFileService_reportProgress(t *testing.T) {
 	b := newMockEventBus()
 	svc := &FileService{logger: testutil.NewTestLogger(),
-		eventBus: b,
-		tasks:         make(map[string]context.CancelFunc),
+		eventBus:     b,
+		tasks:        make(map[string]context.CancelFunc),
 		taskSessions: make(map[string]int64),
 	}
 
@@ -161,8 +161,8 @@ func TestFileService_reportProgress(t *testing.T) {
 func TestFileService_reportProgressNoTotal(t *testing.T) {
 	b := newMockEventBus()
 	svc := &FileService{logger: testutil.NewTestLogger(),
-		eventBus: b,
-		tasks:         make(map[string]context.CancelFunc),
+		eventBus:     b,
+		tasks:        make(map[string]context.CancelFunc),
 		taskSessions: make(map[string]int64),
 	}
 
@@ -228,11 +228,11 @@ func TestFileService_DownloadTaskIDPrefix(t *testing.T) {
 func TestFileService_ReportProgressWithSpeedAndETA(t *testing.T) {
 	b := newMockEventBus()
 	svc := &FileService{
-		logger:   testutil.NewTestLogger(),
-		eventBus: b,
-		tasks:         make(map[string]context.CancelFunc),
+		logger:       testutil.NewTestLogger(),
+		eventBus:     b,
+		tasks:        make(map[string]context.CancelFunc),
 		taskSessions: make(map[string]int64),
-		startsAt: make(map[string]time.Time),
+		startsAt:     make(map[string]time.Time),
 	}
 
 	svc.recordStart("task-speed")
@@ -249,11 +249,11 @@ func TestFileService_ReportProgressWithSpeedAndETA(t *testing.T) {
 func TestFileService_EmitTransferError(t *testing.T) {
 	b := newMockEventBus()
 	svc := &FileService{
-		logger:   testutil.NewTestLogger(),
-		eventBus: b,
-		tasks:         make(map[string]context.CancelFunc),
+		logger:       testutil.NewTestLogger(),
+		eventBus:     b,
+		tasks:        make(map[string]context.CancelFunc),
 		taskSessions: make(map[string]int64),
-		startsAt: make(map[string]time.Time),
+		startsAt:     make(map[string]time.Time),
 	}
 
 	svc.emitTransferError("task-err", fmt.Errorf("disk full"))

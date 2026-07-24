@@ -1,6 +1,7 @@
 package service
 
 import (
+	"bytes"
 	"encoding/json"
 	"testing"
 
@@ -171,4 +172,21 @@ func TestSettingServiceRejectsInvalidLogDir(t *testing.T) {
 	stored, getErr := store.GetSettingEntry(db, "application.log_dir")
 	require.NoError(t, getErr)
 	assert.Nil(t, stored)
+}
+
+func TestApplySettingServiceOptionVariants(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	runtime := NewCryptoRuntime()
+	runtime.SetDEK(bytes.Repeat([]byte{2}, 32))
+	proxy := &stubProxyConfigurer{}
+	svc := NewSettingService(db, testutil.NewTestLogger(),
+		SettingServiceOptions{Crypto: runtime, Proxy: proxy, Log: &stubLogConfigurer{}},
+		runtime,
+		proxy,
+	)
+	require.NotNil(t, svc)
+	applySettingServiceOption(svc, "noop")
+	applySettingServiceOption(svc, SettingServiceOptions{})
+	applySettingServiceOption(svc, ProxyConfigurer(nil))
+	applySettingServiceOption(svc, KeyCrypto(nil))
 }
