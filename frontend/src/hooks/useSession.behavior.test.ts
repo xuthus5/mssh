@@ -258,7 +258,7 @@ describe('useSession behavior', () => {
     expect(useAppStore.getState().connectionStatus['term-first']).toBe('disconnected')
 
     __registerHandler(service + 'TerminalService.Close', async () => { throw new Error('disconnect failed') })
-    await act(async () => result.current.disconnect('term-second'))
+    await expect(act(async () => result.current.disconnect('term-second'))).rejects.toThrow('disconnect failed')
     expect(useAppStore.getState().connectionStatus['term-second']).toBeUndefined()
   })
 

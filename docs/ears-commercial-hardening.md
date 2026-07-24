@@ -1434,3 +1434,11 @@
 | UX-CLIP-180 | 终端右键菜单复制/粘贴失败仅路由到工具栏 banner，不得 error toast。 | done |
 | UX-CLIP-181 | 工具栏复制/粘贴失败继续仅工具栏 banner 展示；同一失败不得出现 toast + banner 双 owner。 | done |
 
+## 2026-07-24 商用硬化波次（应用壳动作错误归属）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| UX-SHELL-182 | 打开本地终端失败仅应用壳 `WorkspaceRestoreBanner`/shellActionError 展示，不得 error toast。 | done |
+| UX-SHELL-183 | 同步后刷新/热更新失败仅应用壳 shellActionError banner 展示，不得 error toast；成功仍可 success toast。 | done |
+| UX-CONN-184 | `disconnect` API 失败向上抛错且不得 error toast（关闭路径由 tab close 归属）。 | done |
+

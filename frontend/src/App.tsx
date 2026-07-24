@@ -149,7 +149,11 @@ function AppShell() {
 
   useEffect(() => onAppEvent(APP_NEW_LOCAL_TERMINAL_EVENT, () => {
     void openLocalTerminal().catch((error: unknown) => {
-      toast(t('打开本地终端失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
+      logger.error('open local terminal failed', error)
+      // App shell banner owns this global action (title bar / welcome / shortcut).
+      useAppStore.getState().setShellActionError(
+        t('打开本地终端失败: ${}', error instanceof Error ? error.message : String(error)),
+      )
     })
   }), [])
 
