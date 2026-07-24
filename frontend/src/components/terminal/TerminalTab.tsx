@@ -4,7 +4,6 @@ import { TerminalToolbar } from '@/components/terminal/TerminalToolbar'
 import { useAppStore, type TerminalTab as TerminalTabState } from '@/store/appStore'
 import { LogService } from '@/lib/wails'
 import { logger } from '@/lib/logger'
-import { toast } from '@/components/ui/toast'
 import type { TerminalFocusRequest } from '@/hooks/useTerminal'
 import { CommandHistoryPanel } from '@/components/terminal/CommandHistoryPanel'
 import { SystemPanel } from '@/components/terminal/SystemPanel'
@@ -30,8 +29,11 @@ interface Props {
 function useRecordingControl(terminalID: string, sessionId: number) {
   const recordingState = useAppStore((state) => state.recordingState[terminalID] ?? 'idle')
   const setRecordingState = useAppStore((state) => state.setRecordingState)
+  const [actionError, setActionError] = useState('')
   const isRecording = recordingState === 'recording' || recordingState === 'stopping'
   const toggle = useCallback(async () => {
+    if (sessionId === 0) return
+    setActionError('')
     if (isRecording) {
       setRecordingState(terminalID, 'stopping')
       try {
@@ -40,7 +42,7 @@ function useRecordingControl(terminalID: string, sessionId: number) {
       } catch (error: unknown) {
         logger.error('TerminalTab: stop recording failed:', error)
         setRecordingState(terminalID, 'error')
-        toast(t('停止录制失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
+        setActionError(t('停止录制失败: ${}', error instanceof Error ? error.message : String(error)))
       }
       return
     }
@@ -52,10 +54,10 @@ function useRecordingControl(terminalID: string, sessionId: number) {
     } catch (error: unknown) {
       logger.error('TerminalTab: start recording failed:', error)
       setRecordingState(terminalID, 'error')
-      toast(t('开始录制失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
+      setActionError(t('开始录制失败: ${}', error instanceof Error ? error.message : String(error)))
     }
   }, [isRecording, sessionId, setRecordingState, terminalID])
-  return { isRecording, toggle }
+  return { isRecording, toggle, actionError }
 }
 
 export function TerminalTab({ terminalID, sessionId, onOpenFiles, active, focusRequest, onPaneClosed, onPaneReplaced, onCloseTerminal }: Props) {
@@ -95,6 +97,7 @@ export function TerminalTab({ terminalID, sessionId, onOpenFiles, active, focusR
         sessionId={sessionId}
         isRecording={recording.isRecording}
         recordingLogId={null}
+        recordingError={recording.actionError}
         onToggleRecording={recording.toggle}
         hostname={currentTab?.title}
         filesSupported={remoteFeatures}

@@ -17,7 +17,7 @@ describe('useThemeCatalog', () => {
     __clearHandlers()
     localStorage.clear()
     document.documentElement.classList.remove('light')
-    useThemeCatalogStore.setState({ definitions: [], profiles: [], assignments: { dark_profile_id: 0, light_profile_id: 0, follow_interface_mode: true, fixed_profile_id: 0 }, globalStyle, colorMode: 'dark', loaded: false, loading: false, error: null })
+    useThemeCatalogStore.setState({ definitions: [], profiles: [], assignments: { dark_profile_id: 0, light_profile_id: 0, follow_interface_mode: true, fixed_profile_id: 0 }, globalStyle, colorMode: 'dark', loaded: false, loading: false, error: null, colorModeError: null })
     registerCatalogHandlers('light')
   })
 
@@ -41,6 +41,7 @@ describe('useThemeCatalog', () => {
 
   it('rolls back interface and terminal themes when persistence fails', async () => {
     registerCatalogHandlers('dark')
+    useToastStore.setState({ toasts: [] })
     renderHook(() => useThemeCatalog())
     await waitFor(() => expect(useThemeCatalogStore.getState().loaded).toBe(true))
     __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.Set', async () => { throw new Error('db failed') })
@@ -48,8 +49,11 @@ describe('useThemeCatalog', () => {
     await act(async () => { await changeColorMode('light') })
 
     expect(useThemeCatalogStore.getState().colorMode).toBe('dark')
+    expect(useThemeCatalogStore.getState().colorModeError).toContain('主题设置保存失败，已恢复原主题')
+    expect(useThemeCatalogStore.getState().colorModeError).toContain('db failed')
     expect(document.documentElement).not.toHaveClass('light')
     expect(useAppStore.getState().terminalTheme.background).toBe('#000000')
+    expect(useToastStore.getState().toasts).toHaveLength(0)
   })
 
   it('does not update terminal theme when interface mode changes with follow disabled', async () => {
