@@ -58,18 +58,19 @@ describe('SerialSignalToolbar', () => {
     vi.useRealTimers()
   })
 
-  it('toasts serial signal and break failures with explicit templates', async () => {
+  it('shows serial signal and break failures inline without error toast', async () => {
     const user = userEvent.setup()
     vi.mocked(toast).mockClear()
     __registerHandler(terminal + 'SerialSetSignals', async () => { throw new Error('set failed') })
     __registerHandler(terminal + 'SerialBreak', async () => { throw new Error('break failed') })
     render(<SerialSignalToolbar terminalID="term-1" />)
     await waitFor(() => expect(screen.getByText('DTR')).toBeInTheDocument())
-    // toggle DTR via switch - first switch
     const switches = screen.getAllByRole('switch')
     await user.click(switches[0])
-    await waitFor(() => expect(toast).toHaveBeenCalledWith('设置串口信号失败: set failed', 'error'))
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('设置串口信号失败: set failed'))
+    expect(toast).not.toHaveBeenCalledWith(expect.stringContaining('设置串口信号失败'), 'error')
     await user.click(screen.getByRole('button', { name: 'Break' }))
-    await waitFor(() => expect(toast).toHaveBeenCalledWith('发送 Break 失败: break failed', 'error'))
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('发送 Break 失败: break failed'))
+    expect(vi.mocked(toast).mock.calls.filter((call) => call[1] === 'error')).toHaveLength(0)
   })
 })

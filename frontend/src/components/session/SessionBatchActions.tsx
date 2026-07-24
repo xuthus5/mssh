@@ -4,7 +4,6 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { toast } from '@/components/ui/toast'
 import { MacroService, SessionService } from '@/lib/wails'
 import type { BatchSessionResult } from '@/lib/sessionBatch'
 import { t } from '@/i18n'
@@ -31,6 +30,7 @@ export function SessionBatchActions({ selectedIDs, onBatchConnect, onBatchExecut
   const [deleteImpact, setDeleteImpact] = useState<{ tunnels: number; history: number; recordings: number; transfers: number } | null>(null)
   const [macroError, setMacroError] = useState('')
   const [impactError, setImpactError] = useState('')
+  const [executeError, setExecuteError] = useState('')
 
   useEffect(() => {
     let current = true
@@ -70,6 +70,7 @@ export function SessionBatchActions({ selectedIDs, onBatchConnect, onBatchExecut
   const execute = async () => {
     if (!pendingAction) return
     setExecuting(true)
+    setExecuteError('')
     try {
       const nextResults = pendingAction.type === 'connect'
         ? await onBatchConnect(selectedIDs)
@@ -80,7 +81,7 @@ export function SessionBatchActions({ selectedIDs, onBatchConnect, onBatchExecut
       setPendingAction(null)
       onComplete()
     } catch (error) {
-      toast(t('批量操作失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
+      setExecuteError(t('批量操作失败: ${}', error instanceof Error ? error.message : String(error)))
     } finally {
       setExecuting(false)
     }
@@ -95,13 +96,13 @@ export function SessionBatchActions({ selectedIDs, onBatchConnect, onBatchExecut
       {selectedIDs.length > 0 && <Button size="sm" variant="ghost" className="ml-auto" onClick={onComplete}>{t('清除选择')}</Button>}
       {macroError ? <p className="basis-full text-xs text-destructive" role="alert">{t('加载宏失败: ${}', macroError)}</p> : null}
     </div>
-    <BatchConfirmation action={pendingAction} count={selectedIDs.length} executing={executing} deleteImpact={deleteImpact} impactError={impactError} onOpenChange={(open) => { if (!open && !executing) setPendingAction(null) }} onConfirm={() => { void execute() }} />
+    <BatchConfirmation action={pendingAction} count={selectedIDs.length} executing={executing} deleteImpact={deleteImpact} impactError={impactError} executeError={executeError} onOpenChange={(open) => { if (!open && !executing) { setPendingAction(null); setExecuteError('') } }} onConfirm={() => { void execute() }} />
     <BatchResults results={results} onClose={() => setResults(null)} />
   </>
 }
 
 
-function BatchConfirmation({ action, count, executing, deleteImpact, impactError, onOpenChange, onConfirm }: { action: PendingAction | null; count: number; executing: boolean; deleteImpact: { tunnels: number; history: number; recordings: number; transfers: number } | null; impactError: string; onOpenChange: (open: boolean) => void; onConfirm: () => void }) {
+function BatchConfirmation({ action, count, executing, deleteImpact, impactError, executeError, onOpenChange, onConfirm }: { action: PendingAction | null; count: number; executing: boolean; deleteImpact: { tunnels: number; history: number; recordings: number; transfers: number } | null; impactError: string; executeError: string; onOpenChange: (open: boolean) => void; onConfirm: () => void }) {
   const operation = action?.type === 'macro'
     ? t('执行宏“${}”', action.macro.name)
     : action?.type === 'delete'
@@ -114,7 +115,7 @@ function BatchConfirmation({ action, count, executing, deleteImpact, impactError
         ? t('即将删除 ${} 个会话。将同时影响 ${} 条隧道、${} 条命令历史、${} 条录制记录和 ${} 个进行中传输。此操作不可撤销。', count, deleteImpact.tunnels, deleteImpact.history, deleteImpact.recordings, deleteImpact.transfers)
         : t('即将删除 ${} 个会话。正在分析关联资产影响范围。此操作不可撤销。', count))
     : t('即将为') + ` ${count} ` + t('个会话') + operation + t('。每个节点会独立执行，失败不会中断其他节点。')
-  return <AlertDialog open={Boolean(action)} onOpenChange={onOpenChange}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>{action?.type === 'delete' ? t('确认批量删除？') : t('确认批量操作？')}</AlertDialogTitle><AlertDialogDescription>{description}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel disabled={executing}>{t('取消')}</AlertDialogCancel><AlertDialogAction variant={action?.type === 'delete' ? 'destructive' : 'default'} disabled={executing} onClick={onConfirm}>{executing ? t('执行中…') : action?.type === 'delete' ? t('确认删除') : t('确认执行')}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+  return <AlertDialog open={Boolean(action)} onOpenChange={onOpenChange}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>{action?.type === 'delete' ? t('确认批量删除？') : t('确认批量操作？')}</AlertDialogTitle><AlertDialogDescription>{description}</AlertDialogDescription></AlertDialogHeader>{executeError ? <p role="alert" className="text-sm text-destructive">{executeError}</p> : null}<AlertDialogFooter><AlertDialogCancel disabled={executing}>{t('取消')}</AlertDialogCancel><AlertDialogAction variant={action?.type === 'delete' ? 'destructive' : 'default'} disabled={executing} onClick={onConfirm}>{executing ? t('执行中…') : action?.type === 'delete' ? t('确认删除') : t('确认执行')}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
 }
 
 function BatchResults({ results, onClose }: { results: BatchSessionResult[] | null; onClose: () => void }) {

@@ -35,6 +35,7 @@ export function SerialSignalToolbar({ terminalID }: Props) {
   const [inputs, setInputs] = useState<ModemInputs>(emptyInputs)
   const [busy, setBusy] = useState(false)
   const [alive, setAlive] = useState(true)
+  const [actionError, setActionError] = useState('')
   const pollRef = useRef<number | null>(null)
 
   const stopPolling = useCallback(() => {
@@ -63,7 +64,7 @@ export function SerialSignalToolbar({ terminalID }: Props) {
         return
       }
       logger.error('load serial signals failed', err)
-      // Polling path: avoid toast spam; user actions still toast below.
+      // Polling path: avoid spam; user actions surface actionError inline.
     }
   }, [stopPolling, terminalID])
 
@@ -78,6 +79,7 @@ export function SerialSignalToolbar({ terminalID }: Props) {
   const apply = async (nextDtr: boolean, nextRts: boolean) => {
     if (!alive) return
     setBusy(true)
+    setActionError('')
     try {
       await TerminalService.SerialSetSignals(terminalID, nextDtr, nextRts)
       setDtr(nextDtr)
@@ -87,7 +89,7 @@ export function SerialSignalToolbar({ terminalID }: Props) {
         setAlive(false)
         stopPolling()
       } else {
-        toast(t('设置串口信号失败: ${}', err instanceof Error ? err.message : String(err)), 'error')
+        setActionError(t('设置串口信号失败: ${}', err instanceof Error ? err.message : String(err)))
         await load()
       }
     } finally {
@@ -98,6 +100,7 @@ export function SerialSignalToolbar({ terminalID }: Props) {
   const sendBreak = async () => {
     if (!alive) return
     setBusy(true)
+    setActionError('')
     try {
       await TerminalService.SerialBreak(terminalID, 250)
       toast(t('已发送 Break'), 'success')
@@ -106,7 +109,7 @@ export function SerialSignalToolbar({ terminalID }: Props) {
         setAlive(false)
         stopPolling()
       } else {
-        toast(t('发送 Break 失败: ${}', err instanceof Error ? err.message : String(err)), 'error')
+        setActionError(t('发送 Break 失败: ${}', err instanceof Error ? err.message : String(err)))
       }
     } finally {
       setBusy(false)
@@ -114,7 +117,7 @@ export function SerialSignalToolbar({ terminalID }: Props) {
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-2 border-l border-border pl-2 text-xs text-muted-foreground">
+    <div className="flex max-w-full flex-wrap items-center gap-2 border-l border-border pl-2 text-xs text-muted-foreground">
       <Cable className="size-3.5" />
       <label className="flex items-center gap-1">
         <span>DTR</span>
@@ -133,6 +136,7 @@ export function SerialSignalToolbar({ terminalID }: Props) {
       <Button type="button" size="xs" variant="outline" disabled={busy || !alive} onClick={() => void sendBreak()}>
         Break
       </Button>
+      {actionError ? <p role="alert" className="basis-full text-[11px] text-destructive">{actionError}</p> : null}
     </div>
   )
 }
