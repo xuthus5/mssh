@@ -313,5 +313,20 @@ describe('quiet autosave error feedback', () => {
     expect(result.current.general.maxPoolSize).toBe(12)
   })
 
+  it('non-quiet save errors never toast and still throw', async () => {
+    const { useToastStore } = await import('@/components/ui/toast')
+    useToastStore.setState({ toasts: [] })
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.GetMany', async () => ({
+      'terminal.max_pool_size': setting('terminal.max_pool_size', 10),
+    }))
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.SetMany', async () => {
+      throw new Error('persist failed')
+    })
+    const { result } = renderHook(() => useGeneralSettings())
+    await waitFor(() => expect(result.current.general.maxPoolSize).toBe(10))
+    await expect(result.current.saveGeneral({ ...result.current.general })).rejects.toThrow('persist failed')
+    expect(useToastStore.getState().toasts.filter((item) => item.type === 'error')).toHaveLength(0)
+  })
+
 })
 
