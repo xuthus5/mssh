@@ -1,6 +1,6 @@
-import { toast } from '@/components/ui/toast'
 import { logger } from '@/lib/logger'
 import { t } from '@/i18n'
+import { useAppStore } from '@/store/appStore'
 
 
 type CloseTab = (id: string) => Promise<void>
@@ -20,7 +20,8 @@ export function closeTabsWithFeedback(
         return
       }
       const message = error instanceof Error ? error.message : String(error)
-      toast(t('关闭标签失败: ${}', message), 'error')
+      // App-shell banner owns unbound close failures (shortcut / bulk without confirm dialog).
+      useAppStore.getState().setShellActionError(t('关闭标签失败: ${}', message))
     })
   }
 }

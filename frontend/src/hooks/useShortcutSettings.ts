@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from 'react'
 import { Events } from '@wailsio/runtime'
 import { SettingService } from '@/lib/wails'
 import { logger } from '@/lib/logger'
-import { toast } from '@/components/ui/toast'
 import {
   SHORTCUT_SETTING_KEY,
   SHORTCUTS_CHANGED_EVENT,
@@ -13,7 +12,6 @@ import {
 } from '@/lib/shortcuts'
 import { settingEntry } from '@/hooks/useGeneralSettings'
 import { useShortcutStore } from '@/store/shortcutStore'
-import { t } from '@/i18n'
 
 interface EventEnvelope<T> { data?: T }
 
@@ -76,10 +74,7 @@ export function useShortcutSettings() {
       })
     } catch (error: unknown) {
       logger.error('save shortcuts failed', error)
-      // Settings shortcut panel owns failures via AutoSaveStatusIndicator when quiet.
-      if (!options?.quiet) {
-        toast(t('保存快捷键失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
-      }
+      // Shortcut panel owns failures via AutoSaveStatusIndicator / thrown errors.
       throw error
     }
   }, [])

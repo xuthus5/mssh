@@ -131,5 +131,17 @@ describe('quiet SFTP autosave error feedback', () => {
     expect(result.current.settings).toEqual({ showHiddenFiles: true, followTerminalDirectory: false, defaultView: 'tree' })
   })
 
+  it('non-quiet save errors never toast and still throw', async () => {
+    const { useToastStore } = await import('@/components/ui/toast')
+    useToastStore.setState({ toasts: [] })
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.SetMany', async () => {
+      throw new Error('sftp save failed')
+    })
+    const { result } = renderHook(() => useSFTPSettings())
+    await waitFor(() => expect(result.current.settings).toBeTruthy())
+    await expect(result.current.save(result.current.settings)).rejects.toThrow('sftp save failed')
+    expect(useToastStore.getState().toasts.filter((item) => item.type === 'error')).toHaveLength(0)
+  })
+
 })
 

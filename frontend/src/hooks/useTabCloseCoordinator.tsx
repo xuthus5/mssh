@@ -41,7 +41,7 @@ export function useTabCloseCoordinator() {
       setPendingTabID(tabID)
       return
     }
-    // Unconfirmed closes have no dialog surface; toast remains the owner.
+    // Unconfirmed closes have no dialog surface; app-shell banner owns failures.
     closeTabsWithFeedback([tabID], closeTab)
   }, [closeTab, connectionStatus, recordingState, tabs])
 

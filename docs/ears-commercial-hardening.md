@@ -1442,3 +1442,10 @@
 | UX-SHELL-183 | 同步后刷新/热更新失败仅应用壳 shellActionError banner 展示，不得 error toast；成功仍可 success toast。 | done |
 | UX-CONN-184 | `disconnect` API 失败向上抛错且不得 error toast（关闭路径由 tab close 归属）。 | done |
 
+## 2026-07-24 商用硬化波次（设置保存与无确认关标签错误归属）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| UX-SET-185 | 通用/SFTP/快捷键保存失败永不 error toast；调用方（AutoSaveStatusIndicator 或显式 await）承接错误。 | done |
+| UX-TAB-186 | 无确认对话框的关标签失败（快捷键/批量）仅应用壳 shellActionError banner 展示，不得 error toast。 | done |
+
