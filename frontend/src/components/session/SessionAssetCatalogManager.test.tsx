@@ -62,11 +62,12 @@ describe('SessionAssetCatalogManager', () => {
     await waitFor(() => expect(values.onDeleteEnvironment).toHaveBeenCalledWith('1', 'migrate', '2'))
   })
 
-  it('toasts reorder failures with explicit templates', async () => {
+  it('shows reorder failures inline without error toast', async () => {
     const values = props()
     values.onReorderEnvironments = vi.fn(async () => { throw new Error('reorder failed') })
     render(<SessionAssetCatalogManager {...values} />)
     await userEvent.click(screen.getByRole('button', { name: '下移 生产' }))
-    await waitFor(() => expect(toast).toHaveBeenCalledWith('调整资产排序失败: reorder failed', 'error'))
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('调整资产排序失败: reorder failed'))
+    expect(toast).not.toHaveBeenCalled()
   })
 })

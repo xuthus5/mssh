@@ -1377,3 +1377,13 @@
 |---|---|---|
 | UX-TUNNEL-159 | 隧道新建启动失败仅表单 inline alert，不得 error toast。 | done |
 | UX-TUNNEL-160 | 隧道列表启动/停止/删除失败仅对话框 action banner 展示，不得 error toast；删除成功可 toast。 | done |
+
+## 2026-07-24 商用硬化波次（主题/串口信号/录制/批量/资产排序错误归属）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| UX-THEME-161 | 标题栏切换颜色模式失败仅标题栏下方 banner（colorModeError）展示，不得 error toast；回滚原主题。 | done |
+| UX-SERIAL-162 | 串口信号栏 DTR/RTS/Break 失败仅工具栏 inline alert 展示，不得 error toast；Break 成功可 toast。 | done |
+| UX-REC-163 | 终端开始/停止录制失败仅终端工具栏 inline alert 展示，不得 error toast。 | done |
+| UX-BATCH-164 | 会话批量操作执行失败仅确认对话框 inline alert 展示，不得 error toast；对话框保持打开可重试。 | done |
+| UX-ASSET-165 | 资产分类排序失败仅分类表上方 inline alert 展示，不得 error toast。 | done |

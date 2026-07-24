@@ -35,6 +35,7 @@ export function WindowTitleBar() {
     const nextMode = colorMode === 'dark' ? 'light' : 'dark'
     void themeCatalog.setColorMode(nextMode).catch((error: unknown) => logger.error('toggle color mode failed', error))
   }
+  const colorModeError = themeCatalog.colorModeError
 
   const navigationButton = (tab: WorkspaceID, label: string) => {
     const Icon = tab === 'overview' ? LayoutDashboard : tab === 'sessions' ? SquareTerminal : Workflow
@@ -42,7 +43,8 @@ export function WindowTitleBar() {
     return <button id={workspaceTabID(tab)} type="button" aria-controls="sidebar-navigation" aria-pressed={selected} className={cn('flex h-6 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition-colors duration-150 [--wails-draggable:no-drag] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70', selected ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground')} onClick={() => activateWorkspace(tab)}><Icon data-icon="inline-start" aria-hidden="true" className="size-3.5" />{label}</button>
   }
 
-  return <header className={cn('flex h-9 shrink-0 select-none items-stretch bg-card', !terminalSurfaceActive && 'border-b border-border')}>
+  return <>
+  <header className={cn('flex h-9 shrink-0 select-none items-stretch bg-card', !terminalSurfaceActive && 'border-b border-border')}>
     <div data-testid="title-navigation-region" style={{ width: navigationCollapsed ? COLLAPSED_NAVIGATION_WIDTH : sidebarWidth }} className="flex shrink-0 items-center gap-1 overflow-hidden px-1 transition-[width] duration-200 ease-out [--wails-draggable:no-drag]">
       <button type="button" aria-label={navigationCollapsed ? t('展开导航') : t('收起导航')} aria-controls="sidebar-navigation" aria-expanded={!navigationCollapsed} className="grid size-7 place-items-center rounded-md text-muted-foreground transition-colors duration-150 hover:bg-muted/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70" onClick={toggleNavigation}><Menu className="size-3.5" /></button>
       {!navigationCollapsed && <nav aria-label={t('侧边栏导航')} className="flex h-7 items-center gap-0.5 rounded-lg border border-border/60 bg-muted/40 p-0.5">{navigationButton('overview', t('总览'))}{!overviewActive && <>{navigationButton('sessions', t('会话'))}{navigationButton('macros', t('宏'))}</>}</nav>}
@@ -60,4 +62,6 @@ export function WindowTitleBar() {
       <button type="button" aria-label={t('关闭窗口')} className="grid w-11 place-items-center text-muted-foreground transition-colors hover:bg-destructive hover:text-white" onClick={() => runWindowAction('close', Window.Close)}><X className="size-4" /></button>
     </div>
   </header>
+  {colorModeError ? <p role="alert" className="border-b border-destructive/30 bg-destructive/10 px-3 py-1 text-xs text-destructive">{colorModeError}</p> : null}
+</>
 }
