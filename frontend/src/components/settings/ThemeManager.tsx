@@ -29,6 +29,7 @@ export function ThemeManager({ profiles, onImport, onDeleteProfile, onDeleteDefi
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget>(null)
   const [deleting, setDeleting] = useState(false)
   const [actionError, setActionError] = useState('')
+  const [deleteError, setDeleteError] = useState('')
   const filtered = useMemo(
     () => profiles.filter((profile) => profile.name.toLowerCase().includes(query.toLowerCase())),
     [profiles, query],
@@ -72,12 +73,12 @@ export function ThemeManager({ profiles, onImport, onDeleteProfile, onDeleteDefi
     if (!deleteTarget || deleting) return
     setDeleting(true)
     try {
-      setActionError('')
+      setDeleteError('')
       await onDeleteProfile(deleteTarget.id)
       await maybeDeleteOrphanDefinition(deleteTarget, onDeleteDefinition)
       setDeleteTarget(null)
     } catch (error) {
-      setActionError(t('主题操作失败: ${}', error instanceof Error ? error.message : String(error)))
+      setDeleteError(t('主题操作失败: ${}', error instanceof Error ? error.message : String(error)))
     } finally {
       setDeleting(false)
     }
@@ -124,7 +125,7 @@ export function ThemeManager({ profiles, onImport, onDeleteProfile, onDeleteDefi
                 profile={profile}
                 onCreateProfile={onCreateProfile}
                 onUpdateProfile={onUpdateProfile}
-                onRequestDelete={setDeleteTarget}
+                onRequestDelete={(profile) => { setDeleteError(''); setDeleteTarget(profile) }}
                 runAction={runAction}
               />
             ))}
@@ -134,8 +135,9 @@ export function ThemeManager({ profiles, onImport, onDeleteProfile, onDeleteDefi
       <ThemeDeleteDialog
         target={deleteTarget}
         pending={deleting}
+        error={deleteError}
         onOpenChange={(open) => {
-          if (!open && !deleting) setDeleteTarget(null)
+          if (!open && !deleting) { setDeleteTarget(null); setDeleteError('') }
         }}
         onConfirm={() => { void confirmDelete() }}
       />
