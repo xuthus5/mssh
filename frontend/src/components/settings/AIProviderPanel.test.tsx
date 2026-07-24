@@ -27,8 +27,8 @@ describe('AIProviderPanel', () => {
     expect(controller.deleteProvider).toHaveBeenCalledWith(1)
     await selectOption(user, '默认提供商', '未设置')
     await selectOption(user, '故障回退', 'main')
-    expect(controller.saveSettings).toHaveBeenCalledWith(expect.objectContaining({ default_provider_id: null }))
-    expect(controller.saveSettings).toHaveBeenCalledWith(expect.objectContaining({ fallback_provider_id: 1 }))
+    expect(controller.saveSettings).toHaveBeenCalledWith(expect.objectContaining({ default_provider_id: null }), { quiet: true })
+    expect(controller.saveSettings).toHaveBeenCalledWith(expect.objectContaining({ fallback_provider_id: 1 }), { quiet: true })
   })
 
   it('does not delete provider when confirmation is cancelled', async () => {
