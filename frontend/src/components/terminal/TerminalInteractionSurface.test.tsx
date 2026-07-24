@@ -9,11 +9,8 @@ const interactions = vi.hoisted(() => ({
   selectAllTerminal: vi.fn(),
 }))
 const loggerError = vi.hoisted(() => vi.fn())
-const toast = vi.hoisted(() => vi.fn())
-
 vi.mock('@/lib/terminalInteractions', () => interactions)
 vi.mock('@/lib/logger', () => ({ logger: { error: loggerError } }))
-vi.mock('@/components/ui/toast', () => ({ toast }))
 vi.mock('@/components/ui/context-menu', () => ({
   ContextMenu: ({ children, disabled }: { children: ReactNode; disabled?: boolean }) => (
     <div data-testid="context-menu" data-disabled={disabled}>{children}</div>
@@ -110,17 +107,22 @@ describe('TerminalInteractionSurface', () => {
     expect(terminal.focus).toHaveBeenCalledOnce()
   })
 
-  it('logs and toasts explicit clipboard failures', async () => {
+  it('logs and reports explicit clipboard failures without toast', async () => {
     useTerminalBehaviorStore.setState({ rightClickAction: 'paste', copyOnSelect: false, autoReconnect: false, restoreTabsOnStartup: true, scrollbackLines: 10000, renderer: 'dom', historyPredict: false })
     const error = new Error('clipboard denied')
     interactions.pasteClipboardIntoTerminal.mockRejectedValueOnce(error)
     const { terminalRef } = createTerminal()
-    render(<TerminalInteractionSurface terminalRef={terminalRef}><div>terminal</div></TerminalInteractionSurface>)
+    const handler = vi.fn()
+    window.addEventListener('mssh:terminal-clipboard-error', handler as EventListener)
+    render(<TerminalInteractionSurface terminalRef={terminalRef} terminalID="term-1"><div>terminal</div></TerminalInteractionSurface>)
 
     fireEvent.contextMenu(screen.getByText('terminal').parentElement!)
 
     await waitFor(() => expect(loggerError).toHaveBeenCalledWith('terminal clipboard action failed', error))
-    expect(toast).toHaveBeenCalledWith('剪贴板操作失败: clipboard denied', 'error')
+    expect(handler).toHaveBeenCalled()
+    const detail = (handler.mock.calls[0][0] as CustomEvent).detail
+    expect(detail).toEqual({ terminalID: 'term-1', message: '剪贴板操作失败: clipboard denied' })
+    window.removeEventListener('mssh:terminal-clipboard-error', handler as EventListener)
   })
 
   it('hot-switches an already mounted surface between menu and paste modes', () => {

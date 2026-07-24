@@ -7,7 +7,6 @@ import {
   ContextMenuItem,
   ContextMenuTrigger,
 } from '@/components/ui/context-menu'
-import { toast } from '@/components/ui/toast'
 import { logger } from '@/lib/logger'
 import {
   copyTerminalSelection,
@@ -16,10 +15,12 @@ import {
 } from '@/lib/terminalInteractions'
 import { useTerminalBehaviorStore } from '@/store/terminalBehaviorStore'
 import { t } from '@/i18n'
+import { reportTerminalClipboardError } from '@/lib/terminalClipboardEvents'
 
 
 interface TerminalInteractionSurfaceProps {
   terminalRef: RefObject<Terminal | null>
+  terminalID?: string
   children: ReactNode
 }
 
@@ -34,9 +35,13 @@ interface TerminalContextMenuProps extends TerminalInteractionSurfaceProps {
   pasteMode: boolean
 }
 
-function reportExplicitClipboardError(error: unknown) {
+function reportExplicitClipboardError(error: unknown, terminalID?: string) {
   logger.error('terminal clipboard action failed', error)
-  toast(t('剪贴板操作失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
+  // Toolbar banner owns fixed-surface clipboard failures for the active terminal.
+  reportTerminalClipboardError(
+    t('剪贴板操作失败: ${}', error instanceof Error ? error.message : String(error)),
+    terminalID,
+  )
 }
 
 function restoreTerminalFocus(term: Terminal) {
@@ -79,8 +84,9 @@ function useTerminalClipboardActions(terminalRef: RefObject<Terminal | null>): T
   return { copy, paste, selectAll }
 }
 
-function TerminalContextMenu({ terminalRef, children, actions, pasteMode }: TerminalContextMenuProps) {
+function TerminalContextMenu({ terminalRef, terminalID, children, actions, pasteMode }: TerminalContextMenuProps) {
   const [copyDisabled, setCopyDisabled] = useState(true)
+  const report = (error: unknown) => reportExplicitClipboardError(error, terminalID)
   return (
     <ContextMenu disabled={pasteMode}>
       <ContextMenuTrigger
@@ -88,7 +94,7 @@ function TerminalContextMenu({ terminalRef, children, actions, pasteMode }: Term
         onContextMenuCapture={(event) => {
           if (pasteMode) {
             event.preventDefault()
-            void actions.paste().catch(reportExplicitClipboardError)
+            void actions.paste().catch(report)
             return
           }
           setCopyDisabled(!terminalRef.current?.getSelection())
@@ -98,11 +104,11 @@ function TerminalContextMenu({ terminalRef, children, actions, pasteMode }: Term
       </ContextMenuTrigger>
       {!pasteMode && (
         <ContextMenuContent>
-          <ContextMenuItem disabled={copyDisabled} onClick={() => { void actions.copy().catch(reportExplicitClipboardError) }}>
+          <ContextMenuItem disabled={copyDisabled} onClick={() => { void actions.copy().catch(report) }}>
             <Copy />
             {t('复制')}
           </ContextMenuItem>
-          <ContextMenuItem onClick={() => { void actions.paste().catch(reportExplicitClipboardError) }}>
+          <ContextMenuItem onClick={() => { void actions.paste().catch(report) }}>
             <ClipboardPaste />
             {t('粘贴')}
           </ContextMenuItem>
@@ -116,12 +122,12 @@ function TerminalContextMenu({ terminalRef, children, actions, pasteMode }: Term
   )
 }
 
-export function TerminalInteractionSurface({ terminalRef, children }: TerminalInteractionSurfaceProps) {
+export function TerminalInteractionSurface({ terminalRef, terminalID, children }: TerminalInteractionSurfaceProps) {
   const rightClickAction = useTerminalBehaviorStore((state) => state.rightClickAction)
   const actions = useTerminalClipboardActions(terminalRef)
 
   return (
-    <TerminalContextMenu terminalRef={terminalRef} actions={actions} pasteMode={rightClickAction === 'paste'}>
+    <TerminalContextMenu terminalRef={terminalRef} terminalID={terminalID} actions={actions} pasteMode={rightClickAction === 'paste'}>
       {children}
     </TerminalContextMenu>
   )
