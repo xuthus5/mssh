@@ -1416,3 +1416,13 @@
 |---|---|---|
 | UX-CLIP-173 | 终端工具栏复制/粘贴失败仅工具栏 banner 展示，不得 error toast；不得产生未处理 rejection。 | done |
 | UX-TAB-174 | 已确认关闭活动连接时 closeTab 失败仅确认对话框 inline alert 展示，不得 error toast；对话框保持打开可重试。无确认表面的关闭仍可 toast。 | done |
+
+## 2026-07-24 商用硬化波次（删除确认失败保持对话框）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| UX-DEL-175 | 串口单删/批删失败时确认对话框保持打开，仅 dialog inline alert 展示错误，不得 error toast，不得关闭后仅面板 banner。 | done |
+| UX-DEL-176 | 密钥删除失败时确认对话框保持打开，仅 dialog inline alert 展示错误，不得 error toast。 | done |
+| UX-DEL-177 | SFTP 删除文件失败时确认对话框保持打开，仅 dialog inline alert 展示错误，不得 error toast。 | done |
+| UX-DEL-178 | 主题 Profile 删除失败时确认对话框保持打开，仅 dialog inline alert 展示错误，不得 error toast。 | done |
+

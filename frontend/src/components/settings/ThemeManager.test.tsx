@@ -175,11 +175,31 @@ describe('ThemeManager', () => {
     expect(deleteProfile).toHaveBeenCalledWith(4)
     expect(deleteDefinition).toHaveBeenCalledWith(4)
   })
+  it('keeps delete confirm open and shows inline failure without toast', async () => {
+    notify.mockClear()
+    const onDeleteProfile = vi.fn(async () => { throw new Error('delete boom') })
+    render(
+      <ThemeManager
+        profiles={[profile(9, 'Custom', 'light', false)] as never}
+        onImport={vi.fn()}
+        onDeleteProfile={onDeleteProfile}
+        onDeleteDefinition={vi.fn()}
+        onCreateProfile={vi.fn()}
+        onUpdateProfile={vi.fn()}
+      />,
+    )
+    await userEvent.click(screen.getByRole('button', { name: '删除 Custom' }))
+    await userEvent.click(await screen.findByRole('button', { name: '确认删除' }))
+    expect(await screen.findByText('主题操作失败: delete boom')).toBeInTheDocument()
+    expect(screen.getByRole('alertdialog')).toBeInTheDocument()
+    expect(notify).not.toHaveBeenCalled()
+  })
+
 })
 
 const profiles = [profile(1, 'GitHub Dark', 'dark'), profile(2, 'GitHub Light', 'light')]
 
-function profile(id: number, name: string, mode: string) {
+function profile(id: number, name: string, mode: string, builtin = true) {
   return {
     id,
     name,
@@ -193,9 +213,9 @@ function profile(id: number, name: string, mode: string) {
       id,
       name,
       mode,
-      source_type: 'builtin',
+      source_type: builtin ? 'builtin' : 'import',
       source_license: 'MIT',
-      is_builtin: true,
+      is_builtin: builtin,
     },
   }
 }

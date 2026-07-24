@@ -101,6 +101,7 @@ describe('SerialPortCenter', () => {
     await user.click(await screen.findByRole('button', { name: '确认删除' }))
     await waitFor(() => expect(deleteCalls).toEqual([1]))
     await waitFor(() => expect(screen.getByText('删除串口配置失败: del failed')).toBeInTheDocument())
+    expect(screen.getByRole('alertdialog')).toBeInTheDocument()
     expect(useToastStore.getState().toasts.filter((item) => item.type === 'error')).toHaveLength(0)
   })
 })

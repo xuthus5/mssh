@@ -40,6 +40,7 @@ export function SerialPortCenter() {
   const [batchBusy, setBatchBusy] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget>(null)
   const [actionError, setActionError] = useState('')
+  const [deleteError, setDeleteError] = useState('')
 
   const filtered = useMemo(() => {
     const keyword = query.trim().toLowerCase()
@@ -97,7 +98,7 @@ export function SerialPortCenter() {
       const id = Number(deleteTarget.port.id)
       setDeletingID(id)
       try {
-        setActionError('')
+        setDeleteError('')
         await deletePort(id)
         setSelected((prev) => {
           const next = new Set(prev)
@@ -107,8 +108,7 @@ export function SerialPortCenter() {
         setDeleteTarget(null)
         toast(t('串口配置已删除'), 'success')
       } catch (err) {
-        setDeleteTarget(null)
-        setActionError(t('删除串口配置失败: ${}', err instanceof Error ? err.message : String(err)))
+        setDeleteError(t('删除串口配置失败: ${}', err instanceof Error ? err.message : String(err)))
       } finally {
         setDeletingID(null)
       }
@@ -116,14 +116,13 @@ export function SerialPortCenter() {
     }
     setBatchBusy(true)
     try {
-      setActionError('')
+      setDeleteError('')
       await deleteMany(deleteTarget.ids)
       setSelected(new Set())
       setDeleteTarget(null)
       toast(t('已删除 ${} 个串口配置', String(deleteTarget.count)), 'success')
     } catch (err) {
-      setDeleteTarget(null)
-      setActionError(t('批量删除串口配置失败: ${}', err instanceof Error ? err.message : String(err)))
+      setDeleteError(t('批量删除串口配置失败: ${}', err instanceof Error ? err.message : String(err)))
     } finally {
       setBatchBusy(false)
     }
@@ -191,7 +190,7 @@ export function SerialPortCenter() {
                 size="sm"
                 variant="destructive"
                 disabled={batchBusy}
-                onClick={() => setDeleteTarget({ kind: 'batch', ids: [...selected], count: selected.size })}
+                onClick={() => { setDeleteError(''); setDeleteTarget({ kind: 'batch', ids: [...selected], count: selected.size }) }}
               >
                 <Trash2 data-icon="inline-start" />
                 {t('批量删除')} ({selected.size})
@@ -225,7 +224,7 @@ export function SerialPortCenter() {
             onConnect={(port) => void connect(port)}
             onEdit={(port) => { setEditing(port); setDialogOpen(true) }}
             onDuplicate={(port) => void duplicate(port)}
-            onRemove={(port) => setDeleteTarget({ kind: 'single', port })}
+            onRemove={(port) => { setDeleteError(''); setDeleteTarget({ kind: 'single', port }) }}
           />
         </CardContent>
       </Card>
@@ -234,7 +233,8 @@ export function SerialPortCenter() {
       <SerialDeleteDialog
         target={deleteTarget}
         pending={deletePending}
-        onOpenChange={(open) => { if (!open && !deletePending) setDeleteTarget(null) }}
+        error={deleteError}
+        onOpenChange={(open) => { if (!open && !deletePending) { setDeleteTarget(null); setDeleteError('') } }}
         onConfirm={() => { void confirmDelete() }}
       />
     </section>
@@ -244,11 +244,13 @@ export function SerialPortCenter() {
 function SerialDeleteDialog({
   target,
   pending,
+  error,
   onOpenChange,
   onConfirm,
 }: {
   target: DeleteTarget
   pending: boolean
+  error: string
   onOpenChange: (open: boolean) => void
   onConfirm: () => void
 }) {
@@ -262,6 +264,11 @@ function SerialDeleteDialog({
           <AlertDialogTitle>{title}</AlertDialogTitle>
           <AlertDialogDescription>{t('此操作不可撤销。')}</AlertDialogDescription>
         </AlertDialogHeader>
+        {error ? (
+          <Alert variant="destructive">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        ) : null}
         <AlertDialogFooter>
           <AlertDialogCancel disabled={pending}>{t('取消')}</AlertDialogCancel>
           <AlertDialogAction type="button" variant="destructive" disabled={pending} onClick={onConfirm}>

@@ -161,23 +161,23 @@ function FileDialogs({ selected, renameOpen, renameName, deleteOpen, onRenameOpe
       setBusy(false)
     }
   }
+  const [deleteError, setDeleteError] = useState('')
   const confirmDelete = async () => {
     if (!selected || busy) return
     setBusy(true)
-    onMutationError('')
+    setDeleteError('')
     try {
       await onDelete(selected.path)
       onDeleteOpenChange(false)
       onClearSelection()
     } catch (error) {
-      onMutationError(t('删除文件失败: ${}', errorText(error)))
-      onDeleteOpenChange(false)
+      setDeleteError(t('删除文件失败: ${}', errorText(error)))
     } finally {
       setBusy(false)
     }
   }
   return <>
     <Dialog open={renameOpen} onOpenChange={onRenameOpenChange}><DialogContent><DialogHeader><DialogTitle>{t('重命名')}</DialogTitle></DialogHeader><Input value={renameName} onChange={(event) => onRenameNameChange(event.target.value)} autoFocus /><DialogFooter showCloseButton><Button disabled={busy} onClick={() => { void saveRename() }}>{t('保存')}</Button></DialogFooter></DialogContent></Dialog>
-    <AlertDialog open={deleteOpen} onOpenChange={(open) => { if (!busy) onDeleteOpenChange(open) }}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>{t('删除“')}{selected?.name}”</AlertDialogTitle><AlertDialogDescription>{t('远程文件删除后无法恢复。')}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel disabled={busy}>{t('取消')}</AlertDialogCancel><AlertDialogAction variant="destructive" disabled={busy} onClick={() => { void confirmDelete() }}>{t('删除')}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+    <AlertDialog open={deleteOpen} onOpenChange={(open) => { if (!busy) { if (!open) setDeleteError(''); onDeleteOpenChange(open) } }}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>{t('删除“')}{selected?.name}”</AlertDialogTitle><AlertDialogDescription>{t('远程文件删除后无法恢复。')}</AlertDialogDescription></AlertDialogHeader>{deleteError ? <Alert variant="destructive"><AlertDescription>{deleteError}</AlertDescription></Alert> : null}<AlertDialogFooter><AlertDialogCancel disabled={busy}>{t('取消')}</AlertDialogCancel><AlertDialogAction variant="destructive" disabled={busy} onClick={() => { void confirmDelete() }}>{t('删除')}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
   </>
 }

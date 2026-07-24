@@ -234,7 +234,7 @@ describe('KeyManager', () => {
 
 
 
-  it('surfaces delete failures panel-owned without toast', async () => {
+  it('keeps delete confirm open and shows inline failure without toast', async () => {
     useToastStore.setState({ toasts: [] })
     const view = props()
     view.onDelete = vi.fn(async () => { throw new Error('delete boom') })
@@ -242,6 +242,7 @@ describe('KeyManager', () => {
     await userEvent.click(screen.getByRole('button', { name: '删除 generated' }))
     await userEvent.click(await screen.findByRole('button', { name: '确认删除' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('删除密钥失败: delete boom')
+    expect(screen.getByRole('alertdialog')).toBeInTheDocument()
     expect(useToastStore.getState().toasts.filter((item) => item.type === 'error')).toHaveLength(0)
   })
 
