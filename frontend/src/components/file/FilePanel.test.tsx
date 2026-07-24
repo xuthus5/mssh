@@ -35,9 +35,8 @@ describe('FilePanel SFTP views', () => {
     expect(screen.getByRole('tree', { name: '远程文件树' })).toBeInTheDocument()
     expect(screen.getByText('.ssh')).toBeInTheDocument()
   })
-})
 
-  it('surfaces delete failures panel-owned without toast', async () => {
+  it('keeps delete confirm open and shows inline failure without toast', async () => {
     const { useToastStore } = await import('@/components/ui/toast')
     useToastStore.setState({ toasts: [] })
     const onDelete = vi.fn(async () => { throw new Error('delete boom') })
@@ -49,6 +48,7 @@ describe('FilePanel SFTP views', () => {
     await user.click(screen.getByRole('button', { name: '删除' }))
     await user.click(screen.getByRole('button', { name: '删除' }))
     expect(await screen.findByText('删除文件失败: delete boom')).toBeInTheDocument()
+    expect(screen.getByRole('alertdialog')).toBeInTheDocument()
     expect(useToastStore.getState().toasts.filter((item) => item.type === 'error')).toHaveLength(0)
   })
 
@@ -69,4 +69,4 @@ describe('FilePanel SFTP views', () => {
     render(<FilePanel open files={[]} currentPath="/" loading={false} dropTargetId="drop-zone" showHiddenFiles={false} defaultView="list" actionError="选择上传文件失败: picker unavailable" {...handlers} />)
     expect(screen.getByText('选择上传文件失败: picker unavailable')).toBeInTheDocument()
   })
-
+})

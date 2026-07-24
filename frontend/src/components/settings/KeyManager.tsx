@@ -54,6 +54,7 @@ export function KeyManager(props: Props) {
   const [materialState, setMaterialState] = useState<MaterialState | null>(null)
   const [loadingID, setLoadingID] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<{ key: KeyInfo; usage: number } | null>(null)
+  const [deleteError, setDeleteError] = useState('')
   const [deleting, setDeleting] = useState(false)
   const [rowActionError, setRowActionError] = useState('')
   const materialRequest = useRef(0)
@@ -95,7 +96,7 @@ export function KeyManager(props: Props) {
     setRowActionError('')
     try {
       const usage = await KeyService.UsageCount(Number(key.id))
-      setDeleteTarget({ key, usage })
+      setDeleteError(''); setDeleteTarget({ key, usage })
     } catch (error) {
       setRowActionError(t('分析密钥影响失败: ${}', error instanceof Error ? error.message : String(error)))
     }
@@ -104,14 +105,13 @@ export function KeyManager(props: Props) {
   const confirmDeleteKey = async () => {
     if (!deleteTarget || deleting) return
     setDeleting(true)
-    setRowActionError('')
+    setDeleteError('')
     try {
       await props.onDelete(deleteTarget.key.id)
       setDeleteTarget(null)
     } catch (error) {
       logger.error('delete key confirmation failed', error)
-      setRowActionError(t('删除密钥失败: ${}', error instanceof Error ? error.message : String(error)))
-      setDeleteTarget(null)
+      setDeleteError(t('删除密钥失败: ${}', error instanceof Error ? error.message : String(error)))
     } finally {
       setDeleting(false)
     }
@@ -160,7 +160,7 @@ export function KeyManager(props: Props) {
       onGenerated={(material) => setMaterialState({ mode: 'generated', material })} />
     <KeyImportDialog open={importOpen} onOpenChange={setImportOpen} onImport={props.onImport} onSelectFile={props.onSelectImportFile} />
     <KeyMaterialDialog state={materialState} onOpenChange={(open) => { if (!open) setMaterialState(null) }} onUpdate={props.onUpdate} />
-    <AlertDialog open={deleteTarget !== null} onOpenChange={(open) => { if (!open && !deleting) setDeleteTarget(null) }}>
+    <AlertDialog open={deleteTarget !== null} onOpenChange={(open) => { if (!open && !deleting) { setDeleteTarget(null); setDeleteError('') } }}>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>
@@ -170,6 +170,11 @@ export function KeyManager(props: Props) {
           </AlertDialogTitle>
           <AlertDialogDescription>{t('此操作不可撤销。')}</AlertDialogDescription>
         </AlertDialogHeader>
+        {deleteError ? (
+          <div className="rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive" role="alert">
+            {deleteError}
+          </div>
+        ) : null}
         <AlertDialogFooter>
           <AlertDialogCancel disabled={deleting}>{t('取消')}</AlertDialogCancel>
           <AlertDialogAction type="button" variant="destructive" disabled={deleting} onClick={() => { void confirmDeleteKey().catch(() => undefined) }}>
