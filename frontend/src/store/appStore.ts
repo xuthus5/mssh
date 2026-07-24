@@ -126,6 +126,8 @@ export interface AppState {
   workspaceRestoreNotice: string
   workspaceRestoreNonce: number
   workspaceSaveError: string
+  /** App-shell action failures without a local fixed surface (local terminal open, sync reload, ...). */
+  shellActionError: string
   activePaneId: string | null
   recordingState: Record<string, 'idle' | 'starting' | 'recording' | 'stopping' | 'error'>
   tunnelState: Record<string, 'running' | 'stopped'>
@@ -138,6 +140,7 @@ export interface AppState {
   setWorkspaceRestoreError: (error: string) => void
   setWorkspaceRestoreNotice: (notice: string) => void
   setWorkspaceSaveError: (error: string) => void
+  setShellActionError: (error: string) => void
   retryWorkspaceRestore: () => void
   openTab: (tab: Tab) => void
   closeTab: (id: string) => Promise<void>
@@ -188,6 +191,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   workspaceRestoreNotice: '',
   workspaceRestoreNonce: 0,
   workspaceSaveError: '',
+  shellActionError: '',
   activePaneId: null,
   recordingState: {},
   tunnelState: {},

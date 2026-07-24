@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const services = vi.hoisted(() => ({
@@ -41,6 +41,7 @@ describe('WorkspacePersistence', () => {
       activePaneId: null,
       workspaceRestoreError: '',
       workspaceSaveError: '',
+      shellActionError: '',
       workspaceRestoreNotice: '',
       workspaceRestoreNonce: 0,
       
@@ -133,6 +134,7 @@ describe('WorkspacePersistence', () => {
       activePaneId: null,
       workspaceRestoreError: '',
       workspaceSaveError: '',
+      shellActionError: '',
       workspaceRestoreNotice: '',
       workspaceRestoreNonce: 0,
       
@@ -186,4 +188,20 @@ describe('WorkspacePersistence', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('加载串口配置失败')
     expect(useAppStore.getState().tabs[0]).toMatchObject({ terminalId: 'fresh-terminal' })
   })
+  it('shows shell action errors on the shared restore banner without toast', async () => {
+    useAppStore.setState({
+      workspaceRestoreError: '',
+      workspaceRestoreNotice: '',
+      workspaceSaveError: '',
+      shellActionError: '打开本地终端失败: boom',
+    })
+    const { useToastStore } = await import('@/components/ui/toast')
+    useToastStore.setState({ toasts: [] })
+    render(<WorkspaceRestoreBanner />)
+    expect(screen.getByText('打开本地终端失败: boom')).toBeInTheDocument()
+    expect(useToastStore.getState().toasts.filter((item) => item.type === 'error')).toHaveLength(0)
+    fireEvent.click(screen.getByRole('button', { name: '关闭' }))
+    expect(useAppStore.getState().shellActionError).toBe('')
+  })
+
 })

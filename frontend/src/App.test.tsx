@@ -26,6 +26,8 @@ vi.mock('@wailsio/runtime', async (importOriginal) => {
 })
 vi.mock('@/components/session/SessionAssetCenter', () => ({ SessionAssetCenter: () => <div>会话资产工作区</div> }))
 vi.mock('@/components/layout/Sidebar', () => ({ default: () => null }))
+const openLocal = vi.hoisted(() => vi.fn(async (_title?: string) => 'term-local'))
+vi.mock('@/lib/openLocalTerminal', () => ({ openLocalTerminal: openLocal }))
 vi.mock('@/components/security/VaultGate', () => ({ VaultGate: ({ children }: { children: React.ReactNode }) => children }))
 vi.mock('@/components/layout/StatusBar', () => ({ default: () => null }))
 vi.mock('@/components/layout/WindowTitleBar', () => ({ WindowTitleBar: () => null }))
@@ -122,6 +124,10 @@ describe('persistent content layers', () => {
       recordingState: {},
       focusRequest: { id: '', sequence: 0 },
       activePaneId: null,
+      shellActionError: '',
+      workspaceRestoreError: '',
+      workspaceRestoreNotice: '',
+      workspaceSaveError: '',
     })
   })
 
@@ -310,6 +316,26 @@ describe('persistent content layers', () => {
     expect(screen.queryByText('复制失败: write denied')).not.toBeInTheDocument()
     window.removeEventListener('mssh:terminal-clipboard-error', handler as EventListener)
   })
+  it('surfaces open local terminal failures on the app shell banner without error toast', async () => {
+    openLocal.mockRejectedValueOnce(new Error('shell missing'))
+    useAppStore.setState({
+      tabs: [],
+      activeSurface: null,
+      shellActionError: '',
+      workspaceRestoreError: '',
+      workspaceRestoreNotice: '',
+      workspaceSaveError: '',
+    })
+    const { useToastStore } = await import('@/components/ui/toast')
+    useToastStore.setState({ toasts: [] })
+    render(<App />)
+    // Welcome screen CTA (also covers title-bar/shortcut via the same app event).
+    fireEvent.click(screen.getByRole('button', { name: '本地终端' }))
+    await waitFor(() => expect(useAppStore.getState().shellActionError).toBe('打开本地终端失败: shell missing'))
+    expect(useToastStore.getState().toasts.filter((item) => item.type === 'error')).toHaveLength(0)
+    expect(await screen.findByText('打开本地终端失败: shell missing')).toBeInTheDocument()
+  })
+
   it('consumes a rejected Ctrl+W close and shows an error toast', async () => {
     const closeTab = vi.fn(async () => { throw new Error('connection lost') })
     const logError = vi.spyOn(logger, 'error').mockImplementation(() => {})
@@ -325,7 +351,7 @@ describe('persistent content layers', () => {
     render(<App />)
     fireEvent.keyDown(document.body, { key: 'w', ctrlKey: true })
     await waitFor(() => expect(closeTab).toHaveBeenCalledWith('playback-1'))
-    expect(await screen.findByRole('alert')).toHaveTextContent('关闭标签失败: connection lost')
+    expect(await screen.findByText('关闭标签失败: connection lost')).toBeInTheDocument()
     expect(logError).toHaveBeenCalledWith(
       'close tab failed',
       expect.objectContaining({ tabId: 'playback-1', error: expect.any(Error) }),

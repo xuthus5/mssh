@@ -13,6 +13,7 @@ import {
   registerSyncDataReload,
   syncDataChangedEvent,
 } from '@/lib/syncDataReload'
+import { useAppStore } from '@/store/appStore'
 
 describe('registerSyncDataReload', () => {
   beforeEach(() => {
@@ -31,12 +32,14 @@ describe('registerSyncDataReload', () => {
     expect(reload).toHaveBeenCalledOnce()
   })
 
-  it('toasts when the reload handler rejects', async () => {
+  it('surfaces reload handler failures on the app shell banner without error toast', async () => {
+    useAppStore.setState({ shellActionError: '' })
     registerSyncDataReload(async () => {
       throw new Error('boom')
     })
     __emitEvent(syncDataChangedEvent, {})
-    await vi.waitFor(() => expect(toast).toHaveBeenCalledWith('同步后刷新失败: boom', 'error'))
+    await vi.waitFor(() => expect(useAppStore.getState().shellActionError).toBe('同步后刷新失败: boom'))
+    expect(toast).not.toHaveBeenCalledWith(expect.stringContaining('同步后刷新失败'), 'error')
     expect(loggerError).toHaveBeenCalled()
   })
 })
@@ -74,6 +77,7 @@ describe('createAppSyncDataReload', () => {
   })
 
   it('hot-reloads and toasts success without hard reload', async () => {
+    useAppStore.setState({ shellActionError: 'previous' })
     const hotReload = vi.fn(async () => {})
     const hardReload = vi.fn()
     const confirmHardReload = vi.fn(() => true)
@@ -81,17 +85,20 @@ describe('createAppSyncDataReload', () => {
     await handler()
     expect(hotReload).toHaveBeenCalledOnce()
     expect(toast).toHaveBeenCalledWith('同步数据已刷新', 'success')
+    expect(useAppStore.getState().shellActionError).toBe('')
     expect(hardReload).not.toHaveBeenCalled()
     expect(confirmHardReload).not.toHaveBeenCalled()
   })
 
   it('prompts for hard reload only after hot reload fails and user confirms', async () => {
+    useAppStore.setState({ shellActionError: '' })
     const hotReload = vi.fn(async () => { throw new Error('stale') })
     const hardReload = vi.fn()
     const confirmHardReload = vi.fn(() => true)
     const handler = createAppSyncDataReload({ hotReload, hardReload, confirmHardReload })
     await handler()
-    expect(toast).toHaveBeenCalledWith('同步后热更新失败: stale', 'error')
+    expect(useAppStore.getState().shellActionError).toBe('同步后热更新失败: stale')
+    expect(toast).not.toHaveBeenCalledWith(expect.stringContaining('同步后热更新失败'), 'error')
     expect(confirmHardReload).toHaveBeenCalledOnce()
     expect(hardReload).toHaveBeenCalledOnce()
   })

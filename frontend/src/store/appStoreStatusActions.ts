@@ -3,7 +3,7 @@ import type { AppState } from '@/store/appStore'
 import { canTransitionConnection } from '@/store/connectionStatus'
 
 type StoreSet = StoreApi<AppState>['setState']
-type StatusActions = Pick<AppState, 'setConnectionStatus' | 'setActivePane' | 'setRecordingState' | 'setTunnelState' | 'setAppStatus' | 'setTerminalTheme' | 'setMaxPoolSize' | 'setWorkspaceRestoreError' | 'setWorkspaceRestoreNotice' | 'setWorkspaceSaveError' | 'retryWorkspaceRestore'>
+type StatusActions = Pick<AppState, 'setConnectionStatus' | 'setActivePane' | 'setRecordingState' | 'setTunnelState' | 'setAppStatus' | 'setTerminalTheme' | 'setMaxPoolSize' | 'setWorkspaceRestoreError' | 'setWorkspaceRestoreNotice' | 'setWorkspaceSaveError' | 'setShellActionError' | 'retryWorkspaceRestore'>
 
 export function createStatusActions(set: StoreSet): StatusActions {
   return {
@@ -21,6 +21,7 @@ export function createStatusActions(set: StoreSet): StatusActions {
     setWorkspaceRestoreError: (workspaceRestoreError) => set({ workspaceRestoreError }),
     setWorkspaceRestoreNotice: (workspaceRestoreNotice) => set({ workspaceRestoreNotice }),
     setWorkspaceSaveError: (workspaceSaveError) => set({ workspaceSaveError }),
+    setShellActionError: (shellActionError) => set({ shellActionError }),
     retryWorkspaceRestore: () => set((state) => ({
       workspaceRestoreError: '',
       workspaceRestoreNotice: '',
