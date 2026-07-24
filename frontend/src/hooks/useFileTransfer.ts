@@ -114,7 +114,7 @@ function useFileMutations({ sessionId, currentPath, listFiles, setFiles }: FileM
       void listFiles(currentPath, { silent: true })
     } catch (error) {
       logger.error('deleteFile error', error)
-      toast(t('删除文件失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
+      // FilePanel owns mutation failures via panel banner.
       throw error
     }
   }, [sessionId, currentPath, listFiles, setFiles])
@@ -124,7 +124,7 @@ function useFileMutations({ sessionId, currentPath, listFiles, setFiles }: FileM
       void listFiles(currentPath, { silent: true })
     } catch (error) {
       logger.error('renameFile error', error)
-      toast(t('重命名失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
+      // FilePanel owns mutation failures via panel banner.
       throw error
     }
   }, [sessionId, currentPath, listFiles])
@@ -134,7 +134,7 @@ function useFileMutations({ sessionId, currentPath, listFiles, setFiles }: FileM
       void listFiles(currentPath, { silent: true })
     } catch (error) {
       logger.error('makeDir error', error)
-      toast(t('创建目录失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
+      // FilePanel owns mutation failures via panel banner.
       throw error
     }
   }, [sessionId, currentPath, listFiles])
@@ -147,7 +147,7 @@ function useCancelTransfer() {
       await cancelTransferAction(jobId)
     } catch (error) {
       logger.error('cancelTransfer error', error)
-      toast(t('取消传输失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
+      // TransferCenter owns cancel failures via Sheet banner.
       throw error
     }
   }, [])

@@ -1355,3 +1355,11 @@
 | UX-LOG-151 | 通用设置日志目录选择失败仅卡片 inline alert 展示，不得 error toast。 | done |
 | UX-COMPOSE-152 | 终端撰写面板执行/宏执行/粘贴失败仅面板 Alert 展示，不得 error toast。 | done |
 | UX-THEME-153 | 重置内置主题失败仅重置确认对话框 inline alert 展示，不得 error toast；成功可 toast。 | done |
+
+## 2026-07-24 商用硬化波次（SFTP 面板与传输取消错误归属）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| UX-TRANSFER-154 | 传输取消失败仅 TransferCenter Sheet banner 展示，`useFileTransfer.cancelTransfer` 不得再 error toast（避免双 owner）。 | done |
+| UX-SFTP-155 | SFTP 删除/重命名/新建目录失败仅 FilePanel inline alert 展示，不得 error toast。 | done |
+| UX-SFTP-156 | 同步当前目录失败与选择上传/下载路径失败仅 FilePanel actionError banner 展示，不得 error toast；同步成功可 toast。 | done |
