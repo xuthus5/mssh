@@ -178,26 +178,33 @@ describe('Sidebar behavior', () => {
 
     const unhandledRejection = vi.fn()
     window.addEventListener('unhandledrejection', unhandledRejection)
+    useToastStore.setState({ toasts: [] })
     macroService.Create.mockRejectedValueOnce(new Error('create failed'))
     await user.click(within(quickCommands).getAllByRole('button')[0])
     await user.type(screen.getByPlaceholderText('名称'), 'Deploy')
     await user.type(screen.getByPlaceholderText('命令'), 'deploy')
     await user.click(screen.getByRole('button', { name: '添加' }))
     await waitFor(() => expect(logger.error).toHaveBeenCalledWith('Sidebar: create macro error', expect.objectContaining({ message: 'create failed' })))
+    expect(await screen.findByRole('alert')).toHaveTextContent('创建宏失败: create failed')
     await new Promise((resolve) => setTimeout(resolve, 0))
     expect(screen.getByText('Created')).toBeInTheDocument()
     expect(screen.queryByText('Deploy')).not.toBeInTheDocument()
-    expect(screen.queryByPlaceholderText('名称')).not.toBeInTheDocument()
+    // keep form open for retry when create fails
+    expect(screen.getByPlaceholderText('名称')).toBeInTheDocument()
     expect(within(quickCommands).getAllByRole('button')[0]).toBeEnabled()
+    expect(useToastStore.getState().toasts.filter((item) => item.type === 'error')).toHaveLength(0)
     expect(unhandledRejection).not.toHaveBeenCalled()
     window.removeEventListener('unhandledrejection', unhandledRejection)
 
+    useToastStore.setState({ toasts: [] })
     macroService.Delete.mockRejectedValueOnce(new Error('delete failed'))
     const createdRow = screen.getByText('Created').closest<HTMLElement>('[draggable="true"]')
     if (!createdRow) throw new Error('created macro row was not rendered')
     await user.click(within(createdRow).getByRole('button'))
     await waitFor(() => expect(logger.error).toHaveBeenCalledWith('Sidebar: delete macro error', expect.any(Error)))
+    expect(await screen.findByRole('alert')).toHaveTextContent('删除宏失败: delete failed')
     expect(screen.getByText('Created')).toBeInTheDocument()
+    expect(useToastStore.getState().toasts.filter((item) => item.type === 'error')).toHaveLength(0)
 
     useAppStore.setState({
       activeSurface: { type: 'terminal', id: 'tab-1' },
