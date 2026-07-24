@@ -20,11 +20,12 @@ interface Props {
   currentPath: string
   loading: boolean
   error?: string
+  actionError?: string
   onNavigateTo: (path: string) => void
   onNavigateUp: () => void
-  onDelete: (path: string) => void
-  onRename: (oldPath: string, newName: string) => void
-  onMakeDir: (name: string) => void
+  onDelete: (path: string) => void | Promise<void>
+  onRename: (oldPath: string, newName: string) => void | Promise<void>
+  onMakeDir: (name: string) => void | Promise<void>
   onUpload: () => void
   onDownload: (path: string) => void
   dropTargetId: string
@@ -33,6 +34,10 @@ interface Props {
   onLoadDirectory: (path: string) => Promise<FileInfo[]>
   onSyncCurrentDirectory: () => void
   syncingCurrentDirectory: boolean
+}
+
+function errorText(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
 }
 
 export default function FilePanel({
@@ -50,13 +55,14 @@ export default function FilePanel({
   onDownload,
   dropTargetId,
   error,
+  actionError = '',
   showHiddenFiles,
   defaultView,
   onLoadDirectory,
   onSyncCurrentDirectory,
   syncingCurrentDirectory,
 }: Props) {
-  const state = useFilePanelState(defaultView, currentPath, onMakeDir)
+  const state = useFilePanelState(defaultView, currentPath)
   const panel = useToolPanelResize('files')
   if (!open) return null
   return (
@@ -69,12 +75,17 @@ export default function FilePanel({
         onUpload={onUpload} onDownload={onDownload} onNavigateTo={onNavigateTo} onSetView={state.setView}
         onToggleMkdir={state.toggleMkdir} onRename={state.openRename} onDelete={state.openDelete} />
       {error && <Alert variant="destructive" className="m-2"><AlertTitle>{t('目录加载失败')}</AlertTitle><AlertDescription>{error}<Button size="xs" variant="outline" className="ml-2" onClick={() => onNavigateTo(currentPath)}>{t('重试')}</Button></AlertDescription></Alert>}
-      {state.showMkdir && <MkdirForm name={state.mkdirName} onChange={state.setMkdirName} onSubmit={state.submitMkdir} />}
+      {(actionError || state.mutationError) ? (
+        <Alert variant="destructive" className="m-2">
+          <AlertDescription>{actionError || state.mutationError}</AlertDescription>
+        </Alert>
+      ) : null}
+      {state.showMkdir && <MkdirForm name={state.mkdirName} onChange={state.setMkdirName} onSubmit={(event) => { void state.submitMkdir(event, onMakeDir) }} />}
       <FileContent view={state.view} files={files} loading={loading} currentPath={currentPath} showHiddenFiles={showHiddenFiles}
         selected={state.selected} onSelect={state.setSelected} onNavigate={onNavigateTo} onDownload={onDownload} onLoadDirectory={onLoadDirectory} />
       <FileDialogs selected={state.selected} renameOpen={state.renameOpen} renameName={state.renameName} deleteOpen={state.deleteOpen}
         onRenameOpenChange={state.setRenameOpen} onRenameNameChange={state.setRenameName} onDeleteOpenChange={state.setDeleteOpen}
-        onRename={onRename} onDelete={onDelete} onClearSelection={() => state.setSelected(null)} />
+        onRename={onRename} onDelete={onDelete} onClearSelection={() => state.setSelected(null)} onMutationError={state.setMutationError} />
     </aside>
   )
 }
@@ -83,7 +94,7 @@ function ToolPanelResizeHandle(props: ReturnType<typeof useToolPanelResize>['res
   return <div {...props} className="absolute inset-y-0 -left-1 z-30 w-2 cursor-col-resize touch-none outline-none after:absolute after:inset-y-0 after:left-1/2 after:w-px after:-translate-x-1/2 after:bg-transparent hover:after:bg-primary/60 focus-visible:after:bg-primary active:after:bg-primary" />
 }
 
-function useFilePanelState(defaultView: SFTPDefaultView, currentPath: string, onMakeDir: (name: string) => void) {
+function useFilePanelState(defaultView: SFTPDefaultView, currentPath: string) {
   const [mkdirName, setMkdirName] = useState('')
   const [showMkdir, setShowMkdir] = useState(false)
   const [selected, setSelected] = useState<FileInfo | null>(null)
@@ -91,11 +102,27 @@ function useFilePanelState(defaultView: SFTPDefaultView, currentPath: string, on
   const [renameName, setRenameName] = useState('')
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [view, setView] = useState<SFTPDefaultView>(defaultView)
+  const [mutationError, setMutationError] = useState('')
   useEffect(() => setMkdirName(''), [currentPath])
   useEffect(() => setView(defaultView), [defaultView])
-  const submitMkdir = (event: FormEvent) => { event.preventDefault(); if (!mkdirName.trim()) return; void Promise.resolve(onMakeDir(mkdirName.trim())).catch(() => undefined); setMkdirName(''); setShowMkdir(false) }
+  const submitMkdir = async (event: FormEvent, onMakeDir: (name: string) => void | Promise<void>) => {
+    event.preventDefault()
+    if (!mkdirName.trim()) return
+    setMutationError('')
+    try {
+      await onMakeDir(mkdirName.trim())
+      setMkdirName('')
+      setShowMkdir(false)
+    } catch (error) {
+      setMutationError(t('创建目录失败: ${}', errorText(error)))
+    }
+  }
   const openRename = () => { if (selected) { setRenameName(selected.name); setRenameOpen(true) } }
-  return { mkdirName, setMkdirName, showMkdir, toggleMkdir: () => setShowMkdir((current) => !current), submitMkdir, selected, setSelected, renameOpen, setRenameOpen, renameName, setRenameName, openRename, deleteOpen, setDeleteOpen, openDelete: () => setDeleteOpen(true), view, setView }
+  return {
+    mkdirName, setMkdirName, showMkdir, toggleMkdir: () => setShowMkdir((current) => !current), submitMkdir,
+    selected, setSelected, renameOpen, setRenameOpen, renameName, setRenameName, openRename,
+    deleteOpen, setDeleteOpen, openDelete: () => setDeleteOpen(true), view, setView, mutationError, setMutationError,
+  }
 }
 
 function MkdirForm({ name, onChange, onSubmit }: { name: string; onChange: (name: string) => void; onSubmit: (event: FormEvent) => void }) {
@@ -119,6 +146,38 @@ function FileActions({ selected, currentPath, view, showMkdir, onUpload, onDownl
   return <div className="flex items-center gap-1 overflow-x-auto border-b border-border px-3 py-1.5"><Button size="xs" variant="outline" onClick={onUpload}>{t('上传')}</Button><Button size="xs" variant="outline" aria-pressed={showMkdir} onClick={onToggleMkdir}>{t('新建文件夹')}</Button><Button size="xs" variant="outline" disabled={!selected} onClick={() => { if (selected) onDownload(selected.path) }}>{t('下载')}</Button><Button size="xs" variant="outline" disabled={!selected} onClick={onRename}>{t('重命名')}</Button><Button size="xs" variant="destructive" disabled={!selected} onClick={onDelete}>{t('删除')}</Button><Button size="xs" variant="ghost" onClick={() => onNavigateTo(currentPath)}>{t('刷新')}</Button><div className="flex items-center rounded-md border border-border p-0.5" role="group" aria-label={t('文件视图')}><Button size="icon-xs" variant={view === 'list' ? 'secondary' : 'ghost'} aria-label={t('列表视图')} onClick={() => onSetView('list')}><List /></Button><Button size="icon-xs" variant={view === 'tree' ? 'secondary' : 'ghost'} aria-label={t('树状视图')} onClick={() => onSetView('tree')}><FolderTree /></Button></div></div>
 }
 
-function FileDialogs({ selected, renameOpen, renameName, deleteOpen, onRenameOpenChange, onRenameNameChange, onDeleteOpenChange, onRename, onDelete, onClearSelection }: { selected: FileInfo | null; renameOpen: boolean; renameName: string; deleteOpen: boolean; onRenameOpenChange: (open: boolean) => void; onRenameNameChange: (name: string) => void; onDeleteOpenChange: (open: boolean) => void; onRename: (path: string, name: string) => void; onDelete: (path: string) => void; onClearSelection: () => void }) {
-  return <><Dialog open={renameOpen} onOpenChange={onRenameOpenChange}><DialogContent><DialogHeader><DialogTitle>{t('重命名')}</DialogTitle></DialogHeader><Input value={renameName} onChange={(event) => onRenameNameChange(event.target.value)} autoFocus /><DialogFooter showCloseButton><Button onClick={() => { if (selected && renameName.trim()) { void Promise.resolve(onRename(selected.path, renameName.trim())).catch(() => undefined) }; onRenameOpenChange(false) }}>{t('保存')}</Button></DialogFooter></DialogContent></Dialog><AlertDialog open={deleteOpen} onOpenChange={onDeleteOpenChange}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>{t('删除“')}{selected?.name}”</AlertDialogTitle><AlertDialogDescription>{t('远程文件删除后无法恢复。')}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>{t('取消')}</AlertDialogCancel><AlertDialogAction variant="destructive" onClick={() => { if (selected) { void Promise.resolve(onDelete(selected.path)).catch(() => undefined) }; onClearSelection() }}>{t('删除')}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog></>
+function FileDialogs({ selected, renameOpen, renameName, deleteOpen, onRenameOpenChange, onRenameNameChange, onDeleteOpenChange, onRename, onDelete, onClearSelection, onMutationError }: { selected: FileInfo | null; renameOpen: boolean; renameName: string; deleteOpen: boolean; onRenameOpenChange: (open: boolean) => void; onRenameNameChange: (name: string) => void; onDeleteOpenChange: (open: boolean) => void; onRename: (path: string, name: string) => void | Promise<void>; onDelete: (path: string) => void | Promise<void>; onClearSelection: () => void; onMutationError: (message: string) => void }) {
+  const [busy, setBusy] = useState(false)
+  const saveRename = async () => {
+    if (!selected || !renameName.trim() || busy) return
+    setBusy(true)
+    onMutationError('')
+    try {
+      await onRename(selected.path, renameName.trim())
+      onRenameOpenChange(false)
+    } catch (error) {
+      onMutationError(t('重命名失败: ${}', errorText(error)))
+    } finally {
+      setBusy(false)
+    }
+  }
+  const confirmDelete = async () => {
+    if (!selected || busy) return
+    setBusy(true)
+    onMutationError('')
+    try {
+      await onDelete(selected.path)
+      onDeleteOpenChange(false)
+      onClearSelection()
+    } catch (error) {
+      onMutationError(t('删除文件失败: ${}', errorText(error)))
+      onDeleteOpenChange(false)
+    } finally {
+      setBusy(false)
+    }
+  }
+  return <>
+    <Dialog open={renameOpen} onOpenChange={onRenameOpenChange}><DialogContent><DialogHeader><DialogTitle>{t('重命名')}</DialogTitle></DialogHeader><Input value={renameName} onChange={(event) => onRenameNameChange(event.target.value)} autoFocus /><DialogFooter showCloseButton><Button disabled={busy} onClick={() => { void saveRename() }}>{t('保存')}</Button></DialogFooter></DialogContent></Dialog>
+    <AlertDialog open={deleteOpen} onOpenChange={(open) => { if (!busy) onDeleteOpenChange(open) }}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>{t('删除“')}{selected?.name}”</AlertDialogTitle><AlertDialogDescription>{t('远程文件删除后无法恢复。')}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel disabled={busy}>{t('取消')}</AlertDialogCancel><AlertDialogAction variant="destructive" disabled={busy} onClick={() => { void confirmDelete() }}>{t('删除')}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+  </>
 }

@@ -46,15 +46,17 @@ vi.mock('@/components/terminal/TerminalTab', () => ({
 }))
 vi.mock('@/components/terminal/PlaybackTab', () => ({ PlaybackTab: () => null }))
 vi.mock('@/components/file/FilePanel', () => ({
-  default: ({ dropTargetId, showHiddenFiles, defaultView, onSyncCurrentDirectory, onUpload, onDownload }: {
+  default: ({ dropTargetId, showHiddenFiles, defaultView, actionError, onSyncCurrentDirectory, onUpload, onDownload }: {
     dropTargetId: string
     showHiddenFiles: boolean
     defaultView: string
+    actionError?: string
     onSyncCurrentDirectory: () => void
     onUpload: () => void
     onDownload: (path: string) => void
   }) => (
     <div data-testid="file-panel" data-drop-target-id={dropTargetId} data-show-hidden={String(showHiddenFiles)} data-default-view={defaultView}>
+      {actionError ? <div role="alert">{actionError}</div> : null}
       <button type="button" onClick={onSyncCurrentDirectory}>同步当前目录</button>
       <button type="button" onClick={onUpload}>upload</button>
       <button type="button" onClick={() => onDownload('/remote/app.log')}>download</button>
@@ -161,7 +163,8 @@ describe('TerminalLayers SFTP isolation', () => {
     const terminalA = (await screen.findByTestId('terminal-term-a')).closest('[data-layer-id="terminal-a"]') as HTMLElement
     fireEvent.click(within(terminalA).getByRole('button', { name: 'files' }))
     fireEvent.click(await within(terminalA).findByRole('button', { name: 'upload' }))
-    await waitFor(() => expect(notify).toHaveBeenCalledWith('选择上传文件失败: picker unavailable', 'error'))
+    expect(await within(terminalA).findByRole('alert')).toHaveTextContent('选择上传文件失败: picker unavailable')
+    expect(notify).not.toHaveBeenCalledWith(expect.stringContaining('选择上传文件失败'), 'error')
     expect(transfer.upload).not.toHaveBeenCalled()
   })
 
@@ -171,7 +174,8 @@ describe('TerminalLayers SFTP isolation', () => {
     const terminalA = (await screen.findByTestId('terminal-term-a')).closest('[data-layer-id="terminal-a"]') as HTMLElement
     fireEvent.click(within(terminalA).getByRole('button', { name: 'files' }))
     fireEvent.click(await within(terminalA).findByRole('button', { name: 'download' }))
-    await waitFor(() => expect(notify).toHaveBeenCalledWith('选择下载位置失败: save cancelled hard', 'error'))
+    expect(await within(terminalA).findByRole('alert')).toHaveTextContent('选择下载位置失败: save cancelled hard')
+    expect(notify).not.toHaveBeenCalledWith(expect.stringContaining('选择下载位置失败'), 'error')
     expect(transfer.download).not.toHaveBeenCalled()
   })
 
