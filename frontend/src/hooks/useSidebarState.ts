@@ -5,7 +5,6 @@ import type { Folder, Session } from '@/hooks/useSession'
 import { useSessionWorkspace } from '@/hooks/SessionWorkspaceContext'
 import { MacroService } from '@/lib/wails'
 import { logger } from '@/lib/logger'
-import { toast } from '@/components/ui/toast'
 import { executeMacroOnActiveTerminal } from '@/lib/executeMacro'
 import { t } from '@/i18n'
 import type { Macro, MacroInput } from '../../bindings/github.com/xuthus5/mssh/internal/model/models'
@@ -41,12 +40,13 @@ export function useSidebarDialogs(workspace: Workspace) {
   const [sessionDialogOpen, setSessionDialogOpen] = useState(false)
   const [folderDialogOpen, setFolderDialogOpen] = useState(false)
   const [folderName, setFolderName] = useState('')
+  const [folderError, setFolderError] = useState('')
   const [editingFolder, setEditingFolder] = useState<Folder | null>(null)
   const [editingSession, setEditingSession] = useState<Session | null>(null)
   const events = useMemo(() => ({
-    openFolder: () => { setEditingFolder(null); setFolderName(''); setFolderDialogOpen(true) },
+    openFolder: () => { setEditingFolder(null); setFolderName(''); setFolderError(''); setFolderDialogOpen(true) },
     editSession: (session: Session) => { setEditingSession(session); setSessionDialogOpen(true) },
-    editFolder: (folder: Folder) => { setEditingFolder(folder); setFolderName(folder.name); setFolderDialogOpen(true) },
+    editFolder: (folder: Folder) => { setEditingFolder(folder); setFolderName(folder.name); setFolderError(''); setFolderDialogOpen(true) },
     newSession: () => { setEditingSession(null); setSessionDialogOpen(true) },
   }), [])
   useSidebarDialogEvents(events)
@@ -58,10 +58,11 @@ export function useSidebarDialogs(workspace: Workspace) {
   }, [editingSession, workspace])
   const saveFolder = () => {
     if (!folderName.trim()) {
-      toast(t('请输入分组名称'), 'warning')
+      setFolderError(t('请输入分组名称'))
       return
     }
     const name = folderName.trim()
+    setFolderError('')
     const action = editingFolder
       ? workspace.updateFolder(editingFolder.id, name)
       : workspace.createFolder(name, null)
@@ -69,8 +70,9 @@ export function useSidebarDialogs(workspace: Workspace) {
       setFolderName('')
       setEditingFolder(null)
       setFolderDialogOpen(false)
-    }).catch(() => {
-      // toast already shown by workspace mutation helpers
+    }).catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error)
+      setFolderError(editingFolder ? t('更新分组失败: ${}', message) : t('创建分组失败: ${}', message))
     })
   }
   const editSession = (session: Session) => {
@@ -78,7 +80,7 @@ export function useSidebarDialogs(workspace: Workspace) {
     setEditingSession(session)
     setTimeout(() => setSessionDialogOpen(true), 0)
   }
-  return { sessionDialogOpen, setSessionDialogOpen, folderDialogOpen, setFolderDialogOpen, folderName, setFolderName, editingFolder, setEditingFolder, editingSession, setEditingSession, saveSession, saveFolder, editSession }
+  return { sessionDialogOpen, setSessionDialogOpen, folderDialogOpen, setFolderDialogOpen, folderName, setFolderName, folderError, setFolderError, editingFolder, setEditingFolder, editingSession, setEditingSession, saveSession, saveFolder, editSession }
 }
 
 export function useSidebarFilter(folders: Folder[], sessions: Session[]) {

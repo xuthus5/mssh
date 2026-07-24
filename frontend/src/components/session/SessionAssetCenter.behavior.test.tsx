@@ -163,19 +163,26 @@ describe('SessionAssetCenter behavior', () => {
     window.removeEventListener('mssh:new-folder', newFolder)
   })
 
-  it('swallows set-default rejections after workspace toasts', async () => {
+  it('shows set-default failures as asset-center banner without toast', async () => {
     const user = userEvent.setup()
-    state.setDefaultFolder.mockImplementationOnce(async () => {
-      toast('设置默认分组失败: default failed', 'error')
-      throw new Error('default failed')
-    })
+    state.setDefaultFolder.mockRejectedValueOnce(new Error('default failed'))
     render(<SessionAssetCenter />)
     await user.click(screen.getByRole('tab', { name: /分组/ }))
     const prodRow = screen.getByRole('button', { name: '生产环境' }).closest('tr')
     await user.click(within(prodRow!).getByRole('button', { name: '设为默认' }))
     await waitFor(() => expect(state.setDefaultFolder).toHaveBeenCalledWith('prod'))
-    expect(toast).toHaveBeenCalledWith('设置默认分组失败: default failed', 'error')
-    expect(toast).toHaveBeenCalledTimes(1)
+    expect(await screen.findByRole('alert')).toHaveTextContent('设置默认分组失败: default failed')
+    expect(toast).not.toHaveBeenCalled()
+  })
+
+  it('shows move failures as asset-center banner without toast', async () => {
+    const user = userEvent.setup()
+    state.moveSession.mockRejectedValueOnce(new Error('move failed'))
+    render(<SessionAssetCenter />)
+    await user.click(screen.getByRole('button', { name: '默认分组' }))
+    await waitFor(() => expect(state.moveSession).toHaveBeenCalledWith('one', 'default'))
+    expect(await screen.findByRole('alert')).toHaveTextContent('移动会话失败: move failed')
+    expect(toast).not.toHaveBeenCalled()
   })
 })
 

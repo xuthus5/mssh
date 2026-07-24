@@ -1,7 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { SessionService } from '@/lib/wails'
 import { useConnectDialog } from '@/store/connectDialog'
-import { toast } from '@/components/ui/toast'
 import { logger } from '@/lib/logger'
 import type { SessionInput } from '../../bindings/github.com/xuthus5/mssh/internal/model/models'
 import { mapFolder, mapSession, type AssetEnvironment, type AssetProject, type AssetTag, type Folder, type Session } from '@/lib/sessionModels'
@@ -10,7 +9,6 @@ import { useSessionCSVTransfer } from '@/hooks/useSessionCSVTransfer'
 import { remapAfterFolderDelete } from '@/lib/sessionFolderDelete'
 import { useSessionConnectionActions } from '@/hooks/useSessionConnectionActions'
 import { cancelTransfersForSessions, closeTerminalTabsForSessions } from '@/hooks/sessionTabLifecycle'
-import { t } from '@/i18n'
 
 
 export type { BatchSessionResult } from '@/lib/sessionBatch'
@@ -58,9 +56,7 @@ export function useSession() {
       }
       return result ? mapFolder(result) : undefined
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err)
       logger.error('createFolder error', err)
-      toast(t('创建分组失败: ${}', msg), 'error')
       throw err
     }
   }, [])
@@ -72,9 +68,7 @@ export function useSession() {
       setFolders(remapped.folders)
       setSessions(remapped.sessions)
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err)
       logger.error('deleteFolder error', err)
-      toast(t('删除分组失败: ${}', msg), 'error')
       throw err
     }
   }, [])
@@ -84,9 +78,7 @@ export function useSession() {
       await SessionService.UpdateFolder(Number(id), name)
       setFolders((prev) => prev.map((f) => (f.id === id ? { ...f, name } : f)))
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err)
       logger.error('updateFolder error', err)
-      toast(t('更新分组失败: ${}', msg), 'error')
       throw err
     }
   }, [])
@@ -96,9 +88,7 @@ export function useSession() {
       await SessionService.SetDefaultFolder(Number(id))
       setFolders((prev) => prev.map((folder) => ({ ...folder, isDefault: folder.id === id })))
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err)
       logger.error('setDefaultFolder error', err)
-      toast(t('设置默认分组失败: ${}', msg), 'error')
       throw err
     }
   }, [])
@@ -162,9 +152,7 @@ export function useSession() {
         }
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err)
       logger.error('createSession error', err)
-      toast(t('创建会话失败: ${}', msg), 'error')
       throw err
     }
   }, [listAssetCatalogs])
@@ -188,9 +176,7 @@ export function useSession() {
         sort_order: 0,
       } satisfies SessionInput)
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err)
       logger.error('updateSession error', err)
-      toast(t('更新会话失败: ${}', msg), 'error')
       throw err
     }
     // Persist already succeeded; hydrate list from payload, then best-effort server refresh.
@@ -217,9 +203,7 @@ export function useSession() {
       cancelTransfersForSessions([id])
       await closeTerminalTabsForSessions([id])
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err)
       logger.error('deleteSession error', err)
-      toast(t('删除会话失败: ${}', msg), 'error')
       throw err
     }
   }, [])
@@ -229,9 +213,7 @@ export function useSession() {
       await SessionService.MoveSession(Number(id), folderId ? Number(folderId) : null)
       setSessions((prev) => prev.map((s) => (s.id === id ? { ...s, folderId } : s)))
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err)
       logger.error('moveSession error', err)
-      toast(t('移动会话失败: ${}', msg), 'error')
       throw err
     }
   }, [])
