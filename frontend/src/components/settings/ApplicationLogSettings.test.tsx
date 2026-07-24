@@ -34,7 +34,7 @@ describe('ApplicationLogSettingsSection', () => {
     expect(onLogDirChange).toHaveBeenCalledWith('/home/user/mssh-logs')
   })
 
-  it('toasts directory picker failures', async () => {
+  it('shows directory picker failures inline without toast', async () => {
     openFile.mockRejectedValueOnce(new Error('picker failed'))
     const user = userEvent.setup()
     render(
@@ -46,6 +46,7 @@ describe('ApplicationLogSettingsSection', () => {
       />,
     )
     await user.click(screen.getByRole('button', { name: /浏览/ }))
-    await waitFor(() => expect(useToastStore.getState().toasts.some((item) => item.message.includes('picker failed'))).toBe(true))
+    expect(await screen.findByRole('alert')).toHaveTextContent('选择日志目录失败: picker failed')
+    expect(useToastStore.getState().toasts.filter((item) => item.type === 'error')).toHaveLength(0)
   })
 })
