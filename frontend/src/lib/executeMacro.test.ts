@@ -79,14 +79,14 @@ describe('executeMacroOnActiveTerminal', () => {
     expect(useToastStore.getState().toasts.some((item) => item.message.includes('宏已发送') && item.type === 'success')).toBe(true)
   })
 
-  it('surfaces execute failures', async () => {
+  it('rethrows execute failures without error toast', async () => {
     __registerHandler(executePath, async () => { throw new Error('boom') })
     useAppStore.setState({
       tabs: [{ id: 'tab-1', title: 'host', type: 'terminal', terminalId: 'term-1', sessionId: 1 }],
       connectionStatus: { 'term-1': 'connected' },
       activeSurface: { type: 'terminal', id: 'tab-1' },
     })
-    await executeMacroOnActiveTerminal('uptime')
-    expect(useToastStore.getState().toasts.some((item) => item.message.includes('执行宏失败') && item.message.includes('boom') && item.type === 'error')).toBe(true)
+    await expect(executeMacroOnActiveTerminal('uptime')).rejects.toThrow('boom')
+    expect(useToastStore.getState().toasts.filter((item) => item.type === 'error')).toHaveLength(0)
   })
 })

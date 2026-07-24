@@ -1,5 +1,4 @@
 import { useCallback, useRef, useState, type Dispatch, type SetStateAction } from 'react'
-import { toast } from '@/components/ui/toast'
 import { logger } from '@/lib/logger'
 import { cancelTransfer as cancelTransferAction, startDownload, startUpload } from '@/lib/transferActions'
 import { FileService } from '@/lib/wails'
@@ -82,7 +81,8 @@ function useTransferCommands({ sessionId, sessionName }: TransferCommandOptions)
       await startUpload({ sessionId, sessionName, sourcePath: localPath, targetPath })
     } catch (error) {
       logger.error('upload error', error)
-      toast(t('上传失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
+      // File panel / caller owns transfer start failures.
+      throw error
     }
   }, [sessionId, sessionName])
   const uploadMany = useCallback(async (localPaths: string[], remotePath: string) => {
@@ -93,7 +93,8 @@ function useTransferCommands({ sessionId, sessionName }: TransferCommandOptions)
       await startDownload({ sessionId, sessionName, sourcePath: remotePath, targetPath: localPath })
     } catch (error) {
       logger.error('download error', error)
-      toast(t('下载失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
+      // File panel / caller owns transfer start failures.
+      throw error
     }
   }, [sessionId, sessionName])
   return { upload, uploadMany, download }

@@ -155,7 +155,13 @@ function MacrosWorkspace() {
         <QuickCommands
           commands={macros}
           showAddForm={false}
-          onExecute={(command) => { void executeMacroOnActiveTerminal(command) }}
+          onExecute={(command) => {
+            void executeMacroOnActiveTerminal(command).catch((error: unknown) => {
+              const message = error instanceof Error ? error.message : String(error)
+              setActionError(t('执行宏失败: ${}', message))
+              logger.error('execute macro failed', error)
+            })
+          }}
           onAdd={() => {}}
           onDelete={async (id) => {
             try {

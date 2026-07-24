@@ -55,6 +55,7 @@ export async function executeMacroOnActiveTerminal(
     recordCommand(tab.sessionId, command)
     toast(t('宏已发送到活动终端'), 'success')
   } catch (error: unknown) {
-    toast(t('执行宏失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
+    // Callers with fixed surfaces own execute failures.
+    throw error instanceof Error ? error : new Error(String(error))
   }
 }
