@@ -58,6 +58,11 @@ func secureHTTPTransport(base http.RoundTripper) *http.Transport {
 	return transport
 }
 
+// lookupIPAddr resolves hostnames for secure dial; tests may replace it.
+var lookupIPAddr = func(ctx context.Context, host string) ([]net.IPAddr, error) {
+	return net.DefaultResolver.LookupIPAddr(ctx, host)
+}
+
 func secureDialContext(ctx context.Context, network, address string) (net.Conn, error) {
 	host, port, err := net.SplitHostPort(address)
 	if err != nil {
@@ -78,7 +83,7 @@ func secureDialContext(ctx context.Context, network, address string) (net.Conn, 
 	}
 
 	// Hostname: resolve first, skip blocked answers, dial pinned IP (mitigates DNS rebinding to metadata).
-	addrs, err := net.DefaultResolver.LookupIPAddr(ctx, host)
+	addrs, err := lookupIPAddr(ctx, host)
 	if err != nil {
 		return nil, err
 	}

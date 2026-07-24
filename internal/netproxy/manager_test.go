@@ -75,3 +75,35 @@ func mustURL(t *testing.T, raw string) *url.URL {
 	require.NoError(t, err)
 	return parsed
 }
+
+func TestNilManagerAndManualProxyURL(t *testing.T) {
+	var m *Manager
+	require.NoError(t, m.Configure(Config{Mode: ModeDirect}))
+	assert.Equal(t, DefaultConfig().Mode, m.Config().Mode)
+	client := m.Client(time.Second)
+	require.NotNil(t, client)
+
+	url, err := manualProxyURL(Config{URL: "http://proxy.example:8080", Username: "u", Password: "p"})
+	require.NoError(t, err)
+	require.NotNil(t, url.User)
+	assert.Equal(t, "u", url.User.Username())
+	pass, ok := url.User.Password()
+	assert.True(t, ok)
+	assert.Equal(t, "p", pass)
+
+	url, err = manualProxyURL(Config{URL: "http://proxy.example:8080", Username: "u"})
+	require.NoError(t, err)
+	assert.Equal(t, "u", url.User.Username())
+
+	assert.True(t, isBlockedProxyHost("metadata.google.internal"))
+	assert.True(t, isBlockedProxyHost("169.254.169.254"))
+	assert.False(t, isBlockedProxyHost("proxy.example"))
+}
+func TestNormalizeTrimsFields(t *testing.T) {
+	got := Normalize(Config{Mode: " MANUAL ", URL: " http://p ", NoProxy: " a,b ", Username: " u ", Password: " p "})
+	assert.Equal(t, ModeManual, got.Mode)
+	assert.Equal(t, "http://p", got.URL)
+	assert.Equal(t, "a,b", got.NoProxy)
+	assert.Equal(t, "u", got.Username)
+	assert.Equal(t, "p", got.Password)
+}

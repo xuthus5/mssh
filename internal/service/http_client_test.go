@@ -115,3 +115,181 @@ func TestSharedHTTPClientTransportHasSecureDial(t *testing.T) {
 	require.True(t, ok)
 	require.NotNil(t, transport.DialContext)
 }
+
+func TestSecureDialContextInvalidAddress(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	_, err := secureDialContext(ctx, "tcp", "not-a-valid-address")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid dial address")
+}
+
+func TestSecureDialContextBlocksHostnameMetadata(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	// metadata.google.internal is in the blocked hostname set; dial should fail before network.
+	_, err := secureDialContext(ctx, "tcp", "metadata.google.internal:80")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "not allowed")
+}
+
+func TestSecureDialContextAllowsLoopbackLiteral(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	defer ln.Close()
+	go func() {
+		conn, acceptErr := ln.Accept()
+		if acceptErr == nil {
+			_ = conn.Close()
+		}
+	}()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	conn, err := secureDialContext(ctx, "tcp", ln.Addr().String())
+	require.NoError(t, err)
+	require.NoError(t, conn.Close())
+}
+
+func TestSecureDialContextBlocksLinkLocalLiteral(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	_, err := secureDialContext(ctx, "tcp", "169.254.1.1:80")
+	require.Error(t, err)
+}
+
+func TestSecureHTTPTransportUnknownBase(t *testing.T) {
+	// Non-*http.Transport base falls through to DefaultTransport clone path.
+	transport := secureHTTPTransport(roundTripperFunc(func(*http.Request) (*http.Response, error) {
+		return nil, context.Canceled
+	}))
+	require.NotNil(t, transport)
+	require.NotNil(t, transport.DialContext)
+}
+
+type roundTripperFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripperFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
+
+func TestSecureHTTPRedirectNilRequest(t *testing.T) {
+	require.Error(t, secureHTTPRedirect(nil, nil))
+}
+
+func TestIsBlockedOutboundIPNil(t *testing.T) {
+	assert.False(t, isBlockedOutboundIP(nil))
+}
+
+func TestSyncHTTPClientHelpers(t *testing.T) {
+	client := syncHTTPClient()
+	require.NotNil(t, client)
+	require.NotNil(t, client.CheckRedirect)
+
+	svc := &SyncService{}
+	client = svc.syncHTTPClient()
+	require.NotNil(t, client)
+}
+
+func TestFirstProxy(t *testing.T) {
+	assert.Nil(t, firstProxy())
+	manager := netproxy.New()
+	assert.Same(t, manager, firstProxy(manager))
+}
+
+func TestSecureDialContextHostnameLoopback(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	defer ln.Close()
+	_, port, err := net.SplitHostPort(ln.Addr().String())
+	require.NoError(t, err)
+	go func() {
+		conn, acceptErr := ln.Accept()
+		if acceptErr == nil {
+			_ = conn.Close()
+		}
+	}()
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	conn, err := secureDialContext(ctx, "tcp", net.JoinHostPort("localhost", port))
+	require.NoError(t, err)
+	require.NoError(t, conn.Close())
+}
+
+func TestSecureDialContextUnresolvableHost(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	_, err := secureDialContext(ctx, "tcp", "this-host-should-not-resolve.invalid:80")
+	require.Error(t, err)
+}
+
+func TestValidateOutboundHTTPURLEmptyHost(t *testing.T) {
+	assert.Error(t, validateOutboundHTTPURL("https://"))
+	assert.Error(t, validateOutboundHTTPURL("://missing"))
+}
+
+func TestSecureDialContextSkipsBlockedResolvedIPs(t *testing.T) {
+	orig := lookupIPAddr
+	t.Cleanup(func() { lookupIPAddr = orig })
+
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	defer ln.Close()
+	_, port, err := net.SplitHostPort(ln.Addr().String())
+	require.NoError(t, err)
+	go func() {
+		conn, acceptErr := ln.Accept()
+		if acceptErr == nil {
+			_ = conn.Close()
+		}
+	}()
+
+	lookupIPAddr = func(context.Context, string) ([]net.IPAddr, error) {
+		return []net.IPAddr{
+			{IP: net.ParseIP("169.254.169.254")},
+			{IP: net.ParseIP("127.0.0.1")},
+		}, nil
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	conn, err := secureDialContext(ctx, "tcp", net.JoinHostPort("example.test", port))
+	require.NoError(t, err)
+	require.NoError(t, conn.Close())
+}
+
+func TestSecureDialContextAllResolvedIPsBlocked(t *testing.T) {
+	orig := lookupIPAddr
+	t.Cleanup(func() { lookupIPAddr = orig })
+	lookupIPAddr = func(context.Context, string) ([]net.IPAddr, error) {
+		return []net.IPAddr{{IP: net.ParseIP("169.254.1.1")}, {IP: net.ParseIP("0.0.0.0")}}, nil
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	_, err := secureDialContext(ctx, "tcp", "example.test:80")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "not allowed")
+}
+
+func TestSecureDialContextNoResolvedAddresses(t *testing.T) {
+	orig := lookupIPAddr
+	t.Cleanup(func() { lookupIPAddr = orig })
+	lookupIPAddr = func(context.Context, string) ([]net.IPAddr, error) {
+		return nil, nil
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	_, err := secureDialContext(ctx, "tcp", "example.test:80")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "no usable addresses")
+}
+
+func TestSecureDialContextDialFailureUsesLastErr(t *testing.T) {
+	orig := lookupIPAddr
+	t.Cleanup(func() { lookupIPAddr = orig })
+	lookupIPAddr = func(context.Context, string) ([]net.IPAddr, error) {
+		// Unroutable documentation range; connection should fail quickly.
+		return []net.IPAddr{{IP: net.ParseIP("192.0.2.1")}}, nil
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
+	defer cancel()
+	_, err := secureDialContext(ctx, "tcp", "example.test:1")
+	require.Error(t, err)
+}

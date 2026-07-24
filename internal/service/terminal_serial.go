@@ -11,6 +11,9 @@ import (
 	"github.com/xuthus5/mssh/internal/serial"
 )
 
+// openSerialPortSession opens a configured serial profile; tests may replace it.
+var openSerialPortSession = serial.OpenPort
+
 // OpenSerial opens a terminal attached to a configured serial port profile.
 func (t *TerminalService) OpenSerial(ctx context.Context, serialPortID int64, cols, rows int) (string, error) {
 	_ = ctx
@@ -40,7 +43,7 @@ func (t *TerminalService) OpenSerial(ctx context.Context, serialPortID int64, co
 	if err := t.serialSvc.reserveDevice(profile.Device, terminalID); err != nil {
 		return "", err
 	}
-	port, err := serial.OpenPort(*profile)
+	port, err := openSerialPortSession(*profile)
 	if err != nil {
 		t.serialSvc.releaseDevice(profile.Device, terminalID)
 		t.logger.Error("serial open failed", "serialPortID", serialPortID, "error", err)

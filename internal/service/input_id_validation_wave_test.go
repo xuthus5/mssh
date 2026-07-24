@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/xuthus5/mssh/internal/model"
-
 	"github.com/xuthus5/mssh/internal/service/testutil"
 	"github.com/xuthus5/mssh/internal/store"
 )

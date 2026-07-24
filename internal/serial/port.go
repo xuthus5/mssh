@@ -11,6 +11,12 @@ import (
 	"github.com/xuthus5/mssh/internal/model"
 )
 
+// openSerialPort is the serial open entry point; tests may replace it.
+var openSerialPort = goserial.Open
+
+// listSerialPorts is the device enumeration entry point; tests may replace it.
+var listSerialPorts = goserial.GetPortsList
+
 // PortSession wraps an open serial port with the same callback surface as SSH PTY.
 type PortSession struct {
 	port         goserial.Port
@@ -40,7 +46,7 @@ func OpenPort(profile model.SerialPort) (*PortSession, error) {
 	if err != nil {
 		return nil, err
 	}
-	port, err := goserial.Open(profile.Device, mode)
+	port, err := openSerialPort(profile.Device, mode)
 	if err != nil {
 		return nil, mapOpenError(profile.Device, err)
 	}
@@ -73,7 +79,7 @@ func OpenPort(profile model.SerialPort) (*PortSession, error) {
 
 // ListDevices returns system serial device paths (canonicalized).
 func ListDevices() ([]string, error) {
-	ports, err := goserial.GetPortsList()
+	ports, err := listSerialPorts()
 	if err != nil {
 		return nil, fmt.Errorf("list serial ports: %w", err)
 	}
@@ -92,7 +98,14 @@ func (p *PortSession) Start() {
 func (p *PortSession) readLoop() {
 	buf := make([]byte, 4096)
 	for {
-		n, err := p.port.Read(buf)
+		p.mu.RLock()
+		port := p.port
+		p.mu.RUnlock()
+		if port == nil {
+			p.notifyExit(nil)
+			return
+		}
+		n, err := port.Read(buf)
 		if n > 0 {
 			data := make([]byte, n)
 			copy(data, buf[:n])
@@ -230,5 +243,15 @@ func (p *PortSession) ProfileID() int64 { return p.profileID }
 
 // NewTestPortSession builds an offline session handle for lifecycle tests.
 func NewTestPortSession(device string) *PortSession {
-	return &PortSession{device: device}
+	return &PortSession{device: CanonicalDevicePath(device)}
+}
+
+// NewLivePortSessionForTest builds a PortSession around an injected port for tests.
+func NewLivePortSessionForTest(device string, port goserial.Port) *PortSession {
+	return &PortSession{
+		port:   port,
+		device: CanonicalDevicePath(device),
+		dtr:    true,
+		rts:    false,
+	}
 }

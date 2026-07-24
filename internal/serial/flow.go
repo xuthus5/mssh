@@ -34,12 +34,14 @@ func normalizeFlowControl(value string) (flowMode, error) {
 	}
 }
 
+var applyNativeFlow = applyNativeFlowControl
+
 func applyFlowControl(port goserial.Port, profile model.SerialPort) error {
 	mode, err := normalizeFlowControl(profile.FlowControl)
 	if err != nil {
 		return err
 	}
-	return applyNativeFlowControl(port, mode, profile.DTROnOpen, profile.RTSOnOpen)
+	return applyNativeFlow(port, mode, profile.DTROnOpen, profile.RTSOnOpen)
 }
 
 func shouldApplyManualSignals(flowControl string) bool {

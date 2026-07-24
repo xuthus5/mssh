@@ -1,6 +1,7 @@
 package store
 
 import (
+	"database/sql"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -50,4 +51,36 @@ func TestSerialPortCRUD(t *testing.T) {
 	list, err = ListSerialPorts(db)
 	require.NoError(t, err)
 	require.Empty(t, list)
+}
+
+func TestSerialPortErrorPaths(t *testing.T) {
+	db, err := OpenDB(t.TempDir())
+	require.NoError(t, err)
+	require.NoError(t, InitializeSchema(db))
+	t.Cleanup(func() { _ = db.Close() })
+
+	_, err = GetSerialPort(db, 999)
+	require.Error(t, err)
+	require.ErrorIs(t, err, sql.ErrNoRows)
+
+	err = UpdateSerialPort(db, model.SerialPort{ID: 999, Name: "x", Device: "/dev/ttyUSB0"})
+	require.Error(t, err)
+	require.ErrorIs(t, err, sql.ErrNoRows)
+
+	err = DeleteSerialPort(db, 999)
+	require.Error(t, err)
+	require.ErrorIs(t, err, sql.ErrNoRows)
+
+	n, err := DeleteSerialPorts(db, nil)
+	require.NoError(t, err)
+	require.Equal(t, int64(0), n)
+
+	// Create two and delete many including missing ids.
+	a, err := CreateSerialPort(db, model.SerialPort{Name: "a", Device: "/dev/ttyA", BaudRate: 9600, DataBits: 8, Parity: model.SerialParityNone, StopBits: model.SerialStopBitsOne, FlowControl: "none", LineEnding: model.SerialLineEndingCR})
+	require.NoError(t, err)
+	b, err := CreateSerialPort(db, model.SerialPort{Name: "b", Device: "/dev/ttyB", BaudRate: 9600, DataBits: 8, Parity: model.SerialParityNone, StopBits: model.SerialStopBitsOne, FlowControl: "none", LineEnding: model.SerialLineEndingLF, LocalEcho: true, DTROnOpen: false, RTSOnOpen: true, Notes: "n", SortOrder: 2})
+	require.NoError(t, err)
+	n, err = DeleteSerialPorts(db, []int64{a.ID, b.ID, 424242})
+	require.NoError(t, err)
+	require.Equal(t, int64(2), n)
 }

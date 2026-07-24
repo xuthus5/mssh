@@ -78,7 +78,7 @@
 | SEC-011 | 当 known_hosts 路径为空时，系统必须拒绝建立 SSH 连接（fail-closed），不得回退到 `InsecureIgnoreHostKey`。 | done |
 | SEC-012 | 当 vault nonce/密文字段非法时，系统必须返回错误，不得在 GCM Open 时 panic。 | done |
 | SEC-013 | 当会话服务未配置 dataDir 时，系统必须拒绝连接并提示需要主机密钥校验目录。 | done |
-| QA-005 | 当执行 CI 覆盖率门禁时，`go test -coverpkg=./internal/...,./pkg/...` 总覆盖率应 ≥90%。 | **done**（coverpkg total 90.0%） |
+| QA-005 | 当执行 CI 覆盖率门禁时，`go test -race -coverpkg=./internal/...,./pkg/...` 总覆盖率应 ≥90%。 | **done**（race coverpkg total 90.0%） |
 
 实现锚点：`internal/ssh/client.go`、`internal/service/session_connect.go`、`internal/crypto/vault.go`，以及 host key / vault / rotate / terminal exit 等测试。
 
@@ -1455,3 +1455,15 @@
 |---|---|---|
 | UX-AI-187 | 默认/回退提供商下拉变更以 quiet 保存，失败由 AI 面板 error banner 承接，不得 success/error toast 干扰。 | done |
 
+## 2026-07-24 商用硬化波次（coverpkg 覆盖率门禁）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| QA-COV-188 | `go test -race -coverpkg=./internal/...,./pkg/...` total ≥90%；补齐 serial PortSession/OpenPort、secureDial、terminal_serial、proxy/AI/reencrypt 等关键路径测试；串口 open 竞态用 live fake port 稳定。 | done |
+
+## 2026-07-25 商用硬化波次（race 覆盖率闭环）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| QA-COV-189 | `TestOpenSerialSuccessAndControl` 在 `-race` 下稳定：live fake port 保持设备占用，控制 API 成功路径可测。 | done |
+| QA-COV-190 | `go test -race -coverpkg=./internal/...,./pkg/... ./internal/... ./pkg/...` EXIT 0 且 total ≥90.0%。 | done |
