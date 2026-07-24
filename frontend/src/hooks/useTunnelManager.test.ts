@@ -106,7 +106,7 @@ describe('useTunnelManager', () => {
     expect(useToastStore.getState().toasts).toHaveLength(0)
   })
 
-  it('non-silent start failures toast once', async () => {
+  it('non-silent start failures rethrow without toast for dialog ownership', async () => {
     start.mockRejectedValueOnce(new Error('bind failed'))
     const { result } = renderHook(() => useTunnelManager(7))
     let caught: unknown
@@ -126,7 +126,25 @@ describe('useTunnelManager', () => {
       }
     })
     expect(caught).toBeTruthy()
-    expect(useToastStore.getState().toasts.some((item) => item.message.includes('bind failed'))).toBe(true)
+    expect(useToastStore.getState().toasts.filter((item) => item.type === 'error')).toHaveLength(0)
+  })
+
+  it('stop failures rethrow without toast', async () => {
+    stop.mockRejectedValueOnce(new Error('stop boom'))
+    const { result } = renderHook(() => useTunnelManager(7))
+    await act(async () => {
+      await expect(result.current.stop('42')).rejects.toThrow('stop boom')
+    })
+    expect(useToastStore.getState().toasts.filter((item) => item.type === 'error')).toHaveLength(0)
+  })
+
+  it('delete failures rethrow without toast', async () => {
+    del.mockRejectedValueOnce(new Error('delete boom'))
+    const { result } = renderHook(() => useTunnelManager(7))
+    await act(async () => {
+      await expect(result.current.remove('42')).rejects.toThrow('delete boom')
+    })
+    expect(useToastStore.getState().toasts.filter((item) => item.type === 'error')).toHaveLength(0)
   })
 
   it('sets load error without toast so empty list is not assumed', async () => {
