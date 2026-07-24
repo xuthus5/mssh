@@ -28,20 +28,24 @@ vi.mock('@/components/terminal/TerminalComposePanel', () => ({
     : null,
 }))
 vi.mock('@/components/terminal/TerminalToolbar', () => ({
-  TerminalToolbar: ({ isRecording, onToggleRecording, onSplit, onToggleSearch, onToggleCompose }: {
+  TerminalToolbar: ({ isRecording, onToggleRecording, onSplit, onToggleSearch, onToggleCompose, recordingError }: {
     isRecording: boolean
     onToggleRecording: () => void
     onSplit: (direction: 'horizontal') => void
     onToggleSearch: () => void
     onToggleCompose: () => void
+    recordingError?: string
   }) => <div>
     <button type="button" onClick={onToggleRecording}>{isRecording ? '停止录制' : '开始录制'}</button>
     <button type="button" onClick={() => onSplit('horizontal')}>向右分屏</button>
     <button type="button" onClick={onToggleSearch}>搜索终端</button>
     <button type="button" onClick={onToggleCompose}>撰写终端</button>
+    {recordingError ? <p role="alert">{recordingError}</p> : null}
   </div>,
 }))
 
+const toast = vi.hoisted(() => vi.fn())
+vi.mock('@/components/ui/toast', () => ({ toast }))
 import { TerminalTab } from '@/components/terminal/TerminalTab'
 import { useAppStore } from '@/store/appStore'
 import { logger } from '@/lib/logger'
@@ -112,16 +116,21 @@ describe('TerminalTab', () => {
 
   it('marks failed stops as ended and allows recording to restart', async () => {
     const loggerError = vi.spyOn(logger, 'error').mockImplementation(() => {})
+    toast.mockClear()
     logService.start.mockRejectedValueOnce(new Error('start failed'))
     const view = render(<TerminalTab terminalID="term-1" sessionId={7} active focusRequest={focusRequest} onOpenFiles={vi.fn()} />)
     fireEvent.click(screen.getByRole('button', { name: '开始录制' }))
     await waitFor(() => expect(useAppStore.getState().recordingState['term-1']).toBe('error'))
+    expect(screen.getByRole('alert')).toHaveTextContent('开始录制失败: start failed')
+    expect(toast).not.toHaveBeenCalled()
 
     act(() => useAppStore.getState().setRecordingState('term-1', 'recording'))
     logService.stop.mockRejectedValueOnce(new Error('stop failed'))
     view.rerender(<TerminalTab terminalID="term-1" sessionId={7} active focusRequest={focusRequest} onOpenFiles={vi.fn()} />)
     fireEvent.click(screen.getByRole('button', { name: '停止录制' }))
     await waitFor(() => expect(useAppStore.getState().recordingState['term-1']).toBe('error'))
+    expect(screen.getByRole('alert')).toHaveTextContent('停止录制失败: stop failed')
+    expect(toast).not.toHaveBeenCalled()
 
     fireEvent.click(screen.getByRole('button', { name: '开始录制' }))
     await waitFor(() => expect(logService.start).toHaveBeenCalledTimes(2))

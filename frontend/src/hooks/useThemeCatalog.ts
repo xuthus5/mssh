@@ -3,7 +3,6 @@ import { create } from 'zustand'
 import { Events } from '@wailsio/runtime'
 import { SettingService, ThemeService } from '@/lib/wails'
 import { logger } from '@/lib/logger'
-import { toast } from '@/components/ui/toast'
 import { resolveEffectiveTerminalProfile, type ColorMode } from '@/lib/effectiveTerminalTheme'
 import { profileToTerminalTheme } from '@/lib/terminalThemeCatalog'
 import { useAppStore } from '@/store/appStore'
@@ -23,6 +22,7 @@ interface ThemeCatalogState {
   loaded: boolean
   loading: boolean
   error: string | null
+  colorModeError: string | null
 }
 
 const initialState: ThemeCatalogState = {
@@ -34,6 +34,7 @@ const initialState: ThemeCatalogState = {
   loaded: false,
   loading: false,
   error: null,
+  colorModeError: null,
 }
 
 interface ThemeCatalogSnapshot {
@@ -86,6 +87,7 @@ export async function changeColorMode(nextMode: ColorMode) {
   const state = useThemeCatalogStore.getState()
   const previousMode = state.colorMode
   const followsInterfaceMode = state.assignments.follow_interface_mode
+  useThemeCatalogStore.setState({ colorModeError: null })
   applyInterfaceColorMode(nextMode)
   try {
     if (followsInterfaceMode) applyEffectiveTerminalTheme()
@@ -94,7 +96,8 @@ export async function changeColorMode(nextMode: ColorMode) {
   } catch (error) {
     applyInterfaceColorMode(previousMode)
     if (followsInterfaceMode) applyEffectiveTerminalTheme()
-    toast(t('主题设置保存失败，已恢复原主题'), 'error')
+    const message = error instanceof Error ? error.message : String(error)
+    useThemeCatalogStore.setState({ colorModeError: t('主题设置保存失败，已恢复原主题: ${}', message) })
     logger.error('save colour mode failed', error)
   }
 }

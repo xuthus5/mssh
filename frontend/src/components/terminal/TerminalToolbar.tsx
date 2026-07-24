@@ -21,6 +21,7 @@ interface TerminalToolbarProps {
   sessionId: number
   isRecording: boolean
   recordingLogId: number | null
+  recordingError?: string
   onToggleRecording: () => void
   hostname?: string
   onOpenFiles?: () => void
@@ -227,11 +228,14 @@ export function TerminalToolbar(props: TerminalToolbarProps) {
     if (!open && sessionLogBlocked) return
     setShowSessionLog(open)
   }, [sessionLogBlocked])
-  return <div className="relative flex h-8 flex-shrink-0 items-center gap-1 bg-muted/30 px-2">
-    <span className="text-xs text-muted-foreground truncate mr-2">{props.hostname ?? 'Terminal'}</span>
-    {props.serialControls ? <SerialSignalToolbar terminalID={props.terminalID} /> : null}
-    <ToolbarActions {...props} onOpenSystem={props.onOpenSystem ?? (() => {})} onOpenHistory={props.onOpenHistory ?? (() => {})} onOpenAI={props.onOpenAI ?? (() => {})} onOpenTunnels={() => { setTunnelOpen(true); void tunnels.load() }} clipboard={clipboard} logOpen={showSessionLog} setLogOpen={setShowSessionLog}
-      setLogBlocked={setSessionLogBlocked} onLogOpenChange={handleSessionLogOpenChange} />
+  return <div className="relative flex flex-shrink-0 flex-col bg-muted/30">
+    <div className="flex h-8 items-center gap-1 px-2">
+      <span className="mr-2 truncate text-xs text-muted-foreground">{props.hostname ?? 'Terminal'}</span>
+      {props.serialControls ? <SerialSignalToolbar terminalID={props.terminalID} /> : null}
+      <ToolbarActions {...props} onOpenSystem={props.onOpenSystem ?? (() => {})} onOpenHistory={props.onOpenHistory ?? (() => {})} onOpenAI={props.onOpenAI ?? (() => {})} onOpenTunnels={() => { setTunnelOpen(true); void tunnels.load() }} clipboard={clipboard} logOpen={showSessionLog} setLogOpen={setShowSessionLog}
+        setLogBlocked={setSessionLogBlocked} onLogOpenChange={handleSessionLogOpenChange} />
+    </div>
+    {props.recordingError ? <p role="alert" className="px-2 pb-1 text-[11px] text-destructive">{props.recordingError}</p> : null}
     <TunnelDialog open={tunnelOpen} onOpenChange={setTunnelOpen} tunnels={tunnels.tunnels}
       loadError={tunnels.error} onReload={() => tunnels.load()}
       onStart={tunnels.start} onStop={tunnels.stop} onDelete={tunnels.remove} sessionId={String(props.sessionId)} />

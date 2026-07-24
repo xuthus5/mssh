@@ -112,4 +112,23 @@ describe('SessionBatchActions', () => {
     expect(dialog).not.toHaveTextContent('0 条隧道')
     expect(useToastStore.getState().toasts).toHaveLength(0)
   })
+
+  it('shows batch execute failures inline without error toast', async () => {
+    const user = userEvent.setup()
+    useToastStore.setState({ toasts: [] })
+    render(
+      <SessionBatchActions
+        selectedIDs={['1', '2']}
+        onBatchConnect={vi.fn(async () => { throw new Error('connect boom') })}
+        onBatchExecuteMacro={vi.fn(async () => [])}
+        onBatchDelete={vi.fn(async () => [])}
+        onComplete={vi.fn()}
+      />,
+    )
+    await user.click(screen.getByRole('button', { name: /批量连接/ }))
+    await user.click(await screen.findByRole('button', { name: '确认执行' }))
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('批量操作失败: connect boom'))
+    expect(useToastStore.getState().toasts).toHaveLength(0)
+    expect(screen.getByRole('alertdialog')).toBeInTheDocument()
+  })
 })
