@@ -2,6 +2,7 @@ package service
 
 import (
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/xuthus5/mssh/pkg/event"
@@ -32,14 +33,17 @@ func (t *TerminalService) Attach(terminalID string) error {
 	pending := t.pendingOutput[terminalID]
 	delete(t.pendingOutput, terminalID)
 	handler := t.outputHandler
+	dispatcher := t.outputDispatcherLocked(terminalID)
+	t.outputMu.Unlock()
+	dispatcher.Lock()
 	if !active {
 		delete(t.attached, terminalID)
 	}
 	t.mu.Unlock()
 	if len(pending) > 0 {
-		t.dispatchTerminalOutput(terminalID, pending, handler)
+		t.dispatchTerminalOutputLocked(terminalID, pending, handler)
 	}
-	t.outputMu.Unlock()
+	dispatcher.Unlock()
 	return nil
 }
 
@@ -60,28 +64,64 @@ func (t *TerminalService) handlePTYOutput(terminalID string, data []byte) {
 		t.mu.Unlock()
 		return
 	}
-	t.outputMu.Lock()
 	handler := t.outputHandler
+	dispatcher := t.outputDispatcher(terminalID)
+	dispatcher.Lock()
 	t.mu.Unlock()
-	t.dispatchTerminalOutput(terminalID, data, handler)
-	t.outputMu.Unlock()
+	t.dispatchTerminalOutputLocked(terminalID, data, handler)
+	dispatcher.Unlock()
 }
 
-func (t *TerminalService) dispatchTerminalOutput(terminalID string, data []byte, handler func(string, []byte)) {
+func (t *TerminalService) dispatchTerminalOutputLocked(terminalID string, data []byte, handler func(string, []byte)) {
+	t.outputMu.Lock()
 	if t.outputSequences == nil {
 		t.outputSequences = make(map[string]uint64)
 	}
 	// Wails dispatches each event asynchronously, so the frontend restores PTY byte order with this sequence.
 	// Clone once for the async bus; source buffers (PTY read/pending) are reused or truncated and must not be shared.
 	t.outputSequences[terminalID]++
+	sequence := t.outputSequences[terminalID]
+	t.outputMu.Unlock()
 	t.eventBus.Emit(event.TerminalOutput, event.TerminalOutputPayload{
 		TerminalID: terminalID,
-		Sequence:   t.outputSequences[terminalID],
+		Sequence:   sequence,
 		Data:       cloneTerminalOutput(data),
 	})
 	if handler != nil {
 		handler(terminalID, data)
 	}
+}
+
+func (t *TerminalService) outputDispatcher(terminalID string) *sync.Mutex {
+	t.outputMu.Lock()
+	dispatcher := t.outputDispatcherLocked(terminalID)
+	t.outputMu.Unlock()
+	return dispatcher
+}
+
+func (t *TerminalService) outputDispatcherLocked(terminalID string) *sync.Mutex {
+	if t.outputDispatchers == nil {
+		t.outputDispatchers = make(map[string]*sync.Mutex)
+	}
+	dispatcher := t.outputDispatchers[terminalID]
+	if dispatcher == nil {
+		dispatcher = &sync.Mutex{}
+		t.outputDispatchers[terminalID] = dispatcher
+	}
+	return dispatcher
+}
+
+func (t *TerminalService) lockOutputDispatcher(terminalID string) *sync.Mutex {
+	dispatcher := t.outputDispatcher(terminalID)
+	dispatcher.Lock()
+	return dispatcher
+}
+
+func (t *TerminalService) unlockOutputDispatcher(terminalID string, dispatcher *sync.Mutex) {
+	t.outputMu.Lock()
+	delete(t.outputDispatchers, terminalID)
+	t.outputMu.Unlock()
+	dispatcher.Unlock()
 }
 
 func cloneTerminalOutput(data []byte) []byte {
@@ -100,10 +140,12 @@ func cloneTerminalOutput(data []byte) []byte {
 func (t *TerminalService) expirePendingOutput(terminalID string) {
 	t.mu.Lock()
 	if _, active := t.ptys[terminalID]; !active && !t.attached[terminalID] {
+		dispatcher := t.lockOutputDispatcher(terminalID)
 		delete(t.pendingOutput, terminalID)
 		t.outputMu.Lock()
 		delete(t.outputSequences, terminalID)
 		t.outputMu.Unlock()
+		t.unlockOutputDispatcher(terminalID, dispatcher)
 	}
 	t.mu.Unlock()
 }

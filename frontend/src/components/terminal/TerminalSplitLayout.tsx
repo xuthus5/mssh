@@ -64,6 +64,7 @@ function LeafView(props: SplitTreeViewProps & { node: Extract<SplitNode, { kind:
 
 function Divider({ branch, onRatio }: { branch: SplitBranch; onRatio: (branchID: string, ratio: number) => void }) {
   const horizontal = branch.direction === 'horizontal'
+  const ratio = Math.round(branch.ratio)
   const startDrag = (event: React.PointerEvent<HTMLDivElement>) => {
     event.preventDefault()
     const container = event.currentTarget.parentElement
@@ -81,7 +82,17 @@ function Divider({ branch, onRatio }: { branch: SplitBranch; onRatio: (branchID:
     window.addEventListener('pointermove', move)
     window.addEventListener('pointerup', stop, { once: true })
   }
-  return <div role="separator" aria-orientation={horizontal ? 'vertical' : 'horizontal'} onPointerDown={startDrag}
+  const adjustWithKeyboard = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    const increment = horizontal
+      ? event.key === 'ArrowRight' ? 5 : event.key === 'ArrowLeft' ? -5 : 0
+      : event.key === 'ArrowDown' ? 5 : event.key === 'ArrowUp' ? -5 : 0
+    const nextRatio = event.key === 'Home' ? 15 : event.key === 'End' ? 85 : ratio + increment
+    if (event.key !== 'Home' && event.key !== 'End' && increment === 0) return
+    event.preventDefault()
+    onRatio(branch.id, nextRatio)
+  }
+  return <div role="separator" tabIndex={0} aria-orientation={horizontal ? 'vertical' : 'horizontal'}
+    aria-valuemin={15} aria-valuemax={85} aria-valuenow={ratio} onPointerDown={startDrag} onKeyDown={adjustWithKeyboard}
     className={`z-20 shrink-0 touch-none bg-border/70 transition-colors hover:bg-primary ${horizontal ? 'w-1 cursor-col-resize' : 'h-1 cursor-row-resize'}`} />
 }
 

@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback } from 'react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { AIProviderPanel } from '@/components/settings/AIProviderPanel'
 import { AIAgentPanel } from '@/components/settings/AIAgentPanel'
 import { AutoSaveStatusIndicator } from '@/components/settings/AutoSaveStatus'
 import { AIInteractionSettingsSection, AISearchSettingsSection, AISecuritySettingsSection } from '@/components/settings/AISettingsSections'
 import { useAutoSave } from '@/hooks/useAutoSave'
+import { useDraftSync } from '@/hooks/useDraftSync'
 import type { AISettingsController } from '@/hooks/useAISettings'
 import { AISearchMode, AISearchProvider, type AISettingsDashboard, type AISettingsInput } from '../../../bindings/github.com/xuthus5/mssh/internal/model/models'
 import { t } from '@/i18n'
@@ -60,33 +61,35 @@ function settingsInput(dashboard: AISettingsDashboard): AISettingsInput {
   }
 }
 
+function createDraft(dashboard: AISettingsDashboard | null): AISettingsInput {
+  return dashboard ? settingsInput(dashboard) : emptyAISettingsInput
+}
+
 export function AISettingsPanel({ controller }: { controller: AISettingsController }) {
   const dashboard = controller.dashboard
-  const [draft, setDraft] = useState<AISettingsInput | null>(null)
-  useEffect(() => {
-    if (dashboard) setDraft(settingsInput(dashboard))
-  }, [dashboard])
+  const { draft, setDraft, acknowledgeSaved } = useDraftSync({ source: dashboard, createDraft })
 
   const persist = useCallback(
     async (next: AISettingsInput) => {
       await controller.saveSettings(next, { quiet: true })
+      acknowledgeSaved(next)
     },
-    [controller],
+    [acknowledgeSaved, controller],
   )
   const autoSave = useAutoSave({
-    value: draft ?? emptyAISettingsInput,
+    value: draft,
     onSave: async (next) => {
       await persist(next)
     },
-    enabled: draft !== null,
-    isReady: draft !== null,
+    enabled: dashboard !== null,
+    isReady: dashboard !== null,
     delayMs: 450,
   })
 
   if (controller.loading && !dashboard) {
     return <p className="p-8 text-center text-sm text-muted-foreground">{t('正在加载 AI 配置...')}</p>
   }
-  if (!dashboard || !draft) {
+  if (!dashboard) {
     return (
       <div className="space-y-2 p-8 text-center">
         <p className="text-sm text-destructive">{t('AI 配置加载失败')}</p>
@@ -99,7 +102,7 @@ export function AISettingsPanel({ controller }: { controller: AISettingsControll
     )
   }
 
-  const update = (changes: Partial<AISettingsInput>) => setDraft({ ...draft, ...changes })
+  const update = (changes: Partial<AISettingsInput>) => setDraft((current) => ({ ...current, ...changes }))
 
   return (
     <Tabs defaultValue="providers" className="min-h-0 flex flex-col gap-4" orientation="horizontal">

@@ -92,6 +92,19 @@ describe('QuickCommands', () => {
     expect(button.className).toContain('group-focus-within:opacity-100')
     expect(button.className).toContain('sm:opacity-0')
   })
+
+  it('executes a command from the keyboard and labels the add action', () => {
+    const onExecute = vi.fn()
+    render(<QuickCommands commands={commands} onExecute={onExecute} onAdd={vi.fn()} onDelete={vi.fn()} />)
+    const row = screen.getByRole('button', { name: '执行宏 List files' })
+    expect(screen.getByRole('button', { name: '添加快捷命令' })).toBeInTheDocument()
+
+    fireEvent.keyDown(row, { key: 'Enter' })
+    fireEvent.keyDown(row, { key: ' ' })
+    expect(onExecute).toHaveBeenCalledTimes(2)
+    expect(onExecute).toHaveBeenNthCalledWith(1, 'ls -la')
+    expect(onExecute).toHaveBeenNthCalledWith(2, 'ls -la')
+  })
 })
 
   it('keeps add form open when onAdd rejects', async () => {
@@ -106,4 +119,3 @@ describe('QuickCommands', () => {
     expect(screen.getByPlaceholderText('名称')).toHaveValue('Deploy')
     expect(screen.getByPlaceholderText('命令')).toHaveValue('deploy')
   })
-

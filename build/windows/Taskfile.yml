@@ -12,7 +12,7 @@ tasks:
   build:
     summary: Builds the application for Windows
     deps:
-      - task: common:go:mod:tidy
+      - task: common:go:mod:verify
       - task: common:build:frontend
         vars:
           BUILD_FLAGS:
@@ -22,7 +22,7 @@ tasks:
       - task: common:generate:icons
     cmds:
       - task: generate:syso
-      - go build {{.BUILD_FLAGS}} -o {{.BIN_DIR}}/{{.APP_NAME}}.exe
+      - go build -mod=readonly {{.BUILD_FLAGS}} -o {{.BIN_DIR}}/{{.APP_NAME}}.exe
       - cmd: powershell Remove-item *.syso
         platforms: [windows]
       - cmd: rm -f *.syso

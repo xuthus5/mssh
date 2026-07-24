@@ -15,7 +15,11 @@ async function selectedRoot() {
 
 async function mount() {
   const Root = await selectedRoot()
-  ReactDOM.createRoot(document.getElementById('root')!).render(<LanguageProvider><TooltipProvider><AppErrorBoundary><Root /></AppErrorBoundary></TooltipProvider></LanguageProvider>)
+  ReactDOM.createRoot(document.getElementById('root')!).render(
+    <LanguageProvider>
+      {() => <TooltipProvider><AppErrorBoundary><Root /></AppErrorBoundary></TooltipProvider>}
+    </LanguageProvider>,
+  )
 }
 
 void mount().catch((error: unknown) => logger.error('mount application failed', error))

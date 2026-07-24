@@ -18,6 +18,7 @@ import { TerminalSplit, type TerminalSplitHandle } from '@/components/terminal/T
 import { TerminalService } from '@/lib/wails'
 import { useAppStore } from '@/store/appStore'
 import { ToastContainer, useToastStore } from '@/components/ui/toast'
+import { TERMINAL_CLOSED_SPLIT_PANE_EVENT } from '@/hooks/sessionReconnect'
 
 const focusRequest = { sequence: 0, targetTerminalID: null }
 const splitStateChange = vi.fn()
@@ -163,6 +164,22 @@ describe('TerminalSplit', () => {
     expect(separator.previousElementSibling).toHaveStyle({ flexBasis: '75%' })
   })
 
+  it('resizes a split with keyboard-accessible separator controls', async () => {
+    render(<Harness />)
+    fireEvent.click(screen.getByText('向右'))
+    await screen.findByTestId('pane-split-1')
+    const separator = screen.getByRole('separator')
+
+    expect(separator).toHaveAttribute('tabindex', '0')
+    expect(separator).toHaveAttribute('aria-valuemin', '15')
+    expect(separator).toHaveAttribute('aria-valuemax', '85')
+    expect(separator).toHaveAttribute('aria-valuenow', '50')
+    fireEvent.keyDown(separator, { key: 'ArrowRight' })
+
+    expect(separator).toHaveAttribute('aria-valuenow', '55')
+    expect(separator.previousElementSibling).toHaveStyle({ flexBasis: '55%' })
+  })
+
   it('closes the original primary pane and promotes its sibling', async () => {
     render(<Harness />)
     fireEvent.click(screen.getByText('向右'))
@@ -205,7 +222,10 @@ describe('TerminalSplit', () => {
     await screen.findByTestId('pane-split-1')
     const previousPane = screen.getByTestId('pane-split-1')
     const terminal = { focus: vi.fn() }
-    useAppStore.setState({ terminalPool: new Map([['split-1', { terminal: terminal as never, lastUsed: 10 }]]) })
+    useAppStore.setState({
+      maxPoolSize: 1,
+      terminalPool: new Map([['split-1', { terminal: terminal as never, lastUsed: 10 }]]),
+    })
     act(() => useAppStore.getState().setConnectionStatus('split-1', 'disconnected'))
 
     fireEvent.click(screen.getByRole('button', { name: '重新连接' }))
@@ -218,6 +238,38 @@ describe('TerminalSplit', () => {
     expect(useAppStore.getState().terminalPool.has('split-1')).toBe(false)
     expect(TerminalService.Close).toHaveBeenCalledWith('split-1')
     expect(useAppStore.getState().connectionStatus['split-2']).toBe('connected')
+  })
+
+  it('removes a secondary pane when the backend closes it', async () => {
+    render(<Harness />)
+    fireEvent.click(screen.getByText('向右'))
+    await screen.findByTestId('pane-split-1')
+
+    act(() => window.dispatchEvent(new CustomEvent(TERMINAL_CLOSED_SPLIT_PANE_EVENT, {
+      detail: { tabID: 'tab-1', terminalID: 'split-1' },
+    })))
+
+    await waitFor(() => expect(screen.queryByTestId('pane-split-1')).not.toBeInTheDocument())
+    expect(screen.getByTestId('pane-primary-1')).toBeInTheDocument()
+    expect(TerminalService.Close).not.toHaveBeenCalledWith('split-1')
+    expect(useAppStore.getState().tabs[0]).toMatchObject({ splitPaneIDs: ['primary-1'] })
+  })
+
+  it('does not activate an inactive tab when its secondary pane closes', async () => {
+    render(<Harness />)
+    fireEvent.click(screen.getByText('向右'))
+    await screen.findByTestId('pane-split-1')
+    act(() => useAppStore.setState({
+      activeSurface: { type: 'workspace', id: 'sessions' },
+      activePaneId: null,
+    }))
+
+    act(() => window.dispatchEvent(new CustomEvent(TERMINAL_CLOSED_SPLIT_PANE_EVENT, {
+      detail: { tabID: 'tab-1', terminalID: 'split-1' },
+    })))
+
+    await waitFor(() => expect(screen.queryByTestId('pane-split-1')).not.toBeInTheDocument())
+    expect(useAppStore.getState().activeSurface).toEqual({ type: 'workspace', id: 'sessions' })
   })
 
   it('preserves the primary terminal instance and runtime mapping after reconnect', async () => {

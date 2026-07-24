@@ -123,6 +123,8 @@ func secureHTTPRedirect(req *http.Request, via []*http.Request) error {
 			req.Header.Del("Authorization")
 			req.Header.Del("X-Api-Key")
 			req.Header.Del("x-api-key")
+			req.Header.Del("X-Goog-Api-Key")
+			req.Header.Del("x-goog-api-key")
 			req.Header.Del("X-Subscription-Token")
 			req.Header.Del("X-API-KEY")
 		}

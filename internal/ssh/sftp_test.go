@@ -55,6 +55,24 @@ func TestCopyWithContextCancel(t *testing.T) {
 	assert.Less(t, dst.Len(), 10*1024*1024)
 }
 
+type eofAfterCancelReader struct {
+	cancel context.CancelFunc
+}
+
+func (r *eofAfterCancelReader) Read([]byte) (int, error) {
+	r.cancel()
+	return 0, io.EOF
+}
+
+func TestCopyWithContextTreatsEOFAfterCancelAsCancelled(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	reader := &eofAfterCancelReader{cancel: cancel}
+
+	_, err := copyWithContext(ctx, io.Discard, reader, nil)
+
+	assert.ErrorIs(t, err, context.Canceled)
+}
+
 func startSFTPServer(t *testing.T) (string, func()) {
 	t.Helper()
 	config := &gossh.ServerConfig{

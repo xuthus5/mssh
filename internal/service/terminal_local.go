@@ -16,10 +16,16 @@ import (
 
 // OpenLocal opens a terminal attached to a local interactive shell.
 func (t *TerminalService) OpenLocal(ctx context.Context, cols, rows int) (string, error) {
-	_ = ctx
 	if err := validateTerminalSize(cols, rows); err != nil {
 		return "", err
 	}
+	if err := contextError(ctx); err != nil {
+		return "", err
+	}
+	if err := t.beginOpen(); err != nil {
+		return "", err
+	}
+	defer t.finishOpen()
 	outcome := "failed"
 	defer func() {
 		if t.sessionSvc != nil {
@@ -33,10 +39,14 @@ func (t *TerminalService) OpenLocal(ctx context.Context, cols, rows int) (string
 	if err != nil {
 		return "", err
 	}
-	session, err := localshell.Open(opts)
+	session, err := localshell.OpenContext(ctx, opts)
 	if err != nil {
 		t.logger.Error("local shell open failed", "error", err)
 		return "", fmt.Errorf("local shell open: %w", err)
+	}
+	if err := contextError(ctx); err != nil {
+		_ = session.Close()
+		return "", err
 	}
 	terminalID := uuid.New().String()
 	t.registerTerminal(terminalID, "", 0, session)

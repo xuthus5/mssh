@@ -64,7 +64,7 @@ func TestCommercialSSHWorkflow(t *testing.T) {
 		_ = os.Remove(remoteSmall)
 		_ = exec.Command("tmux", "-L", "mssh-e2e", "kill-server").Run()
 	}()
-	require.NoError(t, os.WriteFile(remoteLarge, make([]byte, 64*1024*1024), 0o600))
+	createSparseRemoteFile(t, remoteLarge, 1<<30)
 	require.NoError(t, os.WriteFile(remoteSmall, []byte("recovered"), 0o600))
 	destination := filepath.Join(t.TempDir(), "download.bin")
 	require.NoError(t, os.WriteFile(destination, []byte("sentinel"), 0o600))
@@ -90,7 +90,7 @@ func TestConcurrentResourcesReturnToBaseline(t *testing.T) {
 	baseline := runtime.NumGoroutine()
 	appInstance, session := newFixtureSession(t, fixture)
 	remoteFile := filepath.Join(os.TempDir(), "mssh-e2e-resource.bin")
-	require.NoError(t, os.WriteFile(remoteFile, make([]byte, 32*1024*1024), 0o600))
+	createSparseRemoteFile(t, remoteFile, 1<<30)
 	defer func() { _ = os.Remove(remoteFile) }()
 	for iteration := 0; iteration < 5; iteration++ {
 		terminalID := openE2ETerminal(t, appInstance, session.ID)
@@ -118,6 +118,7 @@ func newFixtureSession(t *testing.T, fixture sshdFixture) (*app.App, *model.Sess
 	require.NoError(t, os.WriteFile(filepath.Join(dataDir, "known_hosts"), []byte(knownhosts.Line([]string{fixture.address}, hostKey)+"\n"), 0o600))
 	appInstance, err := app.New(app.Options{DataDir: dataDir, Logger: app.DefaultTestLogger(t)})
 	require.NoError(t, err)
+	setupTestVault(t, appInstance)
 	t.Cleanup(appInstance.Shutdown)
 	keyBytes, err := os.ReadFile(fixture.privateKey)
 	require.NoError(t, err)
@@ -152,8 +153,9 @@ func writeAndWait(t *testing.T, appInstance *app.App, capture *outputCapture, te
 	require.Eventually(t, func() bool { return capture.contains(marker) }, 5*time.Second, 25*time.Millisecond)
 }
 
-func waitTransferStatus(t *testing.T, appInstance *app.App, taskID, status string) {
+func waitTransferStatus(t *testing.T, appInstance *app.App, taskID string, expected ...string) {
 	t.Helper()
+	lastStatus := ""
 	require.Eventually(t, func() bool {
 		jobs, err := appInstance.File.ListTransfers()
 		if err != nil {
@@ -161,9 +163,24 @@ func waitTransferStatus(t *testing.T, appInstance *app.App, taskID, status strin
 		}
 		for _, job := range jobs {
 			if job.ID == taskID {
-				return job.Status == status
+				if job.Status != lastStatus {
+					lastStatus = job.Status
+					t.Logf("transfer %s status=%s error=%s", taskID, job.Status, job.Error)
+				}
+				for _, status := range expected {
+					if job.Status == status {
+						return true
+					}
+				}
+				return false
 			}
 		}
 		return false
 	}, 10*time.Second, 25*time.Millisecond)
+}
+
+func createSparseRemoteFile(t *testing.T, path string, size int64) {
+	t.Helper()
+	require.NoError(t, os.WriteFile(path, nil, 0o600))
+	require.NoError(t, os.Truncate(path, size))
 }

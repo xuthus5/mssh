@@ -9,8 +9,12 @@ export function createStatusActions(set: StoreSet): StatusActions {
   return {
     setConnectionStatus: (id, status) => set((state) => {
       const current = state.connectionStatus[id]
+      const shouldReleaseReservation = status === 'disconnected' || status === 'error'
       if (!canTransitionConnection(current, status)) return state
-      return { connectionStatus: { ...state.connectionStatus, [id]: status } }
+      if (!shouldReleaseReservation) return { connectionStatus: { ...state.connectionStatus, [id]: status } }
+      const terminalOpenReservations = new Set(state.terminalOpenReservations ?? [])
+      terminalOpenReservations.delete(id)
+      return { connectionStatus: { ...state.connectionStatus, [id]: status }, terminalOpenReservations }
     }),
     setActivePane: (activePaneId) => set({ activePaneId }),
     setRecordingState: (id, recording) => set((state) => ({ recordingState: { ...state.recordingState, [id]: recording } })),
@@ -29,4 +33,3 @@ export function createStatusActions(set: StoreSet): StatusActions {
     })),
   }
 }
-

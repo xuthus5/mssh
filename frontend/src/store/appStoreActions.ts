@@ -76,6 +76,9 @@ function replaceTerminalConnectionState(state: AppState, tabID: string, previous
   connectionStatus[nextTerminalID] = state.connectionStatus[nextTerminalID] ?? 'connected'
   const recordingState = { ...state.recordingState }
   delete recordingState[previousTerminalID]
+  const terminalOpenReservations = new Set(state.terminalOpenReservations ?? [])
+  terminalOpenReservations.delete(previousTerminalID)
+  terminalOpenReservations.delete(nextTerminalID)
   const active = state.activeSurface?.type === 'terminal' && state.activeSurface.id === tabID
   const splitPaneIDs = rewriteSplitPaneIDs(tab.splitPaneIDs, previousTerminalID, nextTerminalID)
   return {
@@ -85,6 +88,7 @@ function replaceTerminalConnectionState(state: AppState, tabID: string, previous
     terminalPool,
     connectionStatus,
     recordingState,
+    terminalOpenReservations,
     activePaneId: state.activePaneId === previousTerminalID ? nextTerminalID : state.activePaneId,
     focusRequest: active
       ? { id: tabID, terminalId: nextTerminalID, sequence: state.focusRequest.sequence + 1 }
@@ -233,23 +237,30 @@ export function createPoolActions(set: StoreSet, get: StoreGet): PoolActions {
       set((state) => {
         const terminalPool = new Map(state.terminalPool)
         terminalPool.set(id, { terminal, lastUsed: Date.now() })
-        return { terminalPool }
+        const terminalOpenReservations = new Set(state.terminalOpenReservations ?? [])
+        terminalOpenReservations.delete(id)
+        return { terminalPool, terminalOpenReservations }
       })
     },
     unregisterTerminal: (id) => set((state) => {
       const terminalPool = new Map(state.terminalPool)
       terminalPool.delete(id)
-      return { terminalPool }
+      const terminalOpenReservations = new Set(state.terminalOpenReservations ?? [])
+      terminalOpenReservations.delete(id)
+      return { terminalPool, terminalOpenReservations }
     }),
     forgetTerminal: (id) => set((state) => {
       const terminalPool = new Map(state.terminalPool)
       terminalPool.delete(id)
+      const terminalOpenReservations = new Set(state.terminalOpenReservations ?? [])
+      terminalOpenReservations.delete(id)
       const connectionStatus = { ...state.connectionStatus }
       delete connectionStatus[id]
       const recordingState = { ...state.recordingState }
       delete recordingState[id]
       return {
         terminalPool,
+        terminalOpenReservations,
         connectionStatus,
         recordingState,
         activePaneId: state.activePaneId === id ? null : state.activePaneId,

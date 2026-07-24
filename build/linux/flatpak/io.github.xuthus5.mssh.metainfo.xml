@@ -26,7 +26,6 @@
   <launchable type="desktop-id">io.github.xuthus5.mssh.desktop</launchable>
   <provides>
     <binary>mssh</binary>
-    <id>com.mssh.app</id>
   </provides>
   <url type="homepage">https://github.com/xuthus5/mssh</url>
   <url type="bugtracker">https://github.com/xuthus5/mssh/issues</url>

@@ -149,6 +149,21 @@ describe('reconnectSessionTab', () => {
     expect(useAppStore.getState().connectionStatus['term-local-new']).toBe('connected')
   })
 
+  it('reuses the existing frontend slot when reconnecting at pool limit one', async () => {
+    const terminal = { cols: 100, rows: 30 }
+    useAppStore.setState({
+      maxPoolSize: 1,
+      terminalPool: new Map([['term-old', { terminal: terminal as never, lastUsed: 1 }]]),
+    })
+    __registerHandler(service + 'Open', async () => 'term-new')
+
+    await reconnectSessionTab('tab-1', sessions)
+
+    expect(useAppStore.getState().tabs[0]).toMatchObject({ terminalId: 'term-new' })
+    expect(useAppStore.getState().terminalPool.has('term-old')).toBe(false)
+    expect(useAppStore.getState().terminalPool.get('term-new')?.terminal).toBe(terminal)
+  })
+
   it('surfaces final reconnect failure in dialog without toast', async () => {
     const open = vi.fn(async () => { throw new Error('reconnect boom') })
     __registerHandler(service + 'Open', open)

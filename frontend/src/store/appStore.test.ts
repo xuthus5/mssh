@@ -17,6 +17,8 @@ describe('appStore', () => {
       sidebarWidth: 280,
       focusRequest: { id: '', sequence: 0 },
       terminalPool: new Map(),
+      pendingTerminalOpens: 0,
+      terminalOpenReservations: new Set(),
       connectionStatus: {},
       transfers: [],
       transferCenterOpen: false,
@@ -324,6 +326,32 @@ describe('appStore', () => {
     expect(useAppStore.getState().connectionStatus['term-1']).toBe('connected')
   })
 
+  it('keeps an open reservation until the terminal mounts or closes', () => {
+    useAppStore.setState({ terminalOpenReservations: new Set(['term-1']) })
+    useAppStore.getState().setConnectionStatus('term-1', 'connected')
+    expect(useAppStore.getState().terminalOpenReservations).toEqual(new Set(['term-1']))
+
+    useAppStore.getState().setConnectionStatus('term-1', 'disconnected')
+    expect(useAppStore.getState().terminalOpenReservations).toEqual(new Set())
+  })
+
+  it('keeps the pool bounded when a reservation races with another mount', () => {
+    __registerHandler('github.com/xuthus5/mssh/internal/service.TerminalService.Close', async () => {})
+    useAppStore.setState({
+      maxPoolSize: 1,
+      terminalPool: new Map(),
+      terminalOpenReservations: new Set(['reserved']),
+      tabs: [],
+      activePaneId: null,
+    })
+    const store = useAppStore.getState()
+    store.registerTerminal('other', { dispose: vi.fn() } as never)
+    store.registerTerminal('reserved', { dispose: vi.fn() } as never)
+
+    expect(useAppStore.getState().terminalPool.size).toBeLessThanOrEqual(1)
+    expect(useAppStore.getState().terminalPool.has('reserved')).toBe(true)
+  })
+
   it('evicts LRU when pool exceeds max size', () => {
     __registerHandler('github.com/xuthus5/mssh/internal/service.TerminalService.Close', async () => {})
     const { registerTerminal } = useAppStore.getState()
@@ -448,12 +476,15 @@ describe('appStore', () => {
     } as never)
     store.registerTerminal('primary-1', { dispose: vi.fn() } as never)
     store.registerTerminal('split-1', { dispose: vi.fn() } as never)
+    useAppStore.setState({ terminalOpenReservations: new Set(['primary-2']) })
 
     expect(store.replaceTerminalConnection('tab-1', 'primary-1', 'primary-2')).toBe(true)
-    expect(useAppStore.getState().tabs[0]).toMatchObject({
+    const replaced = useAppStore.getState()
+    expect(replaced.tabs[0]).toMatchObject({
       terminalId: 'primary-2',
       splitPaneIDs: ['primary-2', 'split-1'],
     })
+    expect(replaced.terminalOpenReservations).toEqual(new Set())
 
     useAppStore.setState({
       tabs: [{

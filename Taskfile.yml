@@ -24,6 +24,12 @@ vars:
       fi
       printf '%s' '0.1.0'
   VERSION_LDFLAGS: '-X github.com/xuthus5/mssh/internal/service.Version={{.APP_VERSION}}'
+  GO_VERSION:
+    sh: tr -d '\r\n' < .go-version
+  NODE_VERSION:
+    sh: tr -d '\r\n' < .node-version
+  WAILS_VERSION:
+    sh: tr -d '\r\n' < .wails-version
 
 tasks:
   build:
@@ -122,6 +128,19 @@ tasks:
         golangci-lint version
         golangci-lint run --timeout 5m ./...
 
+  toolchain:check:
+    summary: Verify the pinned local build toolchain
+    cmds:
+      - |
+        set -euo pipefail
+        actual_go="$(go version | awk '{print $3}')"
+        actual_node="$(node --version | sed 's/^v//')"
+        actual_wails="$(wails3 version 2>&1 | tr -d '\r')"
+        test "${actual_go#go}" = "{{.GO_VERSION}}"
+        test "${actual_node}" = "{{.NODE_VERSION}}"
+        test "${actual_wails}" = "{{.WAILS_VERSION}}"
+        printf 'toolchain verified: go=%s node=%s wails=%s\n' "$actual_go" "$actual_node" "$actual_wails"
+
   fmt:
     summary: Format Go code (golangci formatters + goimports-reviser)
     cmds:
@@ -147,14 +166,31 @@ tasks:
       - npm test
 
   test:e2e:
-    summary: Run real SSH/tmux/SFTP integration tests
+    summary: Run real SSH/tmux/SFTP/serial integration tests
     cmds:
       - go test -race -tags=e2e ./e2e -run 'TestCommercialSSHWorkflow|TestConcurrentResourcesReturnToBaseline' -count=1 -timeout=2m
+      - go test -race -tags=e2e ./internal/serial -run '^TestSerialPTYIntegration$' -count=1 -timeout=30s
 
   benchmark:
     summary: Run commercial performance benchmarks
     cmds:
-      - go test -run '^$' -bench 'BenchmarkCommercial' -benchmem ./internal/store ./internal/service
+      - go test -run '^$' -bench 'BenchmarkCommercial|BenchmarkWailsEventBus' -benchmem ./internal/store ./internal/service ./pkg/event
+
+  benchmark:ci:
+    summary: Capture reproducible commercial performance benchmarks
+    cmds:
+      - |
+        set -euo pipefail
+        mkdir -p performance
+        go test -run '^$' -bench 'BenchmarkCommercial|BenchmarkWailsEventBus' -benchmem -count=3 \
+          ./internal/store ./internal/service ./pkg/event | tee performance/commercial-benchmarks.txt
+        test -s performance/commercial-benchmarks.txt
+
+  release:check:
+    summary: Validate release workflow hardening
+    cmds:
+      - bash scripts/release/validate-workflow.sh
+      - bash scripts/release/test-metadata.sh
 
   ci:
     summary: Full local gate aligned with .github/workflows/ci.yml
@@ -162,6 +198,7 @@ tasks:
       Mirrors CI: golangci-lint, backend race+coverage, frontend checks, production build.
       Run before every commit/push. Fails fast on the first failing stage.
     cmds:
+      - task: toolchain:check
       - task: lint
       - task: test
       - node scripts/check-go-source-limits.mjs
@@ -180,8 +217,10 @@ tasks:
     cmds:
       - cmd: rm -f coverage.out coverage.func.txt
         platforms: [linux, darwin]
+      - cmd: rm -rf performance
+        platforms: [linux, darwin]
       - cmd: rm -rf bin build/bin
         platforms: [linux, darwin]
-      - cmd: powershell -NoProfile -Command "Remove-Item coverage.out,coverage.func.txt,bin,build/bin -Recurse -Force -ErrorAction SilentlyContinue"
+      - cmd: powershell -NoProfile -Command "Remove-Item coverage.out,coverage.func.txt,performance,bin,build/bin -Recurse -Force -ErrorAction SilentlyContinue"
         platforms: [windows]
       - go clean -testcache

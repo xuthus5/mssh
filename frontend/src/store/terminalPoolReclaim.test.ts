@@ -2,9 +2,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AppState, Tab } from '@/store/appStore'
 import { __clearHandlers, __registerHandler } from '@/test/__mocks__/wails-runtime'
 import {
-  applyTerminalPoolEviction,
-  ensureTerminalPoolCapacity,
-  openTerminalWithPoolCapacity,
+	applyTerminalPoolEviction,
+	ensureTerminalPoolCapacity,
+	openTerminalWithPoolCapacity,
+	releaseTerminalOpenReservation,
 } from '@/store/terminalPoolReclaim'
 
 const toast = vi.hoisted(() => vi.fn())
@@ -24,6 +25,8 @@ function createStore(initial: Partial<AppState>) {
     activeSurface: null,
     activePaneId: null,
     terminalPool: new Map(),
+    pendingTerminalOpens: 0,
+    terminalOpenReservations: new Set(),
     connectionStatus: {},
     recordingState: {},
     maxPoolSize: 2,
@@ -155,5 +158,67 @@ describe('openTerminalWithPoolCapacity', () => {
     await expect(openTerminalWithPoolCapacity(open, store, { confirmProtected: () => false }))
       .rejects.toThrow('终端池已满')
     expect(open).not.toHaveBeenCalled()
+  })
+
+  it('reserves capacity across concurrent backend opens', async () => {
+    const store = createStore({ maxPoolSize: 1, terminalPool: new Map() })
+    let resolveFirst!: (terminalID: string) => void
+    const firstOpen = vi.fn(() => new Promise<string>((resolve) => { resolveFirst = resolve }))
+    const secondOpen = vi.fn(async () => 'term-second')
+
+    const first = openTerminalWithPoolCapacity(firstOpen, store)
+    await vi.waitFor(() => expect(firstOpen).toHaveBeenCalledOnce())
+    await expect(openTerminalWithPoolCapacity(secondOpen, store)).rejects.toThrow('终端池已满')
+    expect(secondOpen).not.toHaveBeenCalled()
+    expect(store.getState().pendingTerminalOpens).toBe(1)
+
+    resolveFirst('term-first')
+    await expect(first).resolves.toBe('term-first')
+    expect(store.getState().pendingTerminalOpens).toBe(0)
+    expect(store.getState().terminalOpenReservations).toEqual(new Set(['term-first']))
+  })
+
+  it('releases a returned reservation when the backend closes before mount', async () => {
+    const store = createStore({ maxPoolSize: 1, terminalPool: new Map() })
+    await expect(openTerminalWithPoolCapacity(async () => 'term-closed', store)).resolves.toBe('term-closed')
+    expect(store.getState().terminalOpenReservations).toEqual(new Set(['term-closed']))
+
+    releaseTerminalOpenReservation(store, 'term-closed')
+
+    expect(store.getState().terminalOpenReservations).toEqual(new Set())
+    expect(store.getState().pendingTerminalOpens).toBe(0)
+  })
+
+  it('does not bind a reservation after an early disconnect event', async () => {
+    const store = createStore({ maxPoolSize: 1, terminalPool: new Map() })
+    const open = async () => {
+      store.setState({ connectionStatus: { 'term-fast-exit': 'disconnected' } })
+      return 'term-fast-exit'
+    }
+
+    await expect(openTerminalWithPoolCapacity(open, store)).resolves.toBe('term-fast-exit')
+
+    expect(store.getState().pendingTerminalOpens).toBe(0)
+    expect(store.getState().terminalOpenReservations).toEqual(new Set())
+  })
+
+  it('keeps the replacement terminal slot available during in-place reconnect', async () => {
+    const store = createStore({
+      maxPoolSize: 1,
+      tabs: [terminalTab('tab-old', 'term-old')],
+      terminalPool: new Map([['term-old', entry(1)]]),
+      connectionStatus: { 'term-old': 'disconnected' },
+      terminalOpenReservations: new Set(['term-old']),
+    })
+    const open = vi.fn(async () => 'term-new')
+
+    await expect(openTerminalWithPoolCapacity(open, store, {
+      replacementTerminalID: 'term-old',
+      confirmProtected: () => false,
+    })).resolves.toBe('term-new')
+
+    expect(open).toHaveBeenCalledOnce()
+    expect(store.getState().tabs).toHaveLength(1)
+    expect(store.getState().terminalPool.has('term-old')).toBe(true)
   })
 })

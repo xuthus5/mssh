@@ -10,7 +10,11 @@ import (
 )
 
 func applyReencryptPlan(db *sql.DB, plan reencryptPlan) error {
-	if len(plan.keys) == 0 && len(plan.sessions) == 0 && len(plan.settings) == 0 {
+	return applyReencryptPlanWithCleanup(db, plan, nil)
+}
+
+func applyReencryptPlanWithCleanup(db *sql.DB, plan reencryptPlan, cleanup func(*sql.Tx) error) error {
+	if len(plan.keys) == 0 && len(plan.sessions) == 0 && len(plan.settings) == 0 && cleanup == nil {
 		return nil
 	}
 	tx, err := db.Begin()
@@ -30,6 +34,11 @@ func applyReencryptPlan(db *sql.DB, plan reencryptPlan) error {
 	}
 	for _, setting := range plan.settings {
 		if err := applySettingUpdate(tx, setting); err != nil {
+			return err
+		}
+	}
+	if cleanup != nil {
+		if err := cleanup(tx); err != nil {
 			return err
 		}
 	}

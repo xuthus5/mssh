@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/xuthus5/mssh/internal/fsutil"
 	"github.com/xuthus5/mssh/internal/ssh"
 	"github.com/xuthus5/mssh/pkg/event"
 )
@@ -21,9 +22,7 @@ func (f *FileService) Upload(sessionID int64, localPath, remotePath string) (str
 	}
 	localPath = cleanedLocal
 	f.logger.Info("uploading file", "sessionID", sessionID, "localPath", localPath, "remotePath", remotePath)
-	return f.startTransfer("upload", sessionID, localPath, remotePath, func(ctx context.Context, taskID string, client *ssh.SFTPClient) {
-		f.runUpload(ctx, taskID, client, localPath, remotePath)
-	})
+	return f.startTransfer(transferSpec{direction: "upload", sessionID: sessionID, source: localPath, target: remotePath, run: f.runUpload})
 }
 
 func (f *FileService) Download(sessionID int64, remotePath, localPath string) (string, error) {
@@ -36,103 +35,163 @@ func (f *FileService) Download(sessionID int64, remotePath, localPath string) (s
 	}
 	localPath = cleanedLocal
 	f.logger.Info("downloading file", "sessionID", sessionID, "remotePath", remotePath, "localPath", localPath)
-	return f.startTransfer("download", sessionID, remotePath, localPath, func(ctx context.Context, taskID string, client *ssh.SFTPClient) {
-		f.runDownload(ctx, taskID, client, remotePath, localPath)
-	})
+	return f.startTransfer(transferSpec{direction: "download", sessionID: sessionID, source: remotePath, target: localPath, run: f.runDownload})
 }
 
-func (f *FileService) startTransfer(direction string, sessionID int64, source, target string, run func(context.Context, string, *ssh.SFTPClient)) (string, error) {
+type transferSpec struct {
+	direction string
+	sessionID int64
+	source    string
+	target    string
+	run       func(transferExecution)
+}
+
+type transferExecution struct {
+	ctx    context.Context
+	taskID string
+	client *ssh.SFTPClient
+	source string
+	target string
+}
+
+type transferWorker struct {
+	ctx     context.Context
+	cancel  context.CancelFunc
+	taskID  string
+	connID  string
+	wrapper *ssh.ClientWrapper
+	spec    transferSpec
+}
+
+func (f *FileService) startTransfer(spec transferSpec) (string, error) {
 	taskID := generateFileTaskID()
-	if err := f.createTransfer(taskID, sessionID, direction, source, target); err != nil {
+	ctx, cancel := context.WithCancel(context.Background())
+	if err := f.registerTask(taskID, spec.sessionID, cancel); err != nil {
+		cancel()
 		return "", err
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	f.mu.Lock()
-	f.tasks[taskID] = cancel
-	f.taskSessions[taskID] = sessionID
-	f.mu.Unlock()
-	wrapper, connID, err := f.connect(sessionID)
+	if err := f.createTransfer(taskID, spec.sessionID, spec.direction, spec.source, spec.target); err != nil {
+		f.releaseRegisteredTask(taskID, cancel)
+		return "", err
+	}
+	wrapper, connID, err := f.connect(ctx, spec.sessionID)
 	if err != nil {
-		cancel()
-		f.removeTask(taskID)
-		f.finishTransfer(taskID, "failed", err.Error())
-		return "", fmt.Errorf("%s: %w", direction, err)
+		f.releaseRegisteredTask(taskID, cancel)
+		status := "failed"
+		if transferAborted(ctx, err) {
+			status = "cancelled"
+		}
+		f.finishTransfer(taskID, status, err.Error())
+		return "", fmt.Errorf("%s: %w", spec.direction, err)
+	}
+	worker := transferWorker{ctx: ctx, cancel: cancel, taskID: taskID, connID: connID, wrapper: wrapper, spec: spec}
+	if !f.attachTaskCloser(taskID, ctx, wrapper.Close) {
+		return "", f.abortTransferStart(worker)
 	}
 	f.recordStart(taskID)
-	go func() {
-		defer f.disconnect(connID)
-		defer cancel()
-		defer f.removeTask(taskID)
-		defer f.clearStart(taskID)
-		sftpClient, sftpErr := ssh.OpenSFTP(wrapper)
-		if sftpErr != nil {
-			if transferAborted(ctx, sftpErr) {
-				f.emitTransferCancelled(taskID)
-				return
-			}
-			f.emitTransferError(taskID, sftpErr)
-			return
-		}
-		defer func() { _ = sftpClient.Close() }()
-		run(ctx, taskID, sftpClient)
-	}()
+	f.launchTransfer(worker)
 	return taskID, nil
 }
 
-func (f *FileService) runUpload(ctx context.Context, taskID string, sftpClient *ssh.SFTPClient, localPath, remotePath string) {
-	temporaryPath := remotePath + ".mssh-partial-" + taskID
-	size := f.getFileSize(localPath)
-	uploadErr := ssh.UploadFileContext(ctx, sftpClient, localPath, temporaryPath, func(transferred, _ int64) {
-		f.reportProgress(taskID, transferred, size)
-	})
-	if uploadErr != nil {
-		_ = ssh.RemoveFile(sftpClient, temporaryPath)
-		if transferAborted(ctx, uploadErr) {
-			f.emitTransferCancelled(taskID)
-			return
-		}
-		f.emitTransferError(taskID, uploadErr)
-		return
-	}
-	if renameErr := ssh.Rename(sftpClient, temporaryPath, remotePath); renameErr != nil {
-		_ = ssh.RemoveFile(sftpClient, temporaryPath)
-		if transferAborted(ctx, renameErr) {
-			f.emitTransferCancelled(taskID)
-			return
-		}
-		f.emitTransferError(taskID, renameErr)
-		return
-	}
-	f.eventBus.Emit(event.TransferComplete, event.TransferProgressPayload{TaskID: taskID, Status: "completed", Transferred: size, Total: size, Percent: 100})
-	f.finishTransfer(taskID, "completed", "")
+func (f *FileService) releaseRegisteredTask(taskID string, cancel context.CancelFunc) {
+	cancel()
+	f.removeTask(taskID)
+	f.workers.Done()
 }
 
-func (f *FileService) runDownload(ctx context.Context, taskID string, sftpClient *ssh.SFTPClient, remotePath, localPath string) {
-	size := f.getRemoteFileSize(sftpClient, remotePath)
-	partialPath := localPath + ".partial"
-	downloadErr := ssh.DownloadFileContext(ctx, sftpClient, remotePath, partialPath, func(transferred, _ int64) {
-		f.reportProgress(taskID, transferred, size)
+func (f *FileService) abortTransferStart(worker transferWorker) error {
+	abortErr := worker.ctx.Err()
+	if abortErr == nil {
+		abortErr = context.Canceled
+	}
+	if err := worker.wrapper.Close(); err != nil {
+		f.logger.Debug("close cancelled transfer transport failed", "taskID", worker.taskID, "error", err)
+	}
+	f.disconnect(worker.connID)
+	f.releaseRegisteredTask(worker.taskID, worker.cancel)
+	f.finishTransfer(worker.taskID, "cancelled", abortErr.Error())
+	return abortErr
+}
+
+func (f *FileService) launchTransfer(worker transferWorker) {
+	go func() {
+		defer f.workers.Done()
+		defer f.disconnect(worker.connID)
+		defer worker.cancel()
+		defer f.removeTask(worker.taskID)
+		defer f.clearStart(worker.taskID)
+		sftpClient, sftpErr := ssh.OpenSFTP(worker.wrapper)
+		if sftpErr != nil {
+			if transferAborted(worker.ctx, sftpErr) {
+				f.emitTransferCancelled(worker.taskID)
+				return
+			}
+			f.emitTransferError(worker.taskID, sftpErr)
+			return
+		}
+		defer func() { _ = sftpClient.Close() }()
+		worker.spec.run(transferExecution{ctx: worker.ctx, taskID: worker.taskID, client: sftpClient, source: worker.spec.source, target: worker.spec.target})
+	}()
+}
+
+func (f *FileService) runUpload(transfer transferExecution) {
+	temporaryPath := transfer.target + ".mssh-partial-" + transfer.taskID
+	size := f.getFileSize(transfer.source)
+	uploadErr := ssh.UploadFileContext(transfer.ctx, transfer.client, transfer.source, temporaryPath, func(transferred, _ int64) {
+		f.reportProgress(transfer.taskID, transferred, size)
+	})
+	if uploadErr != nil {
+		_ = ssh.RemoveFile(transfer.client, temporaryPath)
+		if transferAborted(transfer.ctx, uploadErr) {
+			f.emitTransferCancelled(transfer.taskID)
+			return
+		}
+		f.emitTransferError(transfer.taskID, uploadErr)
+		return
+	}
+	if renameErr := ssh.Rename(transfer.client, temporaryPath, transfer.target); renameErr != nil {
+		_ = ssh.RemoveFile(transfer.client, temporaryPath)
+		if transferAborted(transfer.ctx, renameErr) {
+			f.emitTransferCancelled(transfer.taskID)
+			return
+		}
+		f.emitTransferError(transfer.taskID, renameErr)
+		return
+	}
+	f.eventBus.Emit(event.TransferComplete, event.TransferProgressPayload{TaskID: transfer.taskID, Status: "completed", Transferred: size, Total: size, Percent: 100})
+	f.finishTransfer(transfer.taskID, "completed", "")
+}
+
+func (f *FileService) runDownload(transfer transferExecution) {
+	size := f.getRemoteFileSize(transfer.client, transfer.source)
+	partialPath := downloadPartialPath(transfer.target, transfer.taskID)
+	downloadErr := ssh.DownloadFileContext(transfer.ctx, transfer.client, transfer.source, partialPath, func(transferred, _ int64) {
+		f.reportProgress(transfer.taskID, transferred, size)
 	})
 	if downloadErr != nil {
 		_ = os.Remove(partialPath)
-		if transferAborted(ctx, downloadErr) {
-			f.emitTransferCancelled(taskID)
+		if transferAborted(transfer.ctx, downloadErr) {
+			f.emitTransferCancelled(transfer.taskID)
 			return
 		}
-		f.emitTransferError(taskID, downloadErr)
+		f.emitTransferError(transfer.taskID, downloadErr)
 		return
 	}
-	if renameErr := os.Rename(partialPath, localPath); renameErr != nil {
+	if renameErr := fsutil.ReplaceFile(partialPath, transfer.target); renameErr != nil {
 		_ = os.Remove(partialPath)
-		if transferAborted(ctx, renameErr) {
-			f.emitTransferCancelled(taskID)
+		if transferAborted(transfer.ctx, renameErr) {
+			f.emitTransferCancelled(transfer.taskID)
 			return
 		}
-		f.emitTransferError(taskID, fmt.Errorf("finalize download: %w", renameErr))
+		f.emitTransferError(transfer.taskID, fmt.Errorf("finalize download: %w", renameErr))
 		return
 	}
-	f.eventBus.Emit(event.TransferComplete, event.TransferProgressPayload{TaskID: taskID, Status: "completed", Transferred: size, Total: size, Percent: 100})
-	f.finishTransfer(taskID, "completed", "")
+	f.eventBus.Emit(event.TransferComplete, event.TransferProgressPayload{TaskID: transfer.taskID, Status: "completed", Transferred: size, Total: size, Percent: 100})
+	f.finishTransfer(transfer.taskID, "completed", "")
+}
+
+func downloadPartialPath(localPath, taskID string) string {
+	return localPath + ".mssh-partial-" + taskID
 }
 
 // CancelTransfer cancels an in-progress file transfer.
@@ -142,26 +201,21 @@ func (f *FileService) CancelTransfer(taskID string) error {
 	}
 	f.logger.Info("cancelling transfer", "taskID", taskID)
 	f.mu.Lock()
-	cancel, ok := f.tasks[taskID]
+	cancellation, ok := f.cancelTaskLocked(taskID)
 	if !ok {
 		f.mu.Unlock()
 		return fmt.Errorf("task %s not found", taskID)
 	}
 	f.mu.Unlock()
-	cancel()
+	f.closeCancelledTask(cancellation)
 	return nil
 }
 
 func (f *FileService) CancelAll() {
 	f.mu.Lock()
-	cancels := make([]context.CancelFunc, 0, len(f.tasks))
-	for _, cancel := range f.tasks {
-		cancels = append(cancels, cancel)
-	}
+	cancellations := f.cancellationSnapshotLocked()
 	f.mu.Unlock()
-	for _, cancel := range cancels {
-		cancel()
-	}
+	f.closeCancelledTasks(cancellations)
 }
 
 func transferAborted(ctx context.Context, err error) bool {

@@ -130,7 +130,7 @@ export async function reconnectSplitPane(terminalID: string, ctx: SplitActionCon
   try {
     const nextID = await openTerminalWithPoolCapacity(() => openSplitPane(
       ctx.sessionId, ctx.connectionKind, ctx.serialPortId, ctx.primaryRef.current,
-    ))
+    ), { replacementTerminalID: terminalID })
     if (!ctx.mountedRef.current) {
       closeSplitTerminalInBackground(nextID, 'TerminalSplit: cancelled reconnect cleanup failed')
       return

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { SettingsView } from '@/components/settings/SettingsView'
@@ -229,10 +229,55 @@ describe('SettingsView', () => {
 
     expect(props.onPreviewUIFont).toHaveBeenLastCalledWith('Segoe UI', 'sans-serif', 14)
   })
+
+  it('flushes pending general changes before switching categories', async () => {
+    const props = settingsProps()
+    render(<SettingsView {...props} />)
+
+    fireEvent.change(screen.getByLabelText('日志保留天数'), { target: { value: '45' } })
+    expect(props.onSaveGeneral).not.toHaveBeenCalled()
+    await act(async () => {
+      fireEvent.click(screen.getByRole('tab', { name: '终端' }))
+      await Promise.resolve()
+    })
+
+    expect(props.onSaveGeneral).toHaveBeenCalledWith(expect.objectContaining({ logRetentionDays: 45 }))
+  })
+
+  it('keeps a newer general draft when an earlier save response arrives', async () => {
+    const firstSave = deferredSave()
+    const props = settingsProps()
+    props.onSaveGeneral = vi.fn()
+      .mockImplementationOnce(() => firstSave.promise)
+      .mockResolvedValue(undefined)
+    const view = render(<SettingsView {...props} />)
+
+    fireEvent.change(screen.getByLabelText('界面字号'), { target: { value: '15' } })
+    await vi.advanceTimersByTimeAsync(450)
+    fireEvent.change(screen.getByLabelText('界面字号'), { target: { value: '16' } })
+    await act(async () => {
+      firstSave.resolve()
+      await firstSave.promise
+      await Promise.resolve()
+    })
+    view.rerender(<SettingsView {...props} general={{ ...general, uiFontSize: 15 }} />)
+
+    expect(screen.getByLabelText('界面字号')).toHaveValue(16)
+    await vi.advanceTimersByTimeAsync(450)
+    expect(props.onSaveGeneral).toHaveBeenLastCalledWith(expect.objectContaining({ uiFontSize: 16 }))
+  })
 })
 
 async function flushAutoSave(user?: ReturnType<typeof userEvent.setup>) {
   await vi.advanceTimersByTimeAsync(600)
   await Promise.resolve()
   if (user) await Promise.resolve()
+}
+
+function deferredSave() {
+  let resolve = () => {}
+  const promise = new Promise<void>((done) => {
+    resolve = done
+  })
+  return { promise, resolve }
 }

@@ -46,6 +46,29 @@ func TestSetSettingsRejectsInvalidBatch(t *testing.T) {
 	assert.Nil(t, setting)
 }
 
+func TestSetSettingsTxUsesCallerTransaction(t *testing.T) {
+	db := setupTestDB(t)
+	setting := model.Setting{Key: "appearance.mode", Namespace: "appearance", Value: `"dark"`, ValueType: "string", Version: 1}
+	assert.Error(t, SetSettingsTx(nil, []model.Setting{setting}))
+
+	tx, err := db.Begin()
+	require.NoError(t, err)
+	require.NoError(t, SetSettingsTx(tx, []model.Setting{setting}))
+	require.NoError(t, tx.Rollback())
+	loaded, err := GetSettingEntry(db, setting.Key)
+	require.NoError(t, err)
+	assert.Nil(t, loaded)
+
+	tx, err = db.Begin()
+	require.NoError(t, err)
+	require.NoError(t, SetSettingsTx(tx, []model.Setting{setting}))
+	require.NoError(t, tx.Commit())
+	loaded, err = GetSettingEntry(db, setting.Key)
+	require.NoError(t, err)
+	require.NotNil(t, loaded)
+	assert.Equal(t, setting.Value, loaded.Value)
+}
+
 func TestValidateSetting(t *testing.T) {
 	tests := []struct {
 		name    string

@@ -1,6 +1,8 @@
 build/bin/
 coverage.out
 coverage.html
+coverage.func.txt
+performance/
 .idea
 .opencode
 .superpowers/

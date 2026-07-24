@@ -60,7 +60,10 @@ fi
 install_stack() {
   local gnome_ver="$1" fd_ver="$2"
   echo "Installing org.gnome.Platform//${gnome_ver} + Sdk + golang/node20 //${fd_ver}"
-  flatpak config --user --set languages "en" >/dev/null 2>&1 || true
+  if ! flatpak config --user --set languages "en" >/dev/null 2>&1; then
+    echo "unable to limit Flatpak runtime languages" >&2
+    return 1
+  fi
   flatpak install -y --user --noninteractive flathub \
     "org.gnome.Platform//${gnome_ver}" \
     "org.gnome.Sdk//${gnome_ver}" \
@@ -131,11 +134,8 @@ print("proxy keys injected:", [k for k in proxy_keys if os.environ.get(k)])
 PY
 
 if command -v appstreamcli >/dev/null 2>&1; then
-  appstreamcli validate --no-net \
-    "${ROOT_DIR}/build/linux/flatpak/${APP_ID}.metainfo.xml" \
-    || appstreamcli validate \
-    "${ROOT_DIR}/build/linux/flatpak/${APP_ID}.metainfo.xml" \
-    || true
+  appstreamcli validate --strict --no-net \
+    "${ROOT_DIR}/build/linux/flatpak/${APP_ID}.metainfo.xml"
 fi
 
 mkdir -p "${EXPORT_DIR}" "${STATE_DIR}"

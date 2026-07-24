@@ -22,7 +22,10 @@ type FileService struct {
 	eventBus            EventBus
 	mu                  sync.Mutex
 	tasks               map[string]context.CancelFunc
+	taskClosers         map[string]func() error
 	taskSessions        map[string]int64
+	workers             sync.WaitGroup
+	stopping            bool
 	progress            sync.Mutex
 	startsAt            map[string]time.Time
 	lastProgressPersist map[string]time.Time
@@ -48,6 +51,7 @@ func NewFileService(sessions *SessionService, eventBus EventBus, logger *slog.Lo
 		sessions:            sessions,
 		eventBus:            eventBus,
 		tasks:               make(map[string]context.CancelFunc),
+		taskClosers:         make(map[string]func() error),
 		taskSessions:        make(map[string]int64),
 		startsAt:            make(map[string]time.Time),
 		lastProgressPersist: make(map[string]time.Time),
@@ -64,9 +68,6 @@ func (f *FileService) ListTransfers() ([]model.TransferJob, error) {
 	if f.db == nil {
 		return []model.TransferJob{}, nil
 	}
-	if err := store.MarkInterruptedTransfers(f.db); err != nil {
-		return nil, fmt.Errorf("mark interrupted transfers: %w", err)
-	}
 	return store.ListTransferJobs(f.db)
 }
 
@@ -76,7 +77,7 @@ func (f *FileService) ListDir(sessionID int64, path string) ([]ssh.FileEntry, er
 		return nil, fmt.Errorf("list dir: %w", err)
 	}
 	f.logger.Info("listing directory", "sessionID", sessionID, "path", path)
-	wrapper, connID, err := f.connect(sessionID)
+	wrapper, connID, err := f.connect(context.Background(), sessionID)
 	if err != nil {
 		f.logger.Error("list dir failed", "sessionID", sessionID, "error", err)
 		return nil, fmt.Errorf("list dir: %w", err)
@@ -98,7 +99,7 @@ func (f *FileService) Delete(sessionID int64, path string) error {
 	if err := validateRemotePath(path); err != nil {
 		return fmt.Errorf("delete: %w", err)
 	}
-	wrapper, connID, err := f.connect(sessionID)
+	wrapper, connID, err := f.connect(context.Background(), sessionID)
 	if err != nil {
 		return fmt.Errorf("delete: %w", err)
 	}
@@ -118,7 +119,7 @@ func (f *FileService) Mkdir(sessionID int64, path string) error {
 	if err := validateRemotePath(path); err != nil {
 		return fmt.Errorf("mkdir: %w", err)
 	}
-	wrapper, connID, err := f.connect(sessionID)
+	wrapper, connID, err := f.connect(context.Background(), sessionID)
 	if err != nil {
 		return fmt.Errorf("mkdir: %w", err)
 	}
@@ -141,7 +142,7 @@ func (f *FileService) Rename(sessionID int64, oldPath, newPath string) error {
 	if err := validateRemotePath(newPath); err != nil {
 		return fmt.Errorf("rename: %w", err)
 	}
-	wrapper, connID, err := f.connect(sessionID)
+	wrapper, connID, err := f.connect(context.Background(), sessionID)
 	if err != nil {
 		return fmt.Errorf("rename: %w", err)
 	}
@@ -157,11 +158,10 @@ func (f *FileService) Rename(sessionID int64, oldPath, newPath string) error {
 }
 
 // connect establishes a temporary SSH connection for a file operation.
-func (f *FileService) connect(sessionID int64) (*ssh.ClientWrapper, string, error) {
+func (f *FileService) connect(ctx context.Context, sessionID int64) (*ssh.ClientWrapper, string, error) {
 	if sessionID <= 0 {
 		return nil, "", fmt.Errorf("invalid session id")
 	}
-	ctx := context.Background()
 	connID, err := f.sessions.connect(ctx, sessionID, false)
 	if err != nil {
 		return nil, "", err
@@ -176,13 +176,6 @@ func (f *FileService) connect(sessionID int64) (*ssh.ClientWrapper, string, erro
 
 func (f *FileService) disconnect(connID string) {
 	_ = f.sessions.disconnect(connID, false)
-}
-
-func (f *FileService) removeTask(taskID string) {
-	f.mu.Lock()
-	delete(f.tasks, taskID)
-	delete(f.taskSessions, taskID)
-	f.mu.Unlock()
 }
 
 func (f *FileService) createTransfer(taskID string, sessionID int64, direction, sourcePath, targetPath string) error {

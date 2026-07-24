@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 	"log/slog"
 	"net"
@@ -44,19 +43,23 @@ type PasswordVerifier interface {
 }
 
 type SessionService struct {
-	db        *sql.DB
-	mu        sync.RWMutex
-	conns     map[string]*managedConn
-	attempts  map[string]*connectAttempt
-	eventBus  EventBus
-	keepAlive int
-	dataDir   string
-	crypto    KeyCrypto
-	logger    *slog.Logger
-	passwords PasswordVerifier
-	tunnels   SessionTunnelStopper
-	transfers SessionTransferCanceller
-	terminals SessionTerminalCloser
+	db           *sql.DB
+	mu           sync.RWMutex
+	closeMu      sync.Mutex
+	conns        map[string]*managedConn
+	attempts     map[string]*connectAttempt
+	connectWG    sync.WaitGroup
+	closing      bool
+	shuttingDown bool
+	eventBus     EventBus
+	keepAlive    int
+	dataDir      string
+	crypto       KeyCrypto
+	logger       *slog.Logger
+	passwords    PasswordVerifier
+	tunnels      SessionTunnelStopper
+	transfers    SessionTransferCanceller
+	terminals    SessionTerminalCloser
 }
 
 type connectAttempt struct {
@@ -138,25 +141,10 @@ func (s *SessionService) ConnectionCount() int {
 }
 
 func (s *SessionService) CloseAll() error {
-	s.mu.Lock()
-	connections := make(map[string]*managedConn, len(s.conns))
-	for id, conn := range s.conns {
-		connections[id] = conn
+	if s == nil {
+		return nil
 	}
-	s.conns = make(map[string]*managedConn)
-	s.mu.Unlock()
-	var closeErr error
-	for id, conn := range connections {
-		if conn.cleanup != nil {
-			conn.cleanup()
-		}
-		if conn.wrapper != nil {
-			if err := conn.wrapper.Close(); err != nil {
-				closeErr = errors.Join(closeErr, fmt.Errorf("close connection %s: %w", id, err))
-			}
-		}
-	}
-	return closeErr
+	return s.closeAll(false)
 }
 
 func (s *SessionService) buildPasswordAuth(sess *model.Session) ([]gossh.AuthMethod, error) {

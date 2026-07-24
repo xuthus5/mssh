@@ -73,7 +73,7 @@ func TestSyncEnginePushNoopConflictAndResolveCloud(t *testing.T) {
 
 	_, err = store.CreateSession(db, model.Session{Name: "local-change", Host: "127.0.0.2", Port: 22, Username: "root", AuthMethod: model.AuthPassword, KeepAlive: 30, TermType: "xterm"})
 	require.NoError(t, err)
-	provider.remote = remoteArtifactForTest(t, "remote-change")
+	provider.remote = remoteArtifactForTest(t, service, "remote-change")
 	result, err = service.SyncNow()
 	require.NoError(t, err)
 	assert.Equal(t, model.SyncStateConflict, result.State)
@@ -109,7 +109,7 @@ func TestSyncEngineDownloadsRemoteOnlyChange(t *testing.T) {
 	require.NoError(t, err)
 	_, err = service.SyncNow()
 	require.NoError(t, err)
-	provider.remote = remoteArtifactForTest(t, "remote-only")
+	provider.remote = remoteArtifactForTest(t, service, "remote-only")
 
 	result, err := service.SyncNow()
 	require.NoError(t, err)
@@ -129,14 +129,14 @@ func TestSyncEngineManualDirectionsAndLocalConflictResolution(t *testing.T) {
 	require.NoError(t, err)
 	_, err = service.PushNow()
 	require.NoError(t, err)
-	provider.remote = remoteArtifactForTest(t, "pulled")
+	provider.remote = remoteArtifactForTest(t, service, "pulled")
 	_, err = service.PullNow()
 	require.NoError(t, err)
 	assert.Equal(t, []string{"pulled"}, syncSessionNames(t, db))
 
 	_, err = store.CreateSession(db, model.Session{Name: "local-change", Host: "127.0.0.2", Port: 22, Username: "root", AuthMethod: model.AuthPassword, KeepAlive: 30, TermType: "xterm"})
 	require.NoError(t, err)
-	provider.remote = remoteArtifactForTest(t, "remote-change")
+	provider.remote = remoteArtifactForTest(t, service, "remote-change")
 	result, err := service.SyncNow()
 	require.NoError(t, err)
 	assert.Equal(t, model.SyncStateConflict, result.State)
@@ -169,29 +169,26 @@ func TestSyncConflictUsesLogicalLocalVersionNumber(t *testing.T) {
 		Provider: model.SyncProviderWebDAV, Source: "test", FileName: "local.msshbackup", CreatedAt: time.Now().UTC(),
 	})
 	require.NoError(t, err)
-	remote := remoteArtifactForTest(t, "remote")
+	service := newTestSyncService(db, syncTestMasterKey)
+	remote := remoteArtifactForTest(t, service, "remote")
 	artifact, err := decodeSyncArtifact(remote.Content, syncTestMasterKey)
 	require.NoError(t, err)
-	service := newTestSyncService(db, syncTestMasterKey)
 	result, err := service.createConflict(defaultSyncConfig(), syncCurrentSnapshot{Fingerprint: "local-fingerprint"}, artifact, remote.ETag)
 	require.NoError(t, err)
 	require.NotNil(t, result.Conflict)
 	assert.Equal(t, int64(7), result.Conflict.Local.VersionNumber)
 }
 
-func remoteArtifactForTest(t *testing.T, sessionName string) syncRemoteObject {
+func remoteArtifactForTest(t *testing.T, service *SyncService, sessionName string) syncRemoteObject {
 	t.Helper()
-	db := testutil.NewTestDB(t)
-	_, err := store.CreateSession(db, model.Session{Name: sessionName, Host: "10.0.0.1", Port: 22, Username: "root", AuthMethod: model.AuthPassword, KeepAlive: 30, TermType: "xterm"})
+	baseline, err := service.loadBaseline(model.SyncProviderWebDAV)
 	require.NoError(t, err)
-	data, err := newTestSyncService(db, syncTestMasterKey).snapshot()
-	require.NoError(t, err)
-	fingerprint, err := snapshotFingerprint(data)
-	require.NoError(t, err)
-	metadata := syncArtifactMetadata{VersionID: "remote-version-" + sessionName, VersionNumber: 2, SnapshotFingerprint: fingerprint, CreatedAt: time.Now().UTC()}
-	content, err := encodeSyncArtifact(data, syncTestMasterKey, metadata, nil)
-	require.NoError(t, err)
-	return syncRemoteObject{Content: content, ETag: `"remote"`}
+	metadata := syncArtifactMetadata{VersionID: "remote-version-" + sessionName, VersionNumber: 1}
+	if baseline.VersionID != "" {
+		metadata.VersionNumber = baseline.VersionNumber + 1
+		metadata.ParentVersionID = baseline.VersionID
+	}
+	return versionedRemoteArtifactForTest(t, sessionName, metadata)
 }
 
 func syncTestConfigInput() model.SyncConfigInput {

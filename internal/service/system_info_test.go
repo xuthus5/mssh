@@ -162,7 +162,9 @@ func TestTerminalServiceSystemInfo(t *testing.T) {
 	sessionService := &SessionService{conns: map[string]*managedConn{"conn-1": {wrapper: &ssh.ClientWrapper{}}}}
 	service := NewTerminalService(sessionService, newMockEventBus(), 2, testutil.NewTestLogger())
 	service.connIDs["term-1"] = "conn-1"
+	service.systemMu.Lock()
 	service.systemSamples["term-1"] = systemSample{total: 100, idle: 40, received: 1024, transmitted: 2048, at: time.Now().Add(-time.Second)}
+	service.systemMu.Unlock()
 
 	info, err := service.SystemInfo("term-1")
 	require.NoError(t, err)

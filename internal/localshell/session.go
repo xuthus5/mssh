@@ -1,6 +1,7 @@
 package localshell
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"sync"
@@ -28,11 +29,22 @@ const maxPendingRead = 1 << 20
 
 // Open starts a local shell session with the given options.
 func Open(opts Options) (*Session, error) {
+	return OpenContext(context.Background(), opts)
+}
+
+// OpenContext starts a local shell while honoring cancellation during startup.
+func OpenContext(ctx context.Context, opts Options) (*Session, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	cfg, err := resolveOptions(opts)
 	if err != nil {
 		return nil, err
 	}
-	return openPlatform(cfg)
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	return openPlatformContext(ctx, cfg)
 }
 
 func (s *Session) Start() {
