@@ -93,3 +93,17 @@ describe('QuickCommands', () => {
     expect(button.className).toContain('sm:opacity-0')
   })
 })
+
+  it('keeps add form open when onAdd rejects', async () => {
+    const user = userEvent.setup()
+    const onAdd = vi.fn(async () => { throw new Error('create boom') })
+    render(<QuickCommands commands={[]} onExecute={vi.fn()} onAdd={onAdd} onDelete={vi.fn()} />)
+    await user.click(screen.getByRole('button'))
+    await user.type(screen.getByPlaceholderText('名称'), 'Deploy')
+    await user.type(screen.getByPlaceholderText('命令'), 'deploy')
+    await user.click(screen.getByRole('button', { name: '添加' }))
+    await waitFor(() => expect(onAdd).toHaveBeenCalled())
+    expect(screen.getByPlaceholderText('名称')).toHaveValue('Deploy')
+    expect(screen.getByPlaceholderText('命令')).toHaveValue('deploy')
+  })
+
