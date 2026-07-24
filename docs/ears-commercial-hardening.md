@@ -1402,3 +1402,10 @@
 | ID | 验收条件 | 状态 |
 |---|---|---|
 | UX-SPLIT-170 | 创建/关闭分屏失败仅 TerminalSplit 顶栏 banner 展示，不得 error toast；串口/上限仍可用 warning toast。 | done |
+
+## 2026-07-24 商用硬化波次（SFTP 传输启动与宏执行错误归属）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| UX-SFTP-171 | 上传/下载启动失败（含拖放）仅 FilePanel actionError banner 展示，`useFileTransfer` 不得 error toast。 | done |
+| UX-MACRO-172 | 侧栏/宏工作区执行宏失败仅对应固定 banner 展示，`executeMacroOnActiveTerminal` 不得 error toast；前置条件 info/warning 与成功 toast 可保留。 | done |

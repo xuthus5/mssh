@@ -86,6 +86,8 @@ describe('useFileTransfer', () => {
     expect(result.current.transfers[0]).toMatchObject({ sourcePath: '/remote/file.txt', targetPath: '/local/file.txt' })
   })
 
+
+
   it('cancelTransfer requests cancellation and keeps terminal state visible', async () => {
     __registerHandler('github.com/xuthus5/mssh/internal/service.FileService.Upload', async () => 'task-1')
     __registerHandler('github.com/xuthus5/mssh/internal/service.FileService.CancelTransfer', async () => {})
@@ -182,20 +184,16 @@ describe('useFileTransfer', () => {
 
   it('reports upload and download failures without creating transfers', async () => {
     const loggerError = vi.spyOn(logger, 'error').mockImplementation(() => {})
+    useToastStore.setState({ toasts: [] })
     __registerHandler('github.com/xuthus5/mssh/internal/service.FileService.Upload', async () => { throw new Error('upload denied') })
     __registerHandler('github.com/xuthus5/mssh/internal/service.FileService.Download', async () => { throw new Error('download denied') })
     const { result } = renderHook(() => useFileTransfer(SESSION_ID))
 
-    await act(async () => {
-      await result.current.upload('/local/a.txt', '/remote')
-      await result.current.download('/remote/b.txt', '/local/b.txt')
-    })
+    await expect(result.current.upload('/local/a.txt', '/remote')).rejects.toThrow('upload denied')
+    await expect(result.current.download('/remote/b.txt', '/local/b.txt')).rejects.toThrow('download denied')
 
     expect(result.current.transfers).toHaveLength(0)
-    expect(useToastStore.getState().toasts.map((item) => item.message)).toEqual([
-      '上传失败: upload denied',
-      '下载失败: download denied',
-    ])
+    expect(useToastStore.getState().toasts).toHaveLength(0)
     expect(loggerError).toHaveBeenCalledWith('upload error', expect.any(Error))
     expect(loggerError).toHaveBeenCalledWith('download error', expect.any(Error))
   })
