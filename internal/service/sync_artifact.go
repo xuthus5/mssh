@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	syncArtifactVersion = 1
+	syncArtifactVersion = 2
 	syncNetworkTimeout  = 20 * time.Second
 )
 
@@ -36,6 +36,12 @@ type syncArtifact struct {
 	Backup          backupcrypto.BackupEnvelope `json:"backup"`
 }
 
+type syncArtifactAuthentication struct {
+	ArtifactVersion int                     `json:"artifact_version"`
+	Metadata        syncArtifactMetadata    `json:"metadata"`
+	Vault           *backupcrypto.VaultFile `json:"vault,omitempty"`
+}
+
 type decodedSyncArtifact struct {
 	Data     ExportData
 	Metadata syncArtifactMetadata
@@ -48,7 +54,11 @@ func encodeSyncArtifact(data ExportData, masterKey string, metadata syncArtifact
 	if err != nil {
 		return nil, fmt.Errorf("encode sync snapshot: %w", err)
 	}
-	backup, err := backupcrypto.EncryptBackup(plaintext, []byte(masterKey))
+	additionalData, err := syncArtifactAdditionalData(syncArtifactVersion, metadata, vault)
+	if err != nil {
+		return nil, err
+	}
+	backup, err := backupcrypto.EncryptBackupWithAAD(plaintext, []byte(masterKey), additionalData)
 	if err != nil {
 		return nil, fmt.Errorf("encrypt sync snapshot: %w", err)
 	}
@@ -71,7 +81,11 @@ func decodeSyncArtifact(content []byte, masterKey string) (decodedSyncArtifact, 
 	if artifact.ArtifactVersion != syncArtifactVersion {
 		return decodedSyncArtifact{}, fmt.Errorf("unsupported sync artifact version %d", artifact.ArtifactVersion)
 	}
-	data, err := decryptSyncBackup(artifact.Backup, masterKey)
+	additionalData, err := syncArtifactAdditionalData(artifact.ArtifactVersion, artifact.Metadata, artifact.Vault)
+	if err != nil {
+		return decodedSyncArtifact{}, err
+	}
+	data, err := decryptSyncBackupAuthenticated(artifact.Backup, masterKey, additionalData)
 	if err != nil {
 		return decodedSyncArtifact{}, err
 	}
@@ -93,6 +107,9 @@ func peekSyncArtifactVault(content []byte) (*backupcrypto.VaultFile, error) {
 	}
 	if artifact.ArtifactVersion == 0 {
 		return nil, errSyncVaultMissing
+	}
+	if artifact.ArtifactVersion != syncArtifactVersion {
+		return nil, fmt.Errorf("unsupported sync artifact version %d", artifact.ArtifactVersion)
 	}
 	if artifact.Vault == nil {
 		return nil, errSyncVaultMissing
@@ -117,7 +134,11 @@ func decodeLegacySyncArtifact(content []byte, masterKey string) (decodedSyncArti
 }
 
 func decryptSyncBackup(envelope backupcrypto.BackupEnvelope, masterKey string) (ExportData, error) {
-	plaintext, err := backupcrypto.DecryptBackup(envelope, []byte(masterKey))
+	return decryptSyncBackupAuthenticated(envelope, masterKey, nil)
+}
+
+func decryptSyncBackupAuthenticated(envelope backupcrypto.BackupEnvelope, masterKey string, additionalData []byte) (ExportData, error) {
+	plaintext, err := backupcrypto.DecryptBackupWithAAD(envelope, []byte(masterKey), additionalData)
 	if err != nil {
 		return ExportData{}, err
 	}
@@ -126,6 +147,14 @@ func decryptSyncBackup(envelope backupcrypto.BackupEnvelope, masterKey string) (
 		return ExportData{}, err
 	}
 	return data, nil
+}
+
+func syncArtifactAdditionalData(version int, metadata syncArtifactMetadata, vault *backupcrypto.VaultFile) ([]byte, error) {
+	additionalData, err := json.Marshal(syncArtifactAuthentication{ArtifactVersion: version, Metadata: metadata, Vault: vault})
+	if err != nil {
+		return nil, fmt.Errorf("encode sync artifact authentication data: %w", err)
+	}
+	return additionalData, nil
 }
 
 func snapshotFingerprint(data ExportData) (string, error) {

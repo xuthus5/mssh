@@ -10,6 +10,7 @@ import (
 	appcrypto "github.com/xuthus5/mssh/internal/crypto"
 	"github.com/xuthus5/mssh/internal/model"
 	"github.com/xuthus5/mssh/internal/service/testutil"
+	"github.com/xuthus5/mssh/internal/store"
 )
 
 type syncTestCrypto struct{ key []byte }
@@ -46,6 +47,24 @@ func TestSyncConfigEncryptsProviderSecretsAndExcludesSyncSettings(t *testing.T) 
 	encoded, err := json.Marshal(snapshot.Tables["settings"])
 	require.NoError(t, err)
 	assert.NotContains(t, string(encoded), "sync.")
+}
+
+func TestSyncSnapshotAndRestoreKeepLocalSecurityRotationMarker(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	service := newTestSyncService(db, syncTestMasterKey)
+	require.NoError(t, store.SetSettings(db, []model.Setting{{
+		Key: securityRotationPendingSetting, Namespace: "security", Value: `{"version":1}`, ValueType: "object", Version: 1,
+	}}))
+
+	snapshot, err := service.snapshot()
+	require.NoError(t, err)
+	encoded, err := json.Marshal(snapshot.Tables["settings"])
+	require.NoError(t, err)
+	assert.NotContains(t, string(encoded), securityRotationPendingSetting)
+	require.NoError(t, service.restore(snapshot))
+	entry, err := store.GetSettingEntry(db, securityRotationPendingSetting)
+	require.NoError(t, err)
+	assert.NotNil(t, entry)
 }
 
 func TestValidateSyncConfigRejectsUnsupportedValues(t *testing.T) {

@@ -7,11 +7,13 @@ on:
 
 permissions:
   contents: write
+  id-token: write
+  attestations: write
 
 env:
-  GO_VERSION: '1.26.x'
-  NODE_VERSION: '20'
   WAILS_VERSION: 'v3.0.0-alpha2.117'
+  SYFT_VERSION: 'v1.49.0'
+  COSIGN_VERSION: 'v3.1.2'
 
 jobs:
   linux:
@@ -31,16 +33,22 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version-file: .go-version
       - uses: actions/setup-node@v4
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version-file: .node-version
       - name: Install Linux package tooling
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential pkg-config libgtk-4-dev libwebkitgtk-6.0-dev libwebkitgtk-6.0-4 rpm file libfuse2 fuse3 desktop-file-utils wget flatpak flatpak-builder ostree appstream
+          sudo apt-get install -y build-essential pkg-config libgtk-4-dev libwebkitgtk-6.0-dev libwebkitgtk-6.0-4 rpm file libfuse2 fuse3 desktop-file-utils wget flatpak flatpak-builder ostree appstream jq
       - name: Install Wails CLI
-        run: go install github.com/wailsapp/wails/v3/cmd/wails3@${{ env.WAILS_VERSION }}
+        run: go install github.com/wailsapp/wails/v3/cmd/wails3@$(tr -d '\r\n' < .wails-version)
+      - name: Verify pinned toolchain
+        run: |
+          set -euo pipefail
+          test "$(go version | awk '{print $3}' | sed 's/^go//')" = "$(tr -d '\r\n' < .go-version)"
+          test "$(node --version | sed 's/^v//')" = "$(tr -d '\r\n' < .node-version)"
+          test "$(wails3 version 2>&1 | tr -d '\r')" = "$(tr -d '\r\n' < .wails-version)"
       - name: Resolve version
         id: version
         run: |
@@ -66,14 +74,9 @@ jobs:
           wails3 task linux:generate:dotdesktop
           wails3 task linux:generate:deb ARCH=${{ matrix.goarch }} APP_VERSION=${APP_VERSION}
           wails3 task linux:generate:rpm ARCH=${{ matrix.goarch }} APP_VERSION=${APP_VERSION}
-
-          # AppImage is a required Linux release asset.
           wails3 task linux:create:appimage ARCH=${{ matrix.goarch }} APP_VERSION=${APP_VERSION}
-
-          # Flatpak bundle (GNOME Platform). Soft-fail if runtime pull/build is unavailable in the runner.
-          wails3 task linux:create:flatpak ARCH=${{ matrix.goarch }} APP_VERSION=${APP_VERSION} || {
-            echo "WARNING: Flatpak packaging failed; continuing release without .flatpak" >&2
-          }
+          bash build/linux/flatpak/validate.sh
+          wails3 task linux:create:flatpak ARCH=${{ matrix.goarch }} APP_VERSION=${APP_VERSION}
       - name: Collect artifacts
         run: |
           set -euo pipefail
@@ -81,6 +84,7 @@ jobs:
           ARCH="${{ matrix.arch }}"
           mkdir -p dist
           cp "bin/mssh" "dist/mssh-${VERSION}-linux-${ARCH}"
+          test -s "dist/mssh-${VERSION}-linux-${ARCH}"
 
           # Normalize package filenames so release assets include version + arch.
           mapfile -t debs < <(find bin -maxdepth 1 -type f -name '*.deb' | sort)
@@ -89,7 +93,7 @@ jobs:
 
           if [[ ${#debs[@]} -eq 0 || ${#rpms[@]} -eq 0 ]]; then
             echo "Missing deb/rpm packages in bin/" >&2
-            ls -la bin || true
+            ls -la bin
             exit 1
           fi
 
@@ -111,7 +115,7 @@ jobs:
           fi
           if [[ -z "${appimage_src}" ]]; then
             echo "Missing AppImage in bin/" >&2
-            ls -la bin || true
+            ls -la bin
             exit 1
           fi
           cp "${appimage_src}" "dist/mssh-${VERSION}-linux-${ARCH}.AppImage"
@@ -129,12 +133,13 @@ jobs:
               esac
             done
           fi
-          if [[ -n "${flatpak_src}" ]]; then
-            cp "${flatpak_src}" "dist/mssh-${VERSION}-linux-${ARCH}.flatpak"
-          else
-            echo "WARNING: Flatpak bundle missing in bin/" >&2
-            ls -la bin || true
+          if [[ -z "${flatpak_src}" ]]; then
+            echo "Flatpak bundle missing in bin/" >&2
+            ls -la bin
+            exit 1
           fi
+          cp "${flatpak_src}" "dist/mssh-${VERSION}-linux-${ARCH}.flatpak"
+          test -s "dist/mssh-${VERSION}-linux-${ARCH}.flatpak"
 
           ls -la bin dist
       - uses: actions/upload-artifact@v4
@@ -158,15 +163,22 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version-file: .go-version
       - uses: actions/setup-node@v4
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version-file: .node-version
       - name: Install NSIS
         run: choco install nsis -y
       - name: Install Wails CLI
         shell: bash
-        run: go install github.com/wailsapp/wails/v3/cmd/wails3@${{ env.WAILS_VERSION }}
+        run: go install github.com/wailsapp/wails/v3/cmd/wails3@$(tr -d '\r\n' < .wails-version)
+      - name: Verify pinned toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(go version | awk '{print $3}' | sed 's/^go//')" = "$(tr -d '\r\n' < .go-version)"
+          test "$(node --version | sed 's/^v//')" = "$(tr -d '\r\n' < .node-version)"
+          test "$(wails3 version 2>&1 | tr -d '\r')" = "$(tr -d '\r\n' < .wails-version)"
       - name: Resolve version
         id: version
         shell: bash
@@ -180,26 +192,36 @@ jobs:
           VERSION="${{ steps.version.outputs.version }}"
           sed -i "s/\"0.1.0\"/\"${VERSION}\"/g" build/windows/info.json
           sed -i "s/version=\"0.1.0\"/version=\"${VERSION}\"/" build/windows/wails.exe.manifest
-          sed -i "s/!define INFO_PRODUCTVERSION \"0.1.0\"/!define INFO_PRODUCTVERSION \"${VERSION}\"/" build/windows/nsis/wails_tools.nsh || true
+          if grep -q '!define INFO_PRODUCTVERSION "0.1.0"' build/windows/nsis/wails_tools.nsh; then
+            sed -i "s/!define INFO_PRODUCTVERSION \"0.1.0\"/!define INFO_PRODUCTVERSION \"${VERSION}\"/" build/windows/nsis/wails_tools.nsh
+          fi
       - name: Build and package
         shell: bash
         env:
           APP_VERSION: ${{ steps.version.outputs.version }}
         run: |
+          set -euo pipefail
+          command -v makensis >/dev/null
           wails3 task windows:build ARCH=${{ matrix.goarch }} PRODUCTION=true APP_VERSION=${APP_VERSION}
-          # NSIS installer if makensis is available
-          if command -v makensis >/dev/null 2>&1; then
-            wails3 task windows:create:nsis:installer ARCH=${{ matrix.goarch }} APP_VERSION=${APP_VERSION} || true
-          fi
+          wails3 task windows:create:nsis:installer ARCH=${{ matrix.goarch }} APP_VERSION=${APP_VERSION}
       - name: Collect artifacts
         shell: bash
         run: |
+          set -euo pipefail
           VERSION="${{ steps.version.outputs.version }}"
           ARCH="${{ matrix.arch }}"
           mkdir -p dist
-          if [ -f "bin/mssh.exe" ]; then cp "bin/mssh.exe" "dist/mssh-${VERSION}-windows-${ARCH}.exe"; fi
-          find bin -maxdepth 1 -type f -name '*installer*.exe' -exec cp {} dist/ \; || true
-          ls -la bin dist || true
+          test -s "bin/mssh.exe"
+          cp "bin/mssh.exe" "dist/mssh-${VERSION}-windows-${ARCH}.exe"
+          mapfile -t installers < <(find bin -maxdepth 1 -type f -iname '*installer*.exe' | sort)
+          if ((${#installers[@]} != 1)); then
+            echo "expected exactly one NSIS installer, found ${#installers[@]}" >&2
+            ls -la bin
+            exit 1
+          fi
+          cp "${installers[0]}" "dist/mssh-${VERSION}-windows-${ARCH}-installer.exe"
+          test -s "dist/mssh-${VERSION}-windows-${ARCH}-installer.exe"
+          ls -la bin dist
       - uses: actions/upload-artifact@v4
         with:
           name: windows-${{ matrix.arch }}
@@ -221,12 +243,18 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version-file: .go-version
       - uses: actions/setup-node@v4
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version-file: .node-version
       - name: Install Wails CLI
-        run: go install github.com/wailsapp/wails/v3/cmd/wails3@${{ env.WAILS_VERSION }}
+        run: go install github.com/wailsapp/wails/v3/cmd/wails3@$(tr -d '\r\n' < .wails-version)
+      - name: Verify pinned toolchain
+        run: |
+          set -euo pipefail
+          test "$(go version | awk '{print $3}' | sed 's/^go//')" = "$(tr -d '\r\n' < .go-version)"
+          test "$(node --version | sed 's/^v//')" = "$(tr -d '\r\n' < .node-version)"
+          test "$(wails3 version 2>&1 | tr -d '\r')" = "$(tr -d '\r\n' < .wails-version)"
       - name: Resolve version
         id: version
         run: |
@@ -249,13 +277,14 @@ jobs:
           wails3 task darwin:package ARCH=${{ matrix.arch }} PRODUCTION=true APP_VERSION=${APP_VERSION}
       - name: Collect artifacts
         run: |
+          set -euo pipefail
           VERSION="${{ steps.version.outputs.version }}"
           ARCH="${{ matrix.arch }}"
           mkdir -p dist
-          if [ -d "bin/mssh.app" ]; then
-            ditto -c -k --sequesterRsrc --keepParent "bin/mssh.app" "dist/mssh-${VERSION}-darwin-${ARCH}.app.zip"
-          fi
-          ls -la bin dist || true
+          test -d "bin/mssh.app"
+          ditto -c -k --sequesterRsrc --keepParent "bin/mssh.app" "dist/mssh-${VERSION}-darwin-${ARCH}.app.zip"
+          test -s "dist/mssh-${VERSION}-darwin-${ARCH}.app.zip"
+          ls -la bin dist
       - uses: actions/upload-artifact@v4
         with:
           name: darwin-${{ matrix.arch }}
@@ -274,13 +303,93 @@ jobs:
           path: release-assets
       - name: Flatten artifacts
         run: |
+          set -euo pipefail
           mkdir -p upload
           find release-assets -type f -print -exec cp {} upload/ \;
           ls -la upload
+          test "$(find upload -maxdepth 1 -type f | wc -l)" -gt 0
+      - name: Install release security tools
+        env:
+          SYFT_VERSION: ${{ env.SYFT_VERSION }}
+          COSIGN_VERSION: ${{ env.COSIGN_VERSION }}
+        run: |
+          set -euo pipefail
+          tool_dir="${RUNNER_TEMP}/release-tools"
+          mkdir -p "${tool_dir}"
+          syft_archive="syft_${SYFT_VERSION#v}_linux_amd64.tar.gz"
+          curl --fail --silent --show-error --location \
+            "https://github.com/anchore/syft/releases/download/${SYFT_VERSION}/${syft_archive}" \
+            --output "${tool_dir}/${syft_archive}"
+          curl --fail --silent --show-error --location \
+            "https://github.com/anchore/syft/releases/download/${SYFT_VERSION}/syft_${SYFT_VERSION#v}_checksums.txt" \
+            --output "${tool_dir}/syft_checksums.txt"
+          (cd "${tool_dir}" && grep "  ${syft_archive}$" syft_checksums.txt | sha256sum -c -)
+          tar -xzf "${tool_dir}/${syft_archive}" -C "${tool_dir}" syft
+
+          cosign_binary="cosign-linux-amd64"
+          curl --fail --silent --show-error --location \
+            "https://github.com/sigstore/cosign/releases/download/${COSIGN_VERSION}/${cosign_binary}" \
+            --output "${tool_dir}/${cosign_binary}"
+          curl --fail --silent --show-error --location \
+            "https://github.com/sigstore/cosign/releases/download/${COSIGN_VERSION}/cosign_checksums.txt" \
+            --output "${tool_dir}/cosign_checksums.txt"
+          (cd "${tool_dir}" && grep "  ${cosign_binary}$" cosign_checksums.txt | sha256sum -c -)
+          chmod 0755 "${tool_dir}/syft" "${tool_dir}/${cosign_binary}"
+          mv "${tool_dir}/${cosign_binary}" "${tool_dir}/cosign"
+          echo "${tool_dir}" >> "${GITHUB_PATH}"
+      - name: Generate and verify release metadata
+        env:
+          RELEASE_VERSION: ${{ github.ref_name }}
+          RELEASE_COMMIT: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          RELEASE_VERSION="${RELEASE_VERSION#v}" bash scripts/release/prepare-metadata.sh upload
+          checksum_file="upload/mssh-${RELEASE_VERSION#v}-SHA256SUMS"
+          test -s "${checksum_file}"
+          (cd upload && sha256sum -c "$(basename "${checksum_file}")")
+      - name: Sign release metadata
+        env:
+          RELEASE_VERSION: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          version="${RELEASE_VERSION#v}"
+          cosign sign-blob --yes \
+            --bundle "upload/mssh-${version}-SHA256SUMS.sigstore.json" \
+            "upload/mssh-${version}-SHA256SUMS"
+          cosign sign-blob --yes \
+            --bundle "upload/mssh-${version}-provenance.json.sigstore.json" \
+            "upload/mssh-${version}-provenance.json"
+          jq -e '.messageSignature.signature and .verificationMaterial' \
+            "upload/mssh-${version}-SHA256SUMS.sigstore.json" >/dev/null
+          jq -e '.messageSignature.signature and .verificationMaterial' \
+            "upload/mssh-${version}-provenance.json.sigstore.json" >/dev/null
+      - name: Verify release metadata signatures
+        env:
+          RELEASE_VERSION: ${{ github.ref_name }}
+          RELEASE_REPOSITORY: ${{ github.repository }}
+          RELEASE_REF: refs/tags/${{ github.ref_name }}
+          RELEASE_WORKFLOW: ${{ github.workflow }}
+        run: |
+          set -euo pipefail
+          version="${RELEASE_VERSION#v}"
+          for subject in SHA256SUMS provenance.json; do
+            cosign verify-blob \
+              --bundle "upload/mssh-${version}-${subject}.sigstore.json" \
+              --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+              --certificate-github-workflow-repository "${RELEASE_REPOSITORY}" \
+              --certificate-github-workflow-ref "${RELEASE_REF}" \
+              --certificate-github-workflow-name "${RELEASE_WORKFLOW}" \
+              "upload/mssh-${version}-${subject}"
+          done
+      - name: Attest release subjects
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: upload/*
       - name: Recreate GitHub Release shell
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          set -euo pipefail
           if gh release view "${{ github.ref_name }}" >/dev/null 2>&1; then
             gh release delete "${{ github.ref_name }}" --yes
           fi

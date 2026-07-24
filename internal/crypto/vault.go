@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"golang.org/x/crypto/argon2"
+
+	"github.com/xuthus5/mssh/internal/fsutil"
 )
 
 const (
@@ -136,16 +138,28 @@ func SaveVaultFile(path string, vault VaultFile) error {
 		return fmt.Errorf("encode vault: %w", err)
 	}
 	payload = append(payload, '\n')
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, payload, 0o600); err != nil {
+	temporary, err := os.CreateTemp(dir, ".mssh-vault-*.tmp")
+	if err != nil {
 		return fmt.Errorf("write vault temp: %w", err)
 	}
-	if err := os.Chmod(tmp, 0o600); err != nil {
-		_ = os.Remove(tmp)
+	temporaryPath := temporary.Name()
+	defer func() { _ = os.Remove(temporaryPath) }()
+	if err := temporary.Chmod(0o600); err != nil {
+		_ = temporary.Close()
 		return fmt.Errorf("secure vault temp: %w", err)
 	}
-	if err := os.Rename(tmp, path); err != nil {
-		_ = os.Remove(tmp)
+	if _, err := temporary.Write(payload); err != nil {
+		_ = temporary.Close()
+		return fmt.Errorf("write vault temp: %w", err)
+	}
+	if err := temporary.Sync(); err != nil {
+		_ = temporary.Close()
+		return fmt.Errorf("sync vault temp: %w", err)
+	}
+	if err := temporary.Close(); err != nil {
+		return fmt.Errorf("close vault temp: %w", err)
+	}
+	if err := fsutil.ReplaceFile(temporaryPath, path); err != nil {
 		return fmt.Errorf("replace vault: %w", err)
 	}
 	return nil

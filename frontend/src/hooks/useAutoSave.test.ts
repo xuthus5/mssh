@@ -42,9 +42,16 @@ describe('useAutoSave', () => {
       { initialProps: { value: 1 } },
     )
     rerender({ value: 2 })
+    expect(onSave).not.toHaveBeenCalled()
     rerender({ value: 3 })
+    expect(onSave).not.toHaveBeenCalled()
     await act(async () => {
-      vi.advanceTimersByTime(200)
+      vi.advanceTimersByTime(199)
+      await Promise.resolve()
+    })
+    expect(onSave).not.toHaveBeenCalled()
+    await act(async () => {
+      vi.advanceTimersByTime(1)
       await Promise.resolve()
     })
     expect(onSave).toHaveBeenCalledTimes(1)
@@ -97,4 +104,20 @@ describe('useAutoSave', () => {
     expect(onSave).toHaveBeenCalledWith({ name: 'user-edit' })
   })
 
+  it('flushes a pending edit when the owner unmounts', async () => {
+    const onSave = vi.fn(async () => {})
+    const { rerender, unmount } = renderHook(
+      ({ value }) => useAutoSave({ value, onSave, delayMs: 500 }),
+      { initialProps: { value: 'initial' } },
+    )
+
+    rerender({ value: 'pending' })
+    await act(async () => {
+      unmount()
+      await Promise.resolve()
+    })
+
+    expect(onSave).toHaveBeenCalledOnce()
+    expect(onSave).toHaveBeenCalledWith('pending')
+  })
 })

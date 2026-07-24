@@ -29,13 +29,13 @@ dev_mode:
       - "*.go"
     git_ignore: true
   executes:
-    - cmd: npm install
+    - cmd: npm ci
       dir: frontend
       type: once
     - cmd: npm run dev
       dir: frontend
       type: background
-    - cmd: go mod tidy
+    - cmd: go mod tidy -diff
       type: blocking
     - cmd: go run .
       type: primary

@@ -1,11 +1,18 @@
 import { Events } from '@wailsio/runtime'
-import { useAppStore } from '@/store/appStore'
+import { useAppStore, type AppState } from '@/store/appStore'
 import { useConnectDialog } from '@/store/connectDialog'
 import { FileService } from '@/lib/wails'
 import { logger } from '@/lib/logger'
 import { t } from '@/i18n'
 import { mapBackendTransferJobs } from '@/lib/transferDTO'
-import { maybeAutoReconnectTerminal, type ReconnectSession } from '@/hooks/sessionReconnect'
+import {
+  maybeAutoReconnectTerminal,
+  TERMINAL_CLOSED_SPLIT_PANE_EVENT,
+  type ReconnectSession,
+  type TerminalClosedSplitPaneDetail,
+} from '@/hooks/sessionReconnect'
+import { releaseAppTerminalOpenReservation } from '@/lib/openTerminal'
+import { scrubTerminalRuntime } from '@/store/terminalTabPanes'
 
 
 interface EventEnvelope<T> { data?: T }
@@ -56,12 +63,43 @@ function handleSessionState(event: EventEnvelope<ConnectionPayload>) {
   }
 }
 
+function secondaryTabForTerminal(state: AppState, terminalID: string) {
+  return state.tabs.find((item) => item.type === 'terminal'
+    && item.terminalId !== terminalID
+    && (item.splitPaneIDs ?? []).includes(terminalID))
+}
+
+function scrubClosedSecondary(state: AppState, tabID: string, terminalID: string): Partial<AppState> {
+  const tabs = state.tabs.map((item) => {
+    if (item.id !== tabID || item.type !== 'terminal') return item
+    return {
+      ...item,
+      splitPaneIDs: item.splitPaneIDs?.filter((paneID) => paneID !== terminalID),
+      splitLayout: null,
+    }
+  })
+  return { tabs, ...scrubTerminalRuntime(state, [terminalID]) }
+}
+
+function notifyClosedSecondary(tabID: string, terminalID: string) {
+  if (typeof window === 'undefined') return
+  window.dispatchEvent(new CustomEvent<TerminalClosedSplitPaneDetail>(TERMINAL_CLOSED_SPLIT_PANE_EVENT, {
+    detail: { tabID, terminalID },
+  }))
+}
+
 function handleTerminalClosed(event: EventEnvelope<ConnectionPayload>) {
-  const terminalId = event.data?.terminal_id
-  if (!terminalId) return
+	const terminalId = event.data?.terminal_id
+	if (!terminalId) return
+	releaseAppTerminalOpenReservation(terminalId)
   const state = useAppStore.getState()
   const tab = state.tabs.find((item) => item.type === 'terminal' && item.terminalId === terminalId)
   if (tab) state.removeTabLocal(tab.id)
+  if (tab) return
+  const secondaryTab = secondaryTabForTerminal(state, terminalId)
+  if (!secondaryTab) return
+	useAppStore.setState((current) => scrubClosedSecondary(current, secondaryTab.id, terminalId))
+  notifyClosedSecondary(secondaryTab.id, terminalId)
 }
 
 function handleTunnelState(event: EventEnvelope<ConnectionPayload>) {

@@ -64,7 +64,7 @@ func chatAnthropicNativeSearch(ctx context.Context, client *http.Client, profile
 }
 
 func chatGeminiNativeSearch(ctx context.Context, client *http.Client, profile model.AIProviderProfile, apiKey string, input aiChatInput) (string, error) {
-	endpoint := fmt.Sprintf("%s/v1beta/models/%s:generateContent?key=%s", providerBaseURL(profile), url.PathEscape(profile.DefaultModel), url.QueryEscape(apiKey))
+	endpoint := fmt.Sprintf("%s/v1beta/models/%s:generateContent", providerBaseURL(profile), url.PathEscape(profile.DefaultModel))
 	payload := map[string]any{"systemInstruction": map[string]any{"parts": []map[string]string{{"text": input.System}}}, "contents": []map[string]any{{"parts": []map[string]string{{"text": userAIContent(input)}}}}, "tools": []map[string]any{{"google_search": map[string]any{}}}}
 	var response struct {
 		Candidates []struct {
@@ -75,7 +75,7 @@ func chatGeminiNativeSearch(ctx context.Context, client *http.Client, profile mo
 			} `json:"content"`
 		} `json:"candidates"`
 	}
-	if err := postJSON(ctx, client, endpoint, "", "", payload, &response); err != nil {
+	if err := postJSON(ctx, client, endpoint, apiKey, "gemini", payload, &response); err != nil {
 		return "", err
 	}
 	if len(response.Candidates) == 0 || len(response.Candidates[0].Content.Parts) == 0 {

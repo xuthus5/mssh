@@ -24,7 +24,7 @@ func UpdateTransferProgress(db *sql.DB, id string, transferred, total, speed, et
 }
 
 func updateTransferProgressOnce(db *sql.DB, id string, transferred, total, speed, eta int64) error {
-	_, err := db.Exec(`UPDATE transfer_jobs SET status='running', transferred_bytes=?, total_bytes=?, speed=?, eta=? WHERE id=?`, transferred, total, speed, eta, id)
+	_, err := db.Exec(`UPDATE transfer_jobs SET status='running', transferred_bytes=?, total_bytes=?, speed=?, eta=? WHERE id=? AND status IN ('queued','running')`, transferred, total, speed, eta, id)
 	if err != nil {
 		return fmt.Errorf("update transfer job: %w", err)
 	}

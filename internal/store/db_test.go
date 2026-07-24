@@ -30,6 +30,14 @@ func TestOpenDB(t *testing.T) {
 	assert.Equal(t, 1, foreignKeys)
 }
 
+func TestOpenDBUsesSingleConnection(t *testing.T) {
+	db, err := OpenDB(t.TempDir())
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, db.Close()) })
+
+	assert.Equal(t, databaseMaxOpenConnections, db.Stats().MaxOpenConnections)
+}
+
 func TestDatabaseFormatVersion(t *testing.T) {
 	assert.Equal(t, 5, databaseFormatVersion)
 }

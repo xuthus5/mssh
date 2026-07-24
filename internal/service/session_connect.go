@@ -17,9 +17,11 @@ const defaultKeepAliveSettingKey = "terminal.default_keep_alive"
 
 func (s *SessionService) connect(ctx context.Context, sessionID int64, emitState bool) (string, error) {
 	s.logger.Info("connecting to session", "sessionID", sessionID)
-	connectCtx, cancel := context.WithCancel(ctx)
-	attemptID := s.registerConnectAttempt(sessionID, cancel)
-	defer s.finishConnectAttempt(attemptID)
+	connectCtx, attemptID, finish, err := s.beginConnect(ctx, sessionID)
+	if err != nil {
+		return "", fmt.Errorf("connect: %w", err)
+	}
+	defer finish()
 	s.eventBus.Emit(event.ConnectionAttempt, event.ConnectionStatePayload{AttemptID: attemptID, State: "connecting"})
 	sess, err := s.sessionForConnect(sessionID)
 	if err != nil {

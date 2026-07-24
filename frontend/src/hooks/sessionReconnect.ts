@@ -3,7 +3,7 @@ import { logger } from '@/lib/logger'
 import { useConnectDialog } from '@/store/connectDialog'
 import { useAppStore } from '@/store/appStore'
 import { toast } from '@/components/ui/toast'
-import { openTerminalWithPoolCapacity } from '@/lib/openTerminal'
+import { openTerminalWithPoolCapacity, releaseAppTerminalOpenReservation } from '@/lib/openTerminal'
 import { useTerminalBehaviorStore } from '@/store/terminalBehaviorStore'
 import { t } from '@/i18n'
 
@@ -20,8 +20,10 @@ const intentionalDisconnects = new Set<string>()
 const intentionalDisconnectTimers = new Map<string, ReturnType<typeof setTimeout>>()
 
 export const RECONNECT_SPLIT_PANE_EVENT = 'mssh:reconnect-split-pane' as const
+export const TERMINAL_CLOSED_SPLIT_PANE_EVENT = 'mssh:terminal-closed-split-pane' as const
 
 export type ReconnectSplitPaneDetail = { tabID: string; terminalID: string }
+export type TerminalClosedSplitPaneDetail = { tabID: string; terminalID: string }
 
 /** Mark a terminal close as user-initiated so auto-reconnect is skipped. */
 export function markIntentionalDisconnect(terminalId: string) {
@@ -79,7 +81,8 @@ function currentReconnectTarget(tabId: string, sessions: ReconnectSession[]) {
 }
 
 async function closeStaleTerminal(terminalId: string) {
-  try {
+	releaseAppTerminalOpenReservation(terminalId)
+	try {
     await TerminalService.Close(terminalId)
   } catch (error: unknown) {
     logger.error('reconnect stale terminal cleanup failed', error)
@@ -136,7 +139,7 @@ export async function reconnectSessionTab(tabId: string, sessions: ReconnectSess
             return TerminalService.OpenLocal(terminal?.cols ?? 80, terminal?.rows ?? 24)
           }
           return TerminalService.Open(Number(session.id), terminal?.cols ?? 80, terminal?.rows ?? 24)
-        })
+        }, { replacementTerminalID: terminalId })
         if (
           controller.signal.aborted
           || !useAppStore.getState().replaceTerminalConnection(tabId, terminalId, nextTerminalId)

@@ -41,9 +41,11 @@ func TestSecureHTTPRedirectBlocksMetadataAndStripsAuth(t *testing.T) {
 	require.NoError(t, err)
 	next.Header.Set("Authorization", "Bearer secret")
 	next.Header.Set("X-API-KEY", "k")
+	next.Header.Set("X-Goog-Api-Key", "gemini-key")
 	require.NoError(t, secureHTTPRedirect(next, []*http.Request{viaReq}))
 	assert.Empty(t, next.Header.Get("Authorization"))
 	assert.Empty(t, next.Header.Get("X-API-KEY"))
+	assert.Empty(t, next.Header.Get("X-Goog-Api-Key"))
 }
 
 func TestSecureHTTPRedirectLimitsHops(t *testing.T) {

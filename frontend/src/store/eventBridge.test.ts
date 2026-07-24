@@ -1,9 +1,10 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useToastStore } from '@/components/ui/toast'
 import { __clearHandlers, __emitEvent, __registerHandler } from '@/test/__mocks__/wails-runtime'
 import { restoreTransfers, startEventBridge } from '@/store/eventBridge'
 import { useAppStore } from '@/store/appStore'
 import { useConnectDialog } from '@/store/connectDialog'
+import { TERMINAL_CLOSED_SPLIT_PANE_EVENT } from '@/hooks/sessionReconnect'
 
 describe('eventBridge', () => {
   beforeEach(() => {
@@ -54,6 +55,37 @@ describe('eventBridge', () => {
     stop()
     __emitEvent('tunnel:state', { data: { terminal_id: 'tunnel-9', state: 'stopped' } })
     expect(useAppStore.getState().tunnelState['9']).toBe('running')
+  })
+
+  it('notifies the owning split when a secondary terminal closes', () => {
+    useAppStore.setState({
+      tabs: [{
+        id: 'tab-split', title: 'split', type: 'terminal', terminalId: 'term-primary', sessionId: 1,
+        splitPaneIDs: ['term-primary', 'term-secondary'],
+      }],
+      terminalPool: new Map([['term-secondary', { terminal: {} as never, lastUsed: 1 }]]),
+      connectionStatus: { 'term-secondary': 'connected' },
+      recordingState: { 'term-secondary': 'recording' },
+      terminalOpenReservations: new Set(['term-secondary']),
+    })
+    const onClosed = vi.fn()
+    window.addEventListener(TERMINAL_CLOSED_SPLIT_PANE_EVENT, onClosed)
+    const stop = startEventBridge()
+
+    __emitEvent('terminal:closed', { data: { terminal_id: 'term-secondary' } })
+
+    expect(onClosed).toHaveBeenCalledOnce()
+    expect(onClosed.mock.calls[0][0]).toMatchObject({
+      detail: { tabID: 'tab-split', terminalID: 'term-secondary' },
+    })
+    expect(useAppStore.getState().tabs[0]).toMatchObject({ splitPaneIDs: ['term-primary'] })
+    expect(useAppStore.getState().terminalPool.has('term-secondary')).toBe(false)
+    expect(useAppStore.getState().connectionStatus['term-secondary']).toBeUndefined()
+    expect(useAppStore.getState().recordingState['term-secondary']).toBeUndefined()
+    expect(useAppStore.getState().terminalOpenReservations).toEqual(new Set())
+
+    stop()
+    window.removeEventListener(TERMINAL_CLOSED_SPLIT_PANE_EVENT, onClosed)
   })
 
   it('maps connection states and ignores incomplete events', () => {

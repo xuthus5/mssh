@@ -15,10 +15,22 @@ func (s *SyncService) StartScheduler() {
 
 //wails:ignore
 func (s *SyncService) StopScheduler() {
+	if s == nil {
+		return
+	}
 	s.schedulerMu.Lock()
+	s.schedulerStopped = true
+	if s.schedulerStop != nil {
+		s.schedulerStop()
+		s.schedulerStop = nil
+	}
+	s.stopSchedulerLocked()
+	s.schedulerMu.Unlock()
+}
+
+func (s *SyncService) stopSchedulerLocked() {
 	cancel := s.schedulerCancel
 	s.schedulerCancel = nil
-	s.schedulerMu.Unlock()
 	if cancel != nil {
 		cancel()
 	}
@@ -33,20 +45,41 @@ func (s *SyncService) NotifyVaultUnlocked() {
 	if s == nil {
 		return
 	}
-	go s.runScheduledSync(context.Background())
+	s.schedulerMu.Lock()
+	if s.schedulerStopped {
+		s.schedulerMu.Unlock()
+		return
+	}
+	s.schedulerWG.Add(1)
+	ctx := s.schedulerContext
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	s.schedulerMu.Unlock()
+	go func() {
+		defer s.schedulerWG.Done()
+		s.runScheduledSync(ctx)
+	}()
 }
 
 func (s *SyncService) restartScheduler() {
-	s.StopScheduler()
+	s.schedulerMu.Lock()
+	defer s.schedulerMu.Unlock()
+	if s.schedulerStopped {
+		return
+	}
+	s.stopSchedulerLocked()
 	config, err := s.LoadConfig()
 	if err != nil || !config.Enabled || config.IntervalMinutes == 0 {
 		return
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	s.schedulerMu.Lock()
+	parent := s.schedulerContext
+	if parent == nil {
+		parent = context.Background()
+	}
+	ctx, cancel := context.WithCancel(parent)
 	s.schedulerCancel = cancel
 	s.schedulerWG.Add(1)
-	s.schedulerMu.Unlock()
 	go s.runScheduler(ctx, time.Duration(config.IntervalMinutes)*time.Minute)
 }
 

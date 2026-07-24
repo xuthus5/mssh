@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -30,6 +31,36 @@ func TestChatProviderProtocols(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) { testProviderProtocol(t, test.provider, test.path, test.response, test.expected) })
 	}
+}
+
+func TestChatGeminiUsesHeaderForAPIKey(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		assert.Empty(t, request.URL.RawQuery)
+		assert.Equal(t, "secret", request.Header.Get("x-goog-api-key"))
+		assert.Empty(t, request.Header.Get("Authorization"))
+		_, err := writer.Write([]byte(`{"candidates":[{"content":{"parts":[{"text":"ok"}]}}]}`))
+		require.NoError(t, err)
+	}))
+	t.Cleanup(server.Close)
+
+	answer, err := chatGemini(context.Background(), server.Client(), model.AIProviderProfile{
+		Provider: model.AIProviderGemini, BaseURL: server.URL, DefaultModel: "model",
+	}, "secret", aiChatInput{})
+	require.NoError(t, err)
+	assert.Equal(t, "ok", answer)
+}
+
+func TestChatGeminiTransportErrorDoesNotExposeAPIKey(t *testing.T) {
+	const secret = "gemini-secret"
+	client := &http.Client{Transport: roundTripFunc(func(request *http.Request) (*http.Response, error) {
+		return nil, fmt.Errorf("dial failed for %s", request.URL.String())
+	})}
+
+	_, err := chatGemini(context.Background(), client, model.AIProviderProfile{
+		Provider: model.AIProviderGemini, BaseURL: "https://example.com", DefaultModel: "model",
+	}, secret, aiChatInput{})
+	require.Error(t, err)
+	assert.NotContains(t, err.Error(), secret)
 }
 
 func testProviderProtocol(t *testing.T, provider model.AIProviderType, expectedPath, responseBody, expected string) {

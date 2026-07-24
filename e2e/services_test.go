@@ -17,8 +17,18 @@ func newTestApp(t *testing.T) *app.App {
 	opts := app.Options{DataDir: t.TempDir(), Logger: app.DefaultTestLogger(t)}
 	a, err := app.New(opts)
 	require.NoError(t, err)
+	setupTestVault(t, a)
 	t.Cleanup(func() { a.Shutdown() })
 	return a
+}
+
+func setupTestVault(t *testing.T, appInstance *app.App) {
+	t.Helper()
+	_, err := appInstance.Security.Setup(model.SecuritySetupInput{
+		Password:       "e2e-test-password-1234",
+		RememberUnlock: false,
+	})
+	require.NoError(t, err)
 }
 
 // ========== Session CRUD 端到端 ==========

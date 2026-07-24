@@ -2,7 +2,7 @@ import { AuditService, MacroService, SessionService, TerminalService } from '@/l
 import { logger } from '@/lib/logger'
 import { createTerminalTab } from '@/lib/terminalTabs'
 import { useAppStore } from '@/store/appStore'
-import { openTerminalWithPoolCapacity } from '@/lib/openTerminal'
+import { openTerminalWithPoolCapacity, releaseAppTerminalOpenReservation } from '@/lib/openTerminal'
 import { resolveOpenTerminalSize } from '@/lib/terminalOpenSize'
 
 interface BatchSession {
@@ -24,6 +24,7 @@ async function openSessionTab(session: BatchSession, command?: string): Promise<
   try {
     if (command) await MacroService.Execute(terminalId, command)
   } catch (error) {
+    releaseAppTerminalOpenReservation(terminalId)
     try { await TerminalService.Close(terminalId) } catch (closeError) { logger.error('close failed batch terminal error', closeError) }
     throw error
   }

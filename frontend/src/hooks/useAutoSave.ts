@@ -122,7 +122,7 @@ export function useAutoSave<T>({
     return () => {
       document.removeEventListener('visibilitychange', onVisibility)
       window.removeEventListener('pagehide', onPageHide)
-      clearTimer()
+      void flush()
     }
   }, [flush, clearTimer])
 
