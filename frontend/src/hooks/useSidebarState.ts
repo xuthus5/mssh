@@ -172,7 +172,9 @@ export function useSidebarMacros() {
   }, [])
   useEffect(() => { void reload() }, [reload])
   const execute = useCallback((command: string) => {
-    void executeMacroOnActiveTerminal(command, { requireTerminalSurface: true })
+    void executeMacroOnActiveTerminal(command, { requireTerminalSurface: true }).catch((error: unknown) => {
+      setError(t('执行宏失败: ${}', macroErrorMessage(error)))
+    })
   }, [])
   const add = useCallback((item: Omit<CommandItem, 'id'>) => addMacro(item, setMacros, setError), [])
   const remove = useCallback((id: string) => deleteMacro(id, setMacros, setError), [])

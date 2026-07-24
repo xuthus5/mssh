@@ -105,8 +105,10 @@ function FilePanelContainer({ sessionID, terminalID, onClose }: { sessionID: num
     const files = event.data?.files ?? []
     const targetID = event.data?.details?.id
     if (files.length === 0 || targetID !== dropTargetID) return
-    // upload/uploadMany already toast on failure; no second owner here.
-    void transfer.uploadMany(files, transfer.currentPath)
+    setActionError('')
+    void transfer.uploadMany(files, transfer.currentPath).catch((error: unknown) => {
+      setActionError(t('上传失败: ${}', error instanceof Error ? error.message : String(error)))
+    })
   }), [dropTargetID, transfer.currentPath, transfer.uploadMany])
 
   const handleUpload = useCallback(async () => {
@@ -119,7 +121,12 @@ function FilePanelContainer({ sessionID, terminalID, onClose }: { sessionID: num
       setActionError(t('选择上传文件失败: ${}', error instanceof Error ? error.message : String(error)))
       return
     }
-    if (localPath) await transfer.upload(localPath, transfer.currentPath)
+    if (!localPath) return
+    try {
+      await transfer.upload(localPath, transfer.currentPath)
+    } catch (error) {
+      setActionError(t('上传失败: ${}', error instanceof Error ? error.message : String(error)))
+    }
   }, [transfer.currentPath, transfer.upload])
 
   const handleDownload = useCallback(async (remotePath: string) => {
@@ -131,7 +138,12 @@ function FilePanelContainer({ sessionID, terminalID, onClose }: { sessionID: num
       setActionError(t('选择下载位置失败: ${}', error instanceof Error ? error.message : String(error)))
       return
     }
-    if (localPath) await transfer.download(remotePath, localPath)
+    if (!localPath) return
+    try {
+      await transfer.download(remotePath, localPath)
+    } catch (error) {
+      setActionError(t('下载失败: ${}', error instanceof Error ? error.message : String(error)))
+    }
   }, [transfer.download])
 
   return <FilePanelView transfer={transfer} actionError={actionError} onClose={onClose} onUpload={() => { void handleUpload() }}
