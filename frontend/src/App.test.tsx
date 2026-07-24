@@ -336,7 +336,7 @@ describe('persistent content layers', () => {
     expect(await screen.findByText('打开本地终端失败: shell missing')).toBeInTheDocument()
   })
 
-  it('consumes a rejected Ctrl+W close and shows an error toast', async () => {
+  it('consumes a rejected Ctrl+W close on the app shell banner without toast', async () => {
     const closeTab = vi.fn(async () => { throw new Error('connection lost') })
     const logError = vi.spyOn(logger, 'error').mockImplementation(() => {})
     const unhandledRejection = vi.fn((event: PromiseRejectionEvent) => event.preventDefault())
@@ -346,12 +346,16 @@ describe('persistent content layers', () => {
       activeSurface: { type: 'playback', id: 'playback-1' },
       connectionStatus: {},
       recordingState: {},
+      shellActionError: '',
       closeTab,
     })
+    useToastStore.setState({ toasts: [] })
     render(<App />)
     fireEvent.keyDown(document.body, { key: 'w', ctrlKey: true })
     await waitFor(() => expect(closeTab).toHaveBeenCalledWith('playback-1'))
+    await waitFor(() => expect(useAppStore.getState().shellActionError).toBe('关闭标签失败: connection lost'))
     expect(await screen.findByText('关闭标签失败: connection lost')).toBeInTheDocument()
+    expect(useToastStore.getState().toasts.filter((item) => item.type === 'error')).toHaveLength(0)
     expect(logError).toHaveBeenCalledWith(
       'close tab failed',
       expect.objectContaining({ tabId: 'playback-1', error: expect.any(Error) }),

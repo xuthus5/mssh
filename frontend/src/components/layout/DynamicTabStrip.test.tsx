@@ -290,17 +290,20 @@ describe('DynamicTabStrip', () => {
     await waitFor(() => expect(closeTab).toHaveBeenCalledWith('terminal-1'))
   })
 
-  it('shows an error toast when closing a playback tab fails', async () => {
+  it('surfaces unbound playback close failures on the app shell banner without toast', async () => {
     const closeTab = vi.fn(async () => { throw new Error('回放清理失败') })
     vi.spyOn(logger, 'error').mockImplementation(() => {})
     seedTabs()
-    useAppStore.setState({ closeTab })
-    render(<><DynamicTabStrip /><ToastContainer /></>)
+    useAppStore.setState({ closeTab, shellActionError: '' })
+    const { useToastStore } = await import('@/components/ui/toast')
+    useToastStore.setState({ toasts: [] })
+    render(<DynamicTabStrip />)
 
     await userEvent.click(screen.getByRole('button', { name: '关闭 回放 #1' }))
 
     await waitFor(() => expect(closeTab).toHaveBeenCalledWith('playback-1'))
-    expect(await screen.findByRole('alert')).toHaveTextContent('关闭标签失败: 回放清理失败')
+    await waitFor(() => expect(useAppStore.getState().shellActionError).toBe('关闭标签失败: 回放清理失败'))
+    expect(useToastStore.getState().toasts.filter((item) => item.type === 'error')).toHaveLength(0)
   })
 
   it('requests close from close-button Enter and Space without activating the tab', () => {
