@@ -155,6 +155,46 @@ describe('TunnelDialog', () => {
   })
 })
 
+
+  it('surfaces list start failures dialog-owned without toast', async () => {
+    const { useToastStore } = await import('@/components/ui/toast')
+    useToastStore.setState({ toasts: [] })
+    const user = userEvent.setup()
+    const props = dialogProps()
+    props.tunnels = [tunnel('local-1', 'local', false)]
+    props.onStart = vi.fn(async () => { throw new Error('start boom') })
+    render(<TunnelDialog {...props} />)
+    await user.click(screen.getByRole('button', { name: '启动' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('启动隧道失败: start boom')
+    expect(useToastStore.getState().toasts.filter((item) => item.type === 'error')).toHaveLength(0)
+  })
+
+  it('surfaces list stop failures dialog-owned without toast', async () => {
+    const { useToastStore } = await import('@/components/ui/toast')
+    useToastStore.setState({ toasts: [] })
+    const user = userEvent.setup()
+    const props = dialogProps()
+    props.tunnels = [tunnel('local-1', 'local', true)]
+    props.onStop = vi.fn(async () => { throw new Error('stop boom') })
+    render(<TunnelDialog {...props} />)
+    await user.click(screen.getByRole('button', { name: '停止' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('停止隧道失败: stop boom')
+    expect(useToastStore.getState().toasts.filter((item) => item.type === 'error')).toHaveLength(0)
+  })
+
+  it('surfaces delete failures dialog-owned without toast', async () => {
+    const { useToastStore } = await import('@/components/ui/toast')
+    useToastStore.setState({ toasts: [] })
+    const user = userEvent.setup()
+    const props = dialogProps()
+    props.tunnels = [tunnel('remote-1', 'remote', false)]
+    props.onDelete = vi.fn(async () => { throw new Error('delete boom') })
+    render(<TunnelDialog {...props} />)
+    await user.click(screen.getByRole('button', { name: '删除' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('删除隧道失败: delete boom')
+    expect(useToastStore.getState().toasts.filter((item) => item.type === 'error')).toHaveLength(0)
+  })
+
 function dialogProps() {
   return {
     open: true,
