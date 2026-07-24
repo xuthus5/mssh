@@ -44,10 +44,8 @@ function useTunnelStart(load: (options?: { silent?: boolean }) => Promise<void>,
       setTunnels((items) => items.map((item) => item.id === String(id) ? { ...item, running: true } : item))
     } catch (error) {
       logger.error('tunnel start failed', error)
-      // Form path uses silent + inline error; list buttons keep toast as the single owner.
-      if (!options?.silent) {
-        toast(t('启动隧道失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
-      }
+      // TunnelDialog owns start failures (form inline or list action banner).
+      void options
       throw error
     }
   }, [load, setTunnels])
@@ -59,7 +57,8 @@ function useTunnelStop(setTunnels: Dispatch<SetStateAction<Tunnel[]>>) {
       await TunnelService.Stop(Number(id))
       setTunnels((items) => items.map((item) => item.id === id ? { ...item, running: false } : item))
     } catch (error) {
-      toast(t('停止隧道失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
+      logger.error('tunnel stop failed', error)
+      // TunnelDialog owns stop failures via action banner.
       throw error
     }
   }, [setTunnels])
@@ -78,7 +77,8 @@ function useTunnelRemove(setTunnels: Dispatch<SetStateAction<Tunnel[]>>) {
       setTunnels((items) => items.filter((item) => item.id !== id))
       toast(t('隧道已删除'), 'success')
     } catch (error) {
-      toast(t('删除隧道失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
+      logger.error('tunnel delete failed', error)
+      // TunnelDialog owns delete failures via action banner.
       throw error
     }
   }, [setTunnels])

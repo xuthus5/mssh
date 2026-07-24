@@ -58,6 +58,7 @@ export default function TunnelDialog({
   const [remoteAddress, setRemoteAddress] = useState('')
   const [remotePort, setRemotePort] = useState('')
   const [error, setError] = useState('')
+  const [actionError, setActionError] = useState('')
   const [pending, setPending] = useState(false)
 
   const resetForm = () => {
@@ -96,6 +97,15 @@ export default function TunnelDialog({
     }
   }
 
+  const runListAction = async (action: () => void | Promise<void>, failure: string) => {
+    setActionError('')
+    try {
+      await action()
+    } catch (err) {
+      setActionError(t(failure, err instanceof Error ? err.message : String(err)))
+    }
+  }
+
   const handleDelete = async (tunnelId: string, label: string) => {
     if (!onDelete) return
     const ok = await requestConfirm({
@@ -106,11 +116,7 @@ export default function TunnelDialog({
       destructive: true,
     })
     if (!ok) return
-    try {
-      await onDelete(tunnelId)
-    } catch {
-      // toast already shown by tunnel manager
-    }
+    await runListAction(() => onDelete(tunnelId), '删除隧道失败: ${}')
   }
 
   const typeLabel = (value: string) => {
@@ -215,6 +221,7 @@ export default function TunnelDialog({
               </DialogFooter>
             </form>
           )}
+          {actionError ? <p role="alert" className="text-sm text-destructive">{actionError}</p> : null}
           <Table>
             <TableHeader>
               <TableRow>
@@ -251,12 +258,12 @@ export default function TunnelDialog({
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
                         {tunnel.running ? (
-                          <Button size="xs" variant="ghost" onClick={() => { void Promise.resolve(onStop(tunnel.id)).catch(() => undefined) }}>{t('停止')}</Button>
+                          <Button size="xs" variant="ghost" onClick={() => { void runListAction(() => onStop(tunnel.id), '停止隧道失败: ${}') }}>{t('停止')}</Button>
                         ) : (
                           <Button
                             size="xs"
                             variant="ghost"
-                            onClick={() => { void Promise.resolve(onStart({
+                            onClick={() => { void runListAction(() => onStart({
                               id: tunnel.id,
                               sessionId: tunnel.sessionId,
                               type: tunnel.type,
@@ -264,7 +271,7 @@ export default function TunnelDialog({
                               localPort: tunnel.localPort,
                               remoteAddress: tunnel.remoteAddress,
                               remotePort: tunnel.remotePort,
-                            })).catch(() => undefined) }}
+                            }), '启动隧道失败: ${}') }}
                           >
                             {t('启动')}
                           </Button>
