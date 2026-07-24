@@ -18,6 +18,7 @@ import { GeneralSettingsRuntime } from '@/components/layout/GeneralSettingsRunti
 import { WorkspacePersistence, WorkspaceRestoreBanner } from '@/components/layout/WorkspacePersistence'
 import { createAppSyncDataReload, hotReloadSessionWorkspace, registerSyncDataReload } from '@/lib/syncDataReload'
 import { getClipboard } from '@/lib/clipboard'
+import { reportTerminalClipboardError } from '@/lib/terminalClipboardEvents'
 import { t } from '@/i18n'
 import { VaultGate } from '@/components/security/VaultGate'
 import { ConfirmDialogHost } from '@/components/confirm/ConfirmDialogHost'
@@ -42,21 +43,42 @@ function activeTerminalEntry(state: AppState) {
   return state.terminalPool.get(state.activePaneId ?? tab.terminalId)
 }
 
+function activeTerminalID(state: AppState): string | null {
+  if (state.activePaneId) return state.activePaneId
+  const tab = activeTab(state)
+  return tab?.type === 'terminal' ? tab.terminalId : null
+}
+
 function copySelection(state: AppState): boolean {
-  const selection = activeTerminalEntry(state)?.terminal.getSelection()
+  const entry = activeTerminalEntry(state)
+  const selection = entry?.terminal.getSelection()
   if (!selection) return false
+  const terminalID = activeTerminalID(state)
   getClipboard().writeText(selection)
     .then(() => logger.debug('Shortcut: Ctrl+Shift+C: copied selection'))
-    .catch((error: unknown) => toast(t('复制失败: ${}', error instanceof Error ? error.message : String(error)), 'error'))
+    .catch((error: unknown) => {
+      logger.error('shortcut copy failed', error)
+      reportTerminalClipboardError(
+        t('复制失败: ${}', error instanceof Error ? error.message : String(error)),
+        terminalID,
+      )
+    })
   return true
 }
 
 function pasteClipboard(state: AppState) {
   const entry = activeTerminalEntry(state)
   if (!entry) return
+  const terminalID = activeTerminalID(state)
   getClipboard().readText()
     .then((text) => { entry.terminal.paste(text); logger.debug('Shortcut: Ctrl+Shift+V: pasted') })
-    .catch((error: unknown) => toast(t('粘贴失败: ${}', error instanceof Error ? error.message : String(error)), 'error'))
+    .catch((error: unknown) => {
+      logger.error('shortcut paste failed', error)
+      reportTerminalClipboardError(
+        t('粘贴失败: ${}', error instanceof Error ? error.message : String(error)),
+        terminalID,
+      )
+    })
 }
 
 function clearTerminal(state: AppState): boolean {

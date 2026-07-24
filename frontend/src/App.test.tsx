@@ -281,7 +281,7 @@ describe('persistent content layers', () => {
     expect(closeTab).not.toHaveBeenCalled()
     expect(await screen.findByRole('status')).toHaveTextContent('请使用标签关闭按钮确认终止活动连接')
   })
-  it('reports clipboard shortcut failures', async () => {
+  it('routes clipboard shortcut failures to the terminal toolbar banner event', async () => {
     const terminal = { getSelection: vi.fn(() => 'selected text'), paste: vi.fn(), clear: vi.fn(), focus: vi.fn() }
     Object.defineProperty(navigator, 'clipboard', {
       configurable: true,
@@ -295,11 +295,20 @@ describe('persistent content layers', () => {
       activeSurface: { type: 'terminal', id: 'terminal-1' },
       terminalPool: new Map([['term-1', { terminal: terminal as never, lastUsed: 0 }]]),
     })
+    const handler = vi.fn()
+    window.addEventListener('mssh:terminal-clipboard-error', handler as EventListener)
     render(<App />)
     fireEvent.keyDown(document.body, { key: 'c', ctrlKey: true, shiftKey: true })
     fireEvent.keyDown(document.body, { key: 'v', ctrlKey: true, shiftKey: true })
-    expect(await screen.findByText('复制失败: write denied')).toBeInTheDocument()
-    expect(await screen.findByText('粘贴失败: read denied')).toBeInTheDocument()
+    await waitFor(() => {
+      const messages = handler.mock.calls.map((call) => (call[0] as CustomEvent).detail.message)
+      expect(messages).toEqual(expect.arrayContaining([
+        '复制失败: write denied',
+        '粘贴失败: read denied',
+      ]))
+    })
+    expect(screen.queryByText('复制失败: write denied')).not.toBeInTheDocument()
+    window.removeEventListener('mssh:terminal-clipboard-error', handler as EventListener)
   })
   it('consumes a rejected Ctrl+W close and shows an error toast', async () => {
     const closeTab = vi.fn(async () => { throw new Error('connection lost') })
