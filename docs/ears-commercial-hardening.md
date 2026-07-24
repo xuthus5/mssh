@@ -1370,3 +1370,10 @@
 |---|---|---|
 | UX-MACRO-157 | 侧栏宏创建失败仅侧栏 banner 展示（创建宏失败），不得 error toast；表单保持打开可重试。 | done |
 | UX-MACRO-158 | 侧栏宏删除失败仅侧栏 banner 展示（删除宏失败），不得 error toast；列表项保留。 | done |
+
+## 2026-07-24 商用硬化波次（隧道对话框动作错误归属）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| UX-TUNNEL-159 | 隧道新建启动失败仅表单 inline alert，不得 error toast。 | done |
+| UX-TUNNEL-160 | 隧道列表启动/停止/删除失败仅对话框 action banner 展示，不得 error toast；删除成功可 toast。 | done |
