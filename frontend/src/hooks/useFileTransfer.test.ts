@@ -209,13 +209,13 @@ describe('useFileTransfer', () => {
     expect(result.current.files).toHaveLength(0)
   })
 
-  it('toasts deleteFile failures', async () => {
+  it('rethrows deleteFile failures without toast', async () => {
     __registerHandler('github.com/xuthus5/mssh/internal/service.FileService.Delete', async () => {
       throw new Error('delete denied')
     })
     const { result } = renderHook(() => useFileTransfer(SESSION_ID))
     await expect(act(async () => { await result.current.deleteFile('/a.txt') })).rejects.toThrow('delete denied')
-    expect(useToastStore.getState().toasts.some((item) => item.message.includes('delete denied'))).toBe(true)
+    expect(useToastStore.getState().toasts.some((item) => item.message.includes('delete denied'))).toBe(false)
   })
 
   it('sets panel error for listFiles failures without toast', async () => {
