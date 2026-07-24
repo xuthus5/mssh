@@ -275,7 +275,9 @@ describe('useSettings', () => {
     __registerHandler('github.com/xuthus5/mssh/internal/service.KeyService.Generate', async () => { throw new Error('key gen failed') })
 
     const { result } = renderHook(() => useSettings())
-    await act(async () => { await result.current.generateKey('bad', 'rsa', 1024) })
+    await act(async () => {
+      await expect(result.current.generateKey('bad', 'rsa', 1024)).rejects.toThrow('key gen failed')
+    })
     expect(result.current.keys).toHaveLength(0)
   })
 
@@ -310,9 +312,9 @@ describe('useSettings', () => {
     await act(async () => {})
 
     await act(async () => {
-      await result.current.importKey('bad', 'bad')
+      await expect(result.current.importKey('bad', 'bad')).rejects.toThrow('import failed')
       await expect(result.current.deleteKey('1')).rejects.toThrow('delete failed')
-      await result.current.exportKey('1')
+      await expect(result.current.exportKey('1')).rejects.toThrow('export failed')
       await expect(result.current.exportConfig()).rejects.toThrow('dialog failed')
       await expect(result.current.importConfig()).rejects.toThrow('dialog failed')
     })
@@ -322,7 +324,7 @@ describe('useSettings', () => {
     expect(result.current.systemFonts).toEqual(['sans-serif'])
   })
 
-  it('surfaces delete and backup transfer failures to the user', async () => {
+  it('rethrows delete and backup transfer failures without error toast', async () => {
     const toast = await import('@/components/ui/toast')
     const toastSpy = vi.spyOn(toast, 'toast')
     __registerHandler('github.com/xuthus5/mssh/internal/service.KeyService.Delete', async () => { throw new Error('delete failed') })
@@ -338,8 +340,8 @@ describe('useSettings', () => {
       await expect(result.current.importConfig()).rejects.toThrow('import failed')
     })
 
-    expect(toastSpy).toHaveBeenCalledWith(expect.stringContaining('删除密钥'), 'error')
-    expect(toastSpy).toHaveBeenCalledWith(expect.stringContaining('导出本地备份'), 'error')
-    expect(toastSpy).toHaveBeenCalledWith(expect.stringContaining('导入本地备份'), 'error')
+    expect(toastSpy).not.toHaveBeenCalledWith(expect.stringContaining('删除密钥'), 'error')
+    expect(toastSpy).not.toHaveBeenCalledWith(expect.stringContaining('导出本地备份'), 'error')
+    expect(toastSpy).not.toHaveBeenCalledWith(expect.stringContaining('导入本地备份'), 'error')
   })
 })

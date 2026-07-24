@@ -56,9 +56,9 @@ function keyMaterial(key: { id: number; name: string; type: KeyType; private_key
   return { ...keyInfo(key, bits), privateKey: key.private_key }
 }
 
-function keyOperationFailed(action: string, error: unknown) {
+function rethrowKeyError(action: string, error: unknown): never {
   logger.error(`${action} failed`, error)
-  toast(t('${}失败: ${}', action, error instanceof Error ? error.message : String(error)), 'error')
+  throw error instanceof Error ? error : new Error(String(error))
 }
 
 function useSystemFonts() {
@@ -95,7 +95,7 @@ export function useKeySettings() {
       const material = keyMaterial(result, bits)
       setKeys((current) => [...current, keyInfo(result, bits)])
       return material
-    } catch (error) { keyOperationFailed(t('生成密钥'), error); return undefined }
+    } catch (error) { rethrowKeyError(t('生成密钥'), error) }
   }, [])
   const importKey = useCallback(async (name: string, privateKey: string) => {
     try {
@@ -104,20 +104,19 @@ export function useKeySettings() {
       const imported = keyInfo(result, 0)
       setKeys((current) => [...current, imported])
       return imported
-    } catch (error) { keyOperationFailed(t('导入密钥'), error); return undefined }
+    } catch (error) { rethrowKeyError(t('导入密钥'), error) }
   }, [])
   const deleteKey = useCallback(async (id: string) => {
     try {
       await KeyService.Delete(Number(id))
       setKeys((current) => current.filter((key) => key.id !== id))
     } catch (error) {
-      keyOperationFailed(t('删除密钥'), error)
-      throw error
+      rethrowKeyError(t('删除密钥'), error)
     }
   }, [])
   const exportKey = useCallback(async (id: string) => {
     try { return await KeyService.ExportPublicKey(Number(id)) }
-    catch (error) { keyOperationFailed(t('复制公钥'), error); return undefined }
+    catch (error) { rethrowKeyError(t('复制公钥'), error) }
   }, [])
   const loadKeyMaterial = useCallback(async (id: string) => {
     try {
@@ -136,13 +135,13 @@ export function useKeySettings() {
       const updated = keyMaterial(result, material.bits)
       setKeys((current) => current.map((key) => key.id === updated.id ? keyInfo(result, material.bits) : key))
       return updated
-    } catch (error) { keyOperationFailed(t('更新密钥'), error); return undefined }
+    } catch (error) { rethrowKeyError(t('更新密钥'), error) }
   }, [])
   const selectKeyImportFile = useCallback(async (): Promise<KeyImportFile | undefined> => {
     try {
       const file = await KeyService.SelectImportFile()
       return file ? { name: file.name, privateKey: file.private_key } : undefined
-    } catch (error) { keyOperationFailed(t('读取私钥文件'), error); return undefined }
+    } catch (error) { rethrowKeyError(t('读取私钥文件'), error) }
   }, [])
   useEffect(() => { void listKeys() }, [listKeys])
   return { keys, error, loading, listKeys, generateKey, importKey, deleteKey, exportKey, loadKeyMaterial, updateKey, selectKeyImportFile }
@@ -156,8 +155,8 @@ function useConfigTransfer() {
       await SyncService.Export(path)
       toast(t('本地备份已导出'), 'success')
     } catch (error) {
-      keyOperationFailed(t('导出本地备份'), error)
-      throw error
+      // Sync panel owns failure banner for fixed export/import actions.
+      rethrowKeyError(t('导出本地备份'), error)
     }
   }, [])
   const importConfig = useCallback(async () => {
@@ -168,8 +167,7 @@ function useConfigTransfer() {
       await SyncService.Import(path)
       toast(t('本地备份已导入'), 'success')
     } catch (error) {
-      keyOperationFailed(t('导入本地备份'), error)
-      throw error
+      rethrowKeyError(t('导入本地备份'), error)
     }
   }, [])
   return { exportConfig, importConfig }
