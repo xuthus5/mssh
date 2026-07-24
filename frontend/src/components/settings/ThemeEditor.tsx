@@ -176,21 +176,23 @@ function ThemeWorkspace({ profile, draft, effectiveTheme, globalStyle, editorSlo
 
 function BuiltinThemeResetControl({ canReset, dirty, saving, resetting, includesFixed, onResettingChange, onReset }: { canReset: boolean; dirty: boolean; saving: boolean; resetting: boolean; includesFixed: boolean; onResettingChange: (resetting: boolean) => void; onReset: () => Promise<BuiltinThemeResetResult> }) {
   const [open, setOpen] = useState(false)
+  const [error, setError] = useState('')
   const reset = async () => {
     onResettingChange(true)
+    setError('')
     try {
       const result = await onReset()
       toast(resetResultMessage(result), 'success')
       setOpen(false)
     } catch (error) {
-      toast(t('重置内置主题失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
+      setError(t('重置内置主题失败: ${}', error instanceof Error ? error.message : String(error)))
     } finally {
       onResettingChange(false)
     }
   }
   const disabled = !canReset || dirty || saving || resetting
   const tooltip = dirty ? t('请先保存或撤销当前主题修改') : saving ? t('正在保存主题配置') : canReset ? t('恢复当前绑定内置主题的默认样式') : t('当前绑定没有可重置的内置主题')
-  return <><Tooltip><TooltipTrigger render={<span className="inline-flex shrink-0" />}><Button type="button" variant="outline" disabled={disabled} onClick={() => setOpen(true)}><RotateCcw data-icon="inline-start" />{t('重置内置主题')}</Button></TooltipTrigger><TooltipContent>{tooltip}</TooltipContent></Tooltip><AlertDialog open={open} onOpenChange={(nextOpen) => { if (!resetting) setOpen(nextOpen) }}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>{t('重置内置终端主题？')}</AlertDialogTitle><AlertDialogDescription>{t('恢复当前 Dark/Light')}{includesFixed ? t('/固定') : ''} {t('内置主题的颜色和备用样式，并重新跟随全局字体与光标。全局字体与光标配置不会被修改。')}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel disabled={resetting}>{t('取消')}</AlertDialogCancel><AlertDialogAction type="button" onClick={() => { void reset() }} disabled={resetting}>{resetting ? <><Spinner data-icon="inline-start" />{t('重置中...')}</> : t('确认重置')}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog></>
+  return <><Tooltip><TooltipTrigger render={<span className="inline-flex shrink-0" />}><Button type="button" variant="outline" disabled={disabled} onClick={() => { setError(''); setOpen(true) }}><RotateCcw data-icon="inline-start" />{t('重置内置主题')}</Button></TooltipTrigger><TooltipContent>{tooltip}</TooltipContent></Tooltip><AlertDialog open={open} onOpenChange={(nextOpen) => { if (!resetting) { setOpen(nextOpen); if (!nextOpen) setError('') } }}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>{t('重置内置终端主题？')}</AlertDialogTitle><AlertDialogDescription>{t('恢复当前 Dark/Light')}{includesFixed ? t('/固定') : ''} {t('内置主题的颜色和备用样式，并重新跟随全局字体与光标。全局字体与光标配置不会被修改。')}</AlertDialogDescription></AlertDialogHeader>{error ? <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert> : null}<AlertDialogFooter><AlertDialogCancel disabled={resetting}>{t('取消')}</AlertDialogCancel><AlertDialogAction type="button" onClick={() => { void reset() }} disabled={resetting}>{resetting ? <><Spinner data-icon="inline-start" />{t('重置中...')}</> : t('确认重置')}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog></>
 }
 
 function resetResultMessage(result: BuiltinThemeResetResult): string {

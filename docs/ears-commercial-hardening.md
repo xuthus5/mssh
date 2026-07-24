@@ -1347,3 +1347,11 @@
 | UX-KEY-148 | 密钥生成/导入/更新失败仅对应对话框 inline alert 展示，不得 error toast。 | done |
 | UX-KEY-149 | 密钥删除/复制公钥失败仅 KeyManager 面板 banner 展示，不得 error toast。 | done |
 | UX-SYNC-150 | 本地备份导出/导入失败仅同步页 transfer banner 展示，不得 error toast；成功可 toast。 | done |
+
+## 2026-07-24 商用硬化波次（日志选择/撰写面板/主题重置错误归属）
+
+| ID | 验收条件 | 状态 |
+|---|---|---|
+| UX-LOG-151 | 通用设置日志目录选择失败仅卡片 inline alert 展示，不得 error toast。 | done |
+| UX-COMPOSE-152 | 终端撰写面板执行/宏执行/粘贴失败仅面板 Alert 展示，不得 error toast。 | done |
+| UX-THEME-153 | 重置内置主题失败仅重置确认对话框 inline alert 展示，不得 error toast；成功可 toast。 | done |

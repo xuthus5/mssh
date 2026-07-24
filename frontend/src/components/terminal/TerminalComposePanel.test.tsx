@@ -102,7 +102,8 @@ describe('TerminalComposePanel', () => {
     await userEvent.type(input, 'whoami')
     await userEvent.keyboard('{Control>}{Enter}{/Control}')
 
-    await waitFor(() => expect(notify).toHaveBeenCalledWith('执行失败: terminal unavailable', 'error'))
+    expect(await screen.findByText('执行失败: terminal unavailable')).toBeInTheDocument()
+    expect(notify).not.toHaveBeenCalled()
     expect(input).toHaveValue('whoami')
     expect(recordCommand).not.toHaveBeenCalled()
   })
@@ -116,7 +117,8 @@ describe('TerminalComposePanel', () => {
 
     await userEvent.click(await screen.findByRole('button', { name: '执行宏 失败宏' }))
 
-    await waitFor(() => expect(notify).toHaveBeenCalledWith('宏执行失败: remote rejected', 'error'))
+    expect(await screen.findByText('宏执行失败: remote rejected')).toBeInTheDocument()
+    expect(notify).not.toHaveBeenCalled()
     expect(recordCommand).not.toHaveBeenCalled()
   })
 
@@ -133,7 +135,8 @@ describe('TerminalComposePanel', () => {
 
     await userEvent.type(screen.getByRole('textbox', { name: '撰写终端内容' }), 'ls')
     await userEvent.click(screen.getByRole('button', { name: '粘贴' }))
-    expect(notify).toHaveBeenCalledWith('当前终端不可用', 'error')
+    expect(await screen.findByText('当前终端不可用')).toBeInTheDocument()
+    expect(notify).not.toHaveBeenCalled()
 
     await userEvent.click(screen.getByRole('button', { name: '关闭撰写面板' }))
     expect(onClose).toHaveBeenCalledOnce()

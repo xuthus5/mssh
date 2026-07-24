@@ -7,7 +7,6 @@ import { Field, FieldLabel } from '@/components/ui/field'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Spinner } from '@/components/ui/spinner'
 import { Textarea } from '@/components/ui/textarea'
-import { toast } from '@/components/ui/toast'
 import { recordCommand } from '@/lib/commandHistory'
 import { MacroService, TerminalService } from '@/lib/wails'
 import { useAppStore } from '@/store/appStore'
@@ -57,20 +56,22 @@ function useMacroCatalog(open: boolean) {
 function useAsyncGate() {
   const activeRef = useRef(false)
   const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
   const run = useCallback(async (action: () => Promise<void>, errorPrefix: string) => {
     if (activeRef.current) return
     activeRef.current = true
     setBusy(true)
+    setError('')
     try {
       await action()
-    } catch (error: unknown) {
-      toast(t('${}: ${}', errorPrefix, errorMessage(error)), 'error')
+    } catch (actionError: unknown) {
+      setError(t('${}: ${}', errorPrefix, errorMessage(actionError)))
     } finally {
       activeRef.current = false
       setBusy(false)
     }
   }, [])
-  return { busy, run }
+  return { busy, error, setError, run }
 }
 
 function MacroList({ state, busy, onExecute, onRetry }: {
@@ -94,7 +95,7 @@ function MacroList({ state, busy, onExecute, onRetry }: {
 }
 
 interface PanelViewProps {
-  busy: boolean; content: string; inputRef: RefObject<HTMLTextAreaElement | null>; macros: MacroState
+  busy: boolean; content: string; actionError: string; inputRef: RefObject<HTMLTextAreaElement | null>; macros: MacroState
   onChange: (value: string) => void; onClose: () => void; onExecute: () => void
   onExecuteMacro: (macro: MacroItem) => void; onKeyDown: (event: KeyboardEvent<HTMLTextAreaElement>) => void
   onPaste: () => void; onRetry: () => void
@@ -109,6 +110,7 @@ function ComposePanelView(props: PanelViewProps) {
       </div>
       <Button type="button" size="icon-xs" variant="ghost" aria-label={t('关闭撰写面板')} onClick={props.onClose}><X /></Button>
     </header>
+    {props.actionError ? <Alert variant="destructive"><AlertDescription>{props.actionError}</AlertDescription></Alert> : null}
     <div className="flex min-h-6 items-start gap-2"><span className="pt-1 text-xs font-medium text-muted-foreground">{t('宏')}</span>
       <MacroList state={props.macros} busy={props.busy} onExecute={props.onExecuteMacro} onRetry={props.onRetry} />
     </div>
@@ -134,7 +136,7 @@ export function TerminalComposePanel({ open, terminalID, sessionID, onClose }: P
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const [content, setContent] = useState('')
   const macros = useMacroCatalog(open)
-  const { busy, run } = useAsyncGate()
+  const { busy, error, setError, run } = useAsyncGate()
   const execute = useCallback(async () => {
     if (!content.trim()) return
     await run(async () => {
@@ -146,10 +148,14 @@ export function TerminalComposePanel({ open, terminalID, sessionID, onClose }: P
   }, [content, run, sessionID, terminalID])
   const paste = useCallback(() => {
     const terminal = useAppStore.getState().terminalPool.get(terminalID)?.terminal
-    if (!terminal) return toast(t('当前终端不可用'), 'error')
+    if (!terminal) {
+      setError(t('当前终端不可用'))
+      return
+    }
+    setError('')
     terminal.paste(content)
     terminal.focus()
-  }, [content, terminalID])
+  }, [content, setError, terminalID])
   const executeMacro = useCallback((macro: MacroItem) => run(async () => {
     await MacroService.Execute(terminalID, commandWithEnter(macro.command))
     recordCommand(sessionID, macro.command)
@@ -162,7 +168,7 @@ export function TerminalComposePanel({ open, terminalID, sessionID, onClose }: P
     void execute()
   }
   if (!open) return null
-  return <ComposePanelView busy={busy} content={content} inputRef={inputRef} macros={macros.state}
+  return <ComposePanelView busy={busy} content={content} actionError={error} inputRef={inputRef} macros={macros.state}
     onChange={setContent} onClose={onClose} onExecute={() => { void execute() }} onExecuteMacro={(macro) => { void executeMacro(macro) }}
     onKeyDown={onKeyDown} onPaste={paste} onRetry={() => { void macros.load() }} />
 }
