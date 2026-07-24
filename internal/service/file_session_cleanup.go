@@ -1,10 +1,6 @@
 package service
 
-import (
-	"context"
-
-	"github.com/xuthus5/mssh/internal/store"
-)
+import "github.com/xuthus5/mssh/internal/store"
 
 // CancelForSessions cancels in-flight transfers owned by sessions about to be deleted.
 //
@@ -13,44 +9,53 @@ func (f *FileService) CancelForSessions(sessionIDs []int64) {
 	if f == nil || len(sessionIDs) == 0 {
 		return
 	}
+	wanted := positiveSessionIDs(sessionIDs)
+	if len(wanted) == 0 {
+		return
+	}
+	persistSessionCancellations(f, sessionIDs)
+	taskIDs, cancellations := f.sessionCancellationSnapshot(wanted)
+	f.closeCancelledTasks(cancellations)
+	for _, taskID := range taskIDs {
+		f.emitTransferCancelled(taskID)
+	}
+}
+
+func positiveSessionIDs(sessionIDs []int64) map[int64]struct{} {
 	wanted := make(map[int64]struct{}, len(sessionIDs))
 	for _, sessionID := range sessionIDs {
 		if sessionID > 0 {
 			wanted[sessionID] = struct{}{}
 		}
 	}
-	if len(wanted) == 0 {
+	return wanted
+}
+
+func persistSessionCancellations(f *FileService, sessionIDs []int64) {
+	if f.db == nil {
 		return
 	}
-
-	// Persist cancel reason before interrupting workers so empty finish messages cannot wipe it.
-	if f.db != nil {
-		if err := store.CancelTransferJobsForSessions(f.db, sessionIDs); err != nil {
-			f.logger.Error("cancel transfer jobs for deleted sessions failed", "error", err)
-		}
+	if err := store.CancelTransferJobsForSessions(f.db, sessionIDs); err != nil {
+		f.logger.Error("cancel transfer jobs for deleted sessions failed", "error", err)
 	}
+}
 
+func (f *FileService) sessionCancellationSnapshot(wanted map[int64]struct{}) ([]string, []transferCancellation) {
 	f.mu.Lock()
-	cancels := make([]context.CancelFunc, 0)
+	defer f.mu.Unlock()
 	taskIDs := make([]string, 0)
-	for taskID, cancel := range f.tasks {
+	cancellations := make([]transferCancellation, 0)
+	for taskID := range f.tasks {
 		sessionID, ok := f.taskSessions[taskID]
 		if !ok {
 			continue
 		}
-		if _, match := wanted[sessionID]; !match {
+		if _, ok := wanted[sessionID]; !ok {
 			continue
 		}
-		cancels = append(cancels, cancel)
+		cancellation, _ := f.cancelTaskLocked(taskID)
 		taskIDs = append(taskIDs, taskID)
+		cancellations = append(cancellations, cancellation)
 	}
-	f.mu.Unlock()
-
-	for _, cancel := range cancels {
-		cancel()
-	}
-	// Emit cancelled immediately so transfer center converges even if workers exit with I/O noise.
-	for _, taskID := range taskIDs {
-		f.emitTransferCancelled(taskID)
-	}
+	return taskIDs, cancellations
 }

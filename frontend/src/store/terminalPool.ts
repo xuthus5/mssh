@@ -82,15 +82,19 @@ export function clearTerminalRuntimeFields(state: AppState, terminalID: string):
   connectionStatus: AppState['connectionStatus']
   recordingState: AppState['recordingState']
   activePaneId: string | null
+  terminalOpenReservations: Set<string>
 } {
   const connectionStatus = { ...state.connectionStatus }
   delete connectionStatus[terminalID]
   const recordingState = { ...state.recordingState }
   delete recordingState[terminalID]
+  const terminalOpenReservations = new Set(state.terminalOpenReservations ?? [])
+  terminalOpenReservations.delete(terminalID)
   return {
     connectionStatus,
     recordingState,
     activePaneId: state.activePaneId === terminalID ? null : state.activePaneId,
+    terminalOpenReservations,
   }
 }
 

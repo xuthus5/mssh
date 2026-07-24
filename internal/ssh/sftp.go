@@ -145,6 +145,9 @@ func copyWithContext(ctx context.Context, dst io.Writer, src io.Reader, onProgre
 		}
 
 		readCount, readErr := src.Read(buffer)
+		if err := ctx.Err(); err != nil {
+			return written, err
+		}
 		if readCount > 0 {
 			var writeErr error
 			written, writeErr = writeCopyChunk(dst, buffer[:readCount], written, onProgress)

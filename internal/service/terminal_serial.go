@@ -16,13 +16,19 @@ var openSerialPortSession = serial.OpenPort
 
 // OpenSerial opens a terminal attached to a configured serial port profile.
 func (t *TerminalService) OpenSerial(ctx context.Context, serialPortID int64, cols, rows int) (string, error) {
-	_ = ctx
 	if serialPortID <= 0 {
 		return "", fmt.Errorf("invalid serial port id")
 	}
 	if err := validateTerminalSize(cols, rows); err != nil {
 		return "", err
 	}
+	if err := contextError(ctx); err != nil {
+		return "", err
+	}
+	if err := t.beginOpen(); err != nil {
+		return "", err
+	}
+	defer t.finishOpen()
 	outcome := "failed"
 	defer func() {
 		if t.sessionSvc != nil {
@@ -48,6 +54,11 @@ func (t *TerminalService) OpenSerial(ctx context.Context, serialPortID int64, co
 		t.serialSvc.releaseDevice(profile.Device, terminalID)
 		t.logger.Error("serial open failed", "serialPortID", serialPortID, "error", err)
 		return "", fmt.Errorf("serial open: %w", err)
+	}
+	if err := contextError(ctx); err != nil {
+		_ = port.Close()
+		t.serialSvc.releaseDevice(profile.Device, terminalID)
+		return "", err
 	}
 	t.registerTerminal(terminalID, "", 0, port)
 	t.logger.Info("serial terminal opened", "terminalID", terminalID, "device", profile.Device)

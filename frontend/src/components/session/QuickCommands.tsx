@@ -66,7 +66,7 @@ export default function QuickCommands({
       <div className="mb-2 flex items-center justify-between">
         <span className="text-xs font-medium text-muted-foreground">{t('快捷命令')}</span>
         {showAddForm && (
-          <Button size="xs" variant="ghost" onClick={() => setShowAdd(!showAdd)}>
+          <Button size="xs" variant="ghost" aria-label={t('添加快捷命令')} onClick={() => setShowAdd(!showAdd)}>
             <Plus className="h-3 w-3" />
           </Button>
         )}
@@ -90,10 +90,18 @@ export default function QuickCommands({
             {commands.map((item) => (
               <div
                 key={item.id}
+                role="button"
+                tabIndex={0}
+                aria-label={t('执行宏 ${}', item.name)}
                 className="group flex cursor-pointer items-center gap-1 rounded px-2 py-1 hover:bg-muted/50"
                 draggable
                 onDragStart={(e) => { e.dataTransfer.setData('text/plain', item.command) }}
                 onClick={() => onExecute(item.command)}
+                onKeyDown={(event) => {
+                  if (event.key !== 'Enter' && event.key !== ' ') return
+                  event.preventDefault()
+                  onExecute(item.command)
+                }}
               >
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-xs">{item.name}</div>

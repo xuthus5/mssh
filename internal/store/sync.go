@@ -73,7 +73,23 @@ func DeleteSyncVersion(db *sql.DB, id int64) error {
 }
 
 func SetSyncVersionProtected(db *sql.DB, id int64, protected bool) error {
-	if _, err := db.Exec("UPDATE sync_versions SET protected = ? WHERE id = ?", protected, id); err != nil {
+	return setSyncVersionProtected(db, id, protected)
+}
+
+// SetSyncVersionProtectedTx updates protection inside a caller-owned transaction.
+func SetSyncVersionProtectedTx(tx *sql.Tx, id int64, protected bool) error {
+	if tx == nil {
+		return fmt.Errorf("protect sync version: transaction is required")
+	}
+	return setSyncVersionProtected(tx, id, protected)
+}
+
+type syncVersionProtectionExecer interface {
+	Exec(query string, args ...any) (sql.Result, error)
+}
+
+func setSyncVersionProtected(execer syncVersionProtectionExecer, id int64, protected bool) error {
+	if _, err := execer.Exec("UPDATE sync_versions SET protected = ? WHERE id = ?", protected, id); err != nil {
 		return fmt.Errorf("protect sync version: %w", err)
 	}
 	return nil

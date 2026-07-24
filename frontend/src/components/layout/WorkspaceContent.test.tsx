@@ -110,8 +110,8 @@ describe('executeMacroOnActiveTerminal', () => {
       connectionStatus: { 'term-1': 'connected' },
       activeSurface: { type: 'terminal', id: 'tab-1' },
     })
-    await executeMacroOnActiveTerminal('uptime')
-    expect(toast).toHaveBeenCalledWith('执行宏失败: boom', 'error')
+    await expect(executeMacroOnActiveTerminal('uptime')).rejects.toThrow('boom')
+    expect(toast).not.toHaveBeenCalledWith('执行宏失败: boom', 'error')
   })
 })
 
@@ -158,6 +158,16 @@ describe('MacrosWorkspace execute path', () => {
     await user.click(screen.getByRole('button', { name: '删除 Uptime' }))
     expect(await screen.findByText('删除宏失败: delete macros failed')).toBeInTheDocument()
     expect(await screen.findByText('Uptime')).toBeInTheDocument()
+    expect(toast).not.toHaveBeenCalled()
+  })
+
+  it('shows macro execute failures inline without toast', async () => {
+    executeMacro.mockRejectedValueOnce(new Error('execute macros failed'))
+    const user = userEvent.setup()
+    render(<WorkspaceContent />)
+    expect(await screen.findByText('Uptime')).toBeInTheDocument()
+    await user.click(screen.getByText('Uptime'))
+    expect(await screen.findByText('执行宏失败: execute macros failed')).toBeInTheDocument()
     expect(toast).not.toHaveBeenCalled()
   })
 

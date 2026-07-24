@@ -7,6 +7,7 @@ import { useAppStore } from '@/store/appStore'
 import {
   collectLeaves,
   hasTerminal,
+  removeTerminal,
   replaceTerminal,
   splitLeaf,
   terminalIDs,
@@ -20,7 +21,12 @@ import {
 } from '@/components/terminal/splitPersistence'
 import { t } from '@/i18n'
 import { useSplitLayoutRestore } from '@/components/terminal/useSplitLayoutRestore'
-import { RECONNECT_SPLIT_PANE_EVENT, type ReconnectSplitPaneDetail } from '@/hooks/sessionReconnect'
+import {
+  RECONNECT_SPLIT_PANE_EVENT,
+  TERMINAL_CLOSED_SPLIT_PANE_EVENT,
+  type ReconnectSplitPaneDetail,
+  type TerminalClosedSplitPaneDetail,
+} from '@/hooks/sessionReconnect'
 import {
   closeSplitPane,
   closeSplitTerminalInBackground,
@@ -87,6 +93,7 @@ export const TerminalSplit = forwardRef<TerminalSplitHandle, Props>(function Ter
   }, [tabID, tree, primaryID, connectionKind, layoutReady, restoreError])
 
   const reconnectPaneRef = useRef<(terminalID: string) => Promise<void>>(async () => {})
+  const closedPaneRef = useRef<(terminalID: string) => void>(() => {})
 
   useEffect(() => {
     const onReconnectSplit = (event: Event) => {
@@ -97,6 +104,27 @@ export const TerminalSplit = forwardRef<TerminalSplitHandle, Props>(function Ter
     }
     window.addEventListener(RECONNECT_SPLIT_PANE_EVENT, onReconnectSplit)
     return () => window.removeEventListener(RECONNECT_SPLIT_PANE_EVENT, onReconnectSplit)
+  }, [tabID])
+
+  const removeClosedPane = (terminalID: string) => {
+    const result = removeTerminal(treeRef.current, terminalID, lastUsed)
+    if (!result) return
+    const state = useAppStore.getState()
+    const shouldFocus = state.activeSurface?.type === 'terminal' && state.activeSurface.id === tabID
+    state.forgetTerminal(terminalID)
+    setTree(() => result.node)
+    onPaneClosed?.(terminalID)
+    if (shouldFocus) requestFocus(result.focusID)
+  }
+
+  useEffect(() => {
+    const onClosed = (event: Event) => {
+      const detail = (event as CustomEvent<TerminalClosedSplitPaneDetail>).detail
+      if (!detail || detail.tabID !== tabID) return
+      closedPaneRef.current(detail.terminalID)
+    }
+    window.addEventListener(TERMINAL_CLOSED_SPLIT_PANE_EVENT, onClosed)
+    return () => window.removeEventListener(TERMINAL_CLOSED_SPLIT_PANE_EVENT, onClosed)
   }, [tabID])
 
   useEffect(() => {
@@ -158,6 +186,7 @@ export const TerminalSplit = forwardRef<TerminalSplitHandle, Props>(function Ter
   }))
 
   reconnectPaneRef.current = (terminalID) => reconnectSplitPane(terminalID, actionCtx)
+  closedPaneRef.current = removeClosedPane
 
   const closeDisconnectedTerminal = (terminalID: string) => {
     if (terminalIDs(treeRef.current).length === 1) {

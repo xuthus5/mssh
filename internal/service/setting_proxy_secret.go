@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/xuthus5/mssh/internal/model"
-	"github.com/xuthus5/mssh/internal/store"
 )
 
 const (
@@ -16,7 +15,7 @@ const (
 )
 
 // prepareProxyPasswordWrites rewrites proxy password entries for secure persistence.
-// Empty password values are dropped (keep existing secret). The clear sentinel deletes the secret.
+// Empty password values are dropped (keep existing secret). The clear sentinel writes an empty secret.
 func (s *SettingService) prepareProxyPasswordWrites(entries []model.Setting) ([]model.Setting, error) {
 	out := make([]model.Setting, 0, len(entries)+1)
 	for _, entry := range entries {
@@ -49,14 +48,13 @@ func (s *SettingService) rewriteProxyPasswordEntry(entry model.Setting) ([]model
 }
 
 func (s *SettingService) clearProxyPasswordSettings() ([]model.Setting, error) {
-	if err := store.DeleteSetting(s.db, applicationProxyPasswordSetting); err != nil {
-		return nil, fmt.Errorf("clear proxy password: %w", err)
-	}
 	saved, err := proxyPasswordSavedSetting(false)
 	if err != nil {
 		return nil, err
 	}
-	return []model.Setting{saved}, nil
+	return []model.Setting{{
+		Key: applicationProxyPasswordSetting, Namespace: "application", Value: `""`, ValueType: "string", Version: 1,
+	}, saved}, nil
 }
 
 func (s *SettingService) encryptedProxyPasswordSettings(entry model.Setting, plaintext string) ([]model.Setting, error) {

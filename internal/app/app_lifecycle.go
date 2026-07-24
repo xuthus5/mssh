@@ -45,28 +45,32 @@ func (a *App) Shutdown() {
 }
 
 func (a *App) shutdown() {
-	if a.Security != nil {
-		a.Security.ClearMemory()
-	}
-
 	logger := a.logger
 	if logger == nil {
 		logger = slog.Default()
+	}
+	if a.Sync != nil {
+		a.Sync.StopScheduler()
+	}
+	if a.Security != nil {
+		a.Security.ClearMemory()
 	}
 	if err := service.CloseAllActiveRecordings(a.Log); err != nil {
 		logger.Error("close active recordings during shutdown failed", "error", err)
 	}
 	if a.File != nil {
-		a.File.CancelAll()
+		a.File.StopAndWait()
 	}
-	if a.Sync != nil {
-		a.Sync.StopScheduler()
+	if a.Terminal != nil {
+		if err := a.Terminal.Shutdown(); err != nil {
+			logger.Error("close terminals during shutdown failed", "error", err)
+		}
 	}
 	if a.Tunnel != nil {
 		a.Tunnel.StopAll()
 	}
 	if a.Session != nil {
-		if err := a.Session.CloseAll(); err != nil {
+		if err := a.Session.Shutdown(); err != nil {
 			logger.Error("close SSH connections during shutdown failed", "error", err)
 		}
 	}

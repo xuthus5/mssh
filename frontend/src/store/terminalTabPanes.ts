@@ -17,18 +17,20 @@ export function rewriteSplitPaneIDs(
 
 /** Drop pool/status/recording entries for closed terminal IDs. */
 export function scrubTerminalRuntime(
-  state: Pick<AppState, 'terminalPool' | 'connectionStatus' | 'recordingState' | 'activePaneId'>,
+  state: Pick<AppState, 'terminalPool' | 'connectionStatus' | 'recordingState' | 'activePaneId' | 'terminalOpenReservations'>,
   terminalIDs: string[],
-): Pick<AppState, 'terminalPool' | 'connectionStatus' | 'recordingState' | 'activePaneId'> {
+): Pick<AppState, 'terminalPool' | 'connectionStatus' | 'recordingState' | 'activePaneId' | 'terminalOpenReservations'> {
   const terminalPool = new Map(state.terminalPool)
   const connectionStatus = { ...state.connectionStatus }
   const recordingState = { ...state.recordingState }
+  const terminalOpenReservations = new Set(state.terminalOpenReservations ?? [])
   let activePaneId = state.activePaneId
   for (const terminalID of terminalIDs) {
     terminalPool.delete(terminalID)
     delete connectionStatus[terminalID]
     delete recordingState[terminalID]
+    terminalOpenReservations.delete(terminalID)
     if (activePaneId === terminalID) activePaneId = null
   }
-  return { terminalPool, connectionStatus, recordingState, activePaneId }
+  return { terminalPool, connectionStatus, recordingState, activePaneId, terminalOpenReservations }
 }

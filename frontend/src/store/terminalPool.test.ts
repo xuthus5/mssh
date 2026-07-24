@@ -156,11 +156,13 @@ describe('clearTerminalRuntimeFields / findTabByTerminalID', () => {
       activePaneId: 'term-1',
       connectionStatus: { 'term-1': 'connected', 'term-2': 'connecting' },
       recordingState: { 'term-1': 'recording' },
+      terminalOpenReservations: new Set(['term-1']),
     })
     expect(clearTerminalRuntimeFields(state, 'term-1')).toEqual({
       connectionStatus: { 'term-2': 'connecting' },
       recordingState: {},
       activePaneId: null,
+      terminalOpenReservations: new Set(),
     })
   })
 

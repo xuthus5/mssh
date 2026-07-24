@@ -70,7 +70,6 @@ func TestCancelTransferJobsForSessions(t *testing.T) {
 	require.Equal(t, "completed", byID["done"].Status)
 }
 
-
 func TestFinishTransferJobDoesNotRegressCancelled(t *testing.T) {
 	db := transferTestDB(t)
 	require.NoError(t, CreateTransferJob(db, model.TransferJob{
@@ -84,4 +83,20 @@ func TestFinishTransferJobDoesNotRegressCancelled(t *testing.T) {
 	require.Len(t, jobs, 1)
 	require.Equal(t, "cancelled", jobs[0].Status)
 	require.Equal(t, "会话已删除", jobs[0].Error)
+}
+
+func TestUpdateTransferProgressDoesNotRegressCancelled(t *testing.T) {
+	db := transferTestDB(t)
+	require.NoError(t, CreateTransferJob(db, model.TransferJob{
+		ID: "progress-race", SessionID: 4, SessionName: "s", Direction: "download",
+		SourcePath: "/a", TargetPath: "/b", Status: "running", StartedAt: time.Now(),
+	}))
+	require.NoError(t, CancelTransferJobsForSessions(db, []int64{4}))
+	require.NoError(t, UpdateTransferProgress(db, "progress-race", 10, 100, 5, 18))
+
+	jobs, err := ListTransferJobs(db)
+	require.NoError(t, err)
+	require.Len(t, jobs, 1)
+	require.Equal(t, "cancelled", jobs[0].Status)
+	require.Equal(t, int64(0), jobs[0].TransferredBytes)
 }

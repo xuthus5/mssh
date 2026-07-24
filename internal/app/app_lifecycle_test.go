@@ -83,6 +83,24 @@ func TestNewAppJoinsStartupAndCloseErrors(t *testing.T) {
 	assert.True(t, state.closed)
 }
 
+func TestNewAppClosesDatabaseWhenTransferRecoveryFails(t *testing.T) {
+	dependencies, state := newLifecycleDependencies(t)
+	recoveryErr := errors.New("recovery failed")
+	dependencies.recoverInterruptedTransfers = func(*sql.DB) error { return recoveryErr }
+	dependencies.initializeServices = func(serviceInitialization) (*App, error) {
+		t.Fatal("services initialized after transfer recovery failure")
+		return nil, nil
+	}
+
+	appInstance, err := newAppWithDependencies(lifecycleOptions(t), dependencies)
+
+	assert.Nil(t, appInstance)
+	require.ErrorIs(t, err, recoveryErr)
+	assert.ErrorContains(t, err, "recover interrupted transfers")
+	assert.True(t, state.closed)
+	assert.Error(t, state.db.Ping())
+}
+
 func TestNewAppReleasesDatabaseCleanupAfterSuccess(t *testing.T) {
 	dependencies, state := newLifecycleDependencies(t)
 
@@ -112,6 +130,7 @@ func newLifecycleDependencies(t *testing.T) (appDependencies, *lifecycleState) {
 			state.schemaInitialized = true
 			return nil
 		},
+		recoverInterruptedTransfers: func(*sql.DB) error { return nil },
 		initializeServices: func(input serviceInitialization) (*App, error) {
 			return &App{DB: input.db}, nil
 		},

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { AutoSaveStatusIndicator } from '@/components/settings/AutoSaveStatus'
 import { TerminalBehaviorSettingsSection } from '@/components/settings/TerminalBehaviorSettings'
@@ -8,6 +8,7 @@ import { TerminalConnectionDefaultsSettingsSection } from '@/components/settings
 import { ThemeEditor } from '@/components/settings/ThemeEditor'
 import { ThemeManager } from '@/components/settings/ThemeManager'
 import { useAutoSave } from '@/hooks/useAutoSave'
+import { useDraftSync } from '@/hooks/useDraftSync'
 import type { GeneralSettings } from '@/hooks/useSettings'
 import type { ColorMode } from '@/lib/effectiveTerminalTheme'
 import type {
@@ -118,16 +119,14 @@ export function TerminalSettingsPanel({
   themeLoadError = '',
   onReloadThemes,
 }: Props) {
-  const [draft, setDraft] = useState(() => createDraft(general))
-  useEffect(() => {
-    setDraft(createDraft(general))
-  }, [general])
+  const { draft, setDraft, acknowledgeSaved } = useDraftSync({ source: general, createDraft })
 
   const persist = useCallback(
     async (next: TerminalDraft) => {
       await onSaveGeneral(buildSavePayload(general, next))
+      acknowledgeSaved(next)
     },
-    [general, onSaveGeneral],
+    [acknowledgeSaved, general, onSaveGeneral],
   )
   const autoSave = useAutoSave({ value: draft, onSave: persist, isReady: settingsReady, delayMs: 450 })
 

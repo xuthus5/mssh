@@ -72,15 +72,7 @@ func (s *SettingService) Set(setting model.SettingInput) error {
 	if err := s.validateRuntimeSettings(entries); err != nil {
 		return err
 	}
-	if len(entries) > 0 {
-		if err := store.SetSettings(s.db, entries); err != nil {
-			return err
-		}
-	}
-	if err := s.applyLogSettings(entries); err != nil {
-		return err
-	}
-	return s.applyProxySettings(entries)
+	return s.persistAndApply(entries)
 }
 
 func (s *SettingService) SetMany(settings []model.SettingInput) error {
@@ -98,15 +90,7 @@ func (s *SettingService) SetMany(settings []model.SettingInput) error {
 	if err := s.validateRuntimeSettings(entries); err != nil {
 		return err
 	}
-	if len(entries) > 0 {
-		if err := store.SetSettings(s.db, entries); err != nil {
-			return err
-		}
-	}
-	if err := s.applyLogSettings(entries); err != nil {
-		return err
-	}
-	return s.applyProxySettings(entries)
+	return s.persistAndApply(entries)
 }
 
 func (s *SettingService) Delete(key string) error {

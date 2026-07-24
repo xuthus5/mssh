@@ -120,19 +120,23 @@ func (t *TerminalService) Close(terminalID string) error {
 
 func (t *TerminalService) clearBufferedTerminal(terminalID string) bool {
 	t.mu.Lock()
-	defer t.mu.Unlock()
 	if _, active := t.ptys[terminalID]; active {
+		t.mu.Unlock()
 		return false
 	}
 	if _, buffered := t.pendingOutput[terminalID]; !buffered {
+		t.mu.Unlock()
 		return false
 	}
+	dispatcher := t.lockOutputDispatcher(terminalID)
 	t.outputMu.Lock()
 	delete(t.pendingOutput, terminalID)
 	delete(t.attached, terminalID)
 	delete(t.outputSequences, terminalID)
-	delete(t.systemSamples, terminalID)
 	t.outputMu.Unlock()
+	t.unlockOutputDispatcher(terminalID, dispatcher)
+	t.mu.Unlock()
+	t.deleteSystemSample(terminalID)
 	t.eventBus.Emit(event.TerminalClosed, event.ConnectionStatePayload{TerminalID: terminalID, State: "closed"})
 	return true
 }
@@ -144,6 +148,7 @@ func (t *TerminalService) detachTerminal(terminalID string) (terminalIO, string,
 		t.mu.Unlock()
 		return nil, "", nil, false
 	}
+	dispatcher := t.lockOutputDispatcher(terminalID)
 	t.outputMu.Lock()
 	delete(t.ptys, terminalID)
 	delete(t.lastUsed, terminalID)
@@ -153,10 +158,11 @@ func (t *TerminalService) detachTerminal(terminalID string) (terminalIO, string,
 	delete(t.connIDs, terminalID)
 	delete(t.sessionIDs, terminalID)
 	delete(t.outputSequences, terminalID)
-	delete(t.systemSamples, terminalID)
 	closeHandler := t.closeHandler
 	t.outputMu.Unlock()
+	t.unlockOutputDispatcher(terminalID, dispatcher)
 	t.mu.Unlock()
+	t.deleteSystemSample(terminalID)
 	return pty, connID, closeHandler, true
 }
 

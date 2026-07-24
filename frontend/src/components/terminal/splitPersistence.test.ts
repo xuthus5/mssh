@@ -110,13 +110,14 @@ describe('splitPersistence', () => {
       ]),
       connectionStatus: { primary: 'connected', second: 'connected' },
       activePaneId: 'second',
+      terminalOpenReservations: new Set(['second-next']),
     } as never)
     replaceSecondaryTerminalRuntime('second', 'second-next', 'tab-1')
     const state = useAppStore.getState()
     expect(state.tabs[0]).toMatchObject({ splitPaneIDs: ['primary', 'second-next'] })
     expect(state.terminalPool.has('second')).toBe(false)
     expect(state.terminalPool.has('second-next')).toBe(true)
+    expect(state.terminalOpenReservations).toEqual(new Set())
     expect(state.activePaneId).toBe('second-next')
   })
 })
-

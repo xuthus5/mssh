@@ -1,7 +1,7 @@
 import { TerminalService } from '@/lib/wails'
 import { useAppStore } from '@/store/appStore'
 import { rewriteSplitPaneIDs } from '@/store/terminalTabPanes'
-import { openTerminalWithPoolCapacity } from '@/lib/openTerminal'
+import { openTerminalWithPoolCapacity, releaseAppTerminalOpenReservation } from '@/lib/openTerminal'
 import {
   materializeSplitLayout,
   serializeSplitLayout,
@@ -30,8 +30,9 @@ export function persistTabSplitLayout(tabID: string, tree: SplitNode, primaryID:
 type OpenFn = () => Promise<string>
 
 export function closeExtraSplitPanes(terminalIDs: string[], context: string): void {
-  for (const id of terminalIDs) {
-    void TerminalService.Close(id).catch((closeErr: unknown) => {
+	for (const id of terminalIDs) {
+		releaseAppTerminalOpenReservation(id)
+		void TerminalService.Close(id).catch((closeErr: unknown) => {
       logger.error(context, closeErr)
     })
   }
@@ -97,7 +98,8 @@ export function openSplitTerminal(
 }
 
 export function closeInBackground(terminalID: string, context: string, isNotFound: (error: unknown) => boolean) {
-  void TerminalService.Close(terminalID).catch((error: unknown) => {
+	releaseAppTerminalOpenReservation(terminalID)
+	void TerminalService.Close(terminalID).catch((error: unknown) => {
     if (!isNotFound(error)) logger.error(context, error)
   })
 }
@@ -113,6 +115,9 @@ export function replaceSecondaryTerminalRuntime(previousID: string, nextID: stri
     connectionStatus[nextID] = 'connected'
     const recordingState = { ...state.recordingState }
     delete recordingState[previousID]
+    const terminalOpenReservations = new Set(state.terminalOpenReservations ?? [])
+    terminalOpenReservations.delete(previousID)
+    terminalOpenReservations.delete(nextID)
     const tabs = tabID
       ? state.tabs.map((item) => {
         if (item.id !== tabID || item.type !== 'terminal') return item
@@ -125,6 +130,7 @@ export function replaceSecondaryTerminalRuntime(previousID: string, nextID: stri
       terminalPool,
       connectionStatus,
       recordingState,
+      terminalOpenReservations,
       activePaneId: state.activePaneId === previousID ? nextID : state.activePaneId,
     }
   })

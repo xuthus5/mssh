@@ -12,7 +12,7 @@ tasks:
   build:
     summary: Builds the application for Linux
     deps:
-      - task: common:go:mod:tidy
+      - task: common:go:mod:verify
       - task: common:build:frontend
         vars:
           BUILD_FLAGS:
@@ -21,7 +21,7 @@ tasks:
             ref: .PRODUCTION
       - task: common:generate:icons
     cmds:
-      - go build {{.BUILD_FLAGS}} -o {{.BIN_DIR}}/{{.APP_NAME}}
+      - go build -mod=readonly {{.BUILD_FLAGS}} -o {{.BIN_DIR}}/{{.APP_NAME}}
     vars:
       APP_VERSION: '{{.APP_VERSION | default "0.1.0"}}'
       VERSION_LDFLAGS: '-X github.com/xuthus5/mssh/internal/service.Version={{.APP_VERSION}}'
@@ -62,7 +62,7 @@ tasks:
         mkdir -p bin build/linux/appimage/build
         cp -f build/appicon.png "build/linux/appimage/{{.APP_NAME}}.png"
         # Keep Categories valid for appimagetool (one main category).
-        sed -i 's/^Categories=.*/Categories=Network;/' "build/linux/{{.APP_NAME}}.desktop" || true
+        sed -i 's/^Categories=.*/Categories=Network;/' "build/linux/{{.APP_NAME}}.desktop"
         APPIMAGE_EXTRACT_AND_RUN=1 NO_STRIP=1 wails3 generate appimage           -binary "bin/{{.APP_NAME}}"           -icon "build/linux/appimage/{{.APP_NAME}}.png"           -desktopfile "build/linux/{{.APP_NAME}}.desktop"           -outputdir "bin"           -builddir "build/linux/appimage/build"
         # Prefer versioned release-friendly names when present.
         shopt -s nullglob

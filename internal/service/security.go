@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"sync"
 
 	"github.com/xuthus5/mssh/internal/crypto"
 	"github.com/xuthus5/mssh/internal/model"
@@ -22,21 +23,23 @@ const (
 )
 
 type SecurityService struct {
-	db          *sql.DB
-	dataDir     string
-	runtime     *CryptoRuntime
-	keychain    crypto.KeychainAdapter
-	eventBus    EventBus
-	logger      *slog.Logger
-	unlock      *unlockLimiter
-	afterUnlock func()
+	db            *sql.DB
+	dataDir       string
+	runtime       *CryptoRuntime
+	keychain      crypto.KeychainAdapter
+	eventBus      EventBus
+	logger        *slog.Logger
+	unlock        *unlockLimiter
+	afterUnlock   func()
+	rotationMu    sync.Mutex
+	saveVaultFile func(string, crypto.VaultFile) error
 }
 
 func NewSecurityService(db *sql.DB, dataDir string, runtime *CryptoRuntime, keychain crypto.KeychainAdapter, logger *slog.Logger) *SecurityService {
 	if logger == nil {
 		logger = slog.Default()
 	}
-	return &SecurityService{db: db, dataDir: dataDir, runtime: runtime, keychain: keychain, logger: logger, unlock: newUnlockLimiter()}
+	return &SecurityService{db: db, dataDir: dataDir, runtime: runtime, keychain: keychain, logger: logger, unlock: newUnlockLimiter(), saveVaultFile: crypto.SaveVaultFile}
 }
 
 // SetEventBus wires lock notifications for the frontend VaultGate.
@@ -199,18 +202,38 @@ func (s *SecurityService) ClearMemory() {
 }
 
 func (s *SecurityService) Rotate(input model.SecurityRotateInput) (model.SecurityStatus, error) {
+	s.rotationMu.Lock()
+	defer s.rotationMu.Unlock()
+	if err := s.recoverPendingRotation(); err != nil {
+		return model.SecurityStatus{}, err
+	}
 	vault, err := crypto.LoadVaultFile(crypto.VaultPath(s.dataDir))
 	if err != nil {
 		return model.SecurityStatus{}, fmt.Errorf("load vault: %w", err)
 	}
-	next, newDEK, err := crypto.RotateVaultPassword(input.CurrentPassword, input.NewPassword, vault, func(oldDEK, nextDEK []byte) error {
-		return s.reencryptProtectedData(oldDEK, nextDEK)
+	var oldDEK []byte
+	next, newDEK, err := crypto.RotateVaultPassword(input.CurrentPassword, input.NewPassword, vault, func(dek, _ []byte) error {
+		oldDEK = append([]byte(nil), dek...)
+		return nil
 	})
 	if err != nil {
 		return model.SecurityStatus{}, err
 	}
-	if err := crypto.SaveVaultFile(crypto.VaultPath(s.dataDir), next); err != nil {
+	plan, err := buildReencryptPlan(s.db, &staticCrypto{key: oldDEK}, &staticCrypto{key: newDEK})
+	if err != nil {
 		return model.SecurityStatus{}, err
+	}
+	marker := securityRotationMarker{Version: securityRotationMarkerVersion, OldVault: vault, NewVault: next}
+	if err := s.writePendingRotation(marker); err != nil {
+		return model.SecurityStatus{}, err
+	}
+	if err := s.saveVault(next); err != nil {
+		cleanupErr := s.clearPendingRotation()
+		return model.SecurityStatus{}, errors.Join(err, cleanupErr)
+	}
+	if err := applyReencryptPlanWithCleanup(s.db, plan, clearPendingRotationTx); err != nil {
+		rollbackErr := s.rollbackPendingRotation(marker)
+		return model.SecurityStatus{}, errors.Join(fmt.Errorf("commit password rotation: %w", err), rollbackErr)
 	}
 	s.runtime.SetDEK(newDEK)
 	s.runAfterUnlock()

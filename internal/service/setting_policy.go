@@ -10,6 +10,7 @@ import (
 // Settings that must never pass through the generic SettingService surface.
 // Secrets are owned by SecurityService / SyncService vault-backed APIs.
 var blockedGenericSettingKeys = map[string]struct{}{
+	securityRotationPendingSetting: {},
 	"sync.master_key":             {},
 	"sync.secret.gist_token":      {},
 	"sync.secret.webdav_password": {},

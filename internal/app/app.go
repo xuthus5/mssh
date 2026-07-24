@@ -65,20 +65,22 @@ type serviceInitialization struct {
 }
 
 type appDependencies struct {
-	openDB             func(string) (*sql.DB, error)
-	initializeSchema   func(*sql.DB) error
-	initializeServices func(serviceInitialization) (*App, error)
-	closeDB            func(*sql.DB) error
-	keychain           crypto.KeychainAdapter
+	openDB                      func(string) (*sql.DB, error)
+	initializeSchema            func(*sql.DB) error
+	recoverInterruptedTransfers func(*sql.DB) error
+	initializeServices          func(serviceInitialization) (*App, error)
+	closeDB                     func(*sql.DB) error
+	keychain                    crypto.KeychainAdapter
 }
 
 func defaultAppDependencies(openDB func(string) (*sql.DB, error)) appDependencies {
 	return appDependencies{
-		openDB:             openDB,
-		initializeSchema:   store.InitializeSchema,
-		initializeServices: initializeServices,
-		closeDB:            func(db *sql.DB) error { return db.Close() },
-		keychain:           crypto.NewKeychainAdapter(),
+		openDB:                      openDB,
+		initializeSchema:            store.InitializeSchema,
+		recoverInterruptedTransfers: store.MarkInterruptedTransfers,
+		initializeServices:          initializeServices,
+		closeDB:                     func(db *sql.DB) error { return db.Close() },
+		keychain:                    crypto.NewKeychainAdapter(),
 	}
 }
 
@@ -114,6 +116,14 @@ func startApp(opts Options, logger *slog.Logger, dependencies appDependencies) (
 	if err = dependencies.initializeSchema(db); err != nil {
 		logger.Error("initialize database schema failed", "error", err)
 		return nil, fmt.Errorf("initialize database schema: %w", err)
+	}
+	recoverInterruptedTransfers := dependencies.recoverInterruptedTransfers
+	if recoverInterruptedTransfers == nil {
+		recoverInterruptedTransfers = store.MarkInterruptedTransfers
+	}
+	if err = recoverInterruptedTransfers(db); err != nil {
+		logger.Error("recover interrupted transfers failed", "error", err)
+		return nil, fmt.Errorf("recover interrupted transfers: %w", err)
 	}
 
 	eventBus := event.NewWailsEventBus(logger)
@@ -167,7 +177,14 @@ func applyStartupSettings(appInstance *App, logger *slog.Logger) {
 
 func initializeServices(input serviceInitialization) (*App, error) {
 	runtime := service.NewCryptoRuntime()
-	securitySvc := newSecurityService(input, runtime)
+	themeSvc, err := newThemeService(input)
+	if err != nil {
+		return nil, err
+	}
+	securitySvc, err := newSecurityService(input, runtime)
+	if err != nil {
+		return nil, fmt.Errorf("recover security state: %w", err)
+	}
 	sessionSvc := service.NewSessionService(input.db, input.eventBus, service.DefaultKeepAliveSeconds, input.opts.DataDir, runtime, input.logger)
 	sessionSvc.SetPasswordVerifier(securitySvc)
 	terminalSvc := service.NewTerminalService(sessionSvc, input.eventBus, 32, input.logger)
@@ -177,22 +194,21 @@ func initializeServices(input serviceInitialization) (*App, error) {
 	sessionSvc.SetTunnelStopper(tunnelSvc)
 	sessionSvc.SetTerminalCloser(terminalSvc)
 	logSvc := service.NewLogService(input.db, input.opts.DataDir, input.logger)
-	themeSvc, err := newThemeService(input)
-	if err != nil {
-		return nil, err
-	}
 	configureTerminalLogging(terminalSvc, logSvc, input.logger)
 	syncSvc := newSyncService(input, runtime, securitySvc, terminalSvc, tunnelSvc, sessionSvc)
 	return assembleApp(input, runtime, securitySvc, sessionSvc, terminalSvc, serialSvc, tunnelSvc, logSvc, themeSvc, syncSvc), nil
 }
 
-func newSecurityService(input serviceInitialization, runtime *service.CryptoRuntime) *service.SecurityService {
+func newSecurityService(input serviceInitialization, runtime *service.CryptoRuntime) (*service.SecurityService, error) {
 	securitySvc := service.NewSecurityService(input.db, input.opts.DataDir, runtime, input.keychain, input.logger)
+	if err := securitySvc.RecoverPendingRotation(); err != nil {
+		return nil, err
+	}
 	securitySvc.SetEventBus(input.eventBus)
 	if err := securitySvc.TryAutoUnlock(); err != nil {
 		input.logger.Warn("auto unlock vault failed", "error", err)
 	}
-	return securitySvc
+	return securitySvc, nil
 }
 
 func newThemeService(input serviceInitialization) (*service.ThemeService, error) {

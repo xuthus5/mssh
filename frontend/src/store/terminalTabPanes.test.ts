@@ -40,6 +40,7 @@ describe('terminalTabPanes', () => {
         connectionStatus: { primary: 'connected', 'split-a': 'connected' },
         recordingState: { primary: 'recording' },
         activePaneId: 'split-a',
+        terminalOpenReservations: new Set(['primary', 'split-a']),
       },
       ['primary', 'split-a'],
     )
@@ -47,5 +48,6 @@ describe('terminalTabPanes', () => {
     expect(result.connectionStatus).toEqual({})
     expect(result.recordingState).toEqual({})
     expect(result.activePaneId).toBeNull()
+    expect(result.terminalOpenReservations).toEqual(new Set())
   })
 })

@@ -3,6 +3,7 @@ package service
 import (
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -78,6 +79,39 @@ func TestTerminalService_OutputSequenceIsPerTerminal(t *testing.T) {
 	assert.Equal(t, uint64(1), events[0].Payload.(event.TerminalOutputPayload).Sequence)
 	assert.Equal(t, uint64(1), events[1].Payload.(event.TerminalOutputPayload).Sequence)
 	assert.Equal(t, uint64(2), events[2].Payload.(event.TerminalOutputPayload).Sequence)
+}
+
+func TestTerminalService_SlowOutputDoesNotBlockAnotherTerminal(t *testing.T) {
+	bus := newBlockingOutputBus()
+	service := NewTerminalService(nil, bus, 32, testutil.NewTestLogger())
+	service.ptys["term-1"] = nil
+	service.ptys["term-2"] = nil
+	service.attached["term-1"] = true
+	service.attached["term-2"] = true
+
+	firstDone := make(chan struct{})
+	go func() {
+		service.handlePTYOutput("term-1", []byte("old"))
+		close(firstDone)
+	}()
+	<-bus.blocked
+
+	secondDone := make(chan struct{})
+	go func() {
+		service.handlePTYOutput("term-2", []byte("new"))
+		close(secondDone)
+	}()
+	select {
+	case <-secondDone:
+	case <-time.After(time.Second):
+		t.Fatal("output from another terminal was blocked")
+	}
+	close(bus.release)
+	select {
+	case <-firstDone:
+	case <-time.After(time.Second):
+		t.Fatal("slow terminal output did not finish")
+	}
 }
 
 func TestTerminalService_CloseWaitsForPendingOutputDrain(t *testing.T) {

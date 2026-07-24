@@ -35,29 +35,36 @@ var backupTables = []string{"session_folders", "ssh_keys", "asset_environments",
 var backupDeleteOrder = []string{"transfer_jobs", "terminal_theme_profiles", "themes", "tunnels", "session_tags", "sessions", "asset_tags", "asset_projects", "asset_environments", "ssh_keys", "session_folders", "macros", "serial_ports", "settings"}
 
 type SyncService struct {
-	db              *sql.DB
-	logger          *slog.Logger
-	dataDir         string
-	crypto          KeyCrypto
-	secretSource    func() (string, error)
-	vaultSource     func() (*backupcrypto.VaultFile, error)
-	vaultInstaller  func(password string, vault backupcrypto.VaultFile) error
-	eventBus        EventBus
-	lifecycle       syncLifecycle
-	providerFactory syncProviderFactory
-	operationMu     sync.Mutex
-	stateMu         sync.RWMutex
-	state           syncRuntimeState
-	schedulerMu     sync.Mutex
-	schedulerCancel context.CancelFunc
-	schedulerWG     sync.WaitGroup
-	proxyManager    *netproxy.Manager
+	db               *sql.DB
+	logger           *slog.Logger
+	dataDir          string
+	crypto           KeyCrypto
+	secretSource     func() (string, error)
+	vaultSource      func() (*backupcrypto.VaultFile, error)
+	vaultInstaller   func(password string, vault backupcrypto.VaultFile) error
+	eventBus         EventBus
+	lifecycle        syncLifecycle
+	providerFactory  syncProviderFactory
+	operationMu      sync.Mutex
+	stateMu          sync.RWMutex
+	state            syncRuntimeState
+	schedulerMu      sync.Mutex
+	schedulerCancel  context.CancelFunc
+	schedulerContext context.Context
+	schedulerStop    context.CancelFunc
+	schedulerWG      sync.WaitGroup
+	schedulerStopped bool
+	proxyManager     *netproxy.Manager
 }
 
 type SyncOption func(*SyncService)
 
 func NewSyncService(db *sql.DB, logger *slog.Logger, options ...SyncOption) *SyncService {
-	service := &SyncService{db: db, logger: logger, providerFactory: defaultSyncProviderFactory{}}
+	schedulerContext, schedulerStop := context.WithCancel(context.Background())
+	service := &SyncService{
+		db: db, logger: logger, providerFactory: defaultSyncProviderFactory{},
+		schedulerContext: schedulerContext, schedulerStop: schedulerStop,
+	}
 	for _, option := range options {
 		option(service)
 	}
@@ -169,7 +176,7 @@ func (s *SyncService) snapshot() (ExportData, error) {
 			filtered := rows[:0]
 			for _, row := range rows {
 				key, _ := row["key"].(string)
-				if !strings.HasPrefix(key, "sync.") {
+				if !strings.HasPrefix(key, "sync.") && !isLocalOnlySetting(key) {
 					filtered = append(filtered, row)
 				}
 			}
@@ -212,7 +219,8 @@ func (s *SyncService) restore(data ExportData) error {
 		statement := "DELETE FROM " + table
 		arguments := []any(nil)
 		if table == "settings" {
-			statement = "DELETE FROM settings WHERE key NOT LIKE 'sync.%'"
+			statement = "DELETE FROM settings WHERE key NOT LIKE 'sync.%' AND key <> ?"
+			arguments = []any{securityRotationPendingSetting}
 		}
 		if _, err := tx.Exec(statement, arguments...); err != nil {
 			return fmt.Errorf("clear %s: %w", table, err)

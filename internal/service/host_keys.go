@@ -11,6 +11,7 @@ import (
 
 	gossh "golang.org/x/crypto/ssh"
 
+	"github.com/xuthus5/mssh/internal/fsutil"
 	"github.com/xuthus5/mssh/internal/model"
 	msshssh "github.com/xuthus5/mssh/internal/ssh"
 )
@@ -114,7 +115,7 @@ func (s *SessionService) deleteHostKeyLocked(path string, line int) error {
 	if err := temporary.Close(); err != nil {
 		return fmt.Errorf("close known_hosts temp file: %w", err)
 	}
-	if err := os.Rename(temporaryPath, path); err != nil {
+	if err := fsutil.ReplaceFile(temporaryPath, path); err != nil {
 		return fmt.Errorf("replace known_hosts: %w", err)
 	}
 	return nil

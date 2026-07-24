@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import { useCallback, type ReactNode } from 'react'
 import { FolderTree, List } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Switch } from '@/components/ui/switch'
 import { AutoSaveStatusIndicator } from '@/components/settings/AutoSaveStatus'
 import { useAutoSave } from '@/hooks/useAutoSave'
+import { useDraftSync } from '@/hooks/useDraftSync'
 import type { SFTPSettings } from '@/lib/sftpSettings'
 import { t } from '@/i18n'
 
@@ -17,13 +18,17 @@ interface Props {
   onReload?: () => void
 }
 
+function createDraft(settings: SFTPSettings): SFTPSettings {
+  return { ...settings }
+}
+
 export function SFTPSettingsPanel({ settings, onSave, settingsReady = true, loadError = '', onReload }: Props) {
-  const [draft, setDraft] = useState(settings)
-  useEffect(() => setDraft(settings), [settings])
+  const { draft, setDraft, acknowledgeSaved } = useDraftSync({ source: settings, createDraft })
   const update = (updates: Partial<SFTPSettings>) => setDraft((current) => ({ ...current, ...updates }))
   const persist = useCallback(async (next: SFTPSettings) => {
     await onSave(next)
-  }, [onSave])
+    acknowledgeSaved(next)
+  }, [acknowledgeSaved, onSave])
   const autoSave = useAutoSave({ value: draft, onSave: persist, isReady: settingsReady, delayMs: 350 })
 
   return (

@@ -71,7 +71,7 @@ wails3 task test            # backend race + coverage >= 90%
 wails3 task test:frontend   # source limits + bundle budget + vitest
 wails3 task build           # production build
 
-# Isolated local sshd + tmux + SFTP integration
+# Isolated local sshd + tmux + SFTP and Linux PTY serial integration
 wails3 task test:e2e
 
 # Performance budgets and allocation benchmarks
@@ -107,7 +107,7 @@ Git tags matching `v*` trigger `.github/workflows/release.yml`, which builds:
 - Windows amd64/arm64: exe + NSIS installer
 - macOS: universal `.app` zip
 
-Version is injected from the git tag into `internal/service.Version` and package metadata. First-release packages are unsigned.
+Version is injected from the git tag into `internal/service.Version` and package metadata. Release metadata includes SHA-256, CycloneDX SBOM, provenance, and Sigstore signatures; native package code signing is not yet enabled.
 
 ### Lint
 ```bash

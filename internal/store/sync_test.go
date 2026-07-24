@@ -40,6 +40,34 @@ func TestSyncVersionStoreLifecycle(t *testing.T) {
 	assert.Nil(t, missing)
 }
 
+func TestSetSyncVersionProtectedTxUsesCallerTransaction(t *testing.T) {
+	db := setupTestDB(t)
+	version, err := InsertSyncVersion(db, model.SyncVersion{
+		VersionID: "tx-version", SnapshotFingerprint: "tx-fingerprint",
+		Provider: model.SyncProviderGist, Source: "test", FileName: "tx.msshbackup", CreatedAt: time.Now().UTC(),
+	})
+	require.NoError(t, err)
+	assert.Error(t, SetSyncVersionProtectedTx(nil, version.ID, true))
+
+	tx, err := db.Begin()
+	require.NoError(t, err)
+	require.NoError(t, SetSyncVersionProtectedTx(tx, version.ID, true))
+	require.NoError(t, tx.Rollback())
+	rolledBack, err := GetSyncVersion(db, version.ID)
+	require.NoError(t, err)
+	require.NotNil(t, rolledBack)
+	assert.False(t, rolledBack.Protected)
+
+	tx, err = db.Begin()
+	require.NoError(t, err)
+	require.NoError(t, SetSyncVersionProtectedTx(tx, version.ID, true))
+	require.NoError(t, tx.Commit())
+	committed, err := GetSyncVersion(db, version.ID)
+	require.NoError(t, err)
+	require.NotNil(t, committed)
+	assert.True(t, committed.Protected)
+}
+
 func TestSyncEventStoreOrdersNewestFirst(t *testing.T) {
 	db := setupTestDB(t)
 	for _, action := range []string{"first", "second"} {

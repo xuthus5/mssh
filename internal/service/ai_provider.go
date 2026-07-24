@@ -166,7 +166,7 @@ func chatAnthropic(ctx context.Context, client *http.Client, profile model.AIPro
 }
 
 func chatGemini(ctx context.Context, client *http.Client, profile model.AIProviderProfile, apiKey string, input aiChatInput) (string, error) {
-	endpoint := fmt.Sprintf("%s/v1beta/models/%s:generateContent?key=%s", providerBaseURL(profile), url.PathEscape(profile.DefaultModel), url.QueryEscape(apiKey))
+	endpoint := fmt.Sprintf("%s/v1beta/models/%s:generateContent", providerBaseURL(profile), url.PathEscape(profile.DefaultModel))
 	payload := map[string]any{"systemInstruction": map[string]any{"parts": []map[string]string{{"text": input.System}}}, "contents": []map[string]any{{"parts": []map[string]string{{"text": input.Prompt + "\n\n终端上下文:\n" + input.Context}}}}}
 	var response struct {
 		Candidates []struct {
@@ -177,7 +177,7 @@ func chatGemini(ctx context.Context, client *http.Client, profile model.AIProvid
 			} `json:"content"`
 		} `json:"candidates"`
 	}
-	if err := postJSON(ctx, client, endpoint, "", "", payload, &response); err != nil {
+	if err := postJSON(ctx, client, endpoint, apiKey, "gemini", payload, &response); err != nil {
 		return "", err
 	}
 	if len(response.Candidates) == 0 || len(response.Candidates[0].Content.Parts) == 0 {
@@ -210,10 +210,13 @@ func postJSON(ctx context.Context, client *http.Client, endpoint, apiKey, kind s
 	}
 	request.Header.Set("Content-Type", "application/json")
 	if apiKey != "" {
-		if kind == "anthropic" {
+		switch kind {
+		case "anthropic":
 			request.Header.Set("x-api-key", apiKey)
 			request.Header.Set("anthropic-version", "2023-06-01")
-		} else {
+		case "gemini":
+			request.Header.Set("x-goog-api-key", apiKey)
+		default:
 			request.Header.Set("Authorization", "Bearer "+apiKey)
 		}
 	}

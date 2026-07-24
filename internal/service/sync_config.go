@@ -251,11 +251,10 @@ func (s *SyncService) deviceID() (string, error) {
 }
 
 func writeSyncSetting(db *sql.DB, key string, value any) error {
-	encoded, err := json.Marshal(value)
+	setting, err := buildSyncSetting(key, value)
 	if err != nil {
-		return fmt.Errorf("encode sync setting %s: %w", key, err)
+		return err
 	}
-	setting := model.Setting{Key: key, Namespace: "sync", Value: string(encoded), ValueType: syncSettingType(value), Version: 1}
 	return store.SetSettings(db, []model.Setting{setting})
 }
 

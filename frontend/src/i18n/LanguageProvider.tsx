@@ -1,8 +1,10 @@
 import type { ReactNode } from 'react'
 import { useLanguageStore } from '@/i18n/languageStore'
+import type { AppLanguage } from '@/i18n/types'
 
-/** Remounts the tree when language changes so all t() calls refresh. */
-export function LanguageProvider({ children }: { children: ReactNode }) {
+type LanguageRenderer = (language: AppLanguage) => ReactNode
+
+export function LanguageProvider({ children }: { children: LanguageRenderer }) {
   const language = useLanguageStore((state) => state.language)
-  return <div key={language} data-language={language} className="contents">{children}</div>
+  return <div data-language={language} className="contents">{children(language)}</div>
 }

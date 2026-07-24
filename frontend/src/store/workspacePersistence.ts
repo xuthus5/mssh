@@ -1,6 +1,7 @@
 import type { AppState, ConnectionStatus, Tab, TerminalTab } from '@/store/appStore'
 import type { ActiveSurface, OverviewSection, WorkspaceID } from '@/store/tabNavigation'
 import { isSplitLayoutSnapshot, type SplitLayoutSnapshot } from '@/components/terminal/splitLayout'
+import { releaseAppTerminalOpenReservation } from '@/lib/openTerminal'
 
 export const WORKSPACE_LAYOUT_SETTING = 'workspace.layout'
 
@@ -230,8 +231,9 @@ async function restoreTabIntent(
     : 'ssh'
   if (kind === 'ssh' && !sessionIDs.has(intent.sessionId)) return null
   if (kind === 'serial' && (!intent.serialPortId || !serialPortIDs.has(intent.serialPortId))) return null
+  let terminalId = ''
   try {
-    const terminalId = await openTerminal({
+    terminalId = await openTerminal({
       connectionKind: kind,
       sessionId: intent.sessionId,
       serialPortId: intent.serialPortId,
@@ -256,6 +258,7 @@ async function restoreTabIntent(
     }
     return tab
   } catch {
+    if (terminalId) releaseAppTerminalOpenReservation(terminalId)
     return null
   }
 }

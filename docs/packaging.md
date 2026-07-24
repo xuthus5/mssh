@@ -28,7 +28,9 @@ wails3 task package:linux:amd64
 wails3 task package:linux:flatpak
 ```
 
-Packages are unsigned in the first release pipeline.
+Release metadata is signed with Sigstore Cosign and accompanied by SHA-256,
+CycloneDX SBOM, provenance, and GitHub build-attestation files. Native package
+code signing remains platform-specific and is not yet enabled.
 
 ## Flatpak
 

@@ -25,6 +25,8 @@ type dbOpenDependencies struct {
 	closeDB  func(*sql.DB) error
 }
 
+const databaseMaxOpenConnections = 1
+
 func OpenDB(dataDir string) (*sql.DB, error) {
 	return openDBWithDependencies(dataDir, defaultDBOpenDependencies())
 }
@@ -65,7 +67,7 @@ func openDBWithDependencies(dataDir string, dependencies dbOpenDependencies) (*s
 	if err != nil {
 		return nil, errors.Join(fmt.Errorf("open database: %w", err), closeOpenedDB(db, dependencies.closeDB))
 	}
-	db.SetMaxOpenConns(1)
+	db.SetMaxOpenConns(databaseMaxOpenConnections)
 	if err = dependencies.ping(db); err != nil {
 		return nil, errors.Join(fmt.Errorf("ping database: %w", err), closeOpenedDB(db, dependencies.closeDB))
 	}

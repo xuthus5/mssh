@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -41,6 +42,23 @@ func TestSyncSchedulerRemainsStoppedWhenDisabled(t *testing.T) {
 	assert.Nil(t, service.schedulerCancel)
 	service.schedulerMu.Unlock()
 	service.StopScheduler()
+}
+
+func TestSyncSchedulerDoesNotRestartAfterStop(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	service := newTestSyncService(db, syncTestMasterKey)
+	config := defaultSyncConfig()
+	config.Enabled = true
+	config.IntervalMinutes = 5
+	require.NoError(t, writeSyncSetting(db, syncConfigSetting, config))
+
+	service.StartScheduler()
+	service.StopScheduler()
+	service.restartScheduler()
+
+	service.schedulerMu.Lock()
+	defer service.schedulerMu.Unlock()
+	assert.Nil(t, service.schedulerCancel)
 }
 
 func TestEnsureVaultReadyForSync(t *testing.T) {
@@ -106,6 +124,99 @@ func TestNotifyVaultUnlockedIsNilSafe(t *testing.T) {
 	locked.NotifyVaultUnlocked()
 	// Give the goroutine a moment to exit.
 	time.Sleep(20 * time.Millisecond)
+}
+
+func TestNotifyVaultUnlockedIsWaitedDuringSchedulerStop(t *testing.T) {
+	started := make(chan struct{})
+	release := make(chan struct{})
+	var releaseOnce sync.Once
+	releaseCatchUp := func() { releaseOnce.Do(func() { close(release) }) }
+	service := NewSyncService(testutil.NewTestDB(t), testutil.NewTestLogger(),
+		WithSyncSecretSource(func() (string, error) {
+			close(started)
+			<-release
+			return "", errors.New("locked")
+		}),
+	)
+	defer releaseCatchUp()
+
+	service.NotifyVaultUnlocked()
+	select {
+	case <-started:
+	case <-time.After(time.Second):
+		t.Fatal("catch-up sync did not start")
+	}
+
+	stopped := make(chan struct{})
+	go func() {
+		service.StopScheduler()
+		close(stopped)
+	}()
+	select {
+	case <-stopped:
+		t.Fatal("scheduler stop returned before catch-up completed")
+	case <-time.After(20 * time.Millisecond):
+	}
+
+	releaseCatchUp()
+	select {
+	case <-stopped:
+	case <-time.After(time.Second):
+		t.Fatal("scheduler stop did not wait for catch-up")
+	}
+}
+
+func TestNotifyVaultUnlockedIsCancelledDuringSchedulerStop(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	config := defaultSyncConfig()
+	config.Enabled = true
+	config.Provider = model.SyncProviderWebDAV
+	config.WebDAV.URL = "https://dav.example/backups"
+	require.NoError(t, writeSyncSetting(db, syncConfigSetting, config))
+
+	provider := &blockingScheduledSyncProvider{started: make(chan struct{})}
+	service := newTestSyncService(db, syncTestMasterKey, WithSyncProviderFactory(blockingScheduledSyncFactory{provider: provider}))
+	service.NotifyVaultUnlocked()
+	select {
+	case <-provider.started:
+	case <-time.After(time.Second):
+		t.Fatal("scheduled sync did not reach provider")
+	}
+
+	stopped := make(chan struct{})
+	go func() {
+		service.StopScheduler()
+		close(stopped)
+	}()
+	select {
+	case <-stopped:
+	case <-time.After(time.Second):
+		t.Fatal("scheduler stop did not cancel scheduled sync")
+	}
+}
+
+type blockingScheduledSyncProvider struct {
+	started chan struct{}
+}
+
+func (p *blockingScheduledSyncProvider) Test(context.Context) error { return nil }
+
+func (p *blockingScheduledSyncProvider) Fetch(ctx context.Context) (syncRemoteObject, error) {
+	close(p.started)
+	<-ctx.Done()
+	return syncRemoteObject{}, ctx.Err()
+}
+
+func (p *blockingScheduledSyncProvider) Put(context.Context, []byte, string) (syncRemoteObject, error) {
+	return syncRemoteObject{}, errors.New("not implemented")
+}
+
+type blockingScheduledSyncFactory struct {
+	provider *blockingScheduledSyncProvider
+}
+
+func (f blockingScheduledSyncFactory) Create(context.Context, model.SyncConfig, syncProviderSecrets) (syncProvider, error) {
+	return f.provider, nil
 }
 
 func TestCloseAllTerminalsHandlesNilAndActiveEntries(t *testing.T) {

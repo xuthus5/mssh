@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { LabeledSelect } from '@/components/ui/labeled-select'
@@ -8,6 +8,7 @@ import { ApplicationLogSettingsSection } from '@/components/settings/Application
 import { ApplicationNetworkProxySettingsSection } from '@/components/settings/ApplicationNetworkProxySettings'
 import { AutoSaveStatusIndicator } from '@/components/settings/AutoSaveStatus'
 import { useAutoSave } from '@/hooks/useAutoSave'
+import { useDraftSync } from '@/hooks/useDraftSync'
 import type { GeneralSettings } from '@/hooks/useSettings'
 import { t } from '@/i18n'
 
@@ -187,10 +188,7 @@ function LanguageSettings({
 }
 
 export function GeneralSettingsPanel({ general, systemFonts, onSave, onPreviewUIFont, settingsReady = true, loadError = '', onReload }: Props) {
-  const [draft, setDraft] = useState(() => createDraft(general))
-  useEffect(() => {
-    setDraft(createDraft(general))
-  }, [general])
+  const { draft, setDraft, acknowledgeSaved } = useDraftSync({ source: general, createDraft })
 
   const previewDraft = (next: GeneralDraft) => {
     setDraft(next)
@@ -200,8 +198,9 @@ export function GeneralSettingsPanel({ general, systemFonts, onSave, onPreviewUI
   const persist = useCallback(
     async (next: GeneralDraft) => {
       await onSave(buildSavePayload(general, next))
+      acknowledgeSaved(next)
     },
-    [general, onSave],
+    [acknowledgeSaved, general, onSave],
   )
   const autoSave = useAutoSave({ value: draft, onSave: persist, isReady: settingsReady, delayMs: 450 })
 

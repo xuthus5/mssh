@@ -3,12 +3,15 @@ package service
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/xuthus5/mssh/internal/service/testutil"
+	"github.com/xuthus5/mssh/internal/ssh"
 	"github.com/xuthus5/mssh/pkg/event"
 )
 
@@ -38,6 +41,67 @@ func TestFileServiceEmitHelpersAndCancelMissing(t *testing.T) {
 	svc.CancelAll()
 }
 
+func TestFileServiceRunUploadEmitsErrorForMissingSource(t *testing.T) {
+	sftpContext := startSFTPTestServer(t)
+	t.Cleanup(sftpContext.cancel)
+	service, session := createSFTPFileService(t, sftpContext)
+	client, cleanup := openTestSFTPClient(t, service, session.ID)
+	t.Cleanup(cleanup)
+
+	service.runUpload(transferExecution{
+		ctx: context.Background(), taskID: "upload-error", client: client,
+		source: filepath.Join(t.TempDir(), "missing"), target: "/remote",
+	})
+
+	assert.True(t, transferErrorEventHasTask(service.eventBus.(*mockEventBus), "upload-error"))
+}
+
+func TestFileServiceRunDownloadEmitsErrorForMissingRemote(t *testing.T) {
+	sftpContext := startSFTPTestServer(t)
+	t.Cleanup(sftpContext.cancel)
+	service, session := createSFTPFileService(t, sftpContext)
+	client, cleanup := openTestSFTPClient(t, service, session.ID)
+	t.Cleanup(cleanup)
+	localPath := filepath.Join(t.TempDir(), "download")
+
+	service.runDownload(transferExecution{
+		ctx: context.Background(), taskID: "download-error", client: client,
+		source: "/missing", target: localPath,
+	})
+
+	assert.True(t, transferErrorEventHasTask(service.eventBus.(*mockEventBus), "download-error"))
+	_, err := os.Stat(downloadPartialPath(localPath, "download-error"))
+	assert.ErrorIs(t, err, os.ErrNotExist)
+}
+
+func openTestSFTPClient(t *testing.T, service *FileService, sessionID int64) (*ssh.SFTPClient, func()) {
+	t.Helper()
+	wrapper, connectionID, err := service.connect(context.Background(), sessionID)
+	require.NoError(t, err)
+	client, err := ssh.OpenSFTP(wrapper)
+	if err != nil {
+		service.disconnect(connectionID)
+		require.NoError(t, err)
+	}
+	return client, func() {
+		_ = client.Close()
+		service.disconnect(connectionID)
+	}
+}
+
+func transferErrorEventHasTask(bus *mockEventBus, taskID string) bool {
+	for _, captured := range bus.Events() {
+		if captured.Name != event.TransferError {
+			continue
+		}
+		payload, ok := captured.Payload.(event.TransferErrorPayload)
+		if ok && payload.TaskID == taskID {
+			return payload.Error != ""
+		}
+	}
+	return false
+}
+
 func TestTransferAborted(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
@@ -46,31 +110,13 @@ func TestTransferAborted(t *testing.T) {
 	assert.False(t, transferAborted(context.Background(), errors.New("disk full")))
 }
 
-func TestFileService_CancelForSessionsEmitsCancelled(t *testing.T) {
-	bus := newMockEventBus()
-	svc := NewFileService(nil, bus, testutil.NewTestLogger())
-	ctx, cancel := context.WithCancel(context.Background())
-	svc.mu.Lock()
-	svc.tasks["task-cancel-ui"] = cancel
-	svc.taskSessions["task-cancel-ui"] = 7
-	svc.mu.Unlock()
+func TestDownloadPartialPathIsUniquePerTask(t *testing.T) {
+	localPath := filepath.Join(t.TempDir(), "result.txt")
+	first := downloadPartialPath(localPath, "file-one")
+	second := downloadPartialPath(localPath, "file-two")
 
-	svc.CancelForSessions([]int64{7})
-	select {
-	case <-ctx.Done():
-	case <-time.After(time.Second):
-		t.Fatal("context not cancelled")
-	}
-	assert.True(t, bus.hasEvent(event.TransferComplete))
-	found := false
-	for _, item := range bus.Events() {
-		if item.Name != event.TransferComplete {
-			continue
-		}
-		payload, ok := item.Payload.(event.TransferProgressPayload)
-		if ok && payload.TaskID == "task-cancel-ui" && payload.Status == "cancelled" {
-			found = true
-		}
-	}
-	assert.True(t, found)
+	assert.NotEqual(t, first, second)
+	assert.Equal(t, localPath, filepath.Dir(first)+string(filepath.Separator)+"result.txt")
+	assert.Contains(t, filepath.Base(first), "file-one")
+	assert.Contains(t, filepath.Base(second), "file-two")
 }

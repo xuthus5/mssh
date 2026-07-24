@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { AISettingsPanel } from '@/components/settings/AISettingsPanel'
 
@@ -66,6 +66,39 @@ describe('AISettingsPanel', () => {
     rerender(<AISettingsPanel controller={loading as never} />)
     expect(screen.getByText('AI 配置加载失败')).toBeInTheDocument()
   })
+
+  it('keeps edits made while an earlier settings save resolves', async () => {
+    const controller = aiController()
+    const firstSave = deferredSave()
+    controller.saveSettings = vi.fn()
+      .mockImplementationOnce(() => firstSave.promise)
+      .mockResolvedValue(undefined)
+    const view = render(<AISettingsPanel controller={controller as never} />)
+    const user = userEvent.setup()
+
+    await user.click(screen.getByRole('tab', { name: '交互配置' }))
+    await changeNumber(user, '面板宽度', '500')
+    await vi.advanceTimersByTimeAsync(450)
+    await changeNumber(user, '面板宽度', '520')
+    await act(async () => {
+      firstSave.resolve()
+      await firstSave.promise
+      await Promise.resolve()
+    })
+    const echoed = {
+      ...controller,
+      dashboard: {
+        ...controller.dashboard,
+        settings: {
+          ...controller.dashboard.settings,
+          interaction: { ...controller.dashboard.settings.interaction, panel_width: 500 },
+        },
+      },
+    }
+    view.rerender(<AISettingsPanel controller={echoed as never} />)
+
+    expect(screen.getByLabelText('面板宽度')).toHaveValue(520)
+  })
 })
 
 async function changeNumber(user: ReturnType<typeof userEvent.setup>, label: string, value: string) {
@@ -84,4 +117,12 @@ function aiController() {
     dashboard: { keychain_available: true, providers: [], settings: { default_provider_id: null, fallback_provider_id: null, interaction: { panel_width: 420, context_lines: 80, include_session_metadata: true, include_system_summary: true, stream_responses: true, auto_scroll: true, render_markdown: true, history_retention_days: 30, max_conversations: 100 }, search: { enabled: false, mode: 'auto', provider: 'brave', timeout_seconds: 10, max_results: 5, require_citations: true, credential_saved: false, credential_session_only: false }, security: { auto_execute_read_only: false, command_timeout_seconds: 60, max_output_bytes: 65536, max_plan_steps: 5, allow_patterns: [], deny_patterns: [], redaction_patterns: [] } } },
     agents: [], loading: false, pending: null, error: null, reload: vi.fn(), saveProvider: vi.fn(), deleteProvider: vi.fn(), testProvider: vi.fn(), saveSettings: vi.fn(async () => {}), detectAgents: vi.fn(async () => {}),
   }
+}
+
+function deferredSave() {
+  let resolve = () => {}
+  const promise = new Promise<void>((done) => {
+    resolve = done
+  })
+  return { promise, resolve }
 }

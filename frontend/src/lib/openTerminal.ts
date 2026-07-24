@@ -1,7 +1,8 @@
 import { useAppStore } from '@/store/appStore'
 import {
-  ensureTerminalPoolCapacity,
-  openTerminalWithPoolCapacity as openWithCapacity,
+	ensureTerminalPoolCapacity,
+	openTerminalWithPoolCapacity as openWithCapacity,
+	releaseTerminalOpenReservation,
   type EnsureTerminalPoolCapacityOptions,
   type TerminalPoolStoreAccess,
 } from '@/store/terminalPoolReclaim'
@@ -25,4 +26,8 @@ export function ensureAppTerminalPoolCapacity(
   options?: Omit<EnsureTerminalPoolCapacityOptions, keyof TerminalPoolStoreAccess>,
 ): Promise<boolean> {
   return ensureTerminalPoolCapacity({ ...appStoreAccess(), ...options })
+}
+
+export function releaseAppTerminalOpenReservation(terminalID: string): void {
+  releaseTerminalOpenReservation(appStoreAccess(), terminalID)
 }

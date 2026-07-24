@@ -82,9 +82,9 @@
 
 实现锚点：`internal/ssh/client.go`、`internal/service/session_connect.go`、`internal/crypto/vault.go`，以及 host key / vault / rotate / terminal exit 等测试。
 
-## 19. 2026-07-22 可商用验收证据
+## 19. 2026-07-22 历史可商用验收快照
 
-本地完整门禁 `wails3 task ci` 已通过（`EXIT:0`），与 `.github/workflows/ci.yml` 对齐：
+以下记录对应 2026-07-22 的历史提交；当前工作树的结果以文档末尾最新快照为准，提交后仍需在新 `HEAD` 上复验。
 
 | 门禁 | 结果 |
 |---|---|
@@ -108,7 +108,7 @@
 - 事件总线 Emit 零拷贝契约
 - SQLite 读写分离 / 多连接架构
 
-结论：在当前 EARS 清单、CI 门禁与安全锚点证据下，项目代码质量达到**可商用基线**。
+当时结论：在当时 EARS 清单、CI 门禁与安全锚点证据下，项目代码质量达到**可商用基线**。后续硬化波次继续扩大了并发、同步认证、传输关闭和前端状态覆盖范围。
 
 
 ## 2026-07-23 商用硬化波次（本地 Shell / 串口 / 快捷键）
@@ -1467,3 +1467,66 @@
 |---|---|---|
 | QA-COV-189 | `TestOpenSerialSuccessAndControl` 在 `-race` 下稳定：live fake port 保持设备占用，控制 API 成功路径可测。 | done |
 | QA-COV-190 | `go test -race -coverpkg=./internal/...,./pkg/... ./internal/... ./pkg/...` EXIT 0 且 total ≥90.0%。 | done |
+
+## 2026-07-25 商用硬化波次（并发、同步认证、关闭生命周期与前端竞态）
+
+| ID | EARS 验收条件 | 状态 |
+|---|---|---|
+| DESKTOP-191 | 当应用退出时，系统必须先阻止新的文件传输，取消并等待已有传输 worker，随后关闭终端资源；重复关闭不得死锁。 | done |
+| SYNC-192 | 当同步 artifact 的版本元数据、父链或嵌入式 Vault 被篡改时，系统必须通过 AES-GCM AAD 校验并拒绝回滚、分叉和非连续版本。 | done |
+| SEC-193 | 当 AI 请求发生跨主机重定向或上下文脱敏时，系统必须剥离 API 密钥并隐藏环境变量密钥、认证 URI 和请求头凭证。 | done |
+| TERM-194 | 当终端池执行 LRU 淘汰、PTY 退出或并发打开时，系统必须避免锁内回调死锁、统一保护系统采样并清理 reservation。 | done |
+| UX-195 | 当语言切换、设置卸载或快速连续输入发生时，系统不得重挂终端树、丢失最后一次草稿或让旧响应覆盖新值。 | done |
+| QA-COV-196 | 新增同步元数据、传输关闭/失败、终端并发回收测试；CI 同款 Go race 覆盖率必须达到 ≥90%，golangci-lint 必须无问题。 | done |
+
+## 2026-07-25 商用硬化波次（关闭闸门、上下文取消与同步状态原子性）
+
+| ID | EARS 验收条件 | 状态 |
+|---|---|---|
+| DESKTOP-203 | 当临时执行 `CloseAll`/`CloseAllTerminals` 时，系统必须阻止新的连接或终端打开，取消并等待已有操作，再释放闸门以支持同步后的正常重连。 | done |
+| DESKTOP-204 | 当应用执行最终 shutdown 时，Session/Terminal 服务必须永久拒绝新操作，重复 shutdown 不得死锁或遗留连接、PTY。 | done |
+| TERM-205 | 当本地 Shell、串口或远程终端的调用上下文取消时，系统必须停止启动流程并关闭已创建的底层资源。 | done |
+| SYNC-206 | 当同步成功状态的版本保护或 baseline 写入任一步失败时，系统必须通过同一数据库事务回滚全部元数据变更。 | done |
+| QA-COV-207 | 生命周期闸门、上下文取消和同步事务必须有 race 回归用例；CI 同款 Go 覆盖率必须保持 ≥90%，golangci-lint 必须无问题。 | done |
+
+### 当前验证快照
+
+本轮已完成的定向证据：
+
+- `golangci-lint run --timeout 5m ./...`：0 issues
+- `go test -race -coverprofile=... -coverpkg=./internal/...,./pkg/... ./internal/... ./pkg/...`：全绿，total **90.0%**
+- 新增 `validateRemoteArtifactMetadata`、传输 worker 关闭/失败、无主任务清理测试，并通过定向 race
+- 新增 Session/Terminal 临时关闭闸门、最终 shutdown、Local Shell/串口 context 取消和同步 baseline 事务回滚测试
+- 已使用 `gofmt` 与 `goimports-reviser` 整理本轮 Go 改动
+
+### 发布与架构收口
+
+以下项目已完成仓库内实现与可本地复现的门禁；依赖 GitHub OIDC 或 Flathub 审核的外部执行证据保持 `partial`，不以本地模拟冒充平台结果：
+
+| ID | EARS 验收条件 | 状态 |
+|---|---|---|
+| RELEASE-197 | 当任一 Linux/Windows/macOS 发布包生成失败时，Release 工作流必须失败并阻止发布；不得使用 Flatpak/NSIS 的 soft-fail 或无条件 `|| true`。 | done |
+| RELEASE-198 | 当发布产物上传前，工作流必须生成并校验 SHA-256、SBOM、构建来源证明和签名；Release 页面必须同时发布校验文件。 | partial |
+| RELEASE-199 | 当 CI 与 Release 构建 Wails、Go、Node 和前端依赖时，必须使用锁定版本/锁文件并在构建前验证版本，避免 `latest` 漂移。 | done |
+| FLATHUB-200 | 当提交 Flathub 时，项目必须提供可审查的应用 ID、manifest、metainfo、图标、权限说明和自动化验证，并以 Flathub 审核结果作为发布门禁。 | partial |
+| QA-E2E-201 | 当执行合并门禁时，真实 SSH/tmux/SFTP/串口集成测试与性能预算必须有可复现的 CI 任务或明确的独立发布门禁。 | done |
+| ARCH-202 | 当并发规模和数据库读写增长时，系统必须以指标证明事件总线、SQLite 连接策略和跨平台系统探针满足定义的性能预算。 | done |
+
+本轮新增证据：
+
+- Release 工作流通过 `actionlint`、`scripts/release/validate-workflow.sh` 与 metadata smoke test；Cosign v3 使用 Sigstore bundle 并在工作流内执行 `verify-blob`。下一次 tag 的 GitHub OIDC 实签是 `RELEASE-198` 的最终外部证据。
+- CI 新增 `commercial-performance` 三次 benchmark artifact、Flatpak/Flathub manifest 校验任务，以及 Linux PTY 串口数据链路集成测试。
+- 本地与 Flathub manifest 均通过 AppStream、`flatpak-builder --show-manifest`、权限/图标检查；Flathub tag/commit 远程一致。商店审核结果是 `FLATHUB-200` 的最终外部证据。
+- SQLite 固定单连接并有断言；Wails event bus、终端输出、系统探针和数据库路径均有预算测试或 allocation benchmark。
+
+## 2026-07-25 商用硬化波次（跨平台文件替换与同步退出收口）
+
+| ID | EARS 验收条件 | 状态 |
+|---|---|---|
+| FS-208 | 当应用在 Windows 覆盖已有本地文件时，系统必须使用可替换且写穿的原子移动；Unix 保持原子重命名语义。 | done |
+| SEC-209 | 当 Vault 被保存或轮转时，系统必须使用同目录唯一临时文件、0600 权限和写入同步，避免并发调用互相覆盖。 | done |
+| DESKTOP-210 | 当应用退出且同步 catch-up 正在运行时，系统必须先取消并等待同步，再关闭终端、连接和数据库；重复退出不得死锁。 | done |
+| QA-COV-211 | 跨平台替换、Vault 覆盖、scheduler context 取消和 shutdown 顺序必须有回归测试；Linux race 与 Windows 目标编译必须通过。 | done |
+| RELEASE-212 | 当 Release 工作流选择 macOS amd64 runner 时，必须使用 GitHub 当前有效的 x64 hosted label，并通过 `actionlint` 校验。 | done |
+
+本波次验证证据：`go vet ./...`、`govulncheck ./...`、Windows `amd64` 目标编译、定向 `go test -race` 压力运行和应用 shutdown 顺序回归均通过。

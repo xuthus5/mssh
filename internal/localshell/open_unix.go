@@ -3,6 +3,7 @@
 package localshell
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -12,8 +13,8 @@ import (
 	"github.com/creack/pty"
 )
 
-func openPlatform(cfg resolvedConfig) (*Session, error) {
-	cmd := exec.Command(cfg.Shell, cfg.Args...)
+func openPlatformContext(ctx context.Context, cfg resolvedConfig) (*Session, error) {
+	cmd := exec.CommandContext(ctx, cfg.Shell, cfg.Args...)
 	cmd.Dir = cfg.CWD
 	cmd.Env = cfg.Env
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}

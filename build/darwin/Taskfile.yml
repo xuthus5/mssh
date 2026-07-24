@@ -11,7 +11,7 @@ tasks:
   build:
     summary: Creates a production build of the application
     deps:
-      - task: common:go:mod:tidy
+      - task: common:go:mod:verify
       - task: common:build:frontend
         vars:
           BUILD_FLAGS:
@@ -20,7 +20,7 @@ tasks:
             ref: .PRODUCTION
       - task: common:generate:icons
     cmds:
-      - go build {{.BUILD_FLAGS}} -o {{.OUTPUT}}
+      - go build -mod=readonly {{.BUILD_FLAGS}} -o {{.OUTPUT}}
     vars:
       APP_VERSION: '{{.APP_VERSION | default "0.1.0"}}'
       VERSION_LDFLAGS: '-X github.com/xuthus5/mssh/internal/service.Version={{.APP_VERSION}}'

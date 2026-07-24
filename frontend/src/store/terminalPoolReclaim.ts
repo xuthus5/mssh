@@ -79,6 +79,65 @@ export type TerminalPoolStoreAccess = {
 export type EnsureTerminalPoolCapacityOptions = TerminalPoolStoreAccess & {
   confirmProtected?: (victim: TerminalPoolVictim) => Promise<boolean> | boolean
   reserve?: number
+  reserveCapacity?: boolean
+  replacementTerminalID?: string
+}
+
+let capacityQueue = Promise.resolve()
+
+async function withCapacityLock<T>(operation: () => Promise<T>): Promise<T> {
+  const previous = capacityQueue
+  let release!: () => void
+  capacityQueue = new Promise<void>((resolve) => { release = resolve })
+  await previous
+  try {
+    return await operation()
+  } finally {
+    release()
+  }
+}
+
+function reservationCount(state: AppState, excludedTerminalID?: string): number {
+	const reservations = state.terminalOpenReservations?.size ?? 0
+	const excluded = excludedTerminalID && state.terminalOpenReservations?.has(excludedTerminalID) ? 1 : 0
+	return (state.pendingTerminalOpens ?? 0) + reservations - excluded
+}
+
+function reservePendingCapacity(options: TerminalPoolStoreAccess, amount: number): void {
+  const state = options.getState()
+  options.setState({ pendingTerminalOpens: (state.pendingTerminalOpens ?? 0) + amount })
+}
+
+function releasePendingCapacity(options: TerminalPoolStoreAccess, amount: number): void {
+  const state = options.getState()
+  options.setState({ pendingTerminalOpens: Math.max(0, (state.pendingTerminalOpens ?? 0) - amount) })
+}
+
+function bindTerminalReservation(options: TerminalPoolStoreAccess, terminalID: string): void {
+  const state = options.getState()
+  const reservations = new Set(state.terminalOpenReservations ?? [])
+  const pending = state.pendingTerminalOpens ?? 0
+  if (pending <= 0) return
+  const status = state.connectionStatus[terminalID]
+  if (status !== 'disconnected' && status !== 'error' && status !== 'closing') {
+    reservations.add(terminalID)
+  }
+  options.setState({ pendingTerminalOpens: pending - 1, terminalOpenReservations: reservations })
+}
+
+function effectivePoolSize(state: AppState, replacementTerminalID?: string): number {
+  if (replacementTerminalID && state.terminalPool.has(replacementTerminalID)) {
+    return state.terminalPool.size - 1
+  }
+  return state.terminalPool.size
+}
+
+export function releaseTerminalOpenReservation(options: TerminalPoolStoreAccess, terminalID: string): void {
+  const state = options.getState()
+  if (!state.terminalOpenReservations?.has(terminalID)) return
+  const reservations = new Set(state.terminalOpenReservations)
+  reservations.delete(terminalID)
+  options.setState({ terminalOpenReservations: reservations })
 }
 
 /**
@@ -86,13 +145,21 @@ export type EnsureTerminalPoolCapacityOptions = TerminalPoolStoreAccess & {
  * Orphans reclaim without confirm; open-tab victims require confirm + recovery toast.
  */
 export async function ensureTerminalPoolCapacity(options: EnsureTerminalPoolCapacityOptions): Promise<boolean> {
+  return withCapacityLock(() => ensureTerminalPoolCapacityUnlocked(options))
+}
+
+async function ensureTerminalPoolCapacityUnlocked(options: EnsureTerminalPoolCapacityOptions): Promise<boolean> {
   const confirmProtected = options.confirmProtected
     ?? ((victim) => confirmProtectedTerminalReclaim(victim))
   const reserve = Math.max(1, options.reserve ?? 1)
 
   while (true) {
     const state = options.getState()
-    if (state.terminalPool.size + reserve - 1 < state.maxPoolSize) return true
+		if (effectivePoolSize(state, options.replacementTerminalID)
+			+ reservationCount(state, options.replacementTerminalID) + reserve - 1 < state.maxPoolSize) {
+      if (options.reserveCapacity) reservePendingCapacity(options, reserve)
+      return true
+    }
 
     const orphanID = selectTerminalPoolEvictionID(state, 'orphan-only')
     if (orphanID) {
@@ -119,8 +186,16 @@ export async function openTerminalWithPoolCapacity(
   store: TerminalPoolStoreAccess,
   options?: Omit<EnsureTerminalPoolCapacityOptions, keyof TerminalPoolStoreAccess>,
 ): Promise<string> {
-  if (!(await ensureTerminalPoolCapacity({ ...store, ...options }))) {
+  const capacityOptions = { ...store, ...options, reserveCapacity: true }
+  if (!(await ensureTerminalPoolCapacity(capacityOptions))) {
     throw new Error(t('终端池已满，用户取消释放现有终端'))
   }
-  return open()
+  try {
+    const terminalID = await open()
+    bindTerminalReservation(store, terminalID)
+    return terminalID
+  } catch (error) {
+    releasePendingCapacity(store, Math.max(1, options?.reserve ?? 1))
+    throw error
+  }
 }

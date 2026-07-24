@@ -10,7 +10,10 @@ import (
 	"github.com/UserExistsError/conpty"
 )
 
-func openPlatform(cfg resolvedConfig) (*Session, error) {
+func openPlatformContext(ctx context.Context, cfg resolvedConfig) (*Session, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	commandLine := quoteWindowsCommand(cfg.Shell, cfg.Args)
 	options := []conpty.ConPtyOption{
 		conpty.ConPtyDimensions(cfg.Cols, cfg.Rows),
@@ -24,6 +27,10 @@ func openPlatform(cfg resolvedConfig) (*Session, error) {
 	cpty, err := conpty.Start(commandLine, options...)
 	if err != nil {
 		return nil, fmt.Errorf("start local shell: %w", err)
+	}
+	if err := ctx.Err(); err != nil {
+		_ = cpty.Close()
+		return nil, err
 	}
 	waitCtx, cancel := context.WithCancel(context.Background())
 	session := &Session{

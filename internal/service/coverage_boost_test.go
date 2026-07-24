@@ -61,7 +61,7 @@ func TestFileServiceListTransfersPersistsLifecycle(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, jobs, 1)
 	assert.Equal(t, "file-task-1", jobs[0].ID)
-	assert.Equal(t, "failed", jobs[0].Status)
+	assert.Equal(t, "queued", jobs[0].Status)
 	assert.Equal(t, "xfer", jobs[0].SessionName)
 
 	require.NoError(t, svc.createTransfer("file-task-2", created.ID, "download", "/remote", "/local"))
@@ -875,7 +875,7 @@ func TestFileServiceConnectDisconnectHelpers(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	sessionSvc := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
 	svc := NewFileService(sessionSvc, newMockEventBus(), testutil.NewTestLogger(), WithTransferDB(db))
-	_, _, err := svc.connect(999)
+	_, _, err := svc.connect(context.Background(), 999)
 	require.Error(t, err)
 	svc.disconnect("missing")
 }

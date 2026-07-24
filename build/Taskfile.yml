@@ -19,7 +19,14 @@ tasks:
       - sh: npm version
         msg: "Looks like npm isn't installed. Npm is part of the Node installer: https://nodejs.org/en/download/"
     cmds:
-      - npm install
+      - npm ci
+
+  go:mod:verify:
+    summary: Verify the committed Go module files without modifying them
+    internal: true
+    cmds:
+      - go mod tidy -diff
+      - go mod verify
 
   build:frontend:
     label: build:frontend (PRODUCTION={{.PRODUCTION}})
@@ -42,7 +49,7 @@ tasks:
     label: generate:bindings (BUILD_FLAGS={{.BUILD_FLAGS}})
     summary: Generates bindings for the frontend
     deps:
-      - task: go:mod:tidy
+      - task: go:mod:verify
     sources:
       - "**/*.[jt]s"
       - exclude: frontend/**/*

@@ -49,6 +49,20 @@ func TestRedactAIText(t *testing.T) {
 	assert.Contains(t, value, "[REDACTED]")
 }
 
+func TestRedactAITextCoversEnvironmentSecretsAndCredentialURLs(t *testing.T) {
+	value := redactAIText(
+		"AWS_SECRET_ACCESS_KEY=aws-secret DATABASE_URL=postgres://dbuser:dbpass@example.com/app SAFE=value",
+		nil,
+	)
+
+	assert.NotContains(t, value, "aws-secret")
+	assert.NotContains(t, value, "dbuser")
+	assert.NotContains(t, value, "dbpass")
+	assert.Contains(t, value, "AWS_SECRET_ACCESS_KEY=[REDACTED]")
+	assert.Contains(t, value, "DATABASE_URL=postgres://[REDACTED]@example.com/app")
+	assert.Contains(t, value, "SAFE=value")
+}
+
 func TestExtractAICommandsAppliesPolicyAndLimit(t *testing.T) {
 	answer := "COMMAND: pwd | PURPOSE: 查看目录\nCOMMAND: reboot | PURPOSE: 重启\nCOMMAND: ls | PURPOSE: 列表"
 	commands := extractAICommands(answer, model.AISecuritySettings{}, 2)

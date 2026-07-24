@@ -50,7 +50,7 @@ func BenchmarkCommercialTerminalOutput1KiB(b *testing.B) {
 	}
 }
 
-func BenchmarkCommercialMonitorParsing(b *testing.B) {
+func BenchmarkCommercialSystemProbeParsing(b *testing.B) {
 	values := sampleSystemInfoValues()
 	b.ResetTimer()
 	for range b.N {

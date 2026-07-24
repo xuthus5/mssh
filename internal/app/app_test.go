@@ -7,6 +7,9 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"runtime"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -43,6 +46,43 @@ func TestNew(t *testing.T) {
 
 	assert.False(t, appInstance.Security == nil)
 	assert.NotNil(t, appInstance.Keychain)
+}
+
+func TestNewRecoversInterruptedTransfersOnlyAtStartup(t *testing.T) {
+	dataDir := t.TempDir()
+	db, err := store.OpenDB(dataDir)
+	require.NoError(t, err)
+	require.NoError(t, store.InitializeSchema(db))
+	require.NoError(t, store.CreateTransferJob(db, model.TransferJob{
+		ID: "interrupted", SessionID: 1, SessionName: "server", Direction: "download",
+		SourcePath: "/remote", TargetPath: "/local", Status: "running", StartedAt: time.Now(),
+	}))
+	require.NoError(t, db.Close())
+
+	appInstance, err := New(Options{DataDir: dataDir})
+	require.NoError(t, err)
+	t.Cleanup(appInstance.Shutdown)
+
+	jobs, err := appInstance.File.ListTransfers()
+	require.NoError(t, err)
+	require.Len(t, jobs, 1)
+	assert.Equal(t, "failed", jobs[0].Status)
+	assert.Contains(t, jobs[0].Error, "中断")
+
+	require.NoError(t, store.CreateTransferJob(appInstance.DB, model.TransferJob{
+		ID: "active", SessionID: 1, SessionName: "server", Direction: "upload",
+		SourcePath: "/local", TargetPath: "/remote", Status: "queued", StartedAt: time.Now(),
+	}))
+	jobs, err = appInstance.File.ListTransfers()
+	require.NoError(t, err)
+	var active model.TransferJob
+	for _, job := range jobs {
+		if job.ID == "active" {
+			active = job
+			break
+		}
+	}
+	assert.Equal(t, "queued", active.Status)
 }
 
 func TestHandleTerminalRecordingCloseLogsStopError(t *testing.T) {
@@ -114,6 +154,92 @@ func TestApp_Shutdown(t *testing.T) {
 
 	pingErr := appInstance.DB.Ping()
 	assert.Error(t, pingErr, "db should be closed after shutdown")
+}
+
+func TestAppShutdownStopsSyncBeforeTerminal(t *testing.T) {
+	db, err := store.OpenDB(t.TempDir())
+	require.NoError(t, err)
+	require.NoError(t, store.InitializeSchema(db))
+
+	secretStarted := make(chan struct{})
+	releaseSecret := make(chan struct{})
+	var blockSecret atomic.Bool
+	var secretOnce sync.Once
+	release := func() { close(releaseSecret) }
+	t.Cleanup(func() {
+		if blockSecret.Load() {
+			select {
+			case <-releaseSecret:
+			default:
+				close(releaseSecret)
+			}
+		}
+	})
+	t.Cleanup(func() { _ = db.Close() })
+
+	syncService := service.NewSyncService(db, slog.Default(),
+		service.WithSyncDataDir(t.TempDir()),
+		service.WithSyncSecretSource(func() (string, error) {
+			if blockSecret.Load() {
+				secretOnce.Do(func() { close(secretStarted) })
+				<-releaseSecret
+			}
+			return "sync-test-key", nil
+		}),
+	)
+	_, err = syncService.SaveConfig(model.SyncConfigInput{
+		Enabled: true, Provider: model.SyncProviderGist, Strategy: model.SyncStrategySmart,
+		IntervalMinutes: 0, RetentionCount: 1, RetentionDays: 1,
+	})
+	require.NoError(t, err)
+	terminalService := service.NewTerminalService(nil, discardEventBus{}, 4, slog.Default())
+	if runtime.GOOS == "windows" {
+		t.Skip("local shell lifecycle is covered by the Windows conpty integration suite")
+	}
+	_, err = terminalService.OpenLocal(t.Context(), 80, 24)
+	require.NoError(t, err)
+	blockSecret.Store(true)
+	syncService.NotifyVaultUnlocked()
+	select {
+	case <-secretStarted:
+	case <-time.After(time.Second):
+		t.Fatal("scheduled sync did not reach secret source")
+	}
+
+	appInstance := &App{DB: db, Sync: syncService, Terminal: terminalService, logger: slog.Default()}
+	shutdownDone := make(chan struct{})
+	go func() {
+		appInstance.Shutdown()
+		close(shutdownDone)
+	}()
+	select {
+	case <-shutdownDone:
+		t.Fatal("shutdown completed while sync request was blocked")
+	case <-time.After(50 * time.Millisecond):
+		assert.Equal(t, 1, terminalService.Count())
+	}
+
+	release()
+	select {
+	case <-shutdownDone:
+	case <-time.After(time.Second):
+		t.Fatal("shutdown did not complete after sync request was released")
+	}
+}
+
+func TestApp_ShutdownClosesLocalTerminals(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("local shell lifecycle is covered by the Windows conpty integration suite")
+	}
+	terminal := service.NewTerminalService(nil, discardEventBus{}, 4, slog.Default())
+	terminalID, err := terminal.OpenLocal(t.Context(), 80, 24)
+	require.NoError(t, err)
+
+	appInstance := &App{Terminal: terminal, logger: slog.Default()}
+	appInstance.Shutdown()
+
+	_, err = terminal.Write(terminalID, "echo after shutdown\n")
+	assert.Error(t, err)
 }
 
 func TestApp_ShutdownEndsActiveRecordingsBeforeClosingDatabase(t *testing.T) {

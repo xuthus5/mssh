@@ -115,6 +115,8 @@ export interface AppState {
   sidebarWidth: number
   focusRequest: { id: string; terminalId?: string | null; sequence: number }
   terminalPool: Map<string, PooledTerminal>
+  pendingTerminalOpens?: number
+  terminalOpenReservations?: Set<string>
   maxPoolSize: number
   connectionStatus: Record<string, ConnectionStatus>
   appStatus: string
@@ -180,6 +182,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   ...initialNavigation,
   focusRequest: { id: '', terminalId: null, sequence: 0 },
   terminalPool: new Map(),
+  pendingTerminalOpens: 0,
+  terminalOpenReservations: new Set(),
   maxPoolSize: DEFAULT_MAX_POOL_SIZE,
   connectionStatus: {},
   appStatus: t('就绪'),

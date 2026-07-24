@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/xuthus5/mssh/internal/model"
-	"github.com/xuthus5/mssh/internal/store"
 )
 
 func (s *SyncService) downloadSnapshot(config model.SyncConfig, artifact decodedSyncArtifact, etag string) (model.SyncResult, error) {
@@ -51,16 +50,8 @@ func (s *SyncService) finishSuccessfulSync(config model.SyncConfig, metadata syn
 	if err != nil {
 		return err
 	}
-	if previous.LocalVersionID > 0 && previous.LocalVersionID != localVersionID {
-		if err := store.SetSyncVersionProtected(s.db, previous.LocalVersionID, false); err != nil {
-			return err
-		}
-	}
-	if err := store.SetSyncVersionProtected(s.db, localVersionID, true); err != nil {
-		return err
-	}
 	baseline := syncBaseline{VersionID: metadata.VersionID, VersionNumber: metadata.VersionNumber, SnapshotFingerprint: metadata.SnapshotFingerprint, ETag: etag, LocalVersionID: localVersionID, SyncedAt: time.Now().UTC()}
-	if err := s.saveBaseline(config.Provider, baseline); err != nil {
+	if err := s.commitSuccessfulSync(config.Provider, previous, baseline); err != nil {
 		return err
 	}
 	if err := s.applyRetention(config); err != nil {

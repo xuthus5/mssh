@@ -59,12 +59,12 @@ modules:
 
         (
           cd frontend
-          npm ci
+          npm ci --ignore-scripts
           npm run build
         )
 
         export CGO_ENABLED=1
-        go build -tags production -trimpath -buildvcs=false \
+        go build -mod=readonly -tags production -trimpath -buildvcs=false \
           -ldflags="-w -s -X github.com/xuthus5/mssh/internal/service.Version=${VERSION}" \
           -o mssh .
 
@@ -87,6 +87,8 @@ modules:
           - .superpowers
           - bin
           - coverage.out
+          - coverage.func.txt
+          - performance
           - frontend/node_modules
           - frontend/dist
           - build/linux/appimage

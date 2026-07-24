@@ -10,6 +10,7 @@ import (
 	"time"
 
 	backupcrypto "github.com/xuthus5/mssh/internal/crypto"
+	"github.com/xuthus5/mssh/internal/fsutil"
 )
 
 func encodeEncryptedSnapshot(data ExportData, masterKey string) ([]byte, error) {
@@ -57,7 +58,7 @@ func writePrivateFileAtomic(path string, content []byte) error {
 	if err := temporary.Close(); err != nil {
 		return err
 	}
-	if err := os.Rename(temporaryPath, path); err != nil {
+	if err := fsutil.ReplaceFile(temporaryPath, path); err != nil {
 		return err
 	}
 	if err := os.Chmod(path, 0o600); err != nil {

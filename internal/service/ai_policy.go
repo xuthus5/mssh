@@ -10,7 +10,9 @@ import (
 )
 
 var (
-	aiSecretPatterns = []*regexp.Regexp{
+	aiCredentialURLPattern = regexp.MustCompile(`(?i)([a-z][a-z0-9+.-]*://)[^/\s:@]+:[^@\s/]+@`)
+	aiEnvSecretPattern     = regexp.MustCompile(`(?i)\b[A-Z0-9_]*(?:PASSWORD|PASSWD|TOKEN|SECRET|API[_-]?KEY|ACCESS[_-]?KEY|PRIVATE[_-]?KEY)[A-Z0-9_]*\s*=\s*(?:"[^"\r\n]*"|'[^'\r\n]*'|[^\s]+)`)
+	aiSecretPatterns       = []*regexp.Regexp{
 		regexp.MustCompile(`(?i)(password|passwd|token|api[_-]?key|secret|authorization)\s*[:=]\s*[^\s]+`),
 		regexp.MustCompile(`(?i)bearer\s+[a-z0-9._-]+`),
 		regexp.MustCompile(`-----BEGIN [A-Z ]+-----[\s\S]*?-----END [A-Z ]+-----`),
@@ -44,15 +46,10 @@ func clampAITextBytes(value string, maxBytes int) string {
 }
 
 func redactAIText(value string, custom []string) string {
-	redacted := value
+	redacted := aiCredentialURLPattern.ReplaceAllString(value, `${1}[REDACTED]@`)
+	redacted = aiEnvSecretPattern.ReplaceAllStringFunc(redacted, redactSecretAssignment)
 	for _, pattern := range aiSecretPatterns {
-		redacted = pattern.ReplaceAllStringFunc(redacted, func(match string) string {
-			separator := strings.IndexAny(match, ":=")
-			if separator < 0 {
-				return "[REDACTED]"
-			}
-			return match[:separator+1] + "[REDACTED]"
-		})
+		redacted = pattern.ReplaceAllStringFunc(redacted, redactSecretAssignment)
 	}
 	for _, expression := range custom {
 		if err := validateUserRegexp(expression); err != nil {
@@ -62,6 +59,14 @@ func redactAIText(value string, custom []string) string {
 		redacted = pattern.ReplaceAllString(redacted, "[REDACTED]")
 	}
 	return redacted
+}
+
+func redactSecretAssignment(match string) string {
+	separator := strings.IndexAny(match, ":=")
+	if separator < 0 {
+		return "[REDACTED]"
+	}
+	return match[:separator+1] + "[REDACTED]"
 }
 
 func classifyAICommand(command string, security model.AISecuritySettings) model.AICommandProposal {

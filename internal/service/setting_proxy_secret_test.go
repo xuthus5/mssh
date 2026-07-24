@@ -55,7 +55,7 @@ func TestProxyPasswordPrepareAndRedact(t *testing.T) {
 		Value: `"` + proxyPasswordClearSentinel + `"`, ValueType: "string", Version: 1,
 	}})
 	require.NoError(t, err)
-	require.Len(t, out, 1)
+	require.Len(t, out, 2)
 	require.NoError(t, store.SetSettings(db, out))
 	password, saved = svc.loadProxyPassword()
 	assert.False(t, saved)

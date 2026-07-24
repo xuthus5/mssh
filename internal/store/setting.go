@@ -63,23 +63,48 @@ func ListSettings(db *sql.DB, namespace string) ([]model.Setting, error) {
 }
 
 func SetSettings(db *sql.DB, settings []model.Setting) error {
-	for _, setting := range settings {
-		if err := validateSetting(setting); err != nil {
-			return err
-		}
+	if err := validateSettings(settings); err != nil {
+		return err
 	}
 	tx, err := db.Begin()
 	if err != nil {
 		return fmt.Errorf("set settings: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
+	if err := setSettings(tx, settings); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// SetSettingsTx writes settings inside a caller-owned transaction.
+func SetSettingsTx(tx *sql.Tx, settings []model.Setting) error {
+	if tx == nil {
+		return fmt.Errorf("set settings: transaction is required")
+	}
+	if err := validateSettings(settings); err != nil {
+		return err
+	}
+	return setSettings(tx, settings)
+}
+
+func validateSettings(settings []model.Setting) error {
+	for _, setting := range settings {
+		if err := validateSetting(setting); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func setSettings(tx *sql.Tx, settings []model.Setting) error {
 	for _, setting := range settings {
 		_, err := tx.Exec(`INSERT INTO settings (key, namespace, value, value_type, version, updated_at) VALUES (?, ?, ?, ?, ?, datetime('now')) ON CONFLICT(key) DO UPDATE SET namespace=excluded.namespace, value=excluded.value, value_type=excluded.value_type, version=excluded.version, updated_at=datetime('now')`, setting.Key, setting.Namespace, setting.Value, setting.ValueType, setting.Version)
 		if err != nil {
 			return fmt.Errorf("set settings: %w", err)
 		}
 	}
-	return tx.Commit()
+	return nil
 }
 
 func DeleteSetting(db *sql.DB, key string) error {

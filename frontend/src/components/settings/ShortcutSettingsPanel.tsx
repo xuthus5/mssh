@@ -3,6 +3,7 @@ import { Keyboard, RotateCcw, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { AutoSaveStatusIndicator } from '@/components/settings/AutoSaveStatus'
 import { useAutoSave } from '@/hooks/useAutoSave'
+import { useDraftSync } from '@/hooks/useDraftSync'
 import { useShortcutSettings } from '@/hooks/useShortcutSettings'
 import {
   SHORTCUT_DEFINITIONS,
@@ -19,6 +20,10 @@ import {
 import { t } from '@/i18n'
 import { toast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'
+
+function createDraft(bindings: ShortcutBindings): ShortcutBindings {
+  return { ...bindings }
+}
 
 function ShortcutRecorder({
   value,
@@ -77,12 +82,8 @@ function ShortcutRecorder({
 
 export function ShortcutSettingsPanel() {
   const { bindings, loading, error, saveBindings, reload } = useShortcutSettings()
-  const [draft, setDraft] = useState<ShortcutBindings>(bindings)
+  const { draft, setDraft, acknowledgeSaved } = useDraftSync({ source: bindings, createDraft })
   const [recordingId, setRecordingId] = useState<ShortcutActionId | null>(null)
-
-  useEffect(() => {
-    setDraft(bindings)
-  }, [bindings])
 
   const conflicts = useMemo(() => findShortcutConflicts(draft), [draft])
   const conflictMap = useMemo(() => {
@@ -97,7 +98,8 @@ export function ShortcutSettingsPanel() {
 
   const persist = useCallback(async (next: ShortcutBindings) => {
     await saveBindings(next, { quiet: true })
-  }, [saveBindings])
+    acknowledgeSaved(next)
+  }, [acknowledgeSaved, saveBindings])
 
   const autoSave = useAutoSave({
     value: draft,
