@@ -258,7 +258,8 @@ describe('ThemeEditor dual mode profiles', () => {
     await userEvent.click(screen.getByRole('button', { name: '确认重置' }))
 
     expect(screen.getByLabelText('背景色 HEX')).toHaveValue('#0d1117')
-    expect(useToastStore.getState().toasts.at(-1)?.message).toBe('重置内置主题失败: db failed')
+    expect(await screen.findByText('重置内置主题失败: db failed')).toBeInTheDocument()
+    expect(useToastStore.getState().toasts.filter((item) => item.type === 'error')).toHaveLength(0)
   })
 
   it('disables reset while the editor has unsaved changes', async () => {
