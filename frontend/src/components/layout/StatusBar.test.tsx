@@ -1,16 +1,21 @@
-import { act, render, screen } from '@testing-library/react'
+import { act, cleanup, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/components/file/TransferCenter', () => ({ TransferCenter: () => <div>transfer center</div> }))
 const terminalService = vi.hoisted(() => ({ SystemInfo: vi.fn() }))
 vi.mock('@/lib/wails', () => ({ TerminalService: terminalService }))
+const platformMock = vi.hoisted(() => ({ isWindowsPlatform: vi.fn() }))
+vi.mock('@/lib/platform', () => ({ isWindowsPlatform: platformMock.isWindowsPlatform }))
 
 import StatusBar from '@/components/layout/StatusBar'
 import { useAppStore } from '@/store/appStore'
 
 describe('StatusBar', () => {
   beforeEach(() => {
+    cleanup()
+    vi.clearAllTimers()
     terminalService.SystemInfo.mockReset()
+    platformMock.isWindowsPlatform.mockReset()
     useAppStore.setState({ tabs: [], activeSurface: null, connectionStatus: {}, appStatus: '就绪' })
   })
 
@@ -64,6 +69,44 @@ describe('StatusBar', () => {
     expect(terminalService.SystemInfo).toHaveBeenCalledTimes(2)
   })
 })
+
+  it('skips system info collection for local terminal on windows', async () => {
+    platformMock.isWindowsPlatform.mockReturnValue(true)
+    useAppStore.setState({
+      tabs: [{ id: 'tab-local', title: '本地终端', type: 'terminal', terminalId: 'term-local', sessionId: 0, connectionKind: 'local' }],
+      activeSurface: { type: 'terminal', id: 'tab-local' },
+      connectionStatus: { 'term-local': 'connected' },
+    })
+    render(<StatusBar />)
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 50)) })
+    expect(terminalService.SystemInfo).not.toHaveBeenCalledWith('term-local')
+  })
+
+  it('still collects system info for local terminal on non-windows', async () => {
+    platformMock.isWindowsPlatform.mockReturnValue(false)
+    terminalService.SystemInfo.mockResolvedValue(systemInfo(10))
+    useAppStore.setState({
+      tabs: [{ id: 'tab-local', title: '本地终端', type: 'terminal', terminalId: 'term-local', sessionId: 0, connectionKind: 'local' }],
+      activeSurface: { type: 'terminal', id: 'tab-local' },
+      connectionStatus: { 'term-local': 'connected' },
+    })
+    render(<StatusBar />)
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 50)) })
+    expect(terminalService.SystemInfo).toHaveBeenCalledWith('term-local')
+  })
+
+  it('still collects system info for windows ssh terminal', async () => {
+    platformMock.isWindowsPlatform.mockReturnValue(true)
+    terminalService.SystemInfo.mockResolvedValue(systemInfo(30))
+    useAppStore.setState({
+      tabs: [{ id: 'tab-ssh', title: 'remote', type: 'terminal', terminalId: 'term-ssh', sessionId: 5, connectionKind: 'ssh' }],
+      activeSurface: { type: 'terminal', id: 'tab-ssh' },
+      connectionStatus: { 'term-ssh': 'connected' },
+    })
+    render(<StatusBar />)
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 50)) })
+    expect(terminalService.SystemInfo).toHaveBeenCalledWith('term-ssh')
+  })
 
 function systemInfo(cpu_percent: number): Record<string, number> {
   return { cpu_percent, cpu_count: 8, memory_used: 1, memory_total: 2, disk_used: 1, disk_total: 2, download_rate: 1, upload_rate: 1 }

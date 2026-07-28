@@ -3,6 +3,7 @@ import { ArrowDown, ArrowUp, Clock, Cpu, Circle, HardDrive, MemoryStick } from '
 import { TransferCenter } from '@/components/file/TransferCenter'
 import { connectionStatusVisual } from '@/lib/connectionStatusVisual'
 import { logger } from '@/lib/logger'
+import { isWindowsPlatform } from '@/lib/platform'
 import { AsyncPoller } from '@/lib/asyncPoller'
 import { useAppStore } from '@/store/appStore'
 import { TerminalService } from '@/lib/wails'
@@ -118,7 +119,8 @@ function ActiveSystemInfo() {
     : undefined
   const activeTerminal = activeTab?.type === 'terminal' ? activeTab : undefined
   const connected = activeTerminal ? connectionStatus[activeTerminal.terminalId] === 'connected' : false
-  const systemInfo = useSystemInfo(activeTerminal?.terminalId, connected, visible)
+  const skipSystemInfo = activeTerminal?.connectionKind === 'local' && isWindowsPlatform()
+  const systemInfo = useSystemInfo(skipSystemInfo ? undefined : activeTerminal?.terminalId, connected, visible)
   return <SystemInfoBar info={systemInfo.info} failed={systemInfo.failed} />
 }
 
