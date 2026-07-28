@@ -88,6 +88,14 @@ describe('AIProviderPanel', () => {
     expect(controller.saveProvider).toHaveBeenCalledWith(expect.objectContaining({ id: 0, name: 'new provider' }))
   })
 
+  it('shows the controller error when provider save fails validation', async () => {
+    const controller = providerController()
+    controller.error = 'AI provider URL must use HTTPS unless it is local'
+    controller.saveProvider = vi.fn(async () => { throw new Error('AI provider URL must use HTTPS unless it is local') })
+    renderProviderPanel(controller)
+    expect(await screen.findByRole('alert')).toHaveTextContent('AI provider URL must use HTTPS unless it is local')
+  })
+
   it('does not switch back when an old provider save resolves late', async () => {
     let resolveSave: ((profile: ReturnType<typeof providerProfile>) => void) | undefined
     const controller = providerController()
@@ -208,7 +216,7 @@ async function selectOption(user: ReturnType<typeof userEvent.setup>, label: str
 
 function providerController() {
   const profile = providerProfile(1, 'main')
-  return { dashboard: { keychain_available: true, providers: [profile], settings: { default_provider_id: 1, fallback_provider_id: null, interaction: { panel_width: 420, context_lines: 80, include_session_metadata: true, include_system_summary: true, stream_responses: true, auto_scroll: true, render_markdown: true, history_retention_days: 30, max_conversations: 100 }, search: { enabled: false, mode: 'auto', provider: 'brave', timeout_seconds: 10, max_results: 5, require_citations: true }, security: { auto_execute_read_only: false, command_timeout_seconds: 60, max_output_bytes: 65536, max_plan_steps: 5, allow_patterns: [], deny_patterns: [], redaction_patterns: [] } } }, pending: null, saveProvider: vi.fn(async (input) => ({ ...profile, ...input, id: input.id || 2 })), deleteProvider: vi.fn(async () => {}), testProvider: vi.fn(async () => {}), saveSettings: vi.fn(async () => {}) }
+  return { dashboard: { keychain_available: true, providers: [profile], settings: { default_provider_id: 1, fallback_provider_id: null, interaction: { panel_width: 420, context_lines: 80, include_session_metadata: true, include_system_summary: true, stream_responses: true, auto_scroll: true, render_markdown: true, history_retention_days: 30, max_conversations: 100 }, search: { enabled: false, mode: 'auto', provider: 'brave', timeout_seconds: 10, max_results: 5, require_citations: true }, security: { auto_execute_read_only: false, command_timeout_seconds: 60, max_output_bytes: 65536, max_plan_steps: 5, allow_patterns: [], deny_patterns: [], redaction_patterns: [] } } }, pending: null, error: null as string | null, saveProvider: vi.fn(async (input) => ({ ...profile, ...input, id: input.id || 2 })), deleteProvider: vi.fn(async () => {}), testProvider: vi.fn(async () => {}), saveSettings: vi.fn(async () => {}) }
 }
 
 function renderProviderPanel(controller: ReturnType<typeof providerController>) {
