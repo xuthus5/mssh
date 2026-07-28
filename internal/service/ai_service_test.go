@@ -153,7 +153,7 @@ func TestAIServiceValidatesSettingsAndProvider(t *testing.T) {
 	_, err := service.SaveProvider(model.AIProviderProfileInput{Name: "", Provider: model.AIProviderOpenAICompatible, DefaultModel: ""})
 	assert.ErrorContains(t, err, "required")
 	_, err = service.SaveProvider(model.AIProviderProfileInput{Name: "bad", Provider: model.AIProviderOpenAICompatible, BaseURL: "http://example.com", DefaultModel: "model"})
-	assert.ErrorContains(t, err, "HTTPS")
+	assert.NoError(t, err)
 	input := aiSettingsInput(defaultAISettings())
 	input.Security.RedactionPatterns = []string{"["}
 	assert.ErrorContains(t, service.SaveSettings(input), "regular expression")

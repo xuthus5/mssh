@@ -126,7 +126,7 @@ func TestProviderDefaultsAndValidation(t *testing.T) {
 	assert.NoError(t, validateProviderURL(model.AIProviderProfile{BaseURL: "http://localhost:11434"}))
 	assert.NoError(t, validateProviderURL(model.AIProviderProfile{BaseURL: "http://127.0.0.1:11434"}))
 	assert.NoError(t, validateProviderURL(model.AIProviderProfile{BaseURL: "https://api.openai.com/v1"}))
-	assert.Error(t, validateProviderURL(model.AIProviderProfile{BaseURL: "http://example.com"}))
+	assert.NoError(t, validateProviderURL(model.AIProviderProfile{BaseURL: "http://example.com"}))
 	assert.Error(t, validateProviderURL(model.AIProviderProfile{BaseURL: "https://169.254.169.254/latest/meta-data"}))
 	assert.Error(t, validateProviderURL(model.AIProviderProfile{BaseURL: "https://metadata.google.internal/"}))
 	assert.Error(t, validateProviderURL(model.AIProviderProfile{BaseURL: "https://user:pass@api.openai.com"}))
@@ -169,10 +169,10 @@ func TestPostJSONTransportAndDecodeErrors(t *testing.T) {
 		_, _ = writer.Write([]byte("not-json"))
 	}))
 	t.Cleanup(server.Close)
-	assert.ErrorContains(t, postJSON(context.Background(), server.Client(), server.URL+"/status", "", "", map[string]string{}, &map[string]any{}), "401")
-	assert.ErrorContains(t, postJSON(context.Background(), server.Client(), server.URL+"/decode", "", "", map[string]string{}, &map[string]any{}), "decode")
+	assert.ErrorContains(t, postJSON(context.Background(), server.Client(), server.URL+"/status", "", "", nil, map[string]string{}, &map[string]any{}), "401")
+	assert.ErrorContains(t, postJSON(context.Background(), server.Client(), server.URL+"/decode", "", "", nil, map[string]string{}, &map[string]any{}), "decode")
 	client := &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) { return nil, errors.New("offline") })}
-	assert.ErrorContains(t, postJSON(context.Background(), client, "https://example.com", "", "", map[string]string{}, &map[string]any{}), "offline")
+	assert.ErrorContains(t, postJSON(context.Background(), client, "https://example.com", "", "", nil, map[string]string{}, &map[string]any{}), "offline")
 }
 
 func TestNativeSearchFallbackOutputAndUnsupportedProvider(t *testing.T) {

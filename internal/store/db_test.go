@@ -39,7 +39,7 @@ func TestOpenDBUsesSingleConnection(t *testing.T) {
 }
 
 func TestDatabaseFormatVersion(t *testing.T) {
-	assert.Equal(t, 5, databaseFormatVersion)
+	assert.Equal(t, 6, databaseFormatVersion)
 }
 
 func TestListSessionsAcceptsNullPassword(t *testing.T) {

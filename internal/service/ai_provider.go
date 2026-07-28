@@ -38,6 +38,7 @@ func chatWithProvider(ctx context.Context, client *http.Client, profile model.AI
 	if err := validateProviderURL(profile); err != nil {
 		return "", err
 	}
+	client = providerHTTPClient(client, profile.SkipTLSVerify)
 	var answer string
 	var err error
 	if input.NativeSearch {
@@ -85,10 +86,6 @@ func validateProviderURL(profile model.AIProviderProfile) error {
 	if isBlockedProviderHost(host) {
 		return fmt.Errorf("AI provider URL host is not allowed")
 	}
-	local := isLocalProviderHost(host)
-	if scheme != "https" && !local {
-		return fmt.Errorf("AI provider URL must use HTTPS unless it is local")
-	}
 	return nil
 }
 
@@ -106,15 +103,6 @@ func providerBaseURL(profile model.AIProviderProfile) string {
 	default:
 		return "https://api.openai.com/v1"
 	}
-}
-
-func isLocalProviderHost(host string) bool {
-	normalized := strings.Trim(strings.ToLower(strings.TrimSpace(host)), "[]")
-	if normalized == "localhost" {
-		return true
-	}
-	ip := net.ParseIP(normalized)
-	return ip != nil && ip.IsLoopback()
 }
 
 func isBlockedProviderHost(host string) bool {
@@ -144,6 +132,7 @@ var blockedAIProviderHostnames = map[string]struct{}{
 
 func chatOpenAI(ctx context.Context, client *http.Client, profile model.AIProviderProfile, apiKey string, input aiChatInput) (string, error) {
 	payload := map[string]any{"model": profile.DefaultModel, "stream": false, "messages": []map[string]string{{"role": "system", "content": input.System}, {"role": "user", "content": input.Prompt + "\n\n终端上下文:\n" + input.Context}}}
+	applyOpenAIParams(payload, profile)
 	var response struct {
 		Choices []struct {
 			Message struct {
@@ -151,7 +140,7 @@ func chatOpenAI(ctx context.Context, client *http.Client, profile model.AIProvid
 			} `json:"message"`
 		} `json:"choices"`
 	}
-	err := postJSON(ctx, client, providerBaseURL(profile)+"/chat/completions", apiKey, "", payload, &response)
+	err := postJSON(ctx, client, providerBaseURL(profile)+"/chat/completions", apiKey, "", profile.CustomHeaders, payload, &response)
 	if err != nil {
 		return "", err
 	}
@@ -162,13 +151,23 @@ func chatOpenAI(ctx context.Context, client *http.Client, profile model.AIProvid
 }
 
 func chatAnthropic(ctx context.Context, client *http.Client, profile model.AIProviderProfile, apiKey string, input aiChatInput) (string, error) {
-	payload := map[string]any{"model": profile.DefaultModel, "max_tokens": 4096, "system": input.System, "messages": []map[string]string{{"role": "user", "content": input.Prompt + "\n\n终端上下文:\n" + input.Context}}}
+	maxTokens := 4096
+	if profile.MaxTokens > 0 {
+		maxTokens = profile.MaxTokens
+	}
+	payload := map[string]any{"model": profile.DefaultModel, "max_tokens": maxTokens, "system": input.System, "messages": []map[string]string{{"role": "user", "content": input.Prompt + "\n\n终端上下文:\n" + input.Context}}}
+	if profile.Temperature != nil {
+		payload["temperature"] = *profile.Temperature
+	}
+	if profile.TopP != nil {
+		payload["top_p"] = *profile.TopP
+	}
 	var response struct {
 		Content []struct {
 			Text string `json:"text"`
 		} `json:"content"`
 	}
-	err := postJSON(ctx, client, providerBaseURL(profile)+"/v1/messages", apiKey, "anthropic", payload, &response)
+	err := postJSON(ctx, client, providerBaseURL(profile)+"/v1/messages", apiKey, "anthropic", profile.CustomHeaders, payload, &response)
 	if err != nil {
 		return "", err
 	}
@@ -181,6 +180,7 @@ func chatAnthropic(ctx context.Context, client *http.Client, profile model.AIPro
 func chatGemini(ctx context.Context, client *http.Client, profile model.AIProviderProfile, apiKey string, input aiChatInput) (string, error) {
 	endpoint := fmt.Sprintf("%s/v1beta/models/%s:generateContent", providerBaseURL(profile), url.PathEscape(profile.DefaultModel))
 	payload := map[string]any{"systemInstruction": map[string]any{"parts": []map[string]string{{"text": input.System}}}, "contents": []map[string]any{{"parts": []map[string]string{{"text": input.Prompt + "\n\n终端上下文:\n" + input.Context}}}}}
+	applyGeminiParams(payload, profile)
 	var response struct {
 		Candidates []struct {
 			Content struct {
@@ -190,7 +190,7 @@ func chatGemini(ctx context.Context, client *http.Client, profile model.AIProvid
 			} `json:"content"`
 		} `json:"candidates"`
 	}
-	if err := postJSON(ctx, client, endpoint, apiKey, "gemini", payload, &response); err != nil {
+	if err := postJSON(ctx, client, endpoint, apiKey, "gemini", profile.CustomHeaders, payload, &response); err != nil {
 		return "", err
 	}
 	if len(response.Candidates) == 0 || len(response.Candidates[0].Content.Parts) == 0 {
@@ -201,18 +201,20 @@ func chatGemini(ctx context.Context, client *http.Client, profile model.AIProvid
 
 func chatOllama(ctx context.Context, client *http.Client, profile model.AIProviderProfile, input aiChatInput) (string, error) {
 	payload := map[string]any{"model": profile.DefaultModel, "stream": false, "messages": []map[string]string{{"role": "system", "content": input.System}, {"role": "user", "content": input.Prompt + "\n\n终端上下文:\n" + input.Context}}}
+	applyOllamaParams(payload, profile)
 	var response struct {
 		Message struct {
 			Content string `json:"content"`
 		} `json:"message"`
 	}
-	if err := postJSON(ctx, client, providerBaseURL(profile)+"/api/chat", "", "", payload, &response); err != nil {
+	if err := postJSON(ctx, client, providerBaseURL(profile)+"/api/chat", "", "", profile.CustomHeaders, payload, &response); err != nil {
 		return "", err
 	}
 	return response.Message.Content, nil
 }
 
-func postJSON(ctx context.Context, client *http.Client, endpoint, apiKey, kind string, payload any, output any) error {
+
+func postJSON(ctx context.Context, client *http.Client, endpoint, apiKey, kind string, headers map[string]string, payload any, output any) error {
 	body, err := json.Marshal(payload)
 	if err != nil {
 		return fmt.Errorf("encode AI request: %w", err)
@@ -233,6 +235,7 @@ func postJSON(ctx context.Context, client *http.Client, endpoint, apiKey, kind s
 			request.Header.Set("Authorization", "Bearer "+apiKey)
 		}
 	}
+	applyCustomHeaders(request, headers)
 	response, err := sameOriginHTTPClient(client, request.URL).Do(request)
 	if err != nil {
 		return &aiProviderError{err: fmt.Errorf("AI request failed: %w", err)}

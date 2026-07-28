@@ -16,7 +16,7 @@ func TestPostJSONRejectsOversizedTrailingResponse(t *testing.T) {
 	client := oversizedJSONClient(http.StatusOK, `{"ok":true}`, 4<<20+1)
 	var output map[string]any
 
-	err := postJSON(context.Background(), client, "https://example.com/chat", "", "", map[string]string{}, &output)
+	err := postJSON(context.Background(), client, "https://example.com/chat", "", "", nil, map[string]string{}, &output)
 
 	assert.ErrorContains(t, err, "exceeds")
 }

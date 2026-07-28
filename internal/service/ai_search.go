@@ -78,7 +78,7 @@ func searchTavily(ctx context.Context, client *http.Client, apiKey, query string
 		} `json:"results"`
 	}
 	payload := map[string]any{"api_key": apiKey, "query": query, "max_results": limit, "search_depth": "basic"}
-	if err := postJSON(ctx, client, tavilySearchEndpoint, "", "", payload, &response); err != nil {
+	if err := postJSON(ctx, client, tavilySearchEndpoint, "", "", nil, payload, &response); err != nil {
 		return nil, err
 	}
 	result := make([]model.AICitation, 0, len(response.Results))

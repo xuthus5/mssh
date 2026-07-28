@@ -395,6 +395,14 @@ export class AIProviderProfile {
     "enabled": boolean;
     "credential_saved": boolean;
     "credential_session_only": boolean;
+    "context_window_size": number;
+    "skip_tls_verify": boolean;
+    "max_tokens": number;
+    "temperature": number | null;
+    "top_p": number | null;
+    "frequency_penalty": number | null;
+    "presence_penalty": number | null;
+    "custom_headers": { [_ in string]?: string };
     "created_at": string;
     "updated_at": string;
 
@@ -424,6 +432,30 @@ export class AIProviderProfile {
         if (!("credential_session_only" in $$source)) {
             this["credential_session_only"] = false;
         }
+        if (!("context_window_size" in $$source)) {
+            this["context_window_size"] = 0;
+        }
+        if (!("skip_tls_verify" in $$source)) {
+            this["skip_tls_verify"] = false;
+        }
+        if (!("max_tokens" in $$source)) {
+            this["max_tokens"] = 0;
+        }
+        if (!("temperature" in $$source)) {
+            this["temperature"] = null;
+        }
+        if (!("top_p" in $$source)) {
+            this["top_p"] = null;
+        }
+        if (!("frequency_penalty" in $$source)) {
+            this["frequency_penalty"] = null;
+        }
+        if (!("presence_penalty" in $$source)) {
+            this["presence_penalty"] = null;
+        }
+        if (!("custom_headers" in $$source)) {
+            this["custom_headers"] = {};
+        }
         if (!("created_at" in $$source)) {
             this["created_at"] = "0001-01-01T00:00:00.000Z";
         }
@@ -451,6 +483,14 @@ export class AIProviderProfileInput {
     "default_model": string;
     "enabled": boolean;
     "api_key": string;
+    "context_window_size": number;
+    "skip_tls_verify": boolean;
+    "max_tokens": number;
+    "temperature": number | null;
+    "top_p": number | null;
+    "frequency_penalty": number | null;
+    "presence_penalty": number | null;
+    "custom_headers": { [_ in string]?: string };
 
     /** Creates a new AIProviderProfileInput instance. */
     constructor($$source: Partial<AIProviderProfileInput> = {}) {
@@ -474,6 +514,30 @@ export class AIProviderProfileInput {
         }
         if (!("api_key" in $$source)) {
             this["api_key"] = "";
+        }
+        if (!("context_window_size" in $$source)) {
+            this["context_window_size"] = 0;
+        }
+        if (!("skip_tls_verify" in $$source)) {
+            this["skip_tls_verify"] = false;
+        }
+        if (!("max_tokens" in $$source)) {
+            this["max_tokens"] = 0;
+        }
+        if (!("temperature" in $$source)) {
+            this["temperature"] = null;
+        }
+        if (!("top_p" in $$source)) {
+            this["top_p"] = null;
+        }
+        if (!("frequency_penalty" in $$source)) {
+            this["frequency_penalty"] = null;
+        }
+        if (!("presence_penalty" in $$source)) {
+            this["presence_penalty"] = null;
+        }
+        if (!("custom_headers" in $$source)) {
+            this["custom_headers"] = {};
         }
 
         Object.assign(this, $$source);
