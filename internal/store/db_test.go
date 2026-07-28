@@ -53,24 +53,26 @@ func TestListSessionsAcceptsNullPassword(t *testing.T) {
 	assert.Empty(t, sessions[0].Password)
 }
 
-func TestInitializeSchemaRejectsUnsupportedOlderFormat(t *testing.T) {
+func TestInitializeSchemaResetsIncompatibleOlderFormat(t *testing.T) {
 	db, err := OpenDB(t.TempDir())
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, db.Close()) })
 	// Simulate an older format with user data present (no full modern schema).
 	_, err = db.Exec("CREATE TABLE sessions (id INTEGER PRIMARY KEY, name TEXT NOT NULL)")
 	require.NoError(t, err)
-	_, err = db.Exec("INSERT INTO sessions (name) VALUES ('keep-me')")
+	_, err = db.Exec("INSERT INTO sessions (name) VALUES ('stale-data')")
 	require.NoError(t, err)
 	_, err = db.Exec("PRAGMA user_version = 1")
 	require.NoError(t, err)
 
-	err = InitializeSchema(db)
-	require.ErrorContains(t, err, "unsupported migration")
+	// Version mismatch triggers a clean slate: rebuild from scratch, no migration.
+	require.NoError(t, InitializeSchema(db))
 
-	// Data must remain intact; no drop-all wipe.
-	assertTableRowCount(t, rowCountExpectation{db: db, table: "sessions", condition: "name = 'keep-me'", expected: 1})
-	assertDatabaseFormatVersion(t, db, 1)
+	// Stale data is gone; fresh schema is in place with the default folder.
+	assertTableRowCount(t, rowCountExpectation{db: db, table: "sessions", condition: "name = 'stale-data'", expected: 0})
+	assertTableRowCount(t, rowCountExpectation{db: db, table: "session_folders", condition: "is_default = 1", expected: 1})
+	assertSQLiteObjectCount(t, sqliteObjectCountExpectation{db: db, objectType: "table", name: "ai_provider_profiles", expected: 1})
+	assertDatabaseFormatVersion(t, db, databaseFormatVersion)
 }
 
 func TestInitializeSchemaRejectsNewerFormat(t *testing.T) {

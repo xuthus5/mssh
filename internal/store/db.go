@@ -108,19 +108,15 @@ func initializeSchema(db *sql.DB, targetVersion int, setVersion func(*sql.Tx, in
 	if currentVersion > targetVersion {
 		return fmt.Errorf("initialize schema: database format %d is newer than supported %d; upgrade the application", currentVersion, targetVersion)
 	}
-	// Existing databases with an older format must not be silently wiped.
-	if currentVersion != 0 && currentVersion < targetVersion {
-		return fmt.Errorf("initialize schema: database format %d requires unsupported migration to %d; restore a matching backup or export data before recreating the database", currentVersion, targetVersion)
+	// Version mismatch: discard the incompatible database and rebuild from scratch.
+	if currentVersion != 0 && currentVersion != targetVersion {
+		if err = dropAllApplicationTables(tx); err != nil {
+			return fmt.Errorf("initialize schema: reset incompatible format %d: %w", currentVersion, err)
+		}
+		currentVersion = 0
 	}
-	// Fresh install only (version 0). Refuse half-migrated/legacy tables without a format version.
-	if currentVersion == 0 {
-		exists, checkErr := hasApplicationTables(tx)
-		if checkErr != nil {
-			return fmt.Errorf("initialize schema: inspect tables: %w", checkErr)
-		}
-		if exists {
-			return fmt.Errorf("initialize schema: legacy database without supported format version detected; export data and recreate the database")
-		}
+	if err = rejectLegacyTablesWithoutVersion(tx, currentVersion); err != nil {
+		return err
 	}
 	if err = createFinalSchema(tx); err != nil {
 		return err
@@ -135,6 +131,21 @@ func initializeSchema(db *sql.DB, targetVersion int, setVersion func(*sql.Tx, in
 	}
 	if err = tx.Commit(); err != nil {
 		return fmt.Errorf("initialize schema: commit transaction: %w", err)
+	}
+	return nil
+}
+
+// rejectLegacyTablesWithoutVersion refuses half-migrated/legacy tables without a format version.
+func rejectLegacyTablesWithoutVersion(tx *sql.Tx, currentVersion int) error {
+	if currentVersion != 0 {
+		return nil
+	}
+	exists, err := hasApplicationTables(tx)
+	if err != nil {
+		return fmt.Errorf("initialize schema: inspect tables: %w", err)
+	}
+	if exists {
+		return fmt.Errorf("initialize schema: legacy database without supported format version detected; export data and recreate the database")
 	}
 	return nil
 }
@@ -154,6 +165,34 @@ func hasApplicationTables(tx *sql.Tx) (bool, error) {
 		return false, err
 	}
 	return count > 0, nil
+}
+
+// dropAllApplicationTables removes every user table so the schema can be rebuilt.
+// Used when the on-disk database format version does not match the supported version.
+// SQLite automatically drops indexes associated with a dropped table.
+func dropAllApplicationTables(tx *sql.Tx) error {
+	rows, err := tx.Query(`SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'`)
+	if err != nil {
+		return err
+	}
+	var names []string
+	for rows.Next() {
+		var name string
+		if err = rows.Scan(&name); err != nil {
+			_ = rows.Close()
+			return err
+		}
+		names = append(names, name)
+	}
+	if closeErr := rows.Close(); closeErr != nil {
+		return closeErr
+	}
+	for _, name := range names {
+		if _, err = tx.Exec(fmt.Sprintf("DROP TABLE IF EXISTS %q", name)); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func createFinalSchema(tx *sql.Tx) error {
