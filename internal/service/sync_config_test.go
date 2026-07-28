@@ -1,6 +1,7 @@
 package service
 
 import (
+	"database/sql"
 	"encoding/json"
 	"testing"
 
@@ -109,6 +110,89 @@ func TestSyncConfigLoadsAndClearsEncryptedSecrets(t *testing.T) {
 	assert.False(t, config.Gist.TokenSaved)
 	assert.False(t, config.WebDAV.PasswordSaved)
 	assert.False(t, config.S3.SecretKeySaved)
+}
+
+func TestSyncConfigSaveRollsBackSecretsWhenConfigWriteFails(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	crypto := syncTestCrypto{key: []byte("01234567890123456789012345678901")}
+	service := newTestSyncService(db, syncTestMasterKey, WithSyncCrypto(crypto))
+	input := syncTestConfigInput()
+	input.Gist.Token = "old-token"
+	_, err := service.SaveConfig(input)
+	require.NoError(t, err)
+	require.NoError(t, installSyncConfigFailureTrigger(db))
+
+	input.Gist.Token = "new-token"
+	input.Gist.GistID = "new-gist"
+	_, err = service.SaveConfig(input)
+	require.ErrorContains(t, err, "forced config failure")
+	secret, err := service.loadSecret(syncGistTokenSetting)
+	require.NoError(t, err)
+	assert.Equal(t, "old-token", secret)
+	config, err := service.LoadConfig()
+	require.NoError(t, err)
+	assert.NotEqual(t, "new-gist", config.Gist.GistID)
+}
+
+func TestSyncConfigInvalidatesConflictWhenProviderTargetChanges(t *testing.T) {
+	tests := []struct {
+		name   string
+		mutate func(*model.SyncConfigInput)
+	}{
+		{name: "provider", mutate: func(input *model.SyncConfigInput) {
+			input.Provider = model.SyncProviderGist
+			input.Gist.GistID = "gist-next"
+		}},
+		{name: "endpoint", mutate: func(input *model.SyncConfigInput) {
+			input.WebDAV.URL = "https://dav.example/next"
+		}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			service := newTestSyncService(testutil.NewTestDB(t), syncTestMasterKey)
+			input := syncTestConfigInput()
+			_, err := service.SaveConfig(input)
+			require.NoError(t, err)
+			conflict, content := installSyncConflict(service)
+			test.mutate(&input)
+			dashboard, err := service.SaveConfig(input)
+			require.NoError(t, err)
+			assert.Nil(t, dashboard.Conflict)
+			assert.Nil(t, dashboard.RemoteVersion)
+			assert.Equal(t, model.SyncStatePending, dashboard.State)
+			assert.Empty(t, conflict.RemoteContent)
+			assert.Equal(t, make([]byte, len(content)), content)
+		})
+	}
+}
+
+func TestSyncConfigKeepsConflictWhenProviderTargetIsUnchanged(t *testing.T) {
+	service := newTestSyncService(testutil.NewTestDB(t), syncTestMasterKey)
+	input := syncTestConfigInput()
+	_, err := service.SaveConfig(input)
+	require.NoError(t, err)
+	conflict, _ := installSyncConflict(service)
+	input.RetentionCount++
+	dashboard, err := service.SaveConfig(input)
+	require.NoError(t, err)
+	require.NotNil(t, dashboard.Conflict)
+	assert.Equal(t, conflict.Summary, *dashboard.Conflict)
+}
+
+func installSyncConflict(service *SyncService) (*syncConflictState, []byte) {
+	content := []byte("encrypted-conflict")
+	conflict := &syncConflictState{Summary: model.SyncConflict{}, RemoteContent: content}
+	service.setRuntimeState(syncRuntimeState{
+		State: model.SyncStateConflict, Conflict: conflict,
+		Remote: &model.SyncRemoteVersion{VersionID: "remote-version"},
+	})
+	return conflict, content
+}
+
+func installSyncConfigFailureTrigger(db *sql.DB) error {
+	_, err := db.Exec(`CREATE TRIGGER fail_sync_config BEFORE INSERT ON settings
+		WHEN NEW.key = 'sync.config' BEGIN SELECT RAISE(FAIL, 'forced config failure'); END`)
+	return err
 }
 
 func TestProviderFactoryCreatesConfiguredProviders(t *testing.T) {

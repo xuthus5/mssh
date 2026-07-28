@@ -166,12 +166,16 @@ func TestBuildAuthBundleAgentMissingSocket(t *testing.T) {
 
 func TestPickLRUVictimPrefersUnattached(t *testing.T) {
 	svc := NewTerminalService(&SessionService{conns: map[string]*managedConn{}}, newMockEventBus(), 2, testutil.NewTestLogger())
+	svc.ptys = map[string]terminalIO{
+		"attached-old":   lruRacePTY{},
+		"unattached-new": lruRacePTY{},
+	}
 	svc.lastUsed = map[string]time.Time{
-		"attached-old": time.Now().Add(-time.Hour),
-		"orphan-new":   time.Now().Add(-time.Minute),
+		"attached-old":   time.Now().Add(-time.Hour),
+		"unattached-new": time.Now().Add(-time.Minute),
 	}
 	svc.attached = map[string]bool{"attached-old": true}
-	assert.Equal(t, "orphan-new", svc.pickLRUVictim())
+	assert.Equal(t, "unattached-new", svc.pickLRUVictim())
 }
 
 func TestCloneTerminalOutputCapsAndCopies(t *testing.T) {

@@ -35,7 +35,7 @@ func TestLogService_ListBySession(t *testing.T) {
 	sessionSvc := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
 	sess := model.Session{
 		Name: "test-log", Host: "10.0.0.1", Port: 22, Username: "root",
-		AuthMethod: model.AuthPassword, Password: "enc", KeepAlive: 30, TermType: "xterm",
+		AuthMethod: model.AuthPassword, KeepAlive: 30, TermType: "xterm",
 	}
 	createdSess, err := sessionSvc.CreateSession(model.SessionInputFrom(sess))
 	require.NoError(t, err)
@@ -60,7 +60,7 @@ func TestLogService_StartTerminalRecordingCreatesFile(t *testing.T) {
 	sessionSvc := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
 	sess := model.Session{
 		Name: "test-rec", Host: "10.0.0.1", Port: 22, Username: "root",
-		AuthMethod: model.AuthPassword, Password: "enc", KeepAlive: 30, TermType: "xterm",
+		AuthMethod: model.AuthPassword, KeepAlive: 30, TermType: "xterm",
 	}
 	createdSess, err := sessionSvc.CreateSession(model.SessionInputFrom(sess))
 	require.NoError(t, err)
@@ -152,7 +152,7 @@ func TestLogService_StopTerminalRecording(t *testing.T) {
 	sessionSvc := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
 	sess := model.Session{
 		Name: "test-stop", Host: "10.0.0.1", Port: 22, Username: "root",
-		AuthMethod: model.AuthPassword, Password: "enc", KeepAlive: 30, TermType: "xterm",
+		AuthMethod: model.AuthPassword, KeepAlive: 30, TermType: "xterm",
 	}
 	createdSess, err := sessionSvc.CreateSession(model.SessionInputFrom(sess))
 	require.NoError(t, err)
@@ -185,7 +185,7 @@ func TestLogService_GetRecording(t *testing.T) {
 	sessionSvc := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
 	sess := model.Session{
 		Name: "test-get", Host: "10.0.0.1", Port: 22, Username: "root",
-		AuthMethod: model.AuthPassword, Password: "enc", KeepAlive: 30, TermType: "xterm",
+		AuthMethod: model.AuthPassword, KeepAlive: 30, TermType: "xterm",
 	}
 	createdSess, err := sessionSvc.CreateSession(model.SessionInputFrom(sess))
 	require.NoError(t, err)
@@ -227,7 +227,7 @@ func TestLogService_Delete(t *testing.T) {
 	sessionSvc := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
 	sess := model.Session{
 		Name: "test-del", Host: "10.0.0.1", Port: 22, Username: "root",
-		AuthMethod: model.AuthPassword, Password: "enc", KeepAlive: 30, TermType: "xterm",
+		AuthMethod: model.AuthPassword, KeepAlive: 30, TermType: "xterm",
 	}
 	createdSess, err := sessionSvc.CreateSession(model.SessionInputFrom(sess))
 	require.NoError(t, err)

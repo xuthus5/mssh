@@ -10,9 +10,35 @@ import (
 	"github.com/stretchr/testify/require"
 
 	backupcrypto "github.com/xuthus5/mssh/internal/crypto"
-	"github.com/xuthus5/mssh/internal/model"
 	"github.com/xuthus5/mssh/internal/service/testutil"
 )
+
+type stubVaultInstallTransaction struct {
+	operation func(func() error) error
+	commit    func() error
+	rollback  func() error
+}
+
+func (t *stubVaultInstallTransaction) WithCryptoOperation(operation func() error) error {
+	if t.operation != nil {
+		return t.operation(operation)
+	}
+	return operation()
+}
+
+func (t *stubVaultInstallTransaction) Commit() error {
+	if t.commit == nil {
+		return nil
+	}
+	return t.commit()
+}
+
+func (t *stubVaultInstallTransaction) Rollback() error {
+	if t.rollback == nil {
+		return nil
+	}
+	return t.rollback()
+}
 
 func TestSyncServiceMasterKeyAndArtifactVault(t *testing.T) {
 	db := testutil.NewTestDB(t)
@@ -67,40 +93,49 @@ func TestSyncServiceAdoptVaultFromContent(t *testing.T) {
 	// Build a minimal sync artifact with vault envelope via encode helpers if available.
 	// Fall back to Adopt with peek failure when content invalid.
 	svc = NewSyncService(db, testutil.NewTestLogger(),
-		WithVaultInstaller(func(password string, v backupcrypto.VaultFile) error {
+		WithVaultTransactionInstaller(func(password string, v backupcrypto.VaultFile) (VaultInstallTransaction, error) {
 			installed = true
 			assert.Equal(t, "initial-pass-12", password)
 			assert.Equal(t, vault.WrappedDEK, v.WrappedDEK)
-			return nil
+			return &stubVaultInstallTransaction{}, nil
 		}),
 	)
-	// invalid content -> missing vault
-	assert.ErrorIs(t, svc.AdoptVaultFromContent("initial-pass-12", []byte("{")), errSyncVaultMissing)
+	// malformed content must remain distinguishable from a legacy artifact.
+	assert.Error(t, svc.AdoptVaultFromContent("initial-pass-12", []byte("{")))
 	assert.False(t, installed)
+}
+
+func TestSyncServiceAdoptVaultRollsBackWhenCommitFails(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	password := "adopt-rollback-pass-12"
+	vault, dek, err := backupcrypto.CreateVault(password)
+	require.NoError(t, err)
+	secret := backupcrypto.SyncSecretFromDEK(dek)
+	rolledBack := false
+	svc := newTestSyncService(db, secret,
+		WithVaultTransactionInstaller(func(string, backupcrypto.VaultFile) (VaultInstallTransaction, error) {
+			return &stubVaultInstallTransaction{
+				commit:   func() error { return assert.AnError },
+				rollback: func() error { rolledBack = true; return nil },
+			}, nil
+		}),
+	)
+	data, err := svc.snapshot()
+	require.NoError(t, err)
+	fingerprint, err := snapshotFingerprint(data)
+	require.NoError(t, err)
+	content, err := encodeSyncArtifact(data, secret, syncArtifactMetadata{SnapshotFingerprint: fingerprint}, &vault)
+	require.NoError(t, err)
+
+	err = svc.AdoptVaultFromContent(password, content)
+	require.ErrorIs(t, err, assert.AnError)
+	assert.True(t, rolledBack)
 }
 
 func TestSyncServiceImportWithPasswordMissingFile(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	svc := NewSyncService(db, testutil.NewTestLogger(),
-		WithVaultInstaller(func(string, backupcrypto.VaultFile) error { return nil }),
-	)
-	err := svc.ImportWithPassword(filepath.Join(t.TempDir(), "missing.msshbackup"), "initial-pass-12")
-	assert.Error(t, err)
-}
-
-func TestSyncServiceInstallJoinVaultAndConfigErrors(t *testing.T) {
-	db := testutil.NewTestDB(t)
-	svc := NewSyncService(db, testutil.NewTestLogger(),
-		WithVaultInstaller(func(string, backupcrypto.VaultFile) error { return errors.New("bad vault") }),
-	)
-	err := svc.installJoinVaultAndConfig(model.SyncConfigInput{}, "initial-pass-12", []byte("x"))
-	assert.Error(t, err)
-}
-
-func TestSyncServiceRestoreJoinSnapshotRequiresMasterKey(t *testing.T) {
-	db := testutil.NewTestDB(t)
 	svc := NewSyncService(db, testutil.NewTestLogger())
-	err := svc.restoreJoinSnapshot([]byte("x"))
+	err := svc.ImportWithPassword(filepath.Join(t.TempDir(), "missing.msshbackup"), "initial-pass-12")
 	assert.Error(t, err)
 }
 

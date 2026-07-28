@@ -13,6 +13,7 @@ interface Props {
   onSelect: (file: FileInfo) => void
   onNavigate: (path: string) => void
   onDownload: (path: string) => void
+  isMutationBusy?: (file: FileInfo) => boolean
 }
 
 const ROW_HEIGHT = 36
@@ -47,21 +48,10 @@ export function FileListView(props: Props) {
           {windowed.startIndex > 0 ? (
             <TableRow aria-hidden="true"><TableCell colSpan={4} style={{ height: windowed.startIndex * ROW_HEIGHT, padding: 0 }} /></TableRow>
           ) : null}
-          {windowed.items.map((item) => {
-            const file = props.files[item.index]
-            return (
-              <TableRow key={file.path} data-state={props.selected?.path === file.path ? 'selected' : undefined} onClick={() => props.onSelect(file)}>
-                <TableCell>{file.isDir ? <FolderOpen className="size-4" /> : <File className="size-4" />}</TableCell>
-                <TableCell>
-                  <button type="button" className="cursor-pointer text-left hover:underline" onClick={() => { if (file.isDir) props.onNavigate(file.path) }} onDoubleClick={() => { if (!file.isDir) props.onDownload(file.path) }}>
-                    {file.name}
-                  </button>
-                </TableCell>
-                <TableCell className="text-right">{file.isDir ? '-' : formatFileSize(file.size)}</TableCell>
-                <TableCell className="text-right text-xs">{file.modified}</TableCell>
-              </TableRow>
-            )
-          })}
+          {windowed.items.map((item) => <FileListRow key={props.files[item.index].path}
+            file={props.files[item.index]} selected={props.selected?.path === props.files[item.index].path}
+            busy={props.isMutationBusy?.(props.files[item.index]) ?? false}
+            onSelect={props.onSelect} onNavigate={props.onNavigate} onDownload={props.onDownload} />)}
           {windowed.endIndex < props.files.length - 1 ? (
             <TableRow aria-hidden="true"><TableCell colSpan={4} style={{ height: (props.files.length - windowed.endIndex - 1) * ROW_HEIGHT, padding: 0 }} /></TableRow>
           ) : null}
@@ -69,6 +59,26 @@ export function FileListView(props: Props) {
       </Table>
     </div>
   )
+}
+
+function FileListRow({ file, selected, busy, onSelect, onNavigate, onDownload }: {
+  file: FileInfo
+  selected: boolean
+  busy: boolean
+  onSelect: Props['onSelect']
+  onNavigate: Props['onNavigate']
+  onDownload: Props['onDownload']
+}) {
+  return <TableRow data-state={selected ? 'selected' : undefined} aria-disabled={busy} onClick={() => onSelect(file)}>
+    <TableCell>{file.isDir ? <FolderOpen className="size-4" /> : <File className="size-4" />}</TableCell>
+    <TableCell>
+      <button type="button" disabled={busy} className="cursor-pointer text-left hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+        onClick={() => { if (file.isDir) onNavigate(file.path) }}
+        onDoubleClick={() => { if (!file.isDir) onDownload(file.path) }}>{file.name}</button>
+    </TableCell>
+    <TableCell className="text-right">{file.isDir ? '-' : formatFileSize(file.size)}</TableCell>
+    <TableCell className="text-right text-xs">{file.modified}</TableCell>
+  </TableRow>
 }
 
 function EmptyRow({ text }: { text: string }) {

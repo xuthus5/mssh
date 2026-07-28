@@ -87,8 +87,9 @@ async function loadRecording({
   } catch (error: unknown) {
     if (isDisposed()) return
     logger.error('PlaybackTab: GetRecording error:', error)
+    const message = error instanceof Error ? error.message : String(error)
     runTerminalRuntime(reportRuntimeError, 'playback load status', () => {
-      term.writeln(`\x1b[31m${t('加载录制失败')}\x1b[0m`)
+      term.writeln(`\x1b[31m${t('${}: ${}', t('加载录制失败'), message)}\x1b[0m`)
     })
     return
   }

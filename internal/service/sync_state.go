@@ -20,10 +20,11 @@ type syncBaseline struct {
 }
 
 type syncConflictState struct {
-	Summary    model.SyncConflict
-	Local      syncCurrentSnapshot
-	Remote     decodedSyncArtifact
-	RemoteETag string
+	Summary        model.SyncConflict
+	Local          syncCurrentSnapshot
+	RemoteContent  []byte
+	RemoteMetadata syncArtifactMetadata
+	RemoteETag     string
 }
 
 type syncRuntimeState struct {
@@ -57,20 +58,46 @@ func (s *SyncService) saveBaseline(provider model.SyncProvider, baseline syncBas
 
 func (s *SyncService) setRuntimeState(state syncRuntimeState) {
 	s.stateMu.Lock()
+	previous := s.state.Conflict
 	s.state = state
 	s.stateMu.Unlock()
+	if previous != nil && previous != state.Conflict {
+		clearSyncConflictState(previous)
+	}
 }
 
 func (s *SyncService) markPending(message string) {
 	s.stateMu.Lock()
+	previous := s.state.Conflict
 	s.state.State = model.SyncStatePending
 	s.state.Message = message
 	s.state.Conflict = nil
 	s.stateMu.Unlock()
+	clearSyncConflictState(previous)
+}
+
+func clearSyncConflictState(conflict *syncConflictState) {
+	if conflict == nil {
+		return
+	}
+	for index := range conflict.RemoteContent {
+		conflict.RemoteContent[index] = 0
+	}
+	conflict.RemoteContent = nil
+	conflict.Local.Data = ExportData{}
 }
 
 func (s *SyncService) Dashboard() (model.SyncDashboard, error) {
-	config, err := s.LoadConfig()
+	finish, err := s.beginReadOperation()
+	if err != nil {
+		return model.SyncDashboard{}, err
+	}
+	defer finish()
+	return s.dashboard()
+}
+
+func (s *SyncService) dashboard() (model.SyncDashboard, error) {
+	config, err := s.loadConfig()
 	if err != nil {
 		return model.SyncDashboard{}, err
 	}

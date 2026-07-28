@@ -5,16 +5,17 @@ import (
 	"strings"
 
 	"github.com/xuthus5/mssh/internal/model"
+	"github.com/xuthus5/mssh/internal/store"
 )
 
 // Settings that must never pass through the generic SettingService surface.
 // Secrets are owned by SecurityService / SyncService vault-backed APIs.
 var blockedGenericSettingKeys = map[string]struct{}{
 	securityRotationPendingSetting: {},
-	"sync.master_key":             {},
-	"sync.secret.gist_token":      {},
-	"sync.secret.webdav_password": {},
-	"sync.secret.s3_secret_key":   {},
+	"sync.master_key":              {},
+	"sync.secret.gist_token":       {},
+	"sync.secret.webdav_password":  {},
+	"sync.secret.s3_secret_key":    {},
 }
 
 func settingBlocked(key string) bool {
@@ -31,8 +32,8 @@ func settingBlocked(key string) bool {
 }
 
 func rejectBlockedSettingKey(key string) error {
-	if strings.TrimSpace(key) == "" {
-		return fmt.Errorf("setting key is required")
+	if err := store.ValidateSettingKey(key); err != nil {
+		return err
 	}
 	if settingBlocked(key) {
 		return fmt.Errorf("setting %q cannot be accessed through the generic settings API", key)

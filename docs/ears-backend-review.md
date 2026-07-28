@@ -18,17 +18,16 @@
 - **应用密码 Vault（Argon2id KEK + DEK）**；数据目录 `0700` / DB 文件 `0600`（`internal/crypto/vault.go`、`store.OpenDB`）。
 - **主机密钥 TOFU + 用户确认**：未知指纹走 `HostKeyFingerprint` 事件与 `DecideHostKey`，变更非空 `Want` 会阻断（`session_connect.go`、`ssh/client.go`）。
 - **SQLite 工程化**：WAL + `busy_timeout(5000)` + `foreign_keys=1` + `MaxOpenConns(1)`，数据目录权限收紧。
-- **终端输出有界**：pending 输出 `1 MiB` + `1m` TTL；池 LRU；输出 sequence 保证前端还原顺序。
+- **终端输出有界且无损背压**：前端 xterm 高水位时暂停 PTY 消费，低水位恢复；未挂载 pending 输出仍为 `1 MiB` + `1m` TTL；池 LRU 与 output sequence 保证资源有界且顺序可恢复。
 - **SFTP 传输**：`.mssh-partial-*` 临时文件 + rename；下载本地 `0600`；进度可持久化；可取消。
 - **AI 安全策略**：危险命令硬阻断、自定义 deny/allow、只读自动执行、密钥脱敏与审计记录。
-- **系统探针有超时与输出上限**，避免监控拖死终端主路径。
+- **系统探针有超时、输出上限与跨平台降级**，覆盖 Linux、macOS、BusyBox 与通用 POSIX。
 - **性能预算测试存在**（会话列表 / 传输进度 / 终端分发 / 监控解析）。
 
 ### 0.2 主要风险（按严重度）
 
 | 级别 | 主题 | 证据摘要 |
 |---|---|---|
-| **P2** | 进程/系统探针偏 Linux | `ps -eo ... --sort` 在 macOS/BusyBox 可能失败（已有局部降级） |
 | **P2** | Emit 仍有一次必要拷贝 | 异步事件总线要求 clone；已 cap 且单次拷贝 |
 | **P2** | 单连接 SQLite 争用 | busy_timeout + retry + 进度节流；极端并发仍可能排队 |
 
@@ -51,6 +50,12 @@
 | BE-SEC-011 | 当 SFTP/本地文件 API 接收路径时，系统必须规范化并拒绝危险本地路径（如非常规 symlink 逃逸策略按产品定义），远程路径保持会话沙箱语义清晰。 | **done** | 本地路径 validateLocalTransferPath；远程非空/NUL 校验 |
 | BE-SEC-012 | 当隧道 Local/Dynamic 启动时，默认监听地址必须是 loopback；绑定非 loopback 需要显式高级选项与风险提示。 | **done** | `validateTunnelBind` Create/Update/Start 拒绝非 loopback |
 | BE-SEC-013 | 当进程退出时，系统应尽力清零内存中的主密钥缓冲（best-effort），并关闭 keychain 句柄与打开的密钥材料缓存。 | **done** | Shutdown/Lock 调用 ClearMemory 清零 DEK |
+| BE-SEC-014 | 当数据库中的录制路径用于读取或删除时，系统必须将其视为不可信输入，拒绝目录外路径、符号链接逃逸和非普通文件。 | **done** | `recording_path.go` 真实目录/父目录/符号链接校验；service/store 安全回归用例 |
+| BE-SEC-015 | 当 Vault 加密运行时缺失或锁定时，会话密码、同步凭证和受保护设置必须 fail-closed；keychain 失败不得静默保持自动解锁状态。 | **done** | `ErrVaultLocked` 门禁；keychain 失败自动关闭 RememberUnlock；回调在释放状态锁后执行 |
+| BE-SEC-016 | 当回放文件声明终端类型、条目数据或时间戳时，系统必须先校验长度与有符号范围；截断数据不得被当作正常文件结束。 | **done** | `recording_limits.go` 上限校验；`parseEntries` 精确识别 EOF；恶意 header/entry/timestamp 回归用例 |
+| BE-SEC-017 | 当录制器编码终端尺寸、类型或输出时，系统必须在写文件前拒绝负值、超出格式范围和超大条目，避免整数回绕与内存放大。 | **done** | `NewRecorder`/`Recorder.Write` 预校验；尺寸、类型和数据边界测试 |
+| BE-SEC-018 | 当本地终端启动或调整窗口尺寸时，系统必须拒绝超过 PTY `uint16` 可表示范围的值后再进行平台转换。 | **done** | `normalizeSize`/`Session.Resize` 上限；Unix `ptySize` 仅接收已校验值；行列边界测试 |
+| BE-SEC-019 | 当串口平台句柄通过反射读取时，系统必须拒绝负值、零值及超出本机 `uintptr` 范围的句柄。 | **done** | `nativeHandleFromUint` 范围与有效值校验；负值、零值和架构边界测试 |
 
 ---
 
@@ -59,9 +64,9 @@
 | ID | EARS 验收条件 | 状态 | 证据 / 备注 |
 |---|---|---|---|
 | BE-REL-001 | 当终端数量达到 `maxSize` 时，系统不得静默断开仍被 UI 引用的终端；必须与前端池回收策略对齐，或返回明确错误并要求用户关闭。 | **done** | 后端 LRU 优先驱逐 unattached；仍可能踢 attached 但发 state=evicted；前端 ensureTerminalPoolCapacity 主路径 |
-| BE-REL-002 | 当远端 shell 退出时，系统必须清理 PTY、连接引用、pending 输出策略，并可靠发出 `disconnected`。 | **done** | `handlePTYExit` + 测试覆盖历史问题 |
-| BE-REL-003 | 当连接 keep-alive 连续失败达到阈值时，系统必须关闭连接一次，且不与正常输入路径死锁。 | **done** | `startKeepAlive` failCount>=3 Close |
-| BE-REL-004 | 当应用退出时，系统必须停止终端、隧道、传输、同步调度，并幂等。 | **done** | Shutdown 停 recording/file/sync/tunnel/session + ClearMemory |
+| BE-REL-002 | 当远端 shell 退出时，系统必须清理 PTY、连接引用、pending 输出策略，并可靠发出 `disconnected`。 | **done** | `handlePTYExit` 清理；pending TTL 可取消/等待；PTY `Close` 等待读循环退出 |
+| BE-REL-003 | 当连接 keep-alive 连续失败达到阈值时，系统必须关闭连接一次，且不与正常输入路径死锁。 | **done** | worker 使用非等待关闭，公开 `Close` 等待 keepalive 退出 |
+| BE-REL-004 | 当应用退出时，系统必须停止终端、隧道、传输、同步调度，并幂等。 | **done** | Shutdown 停资源；SSH/PTTY/本地 Shell/串口 worker 均 join |
 | BE-REL-005 | 当传输取消或失败时，远端 partial 文件必须清理；本地下载失败不得破坏已有完整文件。 | **done** | upload partial remove；download 直写目标仍有风险点见 BE-REL-006 |
 | BE-REL-006 | 当本地下载中断时，系统必须写入临时文件并在成功后原子 rename，避免半截覆盖用户文件。 | **done** | 下载 `.partial` + atomic Rename 已落地（upload 同步 partial rename） |
 | BE-REL-007 | 当 SSH Agent 不可用或签名失败时，系统必须返回可理解错误，不得因过早关 socket 产生 flaky 失败。 | **done** | 依赖 BE-SEC-003 managedConn cleanup |
@@ -83,8 +88,9 @@
 | BE-PERF-005 | 当系统监控轮询时，探针必须超时且输出截断；失败不得阻塞 PTY 读写。 | **done** | 5s timeout + 4MiB cap + 独立 session |
 | BE-PERF-006 | 当列表 1000 会话 / 1e4 输出块 / 监控样本时，系统必须继续满足 `docs/performance-budgets.md`。 | **done** | 既有 budget tests；变更后需回归 |
 | BE-PERF-007 | 当隧道并发连接激增时，系统必须限制同时转发连接数或读写缓冲，避免 goroutine 爆炸。 | **done** | 隧道 Accept 并发 gate max 256 |
-| BE-PERF-008 | 当终端池与连接 map 增长时，关闭路径必须 O(1) 清理附属缓存（samples/sequences/startsAt）。 | **done** | 关闭/驱逐清理 samples/sequences/pending |
+| BE-PERF-008 | 当终端池与连接 map 增长时，关闭路径必须 O(1) 清理附属缓存（samples/sequences/startsAt）。 | **done** | 关闭/驱逐清理 samples/sequences/pending；CloseAll 取消并等待 pending timer |
 | BE-PERF-009 | 当同步拉取/推送时，网络必须有 context 超时，并限制解码体积。 | **done** | `syncNetworkTimeout` + limit reader |
+| BE-PERF-010 | 当 xterm 写入队列达到高水位时，后端必须暂停对应 PTY read；队列降至低水位或终端关闭时恢复/唤醒，且不得丢弃字节或截断 ANSI 序列。 | **done** | `terminalOutputFlow` + 前端 `TerminalOutputFlowControl` 高/低水位；flow-control race 与终端关闭回归测试 |
 
 ---
 
@@ -219,7 +225,7 @@
 - 同步：HTTPS（loopback HTTP 例外）
 - AI/宏：用户正则门禁；宏阻断+审计
 - 传输：进度 DB 节流；下载/上传 partial 原子替换
-- 终端：pendingRead 1MiB；systemSamples 清理；exit/evict 锁缩短
+- 终端：PTY pendingRead 1MiB；前端高/低水位触发无损 PTY 背压；systemSamples 清理；exit/evict 锁缩短
 - 代码体量：`file.go` 拆分为 transfer/progress 子文件
 
 ## 14. 连接共享语义（BE-REL-011）
@@ -245,7 +251,6 @@
 - 主密码 Vault、会话密码加密、Agent、schema 安全失败、隧道/HTTPS/宏/正则/传输节流/路径策略均已落地
 
 非阻塞残留（P2 增强）：
-- 跨平台系统探针命令矩阵
 - Emit 零拷贝（需事件总线生命周期契约）
 - SQLite 读写队列/多连接架构
 
@@ -259,3 +264,30 @@
 
 - `wails3 task ci` 全绿（race + coverpkg 90.0% + 前端 + 生产构建）。
 - 高危安全/可靠性项已闭环；仅保留文档记载的 P2 增强残留。
+
+## 2026-07-27 隧道连接生命周期增量复核
+
+- 本地、远程与动态转发 listener 已托管 Accept、活动连接、目标拨号和 handler 生命周期。
+- `Close` 会取消拨号与双向复制、断开已有流量并等待 handler 退出；accept-exit 回调可重入关闭而不自锁。
+- TCP/SSH `CloseWrite` half-close 语义保持，客户端结束请求后仍可完整接收响应。
+- SSH 全量 race、服务层 Tunnel race、`golangci-lint v2.12.2` 与 `wails3 task ci` 均通过；总覆盖率 **91.0%**。
+
+## 2026-07-27 终端退出回调增量复核
+
+- SSH PTY、本地 Shell 与串口自主退出的清理尾部已纳入 `TerminalService` 生命周期等待。
+- Shutdown/CloseAll 先封闭旧代际回调并等待已进入回调，再关闭稳定终端快照，消除快照漏项与迟到断连。
+- 临时 CloseAll 恢复新代际回调；永久 Shutdown 保持拒绝，旧代际迟到回调不会影响后续终端。
+- 终端定向与 Service/App 全量 race、`golangci-lint v2.12.2` 及 `wails3 task ci` 均通过；总覆盖率 **91.0%**。
+
+## 2026-07-27 终端 pending 输出定时器增量复核
+
+- CloseAll/Shutdown 的终端快照同时覆盖活动 PTY 与 detached pending buffer，不再让最多 1 MiB 输出跨越停机边界等待 TTL。
+- pending expiry 具备 Stop + completion 屏障；尚未触发的 timer 被取消，已开始的回调会被等待后再返回。
+- pause lease timer 仅访问 flow 局部状态，关闭会停止 timer、唤醒 PTY，并使迟到回调由 `closed` 门禁 no-op。
+
+## 2026-07-27 会话删除清理与并发注册增量复核
+
+- 会话删除准备阶段现在聚合终端、隧道和残余 SSH 连接的清理错误；任一关键关闭失败都会阻止数据库行删除，同时其余清理步骤仍继续执行；远端退出后的 detached pending 输出保留独立会话归属并立即纳入删除清理。
+- SessionService 在删除前建立按会话引用计数的连接代际门禁，取消已有 attempt，并拒绝删除期间的新连接以及删除前启动、取消后迟到完成的连接。
+- TerminalService 使用独立的会话打开代际；删除快照前已注册的终端会被关闭，快照后迟到的 PTY 注册会被拒绝并同步清理 PTY 与 SSH 连接。
+- PTY/SSH 关闭失败保留数据、连接与终端迟到注册、嵌套门禁引用计数均有回归；service 全量、定向 race、`golangci-lint v2.12.2`、Go 源码限制与完整 `wails3 task ci` 通过，总覆盖率 **91.0%**。

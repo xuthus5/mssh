@@ -17,6 +17,11 @@ type parsedSessionCSVRow struct {
 }
 
 func (s *SessionService) ImportCSV(path string, options model.SessionCSVImportOptions) (model.SessionCSVImportSummary, error) {
+	finish, err := s.beginOperation()
+	if err != nil {
+		return model.SessionCSVImportSummary{}, err
+	}
+	defer finish()
 	summary := model.SessionCSVImportSummary{Results: []model.SessionCSVImportResult{}}
 	cleaned, pathErr := validateLocalFilePath(path)
 	if pathErr != nil {
@@ -40,10 +45,16 @@ func (s *SessionService) ImportCSV(path string, options model.SessionCSVImportOp
 	}
 	summary.Total = len(rows)
 	summary.Results = make([]model.SessionCSVImportResult, 0, len(rows))
-	for _, row := range rows {
-		result := s.importParsedSessionCSVRow(row, options.ConflictPolicy)
-		summary.Results = append(summary.Results, result)
-		addSessionCSVResult(&summary, result.Status)
+	err = withCryptoOperation(s.crypto, func() error {
+		for _, row := range rows {
+			result := s.importParsedSessionCSVRow(row, options.ConflictPolicy)
+			summary.Results = append(summary.Results, result)
+			addSessionCSVResult(&summary, result.Status)
+		}
+		return nil
+	})
+	if err != nil {
+		return summary, fmt.Errorf("import session csv: %w", err)
 	}
 	if summary.Failed == 0 {
 		outcome = "success"

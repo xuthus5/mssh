@@ -16,9 +16,8 @@ import (
 )
 
 type App struct {
-	DB       *sql.DB
-	Keychain crypto.KeychainAdapter
-
+	DB             *sql.DB
+	Keychain       crypto.KeychainAdapter
 	Session        *service.SessionService
 	Terminal       *service.TerminalService
 	File           *service.FileService
@@ -38,6 +37,7 @@ type App struct {
 	Security       *service.SecurityService
 	Serial         *service.SerialService
 	logger         *slog.Logger
+	proxyManager   *netproxy.Manager
 	shutdownOnce   sync.Once
 }
 
@@ -88,6 +88,7 @@ func newAppWithDependencies(opts Options, dependencies appDependencies) (*App, e
 	if opts.DataDir == "" {
 		return nil, fmt.Errorf("data directory is required")
 	}
+	opts.ProxyManager = defaultProxyManager(opts.ProxyManager)
 	logger := opts.Logger
 	if logger == nil {
 		logger = slog.Default()
@@ -147,31 +148,47 @@ func applyStartupSettings(appInstance *App, logger *slog.Logger) {
 	if appInstance == nil || appInstance.Setting == nil {
 		return
 	}
-	if err := appInstance.Setting.ApplyStoredLogSettings(); err != nil {
-		logger.Warn("apply stored log settings failed", "error", err)
-	}
-	if err := appInstance.Setting.ApplyStoredProxySettings(); err != nil {
-		logger.Warn("apply stored proxy settings failed", "error", err)
-	}
+	applyStoredLogSettings(appInstance.Setting, logger)
+	proxyApplyFailed := applyStoredProxySettings(appInstance.Setting, logger, "apply stored proxy settings failed")
 	if appInstance.Security == nil {
 		return
 	}
+	configureStartupSecurity(appInstance, logger, proxyApplyFailed)
+}
+
+func applyStoredLogSettings(settingSvc *service.SettingService, logger *slog.Logger) {
+	if err := settingSvc.ApplyStoredLogSettings(); err != nil {
+		logger.Warn("apply stored log settings failed", "error", err)
+	}
+}
+
+func applyStoredProxySettings(settingSvc *service.SettingService, logger *slog.Logger, warning string) bool {
+	if err := settingSvc.ApplyStoredProxySettings(); err != nil {
+		logger.Warn(warning, "error", err)
+		return true
+	}
+	return false
+}
+
+func configureStartupSecurity(appInstance *App, logger *slog.Logger, proxyApplyFailed bool) {
 	settingSvc := appInstance.Setting
 	syncSvc := appInstance.Sync
 	appInstance.Security.SetAfterUnlock(func() {
-		if err := settingSvc.ApplyStoredProxySettings(); err != nil {
-			logger.Warn("apply proxy settings after unlock failed", "error", err)
-		}
-		if syncSvc != nil {
-			// Catch up after vault unlock (covers manual unlock and late auto-unlock races).
-			syncSvc.NotifyVaultUnlocked()
-		}
+		applyStoredProxySettings(settingSvc, logger, "apply proxy settings after unlock failed")
+		notifyVaultUnlocked(syncSvc)
 	})
-	// If vault already unlocked during service init (auto-unlock), trigger catch-up once.
-	if syncSvc != nil && appInstance.Security != nil {
-		if status, err := appInstance.Security.Status(); err == nil && status.Unlocked {
-			syncSvc.NotifyVaultUnlocked()
+	if status, err := appInstance.Security.Status(); err == nil && status.Unlocked {
+		if proxyApplyFailed {
+			applyStoredProxySettings(settingSvc, logger, "retry proxy settings after automatic unlock failed")
 		}
+		notifyVaultUnlocked(syncSvc)
+	}
+}
+
+func notifyVaultUnlocked(syncSvc *service.SyncService) {
+	if syncSvc != nil {
+		// Catch up after vault unlock (covers manual unlock and late auto-unlock races).
+		syncSvc.NotifyVaultUnlocked()
 	}
 }
 
@@ -185,9 +202,16 @@ func initializeServices(input serviceInitialization) (*App, error) {
 	if err != nil {
 		return nil, fmt.Errorf("recover security state: %w", err)
 	}
+	settingSvc := newSettingService(input, runtime)
+	maxPoolSize := service.DefaultTerminalPoolSize
+	if configured, loadErr := service.LoadTerminalPoolSize(input.db); loadErr != nil {
+		input.logger.Warn("load terminal pool size failed; using default", "error", loadErr)
+	} else {
+		maxPoolSize = configured
+	}
 	sessionSvc := service.NewSessionService(input.db, input.eventBus, service.DefaultKeepAliveSeconds, input.opts.DataDir, runtime, input.logger)
 	sessionSvc.SetPasswordVerifier(securitySvc)
-	terminalSvc := service.NewTerminalService(sessionSvc, input.eventBus, 32, input.logger)
+	terminalSvc := service.NewTerminalService(sessionSvc, input.eventBus, maxPoolSize, input.logger)
 	serialSvc := service.NewSerialService(input.db, input.logger)
 	terminalSvc.SetSerialService(serialSvc)
 	tunnelSvc := service.NewTunnelService(input.db, sessionSvc, input.eventBus, input.logger)
@@ -195,8 +219,11 @@ func initializeServices(input serviceInitialization) (*App, error) {
 	sessionSvc.SetTerminalCloser(terminalSvc)
 	logSvc := service.NewLogService(input.db, input.opts.DataDir, input.logger)
 	configureTerminalLogging(terminalSvc, logSvc, input.logger)
-	syncSvc := newSyncService(input, runtime, securitySvc, terminalSvc, tunnelSvc, sessionSvc)
-	return assembleApp(input, runtime, securitySvc, sessionSvc, terminalSvc, serialSvc, tunnelSvc, logSvc, themeSvc, syncSvc), nil
+	fileSvc := service.NewFileService(sessionSvc, input.eventBus, input.logger,
+		service.WithTransferDB(input.db), service.WithTransferJournalDataDir(input.opts.DataDir))
+	sessionSvc.SetTransferCanceller(fileSvc)
+	syncSvc := newSyncService(input, runtime, securitySvc, fileSvc, terminalSvc, tunnelSvc, sessionSvc, settingSvc)
+	return assembleApp(input, runtime, securitySvc, sessionSvc, terminalSvc, fileSvc, serialSvc, tunnelSvc, logSvc, themeSvc, syncSvc, settingSvc), nil
 }
 
 func newSecurityService(input serviceInitialization, runtime *service.CryptoRuntime) (*service.SecurityService, error) {
@@ -219,7 +246,7 @@ func newThemeService(input serviceInitialization) (*service.ThemeService, error)
 	return themeSvc, nil
 }
 
-func newSyncService(input serviceInitialization, runtime *service.CryptoRuntime, securitySvc *service.SecurityService, terminalSvc *service.TerminalService, tunnelSvc *service.TunnelService, sessionSvc *service.SessionService) *service.SyncService {
+func newSyncService(input serviceInitialization, runtime *service.CryptoRuntime, securitySvc *service.SecurityService, fileSvc *service.FileService, terminalSvc *service.TerminalService, tunnelSvc *service.TunnelService, sessionSvc *service.SessionService, settingSvc *service.SettingService) *service.SyncService {
 	return service.NewSyncService(input.db, input.logger,
 		service.WithSyncDataDir(input.opts.DataDir),
 		service.WithSyncCrypto(runtime),
@@ -231,23 +258,14 @@ func newSyncService(input serviceInitialization, runtime *service.CryptoRuntime,
 			}
 			return &vault, nil
 		}),
-		service.WithVaultInstaller(securitySvc.InstallVaultFromExport),
+		service.WithVaultTransactionInstaller(securitySvc.PrepareVaultFromExport),
 		service.WithSyncEventBus(input.eventBus),
-		service.WithSyncLifecycle(syncLifecycleAdapter{terminal: terminalSvc, tunnel: tunnelSvc, session: sessionSvc}),
-		service.WithSyncProxy(input.opts.ProxyManager))
+		service.WithSyncLifecycle(syncLifecycleAdapter{file: fileSvc, terminal: terminalSvc, tunnel: tunnelSvc, session: sessionSvc}),
+		service.WithSyncProxy(input.opts.ProxyManager),
+		service.WithSyncRuntimeSettings(settingSvc))
 }
 
-func newSettingService(input serviceInitialization, runtime *service.CryptoRuntime) *service.SettingService {
-	return service.NewSettingService(input.db, input.logger, service.SettingServiceOptions{
-		Log:    input.opts.LogManager,
-		Proxy:  input.opts.ProxyManager,
-		Crypto: runtime,
-	})
-}
-
-func assembleApp(input serviceInitialization, runtime *service.CryptoRuntime, securitySvc *service.SecurityService, sessionSvc *service.SessionService, terminalSvc *service.TerminalService, serialSvc *service.SerialService, tunnelSvc *service.TunnelService, logSvc *service.LogService, themeSvc *service.ThemeService, syncSvc *service.SyncService) *App {
-	fileSvc := service.NewFileService(sessionSvc, input.eventBus, input.logger, service.WithTransferDB(input.db))
-	sessionSvc.SetTransferCanceller(fileSvc)
+func assembleApp(input serviceInitialization, runtime *service.CryptoRuntime, securitySvc *service.SecurityService, sessionSvc *service.SessionService, terminalSvc *service.TerminalService, fileSvc *service.FileService, serialSvc *service.SerialService, tunnelSvc *service.TunnelService, logSvc *service.LogService, themeSvc *service.ThemeService, syncSvc *service.SyncService, settingSvc *service.SettingService) *App {
 	return &App{
 		DB:             input.db,
 		Keychain:       input.keychain,
@@ -261,7 +279,7 @@ func assembleApp(input serviceInitialization, runtime *service.CryptoRuntime, se
 		Theme:          themeSvc,
 		Log:            logSvc,
 		Sync:           syncSvc,
-		Setting:        newSettingService(input, runtime),
+		Setting:        settingSvc,
 		About:          service.NewAboutService(input.opts.ProxyManager),
 		Font:           service.NewFontService(input.logger),
 		Audit:          service.NewAuditService(input.db, input.logger),
@@ -270,5 +288,6 @@ func assembleApp(input serviceInitialization, runtime *service.CryptoRuntime, se
 		Security:       securitySvc,
 		Serial:         serialSvc,
 		logger:         input.logger,
+		proxyManager:   input.opts.ProxyManager,
 	}
 }

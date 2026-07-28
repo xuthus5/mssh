@@ -1,6 +1,7 @@
 package service
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -8,11 +9,10 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"os"
 	"sort"
 	"strings"
 	"sync"
-	"time"
+	"sync/atomic"
 
 	backupcrypto "github.com/xuthus5/mssh/internal/crypto"
 	"github.com/xuthus5/mssh/internal/model"
@@ -30,31 +30,40 @@ const (
 	maxCloudBackupSize   = 32 * 1024 * 1024
 )
 
+var errSyncOperationRunning = errors.New("sync operation is already running")
+
 var backupTables = []string{"session_folders", "ssh_keys", "asset_environments", "asset_projects", "asset_tags", "sessions", "session_tags", "tunnels", "macros", "serial_ports", "settings", "themes", "terminal_theme_profiles", "transfer_jobs"}
 
 var backupDeleteOrder = []string{"transfer_jobs", "terminal_theme_profiles", "themes", "tunnels", "session_tags", "sessions", "asset_tags", "asset_projects", "asset_environments", "ssh_keys", "session_folders", "macros", "serial_ports", "settings"}
 
 type SyncService struct {
-	db               *sql.DB
-	logger           *slog.Logger
-	dataDir          string
-	crypto           KeyCrypto
-	secretSource     func() (string, error)
-	vaultSource      func() (*backupcrypto.VaultFile, error)
-	vaultInstaller   func(password string, vault backupcrypto.VaultFile) error
-	eventBus         EventBus
-	lifecycle        syncLifecycle
-	providerFactory  syncProviderFactory
-	operationMu      sync.Mutex
-	stateMu          sync.RWMutex
-	state            syncRuntimeState
-	schedulerMu      sync.Mutex
-	schedulerCancel  context.CancelFunc
-	schedulerContext context.Context
-	schedulerStop    context.CancelFunc
-	schedulerWG      sync.WaitGroup
-	schedulerStopped bool
-	proxyManager     *netproxy.Manager
+	db                        *sql.DB
+	logger                    *slog.Logger
+	dataDir                   string
+	crypto                    KeyCrypto
+	secretSource              func() (string, error)
+	vaultSource               func() (*backupcrypto.VaultFile, error)
+	vaultTransactionInstaller func(password string, vault backupcrypto.VaultFile) (VaultInstallTransaction, error)
+	eventBus                  EventBus
+	lifecycle                 syncLifecycle
+	providerFactory           syncProviderFactory
+	operationMu               sync.Mutex
+	shutdownMu                sync.Mutex
+	readOperations            sync.WaitGroup
+	stopped                   bool
+	activeCancel              context.CancelFunc
+	configMu                  sync.Mutex
+	stateMu                   sync.RWMutex
+	state                     syncRuntimeState
+	schedulerMu               sync.Mutex
+	schedulerCancel           context.CancelFunc
+	schedulerContext          context.Context
+	schedulerStop             context.CancelFunc
+	schedulerWG               sync.WaitGroup
+	schedulerStopped          bool
+	unlockCatchUpRunning      atomic.Bool
+	proxyManager              *netproxy.Manager
+	runtimeSettings           SyncRuntimeSettings
 }
 
 type SyncOption func(*SyncService)
@@ -85,39 +94,17 @@ func (s *SyncService) Export(path string) error {
 		return fmt.Errorf("export: %w", err)
 	}
 	path = cleaned
+	if err := s.beginSyncOperation(); err != nil {
+		return fmt.Errorf("export: %w", err)
+	}
+	defer s.operationMu.Unlock()
 	outcome := "failed"
 	defer func() {
 		recordAudit(s.db, s.logger, model.AuditEvent{Action: "export", TargetType: "backup", Summary: "导出加密配置", Outcome: outcome})
 	}()
-	masterKey, err := s.masterKey()
-	if err != nil {
+	if err := withCryptoOperation(s.crypto, func() error { return s.exportSnapshot(path) }); err != nil {
 		return fmt.Errorf("export: %w", err)
 	}
-	data, err := s.snapshot()
-	if err != nil {
-		return fmt.Errorf("export: %w", err)
-	}
-	fingerprint, err := snapshotFingerprint(data)
-	if err != nil {
-		return fmt.Errorf("export: %w", err)
-	}
-	deviceID, err := s.deviceID()
-	if err != nil {
-		return fmt.Errorf("export: %w", err)
-	}
-	vault, err := s.artifactVault()
-	if err != nil {
-		return fmt.Errorf("export: %w", err)
-	}
-	metadata := syncArtifactMetadata{SnapshotFingerprint: fingerprint, DeviceID: deviceID, CreatedAt: time.Now().UTC()}
-	content, err := encodeSyncArtifact(data, masterKey, metadata, vault)
-	if err != nil {
-		return fmt.Errorf("export: %w", err)
-	}
-	if err := writePrivateFileAtomic(path, content); err != nil {
-		return fmt.Errorf("export: %w", err)
-	}
-	s.logger.Info("exported encrypted configuration", "path", path)
 	outcome = "success"
 	return nil
 }
@@ -128,47 +115,49 @@ func (s *SyncService) Import(path string) error {
 		return fmt.Errorf("import: %w", err)
 	}
 	path = cleaned
+	if err := s.beginSyncOperation(); err != nil {
+		return fmt.Errorf("import: %w", err)
+	}
+	defer s.operationMu.Unlock()
 	outcome := "failed"
 	defer func() {
 		recordAudit(s.db, s.logger, model.AuditEvent{Action: "import", TargetType: "backup", Summary: "导入加密配置", Outcome: outcome})
 	}()
-	masterKey, err := s.masterKey()
-	if err != nil {
+	if err := withCryptoOperation(s.crypto, func() error { return s.importSnapshot(path) }); err != nil {
 		return fmt.Errorf("import: %w", err)
 	}
-	content, err := os.ReadFile(path)
-	if err != nil {
-		return fmt.Errorf("import: %w", err)
-	}
-	artifact, err := decodeSyncArtifact(content, masterKey)
-	if err != nil {
-		return fmt.Errorf("import: %w", err)
-	}
-	if err := validateSnapshot(s.db, artifact.Data); err != nil {
-		return fmt.Errorf("import: validate: %w", err)
-	}
-	if s.lifecycle != nil {
-		if err := s.lifecycle.PrepareDestructiveSync(); err != nil {
-			return fmt.Errorf("import: prepare: %w", err)
-		}
-	}
-	if err := s.writeRecoveryPoint(masterKey); err != nil {
-		return fmt.Errorf("import: recovery point: %w", err)
-	}
-	if err := s.restore(artifact.Data); err != nil {
-		return fmt.Errorf("import: %w", err)
-	}
-	s.markPending("已导入本地版本，等待同步")
-	s.notifyDataChanged()
-	s.logger.Info("imported encrypted configuration", "path", path)
 	outcome = "success"
 	return nil
 }
 
 func (s *SyncService) snapshot() (ExportData, error) {
+	tx, err := s.db.BeginTx(context.Background(), &sql.TxOptions{ReadOnly: true})
+	if err != nil {
+		return ExportData{}, fmt.Errorf("begin snapshot: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	data, err := snapshotFromTables(tx)
+	if err != nil {
+		return ExportData{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return ExportData{}, fmt.Errorf("commit snapshot: %w", err)
+	}
+	return data, nil
+}
+
+type tableQuerier interface {
+	Query(query string, args ...any) (*sql.Rows, error)
+}
+
+func snapshotFromTables(querier tableQuerier) (ExportData, error) {
 	tables := make(map[string][]map[string]any, len(backupTables))
 	for _, table := range backupTables {
-		rows, err := readTable(s.db, table)
+		if isLocalRuntimeTable(table) {
+			tables[table] = []map[string]any{}
+			continue
+		}
+		rows, err := readTable(querier, table)
 		if err != nil {
 			return ExportData{}, fmt.Errorf("read %s: %w", table, err)
 		}
@@ -189,7 +178,8 @@ func (s *SyncService) snapshot() (ExportData, error) {
 
 func decodeSnapshot(content []byte, data *ExportData) error {
 	*data = ExportData{}
-	decoder := json.NewDecoder(strings.NewReader(string(content)))
+	decoder := json.NewDecoder(bytes.NewReader(content))
+	decoder.UseNumber()
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(data); err != nil {
 		return fmt.Errorf("decode snapshot: %w", err)
@@ -206,6 +196,9 @@ func decodeSnapshot(content []byte, data *ExportData) error {
 			return fmt.Errorf("snapshot table %s is required", table)
 		}
 	}
+	if err := normalizeSnapshotNumbers(data); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -215,7 +208,17 @@ func (s *SyncService) restore(data ExportData) error {
 		return fmt.Errorf("begin restore: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
+	if err := restoreIntoTransaction(tx, data); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func restoreIntoTransaction(tx *sql.Tx, data ExportData) error {
 	for _, table := range backupDeleteOrder {
+		if isLocalRuntimeTable(table) {
+			continue
+		}
 		statement := "DELETE FROM " + table
 		arguments := []any(nil)
 		if table == "settings" {
@@ -227,17 +230,24 @@ func (s *SyncService) restore(data ExportData) error {
 		}
 	}
 	for _, table := range backupTables {
+		if isLocalRuntimeTable(table) {
+			continue
+		}
 		for _, row := range data.Tables[table] {
 			if err := insertRow(tx, table, row); err != nil {
 				return fmt.Errorf("restore %s: %w", table, err)
 			}
 		}
 	}
-	return tx.Commit()
+	return nil
 }
 
-func readTable(db *sql.DB, table string) ([]map[string]any, error) {
-	rows, err := db.Query("SELECT * FROM " + table)
+func isLocalRuntimeTable(table string) bool {
+	return table == "transfer_jobs"
+}
+
+func readTable(querier tableQuerier, table string) ([]map[string]any, error) {
+	rows, err := querier.Query("SELECT * FROM " + table)
 	if err != nil {
 		return nil, err
 	}

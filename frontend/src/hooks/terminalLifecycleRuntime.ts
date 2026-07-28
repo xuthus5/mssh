@@ -23,6 +23,38 @@ function cancelFrame(frameRef: RefObject<number | null>) {
   frameRef.current = null
 }
 
+function startActivationRecovery({ refs, term, reportRuntimeError, recover }: {
+  refs: ActivationRefs
+  term: Terminal
+  reportRuntimeError: TerminalRuntimeErrorReporter
+  recover: (term: Terminal, fitAddon: FitAddon) => boolean
+}) {
+  let cancelled = false
+  let attempts = 0
+  const scheduleRecovery = () => {
+    if (cancelled || refs.activationFrameRef.current !== null) return
+    refs.activationFrameRef.current = window.requestAnimationFrame(recoverOnFrame)
+  }
+  const recoverOnFrame = () => {
+    refs.activationFrameRef.current = null
+    attempts += 1
+    let recovered = false
+    const succeeded = runTerminalRuntime(reportRuntimeError, 'terminal activation', () => {
+      const fitAddon = refs.fitAddonRef.current
+      if (fitAddon) recovered = recover(term, fitAddon)
+    })
+    if (cancelled || !succeeded || recovered || attempts >= MAX_ACTIVATION_FRAMES) return
+    scheduleRecovery()
+  }
+  scheduleRecovery()
+  const fontsReady = document.fonts?.ready
+  if (fontsReady) void fontsReady.then(scheduleRecovery, (error: unknown) => logger.error('terminal font readiness error', error))
+  return () => {
+    cancelled = true
+    cancelFrame(refs.activationFrameRef)
+  }
+}
+
 export function useTerminalActivation({ refs, active, sequence, reportRuntimeError, recover }: {
   refs: ActivationRefs
   active: boolean
@@ -46,32 +78,7 @@ export function useTerminalActivation({ refs, active, sequence, reportRuntimeErr
       term.options.cursorBlink = true
     })
     refs.recoveryPendingRef.current = true
-    let cancelled = false
-    let attempts = 0
-    const scheduleRecovery = () => {
-      if (cancelled || refs.activationFrameRef.current !== null) return
-      refs.activationFrameRef.current = window.requestAnimationFrame(recoverOnFrame)
-    }
-    const recoverOnFrame = () => {
-      refs.activationFrameRef.current = null
-      attempts += 1
-      let recovered = false
-      const succeeded = runTerminalRuntime(reportRuntimeError, 'terminal activation', () => {
-        const fitAddon = refs.fitAddonRef.current
-        if (fitAddon) recovered = recover(term, fitAddon)
-      })
-      if (cancelled || !succeeded || recovered || attempts >= MAX_ACTIVATION_FRAMES) return
-      scheduleRecovery()
-    }
-    scheduleRecovery()
-    const fontsReady = document.fonts?.ready
-    if (fontsReady) {
-      void fontsReady.then(scheduleRecovery, (error: unknown) => logger.error('terminal font readiness error', error))
-    }
-    return () => {
-      cancelled = true
-      cancelFrame(refs.activationFrameRef)
-    }
+    return startActivationRecovery({ refs, term, reportRuntimeError, recover })
   }, [active, reportRuntimeError, sequence])
 }
 

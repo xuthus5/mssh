@@ -1,6 +1,7 @@
 package service
 
 import (
+	"errors"
 	"time"
 
 	"github.com/xuthus5/mssh/internal/store"
@@ -85,7 +86,7 @@ func (f *FileService) shouldPersistTransferProgress(taskID string, transferred, 
 
 // emitTransferError emits a transfer error event with the error message.
 func (f *FileService) emitTransferError(taskID string, err error) {
-	f.finishTransfer(taskID, "failed", err.Error())
+	f.finishTransfer(transferFinalization{taskID: taskID, status: "failed", errorMessage: err.Error()})
 	f.eventBus.Emit(event.TransferError, event.TransferErrorPayload{
 		TaskID: taskID,
 		Status: "failed",
@@ -93,10 +94,23 @@ func (f *FileService) emitTransferError(taskID string, err error) {
 	})
 }
 
-func (f *FileService) emitTransferCancelled(taskID string) {
-	f.finishTransfer(taskID, "cancelled", "")
+func (f *FileService) emitTransferCancelled(taskID string, errs ...error) {
+	errorMessage := ""
+	if err := errors.Join(errs...); err != nil {
+		errorMessage = err.Error()
+	}
+	f.finishTransfer(transferFinalization{taskID: taskID, status: "cancelled", errorMessage: errorMessage})
 	f.eventBus.Emit(event.TransferComplete, event.TransferProgressPayload{
 		TaskID: taskID,
 		Status: "cancelled",
+	})
+}
+
+func (f *FileService) emitTransferCompleted(taskID string, transferred, total int64) {
+	f.finishTransfer(transferFinalization{
+		taskID: taskID, status: "completed", transferred: transferred, total: total,
+	})
+	f.eventBus.Emit(event.TransferComplete, event.TransferProgressPayload{
+		TaskID: taskID, Status: "completed", Transferred: transferred, Total: total, Percent: 100,
 	})
 }

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { markIntentionalDisconnect, maybeAutoReconnectTerminal, reconnectSessionTab } from '@/hooks/sessionReconnect'
 import { DEFAULT_TERMINAL_BEHAVIOR, useTerminalBehaviorStore } from '@/store/terminalBehaviorStore'
 import { logger } from '@/lib/logger'
@@ -10,6 +10,8 @@ import { __clearHandlers, __registerHandler } from '@/test/__mocks__/wails-runti
 const service = 'github.com/xuthus5/mssh/internal/service.TerminalService.'
 const sessions = [{ id: '5', host: 'server.internal', port: 22, username: 'root' }]
 const replaceTerminalConnection = useAppStore.getState().replaceTerminalConnection
+
+afterEach(() => vi.useRealTimers())
 
 function deferred<T>() {
   let resolve!: (value: T) => void
@@ -35,16 +37,22 @@ describe('reconnectSessionTab', () => {
     __clearHandlers()
     seedDisconnectedTab()
     useAppStore.setState({ replaceTerminalConnection })
-    useConnectDialog.setState({ open: false, state: 'idle', attemptId: '', sessionId: '', error: '', fingerprint: '', algorithm: '' })
+    useConnectDialog.setState({
+      open: false, state: 'idle', host: '', port: 0, user: '', sessionId: '', error: '',
+      dialogId: 0, cancelRequest: null, retry: null,
+    })
     useTerminalBehaviorStore.setState({ ...DEFAULT_TERMINAL_BEHAVIOR, autoReconnect: false })
     useToastStore.setState({ toasts: [] })
   })
 
-  it('ignores missing and already connecting terminal targets', async () => {
+  it('ignores missing, active, and already connecting terminal targets', async () => {
     const open = vi.fn(async () => 'term-new')
     __registerHandler(service + 'Open', open)
 
     await reconnectSessionTab('missing', sessions)
+    useAppStore.setState({ connectionStatus: { 'term-old': 'connected' } })
+    await reconnectSessionTab('tab-1', sessions)
+    useAppStore.setState({ connectionStatus: { 'term-old': 'disconnected' } })
     useAppStore.getState().setConnectionStatus('term-old', 'connecting')
     await reconnectSessionTab('tab-1', sessions)
 
@@ -120,12 +128,29 @@ describe('reconnectSessionTab', () => {
     vi.useRealTimers()
   })
 
+  it('does not retry after the user rejects a host key', async () => {
+    vi.useFakeTimers()
+    const open = vi.fn(async () => {
+      throw new Error('open terminal: host key rejected by user: server.internal:22')
+    })
+    __registerHandler(service + 'Open', open)
+
+    const reconnecting = reconnectSessionTab('tab-1', sessions)
+    await vi.runAllTimersAsync()
+    await reconnecting
+
+    expect(open).toHaveBeenCalledOnce()
+    expect(useAppStore.getState().connectionStatus['term-old']).toBe('error')
+    expect(useConnectDialog.getState().error).toContain('host key rejected by user')
+    vi.useRealTimers()
+  })
+
   it('cancels an in-flight reconnect from a second request', async () => {
     const open = deferred<string>()
     __registerHandler(service + 'Open', async () => open.promise)
     const first = reconnectSessionTab('tab-1', sessions)
     await reconnectSessionTab('tab-1', sessions)
-    open.reject(new Error('cancelled'))
+    open.resolve('term-cancelled')
     await first
     expect(useAppStore.getState().connectionStatus['term-old']).toBe('disconnected')
   })
@@ -179,7 +204,10 @@ describe('maybeAutoReconnectTerminal', () => {
     __clearHandlers()
     seedDisconnectedTab()
     useAppStore.setState({ replaceTerminalConnection })
-    useConnectDialog.setState({ open: false, state: 'idle', attemptId: '', sessionId: '', error: '', fingerprint: '', algorithm: '' })
+    useConnectDialog.setState({
+      open: false, state: 'idle', host: '', port: 0, user: '', sessionId: '', error: '',
+      dialogId: 0, cancelRequest: null, retry: null,
+    })
     useTerminalBehaviorStore.setState({ ...DEFAULT_TERMINAL_BEHAVIOR, autoReconnect: false })
   })
 
@@ -245,7 +273,8 @@ describe('maybeAutoReconnectTerminal', () => {
     expect(open).not.toHaveBeenCalled()
     expect(spy).toHaveBeenCalledTimes(1)
     const event = spy.mock.calls[0][0] as CustomEvent
-    expect(event.detail).toEqual({ tabID: 'tab-1', terminalID: 'term-split' })
+    expect(event.detail).toMatchObject({ tabID: 'tab-1', terminalID: 'term-split' })
+    expect(event.detail.accept).toEqual(expect.any(Function))
     window.removeEventListener('mssh:reconnect-split-pane', spy)
   })
 

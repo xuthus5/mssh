@@ -69,6 +69,8 @@ func TestValidateFolderName(t *testing.T) {
 	require.Error(t, err)
 	_, err = validateFolderName(string([]byte{'a', 0}))
 	require.Error(t, err)
+	_, err = validateFolderName(string([]byte{0xff}))
+	require.Error(t, err)
 	name, err := validateFolderName(" 生产环境 ")
 	require.NoError(t, err)
 	require.Equal(t, "生产环境", name)

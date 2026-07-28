@@ -1,7 +1,9 @@
-import { act, renderHook } from '@testing-library/react'
+import { act, renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useTunnelManager } from '@/hooks/useTunnelManager'
 import { useToastStore } from '@/components/ui/toast'
+import { OperationBusyError } from '@/lib/operationBusyError'
+import { resetTunnelMutationCoordinator } from '@/lib/tunnelMutationCoordinator'
 
 const create = vi.fn()
 const start = vi.fn()
@@ -26,6 +28,7 @@ describe('useTunnelManager', () => {
     stop.mockReset()
     del.mockReset()
     list.mockReset()
+    resetTunnelMutationCoordinator()
     useToastStore.setState({ toasts: [] })
     list.mockResolvedValue([])
   })
@@ -167,4 +170,77 @@ describe('useTunnelManager', () => {
     expect(result.current.error).toBe('')
     expect(useToastStore.getState().toasts).toHaveLength(0)
   })
+
+  it('keeps the newest tunnel list when loads resolve out of order', async () => {
+    const first = deferred<unknown[]>()
+    const second = deferred<unknown[]>()
+    list.mockImplementationOnce(() => first.promise).mockImplementationOnce(() => second.promise)
+    const hook = renderHook(({ sessionID }) => useTunnelManager(sessionID), { initialProps: { sessionID: 7 } })
+    let firstLoad!: Promise<void>
+    await act(async () => { firstLoad = hook.result.current.load() })
+    hook.rerender({ sessionID: 8 })
+    let secondLoad!: Promise<void>
+    await act(async () => { secondLoad = hook.result.current.load() })
+    await act(async () => { second.resolve([tunnel(8, 2)]); await secondLoad })
+    expect(hook.result.current.tunnels[0].sessionId).toBe('8')
+    await act(async () => { first.resolve([tunnel(7, 1)]); await firstLoad })
+    expect(hook.result.current.tunnels[0].sessionId).toBe('8')
+  })
+
+  it('hides the previous session catalog immediately after switching sessions', async () => {
+    list.mockResolvedValueOnce([tunnel(7, 42)])
+    const hook = renderHook(({ sessionID }) => useTunnelManager(sessionID), { initialProps: { sessionID: 7 } })
+    await act(async () => { await hook.result.current.load() })
+    expect(hook.result.current.tunnels.map((item) => item.id)).toEqual(['42'])
+
+    hook.rerender({ sessionID: 8 })
+
+    expect(hook.result.current.tunnels).toEqual([])
+    expect(hook.result.current.error).toBe('')
+    expect(hook.result.current.loading).toBe(false)
+  })
+
+  it('serializes mutations across managers for the same session', async () => {
+    const pending = deferred<void>()
+    stop.mockImplementationOnce(() => pending.promise).mockResolvedValue(undefined)
+    const first = renderHook(() => useTunnelManager(7))
+    const second = renderHook(() => useTunnelManager(7))
+    const other = renderHook(() => useTunnelManager(8))
+    let firstStop!: Promise<void>
+
+    await act(async () => {
+      firstStop = first.result.current.stop('42')
+      await Promise.resolve()
+    })
+    await act(async () => {
+      await expect(second.result.current.remove('42')).rejects.toBeInstanceOf(OperationBusyError)
+      await other.result.current.stop('77')
+    })
+
+    expect(del).not.toHaveBeenCalled()
+    expect(stop).toHaveBeenCalledWith(42)
+    expect(stop).toHaveBeenCalledWith(77)
+    await act(async () => { pending.resolve(); await firstStop })
+  })
+
+  it('refreshes other managers after a successful mutation', async () => {
+    stop.mockResolvedValue(undefined)
+    renderHook(() => useTunnelManager(7))
+    const source = renderHook(() => useTunnelManager(7))
+    renderHook(() => useTunnelManager(8))
+
+    await act(async () => { await source.result.current.stop('42') })
+
+    await waitFor(() => expect(list).toHaveBeenCalledOnce())
+  })
 })
+
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((resolvePromise) => { resolve = resolvePromise })
+  return { promise, resolve }
+}
+
+function tunnel(sessionID: number, id: number) {
+  return { id, session_id: sessionID, type: 'local', local_host: '127.0.0.1', local_port: 2200, remote_host: '127.0.0.1', remote_port: 22 }
+}

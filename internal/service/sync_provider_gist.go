@@ -12,7 +12,11 @@ import (
 	"strings"
 )
 
-const syncBackupFileName = ".msshbackup"
+const (
+	syncBackupFileName = ".msshbackup"
+	githubAPIHost      = "api.github.com"
+	githubGistRawHost  = "gist.githubusercontent.com"
+)
 
 type gistSyncProvider struct {
 	client  *http.Client
@@ -33,6 +37,9 @@ type gistResponse struct {
 }
 
 func newGistSyncProvider(client *http.Client, apiBase, gistID, token string) (*gistSyncProvider, error) {
+	if client == nil {
+		return nil, errors.New("HTTP client is required")
+	}
 	if strings.TrimSpace(token) == "" {
 		return nil, errors.New("GitHub token is required")
 	}
@@ -84,7 +91,7 @@ func (g *gistSyncProvider) Fetch(ctx context.Context) (syncRemoteObject, error) 
 		return syncRemoteObject{}, err
 	}
 	var gist gistResponse
-	if err := json.NewDecoder(io.LimitReader(response.Body, maxCloudBackupSize)).Decode(&gist); err != nil {
+	if err := decodeBoundedJSON(response.Body, maxCloudBackupSize, &gist); err != nil {
 		return syncRemoteObject{}, fmt.Errorf("decode GitHub Gist: %w", err)
 	}
 	file, ok := gist.Files[syncBackupFileName]
@@ -131,7 +138,7 @@ func (g *gistSyncProvider) Put(ctx context.Context, content []byte, etag string)
 		return syncRemoteObject{}, gistAPIError(response, "update GitHub Gist")
 	}
 	var gist gistResponse
-	if err := json.NewDecoder(io.LimitReader(response.Body, 1<<20)).Decode(&gist); err != nil {
+	if err := decodeBoundedJSON(response.Body, 1<<20, &gist); err != nil {
 		return syncRemoteObject{}, fmt.Errorf("decode updated GitHub Gist: %w", err)
 	}
 	g.gistID = gist.ID
@@ -191,12 +198,18 @@ func (g *gistSyncProvider) readGistFile(ctx context.Context, file gistFile) ([]b
 		}
 		return []byte(file.Content), nil
 	}
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, file.RawURL, nil)
+	rawURL, includeCredential, err := validateGistRawURL(file.RawURL, g.apiBase)
 	if err != nil {
 		return nil, err
 	}
-	request.Header.Set("Authorization", "Bearer "+g.token)
-	response, err := g.client.Do(request)
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+	if includeCredential {
+		request.Header.Set("Authorization", "Bearer "+g.token)
+	}
+	response, err := g.gistRawHTTPClient().Do(request)
 	if err != nil {
 		return nil, fmt.Errorf("fetch GitHub Gist file: %w", err)
 	}
@@ -205,6 +218,51 @@ func (g *gistSyncProvider) readGistFile(ctx context.Context, file gistFile) ([]b
 		return nil, err
 	}
 	return readCloudBackup(response.Body)
+}
+
+func validateGistRawURL(rawURL, apiBase string) (*url.URL, bool, error) {
+	rawURL = strings.TrimSpace(rawURL)
+	if err := validateOutboundHTTPURL(rawURL); err != nil {
+		return nil, false, fmt.Errorf("GitHub Gist raw URL is invalid: %w", err)
+	}
+	parsed, err := url.ParseRequestURI(rawURL)
+	if err != nil {
+		return nil, false, fmt.Errorf("GitHub Gist raw URL is invalid")
+	}
+	apiURL, err := url.Parse(apiBase)
+	if err != nil || apiURL.Host == "" {
+		return nil, false, fmt.Errorf("GitHub API URL is invalid")
+	}
+	if sameHTTPHost(parsed.Host, apiURL.Host) {
+		return parsed, true, nil
+	}
+	if strings.EqualFold(apiURL.Hostname(), githubAPIHost) &&
+		strings.EqualFold(parsed.Hostname(), githubGistRawHost) &&
+		parsed.Port() == "" && strings.EqualFold(parsed.Scheme, "https") {
+		return parsed, false, nil
+	}
+	return nil, false, fmt.Errorf("GitHub Gist raw URL host is not trusted")
+}
+
+func (g *gistSyncProvider) gistRawHTTPClient() *http.Client {
+	client := *g.client
+	baseRedirect := g.client.CheckRedirect
+	client.CheckRedirect = func(request *http.Request, via []*http.Request) error {
+		if baseRedirect != nil {
+			if err := baseRedirect(request, via); err != nil {
+				return err
+			}
+		}
+		_, includeCredential, err := validateGistRawURL(request.URL.String(), g.apiBase)
+		if err != nil {
+			return err
+		}
+		if !includeCredential {
+			request.Header.Del("Authorization")
+		}
+		return nil
+	}
+	return &client
 }
 
 func (g *gistSyncProvider) do(ctx context.Context, method, path string, body io.Reader) (*http.Response, error) {
@@ -218,7 +276,7 @@ func (g *gistSyncProvider) do(ctx context.Context, method, path string, body io.
 	if body != nil {
 		request.Header.Set("Content-Type", "application/json")
 	}
-	response, err := g.client.Do(request)
+	response, err := sameOriginHTTPClient(g.client, request.URL).Do(request)
 	if err != nil {
 		return nil, fmt.Errorf("GitHub Gist request: %w", err)
 	}

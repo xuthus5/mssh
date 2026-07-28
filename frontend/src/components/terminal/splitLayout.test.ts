@@ -35,6 +35,32 @@ describe('splitLayout', () => {
     requireDefined(snapshot)
     expect(materializeSplitLayout(snapshot, ['only-one'])).toBeNull()
   })
+
+  it('rejects snapshots whose roles are duplicated or missing', () => {
+    expect(isSplitLayoutSnapshot({
+      paneCount: 2,
+      tree: {
+        kind: 'branch',
+        direction: 'horizontal',
+        ratio: 50,
+        first: { kind: 'leaf', role: 0 },
+        second: { kind: 'leaf', role: 0 },
+      },
+    })).toBe(false)
+  })
+
+  it('rejects snapshots whose leaf count differs from pane count', () => {
+    expect(isSplitLayoutSnapshot({
+      paneCount: 3,
+      tree: {
+        kind: 'branch',
+        direction: 'vertical',
+        ratio: 50,
+        first: { kind: 'leaf', role: 0 },
+        second: { kind: 'leaf', role: 1 },
+      },
+    })).toBe(false)
+  })
 })
 
 function requireDefined<T>(value: T | null | undefined): asserts value is T {

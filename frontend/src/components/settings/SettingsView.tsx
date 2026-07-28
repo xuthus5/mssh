@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { GeneralSettingsPanel } from '@/components/settings/GeneralSettingsPanel'
 import { TerminalSettingsPanel } from '@/components/settings/TerminalSettingsPanel'
@@ -10,7 +10,7 @@ import { SFTPSettingsPanel } from '@/components/settings/SFTPSettingsPanel'
 import { AISettingsPanel } from '@/components/settings/AISettingsPanel'
 import type { AISettingsController } from '@/hooks/useAISettings'
 import type { SFTPSettings } from '@/hooks/useSFTPSettings'
-import type { GeneralSettings } from '@/hooks/useSettings'
+import type { GeneralSettings, GeneralSettingsSaveOptions } from '@/hooks/useSettings'
 import type { CloudSyncController } from '@/hooks/useCloudSyncCenter'
 import type { ColorMode } from '@/lib/effectiveTerminalTheme'
 import type {
@@ -37,7 +37,7 @@ export interface SettingsViewProps {
   terminalGlobalStyle: TerminalGlobalStyle
   colorMode: ColorMode
   cloudSync: CloudSyncController
-  onSaveGeneral: (settings: GeneralSettings) => Promise<void>
+  onSaveGeneral: (settings: GeneralSettings, options?: GeneralSettingsSaveOptions) => Promise<void>
   onPreviewUIFont: (fontFamily: string, fallbackFamily: string, fontSize: number) => void
   onSaveThemeConfiguration: (configuration: ThemeConfigurationInput) => Promise<void>
   onImportThemes: (paths: string[]) => Promise<ThemeImportSummary>
@@ -56,10 +56,29 @@ export interface SettingsViewProps {
   ai?: AISettingsController
 }
 
-function SettingsTabPanels(props: SettingsViewProps) {
+const tabPanelClassName = 'min-h-0 min-w-0 overflow-y-auto overscroll-contain pr-2'
+
+const settingsTabValues = ['general', 'terminal', 'ai', 'sync', 'security', 'sftp', 'shortcuts', 'about'] as const
+
+type SettingsTab = typeof settingsTabValues[number]
+
+interface SettingsTabPanelsProps extends SettingsViewProps {
+  visitedTabs: ReadonlySet<SettingsTab>
+}
+
+function SettingsTabContent({ value, visitedTabs, children }: {
+  value: SettingsTab
+  visitedTabs: ReadonlySet<SettingsTab>
+  children: ReactNode
+}) {
+  if (!visitedTabs.has(value)) return null
+  return <TabsContent value={value} keepMounted className={tabPanelClassName}>{children}</TabsContent>
+}
+
+function PrimarySettingsTabPanels(props: SettingsTabPanelsProps) {
   return (
     <>
-      <TabsContent value="general" className="min-h-0 min-w-0 overflow-y-auto overscroll-contain pr-2">
+      <SettingsTabContent value="general" visitedTabs={props.visitedTabs}>
         <GeneralSettingsPanel
           general={props.general}
           systemFonts={props.systemFonts}
@@ -69,8 +88,8 @@ function SettingsTabPanels(props: SettingsViewProps) {
           loadError={props.loadError}
           onReload={props.onReloadSettings}
         />
-      </TabsContent>
-      <TabsContent value="terminal" className="min-h-0 min-w-0 overflow-y-auto overscroll-contain pr-2">
+      </SettingsTabContent>
+      <SettingsTabContent value="terminal" visitedTabs={props.visitedTabs}>
         <TerminalSettingsPanel
           general={props.general}
           themeProfiles={props.themeProfiles}
@@ -91,21 +110,27 @@ function SettingsTabPanels(props: SettingsViewProps) {
           themeLoadError={props.themeLoadError}
           onReloadThemes={props.onReloadThemes}
         />
-      </TabsContent>
-      <TabsContent value="ai" className="min-h-0 min-w-0 overflow-y-auto overscroll-contain pr-2">
+      </SettingsTabContent>
+    </>
+  )
+}
+
+function SecondarySettingsTabPanels(props: SettingsTabPanelsProps) {
+  return <>
+      <SettingsTabContent value="ai" visitedTabs={props.visitedTabs}>
         {props.ai && <AISettingsPanel controller={props.ai} />}
-      </TabsContent>
-      <TabsContent value="sync" className="min-h-0 min-w-0 overflow-y-auto overscroll-contain pr-2">
+      </SettingsTabContent>
+      <SettingsTabContent value="sync" visitedTabs={props.visitedTabs}>
         <SyncPanel
           controller={props.cloudSync}
           onExport={props.onExportConfig}
           onImport={props.onImportConfig}
         />
-      </TabsContent>
-      <TabsContent value="security" className="min-h-0 min-w-0 overflow-y-auto overscroll-contain pr-2">
+      </SettingsTabContent>
+      <SettingsTabContent value="security" visitedTabs={props.visitedTabs}>
         <SecurityPanel />
-      </TabsContent>
-      <TabsContent value="sftp" className="min-h-0 min-w-0 overflow-y-auto overscroll-contain pr-2">
+      </SettingsTabContent>
+      <SettingsTabContent value="sftp" visitedTabs={props.visitedTabs}>
         <SFTPSettingsPanel
           settings={props.sftpSettings}
           onSave={props.onSaveSFTPSettings}
@@ -113,23 +138,31 @@ function SettingsTabPanels(props: SettingsViewProps) {
           loadError={props.sftpLoadError}
           onReload={props.onReloadSFTPSettings}
         />
-      </TabsContent>
-      <TabsContent value="shortcuts" className="min-h-0 min-w-0 overflow-y-auto overscroll-contain pr-2">
+      </SettingsTabContent>
+      <SettingsTabContent value="shortcuts" visitedTabs={props.visitedTabs}>
         <ShortcutSettingsPanel />
-      </TabsContent>
-      <TabsContent value="about" className="min-h-0 min-w-0 overflow-y-auto overscroll-contain pr-2">
+      </SettingsTabContent>
+      <SettingsTabContent value="about" visitedTabs={props.visitedTabs}>
         <AboutPanel />
-      </TabsContent>
-    </>
-  )
+      </SettingsTabContent>
+  </>
+}
+
+function SettingsTabPanels(props: SettingsTabPanelsProps) {
+  return <><PrimarySettingsTabPanels {...props} /><SecondarySettingsTabPanels {...props} /></>
 }
 
 export function SettingsView(props: SettingsViewProps) {
-  const [tab, setTab] = useState('general')
+  const [tab, setTab] = useState<SettingsTab>('general')
+  const [visitedTabs, setVisitedTabs] = useState<ReadonlySet<SettingsTab>>(() => new Set(['general']))
+  const selectTab = (value: SettingsTab) => {
+    setVisitedTabs((current) => current.has(value) ? current : new Set([...current, value]))
+    setTab(value)
+  }
   return (
     <Tabs
       value={tab}
-      onValueChange={setTab}
+      onValueChange={selectTab}
       orientation="vertical"
       className="min-h-0 flex-1 flex-row gap-4 overflow-hidden p-4"
     >
@@ -143,7 +176,7 @@ export function SettingsView(props: SettingsViewProps) {
         <TabsTrigger value="shortcuts">{t('快捷键')}</TabsTrigger>
         <TabsTrigger value="about">{t('关于')}</TabsTrigger>
       </TabsList>
-      <SettingsTabPanels {...props} />
+      <SettingsTabPanels {...props} visitedTabs={visitedTabs} />
     </Tabs>
   )
 }

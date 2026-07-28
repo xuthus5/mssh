@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent, type RefObject } from 'react'
 import { ChevronDown, ChevronUp, Regex, Search, X } from 'lucide-react'
 import type { ISearchOptions, ISearchResultChangeEvent, SearchAddon } from '@xterm/addon-search'
 import { Button } from '@/components/ui/button'
@@ -41,30 +41,33 @@ function useSearchAddon(terminalID: string) {
   return useSyncExternalStore(subscribeTerminalSearch, () => getTerminalSearch(terminalID), () => null)
 }
 
-function runSearch(addon: SearchAddon | null, query: string, regex: boolean, direction: 'next' | 'previous', incremental = false) {
+function runSearch(...args: [SearchAddon | null, string, boolean, 'next' | 'previous', boolean?]) {
+  const [addon, query, regex, direction, incremental = false] = args
   if (!addon || !query) return false
   const options = searchOptions(regex, incremental)
   return direction === 'next' ? addon.findNext(query, options) : addon.findPrevious(query, options)
 }
 
-export function TerminalSearchBar({ terminalID, open, onOpenChange }: Props) {
-  const addon = useSearchAddon(terminalID)
-  const inputRef = useRef<HTMLInputElement>(null)
-  const [query, setQuery] = useState('')
-  const [regex, setRegex] = useState(false)
-  const [result, setResult] = useState<ISearchResultChangeEvent>({ resultIndex: -1, resultCount: 0 })
-  const error = validateQuery(query, regex)
-
+function useTerminalSearchEffects({ open, terminalID, addon, inputRef, query, error, regex, setResult }: {
+  open: boolean
+  terminalID: string
+  addon: SearchAddon | null
+  inputRef: RefObject<HTMLInputElement | null>
+  query: string
+  error: string
+  regex: boolean
+  setResult: (result: ISearchResultChangeEvent) => void
+}) {
   useEffect(() => {
     if (!open) return
     inputRef.current?.focus()
     inputRef.current?.select()
-  }, [open, terminalID])
+  }, [inputRef, open, terminalID])
   useEffect(() => {
     if (!open || !addon) return
     const disposable = addon.onDidChangeResults(setResult)
     return () => disposable.dispose()
-  }, [addon, open])
+  }, [addon, open, setResult])
   useEffect(() => {
     if (!open || !addon) return
     if (!query || error) {
@@ -74,9 +77,18 @@ export function TerminalSearchBar({ terminalID, open, onOpenChange }: Props) {
     }
     runSearch(addon, query, regex, 'next', true)
     return () => addon.clearActiveDecoration()
-  }, [addon, error, open, query, regex])
+  }, [addon, error, open, query, regex, setResult])
   useEffect(() => () => addon?.clearDecorations(), [addon])
+}
 
+export function TerminalSearchBar({ terminalID, open, onOpenChange }: Props) {
+  const addon = useSearchAddon(terminalID)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const [query, setQuery] = useState('')
+  const [regex, setRegex] = useState(false)
+  const [result, setResult] = useState<ISearchResultChangeEvent>({ resultIndex: -1, resultCount: 0 })
+  const error = validateQuery(query, regex)
+  useTerminalSearchEffects({ open, terminalID, addon, inputRef, query, error, regex, setResult })
   if (!open) return null
   const close = () => {
     addon?.clearDecorations()

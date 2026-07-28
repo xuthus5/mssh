@@ -3,9 +3,11 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/xuthus5/mssh/internal/model"
 	ssh "github.com/xuthus5/mssh/internal/ssh"
@@ -13,11 +15,19 @@ import (
 	"github.com/xuthus5/mssh/pkg/event"
 )
 
-const defaultKeepAliveSettingKey = "terminal.default_keep_alive"
+const (
+	defaultKeepAliveSettingKey = "terminal.default_keep_alive"
+	hostKeyDecisionTimeout     = 5 * time.Minute
+)
 
 func (s *SessionService) connect(ctx context.Context, sessionID int64, emitState bool) (string, error) {
+	operationDone, err := s.beginOperation()
+	if err != nil {
+		return "", err
+	}
+	defer operationDone()
 	s.logger.Info("connecting to session", "sessionID", sessionID)
-	connectCtx, attemptID, finish, err := s.beginConnect(ctx, sessionID)
+	connectCtx, attemptID, generation, finish, err := s.beginConnect(ctx, sessionID)
 	if err != nil {
 		return "", fmt.Errorf("connect: %w", err)
 	}
@@ -30,7 +40,7 @@ func (s *SessionService) connect(ctx context.Context, sessionID int64, emitState
 	if err := s.resolveKeepAlive(sess); err != nil {
 		return "", fmt.Errorf("connect: %w", err)
 	}
-	authMethods, cleanup, err := s.buildAuthBundle(sess)
+	authMethods, cleanup, err := s.buildAuthBundleContext(connectCtx, sess)
 	if err != nil {
 		return "", fmt.Errorf("connect: %w", err)
 	}
@@ -51,10 +61,13 @@ func (s *SessionService) connect(ctx context.Context, sessionID int64, emitState
 		}
 		return "", fmt.Errorf("connect: %w", err)
 	}
-	terminalID := generateTerminalID()
-	s.mu.Lock()
-	s.conns[terminalID] = &managedConn{wrapper: wrapper, cleanup: cleanup, sessionID: sessionID}
-	s.mu.Unlock()
+	if err := connectCtx.Err(); err != nil {
+		return "", errors.Join(fmt.Errorf("connect: %w", err), closeRejectedConnection(wrapper, cleanup))
+	}
+	terminalID, err := s.registerConnectedSession(sessionID, generation, &managedConn{wrapper: wrapper, cleanup: cleanup})
+	if err != nil {
+		return "", errors.Join(fmt.Errorf("connect: %w", err), closeRejectedConnection(wrapper, cleanup))
+	}
 	if err := store.MarkSessionConnected(s.db, sessionID); err != nil {
 		s.logger.Error("mark session connected failed", "sessionID", sessionID, "error", err)
 	}
@@ -62,6 +75,19 @@ func (s *SessionService) connect(ctx context.Context, sessionID int64, emitState
 		s.eventBus.Emit(event.ConnectionState, event.ConnectionStatePayload{TerminalID: terminalID, AttemptID: attemptID, State: "connected"})
 	}
 	return terminalID, nil
+}
+
+func closeRejectedConnection(wrapper *ssh.ClientWrapper, cleanup func()) error {
+	if cleanup != nil {
+		cleanup()
+	}
+	if wrapper == nil {
+		return nil
+	}
+	if err := wrapper.Close(); err != nil {
+		return fmt.Errorf("close rejected SSH connection: %w", err)
+	}
+	return nil
 }
 
 func (s *SessionService) resolveKeepAlive(session *model.Session) error {
@@ -88,7 +114,10 @@ func (s *SessionService) resolveKeepAlive(session *model.Session) error {
 func (s *SessionService) registerConnectAttempt(sessionID int64, cancel context.CancelFunc) string {
 	attemptID := generateConnectionAttemptID()
 	s.mu.Lock()
-	s.attempts[attemptID] = &connectAttempt{cancel: cancel, decision: make(chan bool, 1), sessionID: sessionID}
+	s.attempts[attemptID] = &connectAttempt{
+		cancel: cancel, decision: make(chan bool, 1), sessionID: sessionID,
+		generation: s.sessionDeletionGenerationLocked(sessionID),
+	}
 	s.mu.Unlock()
 	return attemptID
 }
@@ -100,6 +129,12 @@ func (s *SessionService) finishConnectAttempt(attemptID string) {
 }
 
 func (s *SessionService) awaitHostKeyDecision(ctx context.Context, attemptID, hostname, algorithm, fingerprint string) bool {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if ctx.Err() != nil {
+		return false
+	}
 	s.mu.RLock()
 	attempt, ok := s.attempts[attemptID]
 	s.mu.RUnlock()
@@ -111,21 +146,31 @@ func (s *SessionService) awaitHostKeyDecision(ctx context.Context, attemptID, ho
 	if accepter, ok := s.eventBus.(hostKeyAutoAccepter); ok && accepter.AutoAcceptHostKeys() {
 		return true
 	}
+	decisionCtx, cancel := context.WithTimeout(ctx, hostKeyDecisionTimeout)
+	defer cancel()
 	select {
 	case accept := <-attempt.decision:
-		return accept
-	case <-ctx.Done():
+		return accept && decisionCtx.Err() == nil
+	case <-decisionCtx.Done():
+		if s.logger != nil {
+			s.logger.Warn("host key decision ended", "attemptID", attemptID, "hostname", hostname, "error", decisionCtx.Err())
+		}
 		return false
 	}
 }
 
 func (s *SessionService) DecideHostKey(attemptID string, accept bool) error {
+	finish, err := s.beginOperation()
+	if err != nil {
+		return err
+	}
+	defer finish()
 	if strings.TrimSpace(attemptID) == "" {
 		return fmt.Errorf("invalid connection attempt id")
 	}
-	s.mu.RLock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	attempt, ok := s.attempts[attemptID]
-	s.mu.RUnlock()
 	if !ok {
 		return fmt.Errorf("connection attempt %s not found", attemptID)
 	}
@@ -138,6 +183,11 @@ func (s *SessionService) DecideHostKey(attemptID string, accept bool) error {
 }
 
 func (s *SessionService) CancelConnect(attemptID string) error {
+	finish, err := s.beginOperation()
+	if err != nil {
+		return err
+	}
+	defer finish()
 	if strings.TrimSpace(attemptID) == "" {
 		return fmt.Errorf("invalid connection attempt id")
 	}
@@ -161,17 +211,21 @@ func (s *SessionService) CancelConnectForSessions(sessionIDs []int64) {
 	if s == nil || len(sessionIDs) == 0 {
 		return
 	}
-	wanted := make(map[int64]struct{}, len(sessionIDs))
-	for _, sessionID := range sessionIDs {
-		if sessionID > 0 {
-			wanted[sessionID] = struct{}{}
-		}
-	}
+	wanted := positiveSessionIDs(sessionIDs)
 	if len(wanted) == 0 {
 		return
 	}
 
 	s.mu.Lock()
+	cancels := s.cancelConnectAttemptsForSessionsLocked(wanted)
+	s.mu.Unlock()
+
+	for _, cancel := range cancels {
+		cancel()
+	}
+}
+
+func (s *SessionService) cancelConnectAttemptsForSessionsLocked(wanted map[int64]struct{}) []context.CancelFunc {
 	cancels := make([]context.CancelFunc, 0)
 	for attemptID, attempt := range s.attempts {
 		if attempt == nil {
@@ -180,12 +234,10 @@ func (s *SessionService) CancelConnectForSessions(sessionIDs []int64) {
 		if _, ok := wanted[attempt.sessionID]; !ok {
 			continue
 		}
-		cancels = append(cancels, attempt.cancel)
+		if attempt.cancel != nil {
+			cancels = append(cancels, attempt.cancel)
+		}
 		delete(s.attempts, attemptID)
 	}
-	s.mu.Unlock()
-
-	for _, cancel := range cancels {
-		cancel()
-	}
+	return cancels
 }

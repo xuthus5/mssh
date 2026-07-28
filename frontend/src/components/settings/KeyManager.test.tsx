@@ -1,9 +1,11 @@
-import { act, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ComponentProps } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { Events } from '@wailsio/runtime'
 import { KeyManager } from '@/components/settings/KeyManager'
 import { useToastStore } from '@/components/ui/toast'
+import { SETTINGS_PREVIEW_CANCELLED_EVENT } from '@/lib/settingsWindowEvents'
 import { __clearHandlers, __registerHandler } from '@/test/__mocks__/wails-runtime'
 
 const material = {
@@ -106,6 +108,81 @@ describe('KeyManager', () => {
     expect(screen.getByLabelText('密钥名称')).toHaveValue('second')
   })
 
+  it('keeps every action on a key row locked while its material is loading', async () => {
+    const load = deferred<typeof material>()
+    const view = props()
+    view.onLoadMaterial = vi.fn(() => load.promise)
+    render(<KeyManager {...view} />)
+
+    await userEvent.click(screen.getByRole('button', { name: '查看 generated' }))
+
+    expect(screen.getByRole('button', { name: '查看 generated' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: '编辑 generated' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: '复制 generated 公钥' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: '删除 generated' })).toBeDisabled()
+    fireEvent.click(screen.getByRole('button', { name: '复制 generated 公钥' }))
+    expect(view.onExport).not.toHaveBeenCalled()
+
+    await act(async () => { load.resolve(material); await load.promise })
+    await waitFor(() => expect(screen.getByRole('button', {
+      name: '查看 generated',
+      hidden: true,
+    })).toBeEnabled())
+  })
+
+  it('keeps the latest public key copy result when exports finish out of order', async () => {
+    const first = { ...material, id: '7', name: 'first' }
+    const second = { ...material, id: '8', name: 'second', publicKey: 'ssh-ed25519 BBBB second' }
+    let rejectFirst: ((reason?: unknown) => void) | undefined
+    let resolveSecond: ((value: string) => void) | undefined
+    const view = props()
+    view.keys = [first, second]
+    view.onExport = vi.fn((id) => new Promise<string>((resolve, reject) => {
+      if (id === first.id) rejectFirst = reject
+      else resolveSecond = resolve
+    }))
+    render(<KeyManager {...view} />)
+
+    await userEvent.click(screen.getByRole('button', { name: '复制 first 公钥' }))
+    await userEvent.click(screen.getByRole('button', { name: '复制 second 公钥' }))
+    await act(async () => {
+      resolveSecond?.(second.publicKey)
+      await Promise.resolve()
+    })
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith(second.publicKey)
+    await act(async () => {
+      rejectFirst?.(new Error('old export failed'))
+      await Promise.resolve()
+    })
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('keeps the latest delete target when usage checks finish out of order', async () => {
+    const first = { ...material, id: '7', name: 'first' }
+    const second = { ...material, id: '8', name: 'second' }
+    const pending = new Map<number, (value: number) => void>()
+    __registerHandler('github.com/xuthus5/mssh/internal/service.KeyService.UsageCount', (id: number) => (
+      new Promise<number>((resolve) => { pending.set(id, resolve) })
+    ))
+    const view = props()
+    view.keys = [first, second]
+    render(<KeyManager {...view} />)
+
+    await userEvent.click(screen.getByRole('button', { name: '删除 first' }))
+    await userEvent.click(screen.getByRole('button', { name: '删除 second' }))
+    await act(async () => {
+      pending.get(8)?.(2)
+      await Promise.resolve()
+    })
+    expect(screen.getByText(/该密钥被 2 个会话引用/)).toBeInTheDocument()
+    await act(async () => {
+      pending.get(7)?.(0)
+      await Promise.resolve()
+    })
+    expect(screen.getByText(/该密钥被 2 个会话引用/)).toBeInTheDocument()
+    expect(screen.queryByText('删除密钥“first”？')).not.toBeInTheDocument()
+  })
+
   it('copies the listed public key and deletes the selected key', async () => {
     const view = props()
     render(<KeyManager {...view} />)
@@ -199,6 +276,64 @@ describe('KeyManager', () => {
     expect(screen.getByRole('heading', { name: '导入密钥' })).toBeInTheDocument()
   })
 
+  it('closes key dialogs and clears private key drafts when the settings window hides', async () => {
+    const view = props()
+    vi.mocked(view.onSelectImportFile)
+      .mockResolvedValueOnce({ name: 'id_ed25519', privateKey: material.privateKey })
+      .mockResolvedValueOnce(undefined)
+    render(<KeyManager {...view} />)
+    await userEvent.click(screen.getByRole('button', { name: '导入' }))
+    expect(await screen.findByLabelText('导入私钥内容')).toHaveValue(material.privateKey)
+
+    await act(async () => { await Events.Emit(SETTINGS_PREVIEW_CANCELLED_EVENT, { data: null }) })
+
+    expect(screen.queryByRole('heading', { name: '导入密钥' })).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: '导入' }))
+    await waitFor(() => expect(view.onSelectImportFile).toHaveBeenCalledTimes(2))
+    expect(screen.getByLabelText('导入私钥内容')).toHaveValue('')
+  })
+
+  it('does not reopen key material from a load that finishes after the settings window hides', async () => {
+    const load = deferred<typeof material>()
+    const view = props()
+    view.onLoadMaterial = vi.fn(() => load.promise)
+    render(<KeyManager {...view} />)
+    await userEvent.click(screen.getByRole('button', { name: '查看 generated' }))
+
+    await act(async () => { await Events.Emit(SETTINGS_PREVIEW_CANCELLED_EVENT, { data: null }) })
+    await act(async () => { load.resolve(material); await load.promise })
+
+    expect(screen.queryByRole('heading', { name: '查看密钥' })).not.toBeInTheDocument()
+  })
+
+  it('keeps a hidden material request visibly leased until it settles', async () => {
+    const load = deferred<typeof material>()
+    const view = props()
+    view.onLoadMaterial = vi.fn(() => load.promise)
+    render(<KeyManager {...view} />)
+    await userEvent.click(screen.getByRole('button', { name: '查看 generated' }))
+
+    await act(async () => { await Events.Emit(SETTINGS_PREVIEW_CANCELLED_EVENT, { data: null }) })
+
+    expect(screen.getByRole('button', { name: '查看 generated' })).toBeDisabled()
+    fireEvent.click(screen.getByRole('button', { name: '查看 generated' }))
+    expect(view.onLoadMaterial).toHaveBeenCalledOnce()
+    await act(async () => { load.resolve(material); await load.promise })
+    await waitFor(() => expect(screen.getByRole('button', { name: '查看 generated' })).toBeEnabled())
+    expect(screen.queryByRole('heading', { name: '查看密钥' })).not.toBeInTheDocument()
+  })
+
+  it('closes an already loaded private key material dialog when the settings window hides', async () => {
+    render(<KeyManager {...props()} />)
+    await userEvent.click(screen.getByRole('button', { name: '查看 generated' }))
+    expect(await screen.findByLabelText('私钥内容')).toHaveValue(material.privateKey)
+
+    await act(async () => { await Events.Emit(SETTINGS_PREVIEW_CANCELLED_EVENT, { data: null }) })
+
+    expect(screen.queryByRole('heading', { name: '查看密钥' })).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('私钥内容')).not.toBeInTheDocument()
+  })
+
   it('surfaces key material load failures panel-owned without toast', async () => {
     useToastStore.setState({ toasts: [] })
     const view = props()
@@ -244,6 +379,20 @@ describe('KeyManager', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('删除密钥失败: delete boom')
     expect(screen.getByRole('alertdialog')).toBeInTheDocument()
     expect(useToastStore.getState().toasts.filter((item) => item.type === 'error')).toHaveLength(0)
+  })
+
+  it('deduplicates rapid key delete confirmations', async () => {
+    const pending = new Promise<void>(() => {})
+    const view = props()
+    view.onDelete = vi.fn(() => pending)
+    render(<KeyManager {...view} />)
+    await userEvent.click(screen.getByRole('button', { name: '删除 generated' }))
+    const confirm = await screen.findByRole('button', { name: '确认删除' })
+    act(() => {
+      fireEvent.click(confirm)
+      fireEvent.click(confirm)
+    })
+    expect(view.onDelete).toHaveBeenCalledOnce()
   })
 
   it('surfaces export failures panel-owned without toast', async () => {
@@ -303,3 +452,9 @@ describe('KeyManager', () => {
   })
 
 })
+
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((resolvePromise) => { resolve = resolvePromise })
+  return { promise, resolve }
+}

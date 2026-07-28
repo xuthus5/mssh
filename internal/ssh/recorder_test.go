@@ -199,6 +199,7 @@ func TestRecorderFilePermissions(t *testing.T) {
 	perm := info.Mode().Perm()
 	assert.Equal(t, os.FileMode(0o600), perm)
 }
+
 func TestRecorderWriteAndClose(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "rec2.msshlog")
 	rec, err := NewRecorder(path, 80, 24, "xterm-256color")

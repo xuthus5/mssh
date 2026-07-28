@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { renderHook, act } from '@testing-library/react'
+import { renderHook, act, waitFor } from '@testing-library/react'
 import { useSession } from '@/hooks/useSession'
 import { useToastStore } from '@/components/ui/toast'
 import { __registerHandler, __clearHandlers } from '@/test/__mocks__/wails-runtime'
@@ -256,18 +256,131 @@ describe('useSession - loading state', () => {
 
   it('sets loading true then false during list', async () => {
     let resolveList: (v: any[]) => void
+    let resolveSessions: (v: any[]) => void
     __registerHandler('github.com/xuthus5/mssh/internal/service.SessionService.ListFolders', () =>
       new Promise<any[]>((r) => { resolveList = r }))
     __registerHandler('github.com/xuthus5/mssh/internal/service.SessionService.ListSessions', () =>
-      new Promise<any[]>((_r) => {}))
+      new Promise<any[]>((resolve) => { resolveSessions = resolve }))
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SessionService.ListRecentSessions', async () => [])
+    __registerHandler('github.com/xuthus5/mssh/internal/service.AssetCatalogService.ListEnvironments', async () => [])
+    __registerHandler('github.com/xuthus5/mssh/internal/service.AssetCatalogService.ListProjects', async () => [])
+    __registerHandler('github.com/xuthus5/mssh/internal/service.AssetCatalogService.ListTags', async () => [])
 
     const { result } = renderHook(() => useSession())
 
     await act(async () => {})
     await act(async () => { resolveList!([]) })
     await act(async () => {})
+    expect(result.current.loading).toBe(true)
+    await act(async () => { resolveSessions!([]) })
 
     expect(result.current.loading).toBe(false)
+  })
+
+  it('keeps the newest session list when requests resolve out of order', async () => {
+    const first = deferred<any[]>()
+    const second = deferred<any[]>()
+    let calls = 0
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SessionService.ListFolders', async () => [])
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SessionService.ListRecentSessions', async () => [])
+    __registerHandler('github.com/xuthus5/mssh/internal/service.AssetCatalogService.ListEnvironments', async () => [])
+    __registerHandler('github.com/xuthus5/mssh/internal/service.AssetCatalogService.ListProjects', async () => [])
+    __registerHandler('github.com/xuthus5/mssh/internal/service.AssetCatalogService.ListTags', async () => [])
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SessionService.ListSessions', async () => {
+      calls++
+      return calls === 1 ? first.promise : second.promise
+    })
+    const { result } = renderHook(() => useSession())
+    await waitFor(() => expect(calls).toBe(1))
+    let firstLoad!: Promise<void>
+    act(() => { firstLoad = result.current.listSessions() })
+    await waitFor(() => expect(calls).toBe(2))
+    await act(async () => { second.resolve([sessionBinding(2, '新会话')]); await firstLoad })
+    expect(result.current.sessions[0].name).toBe('新会话')
+    await act(async () => { first.resolve([sessionBinding(1, '旧会话')]); await Promise.resolve() })
+    expect(result.current.sessions[0].name).toBe('新会话')
+  })
+
+  it('does not let an older session refresh overwrite a newer update', async () => {
+    const firstRefresh = deferred<any>()
+    const secondRefresh = deferred<any>()
+    let refreshCalls = 0
+    const base = sessionBinding(7, '初始会话')
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SessionService.ListFolders', async () => [])
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SessionService.ListSessions', async () => [base])
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SessionService.UpdateSession', async () => undefined)
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SessionService.GetSession', async () => {
+      refreshCalls++
+      return refreshCalls === 1 ? firstRefresh.promise : secondRefresh.promise
+    })
+    const { result } = renderHook(() => useSession())
+    await act(async () => { await result.current.listSessions() })
+
+    const older = { ...result.current.sessions[0], name: '旧编辑' }
+    const newer = { ...result.current.sessions[0], name: '新编辑' }
+    let olderRequest!: Promise<void>
+    let newerRequest!: Promise<void>
+    act(() => {
+      olderRequest = result.current.updateSession(older)
+      newerRequest = result.current.updateSession(newer)
+    })
+    await waitFor(() => expect(refreshCalls).toBe(2))
+    await act(async () => { secondRefresh.resolve({ ...base, name: '新编辑' }); await newerRequest })
+    await act(async () => { firstRefresh.resolve({ ...base, name: '旧编辑' }); await olderRequest })
+
+    expect(result.current.sessions[0].name).toBe('新编辑')
+  })
+
+  it('invalidates an in-flight list after deleting its session', async () => {
+    const staleList = deferred<any[]>()
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SessionService.ListFolders', async () => [])
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SessionService.ListSessions', async () => staleList.promise)
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SessionService.DeleteSession', async () => undefined)
+    const { result } = renderHook(() => useSession())
+
+    await act(async () => { await result.current.deleteSession('7') })
+    await act(async () => { staleList.resolve([sessionBinding(7, '已删除会话')]) })
+
+    expect(result.current.sessions).toEqual([])
+  })
+
+  it('does not let an older asset refresh restore a deleted session', async () => {
+    const staleSessions = deferred<any[]>()
+    const existing = sessionBinding(7, '待删除会话')
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SessionService.ListFolders', async () => [])
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SessionService.ListSessions', async () => [existing])
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SessionService.ListRecentSessions', async () => [existing])
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SessionService.DeleteSession', async () => undefined)
+    const { result } = renderHook(() => useSession())
+    await waitFor(() => expect(result.current.sessions).toHaveLength(1))
+
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SessionService.ListSessions', async () => staleSessions.promise)
+    let refresh!: Promise<void>
+    act(() => { refresh = result.current.refreshAssets() })
+    await act(async () => { await result.current.deleteSession('7') })
+    await act(async () => { staleSessions.resolve([existing]); await refresh })
+
+    expect(result.current.sessions).toEqual([])
+    expect(result.current.recentSessions).toEqual([])
+  })
+
+  it('does not let an update refresh restore a session deleted afterward', async () => {
+    const refresh = deferred<any>()
+    const existing = sessionBinding(7, '待删除会话')
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SessionService.ListFolders', async () => [])
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SessionService.ListSessions', async () => [existing])
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SessionService.UpdateSession', async () => undefined)
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SessionService.GetSession', async () => refresh.promise)
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SessionService.DeleteSession', async () => undefined)
+    const { result } = renderHook(() => useSession())
+    await waitFor(() => expect(result.current.sessions).toHaveLength(1))
+
+    let update!: Promise<void>
+    act(() => { update = result.current.updateSession({ ...result.current.sessions[0], name: '旧更新' }) })
+    await act(async () => { await result.current.deleteSession('7') })
+    await act(async () => { refresh.resolve({ ...existing, name: '旧更新' }); await update })
+
+    expect(result.current.sessions).toEqual([])
   })
 
   it('batch deletes selected sessions and removes them from state', async () => {
@@ -309,3 +422,13 @@ describe('useSession - loading state', () => {
   })
 
 })
+
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((resolvePromise) => { resolve = resolvePromise })
+  return { promise, resolve }
+}
+
+function sessionBinding(id: number, name: string) {
+  return { id, name, host: `${id}.internal`, port: 22, username: 'root', auth_method: 'password', keep_alive: 30, term_type: 'xterm', folder_id: null }
+}

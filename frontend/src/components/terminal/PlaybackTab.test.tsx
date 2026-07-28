@@ -184,6 +184,7 @@ describe('PlaybackTab terminal theme', () => {
     render(<PlaybackTab recordingId="failed" title="demo" active />)
 
     await waitFor(() => expect(terminalInstances[1].writeln).toHaveBeenCalledWith(expect.stringContaining('加载录制失败')))
+    expect(terminalInstances[1].writeln).toHaveBeenCalledWith(expect.stringContaining('recording unavailable'))
     expect(loggerError).toHaveBeenCalledWith('PlaybackTab: GetRecording error:', loadError)
     expect(useToastStore.getState().toasts).toHaveLength(0)
   })

@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -136,7 +135,7 @@ func getJSON(ctx context.Context, client *http.Client, endpoint string, headers 
 }
 
 func executeSearchRequest(client *http.Client, request *http.Request, output any) error {
-	response, err := client.Do(request)
+	response, err := sameOriginHTTPClient(client, request.URL).Do(request)
 	if err != nil {
 		return fmt.Errorf("search request failed: %w", err)
 	}
@@ -144,7 +143,7 @@ func executeSearchRequest(client *http.Client, request *http.Request, output any
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
 		return fmt.Errorf("search provider returned HTTP %d", response.StatusCode)
 	}
-	if err := json.NewDecoder(io.LimitReader(response.Body, 2*1024*1024)).Decode(output); err != nil {
+	if err := decodeBoundedJSON(response.Body, 2*1024*1024, output); err != nil {
 		return fmt.Errorf("decode search response: %w", err)
 	}
 	return nil

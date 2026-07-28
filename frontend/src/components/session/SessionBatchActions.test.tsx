@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -12,6 +12,7 @@ vi.mock('@/lib/wails', () => ({
 import { SessionBatchActions } from '@/components/session/SessionBatchActions'
 import { useToastStore } from '@/components/ui/toast'
 import { MacroService, SessionService } from '@/lib/wails'
+import type { BatchSessionResult } from '@/lib/sessionBatch'
 
 describe('SessionBatchActions', () => {
   beforeEach(() => {
@@ -72,7 +73,7 @@ describe('SessionBatchActions', () => {
     await user.click(screen.getByRole('button', { name: '确认删除' }))
 
     expect(onBatchDelete).toHaveBeenCalledWith(['1', '2'])
-    expect(onComplete).toHaveBeenCalled()
+    expect(onComplete).toHaveBeenCalledWith(['1', '2'])
     expect(await screen.findByText('成功 2 项，失败 0 项。')).toBeInTheDocument()
   })
 
@@ -130,5 +131,52 @@ describe('SessionBatchActions', () => {
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('批量操作失败: connect boom'))
     expect(useToastStore.getState().toasts).toHaveLength(0)
     expect(screen.getByRole('alertdialog')).toBeInTheDocument()
+  })
+
+  it('executes only once when confirmation is triggered repeatedly', async () => {
+    const resolvers: Array<(value: BatchSessionResult[]) => void> = []
+    const onBatchConnect = vi.fn(() => new Promise<BatchSessionResult[]>((resolve) => resolvers.push(resolve)))
+    const user = userEvent.setup()
+    render(
+      <SessionBatchActions
+        selectedIDs={['1']}
+        onBatchConnect={onBatchConnect}
+        onBatchExecuteMacro={vi.fn(async () => [])}
+        onBatchDelete={vi.fn(async () => [])}
+        onComplete={vi.fn()}
+      />,
+    )
+    await user.click(screen.getByRole('button', { name: /批量连接/ }))
+    const confirm = await screen.findByRole('button', { name: '确认执行' })
+
+    await act(async () => {
+      confirm.click()
+      confirm.removeAttribute('disabled')
+      confirm.click()
+    })
+
+    expect(onBatchConnect).toHaveBeenCalledTimes(1)
+    await act(async () => resolvers[0]?.([]))
+  })
+
+  it('completes only successful IDs from the original selection snapshot', async () => {
+    const onBatchConnect = vi.fn(async () => [{ sessionId: '1', name: 'one', success: true }])
+    const onComplete = vi.fn()
+    const props = {
+      onBatchConnect,
+      onBatchExecuteMacro: vi.fn(async () => []),
+      onBatchDelete: vi.fn(async () => []),
+      onComplete,
+    }
+    const user = userEvent.setup()
+    const view = render(<SessionBatchActions selectedIDs={['1']} {...props} />)
+
+    await user.click(screen.getByRole('button', { name: /批量连接/ }))
+    view.rerender(<SessionBatchActions selectedIDs={['2', '3']} {...props} />)
+    expect(screen.getByRole('alertdialog')).toHaveTextContent('1 个会话')
+    await user.click(screen.getByRole('button', { name: '确认执行' }))
+
+    expect(onBatchConnect).toHaveBeenCalledWith(['1'])
+    expect(onComplete).toHaveBeenCalledWith(['1'])
   })
 })

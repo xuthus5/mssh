@@ -71,6 +71,16 @@ func createSyncProvider(ctx context.Context, client *http.Client, config model.S
 }
 
 func (s *SyncService) providerSecrets(config model.SyncConfig, input *model.SyncConfigInput) (syncProviderSecrets, error) {
+	var secrets syncProviderSecrets
+	err := withCryptoOperation(s.crypto, func() error {
+		var operationErr error
+		secrets, operationErr = s.providerSecretsUnlocked(config, input)
+		return operationErr
+	})
+	return secrets, err
+}
+
+func (s *SyncService) providerSecretsUnlocked(config model.SyncConfig, input *model.SyncConfigInput) (syncProviderSecrets, error) {
 	secrets := syncProviderSecrets{}
 	var err error
 	switch config.Provider {
@@ -78,19 +88,19 @@ func (s *SyncService) providerSecrets(config model.SyncConfig, input *model.Sync
 		if input != nil && input.Gist.Token != "" {
 			secrets.GistToken = input.Gist.Token
 		} else {
-			secrets.GistToken, err = s.loadOptionalSecret(syncGistTokenSetting)
+			secrets.GistToken, err = s.loadOptionalSecretUnlocked(syncGistTokenSetting)
 		}
 	case model.SyncProviderWebDAV:
 		if input != nil && input.WebDAV.Password != "" {
 			secrets.WebDAVPassword = input.WebDAV.Password
 		} else if s.secretSaved(syncWebDAVPasswordSetting) {
-			secrets.WebDAVPassword, err = s.loadSecret(syncWebDAVPasswordSetting)
+			secrets.WebDAVPassword, err = s.loadSecretUnlocked(syncWebDAVPasswordSetting)
 		}
 	case model.SyncProviderS3:
 		if input != nil && input.S3.SecretKey != "" {
 			secrets.S3SecretKey = input.S3.SecretKey
 		} else {
-			secrets.S3SecretKey, err = s.loadOptionalSecret(syncS3SecretSetting)
+			secrets.S3SecretKey, err = s.loadOptionalSecretUnlocked(syncS3SecretSetting)
 		}
 	}
 	if err != nil {
@@ -101,6 +111,14 @@ func (s *SyncService) providerSecrets(config model.SyncConfig, input *model.Sync
 
 func (s *SyncService) loadOptionalSecret(key string) (string, error) {
 	value, err := s.loadSecret(key)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", nil
+	}
+	return value, err
+}
+
+func (s *SyncService) loadOptionalSecretUnlocked(key string) (string, error) {
+	value, err := s.loadSecretUnlocked(key)
 	if errors.Is(err, sql.ErrNoRows) {
 		return "", nil
 	}

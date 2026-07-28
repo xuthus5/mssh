@@ -11,8 +11,14 @@ const service = 'github.com/xuthus5/mssh/internal/service.'
 describe('useSession behavior', () => {
   beforeEach(() => {
     __clearHandlers()
-    useAppStore.setState({ tabs: [], activeSurface: null, connectionStatus: {} })
-    useConnectDialog.setState({ open: false, state: 'idle', attemptId: '', sessionId: '', error: '', fingerprint: '', algorithm: '' })
+    useAppStore.setState({
+      tabs: [], activeSurface: null, connectionStatus: {}, pendingTerminalOpens: 0,
+      terminalOpenReservations: new Set(),
+    })
+    useConnectDialog.setState({
+      open: false, state: 'idle', host: '', port: 0, user: '', sessionId: '', error: '',
+      dialogId: 0, cancelRequest: null, retry: null,
+    })
   })
 
   it('remaps folder children and sessions while updating defaults', async () => {
@@ -127,6 +133,29 @@ describe('useSession behavior', () => {
     const messages = useToastStore.getState().toasts.map((item) => item.message)
     expect(messages.some((message) => message.includes('加载会话失败'))).toBe(false)
     expect(messages.some((message) => message.includes('加载最近会话失败'))).toBe(false)
+  })
+
+  it('cancels a deferred connection and closes a late terminal without opening a tab', async () => {
+    registerInitial({ sessions: [bindingSession(5, 'Connect', null)] })
+    const open = deferred<string>()
+    const closeTerminal = vi.fn(async () => {})
+    __registerHandler(service + 'TerminalService.Open', async () => open.promise)
+    __registerHandler(service + 'TerminalService.Close', closeTerminal)
+    const { result } = renderHook(() => useSession())
+    await waitFor(() => expect(result.current.sessions).toHaveLength(1))
+
+    let connecting!: Promise<void>
+    act(() => { connecting = result.current.connect('5') })
+    await waitFor(() => expect(useConnectDialog.getState()).toMatchObject({ open: true, state: 'connecting' }))
+    await act(async () => { await useConnectDialog.getState().cancelConnection() })
+    open.resolve('term-late')
+    await act(async () => { await connecting })
+
+    expect(closeTerminal).toHaveBeenCalledWith('term-late')
+    expect(useAppStore.getState().tabs).toHaveLength(0)
+    expect(useAppStore.getState().pendingTerminalOpens).toBe(0)
+    expect(useAppStore.getState().terminalOpenReservations).toEqual(new Set())
+    expect(useConnectDialog.getState()).toMatchObject({ open: false, state: 'idle' })
   })
 
   it('closes terminal tabs after batch delete', async () => {
@@ -399,10 +428,17 @@ function registerInitial({ folders = [], sessions = [], recent = [] }: { folders
 	__registerHandler(service + 'AssetCatalogService.ListTags', async () => [])
 }
 
-function folder(id: number, name: string, parentID: number | null, isDefault: boolean) {
+function folder(...args: [number, string, number | null, boolean]) {
+  const [id, name, parentID, isDefault] = args
   return { id, name, parent_id: parentID, is_default: isDefault }
 }
 
 function bindingSession(id: number, name: string, folderID: number | null) {
   return { id, name, host: `${id}.internal`, port: 22, username: 'root', auth_method: 'password', password: '', key_id: null, keep_alive: 30, term_type: 'xterm', folder_id: folderID, last_connected_at: null, connection_count: 0 }
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((resolvePromise) => { resolve = resolvePromise })
+  return { promise, resolve }
 }

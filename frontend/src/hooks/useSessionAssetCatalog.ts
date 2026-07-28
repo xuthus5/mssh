@@ -1,4 +1,4 @@
-import { useCallback, type Dispatch, type SetStateAction } from 'react'
+import { useCallback, useEffect, useRef, type Dispatch, type SetStateAction } from 'react'
 import { AssetCatalogService, SessionService } from '@/lib/wails'
 import { logger } from '@/lib/logger'
 import { t } from '@/i18n'
@@ -15,6 +15,8 @@ interface StateSetters {
   setSessions: Dispatch<SetStateAction<Session[]>>
   setRecentSessions: Dispatch<SetStateAction<Session[]>>
   setError: Dispatch<SetStateAction<string>>
+  beginSessionSnapshot: () => () => boolean
+  beginRecentSnapshot: () => () => boolean
 }
 
 
@@ -26,67 +28,123 @@ async function silentRefreshAssets(refreshAssets: (options?: { silent?: boolean 
   }
 }
 
-export function useSessionAssetCatalog(state: StateSetters) {
-  const listAssetCatalogs = useCallback(async (options?: { silent?: boolean }) => {
+function useCatalogRequestGate() {
+  const lifecycle = useRef(0)
+  const requestID = useRef(0)
+  useEffect(() => {
+    const token = ++lifecycle.current
+    return () => {
+      if (lifecycle.current === token) lifecycle.current++
+    }
+  }, [])
+  const beginRequest = useCallback(() => {
+    const lifecycleToken = lifecycle.current
+    const currentRequest = ++requestID.current
+    return () => lifecycle.current === lifecycleToken && requestID.current === currentRequest
+  }, [])
+  const captureLifecycle = useCallback(() => {
+    const lifecycleToken = lifecycle.current
+    return () => lifecycle.current === lifecycleToken
+  }, [])
+  const invalidateRequests = useCallback(() => { requestID.current++ }, [])
+  return { beginRequest, captureLifecycle, invalidateRequests }
+}
+
+function useCatalogList(state: StateSetters, beginRequest: () => () => boolean) {
+  return useCallback(async (options?: { silent?: boolean }) => {
+    const isCurrent = beginRequest()
     try {
       const [environmentItems, projectItems, tagItems] = await Promise.all([
         AssetCatalogService.ListEnvironments(), AssetCatalogService.ListProjects(), AssetCatalogService.ListTags(),
       ])
+      if (!isCurrent()) return
       state.setEnvironments((environmentItems ?? []).map(mapEnvironment))
       state.setProjects((projectItems ?? []).map(mapProject))
       state.setTags((tagItems ?? []).map(mapTag))
+      state.setError('')
     } catch (error) {
+      if (!isCurrent()) return
       const message = error instanceof Error ? error.message : String(error)
       logger.error('listAssetCatalogs error', error)
       state.setError(message)
       if (options?.silent) throw error
     }
-  }, [state.setEnvironments, state.setError, state.setProjects, state.setTags])
+  }, [beginRequest, state.setEnvironments, state.setError, state.setProjects, state.setTags])
+}
 
-  const refreshAssets = useCallback(async (options?: { silent?: boolean }) => {
+function useAssetRefresh(state: StateSetters, beginRequest: () => () => boolean) {
+  return useCallback(async (options?: { silent?: boolean }) => {
+    const isCatalogCurrent = beginRequest()
+    const isSessionCurrent = state.beginSessionSnapshot()
+    const isRecentCurrent = state.beginRecentSnapshot()
     try {
       const [environmentItems, projectItems, tagItems, sessionItems, recentItems] = await Promise.all([
         AssetCatalogService.ListEnvironments(), AssetCatalogService.ListProjects(), AssetCatalogService.ListTags(),
         SessionService.ListSessions(null), SessionService.ListRecentSessions(10),
       ])
-      state.setEnvironments((environmentItems ?? []).map(mapEnvironment))
-      state.setProjects((projectItems ?? []).map(mapProject))
-      state.setTags((tagItems ?? []).map(mapTag))
-      state.setSessions((sessionItems ?? []).map(mapSession))
-      state.setRecentSessions((recentItems ?? []).map(mapSession))
+      if (isCatalogCurrent()) {
+        state.setEnvironments((environmentItems ?? []).map(mapEnvironment))
+        state.setProjects((projectItems ?? []).map(mapProject))
+        state.setTags((tagItems ?? []).map(mapTag))
+        state.setError('')
+      }
+      if (isSessionCurrent()) state.setSessions((sessionItems ?? []).map(mapSession))
+      if (isRecentCurrent()) state.setRecentSessions((recentItems ?? []).map(mapSession))
     } catch (error) {
+      if (!isCatalogCurrent()) return
       const message = error instanceof Error ? error.message : String(error)
       logger.error('refreshAssets error', error)
       state.setError(message)
       if (options?.silent) throw error
       // non-silent: page banner owns the failure
     }
-  }, [state.setEnvironments, state.setError, state.setProjects, state.setRecentSessions, state.setSessions, state.setTags])
+  }, [beginRequest, state.beginRecentSnapshot, state.beginSessionSnapshot, state.setEnvironments, state.setError, state.setProjects, state.setRecentSessions, state.setSessions, state.setTags])
+}
 
+function useCatalogCreators(
+  state: StateSetters,
+  captureLifecycle: () => () => boolean,
+  invalidateRequests: () => void,
+) {
   const createEnvironment = useCallback(async (name: string, colorToken: AssetColorToken) => {
+    const isActive = captureLifecycle()
     const result = await AssetCatalogService.CreateEnvironment({ id: 0, name, color_token: colorToken as unknown as BindingAssetColorToken, sort_order: state.environments.length })
     if (!result) throw new Error(t('创建环境失败'))
     const mapped = mapEnvironment(result)
-    state.setEnvironments((current) => [...current, mapped])
+    if (isActive()) {
+      invalidateRequests()
+      state.setEnvironments((current) => [...current, mapped])
+    }
     return mapped
-  }, [state.environments.length, state.setEnvironments])
+  }, [captureLifecycle, invalidateRequests, state.environments.length, state.setEnvironments])
 
   const createProject = useCallback(async (name: string, code = '', description = '') => {
+    const isActive = captureLifecycle()
     const result = await AssetCatalogService.CreateProject({ id: 0, name, code, description, sort_order: state.projects.length })
     if (!result) throw new Error(t('创建项目失败'))
     const mapped = mapProject(result)
-    state.setProjects((current) => [...current, mapped])
+    if (isActive()) {
+      invalidateRequests()
+      state.setProjects((current) => [...current, mapped])
+    }
     return mapped
-  }, [state.projects.length, state.setProjects])
+  }, [captureLifecycle, invalidateRequests, state.projects.length, state.setProjects])
 
   const createTag = useCallback(async (name: string, colorToken: AssetColorToken) => {
+    const isActive = captureLifecycle()
     const result = await AssetCatalogService.CreateTag({ id: 0, name, color_token: colorToken as unknown as BindingAssetColorToken })
     if (!result) throw new Error(t('创建标签失败'))
     const mapped = mapTag(result)
-    state.setTags((current) => [...current, mapped])
+    if (isActive()) {
+      invalidateRequests()
+      state.setTags((current) => [...current, mapped])
+    }
     return mapped
-  }, [state.setTags])
+  }, [captureLifecycle, invalidateRequests, state.setTags])
+  return { createEnvironment, createProject, createTag }
+}
 
+function useCatalogMutations(refreshAssets: (options?: { silent?: boolean }) => Promise<void>) {
   const updateEnvironment = useCallback(async (item: AssetEnvironment) => {
     await AssetCatalogService.UpdateEnvironment({ id: Number(item.id), name: item.name, color_token: item.colorToken as unknown as BindingAssetColorToken, sort_order: item.sortOrder })
     await silentRefreshAssets(refreshAssets, 'updateEnvironment')
@@ -119,6 +177,10 @@ export function useSessionAssetCatalog(state: StateSetters) {
     await AssetCatalogService.ReorderProjects(ids.map(Number))
     await silentRefreshAssets(refreshAssets, 'reorderProjects')
   }, [refreshAssets])
+  return { updateEnvironment, updateProject, updateTag, deleteEnvironment, deleteProject, deleteTag, reorderEnvironments, reorderProjects }
+}
+
+function useCatalogBulkMutations(refreshAssets: (options?: { silent?: boolean }) => Promise<void>) {
   const bulkSetEnvironment = useCallback(async (sessionIDs: string[], targetID: string | null) => {
     const count = await AssetCatalogService.BulkSetEnvironment({ session_ids: sessionIDs.map(Number), target_id: targetID ? Number(targetID) : null })
     await silentRefreshAssets(refreshAssets, 'bulkSetEnvironment')
@@ -134,6 +196,18 @@ export function useSessionAssetCatalog(state: StateSetters) {
     await silentRefreshAssets(refreshAssets, 'bulkUpdateTags')
     return count
   }, [refreshAssets])
+  return { bulkSetEnvironment, bulkSetProject, bulkUpdateTags }
+}
 
-  return { listAssetCatalogs, createEnvironment, createProject, createTag, updateEnvironment, updateProject, updateTag, deleteEnvironment, deleteProject, deleteTag, reorderEnvironments, reorderProjects, bulkSetEnvironment, bulkSetProject, bulkUpdateTags, refreshAssets }
+export function useSessionAssetCatalog(state: StateSetters) {
+  const gate = useCatalogRequestGate()
+  const listAssetCatalogs = useCatalogList(state, gate.beginRequest)
+  const refreshAssets = useAssetRefresh(state, gate.beginRequest)
+  return {
+    listAssetCatalogs,
+    refreshAssets,
+    ...useCatalogCreators(state, gate.captureLifecycle, gate.invalidateRequests),
+    ...useCatalogMutations(refreshAssets),
+    ...useCatalogBulkMutations(refreshAssets),
+  }
 }

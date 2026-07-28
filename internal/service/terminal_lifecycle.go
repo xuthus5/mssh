@@ -1,19 +1,35 @@
 package service
 
-import "fmt"
+import (
+	"errors"
+	"fmt"
+	"sync"
+)
+
+var errTerminalServiceStopped = errors.New("terminal service is shutting down")
+
+func (t *TerminalService) beginOperation() (func(), error) {
+	if t == nil {
+		return nil, errTerminalServiceStopped
+	}
+	t.mu.Lock()
+	if t.closing || t.shuttingDown {
+		t.mu.Unlock()
+		return nil, errTerminalServiceStopped
+	}
+	t.operationWG.Add(1)
+	t.mu.Unlock()
+	var finishOnce sync.Once
+	return func() { finishOnce.Do(t.operationWG.Done) }, nil
+}
 
 func (t *TerminalService) beginOpen() error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	if t.closing || t.shuttingDown {
-		return fmt.Errorf("terminal service is shutting down")
+		return errTerminalServiceStopped
 	}
-	t.openWG.Add(1)
 	return nil
-}
-
-func (t *TerminalService) finishOpen() {
-	t.openWG.Done()
 }
 
 func (t *TerminalService) closeAll(permanent bool) error {
@@ -27,23 +43,37 @@ func (t *TerminalService) closeAll(permanent bool) error {
 	if t.sessionSvc != nil {
 		t.sessionSvc.CancelConnectAttempts()
 	}
-	t.openWG.Wait()
-	terminalIDs := t.snapshotTerminalIDs()
-	closeErr := closeTerminalIDs(t, terminalIDs)
+	t.stopTerminalExitCallbacks()
+	closeErr := closeTerminalIDsIfPresent(t, t.snapshotTerminalIDs())
+	t.operationWG.Wait()
+	t.stopPendingOutputExpiries()
+	closeErr = errors.Join(closeErr, closeTerminalIDsIfPresent(t, t.snapshotTerminalIDs()))
+	closeErr = errors.Join(closeErr, t.retryPendingSerialCleanups())
 	t.mu.Lock()
-	if !permanent && !t.shuttingDown {
-		t.closing = false
-	}
+	resume := !permanent && !t.shuttingDown
 	t.mu.Unlock()
+	if resume {
+		t.resumeTerminalExitCallbacks()
+		t.mu.Lock()
+		t.closing = false
+		t.mu.Unlock()
+	}
 	t.closeMu.Unlock()
 	return closeErr
 }
 
 func (t *TerminalService) snapshotTerminalIDs() []string {
 	t.mu.RLock()
-	terminalIDs := make([]string, 0, len(t.ptys))
+	terminalIDs := make([]string, 0, len(t.ptys)+len(t.pendingOutput))
+	seen := make(map[string]struct{}, cap(terminalIDs))
 	for terminalID := range t.ptys {
 		terminalIDs = append(terminalIDs, terminalID)
+		seen[terminalID] = struct{}{}
+	}
+	for terminalID := range t.pendingOutput {
+		if _, exists := seen[terminalID]; !exists {
+			terminalIDs = append(terminalIDs, terminalID)
+		}
 	}
 	t.mu.RUnlock()
 	return terminalIDs
@@ -52,7 +82,17 @@ func (t *TerminalService) snapshotTerminalIDs() []string {
 func closeTerminalIDs(service *TerminalService, terminalIDs []string) error {
 	var closeErr error
 	for _, terminalID := range terminalIDs {
-		if err := service.Close(terminalID); err != nil {
+		if err := service.closeTerminal(terminalID); err != nil {
+			closeErr = joinTerminalCloseError(closeErr, terminalID, err)
+		}
+	}
+	return closeErr
+}
+
+func closeTerminalIDsIfPresent(service *TerminalService, terminalIDs []string) error {
+	var closeErr error
+	for _, terminalID := range terminalIDs {
+		if err := service.closeTerminalIfPresent(terminalID); err != nil {
 			closeErr = joinTerminalCloseError(closeErr, terminalID, err)
 		}
 	}

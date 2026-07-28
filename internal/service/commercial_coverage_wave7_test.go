@@ -139,11 +139,13 @@ func TestWaitSystemProbeTimeout(t *testing.T) {
 	systemProbeTimeout = 20 * time.Millisecond
 	t.Cleanup(func() { systemProbeTimeout = orig })
 	cancelled := false
+	release := make(chan struct{})
 	_, err := waitSystemProbe(func() ([]byte, error) {
-		time.Sleep(200 * time.Millisecond)
+		<-release
 		return []byte("late"), nil
 	}, func() error {
 		cancelled = true
+		close(release)
 		return nil
 	})
 	require.Error(t, err)
@@ -361,11 +363,13 @@ func TestParseSessionCSVRecordBasics(t *testing.T) {
 func TestCloudMetadataAndBackupHelpers(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	svc := &SyncService{db: db, logger: slog.Default(), dataDir: t.TempDir()}
-	assert.Equal(t, "", svc.cloudETag())
+	etag, err := svc.cloudETag()
+	require.NoError(t, err)
+	assert.Equal(t, "", etag)
 	require.NoError(t, svc.saveCloudMetadata(`"abc"`, "upload"))
-	// cloudETag unmarshals JSON string from settings value
-	// saveCloudMetadata json-marshals etag again so stored is "\"\\\"abc\\\"\"" etc - still non-empty path
-	_ = svc.cloudETag()
+	etag, err = svc.cloudETag()
+	require.NoError(t, err)
+	assert.Equal(t, `"abc"`, etag)
 
 	content, err := readCloudBackup(strings.NewReader("hello"))
 	require.NoError(t, err)
@@ -425,9 +429,10 @@ func TestClosedDBCoverageBoost(t *testing.T) {
 
 	svc := &SyncService{db: db, logger: slog.Default(), dataDir: t.TempDir()}
 	assert.Error(t, svc.saveCloudMetadata("e", "up"))
-	assert.Equal(t, "", svc.cloudETag())
+	_, err := svc.cloudETag()
+	assert.Error(t, err)
 
-	_, err := tableColumns(db, "sessions")
+	_, err = tableColumns(db, "sessions")
 	require.Error(t, err)
 	assert.Error(t, validateSnapshot(db, ExportData{Tables: map[string][]map[string]any{}}))
 

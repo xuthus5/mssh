@@ -1,24 +1,17 @@
 import { create } from 'zustand'
 import { DEFAULT_LANGUAGE, LANGUAGE_STORAGE_KEY, type AppLanguage } from '@/i18n/types'
+import { readStorageItem, writeStorageItem } from '@/lib/safeStorage'
 
 function normalizeLanguage(value: unknown): AppLanguage {
   return value === 'en' ? 'en' : DEFAULT_LANGUAGE
 }
 
 function readStoredLanguage(): AppLanguage {
-  try {
-    return normalizeLanguage(localStorage.getItem(LANGUAGE_STORAGE_KEY))
-  } catch {
-    return DEFAULT_LANGUAGE
-  }
+  return normalizeLanguage(readStorageItem(LANGUAGE_STORAGE_KEY))
 }
 
 function persistLanguage(language: AppLanguage) {
-  try {
-    localStorage.setItem(LANGUAGE_STORAGE_KEY, language)
-  } catch {
-    // ignore quota / private mode failures
-  }
+  writeStorageItem(LANGUAGE_STORAGE_KEY, language)
   if (typeof document !== 'undefined') {
     document.documentElement.lang = language === 'en' ? 'en' : 'zh-CN'
   }

@@ -4,10 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 
 	backupcrypto "github.com/xuthus5/mssh/internal/crypto"
 	"github.com/xuthus5/mssh/internal/model"
+	"github.com/xuthus5/mssh/internal/store"
 )
 
 // ImportWithPassword installs the embedded vault (if present) using the application password,
@@ -18,33 +18,90 @@ func (s *SyncService) ImportWithPassword(path, password string) error {
 		return fmt.Errorf("import: %w", err)
 	}
 	path = cleaned
-	content, err := os.ReadFile(path)
+	if err := s.beginSyncOperation(); err != nil {
+		return fmt.Errorf("import: %w", err)
+	}
+	defer s.operationMu.Unlock()
+	outcome := "failed"
+	defer func() {
+		recordAudit(s.db, s.logger, model.AuditEvent{Action: "import", TargetType: "backup", Summary: "导入加密配置", Outcome: outcome})
+	}()
+	content, err := readLocalBackup(path)
 	if err != nil {
 		return fmt.Errorf("import: %w", err)
 	}
-	if err := s.AdoptVaultFromContent(password, content); err != nil {
-		// Legacy backups without vault still import when local secret already matches.
-		if !errors.Is(err, errSyncVaultMissing) {
-			return fmt.Errorf("import: %w", err)
-		}
+	if err := s.importPasswordContent(path, password, content); err != nil {
+		return err
 	}
-	return s.Import(path)
+	outcome = "success"
+	return nil
+}
+
+func (s *SyncService) importPasswordContent(path, password string, content []byte) error {
+	artifact, vault, err := decodePasswordProtectedArtifact(content, password)
+	if errors.Is(err, errSyncVaultMissing) {
+		if importErr := withCryptoOperation(s.crypto, func() error { return s.importSnapshotContent(content) }); importErr != nil {
+			return fmt.Errorf("import: %w", importErr)
+		}
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("import: %w", err)
+	}
+	if err := validateSnapshot(s.db, artifact.Data); err != nil {
+		return fmt.Errorf("import: validate: %w", err)
+	}
+	previousKey := ""
+	if key, keyErr := s.masterKey(); keyErr == nil {
+		previousKey = key
+	}
+	previousData, err := s.prepareImportRestore(previousKey)
+	if err != nil {
+		return fmt.Errorf("import: prepare: %w", err)
+	}
+	transaction, err := s.prepareVaultInstall(password, vault)
+	if err != nil {
+		return fmt.Errorf("import: install vault: %w", err)
+	}
+	if err := transaction.WithCryptoOperation(func() error { return s.restore(artifact.Data) }); err != nil {
+		return rollbackVaultInstall(transaction, fmt.Errorf("import: restore: %w", err))
+	}
+	if err := transaction.Commit(); err != nil {
+		state := passwordRestoreState{data: previousData}
+		return s.rollbackVaultRestore(transaction, state, fmt.Errorf("import: commit vault: %w", err))
+	}
+	if err := s.applyRestoredProxySettings(); err != nil {
+		return fmt.Errorf("import: %w", err)
+	}
+	s.finishImportedSnapshot(path)
+	return nil
 }
 
 // AdoptVaultFromContent installs the vault envelope embedded in a sync/backup artifact.
+//
+//wails:ignore
 func (s *SyncService) AdoptVaultFromContent(password string, content []byte) error {
-	if s.vaultInstaller == nil {
-		return errors.New("vault installer is not configured")
-	}
-	vault, err := peekSyncArtifactVault(content)
-	if err != nil {
-		return errSyncVaultMissing
-	}
-	if vault == nil {
-		return errSyncVaultMissing
-	}
-	if err := s.vaultInstaller(password, *vault); err != nil {
+	if err := s.beginSyncOperation(); err != nil {
 		return err
+	}
+	defer s.operationMu.Unlock()
+	return s.adoptVaultFromContentLocked(password, content)
+}
+
+func (s *SyncService) adoptVaultFromContentLocked(password string, content []byte) error {
+	artifact, vault, err := decodePasswordProtectedArtifact(content, password)
+	if err != nil {
+		return err
+	}
+	if err := validateSnapshot(s.db, artifact.Data); err != nil {
+		return err
+	}
+	transaction, err := s.prepareVaultInstall(password, vault)
+	if err != nil {
+		return err
+	}
+	if err := transaction.Commit(); err != nil {
+		return rollbackVaultInstall(transaction, err)
 	}
 	return nil
 }
@@ -82,24 +139,79 @@ func (s *SyncService) artifactVault() (*backupcrypto.VaultFile, error) {
 // JoinWithPassword bootstraps a new device from the remote cloud backup using the application password.
 // It installs the embedded vault envelope, saves provider config/secrets, then restores remote data.
 func (s *SyncService) JoinWithPassword(input model.SyncConfigInput, password string) (model.SyncResult, error) {
-	if !s.operationMu.TryLock() {
-		return model.SyncResult{}, errors.New("sync operation is already running")
-	}
-	defer s.operationMu.Unlock()
-	config, remote, err := s.fetchJoinRemote(input)
+	operationContext, finish, err := s.beginCancelableSyncOperation(context.Background())
 	if err != nil {
 		return model.SyncResult{}, err
 	}
-	if err := s.installJoinVaultAndConfig(input, password, remote.Content); err != nil {
+	defer finish()
+	config, remote, err := s.fetchJoinRemote(operationContext, input)
+	if err != nil {
 		return model.SyncResult{}, err
 	}
-	if err := s.restoreJoinSnapshot(remote.Content); err != nil {
+	artifact, vault, err := decodePasswordProtectedArtifact(remote.Content, password)
+	if err != nil {
 		return model.SyncResult{}, err
 	}
+	if err := validateSnapshot(s.db, artifact.Data); err != nil {
+		return model.SyncResult{}, fmt.Errorf("join: validate: %w", err)
+	}
+	request := passwordJoinRequest{input: input, password: password, config: config, artifact: artifact, vault: vault}
+	s.configMu.Lock()
+	err = s.restoreJoinedBackup(request)
+	s.configMu.Unlock()
+	if err != nil {
+		return model.SyncResult{}, err
+	}
+	if err := s.applyRestoredProxySettings(); err != nil {
+		return model.SyncResult{}, fmt.Errorf("join: %w", err)
+	}
+	s.restartScheduler()
 	return s.finishJoinSuccess(config), nil
 }
 
-func (s *SyncService) fetchJoinRemote(input model.SyncConfigInput) (model.SyncConfig, syncRemoteObject, error) {
+type passwordJoinRequest struct {
+	input    model.SyncConfigInput
+	password string
+	config   model.SyncConfig
+	artifact decodedSyncArtifact
+	vault    backupcrypto.VaultFile
+}
+
+func (s *SyncService) restoreJoinedBackup(request passwordJoinRequest) error {
+	previous, err := s.loadConfig()
+	if err != nil {
+		return err
+	}
+	previousKey := ""
+	if key, keyErr := s.masterKey(); keyErr == nil {
+		previousKey = key
+	}
+	previousData, err := s.prepareImportRestore(previousKey)
+	if err != nil {
+		return fmt.Errorf("join: prepare: %w", err)
+	}
+	previousSettings, err := store.ListSettings(s.db, "sync")
+	if err != nil {
+		return fmt.Errorf("join: capture sync settings: %w", err)
+	}
+	transaction, err := s.prepareVaultInstall(request.password, request.vault)
+	if err != nil {
+		return err
+	}
+	restoreErr := transaction.WithCryptoOperation(func() error {
+		return s.restoreAndPersistJoin(request.artifact.Data, request.input, previous, request.config)
+	})
+	if restoreErr != nil {
+		return rollbackVaultInstall(transaction, fmt.Errorf("join: restore: %w", restoreErr))
+	}
+	if err := transaction.Commit(); err != nil {
+		state := passwordRestoreState{data: previousData, syncSettings: previousSettings, restoreSyncSettings: true}
+		return s.rollbackVaultRestore(transaction, state, fmt.Errorf("join: commit vault: %w", err))
+	}
+	return nil
+}
+
+func (s *SyncService) fetchJoinRemote(parent context.Context, input model.SyncConfigInput) (model.SyncConfig, syncRemoteObject, error) {
 	config := configFromInput(input)
 	if err := validateSyncConfig(config); err != nil {
 		return model.SyncConfig{}, syncRemoteObject{}, err
@@ -111,7 +223,7 @@ func (s *SyncService) fetchJoinRemote(input model.SyncConfigInput) (model.SyncCo
 	if err := validateProviderReady(config, secrets); err != nil {
 		return model.SyncConfig{}, syncRemoteObject{}, err
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), syncNetworkTimeout)
+	ctx, cancel := context.WithTimeout(parent, syncNetworkTimeout)
 	defer cancel()
 	provider, err := s.providerFactory.Create(ctx, config, secrets)
 	if err != nil {
@@ -122,39 +234,6 @@ func (s *SyncService) fetchJoinRemote(input model.SyncConfigInput) (model.SyncCo
 		return model.SyncConfig{}, syncRemoteObject{}, err
 	}
 	return config, remote, nil
-}
-
-func (s *SyncService) installJoinVaultAndConfig(input model.SyncConfigInput, password string, content []byte) error {
-	if err := s.AdoptVaultFromContent(password, content); err != nil {
-		return fmt.Errorf("join: %w", err)
-	}
-	if _, err := s.SaveConfig(input); err != nil {
-		return fmt.Errorf("join: save config: %w", err)
-	}
-	return nil
-}
-
-func (s *SyncService) restoreJoinSnapshot(content []byte) error {
-	masterKey, err := s.masterKey()
-	if err != nil {
-		return err
-	}
-	artifact, err := decodeSyncArtifact(content, masterKey)
-	if err != nil {
-		return fmt.Errorf("join: decrypt: %w", err)
-	}
-	if err := validateSnapshot(s.db, artifact.Data); err != nil {
-		return fmt.Errorf("join: validate: %w", err)
-	}
-	if s.lifecycle != nil {
-		if err := s.lifecycle.PrepareDestructiveSync(); err != nil {
-			return fmt.Errorf("join: prepare: %w", err)
-		}
-	}
-	if err := s.restore(artifact.Data); err != nil {
-		return fmt.Errorf("join: restore: %w", err)
-	}
-	return nil
 }
 
 func (s *SyncService) finishJoinSuccess(config model.SyncConfig) model.SyncResult {

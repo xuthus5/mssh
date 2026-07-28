@@ -2,6 +2,7 @@ package service
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 )
@@ -19,6 +20,21 @@ func validateLocalTransferPath(path string) (string, error) {
 	cleaned := filepath.Clean(trimmed)
 	if cleaned == "." || cleaned == string(filepath.Separator) {
 		return "", fmt.Errorf("local path is invalid")
+	}
+	return cleaned, nil
+}
+
+func validateUploadSource(path string) (string, error) {
+	cleaned, err := validateLocalTransferPath(path)
+	if err != nil {
+		return "", err
+	}
+	info, err := os.Stat(cleaned)
+	if err != nil {
+		return "", fmt.Errorf("stat upload source: %w", err)
+	}
+	if !info.Mode().IsRegular() {
+		return "", fmt.Errorf("upload source must be a regular file")
 	}
 	return cleaned, nil
 }

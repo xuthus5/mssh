@@ -7,6 +7,7 @@ import { SETTINGS_SFTP_CHANGED_EVENT } from '@/lib/settingsWindowEvents'
 import { useSFTPSettingsStore } from '@/store/sftpSettingsStore'
 import { __clearHandlers, __emitEvent, __registerHandler } from '@/test/__mocks__/wails-runtime'
 import { logger } from '@/lib/logger'
+import { syncDataChangedEvent } from '@/lib/syncDataReload'
 
 function setting(key: string, value: unknown) {
   return { key, namespace: key.split('.')[0], value: JSON.stringify(value), value_type: typeof value, version: 1, updated_at: '' }
@@ -64,6 +65,45 @@ describe('useSFTPSettings', () => {
     expect(useSFTPSettingsStore.getState().defaultView).toBe('tree')
   })
 
+  it('reloads persisted settings after synchronized data changes', async () => {
+    let synchronized = false
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.GetMany', async () => ({
+      'sftp.show_hidden_files': setting('sftp.show_hidden_files', synchronized),
+      'sftp.follow_terminal_directory': setting('sftp.follow_terminal_directory', synchronized),
+      'sftp.default_view': setting('sftp.default_view', synchronized ? 'tree' : 'list'),
+    }))
+    const { result } = renderHook(() => useSFTPSettings())
+    await waitFor(() => expect(result.current.settings.defaultView).toBe('list'))
+
+    synchronized = true
+    act(() => __emitEvent(syncDataChangedEvent, { data: { changed: true } }))
+
+    await waitFor(() => expect(result.current.settings).toEqual({
+      showHiddenFiles: true,
+      followTerminalDirectory: true,
+      defaultView: 'tree',
+    }))
+  })
+
+  it('keeps the newest SFTP settings when reloads resolve out of order', async () => {
+    const first = deferred<Record<string, unknown>>()
+    const second = deferred<Record<string, unknown>>()
+    let loads = 0
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.GetMany', async () => {
+      loads++
+      return loads === 1 ? first.promise : second.promise
+    })
+    const { result } = renderHook(() => useSFTPSettings())
+    await waitFor(() => expect(loads).toBe(1))
+    let latestReload!: Promise<void>
+    act(() => { latestReload = result.current.reload() })
+    await waitFor(() => expect(loads).toBe(2))
+    await act(async () => { second.resolve(sftpSettingsPayload('tree')); await latestReload })
+    expect(result.current.settings.defaultView).toBe('tree')
+    await act(async () => { first.resolve(sftpSettingsPayload('list')); await first.promise })
+    expect(result.current.settings.defaultView).toBe('tree')
+  })
+
   it('does not publish or update state when saving fails', async () => {
     const loggerError = vi.spyOn(logger, 'debug').mockImplementation(() => {})
     __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.SetMany', async () => { throw new Error('save failed') })
@@ -79,6 +119,20 @@ describe('useSFTPSettings', () => {
     loggerError.mockRestore()
   })
 })
+
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((resolvePromise) => { resolve = resolvePromise })
+  return { promise, resolve }
+}
+
+function sftpSettingsPayload(defaultView: 'list' | 'tree') {
+  return {
+    'sftp.show_hidden_files': setting('sftp.show_hidden_files', defaultView === 'tree'),
+    'sftp.follow_terminal_directory': setting('sftp.follow_terminal_directory', false),
+    'sftp.default_view': setting('sftp.default_view', defaultView),
+  }
+}
 
 describe('quiet SFTP autosave error feedback', () => {
   beforeEach(() => {
@@ -144,4 +198,3 @@ describe('quiet SFTP autosave error feedback', () => {
   })
 
 })
-

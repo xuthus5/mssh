@@ -16,8 +16,9 @@ const (
 )
 
 type CommandHistoryService struct {
-	db     *sql.DB
-	logger *slog.Logger
+	db        *sql.DB
+	logger    *slog.Logger
+	lifecycle serviceOperationGate
 }
 
 func NewCommandHistoryService(db *sql.DB, logger *slog.Logger) *CommandHistoryService {
@@ -25,6 +26,11 @@ func NewCommandHistoryService(db *sql.DB, logger *slog.Logger) *CommandHistorySe
 }
 
 func (s *CommandHistoryService) Add(sessionID int64, command string) (*model.CommandHistory, error) {
+	finish, err := s.beginOperation()
+	if err != nil {
+		return nil, err
+	}
+	defer finish()
 	if sessionID <= 0 {
 		return nil, fmt.Errorf("invalid session id")
 	}
@@ -43,6 +49,11 @@ func (s *CommandHistoryService) Add(sessionID int64, command string) (*model.Com
 }
 
 func (s *CommandHistoryService) List(sessionID int64, query string) ([]model.CommandHistory, error) {
+	finish, err := s.beginOperation()
+	if err != nil {
+		return nil, err
+	}
+	defer finish()
 	if sessionID <= 0 {
 		return nil, fmt.Errorf("invalid session id")
 	}
@@ -50,6 +61,11 @@ func (s *CommandHistoryService) List(sessionID int64, query string) ([]model.Com
 }
 
 func (s *CommandHistoryService) Delete(id int64) error {
+	finish, err := s.beginOperation()
+	if err != nil {
+		return err
+	}
+	defer finish()
 	if id <= 0 {
 		return fmt.Errorf("invalid command history id")
 	}
@@ -57,6 +73,11 @@ func (s *CommandHistoryService) Delete(id int64) error {
 }
 
 func (s *CommandHistoryService) Clear(sessionID int64) error {
+	finish, err := s.beginOperation()
+	if err != nil {
+		return err
+	}
+	defer finish()
 	if sessionID <= 0 {
 		return fmt.Errorf("invalid session id")
 	}

@@ -1,5 +1,5 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { __clearHandlers, __registerHandler } from '@/test/__mocks__/wails-runtime'
 import { useSerial } from '@/hooks/useSerial'
 import { useToastStore } from '@/components/ui/toast'
@@ -15,6 +15,8 @@ describe('useSerial', () => {
     __registerHandler(service + 'SerialService.ListDevices', async () => [])
     __registerHandler(service + 'SerialService.ActiveDeviceMap', async () => ({}))
   })
+
+  afterEach(() => vi.useRealTimers())
 
   it('sets error banner when serial profile list fails without toast', async () => {
     __registerHandler(service + 'SerialService.List', async () => {
@@ -148,4 +150,60 @@ describe('useSerial', () => {
     expect(useToastStore.getState().toasts.filter((item) => item.type === 'error')).toHaveLength(0)
   })
 
+  it('keeps the newest port list when refreshes resolve out of order', async () => {
+    const first = deferred<unknown[]>()
+    const second = deferred<unknown[]>()
+    let listCalls = 0
+    __registerHandler(service + 'SerialService.List', async () => {
+      listCalls++
+      return listCalls === 1 ? first.promise : second.promise
+    })
+    const { result } = renderHook(() => useSerial())
+    await waitFor(() => expect(listCalls).toBe(1))
+    let latestRefresh!: Promise<void>
+    act(() => { latestRefresh = result.current.refresh() })
+    await waitFor(() => expect(listCalls).toBe(2))
+
+    await act(async () => { second.resolve([serialPort('new')]); await latestRefresh })
+    expect(result.current.ports[0].name).toBe('new')
+    await act(async () => { first.resolve([serialPort('old')]); await first.promise })
+    expect(result.current.ports[0].name).toBe('new')
+  })
+
+  it('does not overlap slow serial catalog polls', async () => {
+    vi.useFakeTimers()
+    const first = deferred<unknown[]>()
+    let listCalls = 0
+    __registerHandler(service + 'SerialService.List', async () => {
+      listCalls++
+      return listCalls === 1 ? first.promise : []
+    })
+    renderHook(() => useSerial())
+    await act(async () => { await Promise.resolve() })
+    expect(listCalls).toBe(1)
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(15000) })
+    expect(listCalls).toBe(1)
+    await act(async () => {
+      first.resolve([])
+      await first.promise
+      await Promise.resolve()
+    })
+    await act(async () => { await vi.advanceTimersByTimeAsync(5000) })
+    expect(listCalls).toBe(2)
+  })
+
 })
+
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((resolvePromise) => { resolve = resolvePromise })
+  return { promise, resolve }
+}
+
+function serialPort(name: string) {
+  return {
+    id: 1, name, device: '/dev/ttyUSB0', baud_rate: 115200, data_bits: 8, parity: 'none', stop_bits: 1,
+    flow_control: 'none', line_ending: 'lf', local_echo: false, dtr_on_open: true, rts_on_open: true, notes: '', sort_order: 0,
+  }
+}

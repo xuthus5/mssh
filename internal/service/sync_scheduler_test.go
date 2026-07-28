@@ -166,6 +166,39 @@ func TestNotifyVaultUnlockedIsWaitedDuringSchedulerStop(t *testing.T) {
 	}
 }
 
+func TestNotifyVaultUnlockedCoalescesConcurrentCatchUps(t *testing.T) {
+	started := make(chan struct{})
+	release := make(chan struct{})
+	var calls atomic.Int32
+	service := NewSyncService(testutil.NewTestDB(t), testutil.NewTestLogger(),
+		WithSyncSecretSource(func() (string, error) {
+			if calls.Add(1) == 1 {
+				close(started)
+			}
+			<-release
+			return "", errors.New("locked")
+		}),
+	)
+
+	service.NotifyVaultUnlocked()
+	select {
+	case <-started:
+	case <-time.After(time.Second):
+		t.Fatal("catch-up sync did not start")
+	}
+	for range 8 {
+		service.NotifyVaultUnlocked()
+	}
+	close(release)
+	service.schedulerWG.Wait()
+
+	assert.Equal(t, int32(1), calls.Load())
+	service.NotifyVaultUnlocked()
+	service.schedulerWG.Wait()
+	assert.Equal(t, int32(2), calls.Load())
+	service.StopScheduler()
+}
+
 func TestNotifyVaultUnlockedIsCancelledDuringSchedulerStop(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	config := defaultSyncConfig()

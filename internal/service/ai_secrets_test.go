@@ -27,6 +27,17 @@ func TestAISecretStoreUsesKeychainAndVolatileFallback(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, saved)
 	assert.Equal(t, "volatile", value)
+	assert.Error(t, store.delete("provider:2"))
+	value, saved, err = store.get("provider:2")
+	require.NoError(t, err)
+	assert.True(t, saved)
+	assert.Equal(t, "volatile", value)
+	keychain.err = nil
+	assert.True(t, store.set("provider:2", "persisted"))
+	value, saved, err = store.get("provider:2")
+	require.NoError(t, err)
+	assert.True(t, saved)
+	assert.Equal(t, "persisted", value)
 }
 
 func TestAISecretStorePropagatesReadAndDeleteErrors(t *testing.T) {

@@ -283,7 +283,7 @@ func TestDeleteSessionsRemovesRecordingFiles(t *testing.T) {
 	_, err = db.Exec("INSERT INTO session_logs (session_id, started_at, data_path) VALUES (?, datetime('now'), ?)", session.ID, path)
 	require.NoError(t, err)
 
-	require.NoError(t, DeleteSessions(db, []int64{session.ID}))
+	require.NoError(t, DeleteSessionsWithRecordingDirectory(db, []int64{session.ID}, dir))
 	_, err = os.Stat(path)
 	require.Error(t, err)
 	assert.True(t, os.IsNotExist(err))

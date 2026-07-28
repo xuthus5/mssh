@@ -8,19 +8,21 @@ import { useCloudSyncCenter } from '@/hooks/useCloudSyncCenter'
 import { useThemeCatalog } from '@/hooks/useThemeCatalog'
 import { useAISettings } from '@/hooks/useAISettings'
 import { VaultGate } from '@/components/security/VaultGate'
-import type { GeneralSettings } from '@/hooks/useSettings'
+import type { GeneralSettings, GeneralSettingsSaveOptions } from '@/hooks/useSettings'
 import type { SFTPSettings } from '@/hooks/useSFTPSettings'
 import type { ThemeConfigurationInput } from '../../../bindings/github.com/xuthus5/mssh/internal/model/models'
 
-function settingsViewProps(
-  settings: ReturnType<typeof useSettings>,
-  catalog: ReturnType<typeof useThemeCatalog>,
-  cloudSync: ReturnType<typeof useCloudSyncCenter>,
-  ai: ReturnType<typeof useAISettings>,
-  saveGeneralQuiet: (settings: GeneralSettings) => Promise<void>,
-  saveSFTPQuiet: (settings: SFTPSettings) => Promise<void>,
-  saveThemeQuiet: (configuration: ThemeConfigurationInput) => Promise<void>,
-): SettingsViewProps {
+interface SettingsViewOptions {
+  settings: ReturnType<typeof useSettings>
+  catalog: ReturnType<typeof useThemeCatalog>
+  cloudSync: ReturnType<typeof useCloudSyncCenter>
+  ai: ReturnType<typeof useAISettings>
+  saveGeneralQuiet: (settings: GeneralSettings, options?: GeneralSettingsSaveOptions) => Promise<void>
+  saveSFTPQuiet: (settings: SFTPSettings) => Promise<void>
+  saveThemeQuiet: (configuration: ThemeConfigurationInput) => Promise<void>
+}
+
+function settingsViewProps({ settings, catalog, cloudSync, ai, saveGeneralQuiet, saveSFTPQuiet, saveThemeQuiet }: SettingsViewOptions): SettingsViewProps {
   return {
     general: settings.general, settingsReady: settings.settingsReady, loadError: settings.loadError,
     onReloadSettings: settings.reloadGeneral, systemFonts: settings.systemFonts, cloudSync,
@@ -46,7 +48,7 @@ function SettingsWindowContent() {
   const cloudSync = useCloudSyncCenter()
   const ai = useAISettings()
   const saveGeneralQuiet = useCallback(
-    (value: GeneralSettings) => settings.saveGeneral(value, { quiet: true }),
+    (value: GeneralSettings, options?: GeneralSettingsSaveOptions) => settings.saveGeneral(value, { ...options, quiet: true }),
     [settings.saveGeneral],
   )
   const saveSFTPQuiet = useCallback(
@@ -62,7 +64,7 @@ function SettingsWindowContent() {
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-background text-foreground">
       <SettingsWindowTitleBar />
-      <SettingsView {...settingsViewProps(settings, catalog, cloudSync, ai, saveGeneralQuiet, saveSFTPQuiet, saveThemeQuiet)} />
+      <SettingsView {...settingsViewProps({ settings, catalog, cloudSync, ai, saveGeneralQuiet, saveSFTPQuiet, saveThemeQuiet })} />
       <ToastContainer />
       <ConfirmDialogHost />
     </div>
@@ -71,7 +73,7 @@ function SettingsWindowContent() {
 
 export function SettingsWindowApp() {
   return (
-    <VaultGate>
+    <VaultGate clearOnSettingsHide>
       <SettingsWindowContent />
     </VaultGate>
   )

@@ -17,6 +17,21 @@ describe('terminalInputRuntime', () => {
     expect(resolveSessionId(refs as never)).toBe(9)
   })
 
+  it('resolves the owning session for a secondary split pane', () => {
+    const refs = {
+      terminalIDRef: { current: 'term-secondary' },
+      storeRef: {
+        current: {
+          tabs: [{
+            type: 'terminal', terminalId: 'term-primary', splitPaneIDs: ['term-primary', 'term-secondary'], sessionId: 9,
+          }],
+          updateLastUsed: vi.fn(),
+        },
+      },
+    }
+    expect(resolveSessionId(refs as never)).toBe(9)
+  })
+
   it('uses negative serial port ids for serial history buckets', () => {
     const refs = {
       terminalIDRef: { current: 'term-s' },
@@ -68,5 +83,31 @@ describe('terminalInputRuntime', () => {
     expect(write).toHaveBeenCalledWith('echo hi\r')
     expect(updateLastUsed).toHaveBeenCalledWith('term-1')
     expect(readCommandHistory(3)[0]?.command).toBe('echo hi')
+  })
+
+  it('records commands entered in a secondary split pane', () => {
+    localStorage.clear()
+    let handler: ((data: string) => void) | undefined
+    const refs = {
+      terminalIDRef: { current: 'term-secondary' },
+      storeRef: {
+        current: {
+          tabs: [{
+            type: 'terminal', terminalId: 'term-primary', splitPaneIDs: ['term-primary', 'term-secondary'], sessionId: 7,
+          }],
+          updateLastUsed: vi.fn(),
+        },
+      },
+    }
+    subscribeToTerminalData({
+      onData: (callback: (data: string) => void) => {
+        handler = callback
+        return { dispose: vi.fn() }
+      },
+    } as never, refs as never, new TerminalCommandCapture(), vi.fn())
+
+    handler?.('tail -f app.log\r')
+
+    expect(readCommandHistory(7)[0]?.command).toBe('tail -f app.log')
   })
 })

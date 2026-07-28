@@ -1,9 +1,11 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { renderHook, act } from '@testing-library/react'
-import { Dialogs } from '@wailsio/runtime'
+import { renderHook, act, waitFor } from '@testing-library/react'
+import { Dialogs, Events } from '@wailsio/runtime'
 import { useSettings, type KeyImportFile, type KeyMaterial } from '@/hooks/useSettings'
 import { DEFAULT_TERMINAL_BEHAVIOR, useTerminalBehaviorStore } from '@/store/terminalBehaviorStore'
-import { __registerHandler, __clearHandlers } from '@/test/__mocks__/wails-runtime'
+import { __registerHandler, __clearHandlers, __emitEvent } from '@/test/__mocks__/wails-runtime'
+import { SETTINGS_PREVIEW_CANCELLED_EVENT } from '@/lib/settingsWindowEvents'
+import { syncDataChangedEvent } from '@/lib/syncDataReload'
 
 let _counter = 0
 function nextId() { return ++_counter }
@@ -45,6 +47,17 @@ describe('useSettings', () => {
     expect(result.current.general.scrollbackLines).toBe(10000)
     expect(result.current.general.closeButtonAction).toBe('tray')
     expect(result.current.systemFonts).toEqual(['Arial', 'Segoe UI'])
+  })
+
+  it('does not publish a late font response after unmount', async () => {
+    let resolveFonts: ((fonts: string[]) => void) | undefined
+    __registerHandler('github.com/xuthus5/mssh/internal/service.FontService.List', async () => new Promise<string[]>((resolve) => { resolveFonts = resolve }))
+    const { result, unmount } = renderHook(() => useSettings())
+    await act(async () => {})
+    unmount()
+
+    await act(async () => { resolveFonts?.(['Late Font']) })
+    expect(result.current.systemFonts).toEqual([])
   })
 
   it('saves general settings and updates state', async () => {
@@ -201,6 +214,81 @@ describe('useSettings', () => {
     expect(generated).toMatchObject({ privateKey: 'mock-private', publicKey: 'mock-pub' })
   })
 
+  it('reloads the key catalog after synchronized data changes', async () => {
+    let synchronized = false
+    __registerHandler('github.com/xuthus5/mssh/internal/service.KeyService.List', async () => synchronized ? [{
+      id: 8,
+      name: 'synced-key',
+      type: 'ed25519',
+      public_key: 'ssh-ed25519 AAAA',
+      created_at: '',
+    }] : [])
+    const { result } = renderHook(() => useSettings())
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    expect(result.current.keys).toEqual([])
+
+    synchronized = true
+    act(() => __emitEvent(syncDataChangedEvent, { data: { changed: true } }))
+
+    await waitFor(() => expect(result.current.keys.map((key) => key.name)).toEqual(['synced-key']))
+  })
+
+  it('clears an earlier key-list error after a successful mutation', async () => {
+    __registerHandler('github.com/xuthus5/mssh/internal/service.KeyService.List', async () => { throw new Error('list failed') })
+    __registerHandler('github.com/xuthus5/mssh/internal/service.KeyService.Generate', async (name: string, keyType: string) => ({
+      id: nextId(), name, type: keyType, private_key: 'mock-private', public_key: 'mock-pub', created_at: new Date().toISOString(),
+    }))
+
+    const { result } = renderHook(() => useSettings())
+    await waitFor(() => expect(result.current.error).toBe('list failed'))
+    await act(async () => { await result.current.generateKey('recovered', 'ed25519', 256) })
+
+    expect(result.current.error).toBe('')
+    expect(result.current.keys.map((key) => key.name)).toEqual(['recovered'])
+  })
+
+  it('does not let an earlier key list remove a newly generated key', async () => {
+    const initialList = deferred<unknown[]>()
+    const canonicalList = deferred<unknown[]>()
+    const fresh = { id: nextId(), name: 'fresh', type: 'ed25519', private_key: 'mock-private', public_key: 'mock-pub', created_at: new Date().toISOString() }
+    let listCalls = 0
+    __registerHandler('github.com/xuthus5/mssh/internal/service.KeyService.List', async () => {
+      listCalls++
+      return listCalls === 1 ? initialList.promise : canonicalList.promise
+    })
+    __registerHandler('github.com/xuthus5/mssh/internal/service.KeyService.Generate', async () => fresh)
+    const { result } = renderHook(() => useSettings())
+    await act(async () => {})
+    await act(async () => { await result.current.generateKey('fresh', 'ed25519', 256) })
+    expect(result.current.keys.map((key) => key.name)).toEqual(['fresh'])
+    await waitFor(() => expect(listCalls).toBe(2))
+    await act(async () => { canonicalList.resolve([fresh]); await Promise.resolve() })
+    await act(async () => { initialList.resolve([]); await Promise.resolve() })
+    expect(result.current.keys.map((key) => key.name)).toEqual(['fresh'])
+  })
+
+  it('reloads the canonical key list after a mutation invalidates the initial load', async () => {
+    const initialList = deferred<unknown[]>()
+    const createdAt = new Date().toISOString()
+    const existing = { id: 7, name: 'existing', type: 'ed25519', public_key: 'existing-pub', created_at: createdAt }
+    const fresh = { id: 8, name: 'fresh', type: 'ed25519', private_key: 'fresh-private', public_key: 'fresh-pub', created_at: createdAt }
+    let listCalls = 0
+    __registerHandler('github.com/xuthus5/mssh/internal/service.KeyService.List', async () => {
+      listCalls++
+      return listCalls === 1 ? initialList.promise : [existing, fresh]
+    })
+    __registerHandler('github.com/xuthus5/mssh/internal/service.KeyService.Generate', async () => fresh)
+
+    const { result } = renderHook(() => useSettings())
+    await act(async () => {})
+    await act(async () => { await result.current.generateKey('fresh', 'ed25519', 256) })
+
+    await waitFor(() => expect(listCalls).toBe(2))
+    await waitFor(() => expect(result.current.keys.map((key) => key.name)).toEqual(['existing', 'fresh']))
+    await act(async () => { initialList.resolve([existing]); await Promise.resolve() })
+    expect(result.current.keys.map((key) => key.name)).toEqual(['existing', 'fresh'])
+  })
+
   it('deletes a key and removes from state', async () => {
     __registerHandler('github.com/xuthus5/mssh/internal/service.KeyService.Generate', async (name: string, keyType: string, bits: number) => ({
       id: nextId(), name, type: keyType, private_key: 'mock-private', public_key: 'mock-pub', created_at: new Date().toISOString(),
@@ -298,6 +386,69 @@ describe('useSettings', () => {
     expect(importConfig).toHaveBeenCalledWith('/tmp/mssh-import.json')
   })
 
+  it('keeps backup file pickers single-flight across export and import', async () => {
+    const picker = deferred<string>()
+    const saveFile = vi.spyOn(Dialogs, 'SaveFile').mockReturnValueOnce(picker.promise)
+    const openFile = vi.spyOn(Dialogs, 'OpenFile')
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SyncService.Export', async () => {})
+    const { result } = renderHook(() => useSettings())
+
+    let exportPromise!: Promise<void>
+    await act(async () => {
+      exportPromise = result.current.exportConfig()
+      await result.current.importConfig()
+    })
+    expect(saveFile).toHaveBeenCalledOnce()
+    expect(openFile).not.toHaveBeenCalled()
+
+    await act(async () => { picker.resolve('/tmp/single-flight.msshbackup'); await exportPromise })
+  })
+
+  it('drops a backup picker result after hide and accepts a fresh request', async () => {
+    const firstPicker = deferred<string>()
+    const secondPicker = deferred<string>()
+    const saveFile = vi.spyOn(Dialogs, 'SaveFile')
+      .mockReturnValueOnce(firstPicker.promise)
+      .mockReturnValueOnce(secondPicker.promise)
+    const exportConfig = vi.fn(async () => {})
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SyncService.Export', exportConfig)
+    const { result } = renderHook(() => useSettings())
+
+    let firstExport!: Promise<void>
+    act(() => { firstExport = result.current.exportConfig() })
+    await act(async () => { await Events.Emit(SETTINGS_PREVIEW_CANCELLED_EVENT, { data: null }) })
+    await act(async () => { await result.current.exportConfig() })
+    expect(saveFile).toHaveBeenCalledOnce()
+
+    await act(async () => { firstPicker.resolve('/tmp/stale.msshbackup'); await firstExport })
+    expect(exportConfig).not.toHaveBeenCalled()
+    let secondExport!: Promise<void>
+    act(() => { secondExport = result.current.exportConfig() })
+    expect(saveFile).toHaveBeenCalledTimes(2)
+    await act(async () => { secondPicker.resolve('/tmp/current.msshbackup'); await secondExport })
+    expect(exportConfig).toHaveBeenCalledWith('/tmp/current.msshbackup')
+  })
+
+  it('keeps a confirmed backup transfer single-flight while the settings window hides', async () => {
+    const exportRun = deferred<void>()
+    vi.spyOn(Dialogs, 'SaveFile').mockResolvedValue('/tmp/confirmed.msshbackup')
+    const openFile = vi.spyOn(Dialogs, 'OpenFile').mockResolvedValue('')
+    const exportConfig = vi.fn(() => exportRun.promise)
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SyncService.Export', exportConfig)
+    const { result } = renderHook(() => useSettings())
+
+    let exportPromise!: Promise<void>
+    act(() => { exportPromise = result.current.exportConfig() })
+    await waitFor(() => expect(exportConfig).toHaveBeenCalledWith('/tmp/confirmed.msshbackup'))
+    await act(async () => { await Events.Emit(SETTINGS_PREVIEW_CANCELLED_EVENT, { data: null }) })
+    await act(async () => { await result.current.importConfig() })
+    expect(openFile).not.toHaveBeenCalled()
+
+    await act(async () => { exportRun.resolve(undefined); await exportPromise })
+    await act(async () => { await result.current.importConfig() })
+    expect(openFile).toHaveBeenCalledOnce()
+  })
+
   it('handles auxiliary service failures without leaking rejections', async () => {
     __registerHandler('github.com/xuthus5/mssh/internal/service.KeyService.List', async () => { throw new Error('list failed') })
     __registerHandler('github.com/xuthus5/mssh/internal/service.FontService.List', async () => { throw new Error('font failed') })
@@ -345,3 +496,9 @@ describe('useSettings', () => {
     expect(toastSpy).not.toHaveBeenCalledWith(expect.stringContaining('导入本地备份'), 'error')
   })
 })
+
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((resolvePromise) => { resolve = resolvePromise })
+  return { promise, resolve }
+}

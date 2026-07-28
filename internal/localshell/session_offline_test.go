@@ -35,12 +35,14 @@ func (f *fakePTY) Read(p []byte) (int, error) {
 	n := copy(p, item.data)
 	return n, item.err
 }
+
 func (f *fakePTY) Write(p []byte) (int, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.written = append(f.written, p...)
 	return len(p), nil
 }
+
 func (f *fakePTY) Close() error {
 	f.closed = true
 	return nil
@@ -101,6 +103,7 @@ func TestLocalSessionPendingReadAndWriteResizeClose(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		t.Fatal("exit timeout")
 	}
+	assert.True(t, pty.closed)
 	require.NoError(t, session.Close())
 	assert.True(t, pty.closed)
 

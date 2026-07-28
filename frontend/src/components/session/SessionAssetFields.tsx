@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Plus, Tags, X } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input'
 import { LabeledSelect } from '@/components/ui/labeled-select'
 import { Textarea } from '@/components/ui/textarea'
 import type { AssetColorToken, AssetEnvironment, AssetProject, AssetTag } from '@/lib/sessionModels'
-import { ASSET_COLOR_OPTIONS } from '@/lib/assetColors'
+import { getAssetColorOptions } from '@/lib/assetColors'
 import { t } from '@/i18n'
 
 
@@ -56,20 +56,61 @@ function AssetSelect({ label, value, options, onChange, onCreate }: { label: str
   return <div className="flex flex-col gap-1.5"><div className="flex items-center justify-between"><span className="text-xs font-medium text-muted-foreground">{label}</span><Button type="button" size="xs" variant="ghost" onClick={onCreate}><Plus data-icon="inline-start" />{t('新建')}</Button></div><LabeledSelect ariaLabel={label} value={value} options={options} onValueChange={onChange} /></div>
 }
 
+function useLifecycleToken() {
+  const lifecycle = useRef(0)
+  useEffect(() => {
+    const token = ++lifecycle.current
+    return () => { if (lifecycle.current === token) lifecycle.current++ }
+  }, [])
+  return lifecycle
+}
+
 function QuickCreateDialog({ kind, onOpenChange, onCreated, onCreateEnvironment, onCreateProject, onCreateTag }: { kind: 'environment' | 'project' | 'tag' | null; onOpenChange: (open: boolean) => void; onCreated: (id: string) => void; onCreateEnvironment: Props['onCreateEnvironment']; onCreateProject: Props['onCreateProject']; onCreateTag: Props['onCreateTag'] }) {
   const [name, setName] = useState('')
   const [code, setCode] = useState('')
   const [color, setColor] = useState<AssetColorToken>('slate')
   const [pending, setPending] = useState(false)
   const [error, setError] = useState('')
+  const lifecycle = useLifecycleToken()
+  const generation = useRef(0)
+  const requestID = useRef(0)
+  const active = useRef(false)
+  useEffect(() => {
+    generation.current++
+    setPending(active.current)
+    setError('')
+    setName('')
+    setCode('')
+    setColor('slate')
+  }, [kind])
   const create = async () => {
+    if (!kind || active.current) return
+    active.current = true
+    const targetKind = kind
+    const lifecycleToken = lifecycle.current
+    const generationToken = generation.current
+    const request = ++requestID.current
+    const isLatest = () => lifecycle.current === lifecycleToken && requestID.current === request
+    const isCurrent = () => isLatest() && generation.current === generationToken
     setPending(true); setError('')
     try {
-      const created = kind === 'environment' ? await onCreateEnvironment(name, color) : kind === 'project' ? await onCreateProject(name, code) : await onCreateTag(name, color)
-      onCreated(created.id); setName(''); setCode(''); setColor('slate')
-    } catch (reason) { const message = reason instanceof Error ? reason.message : String(reason); setError(message) }
-    finally { setPending(false) }
+      const created = targetKind === 'environment' ? await onCreateEnvironment(name, color) : targetKind === 'project' ? await onCreateProject(name, code) : await onCreateTag(name, color)
+      if (isCurrent()) onCreated(created.id)
+    } catch (reason) {
+      if (isCurrent()) setError(reason instanceof Error ? reason.message : String(reason))
+    } finally {
+      if (requestID.current === request) active.current = false
+      if (isLatest()) setPending(false)
+    }
+  }
+  const handleOpenChange = (open: boolean) => {
+    if (!open && active.current) return
+    if (!open) {
+      generation.current++; requestID.current++; active.current = false
+      setPending(false); setError('')
+    }
+    onOpenChange(open)
   }
   const title = kind === 'environment' ? t('新建环境') : kind === 'project' ? t('新建项目') : t('新建标签')
-  return <Dialog open={kind !== null} onOpenChange={onOpenChange}><DialogContent className="sm:max-w-sm"><DialogHeader><DialogTitle>{title}</DialogTitle></DialogHeader><div className="flex flex-col gap-3">{error && <p role="alert" className="text-xs text-destructive">{error}</p>}<label className="flex flex-col gap-1.5"><span className="text-xs font-medium text-muted-foreground">{t('名称')}</span><Input value={name} maxLength={kind === 'tag' ? 32 : 64} onChange={(event) => setName(event.target.value)} autoFocus /></label>{kind === 'project' ? <label className="flex flex-col gap-1.5"><span className="text-xs font-medium text-muted-foreground">{t('项目代号（可选）')}</span><Input value={code} maxLength={24} onChange={(event) => setCode(event.target.value)} /></label> : <label className="flex flex-col gap-1.5"><span className="text-xs font-medium text-muted-foreground">{t('颜色')}</span><LabeledSelect value={color} options={ASSET_COLOR_OPTIONS} onValueChange={(value) => setColor(value as AssetColorToken)} /></label>}</div><DialogFooter><Button type="button" disabled={pending || !name.trim()} onClick={() => { void create() }}>{pending ? t('创建中…') : t('创建')}</Button></DialogFooter></DialogContent></Dialog>
+  return <Dialog open={kind !== null} onOpenChange={handleOpenChange}><DialogContent showCloseButton={!pending} className="sm:max-w-sm"><DialogHeader><DialogTitle>{title}</DialogTitle></DialogHeader><div className="flex flex-col gap-3">{error && <p role="alert" className="text-xs text-destructive">{error}</p>}<label className="flex flex-col gap-1.5"><span className="text-xs font-medium text-muted-foreground">{t('名称')}</span><Input disabled={pending} value={name} maxLength={kind === 'tag' ? 32 : 64} onChange={(event) => setName(event.target.value)} autoFocus /></label>{kind === 'project' ? <label className="flex flex-col gap-1.5"><span className="text-xs font-medium text-muted-foreground">{t('项目代号（可选）')}</span><Input disabled={pending} value={code} maxLength={24} onChange={(event) => setCode(event.target.value)} /></label> : <label className="flex flex-col gap-1.5"><span className="text-xs font-medium text-muted-foreground">{t('颜色')}</span><LabeledSelect disabled={pending} value={color} options={getAssetColorOptions()} onValueChange={(value) => setColor(value as AssetColorToken)} /></label>}</div><DialogFooter><Button type="button" variant="outline" disabled={pending} onClick={() => handleOpenChange(false)}>{t('取消')}</Button><Button type="button" disabled={pending || !name.trim()} onClick={() => { void create() }}>{pending ? t('创建中…') : t('创建')}</Button></DialogFooter></DialogContent></Dialog>
 }

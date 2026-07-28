@@ -6,7 +6,7 @@ import { isHexColor, safeHexColor } from '@/components/settings/terminalThemeVal
 import { t } from '@/i18n'
 
 
-const ANSI_NAMES = [t('黑色'), t('红色'), t('绿色'), t('黄色'), t('蓝色'), t('洋红'), t('青色'), t('白色'), t('亮黑'), t('亮红'), t('亮绿'), t('亮黄'), t('亮蓝'), t('亮洋红'), t('亮青'), t('亮白')]
+const ANSI_NAME_KEYS = ['黑色', '红色', '绿色', '黄色', '蓝色', '洋红', '青色', '白色', '亮黑', '亮红', '亮绿', '亮黄', '亮蓝', '亮洋红', '亮青', '亮白']
 
 interface Props {
   colors: string[]
@@ -23,7 +23,8 @@ function nextAnsiIndex(key: string, index: number, total: number): number | unde
 
 export function AnsiPaletteEditor({ colors, onChange }: Props) {
   const [selectedIndex, setSelectedIndex] = useState(0)
-  const selectedName = ANSI_NAMES[selectedIndex]
+  const names = ANSI_NAME_KEYS.map((name) => t(name))
+  const selectedName = names[selectedIndex]
   const selectedColor = colors[selectedIndex] ?? '#000000'
   const valid = isHexColor(selectedColor)
   const selectWithKeyboard = (event: React.KeyboardEvent<HTMLButtonElement>, index: number) => {
@@ -41,7 +42,7 @@ export function AnsiPaletteEditor({ colors, onChange }: Props) {
         {colors.map((color, index) => <button
           key={index}
           type="button"
-          aria-label={`ANSI ${index} ${ANSI_NAMES[index]}`}
+          aria-label={`ANSI ${index} ${names[index]}`}
           role="radio"
           aria-checked={selectedIndex === index}
           tabIndex={selectedIndex === index ? 0 : -1}

@@ -187,13 +187,7 @@ export function DynamicTabOverflowMenu() {
   return <TabListMenu tabs={tabs} activeID={activeSurface?.id ?? null} onActivate={activateWithFocus} />
 }
 
-export function DynamicTabStrip({ onOverflowChange }: { onOverflowChange?: (overflow: boolean) => void }) {
-  const { connect } = useSessionWorkspace()
-  const tabs = useAppStore((state) => state.tabs)
-  const activeSurface = useAppStore((state) => state.activeSurface)
-  const activateTab = useAppStore((state) => state.activateTab)
-  const connectionStatus = useAppStore((state) => state.connectionStatus)
-  const navigation = useTabNavigation(tabs, activeSurface?.id ?? null, activateTab)
+function useTabStripScroll(tabs: Tab[], onOverflowChange?: (overflow: boolean) => void) {
   const [overflow, setOverflow] = useState(false)
   const [canScrollLeft, setCanScrollLeft] = useState(false)
   const [canScrollRight, setCanScrollRight] = useState(false)
@@ -202,10 +196,6 @@ export function DynamicTabStrip({ onOverflowChange }: { onOverflowChange?: (over
     onOverflowChange?.(value)
   }, [onOverflowChange])
   const tabListRef = useTabOverflow(tabs, handleOverflow)
-  const activateWithFocus = useCallback((tabID: string) => activateTab(tabID, true), [activateTab])
-  const duplicateTerminal = useCallback((sessionID: number) => { void connect(String(sessionID)) }, [connect])
-  const closeCoordinator = useTabCloseCoordinator()
-  const quickConnectAfter = lastTerminalTabIndex(tabs)
   const syncScrollAffordances = useCallback(() => {
     const node = tabListRef.current
     if (!node) return
@@ -222,24 +212,38 @@ export function DynamicTabStrip({ onOverflowChange }: { onOverflowChange?: (over
   const scrollByTabs = (direction: -1 | 1) => {
     tabListRef.current?.scrollBy({ left: direction * 160, behavior: 'smooth' })
   }
+  return { overflow, canScrollLeft, canScrollRight, tabListRef, syncScrollAffordances, scrollByTabs }
+}
 
+export function DynamicTabStrip({ onOverflowChange }: { onOverflowChange?: (overflow: boolean) => void }) {
+  const { connect } = useSessionWorkspace()
+  const tabs = useAppStore((state) => state.tabs)
+  const activeSurface = useAppStore((state) => state.activeSurface)
+  const activateTab = useAppStore((state) => state.activateTab)
+  const connectionStatus = useAppStore((state) => state.connectionStatus)
+  const navigation = useTabNavigation(tabs, activeSurface?.id ?? null, activateTab)
+  const scroll = useTabStripScroll(tabs, onOverflowChange)
+  const activateWithFocus = useCallback((tabID: string) => activateTab(tabID, true), [activateTab])
+  const duplicateTerminal = useCallback((sessionID: number) => { void connect(String(sessionID)) }, [connect])
+  const closeCoordinator = useTabCloseCoordinator()
+  const quickConnectAfter = lastTerminalTabIndex(tabs)
   if (tabs.length === 0) return null
 
   return (
     <div className="flex min-w-0 shrink overflow-hidden [--wails-draggable:no-drag]">
-      {overflow ? (
-        <Button type="button" variant="ghost" size="icon-sm" aria-label={t('向左滚动标签')} className="h-9 w-7 shrink-0 rounded-none" disabled={!canScrollLeft} onClick={() => scrollByTabs(-1)}>‹</Button>
+      {scroll.overflow ? (
+        <Button type="button" variant="ghost" size="icon-sm" aria-label={t('向左滚动标签')} className="h-9 w-7 shrink-0 rounded-none" disabled={!scroll.canScrollLeft} onClick={() => scroll.scrollByTabs(-1)}>‹</Button>
       ) : null}
-      <div className={`relative min-w-0 ${overflow ? 'flex-1' : ''} ${canScrollLeft ? 'shadow-[inset_12px_0_8px_-12px_rgba(0,0,0,0.45)]' : ''} ${canScrollRight ? 'shadow-[inset_-12px_0_8px_-12px_rgba(0,0,0,0.45)]' : ''}`}>
-        <div ref={tabListRef} role="tablist" aria-label={t('动态标签')} className="mssh-tab-strip-scroll flex h-9 min-w-0 items-end gap-1 overflow-x-auto overflow-y-hidden" onWheel={scrollTabsWithWheel} onScroll={syncScrollAffordances}>
+      <div className={`relative min-w-0 ${scroll.overflow ? 'flex-1' : ''} ${scroll.canScrollLeft ? 'shadow-[inset_12px_0_8px_-12px_rgba(0,0,0,0.45)]' : ''} ${scroll.canScrollRight ? 'shadow-[inset_-12px_0_8px_-12px_rgba(0,0,0,0.45)]' : ''}`}>
+        <div ref={scroll.tabListRef} role="tablist" aria-label={t('动态标签')} className="mssh-tab-strip-scroll flex h-9 min-w-0 items-end gap-1 overflow-x-auto overflow-y-hidden" onWheel={scrollTabsWithWheel} onScroll={scroll.syncScrollAffordances}>
           {tabs.map((tab, index) => <Fragment key={tab.id}>
             <DynamicTab tab={tab} active={activeSurface?.id === tab.id} connectionStatus={connectionStatus} navigation={navigation} onActivate={activateWithFocus} onClose={closeCoordinator.requestClose} onDuplicate={duplicateTerminal} />
             {index === quickConnectAfter && <QuickConnectButton />}
           </Fragment>)}
         </div>
       </div>
-      {overflow ? (
-        <Button type="button" variant="ghost" size="icon-sm" aria-label={t('向右滚动标签')} className="h-9 w-7 shrink-0 rounded-none" disabled={!canScrollRight} onClick={() => scrollByTabs(1)}>›</Button>
+      {scroll.overflow ? (
+        <Button type="button" variant="ghost" size="icon-sm" aria-label={t('向右滚动标签')} className="h-9 w-7 shrink-0 rounded-none" disabled={!scroll.canScrollRight} onClick={() => scroll.scrollByTabs(1)}>›</Button>
       ) : null}
       <TabCloseConfirmation {...closeCoordinator.confirmation} />
     </div>

@@ -34,18 +34,41 @@ func updateTransferProgressOnce(db *sql.DB, id string, transferred, total, speed
 func FinishTransferJob(db *sql.DB, id, status, errorMessage string) error {
 	return withBusyRetry(func() error {
 		completedAt := time.Now().UTC().Format(time.RFC3339Nano)
-		// Preserve session-delete cancel reasons when the transfer goroutine finishes with an empty message.
-		if status == "cancelled" && errorMessage == "" {
-			_, err := db.Exec(`UPDATE transfer_jobs SET status=?, completed_at=? WHERE id=? AND status IN ('queued','running','cancelled')`, status, completedAt, id)
-			if err != nil {
-				return fmt.Errorf("finish transfer job: %w", err)
-			}
-			return nil
+		if status == "cancelled" {
+			return finishCancelledTransferJob(db, id, errorMessage, completedAt)
 		}
 		// Do not regress an already terminal cancelled/completed row (e.g. session delete race).
 		_, err := db.Exec(`UPDATE transfer_jobs SET status=?, error=?, completed_at=? WHERE id=? AND status IN ('queued','running')`, status, errorMessage, completedAt, id)
 		if err != nil {
 			return fmt.Errorf("finish transfer job: %w", err)
+		}
+		return nil
+	})
+}
+
+func finishCancelledTransferJob(db *sql.DB, id, errorMessage, completedAt string) error {
+	_, err := db.Exec(`UPDATE transfer_jobs SET status='cancelled', error=CASE
+		WHEN ?='' THEN error
+		WHEN error='' THEN ?
+		WHEN instr(error, ?)>0 THEN error
+		ELSE error || char(10) || ? END, completed_at=?
+		WHERE id=? AND status IN ('queued','running','cancelled')`,
+		errorMessage, errorMessage, errorMessage, errorMessage, completedAt, id)
+	if err != nil {
+		return fmt.Errorf("finish cancelled transfer job: %w", err)
+	}
+	return nil
+}
+
+func FinishTransferJobWithProgress(db *sql.DB, job model.TransferJob) error {
+	return withBusyRetry(func() error {
+		completedAt := time.Now().UTC()
+		if job.CompletedAt != nil {
+			completedAt = job.CompletedAt.UTC()
+		}
+		_, err := db.Exec(`UPDATE transfer_jobs SET status=?, error=?, transferred_bytes=?, total_bytes=?, speed=0, eta=0, completed_at=? WHERE id=? AND status IN ('queued','running')`, job.Status, job.Error, job.TransferredBytes, job.TotalBytes, completedAt.Format(time.RFC3339Nano), job.ID)
+		if err != nil {
+			return fmt.Errorf("finish transfer job with progress: %w", err)
 		}
 		return nil
 	})

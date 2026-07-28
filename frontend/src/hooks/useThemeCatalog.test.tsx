@@ -6,6 +6,7 @@ import { changeColorMode, useThemeCatalog, useThemeCatalogStore } from '@/hooks/
 import { useAppStore } from '@/store/appStore'
 import { CursorStyle } from '../../bindings/github.com/xuthus5/mssh/internal/model/models'
 import { COLOR_MODE_CHANGED_EVENT, THEME_CATALOG_CHANGED_EVENT } from '@/lib/settingsWindowEvents'
+import { syncDataChangedEvent } from '@/lib/syncDataReload'
 
 const darkProfile = profile(1, 'dark', '#000000')
 const lightProfile = profile(2, 'light', '#ffffff')
@@ -91,6 +92,25 @@ describe('useThemeCatalog', () => {
     } }))
     expect(useThemeCatalogStore.getState().profiles[0].id).toBe(4)
     expect(useAppStore.getState().terminalTheme.background).toBe('#224466')
+  })
+
+  it('force reloads the theme catalog after synchronized data changes', async () => {
+    renderHook(() => useThemeCatalog())
+    await waitFor(() => expect(useThemeCatalogStore.getState().loaded).toBe(true))
+    const synchronized = profile(7, 'dark', '#335577')
+    __registerHandler('github.com/xuthus5/mssh/internal/service.ThemeService.ListDefinitions', async () => [synchronized.definition])
+    __registerHandler('github.com/xuthus5/mssh/internal/service.ThemeService.ListProfiles', async () => [synchronized])
+    __registerHandler('github.com/xuthus5/mssh/internal/service.ThemeService.GetAssignments', async () => ({
+      dark_profile_id: 7,
+      light_profile_id: 7,
+      follow_interface_mode: true,
+      fixed_profile_id: 0,
+    }))
+
+    act(() => __emitEvent(syncDataChangedEvent, { data: { changed: true } }))
+
+    await waitFor(() => expect(useThemeCatalogStore.getState().profiles[0]?.id).toBe(7))
+    expect(useAppStore.getState().terminalTheme.background).toBe('#335577')
   })
 
   it('synchronizes colour mode and effective terminal theme across windows', async () => {
@@ -243,6 +263,58 @@ describe('useThemeCatalog', () => {
     expect(messages.some((message) => message.includes('reload boom'))).toBe(false)
   })
 
+  it('does not let an older reload overwrite a newer window snapshot', async () => {
+    const { result } = renderHook(() => useThemeCatalog())
+    await waitFor(() => expect(result.current.loaded).toBe(true))
+    const staleProfiles = deferred<typeof darkProfile[]>()
+    __registerHandler('github.com/xuthus5/mssh/internal/service.ThemeService.ListProfiles', async () => staleProfiles.promise)
+    let reload!: Promise<boolean>
+    act(() => { reload = result.current.reload({ force: true }) })
+    const synchronized = profile(9, 'dark', '#909090')
+    act(() => __emitEvent(THEME_CATALOG_CHANGED_EVENT, { data: {
+      definitions: [synchronized.definition], profiles: [synchronized],
+      assignments: { dark_profile_id: 9, light_profile_id: 9, follow_interface_mode: true, fixed_profile_id: 0 },
+      globalStyle,
+    } }))
+    await act(async () => { staleProfiles.resolve([darkProfile]); await reload })
+    expect(useThemeCatalogStore.getState().profiles[0].id).toBe(9)
+  })
+
+  it('keeps the newest optimistic color mode after an older save fails', async () => {
+    const { result } = renderHook(() => useThemeCatalog())
+    await waitFor(() => expect(result.current.loaded).toBe(true))
+    const first = deferred<void>()
+    const second = deferred<void>()
+    let call = 0
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.Set', async () => {
+      call += 1
+      return (call === 1 ? first : second).promise
+    })
+    let firstChange!: Promise<void>
+    let secondChange!: Promise<void>
+    act(() => {
+      firstChange = changeColorMode('light')
+      secondChange = changeColorMode('light')
+    })
+    await act(async () => { first.reject(new Error('old save failed')); await firstChange })
+    expect(useThemeCatalogStore.getState().colorMode).toBe('light')
+    second.resolve()
+    await act(async () => { await secondChange })
+  })
+
+  it('keeps the last valid snapshot when a silent mutation refresh fails', async () => {
+    const { result } = renderHook(() => useThemeCatalog())
+    await waitFor(() => expect(result.current.loaded).toBe(true))
+    const before = useThemeCatalogStore.getState().profiles
+    __registerHandler('github.com/xuthus5/mssh/internal/service.ThemeService.SaveConfiguration', async () => {})
+    __registerHandler('github.com/xuthus5/mssh/internal/service.ThemeService.ListProfiles', async () => { throw new Error('refresh unavailable') })
+    await act(async () => {
+      await result.current.saveConfiguration({ global_style: globalStyle, profiles: [], assignments: before } as never)
+    })
+    expect(useThemeCatalogStore.getState().loaded).toBe(true)
+    expect(useThemeCatalogStore.getState().profiles).toEqual(before)
+  })
+
 
   it('load failure sets error without toast', async () => {
     useToastStore.setState({ toasts: [] })
@@ -256,6 +328,13 @@ describe('useThemeCatalog', () => {
   })
 
 })
+
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  let reject!: (error: unknown) => void
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => { resolve = resolvePromise; reject = rejectPromise })
+  return { promise, resolve, reject }
+}
 
 function registerCatalogHandlers(
   mode: 'dark' | 'light',

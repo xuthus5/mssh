@@ -1,7 +1,8 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { cancelTransfer, retryTransfer, startDownload, startUpload } from '@/lib/transferActions'
 import { useAppStore, type TransferJob } from '@/store/appStore'
-import { __clearHandlers, __registerHandler } from '@/test/__mocks__/wails-runtime'
+import { startEventBridge } from '@/store/eventBridge'
+import { __clearHandlers, __emitEvent, __registerHandler } from '@/test/__mocks__/wails-runtime'
 
 describe('transferActions', () => {
   beforeEach(() => {
@@ -44,6 +45,44 @@ describe('transferActions', () => {
 
     expect(cancelled).toBe('running-1')
     expect(useAppStore.getState().transfers).toHaveLength(1)
+  })
+
+  it.each([
+    ['completed', 'file:complete', { status: 'completed', transferred: 10, total: 10 }],
+    ['failed', 'file:error', { error: 'remote denied' }],
+  ] as const)('keeps an early %s event emitted before the start call returns', async (status, eventName, payload) => {
+    const listTransfers = vi.fn(async () => [])
+    __registerHandler('github.com/xuthus5/mssh/internal/service.FileService.ListTransfers', listTransfers)
+    const stopBridge = startEventBridge()
+    await vi.waitFor(() => expect(listTransfers).toHaveBeenCalled())
+    __registerHandler('github.com/xuthus5/mssh/internal/service.FileService.Upload', async () => {
+      __emitEvent(eventName, { data: { task_id: 'fast-upload', ...payload } })
+      return 'fast-upload'
+    })
+
+    await startUpload({ sessionId: 7, sessionName: '生产服务器', sourcePath: '/tmp/fast.txt', targetPath: '/srv/fast.txt' })
+
+    const expected = status === 'failed'
+      ? { id: 'fast-upload', status, error: 'remote denied' }
+      : { id: 'fast-upload', status }
+    expect(useAppStore.getState().transfers).toEqual([expect.objectContaining(expected)])
+    stopBridge()
+  })
+
+  it('keeps a newly started transfer when an older restore resolves later', async () => {
+    let resolveRestore: (jobs: unknown[]) => void = () => {}
+    const restore = new Promise<unknown[]>((resolve) => { resolveRestore = resolve })
+    __registerHandler('github.com/xuthus5/mssh/internal/service.FileService.ListTransfers', async () => restore)
+    __registerHandler('github.com/xuthus5/mssh/internal/service.FileService.Upload', async () => 'new-upload')
+    const stopBridge = startEventBridge()
+
+    await startUpload({ sessionId: 7, sessionName: '生产服务器', sourcePath: '/tmp/new.txt', targetPath: '/srv/new.txt' })
+    resolveRestore([])
+
+    await vi.waitFor(() => expect(useAppStore.getState().transfers).toEqual([
+      expect.objectContaining({ id: 'new-upload', status: 'queued' }),
+    ]))
+    stopBridge()
   })
 
   it('refuses retry for session-deleted transfers', async () => {

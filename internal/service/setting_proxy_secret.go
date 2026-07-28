@@ -10,12 +10,11 @@ import (
 
 const (
 	applicationProxyPasswordSavedSetting = "application.proxy_password_saved"
-	proxyPasswordClearSentinel           = "__clear_proxy_password__"
 	proxyPasswordEncPrefix               = "enc1:"
 )
 
 // prepareProxyPasswordWrites rewrites proxy password entries for secure persistence.
-// Empty password values are dropped (keep existing secret). The clear sentinel writes an empty secret.
+// Empty password values are dropped (keep existing secret). JSON null writes an empty secret.
 func (s *SettingService) prepareProxyPasswordWrites(entries []model.Setting) ([]model.Setting, error) {
 	out := make([]model.Setting, 0, len(entries)+1)
 	for _, entry := range entries {
@@ -33,18 +32,28 @@ func (s *SettingService) prepareProxyPasswordWrites(entries []model.Setting) ([]
 }
 
 func (s *SettingService) rewriteProxyPasswordEntry(entry model.Setting) ([]model.Setting, error) {
-	value, err := decodeSettingString(entry.Value)
+	if entry.ValueType == "null" {
+		if strings.TrimSpace(entry.Value) != "null" {
+			return nil, fmt.Errorf("invalid proxy password clear value")
+		}
+		return s.clearProxyPasswordSettings()
+	}
+	value, err := decodeExactSettingString(entry.Value)
 	if err != nil {
 		return nil, err
 	}
-	value = strings.TrimSpace(value)
 	if value == "" {
 		return nil, nil
 	}
-	if value == proxyPasswordClearSentinel {
-		return s.clearProxyPasswordSettings()
-	}
 	return s.encryptedProxyPasswordSettings(entry, value)
+}
+
+func decodeExactSettingString(raw string) (string, error) {
+	var value string
+	if err := json.Unmarshal([]byte(raw), &value); err != nil {
+		return "", fmt.Errorf("decode exact string setting: %w", err)
+	}
+	return value, nil
 }
 
 func (s *SettingService) clearProxyPasswordSettings() ([]model.Setting, error) {
@@ -104,16 +113,19 @@ func (s *SettingService) decryptProxyPassword(raw string) (string, error) {
 	return plaintext, nil
 }
 
-func (s *SettingService) loadProxyPassword() (string, bool) {
-	raw, ok := s.readProxyString(applicationProxyPasswordSetting)
+func (s *SettingService) loadProxyPassword() (string, bool, error) {
+	raw, ok, err := s.readProxyString(applicationProxyPasswordSetting)
+	if err != nil {
+		return "", false, err
+	}
 	if !ok || raw == "" {
-		return "", false
+		return "", false, nil
 	}
 	password, err := s.decryptProxyPassword(raw)
 	if err != nil {
-		return "", true
+		return "", false, err
 	}
-	return password, true
+	return password, true, nil
 }
 
 func redactProxyPasswordSetting(setting *model.Setting) {

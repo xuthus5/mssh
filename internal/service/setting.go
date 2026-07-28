@@ -4,19 +4,27 @@ import (
 	"database/sql"
 	"log/slog"
 	"reflect"
+	"sync"
 
 	"github.com/xuthus5/mssh/internal/model"
 	"github.com/xuthus5/mssh/internal/store"
 )
 
 type SettingService struct {
-	db     *sql.DB
-	log    LogConfigurer
-	proxy  ProxyConfigurer
-	crypto KeyCrypto
+	db        *sql.DB
+	mu        sync.Mutex
+	log       LogConfigurer
+	proxy     ProxyConfigurer
+	crypto    KeyCrypto
+	lifecycle serviceOperationGate
 }
 
 func (s *SettingService) Get(key string) (*model.Setting, error) {
+	finish, err := s.beginOperation()
+	if err != nil {
+		return nil, err
+	}
+	defer finish()
 	if err := rejectBlockedSettingKey(key); err != nil {
 		return nil, err
 	}
@@ -29,6 +37,14 @@ func (s *SettingService) Get(key string) (*model.Setting, error) {
 }
 
 func (s *SettingService) GetMany(keys []string) (map[string]model.Setting, error) {
+	finish, err := s.beginOperation()
+	if err != nil {
+		return nil, err
+	}
+	defer finish()
+	if err := store.ValidateSettingKeys(keys); err != nil {
+		return nil, err
+	}
 	for _, key := range keys {
 		if err := rejectBlockedSettingKey(key); err != nil {
 			return nil, err
@@ -44,6 +60,14 @@ func (s *SettingService) GetMany(keys []string) (map[string]model.Setting, error
 }
 
 func (s *SettingService) List(namespace string) ([]model.Setting, error) {
+	finish, err := s.beginOperation()
+	if err != nil {
+		return nil, err
+	}
+	defer finish()
+	if err := store.ValidateSettingNamespace(namespace); err != nil {
+		return nil, err
+	}
 	settings, err := store.ListSettings(s.db, namespace)
 	if err != nil {
 		return nil, err
@@ -61,24 +85,42 @@ func (s *SettingService) List(namespace string) ([]model.Setting, error) {
 }
 
 func (s *SettingService) Set(setting model.SettingInput) error {
-	entry := setting.Setting()
-	if err := rejectBlockedSettingKey(entry.Key); err != nil {
-		return err
-	}
-	entries, err := s.prepareProxyPasswordWrites([]model.Setting{entry})
+	finish, err := s.beginOperation()
 	if err != nil {
 		return err
 	}
-	if err := s.validateRuntimeSettings(entries); err != nil {
+	defer finish()
+	entries, err := settingEntriesFromInputs([]model.SettingInput{setting})
+	if err != nil {
 		return err
 	}
-	return s.persistAndApply(entries)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return withCryptoOperation(s.crypto, func() error {
+		return s.setEntries(entries)
+	})
 }
 
 func (s *SettingService) SetMany(settings []model.SettingInput) error {
-	entries := make([]model.Setting, len(settings))
-	for index, setting := range settings {
-		entries[index] = setting.Setting()
+	finish, err := s.beginOperation()
+	if err != nil {
+		return err
+	}
+	defer finish()
+	entries, err := settingEntriesFromInputs(settings)
+	if err != nil {
+		return err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return withCryptoOperation(s.crypto, func() error {
+		return s.setEntries(entries)
+	})
+}
+
+func (s *SettingService) setEntries(entries []model.Setting) error {
+	if err := store.ValidateSettings(entries); err != nil {
+		return err
 	}
 	if err := rejectBlockedSettings(entries); err != nil {
 		return err
@@ -87,17 +129,43 @@ func (s *SettingService) SetMany(settings []model.SettingInput) error {
 	if err != nil {
 		return err
 	}
+	if err := store.ValidateSettings(entries); err != nil {
+		return err
+	}
 	if err := s.validateRuntimeSettings(entries); err != nil {
 		return err
 	}
 	return s.persistAndApply(entries)
 }
 
+func settingEntriesFromInputs(inputs []model.SettingInput) ([]model.Setting, error) {
+	if err := store.ValidateSettingBatchSize(len(inputs)); err != nil {
+		return nil, err
+	}
+	entries := make([]model.Setting, len(inputs))
+	for index, input := range inputs {
+		entries[index] = input.Setting()
+	}
+	if err := store.ValidateSettings(entries); err != nil {
+		return nil, err
+	}
+	return entries, nil
+}
+
 func (s *SettingService) Delete(key string) error {
-	if err := rejectBlockedSettingKey(key); err != nil {
+	finish, err := s.beginOperation()
+	if err != nil {
 		return err
 	}
-	return store.DeleteSetting(s.db, key)
+	defer finish()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return withCryptoOperation(s.crypto, func() error {
+		if err := rejectBlockedSettingKey(key); err != nil {
+			return err
+		}
+		return store.DeleteSetting(s.db, key)
+	})
 }
 
 type SettingServiceOptions struct {

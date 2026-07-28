@@ -40,4 +40,15 @@ describe('TerminalOutputSequencer', () => {
     expect(() => sequencer.push(0, new Uint8Array([0x30]))).toThrow('invalid terminal output sequence: 0')
     expect(() => sequencer.push(Number.MAX_SAFE_INTEGER + 1, new Uint8Array([0x31]))).toThrow('invalid terminal output sequence')
   })
+
+  it('can recover from an exhausted gap without blocking later output', () => {
+    const write = vi.fn()
+    const sequencer = new TerminalOutputSequencer(write, { maxPendingChunks: 1 })
+
+    sequencer.push(3, new Uint8Array([0x33]))
+    sequencer.reset(3)
+    sequencer.push(3, new Uint8Array([0x33]))
+
+    expect(write.mock.calls.map(([data]) => Array.from(data))).toEqual([[0x33]])
+  })
 })

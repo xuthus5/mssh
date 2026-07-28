@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { SessionAssetFields } from '@/components/session/SessionAssetFields'
@@ -41,5 +41,24 @@ describe('SessionAssetFields', () => {
     await userEvent.click(screen.getByRole('button', { name: '创建' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('名称重复')
     expect(screen.getByRole('dialog')).toBeInTheDocument()
+  })
+
+  it('locks quick create until the active request completes', async () => {
+    let resolveCreate: ((item: { id: string; name: string; colorToken: 'slate'; sortOrder: number; sessionCount: number }) => void) | undefined
+    const values = props()
+    values.onCreateEnvironment = vi.fn(() => new Promise((resolve) => { resolveCreate = resolve }))
+    render(<SessionAssetFields {...values} />)
+    await userEvent.click(screen.getAllByRole('button', { name: /新建/ })[0])
+    await userEvent.type(screen.getByRole('textbox', { name: '名称' }), '生产')
+    await userEvent.click(screen.getByRole('button', { name: '创建' }))
+    await userEvent.keyboard('{Escape}')
+    expect(screen.getByRole('heading', { name: '新建环境' })).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: '名称' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: '创建中…' })).toBeDisabled()
+
+    await act(async () => { resolveCreate?.({ id: 'old-env', name: '生产', colorToken: 'slate', sortOrder: 0, sessionCount: 0 }) })
+
+    expect(values.onEnvironmentChange).toHaveBeenCalledWith('old-env')
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 })

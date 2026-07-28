@@ -1,7 +1,4 @@
-import { createPortal } from 'react-dom'
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
-import { TerminalEmulator } from '@/components/terminal/TerminalEmulator'
-import { SplitTreeView } from '@/components/terminal/TerminalSplitLayout'
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type MutableRefObject } from 'react'
 import type { TerminalFocusRequest } from '@/hooks/useTerminal'
 import { useAppStore } from '@/store/appStore'
 import {
@@ -19,12 +16,9 @@ import {
   ensurePaneHost,
   persistTabSplitLayout,
 } from '@/components/terminal/splitPersistence'
-import { t } from '@/i18n'
 import { useSplitLayoutRestore } from '@/components/terminal/useSplitLayoutRestore'
 import {
-  RECONNECT_SPLIT_PANE_EVENT,
   TERMINAL_CLOSED_SPLIT_PANE_EVENT,
-  type ReconnectSplitPaneDetail,
   type TerminalClosedSplitPaneDetail,
 } from '@/hooks/sessionReconnect'
 import {
@@ -33,8 +27,8 @@ import {
   reconnectSplitPane,
   splitPane,
 } from '@/components/terminal/terminalSplitActions'
-
-const noFocusRequest: TerminalFocusRequest = { sequence: 0, targetTerminalID: null }
+import { useSplitAutoReconnect } from '@/components/terminal/useSplitAutoReconnect'
+import { TerminalSplitView } from '@/components/terminal/TerminalSplitView'
 
 export interface TerminalSplitHandle {
   split: (direction: SplitDirection) => void
@@ -54,69 +48,81 @@ interface Props {
   onCloseTerminal?: () => void
 }
 
-export const TerminalSplit = forwardRef<TerminalSplitHandle, Props>(function TerminalSplit({
-  tabID, primaryID, sessionId, connectionKind, serialPortId, active, focusRequest, onStateChange, onPaneClosed, onPaneReplaced, onCloseTerminal,
-}, ref) {
-  const [tree, setTree] = useState<SplitNode>(() => splitLeaf(primaryID))
+function useSplitModel(props: Props) {
+  const [tree, setTree] = useState<SplitNode>(() => splitLeaf(props.primaryID))
   const [busy, setBusy] = useState(false)
   const [closingID, setClosingID] = useState<string | null>(null)
   const [actionError, setActionError] = useState('')
   const treeRef = useRef(tree)
   const mountedRef = useRef(true)
-  const primaryRef = useRef(primaryID)
+  const primaryRef = useRef(props.primaryID)
   const operationRef = useRef(false)
   const hostsRef = useRef(new Map<string, HTMLDivElement>())
   const stagingRef = useRef<HTMLDivElement | null>(null)
   const activePaneID = useAppStore((state) => state.activePaneId)
   treeRef.current = tree
-  primaryRef.current = primaryID
+  primaryRef.current = props.primaryID
   const leaves = useMemo(() => collectLeaves(tree), [tree])
   const paneCount = leaves.length
-  const requestFocus = (terminalID: string) => useAppStore.getState().requestTerminalFocus(tabID, terminalID)
-  const lastUsed = (terminalID: string) => useAppStore.getState().terminalPool.get(terminalID)?.lastUsed ?? 0
+  const requestFocus = useCallback((terminalID: string) => {
+    useAppStore.getState().requestTerminalFocus(props.tabID, terminalID)
+  }, [props.tabID])
+  const lastUsed = useCallback((terminalID: string) => (
+    useAppStore.getState().terminalPool.get(terminalID)?.lastUsed ?? 0
+  ), [])
   const { layoutReady, restoreError, retryRestore } = useSplitLayoutRestore({
-    tabID, sessionId, connectionKind, serialPortId, primaryID,
+    tabID: props.tabID, sessionId: props.sessionId, connectionKind: props.connectionKind,
+    serialPortId: props.serialPortId, primaryID: props.primaryID,
     operationRef, mountedRef, setTree, setBusy, requestFocus,
   })
-  const actionCtx = {
-    tabID, primaryID, sessionId, connectionKind, serialPortId, activePaneID,
-    treeRef, primaryRef, operationRef, mountedRef, setTree, setBusy, setClosingID, setActionError,
-    requestFocus, lastUsed, onPaneClosed, onPaneReplaced,
+  return {
+    tree, setTree, busy, setBusy, closingID, setClosingID, actionError, setActionError,
+    treeRef, mountedRef, primaryRef, operationRef, hostsRef, stagingRef, activePaneID,
+    leaves, paneCount, requestFocus, lastUsed, layoutReady, restoreError, retryRestore,
   }
+}
 
-  useEffect(() => { onStateChange?.({ paneCount, busy }) }, [busy, onStateChange, paneCount])
+type SplitModel = ReturnType<typeof useSplitModel>
 
+function createSplitActionContext(props: Props, model: SplitModel) {
+  return {
+    tabID: props.tabID, primaryID: props.primaryID, sessionId: props.sessionId,
+    connectionKind: props.connectionKind, serialPortId: props.serialPortId, activePaneID: model.activePaneID,
+    treeRef: model.treeRef, primaryRef: model.primaryRef, operationRef: model.operationRef,
+    mountedRef: model.mountedRef, setTree: model.setTree, setBusy: model.setBusy,
+    setClosingID: model.setClosingID, setActionError: model.setActionError,
+    requestFocus: model.requestFocus, lastUsed: model.lastUsed,
+    onPaneClosed: props.onPaneClosed, onPaneReplaced: props.onPaneReplaced,
+  }
+}
+
+function useSplitStateReport(props: Props, model: SplitModel) {
+  useEffect(() => { props.onStateChange?.({ paneCount: model.paneCount, busy: model.busy }) }, [model.busy, model.paneCount, props.onStateChange])
+}
+
+function useSplitPersistence(props: Props, model: SplitModel) {
   useEffect(() => {
     // Keep the saved multi-pane snapshot until restore succeeds; otherwise retry is impossible.
-    if (!layoutReady || restoreError) return
-    persistTabSplitLayout(tabID, tree, primaryID, connectionKind)
-  }, [tabID, tree, primaryID, connectionKind, layoutReady, restoreError])
+    if (!model.layoutReady || model.restoreError) return
+    persistTabSplitLayout(props.tabID, model.tree, props.primaryID, props.connectionKind)
+  }, [model.layoutReady, model.restoreError, model.tree, props.connectionKind, props.primaryID, props.tabID])
+}
 
-  const reconnectPaneRef = useRef<(terminalID: string) => Promise<void>>(async () => {})
-  const closedPaneRef = useRef<(terminalID: string) => void>(() => {})
-
-  useEffect(() => {
-    const onReconnectSplit = (event: Event) => {
-      const detail = (event as CustomEvent<ReconnectSplitPaneDetail>).detail
-      if (!detail || detail.tabID !== tabID) return
-      if (!hasTerminal(treeRef.current, detail.terminalID)) return
-      void reconnectPaneRef.current(detail.terminalID)
-    }
-    window.addEventListener(RECONNECT_SPLIT_PANE_EVENT, onReconnectSplit)
-    return () => window.removeEventListener(RECONNECT_SPLIT_PANE_EVENT, onReconnectSplit)
-  }, [tabID])
-
-  const removeClosedPane = (terminalID: string) => {
-    const result = removeTerminal(treeRef.current, terminalID, lastUsed)
+function useRemoveClosedPane(props: Props, model: SplitModel) {
+  return (terminalID: string) => {
+    const result = removeTerminal(model.treeRef.current, terminalID, model.lastUsed)
     if (!result) return
     const state = useAppStore.getState()
-    const shouldFocus = state.activeSurface?.type === 'terminal' && state.activeSurface.id === tabID
+    const shouldFocus = state.activeSurface?.type === 'terminal' && state.activeSurface.id === props.tabID
     state.forgetTerminal(terminalID)
-    setTree(() => result.node)
-    onPaneClosed?.(terminalID)
-    if (shouldFocus) requestFocus(result.focusID)
+    model.treeRef.current = result.node
+    model.setTree(() => result.node)
+    props.onPaneClosed?.(terminalID)
+    if (shouldFocus) model.requestFocus(result.focusID)
   }
+}
 
+function useClosedPaneListener(tabID: string, closedPaneRef: MutableRefObject<(terminalID: string) => void>) {
   useEffect(() => {
     const onClosed = (event: Event) => {
       const detail = (event as CustomEvent<TerminalClosedSplitPaneDetail>).detail
@@ -126,12 +132,14 @@ export const TerminalSplit = forwardRef<TerminalSplitHandle, Props>(function Ter
     window.addEventListener(TERMINAL_CLOSED_SPLIT_PANE_EVENT, onClosed)
     return () => window.removeEventListener(TERMINAL_CLOSED_SPLIT_PANE_EVENT, onClosed)
   }, [tabID])
+}
 
+function usePrimaryPaneSync(primaryID: string, model: SplitModel) {
   useEffect(() => {
     if (!primaryID) return
-    setTree((current) => {
+    model.setTree((current) => {
       if (hasTerminal(current, primaryID)) return current
-      const previousPrimary = primaryRef.current
+      const previousPrimary = model.primaryRef.current
       if (previousPrimary && previousPrimary !== primaryID && hasTerminal(current, previousPrimary)) {
         return replaceTerminal(current, previousPrimary, primaryID)
       }
@@ -139,29 +147,35 @@ export const TerminalSplit = forwardRef<TerminalSplitHandle, Props>(function Ter
       if (currentLeaves.length === 0) return splitLeaf(primaryID)
       return replaceTerminal(current, currentLeaves[0].terminalID, primaryID)
     })
-    primaryRef.current = primaryID
+    model.primaryRef.current = primaryID
   }, [primaryID])
+}
 
+function useSplitCleanup(model: SplitModel) {
   useEffect(() => () => {
-    mountedRef.current = false
-    for (const terminalID of terminalIDs(treeRef.current)) {
-      if (terminalID !== primaryRef.current) closeSplitTerminalInBackground(terminalID, 'TerminalSplit: cleanup failed')
+    model.mountedRef.current = false
+    for (const terminalID of terminalIDs(model.treeRef.current)) {
+      if (terminalID !== model.primaryRef.current) closeSplitTerminalInBackground(terminalID, 'TerminalSplit: cleanup failed')
     }
   }, [])
+}
 
+function usePaneHostSync(model: SplitModel) {
   useEffect(() => {
-    const hosts = hostsRef.current
-    const activeLeafIDs = new Set(leaves.map((leaf) => leaf.id))
-    for (const leaf of leaves) ensurePaneHost(hosts, leaf.id, leaf.terminalID)
+    const hosts = model.hostsRef.current
+    const activeLeafIDs = new Set(model.leaves.map((leaf) => leaf.id))
+    for (const leaf of model.leaves) ensurePaneHost(hosts, leaf.id, leaf.terminalID)
     for (const [leafID, host] of [...hosts.entries()]) {
       if (activeLeafIDs.has(leafID)) continue
       host.remove()
       hosts.delete(leafID)
     }
-  }, [leaves])
+  }, [model.leaves])
+}
 
-  const registerSlot = useCallback((leafID: string, terminalID: string, slot: HTMLDivElement | null) => {
-    const host = ensurePaneHost(hostsRef.current, leafID, terminalID)
+function useRegisterPaneSlot(model: SplitModel) {
+  return useCallback((leafID: string, terminalID: string, slot: HTMLDivElement | null) => {
+    const host = ensurePaneHost(model.hostsRef.current, leafID, terminalID)
     let moved = false
     if (slot) {
       if (host.parentElement !== slot) {
@@ -169,7 +183,7 @@ export const TerminalSplit = forwardRef<TerminalSplitHandle, Props>(function Ter
         moved = true
       }
     } else {
-      const staging = stagingRef.current
+      const staging = model.stagingRef.current
       if (staging && host.parentElement !== staging) {
         staging.appendChild(host)
         moved = true
@@ -180,69 +194,42 @@ export const TerminalSplit = forwardRef<TerminalSplitHandle, Props>(function Ter
       window.dispatchEvent(new CustomEvent('mssh:terminal-host-moved', { detail: { terminalID } }))
     }
   }, [])
+}
 
-  useImperativeHandle(ref, () => ({
-    split: (direction) => { void splitPane(direction, actionCtx) },
-  }))
-
-  reconnectPaneRef.current = (terminalID) => reconnectSplitPane(terminalID, actionCtx)
-  closedPaneRef.current = removeClosedPane
-
-  const closeDisconnectedTerminal = (terminalID: string) => {
-    if (terminalIDs(treeRef.current).length === 1) {
-      onCloseTerminal?.()
+function useCloseDisconnectedTerminal(props: Props, model: SplitModel, actionCtx: ReturnType<typeof createSplitActionContext>) {
+  return (terminalID: string) => {
+    if (terminalIDs(model.treeRef.current).length === 1) {
+      props.onCloseTerminal?.()
       return
     }
     void closeSplitPane(terminalID, actionCtx)
   }
+}
 
-  return <div className="relative flex h-full w-full min-h-0 min-w-0 flex-1 flex-col">
-    {restoreError ? (
-      <div role="alert" className="z-20 flex shrink-0 items-center justify-between gap-2 border-b border-destructive/30 bg-destructive/10 px-3 py-1.5 text-xs text-destructive">
-        <span className="min-w-0 truncate">{t('恢复分屏布局失败: ${}', restoreError)}</span>
-        <button type="button" aria-label={t('重试')} className="shrink-0 rounded-md border border-border bg-background px-2 py-0.5 text-foreground hover:bg-muted" onClick={retryRestore} disabled={busy}>
-          {t('重试')}
-        </button>
-      </div>
-    ) : null}
-    {actionError ? (
-      <div role="alert" className="z-20 flex shrink-0 items-center justify-between gap-2 border-b border-destructive/30 bg-destructive/10 px-3 py-1.5 text-xs text-destructive">
-        <span className="min-w-0 truncate">{actionError}</span>
-        <button type="button" aria-label={t('关闭')} className="shrink-0 rounded-md border border-border bg-background px-2 py-0.5 text-foreground hover:bg-muted" onClick={() => setActionError('')}>
-          {t('关闭')}
-        </button>
-      </div>
-    ) : null}
-    <div className="relative flex min-h-0 min-w-0 flex-1">
-    <div ref={stagingRef} className="pointer-events-none absolute h-0 w-0 overflow-hidden opacity-0" aria-hidden="true" />
-    <SplitTreeView
-      node={tree}
-      primaryID={primaryID}
-      activePaneID={activePaneID}
-      paneCount={paneCount}
-      closingID={closingID}
-      onClose={(id) => { void closeSplitPane(id, actionCtx) }}
-      onReconnect={(id) => { void reconnectSplitPane(id, actionCtx) }}
-      onCloseTerminal={closeDisconnectedTerminal}
-      onRatio={(id, ratio) => setTree((current) => updateSplitRatio(current, id, ratio))}
-      registerHost={registerSlot}
-    />
-    {leaves.map((leaf) => {
-      const host = ensurePaneHost(hostsRef.current, leaf.id, leaf.terminalID)
-      const selected = activePaneID ? activePaneID === leaf.terminalID : primaryID === leaf.terminalID
-      const request = focusRequest.targetTerminalID === leaf.terminalID ? focusRequest : noFocusRequest
-      return createPortal(
-        <TerminalEmulator
-          key={leaf.id}
-          terminalID={leaf.terminalID}
-          active={active && selected}
-          focusRequest={request}
-          className="h-full w-full min-h-0 min-w-0"
-        />,
-        host,
-        leaf.id,
-      )
-    })}
-    </div>
-  </div>
+export const TerminalSplit = forwardRef<TerminalSplitHandle, Props>(function TerminalSplit(props, ref) {
+  const model = useSplitModel(props)
+  const actionCtx = createSplitActionContext(props, model)
+  const reconnectPaneRef = useRef<(terminalID: string) => Promise<void>>(async () => {})
+  const closedPaneRef = useRef<(terminalID: string) => void>(() => {})
+  useSplitAutoReconnect({ tabID: props.tabID, busy: model.busy, treeRef: model.treeRef, operationRef: model.operationRef, mountedRef: model.mountedRef, reconnectRef: reconnectPaneRef })
+  useSplitStateReport(props, model)
+  useSplitPersistence(props, model)
+  useClosedPaneListener(props.tabID, closedPaneRef)
+  usePrimaryPaneSync(props.primaryID, model)
+  useSplitCleanup(model)
+  usePaneHostSync(model)
+  const registerSlot = useRegisterPaneSlot(model)
+  const removeClosedPane = useRemoveClosedPane(props, model)
+  const closeTerminal = useCloseDisconnectedTerminal(props, model, actionCtx)
+  useImperativeHandle(ref, () => ({ split: (direction) => { void splitPane(direction, actionCtx) } }))
+  reconnectPaneRef.current = (terminalID) => reconnectSplitPane(terminalID, actionCtx)
+  closedPaneRef.current = removeClosedPane
+  return <TerminalSplitView tree={model.tree} primaryID={props.primaryID} activePaneID={model.activePaneID}
+    paneCount={model.paneCount} closingID={model.closingID} restoreError={model.restoreError}
+    actionError={model.actionError} busy={model.busy} active={props.active} focusRequest={props.focusRequest}
+    hostsRef={model.hostsRef} stagingRef={model.stagingRef} retryRestore={model.retryRestore}
+    clearActionError={() => model.setActionError('')} closePane={(id) => { void closeSplitPane(id, actionCtx) }}
+    reconnectPane={(id) => { void reconnectSplitPane(id, actionCtx) }} closeTerminal={closeTerminal}
+    updateRatio={(id, ratio) => model.setTree((current) => updateSplitRatio(current, id, ratio))}
+    registerSlot={registerSlot} />
 })

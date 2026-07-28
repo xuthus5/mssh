@@ -18,224 +18,151 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { useSerial, type SerialPort } from '@/hooks/useSerial'
 import { SerialPortDialog } from '@/components/serial/SerialPortDialog'
 import { SerialPortTable } from '@/components/serial/SerialPortTable'
-import { toast } from '@/components/ui/toast'
 import { t } from '@/i18n'
+import { useSerialPortCenterActions, type SerialDeleteTarget } from '@/components/serial/useSerialPortCenterActions'
 
-type DeleteTarget =
-  | { kind: 'single'; port: SerialPort }
-  | { kind: 'batch'; ids: number[]; count: number }
-  | null
+type DeleteTarget = SerialDeleteTarget
 
-export function SerialPortCenter() {
-  const {
-    ports, devices, activeDevices, loading, error, deviceProbeError, activeMapError, refresh,
-    createPort, updatePort, deletePort, deleteMany, duplicatePort, connectPort,
-  } = useSerial()
+function useSerialPortCenterState() {
+  const serial = useSerial()
   const [query, setQuery] = useState('')
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<SerialPort | null>(null)
-  const [connectingID, setConnectingID] = useState<number | null>(null)
-  const [deletingID, setDeletingID] = useState<number | null>(null)
   const [selected, setSelected] = useState<Set<number>>(new Set())
-  const [batchBusy, setBatchBusy] = useState(false)
-  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget>(null)
-  const [actionError, setActionError] = useState('')
-  const [deleteError, setDeleteError] = useState('')
-
+  const actions = useSerialPortCenterActions({
+    refresh: serial.refresh, createPort: serial.createPort, updatePort: serial.updatePort,
+    deletePort: serial.deletePort, deleteMany: serial.deleteMany,
+    duplicatePort: serial.duplicatePort, connectPort: serial.connectPort, setSelected,
+  })
   const filtered = useMemo(() => {
     const keyword = query.trim().toLowerCase()
-    if (!keyword) return ports
-    return ports.filter((port) =>
+    if (!keyword) return serial.ports
+    return serial.ports.filter((port) =>
       [port.name, port.device, port.notes, String(port.baud_rate), port.flow_control].join(' ').toLowerCase().includes(keyword),
     )
-  }, [ports, query])
-
-  const allFilteredSelected = filtered.length > 0 && filtered.every((port) => selected.has(Number(port.id)))
-  const toggleAll = (checked: boolean) => setSelected(checked ? new Set(filtered.map((port) => Number(port.id))) : new Set())
+  }, [query, serial.ports])
+  const selectable = filtered.filter((port) => !actions.pendingRows.has(Number(port.id)))
+  const allFilteredSelected = selectable.length > 0 && selectable.every((port) => selected.has(Number(port.id)))
+  const toggleAll = (checked: boolean) => setSelected(checked ? new Set(selectable.map((port) => Number(port.id))) : new Set())
   const toggleOne = (id: number, checked: boolean) => setSelected((prev) => {
     const next = new Set(prev)
     if (checked) next.add(id)
     else next.delete(id)
     return next
   })
-
-  const save = async (input: Parameters<typeof createPort>[0]) => {
-    if (input.id && Number(input.id) > 0) {
-      await updatePort(input)
-      toast(t('串口配置已更新'), 'success')
-      return
-    }
-    await createPort({ ...input, id: 0 })
-    toast(t('串口配置已创建'), 'success')
+  return {
+    serial, query, setQuery, dialogOpen, setDialogOpen, editing, setEditing,
+    selected, filtered, allFilteredSelected, toggleAll, toggleOne, actions,
   }
+}
 
-  const connect = async (port: SerialPort) => {
-    setConnectingID(Number(port.id))
-    try {
-      await connectPort(port)
-      toast(t('串口已连接: ${}', port.name || port.device), 'success')
-      await refresh({ silent: true })
-    } catch {
-      // error banner handled in hook via setError
-    } finally {
-      setConnectingID(null)
-    }
-  }
+type CenterState = ReturnType<typeof useSerialPortCenterState>
 
-  const duplicate = async (port: SerialPort) => {
-    try {
-      setActionError('')
-      await duplicatePort(port)
-      toast(t('串口配置已复制'), 'success')
-    } catch (err) {
-      setActionError(t('复制串口配置失败: ${}', err instanceof Error ? err.message : String(err)))
-    }
-  }
+function SerialCenterHeader({ state }: { state: CenterState }) {
+  return <header className="mb-5 flex flex-wrap items-start justify-between gap-3">
+    <div className="flex items-center gap-3">
+      <Cable className="size-5 text-primary" />
+      <div>
+        <h1 className="text-xl font-semibold">{t('串口管理')}</h1>
+        <p className="text-sm text-muted-foreground">{t('管理串口设备配置，并一键打开串口终端')}</p>
+      </div>
+      <Badge variant="secondary" className="ml-1">{state.serial.ports.length} {t('个配置')}</Badge>
+    </div>
+    <div className="flex flex-wrap items-center gap-2">
+      <Button type="button" variant="outline" size="sm" onClick={() => void state.serial.refresh()} disabled={state.serial.loading}>
+        <RefreshCw data-icon="inline-start" className={state.serial.loading ? 'animate-spin' : undefined} />
+        {t('刷新设备')}
+      </Button>
+      <Button type="button" size="sm" onClick={() => { state.setEditing(null); state.setDialogOpen(true) }}>{t('新建串口配置')}</Button>
+    </div>
+  </header>
+}
 
-  const confirmDelete = async () => {
-    if (!deleteTarget) return
-    if (deleteTarget.kind === 'single') {
-      const id = Number(deleteTarget.port.id)
-      setDeletingID(id)
-      try {
-        setDeleteError('')
-        await deletePort(id)
-        setSelected((prev) => {
-          const next = new Set(prev)
-          next.delete(id)
-          return next
-        })
-        setDeleteTarget(null)
-        toast(t('串口配置已删除'), 'success')
-      } catch (err) {
-        setDeleteError(t('删除串口配置失败: ${}', err instanceof Error ? err.message : String(err)))
-      } finally {
-        setDeletingID(null)
-      }
-      return
-    }
-    setBatchBusy(true)
-    try {
-      setDeleteError('')
-      await deleteMany(deleteTarget.ids)
-      setSelected(new Set())
-      setDeleteTarget(null)
-      toast(t('已删除 ${} 个串口配置', String(deleteTarget.count)), 'success')
-    } catch (err) {
-      setDeleteError(t('批量删除串口配置失败: ${}', err instanceof Error ? err.message : String(err)))
-    } finally {
-      setBatchBusy(false)
-    }
-  }
+function SerialCenterAlerts({ state }: { state: CenterState }) {
+  const retry = <Button size="xs" variant="outline" className="ml-3" onClick={() => void state.serial.refresh()}>{t('重试')}</Button>
+  return <>
+    {state.serial.error ? <Alert variant="destructive" className="mb-4">
+      <AlertDescription>{state.serial.error}{retry}</AlertDescription>
+    </Alert> : null}
+    {state.serial.deviceProbeError ? <Alert className="mb-4">
+      <AlertDescription>{t('加载串口设备失败: ${}', state.serial.deviceProbeError)}{retry}</AlertDescription>
+    </Alert> : null}
+    {state.serial.activeMapError ? <Alert className="mb-4">
+      <AlertDescription>{t('加载串口占用状态失败: ${}', state.serial.activeMapError)}{retry}</AlertDescription>
+    </Alert> : null}
+    {state.actions.actionError ? <Alert variant="destructive" className="mb-4">
+      <AlertDescription>{state.actions.actionError}</AlertDescription>
+    </Alert> : null}
+  </>
+}
 
-  const deletePending = deletingID !== null || batchBusy
+function SerialListToolbar({ state }: { state: CenterState }) {
+  const selectedBusy = [...state.selected].some((id) => state.actions.pendingRows.has(id))
+  return <div className="flex flex-wrap items-center gap-2">
+    {state.selected.size > 0 ? <Button
+      type="button" size="sm" variant="destructive" disabled={state.actions.deletePending || selectedBusy}
+      onClick={() => state.actions.openDeleteTarget({ kind: 'batch', ids: [...state.selected], count: state.selected.size })}
+    >
+      <Trash2 data-icon="inline-start" />
+      {t('批量删除')} ({state.selected.size})
+    </Button> : null}
+    <div className="relative w-64 max-w-full">
+      <Search className="absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+      <Input value={state.query} onChange={(event) => state.setQuery(event.target.value)} placeholder={t('搜索串口配置...')} className="h-8 pl-7 text-xs" />
+    </div>
+  </div>
+}
+
+function SerialDeviceSummary({ devices }: { devices: string[] }) {
+  return <div className="mb-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+    <PlugZap className="size-3.5" />
+    {devices.length > 0 ? t('检测到 ${} 个串口设备', String(devices.length)) : t('未检测到设备，仍可手动填写路径')}
+    {devices.slice(0, 6).map((device) => (
+      <Badge key={device} variant="outline" className="font-mono text-[10px]">{device}</Badge>
+    ))}
+  </div>
+}
+
+function SerialPortListCard({ state }: { state: CenterState }) {
+  return <Card>
+    <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3 space-y-0">
+      <CardTitle className="text-sm">{t('串口配置列表')}</CardTitle>
+      <SerialListToolbar state={state} />
+    </CardHeader>
+    <CardContent>
+      <SerialDeviceSummary devices={state.serial.devices} />
+      <SerialPortTable
+        ports={state.serial.ports} filtered={state.filtered} devices={state.serial.devices}
+        activeDevices={state.serial.activeDevices} selected={state.selected}
+        connectingID={state.actions.connectingID} duplicatingID={state.actions.duplicatingID}
+        deletingID={state.actions.deletingID} deletePending={state.actions.deletePending} pendingRows={state.actions.pendingRows}
+        allFilteredSelected={state.allFilteredSelected} onToggleAll={state.toggleAll} onToggleOne={state.toggleOne}
+        onConnect={(port) => void state.actions.connect(port)}
+        onEdit={(port) => {
+          if (state.actions.isRowPending(Number(port.id))) return
+          state.setEditing(port)
+          state.setDialogOpen(true)
+        }}
+        onDuplicate={(port) => void state.actions.duplicate(port)}
+        onRemove={(port) => state.actions.openDeleteTarget({ kind: 'single', port })}
+      />
+    </CardContent>
+  </Card>
+}
+
+export function SerialPortCenter() {
+  const state = useSerialPortCenterState()
 
   return (
     <section className="flex min-h-0 flex-1 flex-col overflow-auto bg-background p-5">
-      <header className="mb-5 flex flex-wrap items-start justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <Cable className="size-5 text-primary" />
-          <div>
-            <h1 className="text-xl font-semibold">{t('串口管理')}</h1>
-            <p className="text-sm text-muted-foreground">{t('管理串口设备配置，并一键打开串口终端')}</p>
-          </div>
-          <Badge variant="secondary" className="ml-1">{ports.length} {t('个配置')}</Badge>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button type="button" variant="outline" size="sm" onClick={() => void refresh()} disabled={loading}>
-            <RefreshCw data-icon="inline-start" className={loading ? 'animate-spin' : undefined} />
-            {t('刷新设备')}
-          </Button>
-          <Button type="button" size="sm" onClick={() => { setEditing(null); setDialogOpen(true) }}>{t('新建串口配置')}</Button>
-        </div>
-      </header>
-
-      {error ? (
-        <Alert variant="destructive" className="mb-4">
-          <AlertDescription>
-            {error}
-            <Button size="xs" variant="outline" className="ml-3" onClick={() => void refresh()}>{t('重试')}</Button>
-          </AlertDescription>
-        </Alert>
-      ) : null}
-      {deviceProbeError ? (
-        <Alert className="mb-4">
-          <AlertDescription>
-            {t('加载串口设备失败: ${}', deviceProbeError)}
-            <Button size="xs" variant="outline" className="ml-3" onClick={() => void refresh()}>{t('重试')}</Button>
-          </AlertDescription>
-        </Alert>
-      ) : null}
-      {activeMapError ? (
-        <Alert className="mb-4">
-          <AlertDescription>
-            {t('加载串口占用状态失败: ${}', activeMapError)}
-            <Button size="xs" variant="outline" className="ml-3" onClick={() => void refresh()}>{t('重试')}</Button>
-          </AlertDescription>
-        </Alert>
-      ) : null}
-      {actionError ? (
-        <Alert variant="destructive" className="mb-4">
-          <AlertDescription>{actionError}</AlertDescription>
-        </Alert>
-      ) : null}
-
-      <Card>
-        <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3 space-y-0">
-          <CardTitle className="text-sm">{t('串口配置列表')}</CardTitle>
-          <div className="flex flex-wrap items-center gap-2">
-            {selected.size > 0 ? (
-              <Button
-                type="button"
-                size="sm"
-                variant="destructive"
-                disabled={batchBusy}
-                onClick={() => { setDeleteError(''); setDeleteTarget({ kind: 'batch', ids: [...selected], count: selected.size }) }}
-              >
-                <Trash2 data-icon="inline-start" />
-                {t('批量删除')} ({selected.size})
-              </Button>
-            ) : null}
-            <div className="relative w-64 max-w-full">
-              <Search className="absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-              <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t('搜索串口配置...')} className="h-8 pl-7 text-xs" />
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="mb-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-            <PlugZap className="size-3.5" />
-            {devices.length > 0 ? t('检测到 ${} 个串口设备', String(devices.length)) : t('未检测到设备，仍可手动填写路径')}
-            {devices.slice(0, 6).map((device) => (
-              <Badge key={device} variant="outline" className="font-mono text-[10px]">{device}</Badge>
-            ))}
-          </div>
-          <SerialPortTable
-            ports={ports}
-            filtered={filtered}
-            devices={devices}
-            activeDevices={activeDevices}
-            selected={selected}
-            connectingID={connectingID}
-            deletingID={deletingID}
-            allFilteredSelected={allFilteredSelected}
-            onToggleAll={toggleAll}
-            onToggleOne={toggleOne}
-            onConnect={(port) => void connect(port)}
-            onEdit={(port) => { setEditing(port); setDialogOpen(true) }}
-            onDuplicate={(port) => void duplicate(port)}
-            onRemove={(port) => { setDeleteError(''); setDeleteTarget({ kind: 'single', port }) }}
-          />
-        </CardContent>
-      </Card>
-
-      <SerialPortDialog open={dialogOpen} onOpenChange={setDialogOpen} port={editing} devices={devices} onSave={save} />
+      <SerialCenterHeader state={state} />
+      <SerialCenterAlerts state={state} />
+      <SerialPortListCard state={state} />
+      <SerialPortDialog open={state.dialogOpen} onOpenChange={state.setDialogOpen} port={state.editing} devices={state.serial.devices} onSave={state.actions.save} />
       <SerialDeleteDialog
-        target={deleteTarget}
-        pending={deletePending}
-        error={deleteError}
-        onOpenChange={(open) => { if (!open && !deletePending) { setDeleteTarget(null); setDeleteError('') } }}
-        onConfirm={() => { void confirmDelete() }}
+        target={state.actions.deleteTarget} pending={state.actions.deletePending} error={state.actions.deleteError}
+        onOpenChange={(open) => { if (!open) state.actions.closeDeleteTarget() }}
+        onConfirm={() => { void state.actions.confirmDelete() }}
       />
     </section>
   )

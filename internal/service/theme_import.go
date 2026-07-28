@@ -2,7 +2,6 @@ package service
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 
 	"github.com/xuthus5/mssh/internal/model"
@@ -13,6 +12,11 @@ import (
 const maxThemeImportBytes = 2 << 20
 
 func (service *ThemeService) ImportFiles(paths []string) (model.ThemeImportSummary, error) {
+	finish, err := service.beginOperation()
+	if err != nil {
+		return model.ThemeImportSummary{}, err
+	}
+	defer finish()
 	summary := model.ThemeImportSummary{Results: make([]model.ThemeImportResult, 0, len(paths))}
 	importers := []themeimport.ThemeImporter{themeimport.NewITermColorsImporter()}
 	for _, path := range paths {
@@ -29,12 +33,9 @@ func (service *ThemeService) importThemeFile(path string, importers []themeimpor
 	}
 	path = cleaned
 	result.File = path
-	content, err := os.ReadFile(path)
+	content, err := readBoundedRegularFile(path, "theme file", maxThemeImportBytes)
 	if err != nil {
-		return failedImport(result, fmt.Errorf("read theme file: %w", err))
-	}
-	if len(content) > maxThemeImportBytes {
-		return failedImport(result, fmt.Errorf("theme file exceeds 2 MiB limit"))
+		return failedImport(result, err)
 	}
 	importer := selectThemeImporter(importers, path, content)
 	if importer == nil {
@@ -48,11 +49,6 @@ func (service *ThemeService) importThemeFile(path string, importers []themeimpor
 		return failedImport(result, fmt.Errorf("theme importer returned %d definitions", len(definitions)))
 	}
 	result.Name = definitions[0].Name
-	if existing := service.definitionByFingerprint(definitions[0].SourceFingerprint); existing != nil {
-		result.Status = model.ThemeImportDuplicate
-		result.DefinitionID = existing.ID
-		return result
-	}
 	return service.persistImportedTheme(result, definitions[0])
 }
 
@@ -60,6 +56,17 @@ func (service *ThemeService) persistImportedTheme(result model.ThemeImportResult
 	tx, err := service.db.Begin()
 	if err != nil {
 		return failedImport(result, fmt.Errorf("begin theme import: %w", err))
+	}
+	existing, err := store.FindThemeDefinitionByFingerprint(tx, definition.SourceFingerprint)
+	if err != nil {
+		_ = tx.Rollback()
+		return failedImport(result, err)
+	}
+	if existing != nil {
+		_ = tx.Rollback()
+		result.Status = model.ThemeImportDuplicate
+		result.DefinitionID = existing.ID
+		return result
 	}
 	createdDefinition, err := store.CreateThemeDefinition(tx, definition)
 	if err != nil {
@@ -78,19 +85,6 @@ func (service *ThemeService) persistImportedTheme(result model.ThemeImportResult
 	result.DefinitionID = createdDefinition.ID
 	result.ProfileID = profile.ID
 	return result
-}
-
-func (service *ThemeService) definitionByFingerprint(fingerprint string) *model.ThemeDefinition {
-	definitions, err := store.ListThemeDefinitions(service.db, "")
-	if err != nil {
-		return nil
-	}
-	for index := range definitions {
-		if definitions[index].SourceFingerprint == fingerprint {
-			return &definitions[index]
-		}
-	}
-	return nil
 }
 
 func selectThemeImporter(importers []themeimport.ThemeImporter, path string, content []byte) themeimport.ThemeImporter {

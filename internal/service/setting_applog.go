@@ -103,6 +103,13 @@ func (s *SettingService) currentLogRetention() int {
 //
 //wails:ignore
 func (s *SettingService) ApplyStoredLogSettings() error {
+	finish, err := s.beginOperation()
+	if err != nil {
+		return err
+	}
+	defer finish()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if s.log == nil {
 		return nil
 	}

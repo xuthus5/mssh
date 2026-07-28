@@ -1,11 +1,16 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { Events } from '@wailsio/runtime'
 import { ApplicationLogSettingsSection } from '@/components/settings/ApplicationLogSettings'
 import { useToastStore } from '@/components/ui/toast'
+import { SETTINGS_PREVIEW_CANCELLED_EVENT } from '@/lib/settingsWindowEvents'
 
-const openFile = vi.fn()
-vi.mock('@wailsio/runtime', () => ({ Dialogs: { OpenFile: (...args: unknown[]) => openFile(...args) } }))
+const { openFile } = vi.hoisted(() => ({ openFile: vi.fn() }))
+vi.mock('@wailsio/runtime', async (importOriginal) => {
+  const runtime = await importOriginal<typeof import('@wailsio/runtime')>()
+  return { ...runtime, Dialogs: { ...runtime.Dialogs, OpenFile: (...args: unknown[]) => openFile(...args) } }
+})
 
 describe('ApplicationLogSettingsSection', () => {
   beforeEach(() => {
@@ -49,4 +54,56 @@ describe('ApplicationLogSettingsSection', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('选择日志目录失败: picker failed')
     expect(useToastStore.getState().toasts.filter((item) => item.type === 'error')).toHaveLength(0)
   })
+
+  it('locks the log directory draft while the native picker is pending', async () => {
+    const picker = deferred<string>()
+    openFile.mockReturnValueOnce(picker.promise)
+    const onLogDirChange = vi.fn()
+    render(
+      <ApplicationLogSettingsSection
+        logDir="/home/user/current-logs"
+        logRetentionDays="30"
+        onLogDirChange={onLogDirChange}
+        onLogRetentionDaysChange={vi.fn()}
+      />,
+    )
+
+    await userEvent.click(screen.getByRole('button', { name: /浏览/ }))
+
+    expect(screen.getByLabelText('日志目录')).toBeDisabled()
+    expect(screen.getByLabelText('日志保留天数')).toBeEnabled()
+    await act(async () => { picker.resolve('/home/user/new-logs'); await picker.promise })
+    await waitFor(() => expect(screen.getByLabelText('日志目录')).toBeEnabled())
+    expect(onLogDirChange).toHaveBeenCalledWith('/home/user/new-logs')
+  })
+
+  it('ignores a directory result that arrives after the settings window hides', async () => {
+    let resolvePicker: ((path: string) => void) | undefined
+    openFile.mockReturnValue(new Promise<string>((resolve) => { resolvePicker = resolve }))
+    const onLogDirChange = vi.fn()
+    const user = userEvent.setup()
+    render(
+      <ApplicationLogSettingsSection
+        logDir=""
+        logRetentionDays="30"
+        onLogDirChange={onLogDirChange}
+        onLogRetentionDaysChange={vi.fn()}
+      />,
+    )
+
+    await user.click(screen.getByRole('button', { name: /浏览/ }))
+    expect(screen.getByRole('button', { name: /选择中/ })).toBeDisabled()
+    await act(async () => { await Events.Emit(SETTINGS_PREVIEW_CANCELLED_EVENT, { data: null }) })
+    await act(async () => { resolvePicker?.('/home/user/stale-logs') })
+
+    expect(onLogDirChange).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: /浏览/ })).toBeEnabled()
+  })
+
 })
+
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((resolvePromise) => { resolve = resolvePromise })
+  return { promise, resolve }
+}

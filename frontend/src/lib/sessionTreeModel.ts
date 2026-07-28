@@ -4,12 +4,8 @@ export type SessionTreeNode =
   | { kind: 'folder'; id: string; folder: Folder; depth: number; expanded: boolean }
   | { kind: 'session'; id: string; session: Session; depth: number }
 
-export function buildVisibleSessionTreeNodes(
-  folders: Folder[],
-  sessions: Session[],
-  expanded: Set<string>,
-  revealAll = false,
-): SessionTreeNode[] {
+export function buildVisibleSessionTreeNodes(...args: [Folder[], Session[], Set<string>, boolean?]): SessionTreeNode[] {
+  const [folders, sessions, expanded, revealAll = false] = args
   const nodes: SessionTreeNode[] = []
   const rootFolders = folders.filter((folder) => folder.parentId === null)
   const walkFolder = (folder: Folder, depth: number) => {
