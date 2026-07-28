@@ -11,7 +11,7 @@ import (
 )
 
 func ListAIProviderProfiles(db *sql.DB) ([]model.AIProviderProfile, error) {
-	rows, err := db.Query(`SELECT id, name, provider, base_url, default_model, enabled, created_at, updated_at FROM ai_provider_profiles ORDER BY id`)
+	rows, err := db.Query(`SELECT id, name, provider, base_url, default_model, enabled, context_window_size, skip_tls_verify, max_tokens, temperature, top_p, frequency_penalty, presence_penalty, custom_headers, created_at, updated_at FROM ai_provider_profiles ORDER BY id`)
 	if err != nil {
 		return nil, fmt.Errorf("list ai provider profiles: %w", err)
 	}
@@ -28,7 +28,7 @@ func ListAIProviderProfiles(db *sql.DB) ([]model.AIProviderProfile, error) {
 }
 
 func GetAIProviderProfile(db *sql.DB, id int64) (*model.AIProviderProfile, error) {
-	profile, err := scanAIProviderProfile(db.QueryRow(`SELECT id, name, provider, base_url, default_model, enabled, created_at, updated_at FROM ai_provider_profiles WHERE id = ?`, id))
+	profile, err := scanAIProviderProfile(db.QueryRow(`SELECT id, name, provider, base_url, default_model, enabled, context_window_size, skip_tls_verify, max_tokens, temperature, top_p, frequency_penalty, presence_penalty, custom_headers, created_at, updated_at FROM ai_provider_profiles WHERE id = ?`, id))
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
@@ -40,7 +40,8 @@ func GetAIProviderProfile(db *sql.DB, id int64) (*model.AIProviderProfile, error
 
 func SaveAIProviderProfile(db *sql.DB, input model.AIProviderProfileInput) (*model.AIProviderProfile, error) {
 	if input.ID == 0 {
-		result, err := db.Exec(`INSERT INTO ai_provider_profiles (name, provider, base_url, default_model, enabled) VALUES (?, ?, ?, ?, ?)`, input.Name, input.Provider, input.BaseURL, input.DefaultModel, input.Enabled)
+		customHeadersJSON, _ := json.Marshal(input.CustomHeaders)
+		result, err := db.Exec(`INSERT INTO ai_provider_profiles (name, provider, base_url, default_model, enabled, context_window_size, skip_tls_verify, max_tokens, temperature, top_p, frequency_penalty, presence_penalty, custom_headers) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, input.Name, input.Provider, input.BaseURL, input.DefaultModel, input.Enabled, input.ContextWindowSize, input.SkipTLSVerify, input.MaxTokens, input.Temperature, input.TopP, input.FrequencyPenalty, input.PresencePenalty, string(customHeadersJSON))
 		if err != nil {
 			return nil, fmt.Errorf("create ai provider profile: %w", err)
 		}
@@ -49,7 +50,8 @@ func SaveAIProviderProfile(db *sql.DB, input model.AIProviderProfileInput) (*mod
 			return nil, fmt.Errorf("create ai provider profile id: %w", err)
 		}
 	} else {
-		result, err := db.Exec(`UPDATE ai_provider_profiles SET name=?, provider=?, base_url=?, default_model=?, enabled=?, updated_at=datetime('now') WHERE id=?`, input.Name, input.Provider, input.BaseURL, input.DefaultModel, input.Enabled, input.ID)
+		customHeadersJSON, _ := json.Marshal(input.CustomHeaders)
+		result, err := db.Exec(`UPDATE ai_provider_profiles SET name=?, provider=?, base_url=?, default_model=?, enabled=?, context_window_size=?, skip_tls_verify=?, max_tokens=?, temperature=?, top_p=?, frequency_penalty=?, presence_penalty=?, custom_headers=?, updated_at=datetime('now') WHERE id=?`, input.Name, input.Provider, input.BaseURL, input.DefaultModel, input.Enabled, input.ContextWindowSize, input.SkipTLSVerify, input.MaxTokens, input.Temperature, input.TopP, input.FrequencyPenalty, input.PresencePenalty, string(customHeadersJSON), input.ID)
 		if err != nil {
 			return nil, fmt.Errorf("update ai provider profile: %w", err)
 		}
@@ -82,8 +84,25 @@ func DeleteAIProviderProfile(db *sql.DB, id int64) error {
 func scanAIProviderProfile(scanner settingScanner) (model.AIProviderProfile, error) {
 	var profile model.AIProviderProfile
 	var createdAt, updatedAt string
-	if err := scanner.Scan(&profile.ID, &profile.Name, &profile.Provider, &profile.BaseURL, &profile.DefaultModel, &profile.Enabled, &createdAt, &updatedAt); err != nil {
+	var customHeadersJSON string
+	var temperature, topP, frequencyPenalty, presencePenalty sql.NullFloat64
+	if err := scanner.Scan(&profile.ID, &profile.Name, &profile.Provider, &profile.BaseURL, &profile.DefaultModel, &profile.Enabled, &profile.ContextWindowSize, &profile.SkipTLSVerify, &profile.MaxTokens, &temperature, &topP, &frequencyPenalty, &presencePenalty, &customHeadersJSON, &createdAt, &updatedAt); err != nil {
 		return model.AIProviderProfile{}, err
+	}
+	if temperature.Valid {
+		profile.Temperature = &temperature.Float64
+	}
+	if topP.Valid {
+		profile.TopP = &topP.Float64
+	}
+	if frequencyPenalty.Valid {
+		profile.FrequencyPenalty = &frequencyPenalty.Float64
+	}
+	if presencePenalty.Valid {
+		profile.PresencePenalty = &presencePenalty.Float64
+	}
+	if customHeadersJSON != "" {
+		_ = json.Unmarshal([]byte(customHeadersJSON), &profile.CustomHeaders)
 	}
 	var err error
 	profile.CreatedAt, err = time.Parse("2006-01-02 15:04:05", createdAt)

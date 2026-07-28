@@ -19,7 +19,7 @@ func TestValidateOutboundHTTPURL(t *testing.T) {
 	assert.NoError(t, validateOutboundHTTPURL("https://api.openai.com/v1"))
 	assert.NoError(t, validateOutboundHTTPURL("http://127.0.0.1:11434"))
 	assert.NoError(t, validateOutboundHTTPURL("http://localhost:11434"))
-	assert.Error(t, validateOutboundHTTPURL("http://example.com"))
+	assert.NoError(t, validateOutboundHTTPURL("http://example.com"))
 	assert.Error(t, validateOutboundHTTPURL("https://169.254.169.254/latest"))
 	assert.Error(t, validateOutboundHTTPURL("https://metadata.google.internal/"))
 	assert.Error(t, validateOutboundHTTPURL("https://user:pass@api.openai.com"))
@@ -82,9 +82,11 @@ func TestSharedHTTPClientWithProxyManager(t *testing.T) {
 	require.NoError(t, manager.Configure(netproxy.Config{Mode: netproxy.ModeDirect}))
 	client := sharedHTTPClient(2*time.Second, manager)
 	require.NotNil(t, client.CheckRedirect)
-	// Policy should reject non-loopback HTTP even for crafted redirect requests.
-	req := &http.Request{URL: mustURL(t, "http://example.com")}
-	require.Error(t, client.CheckRedirect(req, nil))
+	// Policy allows non-loopback HTTP but still blocks SSRF hosts.
+	blockedReq := &http.Request{URL: mustURL(t, "https://169.254.169.254/latest")}
+	require.Error(t, client.CheckRedirect(blockedReq, nil))
+	allowedReq := &http.Request{URL: mustURL(t, "http://example.com")}
+	require.NoError(t, client.CheckRedirect(allowedReq, nil))
 }
 
 func mustURL(t *testing.T, raw string) *url.URL {

@@ -1,6 +1,6 @@
 package store
 
-const databaseFormatVersion = 5
+const databaseFormatVersion = 6
 
 // DatabaseFormatVersion exposes the supported on-disk format version.
 func DatabaseFormatVersion() int { return databaseFormatVersion }
@@ -183,6 +183,14 @@ const aiProviderProfilesTableSQL = `CREATE TABLE IF NOT EXISTS ai_provider_profi
 	base_url TEXT NOT NULL,
 	default_model TEXT NOT NULL,
 	enabled INTEGER NOT NULL DEFAULT 1,
+	context_window_size INTEGER NOT NULL DEFAULT 0,
+	skip_tls_verify INTEGER NOT NULL DEFAULT 0,
+	max_tokens INTEGER NOT NULL DEFAULT 0,
+	temperature REAL,
+	top_p REAL,
+	frequency_penalty REAL,
+	presence_penalty REAL,
+	custom_headers TEXT NOT NULL DEFAULT '{}',
 	created_at TEXT NOT NULL DEFAULT (datetime('now')),
 	updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 )`

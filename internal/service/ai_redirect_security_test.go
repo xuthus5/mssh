@@ -18,7 +18,7 @@ func TestPostJSONRejectsCrossOriginTemporaryRedirect(t *testing.T) {
 	client, endpoint, targetCalls := newCrossOriginRedirectEndpoint(t, http.StatusTemporaryRedirect)
 	output := map[string]any{}
 
-	err := postJSON(t.Context(), client, endpoint, "provider-secret", "", map[string]string{
+	err := postJSON(t.Context(), client, endpoint, "provider-secret", "", nil, map[string]string{
 		"prompt": "private terminal context",
 	}, &output)
 
@@ -40,7 +40,7 @@ func TestPostJSONDoesNotFollowMovedRedirect(t *testing.T) {
 	serverURL = server.URL
 	t.Cleanup(server.Close)
 
-	err := postJSON(t.Context(), server.Client(), server.URL+"/source", "secret", "", map[string]string{
+	err := postJSON(t.Context(), server.Client(), server.URL+"/source", "secret", "", nil, map[string]string{
 		"prompt": "private terminal context",
 	}, &map[string]any{})
 
@@ -75,7 +75,7 @@ func TestPostJSONAllowsSameOriginTemporaryRedirect(t *testing.T) {
 	var output struct {
 		OK bool `json:"ok"`
 	}
-	err := postJSON(t.Context(), server.Client(), server.URL+"/source", "provider-secret", "", map[string]string{
+	err := postJSON(t.Context(), server.Client(), server.URL+"/source", "provider-secret", "", nil, map[string]string{
 		"prompt": "private terminal context",
 	}, &output)
 
