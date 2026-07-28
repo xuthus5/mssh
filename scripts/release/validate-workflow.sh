@@ -15,7 +15,7 @@ for pattern in \
   'cosign verify-blob' \
   'go-version-file: .go-version' \
   'node-version-file: .node-version' \
-  'runner: macos-15-intel'; do
+  'runner: macos-15'; do
   grep -Fq -- "${pattern}" "${workflow}"
 done
 

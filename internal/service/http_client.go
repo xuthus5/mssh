@@ -22,7 +22,6 @@ func sharedHTTPClient(timeout time.Duration, manager *netproxy.Manager) *http.Cl
 		client = &http.Client{Timeout: timeout, Transport: secureHTTPTransport(nil)}
 	} else {
 		client = manager.Client(timeout)
-		client.Transport = secureHTTPTransport(client.Transport)
 	}
 	client.CheckRedirect = secureHTTPRedirect
 	return client
@@ -54,8 +53,33 @@ func secureHTTPTransport(base http.RoundTripper) *http.Transport {
 			transport = &http.Transport{}
 		}
 	}
-	transport.DialContext = secureDialContext
+	configuredDialContext := transport.DialContext
+	if configuredDialContext == nil {
+		transport.DialContext = secureDialContext
+		return transport
+	}
+	transport.DialContext = func(ctx context.Context, network, address string) (net.Conn, error) {
+		if err := validateConfiguredDialTarget(network, address); err != nil {
+			return nil, err
+		}
+		return configuredDialContext(ctx, network, address)
+	}
 	return transport
+}
+
+func validateConfiguredDialTarget(network, address string) error {
+	if network != "tcp" && network != "tcp4" && network != "tcp6" {
+		return fmt.Errorf("unsupported dial network %q", network)
+	}
+	host, _, err := net.SplitHostPort(address)
+	if err != nil {
+		return fmt.Errorf("invalid dial address: %w", err)
+	}
+	host = strings.Trim(host, "[]")
+	if isBlockedOutboundHost(host) {
+		return fmt.Errorf("outbound dial host is not allowed")
+	}
+	return nil
 }
 
 // lookupIPAddr resolves hostnames for secure dial; tests may replace it.

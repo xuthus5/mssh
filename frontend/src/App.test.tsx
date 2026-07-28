@@ -256,6 +256,33 @@ describe('persistent content layers', () => {
     expect(newSession).toHaveBeenCalledOnce()
     window.removeEventListener('mssh:new-session', newSession)
   })
+
+  it('does not paste into a terminal instance replaced during clipboard read', async () => {
+    let resolveRead: ((text: string) => void) | undefined
+    const originalTerminal = { getSelection: vi.fn(), paste: vi.fn(), clear: vi.fn(), focus: vi.fn() }
+    const replacementTerminal = { getSelection: vi.fn(), paste: vi.fn(), clear: vi.fn(), focus: vi.fn() }
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: {
+        writeText: vi.fn(async () => {}),
+        readText: vi.fn(() => new Promise<string>((resolve) => { resolveRead = resolve })),
+      },
+    })
+    useAppStore.setState({
+      tabs: [{ id: 'terminal-1', title: 'Terminal', type: 'terminal', terminalId: 'term-1', sessionId: 1 }],
+      activeSurface: { type: 'terminal', id: 'terminal-1' },
+      terminalPool: new Map([['term-1', { terminal: originalTerminal as never, lastUsed: 0 }]]),
+    })
+    render(<App />)
+    fireEvent.keyDown(document.body, { key: 'v', ctrlKey: true, shiftKey: true })
+    act(() => useAppStore.setState({
+      terminalPool: new Map([['term-1', { terminal: replacementTerminal as never, lastUsed: 0 }]]),
+    }))
+    await act(async () => { resolveRead?.('stale clipboard text') })
+
+    expect(originalTerminal.paste).not.toHaveBeenCalled()
+    expect(replacementTerminal.paste).not.toHaveBeenCalled()
+  })
   it('opens session search globally while preserving ordinary form input', () => {
     const openSearch = vi.fn()
     window.addEventListener('mssh:open-session-search', openSearch)

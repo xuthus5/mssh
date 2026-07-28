@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/xuthus5/mssh/internal/model"
 )
@@ -155,15 +154,14 @@ func replaceSessionCSVTags(tx *sql.Tx, sessionID int64, tagIDs []int64) error {
 // sealSessionPasswordForCSV encrypts plaintext passwords from CSV rows.
 // keepSealed is true when the password already came from the DB ciphertext.
 func (s *SessionService) sealSessionPasswordForCSV(input *model.SessionInput, keepSealed bool) error {
-	if input == nil || input.Password == "" || keepSealed {
+	if input == nil || input.Password == "" {
 		return nil
 	}
-	if strings.HasPrefix(input.Password, sessionPasswordPrefix) {
-		return nil
+	if keepSealed {
+		return validateStoredSessionPassword(input.Password)
 	}
-	if s.crypto == nil {
-		// Test fixtures and legacy bootstraps without vault crypto store plaintext.
-		return nil
+	if err := requireSessionPasswordCrypto(s.crypto); err != nil {
+		return err
 	}
 	sealed, err := sealSessionPassword(s.crypto, input.Password)
 	if err != nil {

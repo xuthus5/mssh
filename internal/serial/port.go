@@ -1,21 +1,15 @@
 package serial
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"sync"
-	"time"
 
 	goserial "go.bug.st/serial"
 
 	"github.com/xuthus5/mssh/internal/model"
 )
-
-// openSerialPort is the serial open entry point; tests may replace it.
-var openSerialPort = goserial.Open
-
-// listSerialPorts is the device enumeration entry point; tests may replace it.
-var listSerialPorts = goserial.GetPortsList
 
 // PortSession wraps an open serial port with the same callback surface as SSH PTY.
 type PortSession struct {
@@ -31,8 +25,10 @@ type PortSession struct {
 	exitErr      error
 	exited       bool
 	exitNotified bool
-	closeOnce    sync.Once
-	closeErr     error
+	closeMu      sync.Mutex
+	closePending bool
+	pendingExit  error
+	readWG       sync.WaitGroup
 	startOnce    sync.Once
 	dtr          bool
 	rts          bool
@@ -40,70 +36,38 @@ type PortSession struct {
 
 const maxPendingRead = 1 << 20
 
-// OpenPort opens a serial device using the given profile.
-func OpenPort(profile model.SerialPort) (*PortSession, error) {
-	mode, err := modeFromProfile(profile)
-	if err != nil {
-		return nil, err
-	}
-	port, err := openSerialPort(profile.Device, mode)
-	if err != nil {
-		return nil, mapOpenError(profile.Device, err)
-	}
-	if err := port.SetReadTimeout(time.Millisecond * 200); err != nil {
-		_ = port.Close()
-		return nil, fmt.Errorf("set serial read timeout: %w", err)
-	}
-	session := &PortSession{
-		port:       port,
-		device:     CanonicalDevicePath(profile.Device),
-		profileID:  profile.ID,
-		lineEnding: profile.LineEnding,
-		localEcho:  profile.LocalEcho,
-		dtr:        profile.DTROnOpen,
-		rts:        profile.RTSOnOpen,
-	}
-	if err := applyFlowControl(port, profile); err != nil {
-		_ = port.Close()
-		return nil, fmt.Errorf("configure serial flow control: %w", err)
-	}
-	// Manual DTR/RTS only when the flow mode is not hardware-handshake driven.
-	if shouldApplyManualSignals(profile.FlowControl) {
-		if err := session.applyInitialSignals(); err != nil {
-			_ = port.Close()
-			return nil, err
-		}
-	}
-	return session, nil
-}
-
-// ListDevices returns system serial device paths (canonicalized).
-func ListDevices() ([]string, error) {
-	ports, err := listSerialPorts()
-	if err != nil {
-		return nil, fmt.Errorf("list serial ports: %w", err)
-	}
-	if ports == nil {
-		return []string{}, nil
-	}
-	return CanonicalDevicePaths(ports), nil
-}
-
 func (p *PortSession) Start() {
+	notifyUnavailable := false
 	p.startOnce.Do(func() {
-		go p.readLoop()
+		p.mu.Lock()
+		if p.port == nil {
+			p.mu.Unlock()
+			notifyUnavailable = true
+			return
+		}
+		p.readWG.Add(1)
+		p.mu.Unlock()
+		go p.runReadLoop()
 	})
+	if notifyUnavailable {
+		p.notifyExit(nil)
+	}
 }
 
-func (p *PortSession) readLoop() {
+func (p *PortSession) runReadLoop() {
+	readErr := p.readLoop()
+	p.readWG.Done()
+	p.finishRead(readErr)
+}
+
+func (p *PortSession) readLoop() error {
 	buf := make([]byte, 4096)
 	for {
 		p.mu.RLock()
 		port := p.port
 		p.mu.RUnlock()
 		if port == nil {
-			p.notifyExit(nil)
-			return
+			return nil
 		}
 		n, err := port.Read(buf)
 		if n > 0 {
@@ -115,12 +79,41 @@ func (p *PortSession) readLoop() {
 			continue
 		}
 		if err == io.EOF {
-			p.notifyExit(nil)
-			return
+			return nil
 		}
-		p.notifyExit(err)
+		return err
+	}
+}
+
+func (p *PortSession) finishRead(readErr error) {
+	p.mu.RLock()
+	closePending := p.closePending
+	exited := p.exited
+	p.mu.RUnlock()
+	if closePending {
+		if !exited {
+			p.storePendingExit(readErr)
+		}
 		return
 	}
+	closeErr := p.closeResources()
+	if closeErr != nil {
+		closeErr = fmt.Errorf("close serial port: %w", closeErr)
+		p.storePendingExit(errors.Join(readErr, closeErr))
+		return
+	}
+	p.notifyExit(readErr)
+}
+
+func (p *PortSession) storePendingExit(err error) {
+	p.mu.Lock()
+	if p.exited {
+		p.mu.Unlock()
+		return
+	}
+	p.closePending = true
+	p.pendingExit = errors.Join(p.pendingExit, err)
+	p.mu.Unlock()
 }
 
 func (p *PortSession) SetReadCallback(fn func([]byte)) {
@@ -190,8 +183,9 @@ func (p *PortSession) Write(data []byte) (int, error) {
 	lineEnding := p.lineEnding
 	localEcho := p.localEcho
 	exited := p.exited
+	closePending := p.closePending
 	p.mu.RUnlock()
-	if exited || port == nil {
+	if exited || closePending || port == nil {
 		return 0, fmt.Errorf("serial port not available")
 	}
 	payload := transformLineEnding(data, lineEnding)
@@ -222,17 +216,43 @@ func (p *PortSession) Resize(cols, rows int) error {
 }
 
 func (p *PortSession) Close() error {
-	p.closeOnce.Do(func() {
-		p.mu.Lock()
-		port := p.port
+	p.mu.Lock()
+	p.closePending = true
+	p.mu.Unlock()
+	closeErr := p.closeResources()
+	if closeErr != nil {
+		return closeErr
+	}
+	p.mu.Lock()
+	exitErr := p.pendingExit
+	p.pendingExit = nil
+	p.mu.Unlock()
+	if exitErr == nil {
+		exitErr = io.EOF
+	}
+	p.notifyExit(exitErr)
+	p.readWG.Wait()
+	return nil
+}
+
+func (p *PortSession) closeResources() error {
+	p.closeMu.Lock()
+	defer p.closeMu.Unlock()
+	p.mu.RLock()
+	port := p.port
+	p.mu.RUnlock()
+	if port == nil {
+		return nil
+	}
+	if err := port.Close(); err != nil {
+		return err
+	}
+	p.mu.Lock()
+	if p.port == port {
 		p.port = nil
-		p.mu.Unlock()
-		if port != nil {
-			p.closeErr = port.Close()
-		}
-		p.notifyExit(io.EOF)
-	})
-	return p.closeErr
+	}
+	p.mu.Unlock()
+	return nil
 }
 
 // Device returns the opened device path.

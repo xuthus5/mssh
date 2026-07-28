@@ -2,16 +2,11 @@ package service
 
 import (
 	"database/sql"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"net/http"
 	"net/url"
-	"path/filepath"
 	"slices"
 	"strings"
-
-	"github.com/google/uuid"
 
 	backupcrypto "github.com/xuthus5/mssh/internal/crypto"
 	"github.com/xuthus5/mssh/internal/model"
@@ -41,8 +36,8 @@ func WithVaultSource(source func() (*backupcrypto.VaultFile, error)) SyncOption 
 	return func(service *SyncService) { service.vaultSource = source }
 }
 
-func WithVaultInstaller(installer func(password string, vault backupcrypto.VaultFile) error) SyncOption {
-	return func(service *SyncService) { service.vaultInstaller = installer }
+func WithVaultTransactionInstaller(installer func(password string, vault backupcrypto.VaultFile) (VaultInstallTransaction, error)) SyncOption {
+	return func(service *SyncService) { service.vaultTransactionInstaller = installer }
 }
 
 func WithSyncCrypto(crypto KeyCrypto) SyncOption {
@@ -51,6 +46,10 @@ func WithSyncCrypto(crypto KeyCrypto) SyncOption {
 
 func WithSyncProxy(manager *netproxy.Manager) SyncOption {
 	return func(service *SyncService) { service.proxyManager = manager }
+}
+
+func WithSyncRuntimeSettings(settings SyncRuntimeSettings) SyncOption {
+	return func(service *SyncService) { service.runtimeSettings = settings }
 }
 
 func WithSyncEventBus(eventBus EventBus) SyncOption {
@@ -73,6 +72,15 @@ func defaultSyncConfig() model.SyncConfig {
 }
 
 func (s *SyncService) LoadConfig() (model.SyncConfig, error) {
+	finish, err := s.beginReadOperation()
+	if err != nil {
+		return model.SyncConfig{}, err
+	}
+	defer finish()
+	return s.loadConfig()
+}
+
+func (s *SyncService) loadConfig() (model.SyncConfig, error) {
 	config := defaultSyncConfig()
 	if err := readSyncSetting(s.db, syncConfigSetting, &config); err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return model.SyncConfig{}, err
@@ -90,27 +98,40 @@ func (s *SyncService) LoadConfig() (model.SyncConfig, error) {
 }
 
 func (s *SyncService) SaveConfig(input model.SyncConfigInput) (model.SyncDashboard, error) {
-	config := configFromInput(input)
-	if err := validateSyncConfig(config); err != nil {
+	if err := s.lockSyncOperation(); err != nil {
 		return model.SyncDashboard{}, err
 	}
-	previous, err := s.LoadConfig()
+	defer s.operationMu.Unlock()
+	s.configMu.Lock()
+	err := s.saveConfig(input)
+	s.configMu.Unlock()
 	if err != nil {
 		return model.SyncDashboard{}, err
 	}
-	if err := s.saveInputSecrets(input); err != nil {
-		return model.SyncDashboard{}, err
-	}
-	if err := writeSyncSetting(s.db, syncConfigSetting, config); err != nil {
-		return model.SyncDashboard{}, err
-	}
-	if previous.Provider != config.Provider || providerIdentity(previous) != providerIdentity(config) {
-		if err := store.DeleteSetting(s.db, syncBaselineSetting(config.Provider)); err != nil {
-			return model.SyncDashboard{}, err
-		}
-	}
 	s.restartScheduler()
-	return s.Dashboard()
+	return s.dashboard()
+}
+
+func (s *SyncService) saveConfig(input model.SyncConfigInput) error {
+	config := configFromInput(input)
+	if err := validateSyncConfig(config); err != nil {
+		return err
+	}
+	previous, err := s.loadConfig()
+	if err != nil {
+		return err
+	}
+	changedProvider := providerChanged(previous, config)
+	err = withCryptoOperation(s.crypto, func() error {
+		return s.persistSyncConfig(input, previous, config)
+	})
+	if err != nil {
+		return err
+	}
+	if changedProvider {
+		s.setRuntimeState(syncRuntimeState{State: model.SyncStatePending})
+	}
+	return nil
 }
 
 func configFromInput(input model.SyncConfigInput) model.SyncConfig {
@@ -178,11 +199,29 @@ func providerIdentity(config model.SyncConfig) string {
 }
 
 func (s *SyncService) saveGistID(config model.SyncConfig, gistID string) error {
-	config.Gist.GistID = gistID
-	return writeSyncSetting(s.db, syncConfigSetting, config)
+	gistID = strings.TrimSpace(gistID)
+	if gistID == "" {
+		return errors.New("GitHub Gist ID is required")
+	}
+	s.configMu.Lock()
+	defer s.configMu.Unlock()
+	current, err := s.loadConfig()
+	if err != nil {
+		return err
+	}
+	if current.Provider != model.SyncProviderGist || current.Gist.GistID != config.Gist.GistID {
+		return errors.New("sync configuration changed while creating GitHub Gist")
+	}
+	current.Gist.GistID = gistID
+	return writeSyncSetting(s.db, syncConfigSetting, current)
 }
 
-func (s *SyncService) saveInputSecrets(input model.SyncConfigInput) error {
+type syncSecretChanges struct {
+	settings []model.Setting
+	deletes  []string
+}
+
+func (s *SyncService) prepareInputSecrets(input model.SyncConfigInput) (syncSecretChanges, error) {
 	updates := []struct {
 		key, value string
 		clear      bool
@@ -191,34 +230,57 @@ func (s *SyncService) saveInputSecrets(input model.SyncConfigInput) error {
 		{syncWebDAVPasswordSetting, input.WebDAV.Password, input.WebDAV.ClearPassword},
 		{syncS3SecretSetting, input.S3.SecretKey, input.S3.ClearSecretKey},
 	}
+	changes := syncSecretChanges{}
 	for _, update := range updates {
 		if update.clear {
-			if err := store.DeleteSetting(s.db, update.key); err != nil {
-				return err
-			}
+			changes.deletes = append(changes.deletes, update.key)
 			continue
 		}
 		if update.value != "" {
-			if err := s.saveSecret(update.key, update.value); err != nil {
-				return err
+			setting, err := s.encryptedSecretSetting(update.key, update.value)
+			if err != nil {
+				return syncSecretChanges{}, err
 			}
+			changes.settings = append(changes.settings, setting)
 		}
 	}
-	return nil
+	return changes, nil
 }
 
 func (s *SyncService) saveSecret(key, value string) error {
+	return withCryptoOperation(s.crypto, func() error {
+		setting, err := s.encryptedSecretSetting(key, value)
+		if err != nil {
+			return err
+		}
+		return store.SetSettings(s.db, []model.Setting{setting})
+	})
+}
+
+func (s *SyncService) encryptedSecretSetting(key, value string) (model.Setting, error) {
 	if s.crypto == nil {
-		return errors.New("sync credential encryption is unavailable")
+		return model.Setting{}, errors.New("sync credential encryption is unavailable")
 	}
-	encrypted, err := s.crypto.Encrypt([]byte(value))
+	plaintext := []byte(value)
+	defer clear(plaintext)
+	encrypted, err := s.crypto.Encrypt(plaintext)
 	if err != nil {
-		return fmt.Errorf("encrypt sync credential: %w", err)
+		return model.Setting{}, fmt.Errorf("encrypt sync credential: %w", err)
 	}
-	return writeSyncSetting(s.db, key, string(encrypted))
+	return buildSyncSetting(key, string(encrypted))
 }
 
 func (s *SyncService) loadSecret(key string) (string, error) {
+	var plaintext string
+	err := withCryptoOperation(s.crypto, func() error {
+		var err error
+		plaintext, err = s.loadSecretUnlocked(key)
+		return err
+	})
+	return plaintext, err
+}
+
+func (s *SyncService) loadSecretUnlocked(key string) (string, error) {
 	var encrypted string
 	if err := readSyncSetting(s.db, key, &encrypted); err != nil {
 		return "", err
@@ -226,73 +288,10 @@ func (s *SyncService) loadSecret(key string) (string, error) {
 	if s.crypto == nil {
 		return "", errors.New("sync credential decryption is unavailable")
 	}
-	plaintext, err := s.crypto.Decrypt([]byte(encrypted))
+	decrypted, err := s.crypto.Decrypt([]byte(encrypted))
 	if err != nil {
 		return "", fmt.Errorf("decrypt sync credential: %w", err)
 	}
-	return string(plaintext), nil
-}
-
-func (s *SyncService) secretSaved(key string) bool {
-	var raw string
-	return s.db.QueryRow("SELECT value FROM settings WHERE key = ?", key).Scan(&raw) == nil && raw != ""
-}
-
-func (s *SyncService) deviceID() (string, error) {
-	var value string
-	if err := readSyncSetting(s.db, syncDeviceIDSetting, &value); err == nil && value != "" {
-		return value, nil
-	}
-	value = uuid.NewString()
-	if err := writeSyncSetting(s.db, syncDeviceIDSetting, value); err != nil {
-		return "", err
-	}
-	return value, nil
-}
-
-func writeSyncSetting(db *sql.DB, key string, value any) error {
-	setting, err := buildSyncSetting(key, value)
-	if err != nil {
-		return err
-	}
-	return store.SetSettings(db, []model.Setting{setting})
-}
-
-func readSyncSetting(db *sql.DB, key string, value any) error {
-	setting, err := store.GetSettingEntry(db, key)
-	if err != nil {
-		return err
-	}
-	if setting == nil {
-		return sql.ErrNoRows
-	}
-	if err := json.Unmarshal([]byte(setting.Value), value); err != nil {
-		return fmt.Errorf("decode sync setting %s: %w", key, err)
-	}
-	return nil
-}
-
-func syncSettingType(value any) string {
-	switch value.(type) {
-	case string:
-		return "string"
-	case bool:
-		return "boolean"
-	case int, int64:
-		return "number"
-	default:
-		return "object"
-	}
-}
-
-func syncVersionPath(dataDir, fileName string) string {
-	return filepath.Join(dataDir, "sync", "versions", fileName)
-}
-
-func (s *SyncService) syncHTTPClient() *http.Client {
-	return sharedHTTPClient(syncNetworkTimeout, s.proxyManager)
-}
-
-func syncHTTPClient() *http.Client {
-	return sharedHTTPClient(syncNetworkTimeout, nil)
+	defer clear(decrypted)
+	return string(decrypted), nil
 }

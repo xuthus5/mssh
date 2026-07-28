@@ -74,7 +74,7 @@ const sessions = [
 describe('SessionAssetCenter behavior', () => {
   beforeEach(() => {
 	useSessionAssetFilterStore.getState().resetFilters()
-    Object.assign(state, { folders: [...folders], sessions: [...sessions], recentSessions: [{ ...sessions[0], lastConnectedAt: '2026-07-12T12:00:00Z', connectionCount: 3 }], loading: false, error: '' })
+    Object.assign(state, { folders: [...folders], sessions: [...sessions], recentSessions: [{ ...sessions[0], lastConnectedAt: '2026-07-12T12:00:00Z', connectionCount: 3 }], environments: [], projects: [], tags: [], loading: false, error: '' })
     for (const value of Object.values(state)) if (typeof value === 'function' && 'mockReset' in value) value.mockReset().mockResolvedValue(undefined)
     toast.mockClear()
   })
@@ -183,6 +183,98 @@ describe('SessionAssetCenter behavior', () => {
     await waitFor(() => expect(state.moveSession).toHaveBeenCalledWith('one', 'default'))
     expect(await screen.findByRole('alert')).toHaveTextContent('移动会话失败: move failed')
     expect(toast).not.toHaveBeenCalled()
+  })
+
+  it('serializes moves for the same session and disables alternate targets while pending', async () => {
+    let resolveMove: (() => void) | undefined
+    state.folders = [...folders, { id: 'archive', name: '归档分组', parentId: null, isDefault: false }]
+    state.moveSession.mockImplementationOnce(() => new Promise<void>((resolve) => { resolveMove = resolve }))
+    const user = userEvent.setup()
+    render(<SessionAssetCenter />)
+
+    await user.click(screen.getByRole('button', { name: '默认分组' }))
+    await waitFor(() => expect(state.moveSession).toHaveBeenCalledWith('one', 'default'))
+    const archiveTarget = screen.getByRole('button', { name: '归档分组' })
+    expect(archiveTarget).toBeDisabled()
+
+    await user.click(archiveTarget)
+    expect(state.moveSession).toHaveBeenCalledTimes(1)
+
+    await act(async () => { resolveMove?.() })
+    await waitFor(() => expect(archiveTarget).toBeEnabled())
+    await user.click(archiveTarget)
+    expect(state.moveSession).toHaveBeenLastCalledWith('one', 'archive')
+  })
+
+  it('keeps the latest asset action as the owner of the error banner', async () => {
+    let rejectDefault: ((reason?: unknown) => void) | undefined
+    let resolveMove: (() => void) | undefined
+    state.setDefaultFolder.mockImplementationOnce(() => new Promise<void>((_, reject) => { rejectDefault = reject }))
+    state.moveSession.mockImplementationOnce(() => new Promise<void>((resolve) => { resolveMove = resolve }))
+    const user = userEvent.setup()
+    render(<SessionAssetCenter />)
+
+    await user.click(screen.getByRole('tab', { name: /分组/ }))
+    await user.click(within(screen.getByRole('button', { name: '生产环境' }).closest('tr')!).getByRole('button', { name: '设为默认' }))
+    await user.click(screen.getByRole('tab', { name: /最近连接/ }))
+    const row = screen.getByText('生产服务器').closest('tr')!
+    await user.click(within(row).getByRole('button', { name: /更多操作/ }))
+    await user.click(await screen.findByRole('button', { name: '默认分组' }))
+    await waitFor(() => expect(state.moveSession).toHaveBeenCalledWith('one', 'default'))
+
+    await act(async () => { resolveMove?.() })
+    await act(async () => { rejectDefault?.(new Error('stale default failed')) })
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('locks the delete target until the active destructive operation completes', async () => {
+    const resolvers: Array<() => void> = []
+    state.deleteSession.mockImplementation(() => new Promise<void>((resolve) => { resolvers.push(resolve) }))
+    const user = userEvent.setup()
+    render(<SessionAssetCenter />)
+    await user.click(screen.getByRole('tab', { name: /所有节点/ }))
+
+    const firstRow = screen.getByText('生产服务器').closest('tr')!
+    await user.click(within(firstRow).getByRole('button', { name: /更多操作/ }))
+    await user.click(within(firstRow).getByRole('button', { name: '删除' }))
+    await user.click(screen.getByRole('button', { name: '确认删除' }))
+
+    const secondRow = screen.getByText('测试服务器').closest('tr')!
+    await user.click(within(secondRow).getByRole('button', { name: /更多操作/ }))
+    await user.click(within(secondRow).getByRole('button', { name: '删除' }))
+    expect(screen.getByRole('dialog')).toHaveTextContent('删除“生产服务器”？')
+    expect(state.deleteSession).toHaveBeenCalledTimes(1)
+
+    await act(async () => { resolvers[0]?.() })
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+
+    await user.click(within(secondRow).getByRole('button', { name: /更多操作/ }))
+    await user.click(within(secondRow).getByRole('button', { name: '删除' }))
+    expect(screen.getByRole('dialog')).toHaveTextContent('删除“测试服务器”？')
+  })
+
+  it('keeps the catalog mutation lease across asset tab navigation', async () => {
+    let resolveReorder: (() => void) | undefined
+    state.environments = [
+      { id: 'prod', name: '生产', colorToken: 'red', sortOrder: 0, sessionCount: 1 },
+      { id: 'test', name: '测试', colorToken: 'amber', sortOrder: 1, sessionCount: 1 },
+    ]
+    state.reorderEnvironments.mockImplementationOnce(() => new Promise<void>((resolve) => { resolveReorder = resolve }))
+    const user = userEvent.setup()
+    render(<SessionAssetCenter />)
+
+    await user.click(screen.getByRole('tab', { name: /分类管理/ }))
+    await user.click(screen.getByRole('button', { name: '下移 生产' }))
+    await user.click(screen.getByRole('tab', { name: /最近连接/ }))
+    await user.click(screen.getByRole('tab', { name: /分类管理/ }))
+
+    const moveButton = screen.getByRole('button', { name: '下移 生产' })
+    expect(moveButton).toBeDisabled()
+    await user.click(moveButton)
+    expect(state.reorderEnvironments).toHaveBeenCalledOnce()
+
+    await act(async () => { resolveReorder?.() })
+    await waitFor(() => expect(moveButton).toBeEnabled())
   })
 })
 

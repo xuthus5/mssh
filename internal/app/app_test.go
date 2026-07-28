@@ -18,6 +18,7 @@ import (
 
 	"github.com/xuthus5/mssh/internal/model"
 	"github.com/xuthus5/mssh/internal/service"
+	"github.com/xuthus5/mssh/internal/service/testutil"
 	"github.com/xuthus5/mssh/internal/store"
 )
 
@@ -154,6 +155,41 @@ func TestApp_Shutdown(t *testing.T) {
 
 	pingErr := appInstance.DB.Ping()
 	assert.Error(t, pingErr, "db should be closed after shutdown")
+}
+
+func TestAppShutdownWaitsForFileMetadataBeforeClosingDatabase(t *testing.T) {
+	database, err := store.OpenDB(t.TempDir())
+	require.NoError(t, err)
+	require.NoError(t, store.InitializeSchema(database))
+	fileService := service.NewFileService(nil, discardEventBus{}, slog.Default(), service.WithTransferDB(database))
+	rollback := testutil.HoldDatabaseConnection(t, database)
+	baselineWaits := database.Stats().WaitCount
+	listDone := make(chan error, 1)
+	go func() {
+		_, listErr := fileService.ListTransfers()
+		listDone <- listErr
+	}()
+	testutil.WaitForDatabaseWaitCount(t, database, baselineWaits+1)
+
+	shutdownDone := make(chan struct{})
+	go func() {
+		(&App{DB: database, File: fileService, logger: slog.Default()}).Shutdown()
+		close(shutdownDone)
+	}()
+	select {
+	case <-shutdownDone:
+		t.Fatal("app shutdown returned before file metadata completed")
+	case <-time.After(50 * time.Millisecond):
+	}
+
+	rollback()
+	require.NoError(t, <-listDone)
+	select {
+	case <-shutdownDone:
+	case <-time.After(time.Second):
+		t.Fatal("app shutdown did not finish after file metadata completed")
+	}
+	assert.Error(t, database.Ping())
 }
 
 func TestAppShutdownStopsSyncBeforeTerminal(t *testing.T) {

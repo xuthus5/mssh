@@ -39,7 +39,7 @@ func TestTunnelService_CRUD(t *testing.T) {
 
 	sess := model.Session{
 		Name: "test", Host: "10.0.0.1", Port: 22, Username: "root",
-		AuthMethod: model.AuthPassword, Password: "enc", KeepAlive: 30, TermType: "xterm",
+		AuthMethod: model.AuthPassword, KeepAlive: 30, TermType: "xterm",
 	}
 	createdSess, err := sessionSvc.CreateSession(model.SessionInputFrom(sess))
 	require.NoError(t, err)
@@ -273,7 +273,7 @@ func TestTunnelService_Remote(t *testing.T) {
 
 	sess := model.Session{
 		Name: "test", Host: "10.0.0.1", Port: 22, Username: "root",
-		AuthMethod: model.AuthPassword, Password: "enc", KeepAlive: 30, TermType: "xterm",
+		AuthMethod: model.AuthPassword, KeepAlive: 30, TermType: "xterm",
 	}
 	createdSess, err := sessionSvc.CreateSession(model.SessionInputFrom(sess))
 	require.NoError(t, err)
@@ -296,7 +296,7 @@ func TestTunnelService_LocalForward(t *testing.T) {
 
 	sess := model.Session{
 		Name: "test", Host: "10.0.0.1", Port: 22, Username: "root",
-		AuthMethod: model.AuthPassword, Password: "enc", KeepAlive: 30, TermType: "xterm",
+		AuthMethod: model.AuthPassword, KeepAlive: 30, TermType: "xterm",
 	}
 	createdSess, err := sessionSvc.CreateSession(model.SessionInputFrom(sess))
 	require.NoError(t, err)
@@ -316,7 +316,7 @@ func TestTunnelService_StartConnectError(t *testing.T) {
 
 	sess := model.Session{
 		Name: "dead-sess", Host: "127.0.0.1", Port: 19, Username: "root",
-		AuthMethod: model.AuthPassword, Password: "enc", KeepAlive: 30, TermType: "xterm",
+		AuthMethod: model.AuthPassword, KeepAlive: 30, TermType: "xterm",
 	}
 	createdSess, err := sessionSvc.CreateSession(model.SessionInputFrom(sess))
 	require.NoError(t, err)

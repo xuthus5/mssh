@@ -5,17 +5,22 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"strconv"
 	"strings"
 	"unicode/utf8"
 
+	"github.com/xuthus5/mssh/internal/fsutil"
 	"github.com/xuthus5/mssh/internal/model"
 )
 
 const maxSessionCSVPreviewRows = 20
 
 func (s *SessionService) PreviewCSV(path string) (model.SessionCSVPreview, error) {
+	finish, err := s.beginOperation()
+	if err != nil {
+		return model.SessionCSVPreview{}, err
+	}
+	defer finish()
 	cleaned, err := validateLocalFilePath(path)
 	if err != nil {
 		return model.SessionCSVPreview{}, fmt.Errorf("preview session csv: %w", err)
@@ -40,14 +45,18 @@ func (s *SessionService) PreviewCSV(path string) (model.SessionCSVPreview, error
 }
 
 func readSessionCSVRecords(path string) ([][]string, error) {
-	file, err := os.Open(path)
+	file, info, err := fsutil.OpenRegularFileFollowingSymlinks(path)
 	if err != nil {
 		return nil, err
 	}
-	defer func() { _ = file.Close() }()
-	content, err := io.ReadAll(io.LimitReader(file, maxSessionCSVBytes+1))
-	if err != nil {
-		return nil, err
+	if info.Size() > maxSessionCSVBytes {
+		closeErr := file.Close()
+		return nil, errors.Join(fmt.Errorf("session csv exceeds %d bytes", maxSessionCSVBytes), closeErr)
+	}
+	content, readErr := io.ReadAll(io.LimitReader(file, maxSessionCSVBytes+1))
+	closeErr := file.Close()
+	if readErr != nil || closeErr != nil {
+		return nil, errors.Join(readErr, closeErr)
 	}
 	if len(content) > maxSessionCSVBytes {
 		return nil, fmt.Errorf("session csv exceeds %d bytes", maxSessionCSVBytes)

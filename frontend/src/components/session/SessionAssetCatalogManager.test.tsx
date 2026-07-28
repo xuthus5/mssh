@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -70,4 +70,83 @@ describe('SessionAssetCatalogManager', () => {
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('调整资产排序失败: reorder failed'))
     expect(toast).not.toHaveBeenCalled()
   })
+
+  it('allows only one reorder request for a catalog target', async () => {
+    let resolveReorder: (() => void) | undefined
+    const values = props()
+    values.onReorderEnvironments = vi.fn(() => new Promise<void>((resolve) => { resolveReorder = resolve }))
+    render(<SessionAssetCatalogManager {...values} />)
+
+    const moveButton = screen.getByRole('button', { name: '下移 生产' })
+    act(() => {
+      fireEvent.click(moveButton)
+      fireEvent.click(moveButton)
+    })
+    expect(moveButton).toBeDisabled()
+    expect(values.onReorderEnvironments).toHaveBeenCalledOnce()
+    await act(async () => { resolveReorder?.() })
+    expect(moveButton).toBeEnabled()
+  })
+
+  it('does not show an old reorder error after the catalog target changes', async () => {
+    let rejectReorder: ((reason: Error) => void) | undefined
+    const values = props()
+    values.onReorderEnvironments = vi.fn(() => new Promise<void>((_, reject) => { rejectReorder = reject }))
+    const view = render(<SessionAssetCatalogManager {...values} />)
+    await userEvent.click(screen.getByRole('button', { name: '下移 生产' }))
+    view.rerender(<SessionAssetCatalogManager {...values} environments={[{ ...values.environments[0], id: 'new', name: '新环境' }]} />)
+    await act(async () => { rejectReorder?.(new Error('old reorder failed')) })
+    expect(screen.queryByText('调整资产排序失败: old reorder failed')).not.toBeInTheDocument()
+  })
+
+  it('keeps the reorder lease while refreshed catalog data replaces the visible target', async () => {
+    let resolveReorder: (() => void) | undefined
+    const values = props()
+    values.onReorderEnvironments = vi.fn(() => new Promise<void>((resolve) => { resolveReorder = resolve }))
+    const view = render(<SessionAssetCatalogManager {...values} />)
+    await userEvent.click(screen.getByRole('button', { name: '下移 生产' }))
+
+    const refreshed = [
+      { ...values.environments[0], id: 'new-1', name: '新环境' },
+      { ...values.environments[1], id: 'new-2', name: '新测试' },
+    ]
+    view.rerender(<SessionAssetCatalogManager {...values} environments={refreshed} />)
+    const refreshedMove = screen.getByRole('button', { name: '下移 新环境' })
+    expect(refreshedMove).toBeDisabled()
+    await userEvent.click(refreshedMove)
+    expect(values.onReorderEnvironments).toHaveBeenCalledOnce()
+
+    await act(async () => { resolveReorder?.() })
+    await waitFor(() => expect(refreshedMove).toBeEnabled())
+    await userEvent.click(refreshedMove)
+    expect(values.onReorderEnvironments).toHaveBeenLastCalledWith(['new-2', 'new-1'])
+  })
+
+  it('blocks catalog create, edit, and delete while reorder is pending', async () => {
+    const reorder = deferred<void>()
+    const values = props()
+    values.onReorderEnvironments = vi.fn(() => reorder.promise)
+    render(<SessionAssetCatalogManager {...values} />)
+
+    fireEvent.click(screen.getByRole('button', { name: '下移 生产' }))
+    const createButton = screen.getByRole('button', { name: '新建环境' })
+    const rowActions = screen.getByRole('button', { name: '生产 分类操作' })
+    expect(createButton).toBeDisabled()
+    expect(rowActions).toBeDisabled()
+
+    fireEvent.click(createButton)
+    fireEvent.click(rowActions)
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+
+    await act(async () => reorder.resolve())
+    await waitFor(() => expect(createButton).toBeEnabled())
+    expect(rowActions).toBeEnabled()
+  })
 })
+
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((resolvePromise) => { resolve = resolvePromise })
+  return { promise, resolve }
+}

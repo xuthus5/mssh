@@ -8,12 +8,8 @@ const MIN_WIDTH = 220
 const MAX_WIDTH = 480
 const KEYBOARD_STEP = 16
 
-export function useResizablePanel() {
-  const width = useAppStore((state) => state.sidebarWidth)
-  const collapsed = useAppStore((state) => state.navigationCollapsed)
-  const setSidebarWidth = useAppStore((state) => state.setSidebarWidth)
+function useResizeDrag(setSidebarWidth: (width: number) => void) {
   const dragRef = useRef<{ pointerId: number; startX: number; startWidth: number } | null>(null)
-
   useEffect(() => {
     const handleMove = (event: PointerEvent) => {
       const drag = dragRef.current
@@ -21,8 +17,7 @@ export function useResizablePanel() {
       setSidebarWidth(drag.startWidth + event.clientX - drag.startX)
     }
     const handleUp = (event: PointerEvent) => {
-      if (dragRef.current?.pointerId !== event.pointerId) return
-      dragRef.current = null
+      if (dragRef.current?.pointerId === event.pointerId) dragRef.current = null
     }
     window.addEventListener('pointermove', handleMove)
     window.addEventListener('pointerup', handleUp)
@@ -33,6 +28,14 @@ export function useResizablePanel() {
       window.removeEventListener('pointercancel', handleUp)
     }
   }, [setSidebarWidth])
+  return dragRef
+}
+
+export function useResizablePanel() {
+  const width = useAppStore((state) => state.sidebarWidth)
+  const collapsed = useAppStore((state) => state.navigationCollapsed)
+  const setSidebarWidth = useAppStore((state) => state.setSidebarWidth)
+  const dragRef = useResizeDrag(setSidebarWidth)
 
   const resize = (nextWidth: number) => {
     setSidebarWidth(nextWidth)

@@ -22,13 +22,17 @@ func (t *TerminalService) OpenSerial(ctx context.Context, serialPortID int64, co
 	if err := validateTerminalSize(cols, rows); err != nil {
 		return "", err
 	}
-	if err := contextError(ctx); err != nil {
+	finish, err := t.beginOperation()
+	if err != nil {
 		return "", err
 	}
+	defer finish()
 	if err := t.beginOpen(); err != nil {
 		return "", err
 	}
-	defer t.finishOpen()
+	if err := contextError(ctx); err != nil {
+		return "", err
+	}
 	outcome := "failed"
 	defer func() {
 		if t.sessionSvc != nil {
@@ -45,8 +49,14 @@ func (t *TerminalService) OpenSerial(ctx context.Context, serialPortID int64, co
 	if err != nil {
 		return "", fmt.Errorf("serial open: %w", err)
 	}
+	if err := t.retryPendingSerialCleanupForDevice(profile.Device); err != nil {
+		return "", fmt.Errorf("retry pending serial cleanup for %s: %w", profile.Device, err)
+	}
+	if err := contextError(ctx); err != nil {
+		return "", err
+	}
 	terminalID := uuid.New().String()
-	if err := t.serialSvc.reserveDevice(profile.Device, terminalID); err != nil {
+	if err := t.serialSvc.reserveProfile(*profile, terminalID); err != nil {
 		return "", err
 	}
 	port, err := openSerialPortSession(*profile)
@@ -56,11 +66,21 @@ func (t *TerminalService) OpenSerial(ctx context.Context, serialPortID int64, co
 		return "", fmt.Errorf("serial open: %w", err)
 	}
 	if err := contextError(ctx); err != nil {
-		_ = port.Close()
-		t.serialSvc.releaseDevice(profile.Device, terminalID)
-		return "", err
+		return "", t.rollbackUnregisteredSerial(unregisteredSerialResource{
+			terminalID: terminalID,
+			device:     profile.Device,
+			port:       port,
+			leaseOwner: t.serialSvc,
+		}, err)
 	}
-	t.registerTerminal(terminalID, "", 0, port)
+	if err := t.registerTerminal(terminalID, "", 0, port); err != nil {
+		return "", t.rollbackUnregisteredSerial(unregisteredSerialResource{
+			terminalID: terminalID,
+			device:     profile.Device,
+			port:       port,
+			leaseOwner: t.serialSvc,
+		}, fmt.Errorf("register serial terminal: %w", err))
+	}
 	t.logger.Info("serial terminal opened", "terminalID", terminalID, "device", profile.Device)
 	outcome = "success"
 	return terminalID, nil
@@ -85,6 +105,11 @@ func (t *TerminalService) SerialSetSignals(terminalID string, dtr, rts bool) err
 	if err := validateTerminalID(terminalID); err != nil {
 		return err
 	}
+	finish, err := t.beginOperation()
+	if err != nil {
+		return err
+	}
+	defer finish()
 	port, err := t.serialPortSession(terminalID)
 	if err != nil {
 		return err
@@ -97,11 +122,16 @@ func (t *TerminalService) SerialSignals(terminalID string) (model.SerialSignals,
 	if err := validateTerminalID(terminalID); err != nil {
 		return model.SerialSignals{}, err
 	}
+	finish, err := t.beginOperation()
+	if err != nil {
+		return model.SerialSignals{}, err
+	}
+	defer finish()
 	port, err := t.serialPortSession(terminalID)
 	if err != nil {
 		return model.SerialSignals{}, err
 	}
-	return port.Signals(), nil
+	return port.Signals()
 }
 
 // SerialBreak sends a break signal on an open serial terminal.
@@ -112,6 +142,11 @@ func (t *TerminalService) SerialBreak(terminalID string, durationMs int) error {
 	if durationMs < 0 {
 		return fmt.Errorf("invalid break duration")
 	}
+	finish, err := t.beginOperation()
+	if err != nil {
+		return err
+	}
+	defer finish()
 	port, err := t.serialPortSession(terminalID)
 	if err != nil {
 		return err

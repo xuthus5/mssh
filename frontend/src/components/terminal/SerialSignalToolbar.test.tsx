@@ -1,4 +1,4 @@
-import { render, screen, waitFor, act } from '@testing-library/react'
+import { render, screen, waitFor, act, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { SerialSignalToolbar } from '@/components/terminal/SerialSignalToolbar'
@@ -73,4 +73,80 @@ describe('SerialSignalToolbar', () => {
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('发送 Break 失败: break failed'))
     expect(vi.mocked(toast).mock.calls.filter((call) => call[1] === 'error')).toHaveLength(0)
   })
+
+  it('does not overlap slow signal polls', async () => {
+    vi.useFakeTimers()
+    const pending: Array<(value: { dtr: boolean; rts: boolean; cts: boolean; dsr: boolean; dcd: boolean; ri: boolean }) => void> = []
+    __registerHandler(terminal + 'SerialSignals', () => new Promise((resolve) => { pending.push(resolve) }))
+    render(<SerialSignalToolbar terminalID="term-1" />)
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(5000) })
+    expect(pending).toHaveLength(1)
+    await act(async () => {
+      pending[0]({ dtr: false, rts: false, cts: true, dsr: true, dcd: false, ri: true })
+      await Promise.resolve()
+    })
+    expect(screen.getAllByRole('switch')[0]).not.toBeChecked()
+    await act(async () => { await vi.advanceTimersByTimeAsync(1000) })
+    expect(pending).toHaveLength(2)
+    vi.useRealTimers()
+  })
+
+  it('does not paint an old signal action after switching terminals', async () => {
+    const user = userEvent.setup()
+    let rejectSet: ((reason?: unknown) => void) | undefined
+    __registerHandler(terminal + 'SerialSetSignals', () => new Promise((_, reject) => { rejectSet = reject }))
+    const view = render(<SerialSignalToolbar terminalID="term-1" />)
+    await waitFor(() => expect(screen.getByText('DTR')).toBeInTheDocument())
+    await user.click(screen.getAllByRole('switch')[0])
+    view.rerender(<SerialSignalToolbar terminalID="term-2" />)
+    await act(async () => {
+      rejectSet?.(new Error('old terminal action failed'))
+      await Promise.resolve()
+    })
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('deduplicates rapid signal mutations before pending state renders', async () => {
+    const pending = deferred<void>()
+    const setSignals = vi.fn(() => pending.promise)
+    __registerHandler(terminal + 'SerialSetSignals', setSignals)
+    render(<SerialSignalToolbar terminalID="term-1" />)
+    await waitFor(() => expect(screen.getAllByRole('switch')[0]).toBeChecked())
+
+    const signal = screen.getAllByRole('switch')[0]
+    act(() => {
+      fireEvent.click(signal)
+      fireEvent.click(signal)
+    })
+    expect(setSignals).toHaveBeenCalledOnce()
+    await act(async () => pending.resolve())
+  })
+
+  it('keeps the signal mutation lease across terminal changes', async () => {
+    const pending = deferred<void>()
+    const setSignals = vi.fn(() => pending.promise)
+    const sendBreak = vi.fn(async () => undefined)
+    __registerHandler(terminal + 'SerialSetSignals', setSignals)
+    __registerHandler(terminal + 'SerialBreak', sendBreak)
+    const view = render(<SerialSignalToolbar terminalID="term-1" />)
+    await waitFor(() => expect(screen.getAllByRole('switch')[0]).toBeChecked())
+    await userEvent.click(screen.getAllByRole('switch')[0])
+
+    view.rerender(<SerialSignalToolbar terminalID="term-2" />)
+    expect(screen.getByRole('button', { name: 'Break' })).toBeDisabled()
+    await userEvent.click(screen.getByRole('button', { name: 'Break' }))
+    expect(sendBreak).not.toHaveBeenCalled()
+
+    await act(async () => pending.resolve())
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Break' })).toBeEnabled())
+    await userEvent.click(screen.getByRole('button', { name: 'Break' }))
+    expect(sendBreak).toHaveBeenCalledOnce()
+  })
 })
+
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((resolvePromise) => { resolve = resolvePromise })
+  return { promise, resolve }
+}

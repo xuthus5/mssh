@@ -64,17 +64,26 @@ func planSSHKeyUpdates(db *sql.DB, oldCrypto, newCrypto KeyCrypto) ([]reencryptK
 		if err != nil {
 			return nil, fmt.Errorf("load key %d: %w", keyID, err)
 		}
-		plain, err := oldCrypto.Decrypt([]byte(key.PrivateKey))
+		sealed, err := reencryptSSHPrivateKey(oldCrypto, newCrypto, keyID, key.PrivateKey)
 		if err != nil {
-			return nil, fmt.Errorf("decrypt key %d: %w", keyID, err)
+			return nil, err
 		}
-		sealed, err := newCrypto.Encrypt(plain)
-		if err != nil {
-			return nil, fmt.Errorf("encrypt key %d: %w", keyID, err)
-		}
-		updates = append(updates, reencryptKeyUpdate{id: keyID, privateKey: string(sealed)})
+		updates = append(updates, reencryptKeyUpdate{id: keyID, privateKey: sealed})
 	}
 	return updates, nil
+}
+
+func reencryptSSHPrivateKey(oldCrypto, newCrypto KeyCrypto, keyID int64, encrypted string) (string, error) {
+	plain, err := oldCrypto.Decrypt([]byte(encrypted))
+	if err != nil {
+		return "", fmt.Errorf("decrypt key %d: %w", keyID, err)
+	}
+	defer clear(plain)
+	sealed, err := newCrypto.Encrypt(plain)
+	if err != nil {
+		return "", fmt.Errorf("encrypt key %d: %w", keyID, err)
+	}
+	return string(sealed), nil
 }
 
 func planSessionPasswordUpdates(db *sql.DB, oldCrypto, newCrypto KeyCrypto) ([]reencryptSessionUpdate, error) {
@@ -175,6 +184,7 @@ func planSyncCredentialSetting(db *sql.DB, key string, oldCrypto, newCrypto KeyC
 	if err != nil {
 		return nil, fmt.Errorf("decrypt %s: %w", key, err)
 	}
+	defer clear(plain)
 	sealed, err := newCrypto.Encrypt(plain)
 	if err != nil {
 		return nil, fmt.Errorf("encrypt %s: %w", key, err)

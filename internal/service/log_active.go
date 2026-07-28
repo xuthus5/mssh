@@ -1,17 +1,22 @@
 package service
 
 import (
+	"database/sql/driver"
 	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/xuthus5/mssh/internal/ssh"
-	"github.com/xuthus5/mssh/internal/store"
 )
 
 func (l *LogService) StopTerminalRecording(terminalID string) error {
+	finish, err := l.beginOperation()
+	if err != nil {
+		return err
+	}
+	defer finish()
 	if err := validateTerminalID(terminalID); err != nil {
 		return err
 	}
@@ -20,12 +25,13 @@ func (l *LogService) StopTerminalRecording(terminalID string) error {
 	if !ok {
 		return fmt.Errorf("recording for terminal %s not active", terminalID)
 	}
-	err := l.finishRecording("stop terminal recording", recording)
+	err = l.finishRecording("stop terminal recording", recording)
 	l.addShutdownError(err)
-	l.finalizers.Done()
+	l.completeRecordingFinalizer(recording.logID)
 	return err
 }
 
+//wails:ignore
 func (l *LogService) StopTerminalRecordingIfActive(terminalID string) error {
 	if err := validateTerminalID(terminalID); err != nil {
 		return err
@@ -36,22 +42,27 @@ func (l *LogService) StopTerminalRecordingIfActive(terminalID string) error {
 	}
 	err := l.finishRecording("stop terminal recording if active", recording)
 	l.addShutdownError(err)
-	l.finalizers.Done()
+	l.completeRecordingFinalizer(recording.logID)
 	return err
 }
 
 func (l *LogService) takeRecording(terminalID string) (*activeRecording, bool) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	if l.shuttingDown {
-		return nil, false
-	}
 	recording, ok := l.recorders[terminalID]
 	if ok {
 		delete(l.recorders, terminalID)
+		l.finalizing[recording.logID] = struct{}{}
 		l.finalizers.Add(1)
 	}
 	return recording, ok
+}
+
+func (l *LogService) completeRecordingFinalizer(logID int64) {
+	l.mu.Lock()
+	delete(l.finalizing, logID)
+	l.mu.Unlock()
+	l.finalizers.Done()
 }
 
 func (l *LogService) finishRecording(operation string, recording *activeRecording) error {
@@ -59,11 +70,39 @@ func (l *LogService) finishRecording(operation string, recording *activeRecordin
 	if closeErr != nil {
 		closeErr = fmt.Errorf("%s: close recorder: %w", operation, closeErr)
 	}
-	endErr := l.endSessionLog(l.db, recording.logID)
+	endErr := l.endSessionLogWithRetry(recording.logID)
 	if endErr != nil {
 		endErr = fmt.Errorf("%s: %w", operation, endErr)
 	}
 	return errors.Join(closeErr, endErr)
+}
+
+func (l *LogService) endSessionLogWithRetry(logID int64) error {
+	var finalErr error
+	for attempt := 0; attempt < sessionLogFinalizeAttempts; attempt++ {
+		finalErr = l.endSessionLog(l.db, logID)
+		if finalErr == nil || !isRetryableSessionLogFinalizeError(finalErr) {
+			return finalErr
+		}
+		if attempt+1 < sessionLogFinalizeAttempts {
+			time.Sleep(time.Duration(attempt+1) * sessionLogFinalizeRetryDelay)
+		}
+	}
+	return finalErr
+}
+
+func isRetryableSessionLogFinalizeError(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, driver.ErrBadConn) {
+		return true
+	}
+	message := strings.ToLower(err.Error())
+	return strings.Contains(message, "database is locked") ||
+		strings.Contains(message, "database is busy") ||
+		strings.Contains(message, "sqlite_busy") ||
+		strings.Contains(message, "sqlite_locked")
 }
 
 func (l *LogService) addShutdownError(err error) {
@@ -77,6 +116,7 @@ func (l *LogService) addShutdownError(err error) {
 	l.mu.Unlock()
 }
 
+//wails:ignore
 func (l *LogService) HandleOutput(terminalID string, data []byte) {
 	l.mu.Lock()
 	recording, ok := l.recorders[terminalID]
@@ -90,6 +130,11 @@ func (l *LogService) HandleOutput(terminalID string, data []byte) {
 }
 
 func (l *LogService) GetRecording(path string) (*ssh.Player, error) {
+	finish, err := l.beginOperation()
+	if err != nil {
+		return nil, err
+	}
+	defer finish()
 	cleaned, err := validateLocalFilePath(path)
 	if err != nil {
 		return nil, fmt.Errorf("get recording: %w", err)
@@ -109,27 +154,24 @@ func (l *LogService) ensureRecordingPath(path string) error {
 	if err != nil {
 		return fmt.Errorf("get recording: resolve path: %w", err)
 	}
-	rel, err := filepath.Rel(recordingsDir, absPath)
-	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+	if !pathWithinDirectory(recordingsDir, absPath) {
+		return fmt.Errorf("get recording: path outside recordings directory")
+	}
+	_, resolvedDir, err := l.recordingDirectoryPaths()
+	if err != nil {
+		return fmt.Errorf("get recording: %w", err)
+	}
+	resolvedPath, err := filepath.EvalSymlinks(absPath)
+	if err != nil {
+		return fmt.Errorf("get recording: resolve path: %w", err)
+	}
+	if !pathWithinDirectory(resolvedDir, resolvedPath) {
 		return fmt.Errorf("get recording: path outside recordings directory")
 	}
 	return nil
 }
 
-func (l *LogService) Delete(id int64) error {
-	if id <= 0 {
-		return fmt.Errorf("invalid log id")
-	}
-	l.logger.Info("deleting log", "id", id)
-	log, err := store.GetSessionLog(l.db, id)
-	if err != nil {
-		return fmt.Errorf("delete: %w", err)
-	}
-	if err := store.DeleteSessionLog(l.db, id); err != nil {
-		return fmt.Errorf("delete: %w", err)
-	}
-	if log.DataPath != "" {
-		_ = os.Remove(log.DataPath)
-	}
-	return nil
+func pathWithinDirectory(directory, path string) bool {
+	relative, err := filepath.Rel(directory, path)
+	return err == nil && relative != ".." && !strings.HasPrefix(relative, ".."+string(filepath.Separator))
 }

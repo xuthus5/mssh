@@ -6,7 +6,7 @@ import (
 	"fmt"
 )
 
-func (s *SessionService) beginConnect(ctx context.Context, sessionID int64) (context.Context, string, func(), error) {
+func (s *SessionService) beginConnect(ctx context.Context, sessionID int64) (context.Context, string, uint64, func(), error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -16,13 +16,19 @@ func (s *SessionService) beginConnect(ctx context.Context, sessionID int64) (con
 	if s.closing || s.shuttingDown {
 		s.mu.Unlock()
 		cancel()
-		return nil, "", nil, fmt.Errorf("session service is shutting down")
+		return nil, "", 0, nil, fmt.Errorf("session service is shutting down")
 	}
+	if err := s.sessionRuntimeErrorLocked(sessionID, s.sessionDeletionGenerationLocked(sessionID)); err != nil {
+		s.mu.Unlock()
+		cancel()
+		return nil, "", 0, nil, err
+	}
+	generation := s.sessionDeletionGenerationLocked(sessionID)
 	if s.attempts == nil {
 		s.attempts = make(map[string]*connectAttempt)
 	}
 	s.attempts[attemptID] = &connectAttempt{
-		cancel: cancel, decision: make(chan bool, 1), sessionID: sessionID,
+		cancel: cancel, decision: make(chan bool, 1), sessionID: sessionID, generation: generation,
 	}
 	s.connectWG.Add(1)
 	s.mu.Unlock()
@@ -31,7 +37,7 @@ func (s *SessionService) beginConnect(ctx context.Context, sessionID int64) (con
 		s.finishConnectAttempt(attemptID)
 		s.connectWG.Done()
 	}
-	return connectCtx, attemptID, finish, nil
+	return connectCtx, attemptID, generation, finish, nil
 }
 
 func (s *SessionService) cancelConnectAttemptsLocked() []context.CancelFunc {
@@ -66,6 +72,7 @@ func (s *SessionService) CancelConnectAttempts() {
 
 func (s *SessionService) closeAll(permanent bool) error {
 	s.closeMu.Lock()
+	defer s.closeMu.Unlock()
 	s.mu.Lock()
 	s.closing = true
 	if permanent {
@@ -76,45 +83,47 @@ func (s *SessionService) closeAll(permanent bool) error {
 	cancelConnectAttempts(cancels)
 	s.connectWG.Wait()
 
-	connections := s.takeConnections()
-	closeErr := closeManagedConnections(connections)
+	connections := s.snapshotConnections()
+	closeErr := s.closeManagedConnections(connections)
 	s.mu.Lock()
 	if !permanent && !s.shuttingDown {
 		s.closing = false
 	}
 	s.mu.Unlock()
-	s.closeMu.Unlock()
 	return closeErr
 }
 
-func (s *SessionService) takeConnections() map[string]*managedConn {
-	s.mu.Lock()
+func (s *SessionService) snapshotConnections() map[string]*managedConn {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	connections := make(map[string]*managedConn, len(s.conns))
 	for id, conn := range s.conns {
 		connections[id] = conn
 	}
-	s.conns = make(map[string]*managedConn)
-	s.mu.Unlock()
 	return connections
 }
 
-func closeManagedConnections(connections map[string]*managedConn) error {
+func (s *SessionService) closeManagedConnections(connections map[string]*managedConn) error {
 	var closeErr error
 	for id, conn := range connections {
-		if conn == nil {
-			continue
-		}
-		if conn.cleanup != nil {
-			conn.cleanup()
-		}
-		if conn.wrapper == nil {
-			continue
-		}
-		if err := conn.wrapper.Close(); err != nil {
+		if err := conn.closeConnection(); err != nil {
 			closeErr = errors.Join(closeErr, fmt.Errorf("close connection %s: %w", id, err))
+			continue
 		}
+		s.removeConnectionIfOwned(id, conn)
 	}
 	return closeErr
+}
+
+func (s *SessionService) removeConnectionIfOwned(id string, conn *managedConn) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	registeredConn, registered := s.conns[id]
+	if !registered || registeredConn != conn {
+		return false
+	}
+	delete(s.conns, id)
+	return true
 }
 
 // Shutdown permanently rejects new connections and closes established connections.
@@ -124,5 +133,6 @@ func (s *SessionService) Shutdown() error {
 	if s == nil {
 		return nil
 	}
+	s.StopOperationsAndWait()
 	return s.closeAll(true)
 }

@@ -78,12 +78,13 @@ function FilterChips({ filters, environments, projects, tags, onChange, onReset 
   return <div aria-label={t('当前筛选条件')} className="flex flex-wrap items-center gap-1.5">{chips.map((chip) => <Badge key={chip.key} variant="outline" className="gap-1">{chip.label}<button type="button" aria-label={t('移除筛选 ${}', chip.label)} onClick={() => onChange(chip.clear)}><X /></button></Badge>)}<Button type="button" variant="ghost" size="xs" onClick={onReset}>{t('全部清除')}</Button></div>
 }
 
-export function buildFilterChips(filters: SessionAssetFilters, environments: AssetEnvironment[], projects: AssetProject[], tags: AssetTag[]) {
+export function buildFilterChips(...args: [SessionAssetFilters, AssetEnvironment[], AssetProject[], AssetTag[]]) {
+  const [filters, environments, projects, tags] = args
   const chips: { key: string; label: string; clear: Partial<SessionAssetFilters> }[] = []
   if (filters.query.trim()) chips.push({ key: 'query', label: t('搜索：${}', filters.query.trim()), clear: { query: '' } })
-  appendSelectionChips(chips, 'environment', t('环境'), filters.environmentIds, environments, { environmentIds: [] })
-  appendSelectionChips(chips, 'project', t('项目'), filters.projectIds, projects, { projectIds: [] })
-  appendSelectionChips(chips, 'tag', t('标签'), filters.tagIds, tags, { tagIds: [] })
+  appendSelectionChips({ chips, key: 'environment', label: t('环境'), ids: filters.environmentIds, items: environments, clear: { environmentIds: [] } })
+  appendSelectionChips({ chips, key: 'project', label: t('项目'), ids: filters.projectIds, items: projects, clear: { projectIds: [] } })
+  appendSelectionChips({ chips, key: 'tag', label: t('标签'), ids: filters.tagIds, items: tags, clear: { tagIds: [] } })
   if (filters.includeUnsetEnvironment) chips.push({ key: 'unset-environment', label: t('未设置环境'), clear: { includeUnsetEnvironment: false } })
   if (filters.includeUnsetProject) chips.push({ key: 'unset-project', label: t('未关联项目'), clear: { includeUnsetProject: false } })
   if (filters.includeUntagged) chips.push({ key: 'untagged', label: t('无标签'), clear: { includeUntagged: false } })
@@ -95,7 +96,14 @@ export function buildFilterChips(filters: SessionAssetFilters, environments: Ass
   return chips
 }
 
-function appendSelectionChips(chips: ReturnType<typeof buildFilterChips>, key: string, label: string, ids: string[], items: { id: string; name: string }[], clear: Partial<SessionAssetFilters>) {
+function appendSelectionChips({ chips, key, label, ids, items, clear }: {
+  chips: ReturnType<typeof buildFilterChips>
+  key: string
+  label: string
+  ids: string[]
+  items: { id: string; name: string }[]
+  clear: Partial<SessionAssetFilters>
+}) {
   if (ids.length === 0) return
   const names = ids.map((id) => items.find((item) => item.id === id)?.name ?? id).join('、')
   chips.push({ key, label: `${label}：${names}`, clear })

@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { SessionAssetBulkBar } from '@/components/session/SessionAssetBulkBar'
@@ -40,4 +40,61 @@ describe('SessionAssetBulkBar', () => {
 	await userEvent.click(screen.getByRole('button', { name: '确认更新 1 个会话' }))
 	expect(updateTags).toHaveBeenCalledWith(['1'], ['tag'], 'add')
   })
+
+  it('keeps the old batch lease while selection changes', async () => {
+    const pending = deferred<number>()
+    const update = vi.fn()
+      .mockImplementationOnce(() => pending.promise)
+      .mockResolvedValueOnce(1)
+    const clear = vi.fn()
+    const view = render(<SessionAssetBulkBar selectedIDs={['1']} environments={[]} projects={[]} tags={[]} onSetEnvironment={update} onSetProject={vi.fn()} onUpdateTags={vi.fn()} onClearSelection={clear} />)
+    await userEvent.click(screen.getByRole('button', { name: '环境' }))
+    await userEvent.click(screen.getByRole('button', { name: '确认更新 1 个会话' }))
+    view.rerender(<SessionAssetBulkBar selectedIDs={['2']} environments={[]} projects={[]} tags={[]} onSetEnvironment={update} onSetProject={vi.fn()} onUpdateTags={vi.fn()} onClearSelection={clear} />)
+
+    expect(screen.getByRole('button', { name: '处理中…' })).toBeDisabled()
+    expect(screen.getByRole('combobox')).toBeDisabled()
+    await userEvent.keyboard('{Escape}')
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+
+    await act(async () => pending.resolve(1))
+
+    expect(screen.getByRole('button', { name: '确认更新 1 个会话' })).toBeEnabled()
+    expect(clear).not.toHaveBeenCalled()
+    expect(useToastStore.getState().toasts).toHaveLength(0)
+    await userEvent.click(screen.getByRole('button', { name: '确认更新 1 个会话' }))
+    expect(update).toHaveBeenNthCalledWith(2, ['2'], null)
+  })
+
+  it('deduplicates rapid bulk updates', async () => {
+    const pending = deferred<number>()
+    const update = vi.fn(() => pending.promise)
+    render(<SessionAssetBulkBar selectedIDs={['1']} environments={[]} projects={[]} tags={[]} onSetEnvironment={update} onSetProject={vi.fn()} onUpdateTags={vi.fn()} onClearSelection={vi.fn()} />)
+    await userEvent.click(screen.getByRole('button', { name: '环境' }))
+    const confirm = screen.getByRole('button', { name: '确认更新 1 个会话' })
+    act(() => {
+      fireEvent.click(confirm)
+      fireEvent.click(confirm)
+    })
+    expect(update).toHaveBeenCalledOnce()
+    await act(async () => pending.resolve(1))
+  })
+
+  it('closes a stale bulk dialog when selection is cleared', async () => {
+    const view = render(<SessionAssetBulkBar selectedIDs={['1']} environments={[]} projects={[]} tags={[]} onSetEnvironment={vi.fn()} onSetProject={vi.fn()} onUpdateTags={vi.fn()} onClearSelection={vi.fn()} />)
+    await userEvent.click(screen.getByRole('button', { name: '环境' }))
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+
+    view.rerender(<SessionAssetBulkBar selectedIDs={[]} environments={[]} projects={[]} tags={[]} onSetEnvironment={vi.fn()} onSetProject={vi.fn()} onUpdateTags={vi.fn()} onClearSelection={vi.fn()} />)
+    await act(async () => { await Promise.resolve() })
+    view.rerender(<SessionAssetBulkBar selectedIDs={['2']} environments={[]} projects={[]} tags={[]} onSetEnvironment={vi.fn()} onSetProject={vi.fn()} onUpdateTags={vi.fn()} onClearSelection={vi.fn()} />)
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
 })
+
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((resolvePromise) => { resolve = resolvePromise })
+  return { promise, resolve }
+}

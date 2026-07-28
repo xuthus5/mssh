@@ -205,8 +205,10 @@ func TestSyncService_ImportWithPasswordInstallsVault(t *testing.T) {
 	require.NoError(t, err)
 	vault, err := secA.ExportVaultFile()
 	require.NoError(t, err)
+	storedPassword, err := sealSessionPassword(runtimeA, "session-secret")
+	require.NoError(t, err)
 
-	_, err = store.CreateSession(dbA, model.Session{Name: "prod", Host: "10.0.0.2", Port: 22, Username: "root", AuthMethod: model.AuthPassword, Password: "enc1:placeholder", KeepAlive: 30, TermType: "xterm"})
+	_, err = store.CreateSession(dbA, model.Session{Name: "prod", Host: "10.0.0.2", Port: 22, Username: "root", AuthMethod: model.AuthPassword, Password: storedPassword, KeepAlive: 30, TermType: "xterm"})
 	require.NoError(t, err)
 
 	syncA := newTestSyncService(dbA, secret, WithVaultSource(func() (*crypto.VaultFile, error) { return &vault, nil }))
@@ -218,7 +220,7 @@ func TestSyncService_ImportWithPasswordInstallsVault(t *testing.T) {
 	runtimeB := NewCryptoRuntime()
 	secB := NewSecurityService(dbB, dirB, runtimeB, &memoryKeychain{}, nil)
 	syncB := newTestSyncService(dbB, "unused-before-install",
-		WithVaultInstaller(secB.InstallVaultFromExport),
+		WithVaultTransactionInstaller(secB.PrepareVaultFromExport),
 		WithSyncSecretSource(secB.SyncSecret),
 		WithSyncCrypto(runtimeB),
 	)
@@ -234,6 +236,9 @@ func TestSyncService_ImportWithPasswordInstallsVault(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, sessions)
 	assert.Equal(t, "prod", sessions[0].Name)
+	openedPassword, err := openSessionPassword(runtimeB, sessions[0].Password)
+	require.NoError(t, err)
+	assert.Equal(t, "session-secret", openedPassword)
 }
 
 func TestSyncService_JoinWithPassword(t *testing.T) {
@@ -265,7 +270,7 @@ func TestSyncService_JoinWithPassword(t *testing.T) {
 	secB := NewSecurityService(dbB, dirB, runtimeB, &memoryKeychain{}, nil)
 	provider := &fakeSyncProvider{remote: syncRemoteObject{Content: content, ETag: "etag-1"}}
 	syncB := newTestSyncService(dbB, "before-join",
-		WithVaultInstaller(secB.InstallVaultFromExport),
+		WithVaultTransactionInstaller(secB.PrepareVaultFromExport),
 		WithSyncSecretSource(secB.SyncSecret),
 		WithSyncCrypto(runtimeB),
 		WithSyncProviderFactory(fakeSyncProviderFactory{provider}),
@@ -312,6 +317,24 @@ func TestSecurityService_EmitsVaultChangedOnSetupAndUnlock(t *testing.T) {
 	_, err = svc.Unlock(model.SecurityUnlockInput{Password: "initial-pass-12", RememberUnlock: true})
 	require.NoError(t, err)
 	require.True(t, bus.hasEvent(securityVaultChangedEvent))
+}
+
+func TestSecurityService_LockEmitsOnlyVaultLockedEvent(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	dir := t.TempDir()
+	runtime := NewCryptoRuntime()
+	svc := NewSecurityService(db, dir, runtime, &memoryKeychain{}, nil)
+	_, err := svc.Setup(model.SecuritySetupInput{Password: "initial-pass-12", RememberUnlock: true})
+	require.NoError(t, err)
+
+	bus := newMockEventBus()
+	svc.SetEventBus(bus)
+	_, err = svc.Lock()
+	require.NoError(t, err)
+
+	events := bus.Events()
+	require.Len(t, events, 1)
+	assert.Equal(t, securityVaultLockedEvent, events[0].Name)
 }
 
 func TestSecurityService_UnlockRateLimit(t *testing.T) {

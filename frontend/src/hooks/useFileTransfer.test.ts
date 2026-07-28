@@ -243,4 +243,53 @@ describe('useFileTransfer', () => {
     expect(listed).toBeGreaterThan(1)
     expect(useToastStore.getState().toasts.some((item) => item.message.includes('reload boom') || item.message.includes('加载文件列表失败'))).toBe(false)
   })
+
+  it('ignores a directory response from the previous session', async () => {
+    const oldDirectory = deferred<Array<{ name: string; path: string; size: number; is_dir: boolean; mod_time: string }>>()
+    __registerHandler('github.com/xuthus5/mssh/internal/service.FileService.ListDir', async (sessionID: number) => {
+      if (sessionID === SESSION_ID) return oldDirectory.promise
+      return []
+    })
+    const view = renderHook(({ sessionID }) => useFileTransfer(sessionID), {
+      initialProps: { sessionID: SESSION_ID },
+    })
+    let oldLoad!: Promise<void>
+    act(() => { oldLoad = view.result.current.listFiles('/old') })
+
+    view.rerender({ sessionID: SESSION_ID + 1 })
+    await act(async () => {
+      oldDirectory.resolve([{ name: 'stale.txt', path: '/old/stale.txt', size: 1, is_dir: false, mod_time: '' }])
+      await oldLoad
+    })
+
+    expect(view.result.current.files).toEqual([])
+    expect(view.result.current.currentPath).toBe('/')
+  })
+
+  it('does not let an old-session mutation overwrite the new session listing', async () => {
+    const deletion = deferred<void>()
+    __registerHandler('github.com/xuthus5/mssh/internal/service.FileService.ListDir', async (sessionID: number) => sessionID === SESSION_ID
+      ? [{ name: 'old.txt', path: '/shared.txt', size: 1, is_dir: false, mod_time: '' }]
+      : [{ name: 'new.txt', path: '/shared.txt', size: 2, is_dir: false, mod_time: '' }])
+    __registerHandler('github.com/xuthus5/mssh/internal/service.FileService.Delete', async () => deletion.promise)
+    const view = renderHook(({ sessionID }) => useFileTransfer(sessionID), {
+      initialProps: { sessionID: SESSION_ID },
+    })
+    await act(async () => { await view.result.current.listFiles('/') })
+    const deleteFromOldSession = view.result.current.deleteFile
+    let oldDelete!: Promise<void>
+    act(() => { oldDelete = deleteFromOldSession('/shared.txt') })
+
+    view.rerender({ sessionID: SESSION_ID + 1 })
+    await act(async () => { await view.result.current.listFiles('/') })
+    await act(async () => { deletion.resolve(); await oldDelete; await Promise.resolve() })
+
+    expect(view.result.current.files.map((file) => file.name)).toEqual(['new.txt'])
+  })
 })
+
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((resolvePromise) => { resolve = resolvePromise })
+  return { promise, resolve }
+}

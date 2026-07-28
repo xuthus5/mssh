@@ -47,4 +47,20 @@ describe('useAsyncAction', () => {
     act(() => result.current.reset())
     expect(result.current.status).toBe('idle')
   })
+
+  it('does not publish a result after the hook unmounts', async () => {
+    const pending = deferred<string>()
+    const { result, unmount } = renderHook(() => useAsyncAction(() => pending.promise))
+    act(() => { void result.current.run() })
+    expect(result.current.status).toBe('pending')
+
+    unmount()
+    await act(async () => {
+      pending.resolve('late result')
+      await pending.promise
+    })
+
+    expect(result.current.status).toBe('pending')
+    expect(result.current.result).toBeUndefined()
+  })
 })

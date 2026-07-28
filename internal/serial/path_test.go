@@ -44,7 +44,8 @@ func TestCanonicalDevicePathsDedup(t *testing.T) {
 func TestSignalsClosedPort(t *testing.T) {
 	session := NewTestPortSession("/dev/ttyTEST")
 	require.NoError(t, session.Close())
-	signals := session.Signals()
+	signals, err := session.Signals()
+	require.NoError(t, err)
 	assert.False(t, signals.DTR)
 	assert.False(t, signals.RTS)
 	assert.False(t, signals.CTS)

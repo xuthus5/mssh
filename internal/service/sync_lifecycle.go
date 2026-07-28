@@ -3,7 +3,6 @@ package service
 import (
 	"errors"
 	"fmt"
-	"os"
 
 	"github.com/xuthus5/mssh/internal/model"
 	"github.com/xuthus5/mssh/internal/store"
@@ -19,7 +18,11 @@ func (s *SyncService) RestoreVersion(id int64) error {
 	if id <= 0 {
 		return errors.New("invalid sync version id")
 	}
-	config, err := s.LoadConfig()
+	if err := s.beginSyncOperation(); err != nil {
+		return err
+	}
+	defer s.operationMu.Unlock()
+	config, err := s.loadConfig()
 	if err != nil {
 		return err
 	}
@@ -30,25 +33,11 @@ func (s *SyncService) RestoreVersion(id int64) error {
 	if version == nil {
 		return errors.New("sync version not found")
 	}
-	content, err := os.ReadFile(s.versionFilePath(*version))
-	if err != nil {
-		return fmt.Errorf("read sync version: %w", err)
-	}
-	masterKey, err := s.masterKey()
+	content, err := readBoundedRegularFile(s.versionFilePath(*version), "sync version", maxCloudBackupSize)
 	if err != nil {
 		return err
 	}
-	artifact, err := decodeSyncArtifact(content, masterKey)
-	if err != nil {
-		return err
-	}
-	if err := validateSnapshot(s.db, artifact.Data); err != nil {
-		return err
-	}
-	if err := s.prepareDestructiveSync(config, "pre-restore"); err != nil {
-		return err
-	}
-	if err := s.restore(artifact.Data); err != nil {
+	if err := s.restoreVersionData(config, content); err != nil {
 		return err
 	}
 	s.markPending("已恢复本地版本，等待同步")
@@ -57,15 +46,45 @@ func (s *SyncService) RestoreVersion(id int64) error {
 	return nil
 }
 
+func (s *SyncService) restoreVersionData(config model.SyncConfig, content []byte) error {
+	return withCryptoOperation(s.crypto, func() error {
+		masterKey, err := s.masterKey()
+		if err != nil {
+			return err
+		}
+		artifact, err := decodeSyncArtifact(content, masterKey)
+		if err != nil {
+			return err
+		}
+		if err := validateSnapshot(s.db, artifact.Data); err != nil {
+			return err
+		}
+		if err := s.prepareDestructiveSync(config, "pre-restore"); err != nil {
+			return err
+		}
+		if err := s.restore(artifact.Data); err != nil {
+			return err
+		}
+		return s.applyRestoredProxySettingsWithinCryptoOperation()
+	})
+}
+
 func (s *SyncService) ResetLocalData() error {
-	config, err := s.LoadConfig()
+	if err := s.beginSyncOperation(); err != nil {
+		return err
+	}
+	defer s.operationMu.Unlock()
+	config, err := s.loadConfig()
 	if err != nil {
 		return err
 	}
-	if err := s.prepareDestructiveSync(config, "pre-reset"); err != nil {
-		return err
-	}
-	if err := s.clearSynchronizedData(); err != nil {
+	err = withCryptoOperation(s.crypto, func() error {
+		if prepareErr := s.prepareDestructiveSync(config, "pre-reset"); prepareErr != nil {
+			return prepareErr
+		}
+		return s.clearSynchronizedData()
+	})
+	if err != nil {
 		return err
 	}
 	s.markPending("本地业务数据已清空，等待同步")

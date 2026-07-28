@@ -2,9 +2,9 @@ package main
 
 import (
 	"context"
-	"embed"
+	_ "embed"
 	"fmt"
-	"io/fs"
+	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -21,9 +21,6 @@ import (
 
 //go:embed build/appicon.png
 var appIcon []byte
-
-//go:embed all:frontend/dist
-var frontendDist embed.FS
 
 const (
 	windowCloseTimeout      = 2 * time.Second
@@ -47,21 +44,47 @@ func main() {
 	})
 	if err != nil {
 		logger.Error("startup failed", "error", err)
-		_ = logManager.Close()
+		shutdownRuntime(nil, logManager, os.Stderr)
 		os.Exit(1)
 	}
 
 	wailsApp := newWailsApplication(appInstance, logger)
 	configureWindows(wailsApp, windowConfiguration{Settings: appInstance.Setting, Logger: logger})
 	wailsApp.OnShutdown(func() {
-		appInstance.Shutdown()
-		_ = logManager.Close()
+		shutdownRuntime(appInstance, logManager, os.Stderr)
 	})
 
 	logger.Info("MSSH started")
-	if err := wailsApp.Run(); err != nil {
-		logger.Error("MSSH run failed", "error", err)
+	runErr := wailsApp.Run()
+	if runErr != nil {
+		logger.Error("MSSH run failed", "error", runErr)
+	}
+	shutdownRuntime(appInstance, logManager, os.Stderr)
+	if runErr != nil {
 		os.Exit(1)
+	}
+}
+
+type runtimeShutdowner interface {
+	Shutdown()
+}
+
+type runtimeLogCloser interface {
+	Close() error
+}
+
+func shutdownRuntime(application runtimeShutdowner, logCloser runtimeLogCloser, stderr io.Writer) {
+	if application != nil {
+		application.Shutdown()
+	}
+	if logCloser == nil {
+		return
+	}
+	if err := logCloser.Close(); err != nil {
+		if stderr == nil {
+			stderr = os.Stderr
+		}
+		_, _ = fmt.Fprintf(stderr, "close application log failed: %v\n", err)
 	}
 }
 
@@ -223,14 +246,6 @@ func mainWindowOptions() application.WebviewWindowOptions {
 			WebviewGpuPolicy: application.WebviewGpuPolicyNever,
 		},
 	}
-}
-
-func frontendAssets() fs.FS {
-	sub, err := fs.Sub(frontendDist, "frontend/dist")
-	if err != nil {
-		return frontendDist
-	}
-	return sub
 }
 
 func defaultDataDir() string {

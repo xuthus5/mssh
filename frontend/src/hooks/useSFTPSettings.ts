@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Events } from '@wailsio/runtime'
 import { SettingService } from '@/lib/wails'
 import { logger } from '@/lib/logger'
@@ -9,6 +9,7 @@ import { useSFTPSettingsStore } from '@/store/sftpSettingsStore'
 import { DEFAULT_SFTP_SETTINGS, type SFTPSettings } from '@/lib/sftpSettings'
 import type { Setting } from '../../bindings/github.com/xuthus5/mssh/internal/model/models'
 import { t } from '@/i18n'
+import { syncDataChangedEvent } from '@/lib/syncDataReload'
 
 
 const sftpSettingKeys = ['sftp.show_hidden_files', 'sftp.follow_terminal_directory', 'sftp.default_view']
@@ -43,28 +44,55 @@ function emitSFTPSettings(settings: SFTPSettings) {
   void Events.Emit(SETTINGS_SFTP_CHANGED_EVENT, settings).catch((error: unknown) => logger.error('emit SFTP settings failed', error))
 }
 
-export function useSFTPSettings() {
-  const [settings, setSettings] = useState<SFTPSettings>(DEFAULT_SFTP_SETTINGS)
-  const [settingsReady, setSettingsReady] = useState(false)
-  const [loadError, setLoadError] = useState('')
+function useSFTPRuntime() {
   const revision = useRef(0)
-  const load = useCallback(async () => {
+  const lifecycle = useRef(0)
+  const requestID = useRef(0)
+  useEffect(() => {
+    const token = ++lifecycle.current
+    return () => {
+      if (lifecycle.current === token) lifecycle.current++
+    }
+  }, [])
+  return useMemo(() => ({ revision, lifecycle, requestID }), [])
+}
+
+function publishSFTPSettings(settings: SFTPSettings, setSettings: (settings: SFTPSettings) => void) {
+  setSettings(settings)
+  useSFTPSettingsStore.getState().setSettings(settings)
+}
+
+function useSFTPLoad(options: {
+  runtime: ReturnType<typeof useSFTPRuntime>
+  setSettings: (settings: SFTPSettings) => void
+  setSettingsReady: (ready: boolean) => void
+  setLoadError: (error: string) => void
+}) {
+  const { runtime, setSettings, setSettingsReady, setLoadError } = options
+  return useCallback(async () => {
+    const { lifecycle, requestID, revision } = runtime
+    const lifecycleToken = lifecycle.current
+    const currentRequest = ++requestID.current
     const currentRevision = revision.current
+    const isCurrent = () => lifecycle.current === lifecycleToken
+      && requestID.current === currentRequest && revision.current === currentRevision
     try {
       const persisted = parseSFTPSettings(await SettingService.GetMany(sftpSettingKeys))
-      if (currentRevision === revision.current) {
-        setSettings(persisted)
-        useSFTPSettingsStore.getState().setSettings(persisted)
-        setLoadError('')
-        setSettingsReady(true)
-      }
+      if (!isCurrent()) return
+      publishSFTPSettings(persisted, setSettings)
+      setLoadError('')
+      setSettingsReady(true)
     } catch (error) {
+      if (!isCurrent()) return
       logger.error('loadSFTPSettings error', error)
       setLoadError(error instanceof Error ? error.message : String(error))
       setSettingsReady(false)
     }
-  }, [])
-  const save = useCallback(async (next: SFTPSettings, options?: { quiet?: boolean }) => {
+  }, [runtime, setLoadError, setSettings, setSettingsReady])
+}
+
+function useSFTPSave(runtime: ReturnType<typeof useSFTPRuntime>, setSettings: (settings: SFTPSettings) => void) {
+  return useCallback(async (next: SFTPSettings, options?: { quiet?: boolean }) => {
     const normalized = normalizeSFTPSettings(next)
     try {
       await SettingService.SetMany([
@@ -72,9 +100,9 @@ export function useSFTPSettings() {
         settingEntry('sftp.follow_terminal_directory', normalized.followTerminalDirectory),
         settingEntry('sftp.default_view', normalized.defaultView),
       ])
-      revision.current++
-      setSettings(normalized)
-      useSFTPSettingsStore.getState().setSettings(normalized)
+      runtime.revision.current++
+      runtime.requestID.current++
+      publishSFTPSettings(normalized, setSettings)
       emitSFTPSettings(normalized)
       if (!options?.quiet) toast(t('SFTP 设置已保存'), 'success')
     } catch (error) {
@@ -82,10 +110,30 @@ export function useSFTPSettings() {
       // Settings panels own save failures via AutoSaveStatusIndicator / thrown errors.
       throw error
     }
-  }, [])
+  }, [runtime, setSettings])
+}
+
+function useSFTPEventSync(runtime: ReturnType<typeof useSFTPRuntime>, setSettings: (settings: SFTPSettings) => void, reload: () => Promise<void>) {
+  useEffect(() => {
+    const stopChanged = Events.On(SETTINGS_SFTP_CHANGED_EVENT, (event: EventEnvelope<SFTPSettings>) => {
+      if (!event.data) return
+      runtime.revision.current++
+      runtime.requestID.current++
+      publishSFTPSettings(normalizeSFTPSettings(event.data), setSettings)
+    })
+    const stopSync = Events.On(syncDataChangedEvent, () => { void reload() })
+    return () => { stopChanged(); stopSync() }
+  }, [reload, runtime, setSettings])
+}
+
+export function useSFTPSettings() {
+  const [settings, setSettings] = useState<SFTPSettings>(DEFAULT_SFTP_SETTINGS)
+  const [settingsReady, setSettingsReady] = useState(false)
+  const [loadError, setLoadError] = useState('')
+  const runtime = useSFTPRuntime()
+  const load = useSFTPLoad({ runtime, setSettings, setSettingsReady, setLoadError })
+  const save = useSFTPSave(runtime, setSettings)
   useEffect(() => { void load() }, [load])
-  useEffect(() => Events.On(SETTINGS_SFTP_CHANGED_EVENT, (event: EventEnvelope<SFTPSettings>) => {
-    if (event.data) { const normalized = normalizeSFTPSettings(event.data); setSettings(normalized); useSFTPSettingsStore.getState().setSettings(normalized) }
-  }), [])
+  useSFTPEventSync(runtime, setSettings, load)
   return { settings, settingsReady, loadError, save, reload: load }
 }

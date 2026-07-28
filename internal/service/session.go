@@ -5,14 +5,10 @@ import (
 	"database/sql"
 	"fmt"
 	"log/slog"
-	"net"
-	"os"
-	"strings"
 	"sync"
 
 	"github.com/google/uuid"
 	gossh "golang.org/x/crypto/ssh"
-	"golang.org/x/crypto/ssh/agent"
 
 	"github.com/xuthus5/mssh/internal/model"
 	ssh "github.com/xuthus5/mssh/internal/ssh"
@@ -32,9 +28,18 @@ type hostKeyAutoAccepter interface {
 const DefaultKeepAliveSeconds = 60
 
 type managedConn struct {
-	wrapper   *ssh.ClientWrapper
-	cleanup   func()
-	sessionID int64
+	wrapper        *ssh.ClientWrapper
+	cleanup        func()
+	sessionID      int64
+	closeMu        sync.Mutex
+	cleanupOnce    sync.Once
+	closeAttempted bool
+	closed         bool
+}
+
+type sessionDeletionState struct {
+	active     int
+	generation uint64
 }
 
 // PasswordVerifier confirms the application password for step-up actions.
@@ -48,7 +53,9 @@ type SessionService struct {
 	closeMu      sync.Mutex
 	conns        map[string]*managedConn
 	attempts     map[string]*connectAttempt
+	deletions    map[int64]sessionDeletionState
 	connectWG    sync.WaitGroup
+	lifecycle    serviceOperationGate
 	closing      bool
 	shuttingDown bool
 	eventBus     EventBus
@@ -63,9 +70,10 @@ type SessionService struct {
 }
 
 type connectAttempt struct {
-	cancel    context.CancelFunc
-	decision  chan bool
-	sessionID int64
+	cancel     context.CancelFunc
+	decision   chan bool
+	sessionID  int64
+	generation uint64
 }
 
 func NewSessionService(db *sql.DB, eventBus EventBus, keepAlive int, dataDir string, crypto KeyCrypto, logger *slog.Logger) *SessionService {
@@ -76,6 +84,7 @@ func NewSessionService(db *sql.DB, eventBus EventBus, keepAlive int, dataDir str
 		db:        db,
 		conns:     make(map[string]*managedConn),
 		attempts:  make(map[string]*connectAttempt),
+		deletions: make(map[int64]sessionDeletionState),
 		eventBus:  eventBus,
 		keepAlive: keepAlive,
 		dataDir:   dataDir,
@@ -93,21 +102,21 @@ func (s *SessionService) SetPasswordVerifier(verifier PasswordVerifier) {
 
 func (s *SessionService) disconnect(terminalID string, emitState bool) error {
 	s.logger.Info("disconnecting terminal", "terminalID", terminalID)
-	s.mu.Lock()
+	s.mu.RLock()
 	conn, ok := s.conns[terminalID]
+	s.mu.RUnlock()
 	if !ok {
-		s.mu.Unlock()
 		s.logger.Error("disconnect failed", "terminalID", terminalID, "error", "terminal not found")
 		return fmt.Errorf("terminal %s not found", terminalID)
 	}
-	delete(s.conns, terminalID)
-	s.mu.Unlock()
-
-	if conn.cleanup != nil {
-		conn.cleanup()
+	if err := conn.closeConnection(); err != nil {
+		closeErr := fmt.Errorf("close SSH client: %w", err)
+		s.logger.Error("terminal disconnect cleanup failed", "terminalID", terminalID, "error", closeErr)
+		return closeErr
 	}
-	if conn.wrapper != nil {
-		_ = conn.wrapper.Close()
+
+	if !s.removeConnectionIfOwned(terminalID, conn) {
+		return nil
 	}
 
 	if emitState {
@@ -116,35 +125,8 @@ func (s *SessionService) disconnect(terminalID string, emitState bool) error {
 			State:      "disconnected",
 		})
 	}
-
 	s.logger.Info("terminal disconnected", "terminalID", terminalID)
 	return nil
-}
-
-func (s *SessionService) GetClientWrapper(connID string) (*ssh.ClientWrapper, error) {
-	if strings.TrimSpace(connID) == "" {
-		return nil, fmt.Errorf("invalid connection id")
-	}
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	conn, ok := s.conns[connID]
-	if !ok || conn.wrapper == nil {
-		return nil, fmt.Errorf("connection %s not found", connID)
-	}
-	return conn.wrapper, nil
-}
-
-func (s *SessionService) ConnectionCount() int {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return len(s.conns)
-}
-
-func (s *SessionService) CloseAll() error {
-	if s == nil {
-		return nil
-	}
-	return s.closeAll(false)
 }
 
 func (s *SessionService) buildPasswordAuth(sess *model.Session) ([]gossh.AuthMethod, error) {
@@ -157,6 +139,16 @@ func (s *SessionService) buildPasswordAuth(sess *model.Session) ([]gossh.AuthMet
 }
 
 func (s *SessionService) buildKeyAuth(sess *model.Session) ([]gossh.AuthMethod, error) {
+	var methods []gossh.AuthMethod
+	err := withCryptoOperation(s.crypto, func() error {
+		var buildErr error
+		methods, buildErr = s.buildKeyAuthUnlocked(sess)
+		return buildErr
+	})
+	return methods, err
+}
+
+func (s *SessionService) buildKeyAuthUnlocked(sess *model.Session) ([]gossh.AuthMethod, error) {
 	if sess.KeyID == nil {
 		return nil, fmt.Errorf("build auth methods: key auth requires key_id")
 	}
@@ -198,51 +190,14 @@ func (s *SessionService) buildKeyboardInteractiveAuth(sess *model.Session) []gos
 	)}
 }
 
-// agentAuth holds an open SSH agent socket for the full authentication handshake.
-// The socket must remain open until SSH public-key signatures complete.
-type agentAuth struct {
-	sock    net.Conn
-	signers []gossh.Signer
-}
-
-func (a *agentAuth) Close() {
-	if a == nil || a.sock == nil {
-		return
-	}
-	_ = a.sock.Close()
-	a.sock = nil
-}
-
-func openAgentAuth() (*agentAuth, error) {
-	socketPath := os.Getenv("SSH_AUTH_SOCK")
-	if socketPath == "" {
-		return nil, fmt.Errorf("SSH_AUTH_SOCK not set")
-	}
-	sock, err := net.Dial("unix", socketPath)
-	if err != nil {
-		return nil, fmt.Errorf("ssh agent: %w", err)
-	}
-	agentClient := agent.NewClient(sock)
-	signers, err := agentClient.Signers()
-	if err != nil {
-		_ = sock.Close()
-		return nil, fmt.Errorf("ssh agent signers: %w", err)
-	}
-	if len(signers) == 0 {
-		_ = sock.Close()
-		return nil, fmt.Errorf("ssh agent: no signers available")
-	}
-	return &agentAuth{sock: sock, signers: signers}, nil
-}
-
-// buildAgentAuth is for tests/simple callers; the agent socket stays open for signer use.
-// Prefer buildAuthBundle in production so disconnect can close the socket.
-func (s *SessionService) buildAgentAuth() ([]gossh.AuthMethod, error) {
-	methods, _, err := s.buildAuthBundle(&model.Session{AuthMethod: model.AuthAgent})
-	return methods, err
-}
-
 func (s *SessionService) buildAuthBundle(sess *model.Session) ([]gossh.AuthMethod, func(), error) {
+	return s.buildAuthBundleContext(context.Background(), sess)
+}
+
+func (s *SessionService) buildAuthBundleContext(
+	ctx context.Context,
+	sess *model.Session,
+) ([]gossh.AuthMethod, func(), error) {
 	switch sess.AuthMethod {
 	case model.AuthPassword:
 		methods, err := s.buildPasswordAuth(sess)
@@ -253,7 +208,7 @@ func (s *SessionService) buildAuthBundle(sess *model.Session) ([]gossh.AuthMetho
 	case model.AuthKeyboardInteractive:
 		return s.buildKeyboardInteractiveAuth(sess), nil, nil
 	case model.AuthAgent:
-		auth, err := openAgentAuth()
+		auth, err := openAgentAuthContext(ctx)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -261,11 +216,6 @@ func (s *SessionService) buildAuthBundle(sess *model.Session) ([]gossh.AuthMetho
 	default:
 		return nil, nil, nil
 	}
-}
-
-func (s *SessionService) buildAuthMethods(sess *model.Session) ([]gossh.AuthMethod, error) {
-	methods, _, err := s.buildAuthBundle(sess)
-	return methods, err
 }
 
 func generateTerminalID() string {

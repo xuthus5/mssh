@@ -16,16 +16,20 @@ interface Props {
   onDefaultTermTypeChange: (value: string) => void
 }
 
-export function TerminalConnectionDefaultsSettingsSection({
-  maxPoolSize,
-  defaultKeepAlive,
-  defaultTermType,
-  onMaxPoolSizeChange,
-  onDefaultKeepAliveChange,
-  onDefaultTermTypeChange,
-}: Props) {
-  return (
-    <section className="rounded-xl border border-border bg-card p-3 shadow-sm">
+function ConnectionNumberField({ id, label, value, onChange }: {
+  id: string
+  label: string
+  value: string
+  onChange: (value: string) => void
+}) {
+  return <div className="flex flex-col gap-1.5">
+    <label htmlFor={id} className="text-xs font-medium text-muted-foreground">{label}</label>
+    <Input id={id} type="number" min={1} value={value} onChange={(event) => onChange(event.target.value)} aria-label={label} />
+  </div>
+}
+
+export function TerminalConnectionDefaultsSettingsSection(props: Props) {
+  return <section className="rounded-xl border border-border bg-card p-3 shadow-sm">
       <div className="mb-3">
         <h3 className="text-sm font-medium text-foreground">{t('连接默认')}</h3>
         <p className="mt-1 text-xs text-muted-foreground">
@@ -34,43 +38,18 @@ export function TerminalConnectionDefaultsSettingsSection({
       </div>
       <div className="flex flex-col gap-3">
         <div className="grid grid-cols-2 gap-3">
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor="terminal-max-pool-size" className="text-xs font-medium text-muted-foreground">
-              {t('最大终端池大小')}
-            </label>
-            <Input
-              id="terminal-max-pool-size"
-              type="number"
-              min={1}
-              value={maxPoolSize}
-              onChange={(event) => onMaxPoolSizeChange(event.target.value)}
-              aria-label={t('最大终端池大小')}
-            />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor="terminal-default-keepalive" className="text-xs font-medium text-muted-foreground">
-              {t('默认保活间隔 (秒)')}
-            </label>
-            <Input
-              id="terminal-default-keepalive"
-              type="number"
-              min={1}
-              value={defaultKeepAlive}
-              onChange={(event) => onDefaultKeepAliveChange(event.target.value)}
-              aria-label={t('默认保活间隔 (秒)')}
-            />
-          </div>
+          <ConnectionNumberField id="terminal-max-pool-size" label={t('最大终端池大小')} value={props.maxPoolSize} onChange={props.onMaxPoolSizeChange} />
+          <ConnectionNumberField id="terminal-default-keepalive" label={t('默认保活间隔 (秒)')} value={props.defaultKeepAlive} onChange={props.onDefaultKeepAliveChange} />
         </div>
         <div className="flex flex-col gap-1.5">
           <label className="text-xs font-medium text-muted-foreground">{t('默认终端类型')}</label>
           <LabeledSelect
             ariaLabel={t('默认终端类型')}
-            value={defaultTermType}
+            value={props.defaultTermType}
             options={TERMINAL_TYPE_OPTIONS}
-            onValueChange={onDefaultTermTypeChange}
+            onValueChange={props.onDefaultTermTypeChange}
           />
         </div>
       </div>
     </section>
-  )
 }

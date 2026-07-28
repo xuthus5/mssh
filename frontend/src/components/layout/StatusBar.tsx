@@ -3,6 +3,7 @@ import { ArrowDown, ArrowUp, Clock, Cpu, Circle, HardDrive, MemoryStick } from '
 import { TransferCenter } from '@/components/file/TransferCenter'
 import { connectionStatusVisual } from '@/lib/connectionStatusVisual'
 import { logger } from '@/lib/logger'
+import { AsyncPoller } from '@/lib/asyncPoller'
 import { useAppStore } from '@/store/appStore'
 import { TerminalService } from '@/lib/wails'
 import { t } from '@/i18n'
@@ -60,18 +61,24 @@ function useSystemInfo(terminalID: string | undefined, connected: boolean, visib
     setFailed(false)
     if (!terminalID || !connected || !visible) return
     let cancelled = false
+    let requestID = 0
     const load = async () => {
+      const currentRequest = ++requestID
       try {
         const result = await TerminalService.SystemInfo(terminalID)
-        if (!cancelled) { setInfo(result); setFailed(false) }
+        if (!cancelled && currentRequest === requestID) { setInfo(result); setFailed(false) }
       } catch (error) {
         logger.error('system info collection failed', error)
-        if (!cancelled) { setInfo(null); setFailed(true) }
+        if (!cancelled && currentRequest === requestID) { setInfo(null); setFailed(true) }
       }
     }
-    void load()
-    const timer = window.setInterval(() => { void load() }, 3000)
-    return () => { cancelled = true; window.clearInterval(timer) }
+    const poller = new AsyncPoller({
+      task: load,
+      delayMs: 3000,
+      onError: (error) => logger.error('system info polling failed', error),
+    })
+    void poller.start()
+    return () => { cancelled = true; requestID += 1; poller.stop() }
   }, [terminalID, connected, visible])
   return { info, failed }
 }

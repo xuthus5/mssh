@@ -5,6 +5,7 @@ import { AutoSaveStatusIndicator } from '@/components/settings/AutoSaveStatus'
 import { useAutoSave } from '@/hooks/useAutoSave'
 import { useDraftSync } from '@/hooks/useDraftSync'
 import { useShortcutSettings } from '@/hooks/useShortcutSettings'
+import { useSettingsWindowHide } from '@/hooks/useSettingsWindowHide'
 import {
   SHORTCUT_DEFINITIONS,
   chordFromKeyboardEvent,
@@ -38,6 +39,26 @@ function ShortcutRecorder({
   onChange: (chord: ShortcutChord | null) => void
   onCancel: () => void
 }) {
+  useShortcutRecording(recording, onCancel, onChange)
+  return (
+    <button
+      type="button"
+      data-shortcut-recorder="true"
+      aria-label={t('录制快捷键')}
+      className={cn(
+        'min-w-36 rounded-lg border px-3 py-1.5 text-left text-xs font-medium transition-colors',
+        recording
+          ? 'border-primary bg-primary/10 text-primary ring-2 ring-primary/30'
+          : 'border-border bg-background text-foreground hover:bg-muted/60',
+      )}
+      onClick={onStart}
+    >
+      {recording ? t('按下组合键…（Esc 取消）') : formatChordDisplay(value)}
+    </button>
+  )
+}
+
+function useShortcutRecording(recording: boolean, onCancel: () => void, onChange: (chord: ShortcutChord | null) => void) {
   useEffect(() => {
     if (!recording) return
     const onKeyDown = (event: KeyboardEvent) => {
@@ -61,54 +82,38 @@ function ShortcutRecorder({
     window.addEventListener('keydown', onKeyDown, true)
     return () => window.removeEventListener('keydown', onKeyDown, true)
   }, [recording, onCancel, onChange])
-
-  return (
-    <button
-      type="button"
-      data-shortcut-recorder="true"
-      aria-label={t('录制快捷键')}
-      className={cn(
-        'min-w-36 rounded-lg border px-3 py-1.5 text-left text-xs font-medium transition-colors',
-        recording
-          ? 'border-primary bg-primary/10 text-primary ring-2 ring-primary/30'
-          : 'border-border bg-background text-foreground hover:bg-muted/60',
-      )}
-      onClick={onStart}
-    >
-      {recording ? t('按下组合键…（Esc 取消）') : formatChordDisplay(value)}
-    </button>
-  )
 }
 
 export function ShortcutSettingsPanel() {
+  const model = useShortcutSettingsModel()
+  return (
+    <div className="flex flex-col gap-5 pt-2">
+      <ShortcutHeader autoSave={model.autoSave} onReset={model.resetAll} />
+      <ShortcutAlerts error={model.error} conflicts={model.conflicts.length} onReload={model.reload} />
+      <ShortcutList model={model} />
+    </div>
+  )
+}
+
+function useShortcutSettingsModel() {
   const { bindings, loading, error, saveBindings, reload } = useShortcutSettings()
-  const { draft, setDraft, acknowledgeSaved } = useDraftSync({ source: bindings, createDraft })
+  const { draft, setDraft, acknowledgeSaved, baselineRevision } = useDraftSync({ source: bindings, createDraft })
   const [recordingId, setRecordingId] = useState<ShortcutActionId | null>(null)
-
+  useSettingsWindowHide(() => setRecordingId(null))
   const conflicts = useMemo(() => findShortcutConflicts(draft), [draft])
-  const conflictMap = useMemo(() => {
-    const map = new Map<ShortcutActionId, ShortcutActionId[]>()
-    for (const item of conflicts) {
-      const list = map.get(item.actionId) ?? []
-      list.push(item.conflictsWith)
-      map.set(item.actionId, list)
-    }
-    return map
-  }, [conflicts])
-
+  const conflictMap = useMemo(() => buildConflictMap(conflicts), [conflicts])
   const persist = useCallback(async (next: ShortcutBindings) => {
     await saveBindings(next, { quiet: true })
     acknowledgeSaved(next)
   }, [acknowledgeSaved, saveBindings])
-
   const autoSave = useAutoSave({
     value: draft,
     onSave: persist,
     enabled: !loading && recordingId === null && conflicts.length === 0,
     isReady: !loading,
     delayMs: 450,
+    baselineRevision,
   })
-
   const updateBinding = (id: ShortcutActionId, chord: ShortcutChord | null) => {
     if (chord && isReservedShortcutChord(chord)) {
       toast(t(reservedShortcutReason(chord) ?? '该快捷键被系统保留，请选择其他组合'), 'warning')
@@ -118,89 +123,39 @@ export function ShortcutSettingsPanel() {
     setDraft((current) => ({ ...current, [id]: chord }))
     setRecordingId(null)
   }
-
   const resetAll = () => {
     const next = defaultShortcutBindings()
     setDraft(next)
     setRecordingId(null)
-    void persist(next).catch(() => undefined)
   }
+  return { autoSave, conflictMap, conflicts, draft, error, recordingId, reload, resetAll, setRecordingId, updateBinding }
+}
 
-  return (
-    <div className="flex flex-col gap-5 pt-2">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
-            <Keyboard className="size-4" />
-            {t('快捷键')}
-          </h2>
-          <p className="mt-1 text-xs text-muted-foreground">
-            {t('自定义全局快捷键。修改后自动保存；冲突项会以警告标出。macOS 使用 ⌘，Windows/Linux 使用 Ctrl。')}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <AutoSaveStatusIndicator status={autoSave.status} error={autoSave.error} />
-          <Button type="button" size="sm" variant="outline" onClick={resetAll}>
-            <RotateCcw className="size-3.5" />
-            {t('恢复默认')}
-          </Button>
-        </div>
-      </div>
+type ShortcutModel = ReturnType<typeof useShortcutSettingsModel>
 
-      {error ? (
-        <div className="rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">
-          {t('加载快捷键失败: ${}', error)}
-          <Button type="button" size="xs" variant="outline" className="ml-2" onClick={() => { void reload() }}>{t('重试')}</Button>
-        </div>
-      ) : null}
-      {conflicts.length > 0 ? (
-        <div className="rounded-xl border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive">
-          {t('存在快捷键冲突，已暂停自动保存。请先消除冲突后再继续。')}
-        </div>
-      ) : null}
-      <section className="rounded-xl border border-border bg-card p-3 shadow-sm">
-        <div className="flex flex-col divide-y divide-border">
-          {SHORTCUT_DEFINITIONS.map((definition) => {
-            const conflictIds = conflictMap.get(definition.id) ?? []
-            const conflictLabels = conflictIds
-              .map((id) => SHORTCUT_DEFINITIONS.find((item) => item.id === id)?.label)
-              .filter(Boolean)
-              .map((label) => t(label as string))
-            return (
-              <div key={definition.id} className="flex flex-col gap-2 py-3 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between">
-                <div className="min-w-0">
-                  <div className="text-sm font-medium text-foreground">{t(definition.label)}</div>
-                  <div className="text-xs text-muted-foreground">{t(definition.description)}</div>
-                  {conflictLabels.length > 0 && (
-                    <div className="mt-1 text-xs text-destructive">
-                      {t('与「${}」冲突', conflictLabels.join(' / '))}
-                    </div>
-                  )}
-                </div>
-                <div className="flex shrink-0 items-center gap-2">
-                  <ShortcutRecorder
-                    value={draft[definition.id]}
-                    recording={recordingId === definition.id}
-                    onStart={() => setRecordingId(definition.id)}
-                    onCancel={() => setRecordingId(null)}
-                    onChange={(chord) => updateBinding(definition.id, chord)}
-                  />
-                  <Button
-                    type="button"
-                    size="icon-sm"
-                    variant="ghost"
-                    aria-label={t('清除快捷键')}
-                    disabled={draft[definition.id] === null}
-                    onClick={() => updateBinding(definition.id, null)}
-                  >
-                    <Trash2 className="size-3.5" />
-                  </Button>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      </section>
-    </div>
-  )
+function buildConflictMap(conflicts: ReturnType<typeof findShortcutConflicts>) {
+  const map = new Map<ShortcutActionId, ShortcutActionId[]>()
+  for (const item of conflicts) {
+    const list = map.get(item.actionId) ?? []
+    list.push(item.conflictsWith)
+    map.set(item.actionId, list)
+  }
+  return map
+}
+
+function ShortcutHeader({ autoSave, onReset }: Pick<ShortcutModel, 'autoSave'> & { onReset: () => void }) {
+  return <div className="flex items-start justify-between gap-3"><div><h2 className="flex items-center gap-2 text-sm font-semibold text-foreground"><Keyboard className="size-4" />{t('快捷键')}</h2><p className="mt-1 text-xs text-muted-foreground">{t('自定义全局快捷键。修改后自动保存；冲突项会以警告标出。macOS 使用 ⌘，Windows/Linux 使用 Ctrl。')}</p></div><div className="flex items-center gap-2"><AutoSaveStatusIndicator status={autoSave.status} error={autoSave.error} /><Button type="button" size="sm" variant="outline" onClick={onReset}><RotateCcw className="size-3.5" />{t('恢复默认')}</Button></div></div>
+}
+
+function ShortcutAlerts({ error, conflicts, onReload }: { error: string; conflicts: number; onReload: () => Promise<void> }) {
+  return <>{error ? <div className="rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">{t('加载快捷键失败: ${}', error)}<Button type="button" size="xs" variant="outline" className="ml-2" onClick={() => { void onReload() }}>{t('重试')}</Button></div> : null}{conflicts > 0 ? <div className="rounded-xl border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive">{t('存在快捷键冲突，已暂停自动保存。请先消除冲突后再继续。')}</div> : null}</>
+}
+
+function ShortcutList({ model }: { model: ShortcutModel }) {
+  return <section className="rounded-xl border border-border bg-card p-3 shadow-sm"><div className="flex flex-col divide-y divide-border">{SHORTCUT_DEFINITIONS.map((definition) => <ShortcutRow key={definition.id} definition={definition} model={model} />)}</div></section>
+}
+
+function ShortcutRow({ definition, model }: { definition: (typeof SHORTCUT_DEFINITIONS)[number]; model: ShortcutModel }) {
+  const conflictLabels = (model.conflictMap.get(definition.id) ?? []).map((id) => SHORTCUT_DEFINITIONS.find((item) => item.id === id)?.label).filter(Boolean).map((label) => t(label as string))
+  return <div className="flex flex-col gap-2 py-3 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between"><div className="min-w-0"><div className="text-sm font-medium text-foreground">{t(definition.label)}</div><div className="text-xs text-muted-foreground">{t(definition.description)}</div>{conflictLabels.length > 0 ? <div className="mt-1 text-xs text-destructive">{t('与「${}」冲突', conflictLabels.join(' / '))}</div> : null}</div><div className="flex shrink-0 items-center gap-2"><ShortcutRecorder value={model.draft[definition.id]} recording={model.recordingId === definition.id} onStart={() => model.setRecordingId(definition.id)} onCancel={() => model.setRecordingId(null)} onChange={(chord) => model.updateBinding(definition.id, chord)} /><Button type="button" size="icon-sm" variant="ghost" aria-label={t('清除快捷键')} disabled={model.draft[definition.id] === null} onClick={() => model.updateBinding(definition.id, null)}><Trash2 className="size-3.5" /></Button></div></div>
 }

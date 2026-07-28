@@ -15,10 +15,6 @@ export function Lock(): $CancellablePromise<model$0.SecurityStatus> {
     });
 }
 
-export function RequireUnlocked(): $CancellablePromise<void> {
-    return $Call.ByName("github.com/xuthus5/mssh/internal/service.SecurityService.RequireUnlocked");
-}
-
 export function Rotate(input: model$0.SecurityRotateInput): $CancellablePromise<model$0.SecurityStatus> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.SecurityService.Rotate", input).then(($result: any) => {
         return $$createType0($result);
@@ -43,18 +39,10 @@ export function Status(): $CancellablePromise<model$0.SecurityStatus> {
     });
 }
 
-export function SyncSecret(): $CancellablePromise<string> {
-    return $Call.ByName("github.com/xuthus5/mssh/internal/service.SecurityService.SyncSecret");
-}
-
 export function Unlock(input: model$0.SecurityUnlockInput): $CancellablePromise<model$0.SecurityStatus> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.SecurityService.Unlock", input).then(($result: any) => {
         return $$createType0($result);
     });
-}
-
-export function VerifyPassword(password: string): $CancellablePromise<void> {
-    return $Call.ByName("github.com/xuthus5/mssh/internal/service.SecurityService.VerifyPassword", password);
 }
 
 // Private type creation functions

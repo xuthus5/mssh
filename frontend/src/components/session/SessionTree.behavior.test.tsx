@@ -51,6 +51,41 @@ describe('SessionTree behavior', () => {
     expect(screen.getByText('db-01')).toBeInTheDocument()
   })
 
+  it('keeps keyboard actions aligned with the active descendant', async () => {
+    const user = userEvent.setup()
+    const onConnect = vi.fn()
+    render(<SessionTree
+      folders={[]}
+      sessions={[sessions[0], { ...sessions[0], id: 's9', name: 'web-09' }]}
+      onConnect={onConnect}
+      navigationOnly
+    />)
+    const tree = screen.getByRole('tree')
+
+    await user.click(screen.getByRole('treeitem', { name: 'web-01' }))
+    await user.keyboard('{ArrowDown}{Enter}')
+
+    expect(tree).toHaveFocus()
+    expect(onConnect).toHaveBeenCalledOnce()
+    expect(onConnect).toHaveBeenCalledWith('s9')
+  })
+
+  it('keeps the active row operable when the session catalog shrinks', () => {
+    const onConnect = vi.fn()
+    const additional = { ...sessions[0], id: 's9', name: 'web-09' }
+    const { rerender } = render(<SessionTree folders={[]} sessions={[sessions[0], additional]} onConnect={onConnect} navigationOnly />)
+    const tree = screen.getByRole('tree')
+    fireEvent.keyDown(tree, { key: 'End' })
+    expect(tree).toHaveAttribute('aria-activedescendant', 'session-s9')
+
+    rerender(<SessionTree folders={[]} sessions={[sessions[0]]} onConnect={onConnect} navigationOnly />)
+
+    expect(tree).toHaveAttribute('aria-activedescendant', 'session-s1')
+    expect(screen.getByRole('treeitem', { name: 'web-01' })).toHaveAttribute('aria-selected', 'true')
+    fireEvent.keyDown(tree, { key: 'Enter' })
+    expect(onConnect).toHaveBeenCalledWith('s1')
+  })
+
   it('runs folder and session context actions', async () => {
     const user = userEvent.setup()
     const onConnect = vi.fn()

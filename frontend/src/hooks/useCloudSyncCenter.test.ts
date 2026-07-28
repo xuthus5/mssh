@@ -99,4 +99,86 @@ describe('useCloudSyncCenter', () => {
     expect(result.current.error).toBe('dashboard load failed')
     expect(useToastStore.getState().toasts).toHaveLength(0)
   })
+
+  it('does not let an older dashboard reload overwrite a newer one', async () => {
+    const first = deferred<typeof dashboard>()
+    const second = deferred<typeof dashboard>()
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SyncService.Dashboard', async () => { dashboardLoads++; return first.promise })
+    const { result } = renderHook(() => useCloudSyncCenter())
+    await waitFor(() => expect(dashboardLoads).toBe(1))
+
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SyncService.Dashboard', async () => { dashboardLoads++; return second.promise })
+    let latestReload!: Promise<void>
+    act(() => { latestReload = result.current.reload() })
+    await waitFor(() => expect(dashboardLoads).toBe(2))
+    const newer = { ...dashboard, config: { ...dashboard.config, gist: { ...dashboard.config.gist, gist_id: 'new' } } }
+    await act(async () => { second.resolve(newer); await latestReload })
+    expect(result.current.dashboard?.config.gist.gist_id).toBe('new')
+
+    const older = { ...dashboard, config: { ...dashboard.config, gist: { ...dashboard.config.gist, gist_id: 'old' } } }
+    await act(async () => { first.resolve(older); await first.promise })
+    expect(result.current.dashboard?.config.gist.gist_id).toBe('new')
+  })
+
+  it('keeps an operation failure when an earlier event reload resolves later', async () => {
+    const sync = deferred<void>()
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SyncService.SyncNow', async () => sync.promise)
+    const { result } = renderHook(() => useCloudSyncCenter())
+    await waitFor(() => expect(result.current.dashboard).not.toBeNull())
+
+    const eventReload = deferred<typeof dashboard>()
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SyncService.Dashboard', async () => {
+      dashboardLoads++
+      return eventReload.promise
+    })
+    let syncPromise!: Promise<void>
+    act(() => { syncPromise = result.current.syncNow() })
+    await waitFor(() => expect(result.current.pending).toBe('sync'))
+    act(() => __emitEvent('sync:data-changed', { data: { changed: true } }))
+
+    await act(async () => {
+      sync.reject(new Error('network failed'))
+      await syncPromise.catch(() => undefined)
+    })
+    expect(result.current.error).toContain('network failed')
+
+    await act(async () => {
+      eventReload.resolve(dashboard)
+      await eventReload.promise
+    })
+    expect(result.current.error).toContain('network failed')
+  })
+
+  it('rejects overlapping sync operations without calling a second backend action', async () => {
+    const sync = deferred<void>()
+    let pushes = 0
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SyncService.SyncNow', async () => sync.promise)
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SyncService.PushNow', async () => { pushes++; return undefined })
+    const { result } = renderHook(() => useCloudSyncCenter())
+    await waitFor(() => expect(result.current.dashboard).not.toBeNull())
+
+    let syncPromise!: Promise<void>
+    let pushPromise!: Promise<void>
+    act(() => {
+      syncPromise = result.current.syncNow()
+      pushPromise = result.current.pushNow()
+    })
+
+    await expect(pushPromise).rejects.toThrow('同步操作正在进行')
+    expect(pushes).toBe(0)
+    expect(result.current.pending).toBe('sync')
+
+    await act(async () => { sync.resolve(undefined); await syncPromise })
+    expect(result.current.pending).toBeNull()
+  })
 })
+
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  let reject!: (reason?: unknown) => void
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise
+    reject = rejectPromise
+  })
+  return { promise, resolve, reject }
+}

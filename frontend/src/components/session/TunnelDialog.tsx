@@ -1,291 +1,30 @@
-import { useState, type FormEvent } from 'react'
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
 } from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { LabeledSelect } from '@/components/ui/labeled-select'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
-import type { Tunnel } from '@/hooks/useSession'
-import { normalizeTunnelLocalAddress, remoteTunnelExposureWarning, validateTunnelLocalAddress } from '@/lib/tunnelBind'
-import { requestConfirm } from '@/lib/confirmDialog'
 import { t } from '@/i18n'
+import { TunnelTable } from '@/components/session/TunnelTable'
+import { TunnelDialogForm } from '@/components/session/TunnelDialogForm'
+import { useTunnelDialogController, type TunnelDialogProps } from '@/components/session/useTunnelDialogController'
 
-interface Props {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  tunnels: Tunnel[]
-  loadError?: string
-  onReload?: () => void | Promise<void>
-  onStart: (tunnel: Omit<Tunnel, 'id' | 'running'> & { id?: string }, options?: { silent?: boolean }) => void | Promise<void>
-  onStop: (tunnelId: string) => void | Promise<void>
-  onDelete?: (tunnelId: string) => void | Promise<void>
-  sessionId: string
-}
-
-const TUNNEL_TYPE_OPTIONS = [
-  { value: 'local', label: t('本地转发') },
-  { value: 'remote', label: t('远程转发') },
-  { value: 'dynamic', label: t('动态转发') },
-]
-
-export default function TunnelDialog({
-  open,
-  onOpenChange,
-  tunnels,
-  loadError = '',
-  onReload,
-  onStart,
-  onStop,
-  onDelete,
-  sessionId: _sessionId,
-}: Props) {
-  const [showAdd, setShowAdd] = useState(false)
-  const [type, setType] = useState<string>('local')
-  const [localAddress, setLocalAddress] = useState('')
-  const [localPort, setLocalPort] = useState('')
-  const [remoteAddress, setRemoteAddress] = useState('')
-  const [remotePort, setRemotePort] = useState('')
-  const [error, setError] = useState('')
-  const [actionError, setActionError] = useState('')
-  const [pending, setPending] = useState(false)
-
-  const resetForm = () => {
-    setLocalAddress('')
-    setLocalPort('')
-    setRemoteAddress('')
-    setRemotePort('')
-    setError('')
-    setShowAdd(false)
-  }
-
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault()
-    const bindError = validateTunnelLocalAddress(type, localAddress)
-    if (bindError) {
-      setError(t(bindError))
-      return
-    }
-    setPending(true)
-    setError('')
-    try {
-      await onStart({
-        sessionId: _sessionId,
-        type: type as Tunnel['type'],
-        localAddress: normalizeTunnelLocalAddress(type, localAddress),
-        localPort: parseInt(localPort, 10) || 0,
-        remoteAddress: remoteAddress || '127.0.0.1',
-        remotePort: parseInt(remotePort, 10) || 0,
-      }, { silent: true })
-      resetForm()
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err)
-      setError(message)
-    } finally {
-      setPending(false)
-    }
-  }
-
-  const runListAction = async (action: () => void | Promise<void>, failure: string) => {
-    setActionError('')
-    try {
-      await action()
-    } catch (err) {
-      setActionError(t(failure, err instanceof Error ? err.message : String(err)))
-    }
-  }
-
-  const handleDelete = async (tunnelId: string, label: string) => {
-    if (!onDelete) return
-    const ok = await requestConfirm({
-      title: t('删除隧道'),
-      description: t('确认删除隧道「${}」？此操作不可撤销。', label),
-      confirmLabel: t('删除'),
-      cancelLabel: t('取消'),
-      destructive: true,
-    })
-    if (!ok) return
-    await runListAction(() => onDelete(tunnelId), '删除隧道失败: ${}')
-  }
-
-  const typeLabel = (value: string) => {
-    switch (value) {
-      case 'local': return t('本地转发')
-      case 'remote': return t('远程转发')
-      case 'dynamic': return t('动态转发')
-      default: return value
-    }
-  }
-
+export default function TunnelDialog(props: TunnelDialogProps) {
+  const controller = useTunnelDialogController(props)
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>{t('隧道管理')}</DialogTitle>
-        </DialogHeader>
+    <Dialog open={props.open} onOpenChange={controller.handleOpenChange}>
+      <DialogContent showCloseButton={!controller.closeBlocked} className="sm:max-w-lg">
+        <DialogHeader><DialogTitle>{t('隧道管理')}</DialogTitle></DialogHeader>
         <div className="flex flex-col gap-3">
           <div className="flex items-center">
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => {
-                if (showAdd) resetForm()
-                else setShowAdd(true)
-              }}
-            >
-              {showAdd ? t('取消') : t('新建隧道')}
+            <Button size="sm" variant="outline" disabled={controller.busy} onClick={() => { if (controller.showAdd) controller.resetForm(); else controller.setShowAdd(true) }}>
+              {controller.showAdd ? t('取消') : t('新建隧道')}
             </Button>
           </div>
-          {showAdd && (
-            <form onSubmit={handleSubmit} className="flex flex-col gap-3 rounded-lg border border-border p-3">
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium text-muted-foreground">{t('类型')}</label>
-                <LabeledSelect
-                  value={type}
-                  options={TUNNEL_TYPE_OPTIONS}
-                  onValueChange={(value) => {
-                    setType(value)
-                    setError('')
-                  }}
-                />
-              </div>
-              {type !== 'dynamic' && (
-                <>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-xs font-medium text-muted-foreground">{t('本地地址')}</label>
-                      <Input
-                        value={localAddress}
-                        onChange={(e) => { setLocalAddress(e.target.value); setError('') }}
-                        placeholder="127.0.0.1"
-                        aria-label={t('本地地址')}
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-xs font-medium text-muted-foreground">{t('本地端口')}</label>
-                      <Input type="number" value={localPort} onChange={(e) => setLocalPort(e.target.value)} placeholder="8080" />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-xs font-medium text-muted-foreground">{t('远程地址')}</label>
-                      <Input value={remoteAddress} onChange={(e) => setRemoteAddress(e.target.value)} placeholder="127.0.0.1" />
-                    </div>
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-xs font-medium text-muted-foreground">{t('远程端口')}</label>
-                      <Input type="number" value={remotePort} onChange={(e) => setRemotePort(e.target.value)} placeholder="80" />
-                    </div>
-                  </div>
-                </>
-              )}
-              {type === 'dynamic' && (
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-xs font-medium text-muted-foreground">{t('本地地址')}</label>
-                    <Input
-                      value={localAddress}
-                      onChange={(e) => { setLocalAddress(e.target.value); setError('') }}
-                      placeholder="127.0.0.1"
-                      aria-label={t('本地地址')}
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-xs font-medium text-muted-foreground">{t('本地端口')}</label>
-                    <Input type="number" value={localPort} onChange={(e) => setLocalPort(e.target.value)} placeholder="1080" />
-                  </div>
-                </div>
-              )}
-              {(type === 'local' || type === 'dynamic') && (
-                <p className="text-xs text-muted-foreground">{t('本地/动态隧道仅允许绑定回环地址，避免意外对局域网暴露服务。')}</p>
-              )}
-              {type === 'remote' && (
-                <p className="text-xs text-amber-600 dark:text-amber-400">
-                  {t(remoteTunnelExposureWarning('remote', remoteAddress)
-                    ?? '远程转发会在 SSH 服务端打开监听端口；绑定非回环地址时请确认安全边界。')}
-                </p>
-              )}
-              {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-              <DialogFooter showCloseButton>
-                <Button type="submit" disabled={pending}>{pending ? t('启动中…') : t('启动')}</Button>
-              </DialogFooter>
-            </form>
-          )}
-          {actionError ? <p role="alert" className="text-sm text-destructive">{actionError}</p> : null}
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{t('类型')}</TableHead>
-                <TableHead>{t('本地')}</TableHead>
-                <TableHead>{t('远程')}</TableHead>
-                <TableHead>{t('状态')}</TableHead>
-                <TableHead className="text-right">{t('操作')}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loadError ? (
-                <TableRow>
-                  <TableCell colSpan={5} className="text-center">
-                    <div className="flex flex-col items-center gap-2 py-2 text-sm text-destructive" role="alert">
-                      <span>{t('加载隧道失败: ${}', loadError)}</span>
-                      {onReload ? <Button size="xs" variant="outline" onClick={() => { void Promise.resolve(onReload()).catch(() => undefined) }}>{t('重试')}</Button> : null}
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ) : tunnels.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={5} className="text-center text-muted-foreground">{t('无隧道')}</TableCell>
-                </TableRow>
-              ) : (
-                tunnels.map((tunnel) => (
-                  <TableRow key={tunnel.id}>
-                    <TableCell>{typeLabel(tunnel.type)}</TableCell>
-                    <TableCell className="font-mono text-xs">{tunnel.localAddress}:{tunnel.localPort}</TableCell>
-                    <TableCell className="font-mono text-xs">
-                      {tunnel.type !== 'dynamic' ? `${tunnel.remoteAddress}:${tunnel.remotePort}` : '-'}
-                    </TableCell>
-                    <TableCell>{tunnel.running ? t('运行中') : t('已停止')}</TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-1">
-                        {tunnel.running ? (
-                          <Button size="xs" variant="ghost" onClick={() => { void runListAction(() => onStop(tunnel.id), '停止隧道失败: ${}') }}>{t('停止')}</Button>
-                        ) : (
-                          <Button
-                            size="xs"
-                            variant="ghost"
-                            onClick={() => { void runListAction(() => onStart({
-                              id: tunnel.id,
-                              sessionId: tunnel.sessionId,
-                              type: tunnel.type,
-                              localAddress: tunnel.localAddress,
-                              localPort: tunnel.localPort,
-                              remoteAddress: tunnel.remoteAddress,
-                              remotePort: tunnel.remotePort,
-                            }), '启动隧道失败: ${}') }}
-                          >
-                            {t('启动')}
-                          </Button>
-                        )}
-                        {onDelete ? (
-                          <Button size="xs" variant="ghost" className="text-destructive" onClick={() => { void handleDelete(tunnel.id, `${typeLabel(tunnel.type)} ${tunnel.localAddress}:${tunnel.localPort}`).catch(() => undefined) }}>{t('删除')}</Button>
-                        ) : null}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+          {controller.showAdd && <TunnelDialogForm controller={controller} />}
+          {controller.actionError ? <p role="alert" className="text-sm text-destructive">{controller.actionError}</p> : null}
+          <TunnelTable disabled={controller.busy} tunnels={props.tunnels} loadError={props.loadError ?? ''} onReload={props.onReload} onStart={props.onStart} onStop={props.onStop} onStartAction={(action, failure) => { void controller.runListAction(action, failure) }} onStopAction={(action, failure) => { void controller.runListAction(action, failure) }} onDelete={props.onDelete ? (tunnelID, label) => { void controller.handleDelete(tunnelID, label).catch(() => undefined) } : undefined} />
         </div>
       </DialogContent>
     </Dialog>

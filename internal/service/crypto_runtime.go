@@ -12,12 +12,41 @@ var ErrVaultLocked = errors.New("application vault is locked")
 
 // CryptoRuntime is a hot-swappable KeyCrypto backed by the vault DEK.
 type CryptoRuntime struct {
-	mu  sync.RWMutex
-	dek []byte
+	mu          sync.RWMutex
+	operationMu sync.Mutex
+	dek         []byte
 }
 
 func NewCryptoRuntime() *CryptoRuntime {
 	return &CryptoRuntime{}
+}
+
+// WithCryptoOperation serializes database operations that use the active DEK.
+//
+//wails:ignore
+func (c *CryptoRuntime) WithCryptoOperation(operation func() error) error {
+	if c == nil {
+		return ErrVaultLocked
+	}
+	c.lockOperation()
+	defer c.unlockOperation()
+	return operation()
+}
+
+func (c *CryptoRuntime) lockOperation() {
+	c.operationMu.Lock()
+}
+
+func (c *CryptoRuntime) unlockOperation() {
+	c.operationMu.Unlock()
+}
+
+func withCryptoOperation(keyCrypto KeyCrypto, operation func() error) error {
+	coordinator, ok := keyCrypto.(interface{ WithCryptoOperation(func() error) error })
+	if !ok {
+		return operation()
+	}
+	return coordinator.WithCryptoOperation(operation)
 }
 
 func (c *CryptoRuntime) SetDEK(dek []byte) {
@@ -69,6 +98,7 @@ func (c *CryptoRuntime) Encrypt(plaintext []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer clear(dek)
 	return crypto.Encrypt(plaintext, dek)
 }
 
@@ -77,5 +107,6 @@ func (c *CryptoRuntime) Decrypt(ciphertext []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer clear(dek)
 	return crypto.Decrypt(ciphertext, dek)
 }

@@ -1,11 +1,16 @@
-import { render, screen } from '@testing-library/react'
+import { useEffect } from 'react'
+import { act, render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/components/session/SessionAssetCenter', () => ({ SessionAssetCenter: () => <div>会话资产页面</div> }))
 vi.mock('@/components/settings/KeyManager', () => ({ KeyManager: () => <div>密钥管理页面</div> }))
 vi.mock('@/components/session/TunnelDialog', () => ({ default: () => <div>隧道管理弹框</div> }))
 vi.mock('@/components/layout/AuditPanel', () => ({ AuditPanel: () => <div>审计日志页面</div> }))
-vi.mock('@/components/serial/SerialPortCenter', () => ({ SerialPortCenter: () => <div>串口管理页面</div> }))
+const overviewMounts = vi.hoisted(() => ({ serial: 0 }))
+vi.mock('@/components/serial/SerialPortCenter', () => ({ SerialPortCenter: () => {
+  useEffect(() => { overviewMounts.serial += 1 }, [])
+  return <div>串口管理页面</div>
+} }))
 vi.mock('@/hooks/useSettings', () => ({
   useKeySettings: () => ({
     keys: [], generateKey: vi.fn(), importKey: vi.fn(), deleteKey: vi.fn(), exportKey: vi.fn(),
@@ -23,7 +28,10 @@ import { OverviewContent } from '@/components/layout/OverviewContent'
 import { useAppStore } from '@/store/appStore'
 
 describe('OverviewContent', () => {
-  beforeEach(() => useAppStore.setState({ overviewSection: 'sessions' }))
+  beforeEach(() => {
+    overviewMounts.serial = 0
+    useAppStore.setState({ overviewSection: 'sessions' })
+  })
 
   it('renders the session asset center by default', () => {
     render(<OverviewContent />)
@@ -55,5 +63,18 @@ describe('OverviewContent', () => {
     useAppStore.setState({ overviewSection: 'serial' })
     render(<OverviewContent />)
     expect(screen.getByText('串口管理页面')).toBeInTheDocument()
+  })
+
+  it('keeps visited overview sections mounted while hidden', () => {
+    useAppStore.setState({ overviewSection: 'serial' })
+    render(<OverviewContent />)
+    expect(screen.getByText('串口管理页面')).toBeVisible()
+    expect(overviewMounts.serial).toBe(1)
+
+    act(() => useAppStore.setState({ overviewSection: 'sessions' }))
+    expect(screen.getByText('串口管理页面')).not.toBeVisible()
+    act(() => useAppStore.setState({ overviewSection: 'serial' }))
+    expect(screen.getByText('串口管理页面')).toBeVisible()
+    expect(overviewMounts.serial).toBe(1)
   })
 })

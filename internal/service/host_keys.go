@@ -2,6 +2,7 @@ package service
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -17,9 +18,14 @@ import (
 )
 
 func (s *SessionService) ListHostKeys() ([]model.HostKeyEntry, error) {
+	finish, err := s.beginOperation()
+	if err != nil {
+		return nil, err
+	}
+	defer finish()
 	path := filepath.Join(s.dataDir, "known_hosts")
 	var entries []model.HostKeyEntry
-	err := msshssh.WithKnownHostsLock(func() error {
+	err = msshssh.WithKnownHostsLock(func() error {
 		var listErr error
 		entries, listErr = s.listHostKeysLocked(path)
 		return listErr
@@ -28,16 +34,15 @@ func (s *SessionService) ListHostKeys() ([]model.HostKeyEntry, error) {
 }
 
 func (s *SessionService) listHostKeysLocked(path string) ([]model.HostKeyEntry, error) {
-	file, err := os.Open(path)
+	content, err := msshssh.ReadKnownHostsFile(path)
 	if errors.Is(err, os.ErrNotExist) {
 		return []model.HostKeyEntry{}, nil
 	}
 	if err != nil {
-		return nil, fmt.Errorf("open known_hosts: %w", err)
+		return nil, err
 	}
-	defer func() { _ = file.Close() }()
 	entries := make([]model.HostKeyEntry, 0)
-	scanner := bufio.NewScanner(file)
+	scanner := bufio.NewScanner(bytes.NewReader(content))
 	// Bound line size so a corrupt known_hosts cannot exhaust memory.
 	scanner.Buffer(make([]byte, 64*1024), 64*1024)
 	for line := 1; scanner.Scan(); line++ {
@@ -75,6 +80,11 @@ func parseKnownHostLine(line int, value string) (model.HostKeyEntry, bool) {
 }
 
 func (s *SessionService) DeleteHostKey(line int) error {
+	finish, err := s.beginOperation()
+	if err != nil {
+		return err
+	}
+	defer finish()
 	if line < 1 {
 		return errors.New("known_hosts line must be positive")
 	}
@@ -85,37 +95,16 @@ func (s *SessionService) DeleteHostKey(line int) error {
 }
 
 func (s *SessionService) deleteHostKeyLocked(path string, line int) error {
-	content, err := os.ReadFile(path)
+	content, err := msshssh.ReadKnownHostsFile(path)
 	if err != nil {
-		return fmt.Errorf("read known_hosts: %w", err)
+		return err
 	}
 	lines := strings.Split(string(content), "\n")
 	if line > len(lines) || strings.TrimSpace(lines[line-1]) == "" {
 		return fmt.Errorf("known_hosts line %d not found", line)
 	}
 	lines = append(lines[:line-1], lines[line:]...)
-	temporary, err := os.CreateTemp(s.dataDir, "known_hosts-*.tmp")
-	if err != nil {
-		return fmt.Errorf("create known_hosts temp file: %w", err)
-	}
-	temporaryPath := temporary.Name()
-	defer func() { _ = os.Remove(temporaryPath) }()
-	if err := temporary.Chmod(0o600); err != nil {
-		_ = temporary.Close()
-		return fmt.Errorf("secure known_hosts temp file: %w", err)
-	}
-	if _, err := temporary.WriteString(strings.Join(lines, "\n")); err != nil {
-		_ = temporary.Close()
-		return fmt.Errorf("write known_hosts: %w", err)
-	}
-	if err := temporary.Sync(); err != nil {
-		_ = temporary.Close()
-		return fmt.Errorf("sync known_hosts temp file: %w", err)
-	}
-	if err := temporary.Close(); err != nil {
-		return fmt.Errorf("close known_hosts temp file: %w", err)
-	}
-	if err := fsutil.ReplaceFile(temporaryPath, path); err != nil {
+	if err := fsutil.WritePrivateFileAtomic(path, []byte(strings.Join(lines, "\n")), "known_hosts-*.tmp"); err != nil {
 		return fmt.Errorf("replace known_hosts: %w", err)
 	}
 	return nil

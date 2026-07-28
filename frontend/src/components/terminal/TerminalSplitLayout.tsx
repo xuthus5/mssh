@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useCallback, useEffect, useRef, type ReactNode } from 'react'
 import { RefreshCw, WifiOff, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useAppStore } from '@/store/appStore'
@@ -47,11 +47,14 @@ function ConnectionOverlay({ terminalID, onReconnect, onClose }: { terminalID: s
 function LeafView(props: SplitTreeViewProps & { node: Extract<SplitNode, { kind: 'leaf' }> }) {
   const terminalID = props.node.terminalID
   const selected = props.activePaneID ? props.activePaneID === terminalID : props.primaryID === terminalID
+  const registerHost = useCallback((element: HTMLDivElement | null) => {
+    props.registerHost(props.node.id, terminalID, element)
+  }, [props.node.id, props.registerHost, terminalID])
   return <div className={`group relative h-full w-full min-h-0 min-w-0 flex-1 overflow-hidden ${selected ? 'ring-1 ring-inset ring-primary/35' : ''}`}>
     <div
       data-testid={`pane-slot-${terminalID}`}
       className="h-full w-full min-h-0 min-w-0"
-      ref={(element) => props.registerHost(props.node.id, terminalID, element)}
+      ref={registerHost}
     />
     {props.paneCount > 1 ? <button type="button" title={t('关闭当前窗格')} aria-label={t('关闭当前窗格')}
       disabled={props.closingID !== null} onClick={() => props.onClose(terminalID)}
@@ -62,26 +65,45 @@ function LeafView(props: SplitTreeViewProps & { node: Extract<SplitNode, { kind:
   </div>
 }
 
-function Divider({ branch, onRatio }: { branch: SplitBranch; onRatio: (branchID: string, ratio: number) => void }) {
-  const horizontal = branch.direction === 'horizontal'
-  const ratio = Math.round(branch.ratio)
-  const startDrag = (event: React.PointerEvent<HTMLDivElement>) => {
+function useDividerDrag(branch: SplitBranch, onRatio: (branchID: string, ratio: number) => void) {
+  const cleanupRef = useRef<(() => void) | null>(null)
+  const stopDrag = useCallback(() => {
+    const cleanup = cleanupRef.current
+    cleanupRef.current = null
+    cleanup?.()
+  }, [])
+  useEffect(() => stopDrag, [stopDrag])
+  return useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     event.preventDefault()
     const container = event.currentTarget.parentElement
     if (!container) return
+    stopDrag()
+    const pointerID = event.pointerId
+    const horizontal = branch.direction === 'horizontal'
     const move = (pointer: PointerEvent) => {
+      if (pointer.pointerId !== pointerID) return
       const rect = container.getBoundingClientRect()
       const position = horizontal ? pointer.clientX - rect.left : pointer.clientY - rect.top
       const size = horizontal ? rect.width : rect.height
       if (size > 0) onRatio(branch.id, position / size * 100)
     }
-    const stop = () => {
+    const cleanup = () => {
       window.removeEventListener('pointermove', move)
-      window.removeEventListener('pointerup', stop)
+      window.removeEventListener('pointerup', cleanup)
+      window.removeEventListener('pointercancel', cleanup)
+      if (cleanupRef.current === cleanup) cleanupRef.current = null
     }
+    cleanupRef.current = cleanup
     window.addEventListener('pointermove', move)
-    window.addEventListener('pointerup', stop, { once: true })
-  }
+    window.addEventListener('pointerup', cleanup, { once: true })
+    window.addEventListener('pointercancel', cleanup, { once: true })
+  }, [branch.direction, branch.id, onRatio, stopDrag])
+}
+
+function Divider({ branch, onRatio }: { branch: SplitBranch; onRatio: (branchID: string, ratio: number) => void }) {
+  const horizontal = branch.direction === 'horizontal'
+  const ratio = Math.round(branch.ratio)
+  const startDrag = useDividerDrag(branch, onRatio)
   const adjustWithKeyboard = (event: React.KeyboardEvent<HTMLDivElement>) => {
     const increment = horizontal
       ? event.key === 'ArrowRight' ? 5 : event.key === 'ArrowLeft' ? -5 : 0

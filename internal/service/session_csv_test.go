@@ -18,7 +18,7 @@ import (
 
 func TestSessionService_ExportCSV(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	service := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
+	service := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), newUnlockedSessionTestCrypto(), testutil.NewTestLogger())
 	parent, err := service.CreateFolder("基础设施", nil)
 	require.NoError(t, err)
 	child, err := service.CreateFolder("生产/核心", &parent.ID)
@@ -54,7 +54,8 @@ func TestSessionService_ExportCSV(t *testing.T) {
 
 func TestSessionService_ImportCSVCreatesMetadataAndHandlesConflicts(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	service := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
+	runtime := newUnlockedSessionTestCrypto()
+	service := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), runtime, testutil.NewTestLogger())
 	key, err := store.CreateKey(db, model.SSHKey{Name: "deploy", Type: model.KeyTypeED25519, PrivateKey: "private", PublicKey: "ssh-ed25519 AAAA deploy"})
 	require.NoError(t, err)
 	path := writeSessionCSVFixture(t, []map[string]string{
@@ -92,7 +93,9 @@ func TestSessionService_ImportCSVCreatesMetadataAndHandlesConflicts(t *testing.T
 	updated, err := store.GetSession(db, sessions[0].ID)
 	require.NoError(t, err)
 	assert.Equal(t, "updated", updated.Notes)
-	assert.Equal(t, "secret", updated.Password)
+	password, err := openSessionPassword(runtime, updated.Password)
+	require.NoError(t, err)
+	assert.Equal(t, "secret", password)
 }
 
 func TestSessionService_ImportCSVReportsRowFailuresAndRejectsUnsafeFiles(t *testing.T) {

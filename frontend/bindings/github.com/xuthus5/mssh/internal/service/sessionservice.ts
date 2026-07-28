@@ -8,20 +8,9 @@ import { Call as $Call, CancellablePromise as $CancellablePromise, Create as $Cr
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
 import * as model$0 from "../model/models.js";
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore: Unused imports
-import * as ssh$0 from "../ssh/models.js";
 
 export function CancelConnect(attemptID: string): $CancellablePromise<void> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.SessionService.CancelConnect", attemptID);
-}
-
-export function CloseAll(): $CancellablePromise<void> {
-    return $Call.ByName("github.com/xuthus5/mssh/internal/service.SessionService.CloseAll");
-}
-
-export function ConnectionCount(): $CancellablePromise<number> {
-    return $Call.ByName("github.com/xuthus5/mssh/internal/service.SessionService.ConnectionCount");
 }
 
 export function CreateFolder(name: string, parentID: number | null): $CancellablePromise<model$0.SessionFolder | null> {
@@ -62,12 +51,6 @@ export function ExportCSV(path: string, options: model$0.SessionCSVExportOptions
     });
 }
 
-export function GetClientWrapper(connID: string): $CancellablePromise<ssh$0.ClientWrapper | null> {
-    return $Call.ByName("github.com/xuthus5/mssh/internal/service.SessionService.GetClientWrapper", connID).then(($result: any) => {
-        return $$createType6($result);
-    });
-}
-
 export function GetSession(id: number): $CancellablePromise<model$0.Session | null> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.SessionService.GetSession", id).then(($result: any) => {
         return $$createType3($result);
@@ -76,31 +59,31 @@ export function GetSession(id: number): $CancellablePromise<model$0.Session | nu
 
 export function ImportCSV(path: string, options: model$0.SessionCSVImportOptions): $CancellablePromise<model$0.SessionCSVImportSummary> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.SessionService.ImportCSV", path, options).then(($result: any) => {
-        return $$createType7($result);
+        return $$createType5($result);
     });
 }
 
 export function ListFolders(): $CancellablePromise<model$0.SessionFolder[]> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.SessionService.ListFolders").then(($result: any) => {
-        return $$createType8($result);
+        return $$createType6($result);
     });
 }
 
 export function ListHostKeys(): $CancellablePromise<model$0.HostKeyEntry[]> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.SessionService.ListHostKeys").then(($result: any) => {
-        return $$createType10($result);
+        return $$createType8($result);
     });
 }
 
 export function ListRecentSessions(limit: number): $CancellablePromise<model$0.Session[]> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.SessionService.ListRecentSessions", limit).then(($result: any) => {
-        return $$createType11($result);
+        return $$createType9($result);
     });
 }
 
 export function ListSessions(folderID: number | null): $CancellablePromise<model$0.Session[]> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.SessionService.ListSessions", folderID).then(($result: any) => {
-        return $$createType11($result);
+        return $$createType9($result);
     });
 }
 
@@ -114,19 +97,19 @@ export function MoveSession(id: number, newFolderID: number | null): $Cancellabl
 
 export function PreviewCSV(path: string): $CancellablePromise<model$0.SessionCSVPreview> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.SessionService.PreviewCSV", path).then(($result: any) => {
-        return $$createType12($result);
+        return $$createType10($result);
     });
 }
 
 export function SessionDeleteImpact(id: number): $CancellablePromise<model$0.SessionDeleteImpact | null> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.SessionService.SessionDeleteImpact", id).then(($result: any) => {
-        return $$createType14($result);
+        return $$createType12($result);
     });
 }
 
 export function SessionsDeleteImpact(ids: number[]): $CancellablePromise<model$0.SessionDeleteImpact | null> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.SessionService.SessionsDeleteImpact", ids).then(($result: any) => {
-        return $$createType14($result);
+        return $$createType12($result);
     });
 }
 
@@ -148,13 +131,11 @@ const $$createType1 = $Create.Nullable($$createType0);
 const $$createType2 = model$0.Session.createFrom;
 const $$createType3 = $Create.Nullable($$createType2);
 const $$createType4 = model$0.SessionCSVExportResult.createFrom;
-const $$createType5 = ssh$0.ClientWrapper.createFrom;
-const $$createType6 = $Create.Nullable($$createType5);
-const $$createType7 = model$0.SessionCSVImportSummary.createFrom;
-const $$createType8 = $Create.Array($$createType0);
-const $$createType9 = model$0.HostKeyEntry.createFrom;
-const $$createType10 = $Create.Array($$createType9);
-const $$createType11 = $Create.Array($$createType2);
-const $$createType12 = model$0.SessionCSVPreview.createFrom;
-const $$createType13 = model$0.SessionDeleteImpact.createFrom;
-const $$createType14 = $Create.Nullable($$createType13);
+const $$createType5 = model$0.SessionCSVImportSummary.createFrom;
+const $$createType6 = $Create.Array($$createType0);
+const $$createType7 = model$0.HostKeyEntry.createFrom;
+const $$createType8 = $Create.Array($$createType7);
+const $$createType9 = $Create.Array($$createType2);
+const $$createType10 = model$0.SessionCSVPreview.createFrom;
+const $$createType11 = model$0.SessionDeleteImpact.createFrom;
+const $$createType12 = $Create.Nullable($$createType11);

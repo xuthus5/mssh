@@ -30,4 +30,11 @@ describe('useToolPanelResize', () => {
     const { result } = renderHook(() => useToolPanelResize('history'))
     expect(result.current.width).toBe(720)
   })
+
+  it('uses the AI settings minimum width', () => {
+    localStorage.setItem('mssh:tool-panel-width:ai', '280')
+    const { result } = renderHook(() => useToolPanelResize('ai'))
+    expect(result.current.width).toBe(300)
+    expect(result.current.resizeHandleProps['aria-valuemin']).toBe(300)
+  })
 })

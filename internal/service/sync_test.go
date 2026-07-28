@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -33,7 +34,10 @@ func TestSyncServiceExportImportRestoresEncryptedFullSnapshot(t *testing.T) {
 	require.NoError(t, err)
 	tag, err := catalog.CreateTag(model.AssetTagInput{Name: "数据库", ColorToken: model.AssetColorBlue})
 	require.NoError(t, err)
-	created, err := store.CreateSessionWithTags(db, model.Session{FolderID: &folder.ID, Name: "s1", Host: "10.0.0.1", Port: 22, Username: "root", AuthMethod: model.AuthPassword, Password: "secret", KeepAlive: 30, TermType: "xterm", EnvironmentID: &environment.ID, ProjectID: &project.ID, Notes: "维护说明"}, []int64{tag.ID})
+	passwordCrypto := testSessionPasswordRuntime()
+	storedPassword, err := sealSessionPassword(passwordCrypto, "secret")
+	require.NoError(t, err)
+	created, err := store.CreateSessionWithTags(db, model.Session{FolderID: &folder.ID, Name: "s1", Host: "10.0.0.1", Port: 22, Username: "root", AuthMethod: model.AuthPassword, Password: storedPassword, KeepAlive: 30, TermType: "xterm", EnvironmentID: &environment.ID, ProjectID: &project.ID, Notes: "维护说明"}, []int64{tag.ID})
 	require.NoError(t, err)
 	_, err = store.CreateTunnel(db, model.Tunnel{SessionID: created.ID, Name: "web", Type: model.TunnelLocal, LocalHost: "127.0.0.1", LocalPort: 8080, RemoteHost: "127.0.0.1", RemotePort: 80})
 	require.NoError(t, err)
@@ -66,7 +70,9 @@ func TestSyncServiceExportImportRestoresEncryptedFullSnapshot(t *testing.T) {
 	assert.Equal(t, folder.ID, folders[1].ID)
 	session, err := store.GetSession(db2, created.ID)
 	require.NoError(t, err)
-	assert.Equal(t, "secret", session.Password)
+	password, err := openSessionPassword(passwordCrypto, session.Password)
+	require.NoError(t, err)
+	assert.Equal(t, "secret", password)
 	require.NotNil(t, session.Environment)
 	require.NotNil(t, session.Project)
 	assert.Equal(t, "生产", session.Environment.Name)
@@ -218,6 +224,24 @@ func TestCloudSyncUploadDownloadAndConflict(t *testing.T) {
 	require.ErrorContains(t, err, "conflict")
 }
 
+func TestCloudUploadFailsClosedWhenStoredETagIsCorrupt(t *testing.T) {
+	var requests atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		requests.Add(1)
+		writer.WriteHeader(http.StatusNoContent)
+	}))
+	defer server.Close()
+
+	db := testutil.NewTestDB(t)
+	setSyncMasterKey(t, db, syncTestMasterKey)
+	_, err := db.Exec(`INSERT INTO settings (key, namespace, value, value_type, version) VALUES (?, 'sync', ?, 'string', 1)`, syncETagSetting, "not-json")
+	require.NoError(t, err)
+
+	err = newTestSyncService(db, syncTestMasterKey).SyncToCloud(server.URL, "", "")
+	require.ErrorContains(t, err, "decode cloud ETag")
+	assert.Zero(t, requests.Load())
+}
+
 func TestReadCloudBackupRejectsOversizedPayload(t *testing.T) {
 	_, err := readCloudBackup(io.LimitReader(zeroReader{}, maxCloudBackupSize+1))
 	require.ErrorContains(t, err, "exceeds")
@@ -252,9 +276,9 @@ func TestSyncCodecAndCloudErrorPaths(t *testing.T) {
 	})
 
 	t.Run("cloud request and response errors", func(t *testing.T) {
-		_, err := cloudRequest(http.MethodGet, "file:///tmp/config", "", "", nil)
+		_, err := cloudRequest(t.Context(), http.MethodGet, "file:///tmp/config", "", "", nil)
 		require.Error(t, err)
-		request, err := cloudRequest(http.MethodGet, "https://example.com/config", "user", "pass", nil)
+		request, err := cloudRequest(t.Context(), http.MethodGet, "https://example.com/config", "user", "pass", nil)
 		require.NoError(t, err)
 		username, password, ok := request.BasicAuth()
 		assert.True(t, ok)

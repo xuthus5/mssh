@@ -1,4 +1,14 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type Dispatch,
+  type RefObject,
+  type SetStateAction,
+} from 'react'
+import { AutoSaveCoordinator, type AutoSaveRequest } from '@/hooks/autoSaveCoordinator'
+import { useSettingsWindowHide } from '@/hooks/useSettingsWindowHide'
 
 export type AutoSaveStatus = 'idle' | 'pending' | 'saving' | 'saved' | 'error'
 
@@ -9,114 +19,201 @@ export interface UseAutoSaveOptions<T> {
   isReady?: boolean
   delayMs?: number
   serialize?: (value: T) => string
+  baselineRevision?: number
 }
 
-export interface UseAutoSaveResult {
+export interface UseAutoSaveResult<T> {
   status: AutoSaveStatus
   error: string | null
   flush: () => Promise<void>
+  redact: (source: T, redacted: T) => boolean
+}
+
+interface LiveOptions<T> {
+  value: T
+  onSave: (value: T) => Promise<void>
+  enabled: boolean
+  isReady: boolean
+  serialize: (value: T) => string
+}
+
+interface NormalizedOptions<T> extends LiveOptions<T> {
+  delayMs: number
+  baselineRevision: number
 }
 
 const defaultSerialize = <T,>(value: T) => JSON.stringify(value)
 
-export function useAutoSave<T>({
-  value,
-  onSave,
-  enabled = true,
-  isReady = true,
-  delayMs = 450,
-  serialize = defaultSerialize,
-}: UseAutoSaveOptions<T>): UseAutoSaveResult {
+export function useAutoSave<T>(options: UseAutoSaveOptions<T>): UseAutoSaveResult<T> {
+  const normalized = normalizeOptions(options)
+  const liveRef = useLiveOptions(normalized)
+  const state = useCoordinatorState<T>()
+  const timer = useSaveTimer()
+  const flush = useFlush(liveRef, state.coordinator, timer.clear)
+  const redact = useRedaction(liveRef, state.coordinator)
+  useSaveScheduling({ options: normalized, liveRef, state, timer })
+  useExitFlush(flush)
+  return { status: state.status, error: state.error, flush, redact }
+}
+
+function normalizeOptions<T>(options: UseAutoSaveOptions<T>): NormalizedOptions<T> {
+  return {
+    value: options.value,
+    onSave: options.onSave,
+    enabled: options.enabled ?? true,
+    isReady: options.isReady ?? true,
+    delayMs: options.delayMs ?? 450,
+    serialize: options.serialize ?? defaultSerialize,
+    baselineRevision: options.baselineRevision ?? 0,
+  }
+}
+
+function useLiveOptions<T>(options: LiveOptions<T>) {
+  const liveRef = useRef(options)
+  liveRef.current = options
+  return liveRef
+}
+
+function useCoordinatorState<T>() {
   const [status, setStatus] = useState<AutoSaveStatus>('idle')
   const [error, setError] = useState<string | null>(null)
-  const lastSavedRef = useRef<string | null>(null)
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const valueRef = useRef(value)
-  const onSaveRef = useRef(onSave)
-  const serializeRef = useRef(serialize)
-  const saveGenerationRef = useRef(0)
-  const inFlightRef = useRef(false)
-  const queuedRef = useRef(false)
-  const enabledRef = useRef(enabled)
-  const isReadyRef = useRef(isReady)
-
-  valueRef.current = value
-  onSaveRef.current = onSave
-  serializeRef.current = serialize
-  enabledRef.current = enabled
-  isReadyRef.current = isReady
-
-  const clearTimer = useCallback(() => {
-    if (timerRef.current !== null) {
-      clearTimeout(timerRef.current)
-      timerRef.current = null
-    }
-  }, [])
-
-  const persist = useCallback(async () => {
-    if (!enabledRef.current || !isReadyRef.current) return
-    const snapshot = valueRef.current
-    const serialized = serializeRef.current(snapshot)
-    if (lastSavedRef.current === serialized) {
-      setStatus((current) => (current === 'pending' || current === 'saving' ? 'saved' : current))
-      return
-    }
-    if (inFlightRef.current) {
-      queuedRef.current = true
-      return
-    }
-    inFlightRef.current = true
-    const generation = ++saveGenerationRef.current
-    setStatus('saving')
-    setError(null)
-    try {
-      await onSaveRef.current(snapshot)
-      if (generation !== saveGenerationRef.current) return
-      lastSavedRef.current = serializeRef.current(snapshot)
-      setStatus('saved')
-    } catch (saveError) {
-      if (generation !== saveGenerationRef.current) return
+  const coordinatorRef = useRef<AutoSaveCoordinator<T> | null>(null)
+  const coordinator = coordinatorRef.current ?? new AutoSaveCoordinator<T>({
+    onSaving: () => { setError(null); setStatus('saving') },
+    onSaved: () => { setError(null); setStatus('saved') },
+    onError: (saveError) => {
       setError(saveError instanceof Error ? saveError.message : String(saveError))
       setStatus('error')
-    } finally {
-      inFlightRef.current = false
-      if (queuedRef.current) {
-        queuedRef.current = false
-        void persist()
-      }
-    }
+    },
+  })
+  coordinatorRef.current = coordinator
+  return { status, error, setStatus, setError, coordinator }
+}
+
+function useSaveTimer() {
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const clear = useCallback(() => {
+    if (timerRef.current === null) return
+    clearTimeout(timerRef.current)
+    timerRef.current = null
   }, [])
+  return { timerRef, clear }
+}
 
-  const flush = useCallback(async () => {
+function currentRequest<T>(live: LiveOptions<T>): AutoSaveRequest<T> {
+  return {
+    value: live.value,
+    serialized: live.serialize(live.value),
+    save: live.onSave,
+  }
+}
+
+function useFlush<T>(
+  liveRef: RefObject<LiveOptions<T>>,
+  coordinator: AutoSaveCoordinator<T>,
+  clearTimer: () => void,
+) {
+  return useCallback(async () => {
     clearTimer()
-    await persist()
-  }, [clearTimer, persist])
+    const live = liveRef.current
+    if (!live.isReady) return
+    const request = currentRequest(live)
+    const requiresCorrection = coordinator.isActive() && coordinator.isSaved(request.serialized)
+    if (!live.enabled && !requiresCorrection) return
+    await coordinator.request(request)
+  }, [clearTimer, coordinator, liveRef])
+}
 
+function useRedaction<T>(liveRef: RefObject<LiveOptions<T>>, coordinator: AutoSaveCoordinator<T>) {
+  return useCallback((source: T, redacted: T) => {
+    const serialize = liveRef.current.serialize
+    return coordinator.redactLatest(serialize(source), serialize(redacted))
+  }, [coordinator, liveRef])
+}
+
+interface SaveSchedulingState<T> {
+  status: AutoSaveStatus
+  error: string | null
+  setStatus: Dispatch<SetStateAction<AutoSaveStatus>>
+  setError: Dispatch<SetStateAction<string | null>>
+  coordinator: AutoSaveCoordinator<T>
+}
+
+interface SaveSchedulingInput<T> {
+  options: NormalizedOptions<T>
+  liveRef: RefObject<LiveOptions<T>>
+  state: SaveSchedulingState<T>
+  timer: ReturnType<typeof useSaveTimer>
+}
+
+interface ReadySaveSchedulingInput<T> extends SaveSchedulingInput<T> {
+  baselineRef: RefObject<number>
+}
+
+function scheduleReadySave<T>({ options, liveRef, state, timer, baselineRef }: ReadySaveSchedulingInput<T>) {
+  const { coordinator, setError, setStatus } = state
+  const request = currentRequest(liveRef.current)
+  if (coordinator.initialize(request.serialized)) {
+    baselineRef.current = options.baselineRevision
+    setStatus('idle')
+    return
+  }
+  const baselineChanged = baselineRef.current !== options.baselineRevision
+  baselineRef.current = options.baselineRevision
+  if (baselineChanged) {
+    coordinator.synchronize(request.serialized)
+    setError(null)
+    if (!coordinator.isActive()) setStatus('saved')
+    return
+  }
+  if (coordinator.isSaved(request.serialized)) {
+    void coordinator.request(request)
+    return
+  }
+  if (!options.enabled) {
+    coordinator.clearPending()
+    return
+  }
+  if (coordinator.isActive()) {
+    void coordinator.request(request)
+    return
+  }
+  setError(null)
+  setStatus('pending')
+  timer.timerRef.current = setTimeout(() => {
+    timer.timerRef.current = null
+    void coordinator.request(currentRequest(liveRef.current))
+  }, options.delayMs)
+  return timer.clear
+}
+
+function useSaveScheduling<T>({ options, liveRef, state, timer }: SaveSchedulingInput<T>) {
+  const readyRef = useRef(options.isReady)
+  const baselineRef = useRef(options.baselineRevision)
+  const [readyEpoch, setReadyEpoch] = useState(0)
   useEffect(() => {
-    if (!isReady) return
-    const serialized = serializeRef.current(value)
-    if (lastSavedRef.current === null) {
-      lastSavedRef.current = serialized
-      setStatus('idle')
+    timer.clear()
+    const becameReady = options.isReady && !readyRef.current
+    readyRef.current = options.isReady
+    if (becameReady) {
+      setReadyEpoch((current) => current + 1)
       return
     }
-    if (!enabled || lastSavedRef.current === serialized) return
-    setStatus('pending')
-    clearTimer()
-    timerRef.current = setTimeout(() => {
-      timerRef.current = null
-      void persist()
-    }, delayMs)
-    return clearTimer
-  }, [value, enabled, isReady, delayMs, clearTimer, persist])
+    if (!options.isReady) {
+      state.coordinator.clearPending()
+      return
+    }
+    return scheduleReadySave({ options, liveRef, state, timer, baselineRef })
+  }, [liveRef, options.baselineRevision, options.delayMs, options.enabled, options.isReady, options.serialize, options.value, readyEpoch, state.coordinator, state.setError, state.setStatus, timer.clear, timer.timerRef])
+}
 
+function useExitFlush(flush: () => Promise<void>) {
+  useSettingsWindowHide(() => { void flush() })
   useEffect(() => {
     const onVisibility = () => {
       if (document.visibilityState === 'hidden') void flush()
     }
-    const onPageHide = () => {
-      void flush()
-    }
+    const onPageHide = () => { void flush() }
     document.addEventListener('visibilitychange', onVisibility)
     window.addEventListener('pagehide', onPageHide)
     return () => {
@@ -124,7 +221,5 @@ export function useAutoSave<T>({
       window.removeEventListener('pagehide', onPageHide)
       void flush()
     }
-  }, [flush, clearTimer])
-
-  return { status, error, flush }
+  }, [flush])
 }

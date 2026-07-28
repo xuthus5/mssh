@@ -23,7 +23,9 @@ type PTYSession struct {
 	exitNotified bool
 	closeOnce    sync.Once
 	closeErr     error
+	readWG       sync.WaitGroup
 	startOnce    sync.Once
+	closed       bool
 }
 
 func OpenPTY(c *ClientWrapper, termType string, cols, rows int) (*PTYSession, error) {
@@ -68,24 +70,39 @@ func PreparePTY(c *ClientWrapper, termType string, cols, rows int) (*PTYSession,
 
 func (p *PTYSession) Start() {
 	p.startOnce.Do(func() {
-		if p.stdout != nil {
-			go p.readLoop(p.stdout)
+		p.mu.Lock()
+		if p.closed || p.stdout == nil {
+			p.mu.Unlock()
+			return
 		}
+		reader := p.stdout
+		p.readWG.Add(1)
+		p.mu.Unlock()
+		go p.runReadLoop(reader)
 	})
 }
 
-func (p *PTYSession) readLoop(r io.Reader) {
+func (p *PTYSession) runReadLoop(reader io.Reader) {
+	exitErr := p.readOutput(reader)
+	p.readWG.Done()
+	p.notifyExit(exitErr)
+}
+
+func (p *PTYSession) readLoop(reader io.Reader) {
+	p.notifyExit(p.readOutput(reader))
+}
+
+func (p *PTYSession) readOutput(reader io.Reader) error {
 	buf := make([]byte, 4096)
 	for {
-		n, err := r.Read(buf)
+		n, err := reader.Read(buf)
 		if n > 0 {
 			data := make([]byte, n)
 			copy(data, buf[:n])
 			p.deliverRead(data)
 		}
 		if err != nil {
-			p.notifyExit(err)
-			return
+			return err
 		}
 	}
 }
@@ -164,9 +181,13 @@ func (p *PTYSession) Resize(cols, rows int) error {
 
 func (p *PTYSession) Close() error {
 	p.closeOnce.Do(func() {
+		p.mu.Lock()
+		p.closed = true
+		p.mu.Unlock()
 		if p.session != nil {
 			p.closeErr = p.session.Close()
 		}
 	})
+	p.readWG.Wait()
 	return p.closeErr
 }

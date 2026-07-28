@@ -8,6 +8,9 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
+
+	"github.com/google/uuid"
 
 	"github.com/xuthus5/mssh/internal/model"
 	"github.com/xuthus5/mssh/internal/ssh"
@@ -18,9 +21,11 @@ type LogService struct {
 	db                   *sql.DB
 	mu                   sync.Mutex
 	recorders            map[string]*activeRecording
+	finalizing           map[int64]struct{}
 	starting             map[string]struct{}
 	dataDir              string
 	logger               *slog.Logger
+	lifecycle            serviceOperationGate
 	shuttingDown         bool
 	shutdownOnce         sync.Once
 	shutdownErr          error
@@ -33,6 +38,11 @@ type LogService struct {
 }
 
 type LogServiceOption func(*LogService)
+
+const (
+	sessionLogFinalizeAttempts   = 3
+	sessionLogFinalizeRetryDelay = 10 * time.Millisecond
+)
 
 // WithSessionLogFinalizer overrides session-log finalization for alternate storage wiring.
 func WithSessionLogFinalizer(finalizer func(*sql.DB, int64) error) LogServiceOption {
@@ -67,12 +77,16 @@ func (recording *activeRecording) close() error {
 }
 
 func NewLogService(db *sql.DB, dataDir string, logger *slog.Logger, options ...LogServiceOption) *LogService {
+	if logger == nil {
+		logger = slog.Default()
+	}
 	logService := &LogService{
-		db:        db,
-		recorders: make(map[string]*activeRecording),
-		starting:  make(map[string]struct{}),
-		dataDir:   dataDir,
-		logger:    logger,
+		db:         db,
+		recorders:  make(map[string]*activeRecording),
+		finalizing: make(map[int64]struct{}),
+		starting:   make(map[string]struct{}),
+		dataDir:    dataDir,
+		logger:     logger,
 		newRecorder: func(path string, cols, rows int, termType string) (terminalRecorder, error) {
 			return ssh.NewRecorder(path, cols, rows, termType)
 		},
@@ -83,10 +97,31 @@ func NewLogService(db *sql.DB, dataDir string, logger *slog.Logger, options ...L
 	for _, option := range options {
 		option(logService)
 	}
+	logService.cleanupStagedRecordingFiles()
+	logService.recoverIncompleteSessionLogs()
 	return logService
 }
 
+func (l *LogService) recoverIncompleteSessionLogs() {
+	if l.db == nil {
+		return
+	}
+	recovered, err := store.EndIncompleteSessionLogs(l.db)
+	if err != nil {
+		l.logger.Error("recover incomplete session logs failed", "error", err)
+		return
+	}
+	if recovered > 0 {
+		l.logger.Warn("recovered incomplete session logs", "count", recovered)
+	}
+}
+
 func (l *LogService) List(sessionID *int64) ([]model.SessionLog, error) {
+	finish, err := l.beginOperation()
+	if err != nil {
+		return nil, err
+	}
+	defer finish()
 	if sessionID == nil {
 		return store.ListSessionLogs(l.db)
 	}
@@ -97,6 +132,11 @@ func (l *LogService) List(sessionID *int64) ([]model.SessionLog, error) {
 }
 
 func (l *LogService) StartTerminalRecording(terminalID string, sessionID int64, cols, rows int, termType string) (int64, error) {
+	finish, err := l.beginOperation()
+	if err != nil {
+		return 0, err
+	}
+	defer finish()
 	if err := validateTerminalID(terminalID); err != nil {
 		return 0, err
 	}
@@ -142,15 +182,7 @@ func (l *LogService) createActiveRecording(sessionID int64, size [2]int, termTyp
 	if err := os.MkdirAll(recDir, 0o700); err != nil {
 		return nil, fmt.Errorf("start terminal recording: %w", err)
 	}
-	tempFile, err := os.CreateTemp(recDir, "recording-*.msshlog")
-	if err != nil {
-		return nil, fmt.Errorf("start terminal recording: create recording file: %w", err)
-	}
-	dataPath := tempFile.Name()
-	if err = tempFile.Close(); err != nil {
-		closeErr := fmt.Errorf("start terminal recording: close recording file: %w", err)
-		return nil, errors.Join(closeErr, l.removeRecordingFile(dataPath))
-	}
+	dataPath := filepath.Join(recDir, "recording-"+uuid.NewString()+".msshlog")
 	recorder, err := l.newRecorder(dataPath, size[0], size[1], termType)
 	if err != nil {
 		createErr := fmt.Errorf("start terminal recording: %w", err)
@@ -185,17 +217,6 @@ func (l *LogService) removeRecordingFile(path string) error {
 		return fmt.Errorf("start terminal recording: remove recording file: %w", err)
 	}
 	return nil
-}
-
-// CloseAllActiveRecordings permanently stops every active recording without exposing a Wails service method.
-func CloseAllActiveRecordings(logService *LogService) error {
-	if logService == nil {
-		return nil
-	}
-	logService.shutdownOnce.Do(func() {
-		logService.shutdownErr = logService.closeAllActiveRecordings()
-	})
-	return logService.shutdownErr
 }
 
 func (l *LogService) closeAllActiveRecordings() error {

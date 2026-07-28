@@ -2,9 +2,11 @@ package store
 
 import (
 	"database/sql"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/xuthus5/mssh/internal/model"
@@ -31,6 +33,29 @@ func TestTransferJobLifecycle(t *testing.T) {
 	require.Equal(t, int64(50), jobs[0].TransferredBytes)
 	require.Equal(t, "completed", jobs[0].Status)
 	require.NotNil(t, jobs[0].CompletedAt)
+}
+
+func TestFinishTransferJobWithProgress(t *testing.T) {
+	db := transferTestDB(t)
+	startedAt := time.Now().Add(-time.Minute)
+	completedAt := time.Now().UTC().Truncate(time.Nanosecond)
+	require.NoError(t, CreateTransferJob(db, model.TransferJob{
+		ID: "task-with-progress", SessionID: 7, SessionName: "server", Direction: "download",
+		SourcePath: "/remote/a", TargetPath: "/tmp/a", Status: "running", StartedAt: startedAt,
+	}))
+	require.NoError(t, FinishTransferJobWithProgress(db, model.TransferJob{
+		ID: "task-with-progress", Status: "completed", TransferredBytes: 128, TotalBytes: 128,
+		CompletedAt: &completedAt,
+	}))
+
+	jobs, err := ListTransferJobs(db)
+	require.NoError(t, err)
+	require.Len(t, jobs, 1)
+	assert.Equal(t, "completed", jobs[0].Status)
+	assert.Equal(t, int64(128), jobs[0].TransferredBytes)
+	assert.Equal(t, int64(128), jobs[0].TotalBytes)
+	require.NotNil(t, jobs[0].CompletedAt)
+	assert.True(t, jobs[0].CompletedAt.Equal(completedAt))
 }
 
 func TestMarkInterruptedTransfers(t *testing.T) {
@@ -83,6 +108,25 @@ func TestFinishTransferJobDoesNotRegressCancelled(t *testing.T) {
 	require.Len(t, jobs, 1)
 	require.Equal(t, "cancelled", jobs[0].Status)
 	require.Equal(t, "会话已删除", jobs[0].Error)
+}
+
+func TestFinishTransferJobAppendsCleanupErrorToCancelledReason(t *testing.T) {
+	db := transferTestDB(t)
+	require.NoError(t, CreateTransferJob(db, model.TransferJob{
+		ID: "cancel-cleanup", SessionID: 3, SessionName: "s", Direction: "upload",
+		SourcePath: "/a", TargetPath: "/b", Status: "running", StartedAt: time.Now(),
+	}))
+	require.NoError(t, CancelTransferJobsForSessions(db, []int64{3}))
+	cleanupErr := "cleanup remote partial: permission denied"
+	require.NoError(t, FinishTransferJob(db, "cancel-cleanup", "cancelled", cleanupErr))
+	require.NoError(t, FinishTransferJob(db, "cancel-cleanup", "cancelled", cleanupErr))
+
+	jobs, err := ListTransferJobs(db)
+	require.NoError(t, err)
+	require.Len(t, jobs, 1)
+	assert.Equal(t, "cancelled", jobs[0].Status)
+	assert.Contains(t, jobs[0].Error, "会话已删除")
+	assert.Equal(t, 1, strings.Count(jobs[0].Error, cleanupErr))
 }
 
 func TestUpdateTransferProgressDoesNotRegressCancelled(t *testing.T) {

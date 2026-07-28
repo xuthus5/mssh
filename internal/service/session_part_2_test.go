@@ -82,3 +82,40 @@ func TestSessionServiceRejectsEmptyAttemptID(t *testing.T) {
 	assert.Error(t, svc.DecideHostKey("   ", false))
 	assert.Error(t, svc.CancelConnect(""))
 }
+
+func TestSessionServiceHostKeyDecisionHonorsContextCancellation(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	bus := newManualHostKeyEventBus()
+	svc := NewSessionService(db, bus, 30, t.TempDir(), nil, testutil.NewTestLogger())
+	ctx, cancel := context.WithCancel(context.Background())
+	attemptID := svc.registerConnectAttempt(1, cancel)
+	t.Cleanup(func() { cancel(); svc.finishConnectAttempt(attemptID) })
+	result := make(chan bool, 1)
+	go func() {
+		result <- svc.awaitHostKeyDecision(ctx, attemptID, "one:22", "ssh-ed25519", "SHA256:one")
+	}()
+	require.Eventually(t, func() bool { return hostKeyEventCount(bus) == 1 }, time.Second, 5*time.Millisecond)
+	cancel()
+	assert.False(t, <-result)
+}
+
+func TestSessionServiceCancelledHostKeyAttemptRejectsLaterDecision(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	svc := NewSessionService(db, newManualHostKeyEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
+	cancelled := make(chan struct{})
+	attemptID := svc.registerConnectAttempt(1, func() { close(cancelled) })
+
+	require.NoError(t, svc.CancelConnect(attemptID))
+	assert.Error(t, svc.DecideHostKey(attemptID, true))
+	<-cancelled
+}
+
+func hostKeyEventCount(bus *mockEventBus) int {
+	count := 0
+	for _, captured := range bus.Events() {
+		if captured.Name == event.HostKeyFingerprint {
+			count++
+		}
+	}
+	return count
+}

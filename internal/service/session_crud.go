@@ -8,11 +8,21 @@ import (
 )
 
 func (s *SessionService) ListFolders() ([]model.SessionFolder, error) {
+	finish, err := s.beginOperation()
+	if err != nil {
+		return nil, err
+	}
+	defer finish()
 	s.logger.Info("listing folders")
 	return store.ListFolders(s.db)
 }
 
 func (s *SessionService) CreateFolder(name string, parentID *int64) (*model.SessionFolder, error) {
+	finish, err := s.beginOperation()
+	if err != nil {
+		return nil, err
+	}
+	defer finish()
 	normalized, err := validateFolderName(name)
 	if err != nil {
 		return nil, err
@@ -29,6 +39,11 @@ func (s *SessionService) CreateFolder(name string, parentID *int64) (*model.Sess
 }
 
 func (s *SessionService) UpdateFolder(id int64, name string) error {
+	finish, err := s.beginOperation()
+	if err != nil {
+		return err
+	}
+	defer finish()
 	if id <= 0 {
 		return fmt.Errorf("invalid folder id")
 	}
@@ -45,6 +60,11 @@ func (s *SessionService) UpdateFolder(id int64, name string) error {
 }
 
 func (s *SessionService) DeleteFolder(id int64) error {
+	finish, err := s.beginOperation()
+	if err != nil {
+		return err
+	}
+	defer finish()
 	if id <= 0 {
 		return fmt.Errorf("invalid folder id")
 	}
@@ -53,7 +73,7 @@ func (s *SessionService) DeleteFolder(id int64) error {
 		recordAudit(s.db, s.logger, model.AuditEvent{Action: "delete", TargetType: "folder", TargetID: fmt.Sprint(id), Summary: "删除会话分组", Outcome: outcome})
 	}()
 	s.logger.Info("deleting folder", "id", id)
-	err := store.DeleteFolder(s.db, id)
+	err = store.DeleteFolder(s.db, id)
 	if err != nil {
 		s.logger.Error("delete folder failed", "error", err)
 	} else {
@@ -63,6 +83,11 @@ func (s *SessionService) DeleteFolder(id int64) error {
 }
 
 func (s *SessionService) SetDefaultFolder(id int64) error {
+	finish, err := s.beginOperation()
+	if err != nil {
+		return err
+	}
+	defer finish()
 	if id <= 0 {
 		return fmt.Errorf("invalid folder id")
 	}
@@ -71,6 +96,11 @@ func (s *SessionService) SetDefaultFolder(id int64) error {
 }
 
 func (s *SessionService) MoveFolder(id int64, newParentID *int64) error {
+	finish, err := s.beginOperation()
+	if err != nil {
+		return err
+	}
+	defer finish()
 	if id <= 0 {
 		return fmt.Errorf("invalid folder id")
 	}
@@ -78,7 +108,7 @@ func (s *SessionService) MoveFolder(id int64, newParentID *int64) error {
 		return err
 	}
 	s.logger.Info("moving folder", "id", id, "newParentID", newParentID)
-	err := store.MoveFolder(s.db, id, newParentID)
+	err = store.MoveFolder(s.db, id, newParentID)
 	if err != nil {
 		s.logger.Error("move folder failed", "error", err)
 	}
@@ -86,6 +116,11 @@ func (s *SessionService) MoveFolder(id int64, newParentID *int64) error {
 }
 
 func (s *SessionService) ListSessions(folderID *int64) ([]model.Session, error) {
+	finish, err := s.beginOperation()
+	if err != nil {
+		return nil, err
+	}
+	defer finish()
 	if err := validateOptionalAssetID("folder", folderID); err != nil {
 		return nil, err
 	}
@@ -98,6 +133,11 @@ func (s *SessionService) ListSessions(folderID *int64) ([]model.Session, error) 
 }
 
 func (s *SessionService) ListRecentSessions(limit int) ([]model.Session, error) {
+	finish, err := s.beginOperation()
+	if err != nil {
+		return nil, err
+	}
+	defer finish()
 	s.logger.Info("listing recent sessions", "limit", limit)
 	sessions, err := store.ListRecentSessions(s.db, limit)
 	if err != nil {
@@ -107,11 +147,30 @@ func (s *SessionService) ListRecentSessions(limit int) ([]model.Session, error) 
 }
 
 func (s *SessionService) CreateSession(input model.SessionInput) (*model.Session, error) {
+	finish, err := s.beginOperation()
+	if err != nil {
+		return nil, err
+	}
+	defer finish()
 	if err := validateSessionAssetInput(input, false); err != nil {
 		return nil, err
 	}
+	var result *model.Session
+	err = withCryptoOperation(s.crypto, func() error {
+		created, createErr := s.createSession(input)
+		result = created
+		return createErr
+	})
+	if err != nil {
+		s.logger.Error("create session failed", "error", err)
+		return nil, err
+	}
+	return redactSessionPassword(result), nil
+}
+
+func (s *SessionService) createSession(input model.SessionInput) (*model.Session, error) {
 	session := input.Session()
-	if s.crypto != nil && session.Password != "" {
+	if session.Password != "" {
 		sealed, err := sealSessionPassword(s.crypto, session.Password)
 		if err != nil {
 			return nil, fmt.Errorf("create session: encrypt password: %w", err)
@@ -121,24 +180,35 @@ func (s *SessionService) CreateSession(input model.SessionInput) (*model.Session
 	s.logger.Info("creating session", "name", session.Name, "authMethod", session.AuthMethod)
 	result, err := store.CreateSessionWithTags(s.db, session, input.TagIDs)
 	if err != nil {
-		s.logger.Error("create session failed", "error", err)
 		return nil, err
 	}
-	return redactSessionPassword(result), nil
+	return result, nil
 }
 
 func (s *SessionService) UpdateSession(input model.SessionInput) error {
+	finish, err := s.beginOperation()
+	if err != nil {
+		return err
+	}
+	defer finish()
 	if err := validateSessionAssetInput(input, true); err != nil {
 		return err
 	}
+	return withCryptoOperation(s.crypto, func() error { return s.updateSession(input) })
+}
+
+func (s *SessionService) updateSession(input model.SessionInput) error {
 	session := input.Session()
 	existing, err := store.GetSession(s.db, session.ID)
 	if err != nil {
 		return fmt.Errorf("update session: %w", err)
 	}
 	if session.Password == "" {
+		if passwordErr := validateStoredSessionPassword(existing.Password); passwordErr != nil {
+			return fmt.Errorf("update session: %w", passwordErr)
+		}
 		session.Password = existing.Password
-	} else if s.crypto != nil {
+	} else {
 		sealed, sealErr := sealSessionPassword(s.crypto, session.Password)
 		if sealErr != nil {
 			return fmt.Errorf("update session: encrypt password: %w", sealErr)
@@ -154,6 +224,11 @@ func (s *SessionService) UpdateSession(input model.SessionInput) error {
 }
 
 func (s *SessionService) MoveSession(id int64, newFolderID *int64) error {
+	finish, err := s.beginOperation()
+	if err != nil {
+		return err
+	}
+	defer finish()
 	if id <= 0 {
 		return fmt.Errorf("invalid session id")
 	}
@@ -161,7 +236,7 @@ func (s *SessionService) MoveSession(id int64, newFolderID *int64) error {
 		return err
 	}
 	s.logger.Info("moving session", "id", id, "newFolderID", newFolderID)
-	err := store.MoveSession(s.db, id, newFolderID)
+	err = store.MoveSession(s.db, id, newFolderID)
 	if err != nil {
 		s.logger.Error("move session failed", "error", err)
 	}
@@ -169,6 +244,11 @@ func (s *SessionService) MoveSession(id int64, newFolderID *int64) error {
 }
 
 func (s *SessionService) GetSession(id int64) (*model.Session, error) {
+	finish, err := s.beginOperation()
+	if err != nil {
+		return nil, err
+	}
+	defer finish()
 	if id <= 0 {
 		return nil, fmt.Errorf("invalid session id")
 	}
@@ -178,42 +258,4 @@ func (s *SessionService) GetSession(id int64) (*model.Session, error) {
 		return nil, err
 	}
 	return redactSessionPassword(session), nil
-}
-
-func (s *SessionService) sessionForConnect(id int64) (*model.Session, error) {
-	if id <= 0 {
-		return nil, fmt.Errorf("invalid session id")
-	}
-	session, err := store.GetSession(s.db, id)
-	if err != nil {
-		return nil, err
-	}
-	if s.crypto != nil && session.Password != "" {
-		plain, openErr := openSessionPassword(s.crypto, session.Password)
-		if openErr != nil {
-			return nil, fmt.Errorf("decrypt session password: %w", openErr)
-		}
-		session.Password = plain
-	}
-	return session, nil
-}
-
-func redactSessionPassword(session *model.Session) *model.Session {
-	if session == nil {
-		return nil
-	}
-	copy := *session
-	if copy.Password != "" {
-		copy.Password = ""
-	}
-	return &copy
-}
-
-func redactSessionPasswords(sessions []model.Session) []model.Session {
-	for i := range sessions {
-		if sessions[i].Password != "" {
-			sessions[i].Password = ""
-		}
-	}
-	return sessions
 }

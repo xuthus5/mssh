@@ -7,8 +7,15 @@ import (
 	"github.com/xuthus5/mssh/internal/store"
 )
 
-func (s *SyncService) commitSuccessfulSync(provider model.SyncProvider, previous, baseline syncBaseline) error {
-	setting, err := buildSyncSetting(syncBaselineSetting(provider), baseline)
+type successfulSyncCommit struct {
+	Provider model.SyncProvider
+	Previous syncBaseline
+	Baseline syncBaseline
+	Restore  *ExportData
+}
+
+func (s *SyncService) commitSuccessfulSync(commit successfulSyncCommit) error {
+	setting, err := buildSyncSetting(syncBaselineSetting(commit.Provider), commit.Baseline)
 	if err != nil {
 		return err
 	}
@@ -17,12 +24,17 @@ func (s *SyncService) commitSuccessfulSync(provider model.SyncProvider, previous
 		return fmt.Errorf("begin sync state commit: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
-	if previous.LocalVersionID > 0 && previous.LocalVersionID != baseline.LocalVersionID {
-		if err := store.SetSyncVersionProtectedTx(tx, previous.LocalVersionID, false); err != nil {
+	if commit.Restore != nil {
+		if err := restoreIntoTransaction(tx, *commit.Restore); err != nil {
 			return err
 		}
 	}
-	if err := store.SetSyncVersionProtectedTx(tx, baseline.LocalVersionID, true); err != nil {
+	if commit.Previous.LocalVersionID > 0 && commit.Previous.LocalVersionID != commit.Baseline.LocalVersionID {
+		if err := store.SetSyncVersionProtectedTx(tx, commit.Previous.LocalVersionID, false); err != nil {
+			return err
+		}
+	}
+	if err := store.SetSyncVersionProtectedTx(tx, commit.Baseline.LocalVersionID, true); err != nil {
 		return err
 	}
 	if err := store.SetSettingsTx(tx, []model.Setting{setting}); err != nil {

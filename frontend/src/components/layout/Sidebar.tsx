@@ -51,6 +51,18 @@ function SessionPanel({ workspace, filter, editSession }: {
   </>
 }
 
+function MacroPanel({ macro }: { macro: ReturnType<typeof useSidebarMacros> }) {
+  const failure = macro.error
+  const message = failure?.kind === 'load' ? t('加载宏失败: ${}', failure.message) : failure?.message
+  return <div className="flex min-h-0 flex-1 flex-col">
+    {failure ? <div className="m-2 rounded-xl border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive" role="alert">
+      {message}
+      {failure.kind === 'load' ? <Button type="button" size="xs" variant="link" className="ml-2 h-auto p-0 text-destructive" disabled={macro.mutationBusy} onClick={() => { void macro.reload() }}>{t('重试')}</Button> : null}
+    </div> : null}
+    <div className="min-h-0 flex-1"><QuickCommands commands={macro.macros} onExecute={macro.execute} onAdd={macro.add} onDelete={macro.remove} showAddForm mutationDisabled={macro.mutationBusy} /></div>
+  </div>
+}
+
 export default function Sidebar() {
   const activeTab = useAppStore((state) => state.workspaceTab)
   const overviewActive = useAppStore((state) => state.activeSurface?.type === 'workspace' && state.activeSurface.id === 'overview')
@@ -62,7 +74,7 @@ export default function Sidebar() {
   return <div style={{ width: panel.displayedWidth }} className="relative shrink-0 transition-[width] duration-200 ease-out">
     <aside id="sidebar-navigation" style={{ width: panel.width }} aria-labelledby={workspaceTabID(activeTab)} aria-hidden={panel.collapsed} inert={panel.collapsed ? true : undefined} className={`relative flex h-full flex-col border-r border-border bg-card transition-transform duration-200 ease-out ${panel.collapsed ? '-translate-x-full pointer-events-none' : 'translate-x-0'}`}>
       {!panel.collapsed && <div {...panel.resizeHandleProps} className="absolute inset-y-0 -right-1 z-20 w-2 cursor-col-resize touch-none outline-none after:absolute after:inset-y-0 after:left-1/2 after:w-px after:-translate-x-1/2 after:bg-transparent hover:after:bg-primary/60 focus-visible:after:bg-primary active:after:bg-primary" />}
-      {overviewActive ? <OverviewPanel /> : activeTab === 'sessions' ? <SessionPanel workspace={workspace} filter={filter} editSession={dialogs.editSession} /> : <div className="min-h-0 flex-1 flex flex-col">{macro.error ? <div className="m-2 rounded-xl border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive" role="alert">{/^(创建|删除)宏失败/.test(macro.error) ? macro.error : t('加载宏失败: ${}', macro.error)}{!/^(创建|删除)宏失败/.test(macro.error) ? <button type="button" className="ml-2 underline" onClick={() => { void macro.reload() }}>{t('重试')}</button> : null}</div> : null}<div className="min-h-0 flex-1"><QuickCommands commands={macro.macros} onExecute={macro.execute} onAdd={macro.add} onDelete={macro.remove} showAddForm /></div></div>}
+      {overviewActive ? <OverviewPanel /> : activeTab === 'sessions' ? <SessionPanel workspace={workspace} filter={filter} editSession={dialogs.editSession} /> : <MacroPanel macro={macro} />}
       <SidebarDialogs sessionDialogOpen={dialogs.sessionDialogOpen} onSessionOpenChange={(open) => { dialogs.setSessionDialogOpen(open); if (!open) dialogs.setEditingSession(null) }} editingSession={dialogs.editingSession} onSaveSession={dialogs.saveSession} folders={workspace.folders} environments={workspace.environments} projects={workspace.projects} assetTags={workspace.tags} onCreateEnvironment={workspace.createEnvironment} onCreateProject={workspace.createProject} onCreateTag={workspace.createTag} folderDialogOpen={dialogs.folderDialogOpen} onFolderOpenChange={(open) => { dialogs.setFolderDialogOpen(open); if (!open) { dialogs.setEditingFolder(null); dialogs.setFolderName(''); dialogs.setFolderError('') } }} editingFolder={dialogs.editingFolder} folderName={dialogs.folderName} setFolderName={dialogs.setFolderName} folderError={dialogs.folderError} onCreateOrUpdateFolder={dialogs.saveFolder} />
     </aside>
   </div>

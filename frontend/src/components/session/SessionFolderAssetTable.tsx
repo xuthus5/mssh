@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState, type MutableRefObject } from 'react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
@@ -20,32 +20,73 @@ export function SessionNodeBreadcrumb({ folder, onClear }: { folder?: Folder; on
   return <Breadcrumb><BreadcrumbList><BreadcrumbItem>{folder ? <BreadcrumbLink render={<button type="button" onClick={onClear} />}>{t('所有节点')}</BreadcrumbLink> : <BreadcrumbPage>{t('所有节点')}</BreadcrumbPage>}</BreadcrumbItem>{folder && <><BreadcrumbSeparator /><BreadcrumbItem><BreadcrumbPage>{folder.name}</BreadcrumbPage></BreadcrumbItem></>}</BreadcrumbList></Breadcrumb>
 }
 
-export function SessionAssetDeleteDialog({ target, folders, sessions, onOpenChange, onConfirm }: { target: DeleteTarget | null; folders: Folder[]; sessions: Session[]; onOpenChange: (open: boolean) => void; onConfirm: (target: DeleteTarget) => Promise<void> }) {
+function useDeleteImpact({ target, lifecycle, targetGeneration }: {
+  target: DeleteTarget | null
+  lifecycle: MutableRefObject<number>
+  targetGeneration: MutableRefObject<number>
+}) {
   const [impact, setImpact] = useState<{ tunnels: number; history: number; recordings: number; transfers: number } | null>(null)
-  const [pending, setPending] = useState(false)
   const [error, setError] = useState('')
   useEffect(() => {
+    const generation = ++targetGeneration.current
+    setImpact(null)
     setError('')
-    if (target?.type !== 'session') { setImpact(null); return }
+    if (target?.type !== 'session') return
+    const lifecycleToken = lifecycle.current
     let current = true
-    void SessionService.SessionDeleteImpact(Number(target.item.id)).then((value) => { if (current) setImpact(value) }).catch((reason) => {
-      if (!current) return
-      const message = reason instanceof Error ? reason.message : String(reason)
-      setError(message)
+    void SessionService.SessionDeleteImpact(Number(target.item.id)).then((value) => {
+      if (current && lifecycle.current === lifecycleToken && targetGeneration.current === generation) setImpact(value)
+    }).catch((reason) => {
+      if (!current || lifecycle.current !== lifecycleToken || targetGeneration.current !== generation) return
+      setError(reason instanceof Error ? reason.message : String(reason))
     })
     return () => { current = false }
-  }, [target])
+  }, [lifecycle, target, targetGeneration])
+  return { impact, error, setError }
+}
+
+export function SessionAssetDeleteDialog({ target, folders, sessions, onOpenChange, onConfirm }: { target: DeleteTarget | null; folders: Folder[]; sessions: Session[]; onOpenChange: (open: boolean) => void; onConfirm: (target: DeleteTarget) => Promise<void> }) {
+  const [pending, setPending] = useState(false)
+  const lifecycle = useRef(0)
+  const targetGeneration = useRef(0)
+  const deleteRequest = useRef(0)
+  const deleteActive = useRef(false)
+  useEffect(() => {
+    const token = ++lifecycle.current
+    return () => { if (lifecycle.current === token) lifecycle.current++ }
+  }, [])
+  const { impact, error, setError } = useDeleteImpact({ target, lifecycle, targetGeneration })
   const confirm = async () => {
-    if (!target) return
+    if (!target || deleteActive.current) return
+    deleteActive.current = true
+    const lifecycleToken = lifecycle.current
+    const generation = targetGeneration.current
+    const request = ++deleteRequest.current
+    const isLatest = () => lifecycle.current === lifecycleToken && deleteRequest.current === request
+    const isCurrent = () => isLatest() && targetGeneration.current === generation
+    const deleteTarget = target
     setPending(true); setError('')
-    try { await onConfirm(target) } catch (reason) {
+    try { await onConfirm(deleteTarget) } catch (reason) {
       // dialog owns delete failures via inline alert; workspace no longer toasts
       const message = reason instanceof Error ? reason.message : String(reason)
-      setError(target.type === 'folder' ? t('删除分组失败: ${}', message) : t('删除会话失败: ${}', message))
+      if (isCurrent()) setError(deleteTarget.type === 'folder' ? t('删除分组失败: ${}', message) : t('删除会话失败: ${}', message))
     }
-    finally { setPending(false) }
+    finally {
+      if (deleteRequest.current === request) deleteActive.current = false
+      if (isLatest()) setPending(false)
+    }
+  }
+  const handleOpenChange = (open: boolean) => {
+    if (!open && deleteActive.current) return
+    if (!open) {
+      targetGeneration.current++
+      deleteRequest.current++
+      setPending(false)
+      setError('')
+    }
+    onOpenChange(open)
   }
   const folder = target?.type === 'folder' ? target.item as Folder : undefined
-  const description = folder ? t('其中 ${} 个会话和 ${} 个子分组将迁移到默认分组。', sessions.filter((session) => session.folderId === folder.id).length, folders.filter((item) => item.parentId === folder.id).length) : impact ? t('将同时影响 ${} 条隧道、${} 条命令历史、${} 条录制记录和 ${} 个进行中传输。', impact.tunnels, impact.history, impact.recordings, impact.transfers) : t('正在分析关联资产影响范围。')
-  return <AlertDialog open={Boolean(target)} onOpenChange={onOpenChange}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>{t('删除“')}{target?.item.name}”？</AlertDialogTitle><AlertDialogDescription>{description}</AlertDialogDescription></AlertDialogHeader>{error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}<AlertDialogFooter><AlertDialogCancel disabled={pending}>{t('取消')}</AlertDialogCancel><AlertDialogAction variant="destructive" disabled={pending} onClick={() => { void confirm() }}>{pending ? t('删除中…') : t('确认删除')}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+  const description = folder ? t('其中 ${} 个会话和 ${} 个子分组将迁移到默认分组。', sessions.filter((session) => session.folderId === folder.id).length, folders.filter((item) => item.parentId === folder.id).length) : error ? t('分析关联资产影响失败，影响范围未知。仍可继续删除。') : impact ? t('将同时影响 ${} 条隧道、${} 条命令历史、${} 条录制记录和 ${} 个进行中传输。', impact.tunnels, impact.history, impact.recordings, impact.transfers) : t('正在分析关联资产影响范围。')
+  return <AlertDialog open={Boolean(target)} onOpenChange={handleOpenChange}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>{t('删除“')}{target?.item.name}”？</AlertDialogTitle><AlertDialogDescription>{description}</AlertDialogDescription></AlertDialogHeader>{error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}<AlertDialogFooter><AlertDialogCancel disabled={pending}>{t('取消')}</AlertDialogCancel><AlertDialogAction variant="destructive" disabled={pending} onClick={() => { void confirm() }}>{pending ? t('删除中…') : t('确认删除')}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
 }

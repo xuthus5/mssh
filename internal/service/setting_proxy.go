@@ -39,14 +39,21 @@ func (s *SettingService) applyProxySettings(entries []model.Setting) error {
 		return nil
 	}
 	// Rebuild from storage so encrypted password is decrypted via loadProxyPassword.
-	if err := s.proxy.Configure(s.currentProxyConfig()); err != nil {
+	config, err := s.currentProxyConfig()
+	if err != nil {
+		return err
+	}
+	if err := s.proxy.Configure(config); err != nil {
 		return fmt.Errorf("apply proxy settings: %w", err)
 	}
 	return nil
 }
 
 func (s *SettingService) resolveProxySettings(entries []model.Setting) (netproxy.Config, bool, error) {
-	current := s.currentProxyConfig()
+	current, err := s.currentProxyConfigWithoutPassword()
+	if err != nil {
+		return netproxy.Config{}, false, err
+	}
 	changed, err := mergeProxySettingEntries(&current, entries)
 	if err != nil || !changed {
 		return netproxy.Config{}, false, err
@@ -100,47 +107,107 @@ func applyProxySettingValue(current *netproxy.Config, key, value string) {
 	}
 }
 
-func (s *SettingService) currentProxyConfig() netproxy.Config {
-	// Always rebuild from storage so cleared secrets do not stick in the live manager.
-	config := netproxy.DefaultConfig()
-	if mode, ok := s.readProxyString(applicationProxyModeSetting); ok {
-		config.Mode = netproxy.NormalizeMode(netproxy.Mode(mode))
+func (s *SettingService) currentProxyConfig() (netproxy.Config, error) {
+	config, err := s.currentProxyConfigWithoutPassword()
+	if err != nil {
+		return netproxy.Config{}, err
 	}
-	if value, ok := s.readProxyString(applicationProxyURLSetting); ok {
-		config.URL = value
+	password, saved, err := s.loadProxyPassword()
+	if err != nil {
+		return netproxy.Config{}, err
 	}
-	if value, ok := s.readProxyString(applicationProxyNoProxySetting); ok {
-		config.NoProxy = value
-	}
-	if value, ok := s.readProxyString(applicationProxyUsernameSetting); ok {
-		config.Username = value
-	}
-	if password, ok := s.loadProxyPassword(); ok {
+	if saved {
 		config.Password = password
 	}
-	return netproxy.Normalize(config)
+	return netproxy.Normalize(config), nil
 }
 
-func (s *SettingService) readProxyString(key string) (string, bool) {
+func (s *SettingService) currentProxyConfigWithoutPassword() (netproxy.Config, error) {
+	config := netproxy.DefaultConfig()
+	mode, ok, err := s.readProxyString(applicationProxyModeSetting)
+	if err != nil {
+		return netproxy.Config{}, err
+	}
+	if ok {
+		config.Mode = netproxy.NormalizeMode(netproxy.Mode(mode))
+	}
+	value, ok, err := s.readProxyString(applicationProxyURLSetting)
+	if err != nil {
+		return netproxy.Config{}, err
+	}
+	if ok {
+		config.URL = value
+	}
+	value, ok, err = s.readProxyString(applicationProxyNoProxySetting)
+	if err != nil {
+		return netproxy.Config{}, err
+	}
+	if ok {
+		config.NoProxy = value
+	}
+	value, ok, err = s.readProxyString(applicationProxyUsernameSetting)
+	if err != nil {
+		return netproxy.Config{}, err
+	}
+	if ok {
+		config.Username = value
+	}
+	return netproxy.Normalize(config), nil
+}
+
+func (s *SettingService) readProxyString(key string) (string, bool, error) {
 	setting, err := store.GetSettingEntry(s.db, key)
-	if err != nil || setting == nil {
-		return "", false
+	if err != nil {
+		return "", false, fmt.Errorf("load proxy setting %s: %w", key, err)
+	}
+	if setting == nil {
+		return "", false, nil
 	}
 	value, err := decodeSettingString(setting.Value)
 	if err != nil {
-		return "", false
+		return "", false, fmt.Errorf("decode proxy setting %s: %w", key, err)
 	}
-	return value, true
+	return value, true, nil
 }
 
 // ApplyStoredProxySettings loads persisted proxy settings and applies them.
 //
 //wails:ignore
 func (s *SettingService) ApplyStoredProxySettings() error {
+	finish, err := s.beginOperation()
+	if err != nil {
+		return err
+	}
+	defer finish()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return withCryptoOperation(s.crypto, s.applyStoredProxySettingsLocked)
+}
+
+// ApplyStoredProxySettingsWithinCryptoOperation reloads proxy settings while
+// the caller already owns the shared crypto operation boundary.
+//
+//wails:ignore
+func (s *SettingService) ApplyStoredProxySettingsWithinCryptoOperation() error {
+	finish, err := s.beginOperation()
+	if err != nil {
+		return err
+	}
+	defer finish()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.applyStoredProxySettingsLocked()
+}
+
+func (s *SettingService) applyStoredProxySettingsLocked() error {
 	if s.proxy == nil {
 		return nil
 	}
-	return s.proxy.Configure(s.currentProxyConfig())
+	config, err := s.currentProxyConfig()
+	if err != nil {
+		return err
+	}
+	return s.proxy.Configure(config)
 }
 
 func (s *SettingService) validateRuntimeSettings(entries []model.Setting) error {

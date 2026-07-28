@@ -10,8 +10,9 @@ import (
 )
 
 type AuditService struct {
-	db     *sql.DB
-	logger *slog.Logger
+	db        *sql.DB
+	logger    *slog.Logger
+	lifecycle serviceOperationGate
 }
 
 func NewAuditService(db *sql.DB, logger *slog.Logger) *AuditService {
@@ -19,14 +20,29 @@ func NewAuditService(db *sql.DB, logger *slog.Logger) *AuditService {
 }
 
 func (a *AuditService) Enabled() (bool, error) {
+	finish, err := a.beginOperation()
+	if err != nil {
+		return false, err
+	}
+	defer finish()
 	return store.AuditEnabled(a.db)
 }
 
 func (a *AuditService) SetEnabled(enabled bool) error {
+	finish, err := a.beginOperation()
+	if err != nil {
+		return err
+	}
+	defer finish()
 	return store.SetAuditEnabled(a.db, enabled)
 }
 
 func (a *AuditService) List(filter model.AuditFilter) ([]model.AuditEvent, error) {
+	finish, err := a.beginOperation()
+	if err != nil {
+		return nil, err
+	}
+	defer finish()
 	if filter.SessionID != nil && *filter.SessionID <= 0 {
 		return nil, fmt.Errorf("invalid session id")
 	}
@@ -34,6 +50,11 @@ func (a *AuditService) List(filter model.AuditFilter) ([]model.AuditEvent, error
 }
 
 func (a *AuditService) RecordBatch(action string, sessionIDs []int64, outcomes []string) error {
+	finish, err := a.beginOperation()
+	if err != nil {
+		return err
+	}
+	defer finish()
 	if action != "batch_connect" && action != "batch_macro" && action != "batch_delete" {
 		return fmt.Errorf("unsupported batch audit action %s", action)
 	}

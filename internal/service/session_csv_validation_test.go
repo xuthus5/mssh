@@ -98,7 +98,7 @@ func TestSessionCSVHeaderAndRecordValidation(t *testing.T) {
 
 func TestSessionService_ExportCSVIncludesPasswordsAndRejectsInvalidSelection(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	service := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
+	service := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), newUnlockedSessionTestCrypto(), testutil.NewTestLogger())
 	session, err := service.CreateSession(model.SessionInput{
 		Name: "server", Host: "host", Port: 22, Username: "root", AuthMethod: model.AuthPassword,
 		Password: "secret", KeepAlive: 30, TermType: "xterm-256color",

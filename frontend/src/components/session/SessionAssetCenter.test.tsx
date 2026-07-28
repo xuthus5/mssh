@@ -77,6 +77,9 @@ describe('SessionAssetCenter', () => {
     expect(await screen.findByText('成功 1 项，失败 1 项。')).toBeInTheDocument()
     expect(screen.getAllByText('生产服务器')).toHaveLength(2)
     expect(screen.getAllByText('测试服务器')).toHaveLength(2)
+    await userEvent.click(screen.getByRole('button', { name: '关闭' }))
+    expect(screen.getByRole('checkbox', { name: '选择 生产服务器' })).not.toBeChecked()
+    expect(screen.getByRole('checkbox', { name: '选择 测试服务器' })).toBeChecked()
   })
 
   it('selects multiple sessions, confirms batch delete, and shows results', async () => {

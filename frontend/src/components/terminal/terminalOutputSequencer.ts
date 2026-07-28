@@ -28,6 +28,14 @@ export class TerminalOutputSequencer {
     this.drain()
   }
 
+  reset(nextSequence: number): void {
+    if (!Number.isSafeInteger(nextSequence) || nextSequence < 1) {
+      throw new Error(`invalid terminal output sequence: ${nextSequence}`)
+    }
+    this.pending.clear()
+    this.nextSequence = nextSequence
+  }
+
   private drain(): void {
     while (this.pending.has(this.nextSequence)) {
       const data = this.pending.get(this.nextSequence)

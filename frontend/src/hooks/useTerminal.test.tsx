@@ -25,65 +25,65 @@ let runtimeFailure: 'fit' | 'refresh' | 'focus' | 'write' | null = null
 let proposedDimensions: Array<{ cols: number; rows: number } | undefined> = []
 let canvasLoadFailure = false
 
-vi.mock('@xterm/xterm', () => ({
-  Terminal: class {
-    cols = 80
-    rows = 24
-    options = {}
-    private allowProposedApi = false
-    private unicodeApi = { activeVersion: '6' }
-    open() { calls.push('open') }
-    private addons: Array<{ dispose: () => void }> = []
-    loadAddon(addon: { name: string; dispose: () => void }) {
-      calls.push(`load:${addon.name}`)
-      this.addons.push(addon)
-      if (addon.name === 'canvas' && canvasLoadFailure) throw new Error('canvas unavailable')
-    }
-    private terminalDispose = vi.fn(() => calls.push('dispose'))
-    constructor(options: Record<string, unknown>) {
-      terminalOptions.push(options)
-      terminalInstances.push(this)
-      terminalDisposes.push(this.terminalDispose)
-      this.options = options
-      this.allowProposedApi = options.allowProposedApi === true
-    }
-    get unicode() {
-      if (!this.allowProposedApi) throw new Error('you must set the allowProposedApi option to true to use proposed api')
-      return this.unicodeApi
-    }
-    attachCustomKeyEventHandler() { return true }
-    onData() {
+class MockTerminal {
+  cols = 80
+  rows = 24
+  options = {}
+  private allowProposedApi = false
+  private unicodeApi = { activeVersion: '6' }
+  private addons: Array<{ dispose: () => void }> = []
+  private terminalDispose = vi.fn(() => calls.push('dispose'))
+  constructor(options: Record<string, unknown>) {
+    terminalOptions.push(options)
+    terminalInstances.push(this)
+    terminalDisposes.push(this.terminalDispose)
+    this.options = options
+    this.allowProposedApi = options.allowProposedApi === true
+  }
+  open() { calls.push('open') }
+  loadAddon(addon: { name: string; dispose: () => void }) {
+    calls.push(`load:${addon.name}`)
+    this.addons.push(addon)
+    if (addon.name === 'canvas' && canvasLoadFailure) throw new Error('canvas unavailable')
+  }
+  get unicode() {
+    if (!this.allowProposedApi) throw new Error('you must set the allowProposedApi option to true to use proposed api')
+    return this.unicodeApi
+  }
+  attachCustomKeyEventHandler() { return true }
+  onData() {
+    const dispose = vi.fn()
+    dataDisposes.push(dispose)
+    return { dispose }
+  }
+  getSelection() { return '' }
+  onSelectionChange() {
+    const dispose = vi.fn()
+    selectionDisposes.push(dispose)
+    return { dispose }
+  }
+  parser = {
+    registerCsiHandler: vi.fn((_id: unknown, handler: (params: Array<number | number[]>) => boolean) => {
+      parserHandlers.push(handler)
       const dispose = vi.fn()
-      dataDisposes.push(dispose)
+      parserDisposes.push(dispose)
       return { dispose }
-    }
-    getSelection() { return '' }
-    onSelectionChange() {
+    }),
+    registerOscHandler: vi.fn(() => {
       const dispose = vi.fn()
-      selectionDisposes.push(dispose)
+      oscDisposes.push(dispose)
       return { dispose }
-    }
-    parser = {
-      registerCsiHandler: vi.fn((_id: unknown, handler: (params: Array<number | number[]>) => boolean) => {
-        parserHandlers.push(handler)
-        const dispose = vi.fn()
-        parserDisposes.push(dispose)
-        return { dispose }
-      }),
-      registerOscHandler: vi.fn(() => {
-        const dispose = vi.fn()
-        oscDisposes.push(dispose)
-        return { dispose }
-      }),
-    }
-    input(data: string, wasUserInput: boolean) { calls.push(`input:${data}:${wasUserInput}`) }
-    write(data: string | Uint8Array) { terminalWrites.push(data); if (runtimeFailure === 'write') throw new Error('write failed') }
-    focus() { calls.push('focus'); if (runtimeFailure === 'focus') throw new Error('focus failed') }
-    blur() { calls.push('blur') }
-    refresh() { calls.push('refresh'); if (runtimeFailure === 'refresh') throw new Error('refresh failed') }
-    dispose() { this.addons.forEach((addon) => addon.dispose()); this.terminalDispose() }
-  },
-}))
+    }),
+  }
+  input(data: string, wasUserInput: boolean) { calls.push(`input:${data}:${wasUserInput}`) }
+  write(data: string | Uint8Array) { terminalWrites.push(data); if (runtimeFailure === 'write') throw new Error('write failed') }
+  focus() { calls.push('focus'); if (runtimeFailure === 'focus') throw new Error('focus failed') }
+  blur() { calls.push('blur') }
+  refresh() { calls.push('refresh'); if (runtimeFailure === 'refresh') throw new Error('refresh failed') }
+  dispose() { this.addons.forEach((addon) => addon.dispose()); this.terminalDispose() }
+}
+
+vi.doMock('@xterm/xterm', () => ({ Terminal: MockTerminal }))
 
 vi.mock('@xterm/addon-fit', () => ({
   FitAddon: class {
@@ -147,13 +147,13 @@ vi.mock('@/lib/wails', () => ({
   CommandHistoryService: { Add: vi.fn(async () => {}) },
 }))
 
-import { useTerminal } from '@/hooks/useTerminal'
-import { TerminalService } from '@/lib/wails'
-import { useAppStore } from '@/store/appStore'
-import { useTerminalBehaviorStore } from '@/store/terminalBehaviorStore'
-import { TerminalErrorBoundary } from '@/components/terminal/TerminalErrorBoundary'
-import { getTerminalSearch } from '@/lib/terminalSearchRegistry'
-import { logger } from '@/lib/logger'
+const { useTerminal } = await import('@/hooks/useTerminal')
+const { TerminalService } = await import('@/lib/wails')
+const { useAppStore } = await import('@/store/appStore')
+const { useTerminalBehaviorStore } = await import('@/store/terminalBehaviorStore')
+const { TerminalErrorBoundary } = await import('@/components/terminal/TerminalErrorBoundary')
+const { getTerminalSearch } = await import('@/lib/terminalSearchRegistry')
+const { logger } = await import('@/lib/logger')
 
 describe('useTerminal', () => {
   beforeEach(() => {

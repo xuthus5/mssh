@@ -16,16 +16,19 @@ import (
 )
 
 type aiChatInput struct {
-	System       string
-	Prompt       string
-	Context      string
-	NativeSearch bool
+	System                string
+	Prompt                string
+	Context               string
+	NativeSearch          bool
+	RequiredCitationCount int
 }
 
 type aiProviderError struct {
 	status int
 	err    error
 }
+
+var errAIProviderProtocol = errors.New("AI provider returned an invalid response")
 
 func (e *aiProviderError) Error() string { return e.err.Error() }
 
@@ -35,21 +38,31 @@ func chatWithProvider(ctx context.Context, client *http.Client, profile model.AI
 	if err := validateProviderURL(profile); err != nil {
 		return "", err
 	}
+	var answer string
+	var err error
 	if input.NativeSearch {
-		return chatNativeSearch(ctx, client, profile, apiKey, input)
+		answer, err = chatNativeSearch(ctx, client, profile, apiKey, input)
+	} else {
+		switch profile.Provider {
+		case model.AIProviderOpenAICompatible:
+			answer, err = chatOpenAI(ctx, client, profile, apiKey, input)
+		case model.AIProviderAnthropic:
+			answer, err = chatAnthropic(ctx, client, profile, apiKey, input)
+		case model.AIProviderGemini:
+			answer, err = chatGemini(ctx, client, profile, apiKey, input)
+		case model.AIProviderOllama:
+			answer, err = chatOllama(ctx, client, profile, input)
+		default:
+			return "", fmt.Errorf("unsupported AI provider %s", profile.Provider)
+		}
 	}
-	switch profile.Provider {
-	case model.AIProviderOpenAICompatible:
-		return chatOpenAI(ctx, client, profile, apiKey, input)
-	case model.AIProviderAnthropic:
-		return chatAnthropic(ctx, client, profile, apiKey, input)
-	case model.AIProviderGemini:
-		return chatGemini(ctx, client, profile, apiKey, input)
-	case model.AIProviderOllama:
-		return chatOllama(ctx, client, profile, input)
-	default:
-		return "", fmt.Errorf("unsupported AI provider %s", profile.Provider)
+	if err != nil {
+		return "", err
 	}
+	if strings.TrimSpace(answer) == "" {
+		return "", fmt.Errorf("%w: answer content is empty", errAIProviderProtocol)
+	}
+	return answer, nil
 }
 
 func validateProviderURL(profile model.AIProviderProfile) error {
@@ -143,7 +156,7 @@ func chatOpenAI(ctx context.Context, client *http.Client, profile model.AIProvid
 		return "", err
 	}
 	if len(response.Choices) == 0 {
-		return "", errors.New("AI provider returned no choices")
+		return "", fmt.Errorf("%w: no choices", errAIProviderProtocol)
 	}
 	return response.Choices[0].Message.Content, nil
 }
@@ -160,7 +173,7 @@ func chatAnthropic(ctx context.Context, client *http.Client, profile model.AIPro
 		return "", err
 	}
 	if len(response.Content) == 0 {
-		return "", errors.New("AI provider returned no content")
+		return "", fmt.Errorf("%w: no content", errAIProviderProtocol)
 	}
 	return response.Content[0].Text, nil
 }
@@ -181,7 +194,7 @@ func chatGemini(ctx context.Context, client *http.Client, profile model.AIProvid
 		return "", err
 	}
 	if len(response.Candidates) == 0 || len(response.Candidates[0].Content.Parts) == 0 {
-		return "", errors.New("AI provider returned no candidates")
+		return "", fmt.Errorf("%w: no candidates", errAIProviderProtocol)
 	}
 	return response.Candidates[0].Content.Parts[0].Text, nil
 }
@@ -220,7 +233,7 @@ func postJSON(ctx context.Context, client *http.Client, endpoint, apiKey, kind s
 			request.Header.Set("Authorization", "Bearer "+apiKey)
 		}
 	}
-	response, err := client.Do(request)
+	response, err := sameOriginHTTPClient(client, request.URL).Do(request)
 	if err != nil {
 		return &aiProviderError{err: fmt.Errorf("AI request failed: %w", err)}
 	}
@@ -232,9 +245,8 @@ func postJSON(ctx context.Context, client *http.Client, endpoint, apiKey, kind s
 		}
 		return &aiProviderError{status: response.StatusCode, err: fmt.Errorf("AI provider returned HTTP %d: %s", response.StatusCode, strings.TrimSpace(string(message)))}
 	}
-	decoder := json.NewDecoder(io.LimitReader(response.Body, 4*1024*1024))
-	if err := decoder.Decode(output); err != nil {
-		return fmt.Errorf("decode AI response: %w", err)
+	if err := decodeBoundedJSON(response.Body, 4*1024*1024, output); err != nil {
+		return fmt.Errorf("%w: decode AI response: %v", errAIProviderProtocol, err)
 	}
 	return nil
 }

@@ -1,6 +1,7 @@
 package service
 
 import (
+	"bytes"
 	"crypto/ecdsa"
 	"crypto/ed25519"
 	"crypto/elliptic"
@@ -12,6 +13,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"sync"
 
 	gossh "golang.org/x/crypto/ssh"
 
@@ -29,10 +31,12 @@ type keyFilePicker interface {
 }
 
 type KeyService struct {
-	db     *sql.DB
-	crypto KeyCrypto
-	logger *slog.Logger
-	picker keyFilePicker
+	db        *sql.DB
+	crypto    KeyCrypto
+	logger    *slog.Logger
+	pickerMu  sync.RWMutex
+	picker    keyFilePicker
+	lifecycle serviceOperationGate
 }
 
 func NewKeyService(db *sql.DB, crypto KeyCrypto, logger *slog.Logger) *KeyService {
@@ -51,16 +55,28 @@ func (k *KeyService) requireCrypto() error {
 
 //wails:ignore
 func (k *KeyService) SetFilePicker(picker keyFilePicker) {
+	k.pickerMu.Lock()
+	defer k.pickerMu.Unlock()
 	k.picker = picker
 }
 
 func (k *KeyService) List() ([]model.SSHKey, error) {
+	finish, err := k.beginOperation()
+	if err != nil {
+		return nil, err
+	}
+	defer finish()
 	k.logger.Info("listing keys")
 	return store.ListKeys(k.db)
 }
 
 func (k *KeyService) Generate(name string, keyType model.KeyType, bits int) (*model.SSHKeyMaterial, error) {
-	name, err := normalizedKeyName(name)
+	finish, err := k.beginOperation()
+	if err != nil {
+		return nil, err
+	}
+	defer finish()
+	name, err = normalizedKeyName(name)
 	if err != nil {
 		return nil, fmt.Errorf("generate key: %w", err)
 	}
@@ -81,35 +97,32 @@ func (k *KeyService) Generate(name string, keyType model.KeyType, bits int) (*mo
 	if err != nil {
 		return nil, fmt.Errorf("generate key: %w", err)
 	}
+	defer clear(privPEM)
 
-	if err := k.requireCrypto(); err != nil {
-		return nil, fmt.Errorf("generate key: %w", err)
-	}
-	encrypted, err := k.crypto.Encrypt(privPEM)
+	var created *model.SSHKey
+	err = withCryptoOperation(k.crypto, func() error {
+		var operationErr error
+		created, operationErr = k.createEncryptedKey(name, keyType, privPEM, pubSSH)
+		return operationErr
+	})
 	if err != nil {
 		return nil, fmt.Errorf("generate key: %w", err)
 	}
-
-	key := model.SSHKey{
-		Name:       name,
-		Type:       keyType,
-		PrivateKey: string(encrypted),
-		PublicKey:  pubSSH,
-	}
-	created, err := store.CreateKey(k.db, key)
-	if err != nil {
-		return nil, err
-	}
-	return keyMaterial(created, string(privPEM)), nil
+	return keyMaterial(created, strings.Clone(string(privPEM))), nil
 }
 
 func (k *KeyService) Import(name, privateKeyPEM string) (*model.SSHKey, error) {
-	name, err := normalizedKeyName(name)
+	finish, err := k.beginOperation()
+	if err != nil {
+		return nil, err
+	}
+	defer finish()
+	name, err = normalizedKeyName(name)
 	if err != nil {
 		return nil, fmt.Errorf("import key: %w", err)
 	}
-	if strings.TrimSpace(privateKeyPEM) == "" {
-		return nil, fmt.Errorf("import key: private key is required")
+	if err := validatePrivateKeyInput(privateKeyPEM); err != nil {
+		return nil, fmt.Errorf("import key: %w", err)
 	}
 	k.logger.Info("importing key", "name", name)
 	keyType, pubKey, err := k.extractPublicKeyWithType([]byte(privateKeyPEM))
@@ -117,24 +130,26 @@ func (k *KeyService) Import(name, privateKeyPEM string) (*model.SSHKey, error) {
 		return nil, fmt.Errorf("import key: %w", err)
 	}
 
-	if err := k.requireCrypto(); err != nil {
-		return nil, fmt.Errorf("import key: %w", err)
-	}
-	encrypted, err := k.crypto.Encrypt([]byte(privateKeyPEM))
+	privateKeyBytes := []byte(privateKeyPEM)
+	defer clear(privateKeyBytes)
+	var created *model.SSHKey
+	err = withCryptoOperation(k.crypto, func() error {
+		var operationErr error
+		created, operationErr = k.createEncryptedKey(name, keyType, privateKeyBytes, pubKey)
+		return operationErr
+	})
 	if err != nil {
 		return nil, fmt.Errorf("import key: %w", err)
 	}
-
-	key := model.SSHKey{
-		Name:       name,
-		Type:       keyType,
-		PrivateKey: string(encrypted),
-		PublicKey:  pubKey,
-	}
-	return store.CreateKey(k.db, key)
+	return created, nil
 }
 
 func (k *KeyService) Delete(id int64) error {
+	finish, err := k.beginOperation()
+	if err != nil {
+		return err
+	}
+	defer finish()
 	if id <= 0 {
 		return fmt.Errorf("invalid key id")
 	}
@@ -143,7 +158,7 @@ func (k *KeyService) Delete(id int64) error {
 		recordAudit(k.db, k.logger, model.AuditEvent{Action: "delete", TargetType: "key", TargetID: fmt.Sprint(id), Summary: "删除 SSH 密钥", Outcome: outcome})
 	}()
 	k.logger.Info("deleting key", "id", id)
-	err := store.DeleteKey(k.db, id)
+	err = store.DeleteKey(k.db, id)
 	if err == nil {
 		outcome = "success"
 	}
@@ -151,6 +166,11 @@ func (k *KeyService) Delete(id int64) error {
 }
 
 func (k *KeyService) UsageCount(id int64) (int, error) {
+	finish, err := k.beginOperation()
+	if err != nil {
+		return 0, err
+	}
+	defer finish()
 	if id <= 0 {
 		return 0, fmt.Errorf("invalid key id")
 	}
@@ -162,6 +182,11 @@ func (k *KeyService) UsageCount(id int64) (int, error) {
 }
 
 func (k *KeyService) ExportPublicKey(id int64) (string, error) {
+	finish, err := k.beginOperation()
+	if err != nil {
+		return "", err
+	}
+	defer finish()
 	if id <= 0 {
 		return "", fmt.Errorf("invalid key id")
 	}
@@ -236,9 +261,15 @@ func (k *KeyService) extractPublicKey(privateKeyPEM []byte) (string, error) {
 }
 
 func (k *KeyService) extractPublicKeyWithType(privateKeyPEM []byte) (model.KeyType, string, error) {
-	block, _ := pem.Decode(privateKeyPEM)
+	if len(privateKeyPEM) > maxPrivateKeyFileSize {
+		return "", "", fmt.Errorf("private key exceeds %d bytes", maxPrivateKeyFileSize)
+	}
+	block, rest := pem.Decode(bytes.TrimSpace(privateKeyPEM))
 	if block == nil {
 		return "", "", fmt.Errorf("invalid PEM data")
+	}
+	if len(bytes.TrimSpace(rest)) != 0 {
+		return "", "", fmt.Errorf("private key must contain exactly one private key")
 	}
 	if block.Type == "OPENSSH PRIVATE KEY" {
 		return publicKeyFromOpenSSH(privateKeyPEM)

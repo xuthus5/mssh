@@ -145,12 +145,12 @@ function isTabIntent(value: unknown): value is TabIntent {
     && value.toolPanel !== 'system' && value.toolPanel !== 'ai') {
     return false
   }
-  const kind = value.connectionKind
-  if (kind === undefined || kind === 'ssh') return Number(value.sessionId) > 0
-  if (kind === 'local') return Number(value.sessionId) === 0
   if (value.splitLayout !== undefined && value.splitLayout !== null && !isSplitLayoutSnapshot(value.splitLayout)) {
     return false
   }
+  const kind = value.connectionKind
+  if (kind === undefined || kind === 'ssh') return Number(value.sessionId) > 0
+  if (kind === 'local') return Number(value.sessionId) === 0
   if (kind === 'serial') {
     // Serial tabs must remain single-pane.
     if (value.splitLayout) return false
@@ -171,12 +171,13 @@ function isActive(value: unknown, tabCount: number): value is WorkspaceSnapshot[
 const isWorkspaceID = (value: unknown): value is WorkspaceID => value === 'overview' || value === 'sessions' || value === 'macros'
 const isOverviewSection = (value: unknown): value is OverviewSection => value === 'sessions' || value === 'keys' || value === 'tunnels' || value === 'serial' || value === 'audit'
 
-export async function restoreWorkspaceSnapshot(
-  snapshot: WorkspaceSnapshot,
-  sessionIDs: Set<number>,
-  openTerminal: (intent: OpenTerminalIntent) => Promise<string>,
-  serialPortIDs: Set<number> = new Set(),
-): Promise<RestoredWorkspace> {
+export async function restoreWorkspaceSnapshot(...args: [
+  WorkspaceSnapshot,
+  Set<number>,
+  (intent: OpenTerminalIntent) => Promise<string>,
+  Set<number>?,
+]): Promise<RestoredWorkspace> {
+  const [snapshot, sessionIDs, openTerminal, serialPortIDs = new Set<number>()] = args
   const restored = await restoreTabIntents(snapshot.tabs, sessionIDs, serialPortIDs, openTerminal)
   const tabs = restored.map((tab) => tab ?? undefined).filter((tab): tab is Tab => tab !== undefined)
   const activeTab = snapshot.active?.type === 'tab' ? restored[snapshot.active.index] : undefined
@@ -201,12 +202,13 @@ export async function restoreWorkspaceSnapshot(
   }
 }
 
-async function restoreTabIntents(
-  intents: TabIntent[],
-  sessionIDs: Set<number>,
-  serialPortIDs: Set<number>,
-  openTerminal: (intent: OpenTerminalIntent) => Promise<string>,
-): Promise<Array<Tab | null>> {
+async function restoreTabIntents(...args: [
+  TabIntent[],
+  Set<number>,
+  Set<number>,
+  (intent: OpenTerminalIntent) => Promise<string>,
+]): Promise<Array<Tab | null>> {
+  const [intents, sessionIDs, serialPortIDs, openTerminal] = args
   const results: Array<Tab | null> = Array.from({ length: intents.length }, () => null)
   let nextIndex = 0
   const worker = async () => {
@@ -219,12 +221,13 @@ async function restoreTabIntents(
   return results
 }
 
-async function restoreTabIntent(
-  intent: TabIntent,
-  sessionIDs: Set<number>,
-  serialPortIDs: Set<number>,
-  openTerminal: (intent: OpenTerminalIntent) => Promise<string>,
-): Promise<Tab | null> {
+async function restoreTabIntent(...args: [
+  TabIntent,
+  Set<number>,
+  Set<number>,
+  (intent: OpenTerminalIntent) => Promise<string>,
+]): Promise<Tab | null> {
+  const [intent, sessionIDs, serialPortIDs, openTerminal] = args
   if (intent.type === 'playback') return { id: `playback-restored-${crypto.randomUUID()}`, ...intent }
   const kind: TerminalConnectionKind = intent.connectionKind === 'local' || intent.connectionKind === 'serial'
     ? intent.connectionKind

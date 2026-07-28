@@ -179,6 +179,28 @@ describe('workspace persistence', () => {
     }))).toThrow('workspace layout is invalid')
   })
 
+  it.each([
+    { connectionKind: undefined, sessionId: 1, title: 'SSH' },
+    { connectionKind: 'local', sessionId: 0, title: 'Local' },
+  ])('rejects invalid split layouts for $title tabs', ({ connectionKind, sessionId, title }) => {
+    expect(() => parseWorkspaceSnapshot(JSON.stringify({
+      version: 3,
+      tabs: [{
+        type: 'terminal',
+        title,
+        sessionId,
+        ...(connectionKind ? { connectionKind } : {}),
+        splitLayout: {
+          paneCount: 9,
+          tree: { kind: 'leaf', role: 0 },
+        },
+      }],
+      active: null,
+      workspaceTab: 'sessions',
+      overviewSection: 'sessions',
+    }))).toThrow('workspace layout is invalid')
+  })
+
   it('limits simultaneous reconnects to four workers', async () => {
     let active = 0
     let peak = 0

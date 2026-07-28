@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type RefObject } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type RefObject } from 'react'
 import { ClipboardPaste, PenLine, Play, RotateCw, X } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
@@ -53,22 +53,43 @@ function useMacroCatalog(open: boolean) {
   return { load, state }
 }
 
-function useAsyncGate() {
+function useAsyncGate(identity: string) {
   const activeRef = useRef(false)
+  const mountedRef = useRef(true)
+  const targetGeneration = useRef(0)
+  const actionID = useRef(0)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  useLayoutEffect(() => {
+    targetGeneration.current += 1
+    setError('')
+  }, [identity])
+  useLayoutEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+      targetGeneration.current += 1
+      actionID.current += 1
+    }
+  }, [])
   const run = useCallback(async (action: () => Promise<void>, errorPrefix: string) => {
-    if (activeRef.current) return
+    if (activeRef.current) return false
+    const generation = targetGeneration.current
+    const request = ++actionID.current
+    const isCurrent = () => mountedRef.current && targetGeneration.current === generation && actionID.current === request
     activeRef.current = true
     setBusy(true)
     setError('')
     try {
       await action()
+      return isCurrent()
     } catch (actionError: unknown) {
-      setError(t('${}: ${}', errorPrefix, errorMessage(actionError)))
+      if (isCurrent()) setError(t('${}: ${}', errorPrefix, errorMessage(actionError)))
+      return false
     } finally {
-      activeRef.current = false
-      setBusy(false)
+      const ownsLease = actionID.current === request
+      if (ownsLease) activeRef.current = false
+      if (ownsLease && mountedRef.current) setBusy(false)
     }
   }, [])
   return { busy, error, setError, run }
@@ -108,7 +129,8 @@ function ComposePanelView(props: PanelViewProps) {
       <div className="flex min-w-0 items-center gap-2"><PenLine className="size-4 text-primary" />
         <div><h2 className="text-sm font-medium">{t('撰写终端内容')}</h2><p className="text-xs text-muted-foreground">{t('组织多行命令，执行或仅粘贴到当前终端')}</p></div>
       </div>
-      <Button type="button" size="icon-xs" variant="ghost" aria-label={t('关闭撰写面板')} onClick={props.onClose}><X /></Button>
+      <Button type="button" size="icon-xs" variant="ghost" aria-label={t('关闭撰写面板')}
+        disabled={props.busy} onClick={props.onClose}><X /></Button>
     </header>
     {props.actionError ? <Alert variant="destructive"><AlertDescription>{props.actionError}</AlertDescription></Alert> : null}
     <div className="flex min-h-6 items-start gap-2"><span className="pt-1 text-xs font-medium text-muted-foreground">{t('宏')}</span>
@@ -134,17 +156,21 @@ function ComposePanelView(props: PanelViewProps) {
 
 export function TerminalComposePanel({ open, terminalID, sessionID, onClose }: Props) {
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  const focusTimer = useRef<number | null>(null)
   const [content, setContent] = useState('')
   const macros = useMacroCatalog(open)
-  const { busy, error, setError, run } = useAsyncGate()
+  const { busy, error, setError, run } = useAsyncGate(`${sessionID}:${terminalID}`)
+  useEffect(() => () => {
+    if (focusTimer.current !== null) window.clearTimeout(focusTimer.current)
+  }, [sessionID, terminalID, open])
   const execute = useCallback(async () => {
     if (!content.trim()) return
-    await run(async () => {
-      await TerminalService.Write(terminalID, commandWithEnter(content))
-      recordCommand(sessionID, content)
-      setContent('')
-      window.setTimeout(() => inputRef.current?.focus(), 0)
-    }, t('执行失败'))
+    const command = content
+    const succeeded = await run(async () => { await TerminalService.Write(terminalID, commandWithEnter(command)) }, t('执行失败'))
+    if (!succeeded) return
+    recordCommand(sessionID, command)
+    setContent('')
+    focusTimer.current = window.setTimeout(() => inputRef.current?.focus(), 0)
   }, [content, run, sessionID, terminalID])
   const paste = useCallback(() => {
     const terminal = useAppStore.getState().terminalPool.get(terminalID)?.terminal
@@ -156,19 +182,23 @@ export function TerminalComposePanel({ open, terminalID, sessionID, onClose }: P
     terminal.paste(content)
     terminal.focus()
   }, [content, setError, terminalID])
-  const executeMacro = useCallback((macro: MacroItem) => run(async () => {
-    await MacroService.Execute(terminalID, commandWithEnter(macro.command))
+  const executeMacro = useCallback(async (macro: MacroItem) => {
+    const succeeded = await run(async () => { await MacroService.Execute(terminalID, commandWithEnter(macro.command)) }, t('宏执行失败'))
+    if (!succeeded) return
     recordCommand(sessionID, macro.command)
     useAppStore.getState().terminalPool.get(terminalID)?.terminal.focus()
-  }, t('宏执行失败')), [run, sessionID, terminalID])
+  }, [run, sessionID, terminalID])
   const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     event.stopPropagation()
     if (!(event.ctrlKey || event.metaKey) || event.key !== 'Enter') return
     event.preventDefault()
     void execute()
   }
+  const close = useCallback(() => {
+    if (!busy) onClose()
+  }, [busy, onClose])
   if (!open) return null
   return <ComposePanelView busy={busy} content={content} actionError={error} inputRef={inputRef} macros={macros.state}
-    onChange={setContent} onClose={onClose} onExecute={() => { void execute() }} onExecuteMacro={(macro) => { void executeMacro(macro) }}
+    onChange={setContent} onClose={close} onExecute={() => { void execute() }} onExecuteMacro={(macro) => { void executeMacro(macro) }}
     onKeyDown={onKeyDown} onPaste={paste} onRetry={() => { void macros.load() }} />
 }

@@ -1,10 +1,13 @@
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { Events } from '@wailsio/runtime'
 import { SettingsView } from '@/components/settings/SettingsView'
+import type { GeneralSettings } from '@/hooks/useSettings'
+import { SETTINGS_PREVIEW_CANCELLED_EVENT } from '@/lib/settingsWindowEvents'
 import { CursorStyle } from '../../../bindings/github.com/xuthus5/mssh/internal/model/models'
 
-const general = {
+const general: GeneralSettings = {
   maxPoolSize: 10,
   defaultKeepAlive: 60,
   defaultTermType: 'xterm-256color',
@@ -82,7 +85,7 @@ describe('SettingsView', () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
   })
   afterEach(() => {
-    vi.runOnlyPendingTimers()
+    vi.clearAllTimers()
     vi.useRealTimers()
   })
 
@@ -96,6 +99,16 @@ describe('SettingsView', () => {
     expect(screen.queryByRole('tab', { name: '密钥' })).not.toBeInTheDocument()
   })
 
+  it('lazily mounts settings panels and keeps visited panels mounted', async () => {
+    render(<SettingsView {...settingsProps()} />)
+
+    expect(screen.getAllByRole('tabpanel', { hidden: true })).toHaveLength(1)
+    await userEvent.click(screen.getByRole('tab', { name: '终端' }))
+    expect(screen.getAllByRole('tabpanel', { hidden: true })).toHaveLength(2)
+    await userEvent.click(screen.getByRole('tab', { name: '通用' }))
+    expect(screen.getAllByRole('tabpanel', { hidden: true })).toHaveLength(2)
+  })
+
   it('exposes the SFTP file management settings', async () => {
     const props = settingsProps()
     const user = userEvent.setup()
@@ -105,7 +118,7 @@ describe('SettingsView', () => {
     await user.click(screen.getByRole('switch', { name: '显示隐藏文件' }))
     await user.click(screen.getByRole('switch', { name: '追随终端目录' }))
     await user.click(screen.getByRole('button', { name: '树状视图' }))
-    await flushAutoSave(user)
+    await flushAutoSave()
 
     expect(props.onSaveSFTPSettings).toHaveBeenCalledWith({
       showHiddenFiles: true,
@@ -161,35 +174,45 @@ describe('SettingsView', () => {
       defaultTermType: 'xterm-256color',
       rightClickAction: 'menu',
       copyOnSelect: false,
-    }))
+    }), { scope: 'general' })
   })
 
-  it('saves changed terminal connection and behavior settings from the terminal tab', async () => {
+  it('saves changed terminal connection settings from the terminal tab', async () => {
     const props = settingsProps()
     const user = userEvent.setup()
     render(<SettingsView {...props} />)
 
     await user.click(screen.getByRole('tab', { name: '终端' }))
-    await user.clear(screen.getByRole('spinbutton', { name: '最大终端池大小' }))
-    await user.type(screen.getByRole('spinbutton', { name: '最大终端池大小' }), '24')
-    await user.clear(screen.getByRole('spinbutton', { name: '默认保活间隔 (秒)' }))
-    await user.type(screen.getByRole('spinbutton', { name: '默认保活间隔 (秒)' }), '120')
+    fireEvent.change(screen.getByRole('spinbutton', { name: '最大终端池大小' }), { target: { value: '24' } })
+    fireEvent.change(screen.getByRole('spinbutton', { name: '默认保活间隔 (秒)' }), { target: { value: '120' } })
     await user.click(screen.getByRole('combobox', { name: '默认终端类型' }))
     await user.click(await screen.findByRole('option', { name: 'xterm' }))
-    await user.click(screen.getByRole('combobox', { name: '鼠标右键行为' }))
-    await user.click(await screen.findByRole('option', { name: '粘贴' }))
-    await user.click(screen.getByRole('switch', { name: '选择即复制' }))
-    fireEvent.change(screen.getByRole('spinbutton', { name: '滚动历史行数' }), { target: { value: '8000' } })
-    await flushAutoSave(user)
+    await flushAutoSave()
 
     expect(props.onSaveGeneral).toHaveBeenCalledWith(expect.objectContaining({
       maxPoolSize: 24,
       defaultKeepAlive: 120,
       defaultTermType: 'xterm',
+    }), { scope: 'terminal' })
+  })
+
+  it('saves changed terminal behavior settings from the terminal tab', async () => {
+    const props = settingsProps()
+    const user = userEvent.setup()
+    render(<SettingsView {...props} />)
+
+    await user.click(screen.getByRole('tab', { name: '终端' }))
+    await user.click(screen.getByRole('combobox', { name: '鼠标右键行为' }))
+    await user.click(await screen.findByRole('option', { name: '粘贴' }))
+    fireEvent.click(screen.getByRole('switch', { name: '选择即复制' }))
+    fireEvent.change(screen.getByRole('spinbutton', { name: '滚动历史行数' }), { target: { value: '8000' } })
+    await flushAutoSave()
+
+    expect(props.onSaveGeneral).toHaveBeenCalledWith(expect.objectContaining({
       rightClickAction: 'paste',
       copyOnSelect: true,
       scrollbackLines: 8000,
-    }))
+    }), { scope: 'terminal' })
   })
 
   it('saves the selected close button behavior', async () => {
@@ -199,9 +222,9 @@ describe('SettingsView', () => {
 
     await user.click(screen.getByRole('combobox', { name: '关闭按钮行为' }))
     await user.click(await screen.findByRole('option', { name: '关闭应用' }))
-    await flushAutoSave(user)
+    await flushAutoSave()
 
-    expect(props.onSaveGeneral).toHaveBeenCalledWith(expect.objectContaining({ closeButtonAction: 'exit' as const, language: 'zh-CN' as const }))
+    expect(props.onSaveGeneral).toHaveBeenCalledWith(expect.objectContaining({ closeButtonAction: 'exit' as const, language: 'zh-CN' as const }), { scope: 'general' })
   })
 
   it('previews and saves a distinct fallback font', async () => {
@@ -215,7 +238,7 @@ describe('SettingsView', () => {
 
     expect(props.onPreviewUIFont).toHaveBeenLastCalledWith('Arial', 'Microsoft YaHei', 14)
     await flushAutoSave()
-    expect(props.onSaveGeneral).toHaveBeenCalledWith(expect.objectContaining({ uiFontFallbackFamily: 'Microsoft YaHei' }))
+    expect(props.onSaveGeneral).toHaveBeenCalledWith(expect.objectContaining({ uiFontFallbackFamily: 'Microsoft YaHei' }), { scope: 'general' })
   })
 
   it('resets fallback when the primary font selects the same family', async () => {
@@ -228,6 +251,7 @@ describe('SettingsView', () => {
     await userEvent.click(await screen.findByRole('option', { name: 'Segoe UI' }))
 
     expect(props.onPreviewUIFont).toHaveBeenLastCalledWith('Segoe UI', 'sans-serif', 14)
+    await flushAutoSave()
   })
 
   it('flushes pending general changes before switching categories', async () => {
@@ -236,12 +260,25 @@ describe('SettingsView', () => {
 
     fireEvent.change(screen.getByLabelText('日志保留天数'), { target: { value: '45' } })
     expect(props.onSaveGeneral).not.toHaveBeenCalled()
-    await act(async () => {
-      fireEvent.click(screen.getByRole('tab', { name: '终端' }))
-      await Promise.resolve()
-    })
+    await userEvent.click(screen.getByRole('tab', { name: '终端' }))
+    await flushAutoSave()
 
-    expect(props.onSaveGeneral).toHaveBeenCalledWith(expect.objectContaining({ logRetentionDays: 45 }))
+    expect(props.onSaveGeneral).toHaveBeenCalledWith(expect.objectContaining({ logRetentionDays: 45 }), { scope: 'general' })
+  })
+
+  it('keeps a failed general draft and its error after switching categories', async () => {
+    const props = settingsProps()
+    props.onSaveGeneral = vi.fn().mockRejectedValue(new Error('disk full'))
+    render(<SettingsView {...props} />)
+
+    fireEvent.change(screen.getByLabelText('日志保留天数'), { target: { value: '45' } })
+    await userEvent.click(screen.getByRole('tab', { name: '终端' }))
+    await advanceTimers(500)
+    await userEvent.click(screen.getByRole('tab', { name: '通用' }))
+
+    expect(props.onSaveGeneral).toHaveBeenCalledWith(expect.objectContaining({ logRetentionDays: 45 }), { scope: 'general' })
+    expect(screen.getByLabelText('日志保留天数')).toHaveValue(45)
+    expect(screen.getByRole('status')).toHaveTextContent('自动保存失败: disk full')
   })
 
   it('keeps a newer general draft when an earlier save response arrives', async () => {
@@ -253,7 +290,7 @@ describe('SettingsView', () => {
     const view = render(<SettingsView {...props} />)
 
     fireEvent.change(screen.getByLabelText('界面字号'), { target: { value: '15' } })
-    await vi.advanceTimersByTimeAsync(450)
+    await advanceTimers(450)
     fireEvent.change(screen.getByLabelText('界面字号'), { target: { value: '16' } })
     await act(async () => {
       firstSave.resolve()
@@ -263,15 +300,62 @@ describe('SettingsView', () => {
     view.rerender(<SettingsView {...props} general={{ ...general, uiFontSize: 15 }} />)
 
     expect(screen.getByLabelText('界面字号')).toHaveValue(16)
-    await vi.advanceTimersByTimeAsync(450)
-    expect(props.onSaveGeneral).toHaveBeenLastCalledWith(expect.objectContaining({ uiFontSize: 16 }))
+    await advanceTimers(450)
+    expect(props.onSaveGeneral).toHaveBeenLastCalledWith(expect.objectContaining({ uiFontSize: 16 }), { scope: 'general' })
+  })
+
+  it('clears a saved proxy password without writing it twice', async () => {
+    const save = deferredSave()
+    const props = settingsProps()
+    props.general = { ...general, proxyMode: 'manual' }
+    props.onSaveGeneral = vi.fn(() => save.promise)
+    const view = render(<SettingsView {...props} />)
+
+    await userEvent.type(screen.getByLabelText('代理密码'), 'proxy-secret')
+    await advanceTimers(450)
+    view.rerender(<SettingsView {...props} general={{
+      ...props.general,
+      proxyPasswordSaved: true,
+    }} />)
+    await act(async () => {
+      save.resolve()
+      await save.promise
+      await Promise.resolve()
+    })
+
+    expect(screen.getByLabelText('代理密码')).toHaveValue('')
+    await advanceTimers(600)
+    expect(props.onSaveGeneral).toHaveBeenCalledOnce()
+  })
+
+  it('redacts a pending proxy password when the native settings window hides without writing it twice', async () => {
+    const save = deferredSave()
+    const props = settingsProps()
+    props.general = { ...general, proxyMode: 'manual' }
+    props.onSaveGeneral = vi.fn(() => save.promise)
+    render(<SettingsView {...props} />)
+    await userEvent.type(screen.getByLabelText('代理密码'), 'proxy-secret')
+
+    await act(async () => { await Events.Emit(SETTINGS_PREVIEW_CANCELLED_EVENT, { data: null }) })
+
+    expect(props.onSaveGeneral).toHaveBeenCalledOnce()
+    expect(props.onSaveGeneral).toHaveBeenCalledWith(expect.objectContaining({ proxyPassword: 'proxy-secret' }), { scope: 'general' })
+    expect(screen.getByLabelText('代理密码')).toHaveValue('')
+    await act(async () => { save.resolve(); await save.promise; await Promise.resolve() })
+    await advanceTimers(600)
+    expect(props.onSaveGeneral).toHaveBeenCalledOnce()
   })
 })
 
-async function flushAutoSave(user?: ReturnType<typeof userEvent.setup>) {
-  await vi.advanceTimersByTimeAsync(600)
-  await Promise.resolve()
-  if (user) await Promise.resolve()
+async function flushAutoSave() {
+  await advanceTimers(600)
+}
+
+async function advanceTimers(milliseconds: number) {
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(milliseconds)
+    await Promise.resolve()
+  })
 }
 
 function deferredSave() {

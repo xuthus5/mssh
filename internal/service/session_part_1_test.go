@@ -26,7 +26,7 @@ func TestSessionService_buildAuthMethodsPassword(t *testing.T) {
 	svc := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
 
 	sess := &model.Session{AuthMethod: model.AuthPassword, Password: "secret"}
-	methods, err := svc.buildAuthMethods(sess)
+	methods, err := buildAuthMethodsForTest(t, svc, sess)
 	require.NoError(t, err)
 	assert.Len(t, methods, 2) // password + keyboard-interactive fallback
 }
@@ -36,7 +36,7 @@ func TestSessionService_buildAuthMethodsKey(t *testing.T) {
 	svc := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
 
 	sess := &model.Session{AuthMethod: model.AuthKey, KeyID: ptr(int64(999))}
-	_, err := svc.buildAuthMethods(sess)
+	_, err := buildAuthMethodsForTest(t, svc, sess)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "load key")
 
@@ -46,7 +46,7 @@ func TestSessionService_buildAuthMethodsKey(t *testing.T) {
 	require.NoError(t, err)
 
 	sess.KeyID = &createdKey.ID
-	methods, err := svc.buildAuthMethods(sess)
+	methods, err := buildAuthMethodsForTest(t, svc, sess)
 	require.NoError(t, err)
 	assert.Len(t, methods, 1)
 }
@@ -56,7 +56,7 @@ func TestSessionService_buildAuthMethodsKeyboardInteractive(t *testing.T) {
 	svc := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
 
 	sess := &model.Session{AuthMethod: model.AuthKeyboardInteractive, Password: "secret"}
-	methods, err := svc.buildAuthMethods(sess)
+	methods, err := buildAuthMethodsForTest(t, svc, sess)
 	require.NoError(t, err)
 	assert.Len(t, methods, 1)
 }
@@ -66,7 +66,7 @@ func TestSessionService_buildAuthMethodsUnknown(t *testing.T) {
 	svc := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
 
 	sess := &model.Session{AuthMethod: "unknown"}
-	methods, err := svc.buildAuthMethods(sess)
+	methods, err := buildAuthMethodsForTest(t, svc, sess)
 	require.NoError(t, err)
 	assert.Len(t, methods, 0)
 }
@@ -80,7 +80,7 @@ func TestSessionService_buildAuthMethodsKeyInvalidKey(t *testing.T) {
 	require.NoError(t, err)
 
 	sess := &model.Session{AuthMethod: model.AuthKey, KeyID: &createdKey.ID}
-	_, err = svc.buildAuthMethods(sess)
+	_, err = buildAuthMethodsForTest(t, svc, sess)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "parse private key")
 }
@@ -90,7 +90,7 @@ func TestSessionService_buildAuthMethodsKeyNilID(t *testing.T) {
 	svc := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
 
 	sess := &model.Session{AuthMethod: model.AuthKey}
-	_, err := svc.buildAuthMethods(sess)
+	_, err := buildAuthMethodsForTest(t, svc, sess)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "requires key_id")
 }
@@ -100,7 +100,7 @@ func TestSessionService_buildAuthMethodsAgent(t *testing.T) {
 	svc := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
 
 	sess := &model.Session{AuthMethod: model.AuthAgent}
-	methods, err := svc.buildAuthMethods(sess)
+	methods, err := buildAuthMethodsForTest(t, svc, sess)
 	assert.Nil(t, methods)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "SSH_AUTH_SOCK")
@@ -123,6 +123,19 @@ func parsePort(t *testing.T, addr string) int {
 
 func ptr[T any](v T) *T {
 	return &v
+}
+
+func buildAuthMethodsForTest(
+	t *testing.T,
+	service *SessionService,
+	session *model.Session,
+) ([]gossh.AuthMethod, error) {
+	t.Helper()
+	methods, cleanup, err := service.buildAuthBundle(session)
+	if cleanup != nil {
+		t.Cleanup(cleanup)
+	}
+	return methods, err
 }
 
 func generateTestPrivateKey(t *testing.T) string {
@@ -235,7 +248,7 @@ func TestSessionService_buildAgentAuthSuccess(t *testing.T) {
 	svc := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
 
 	t.Setenv("SSH_AUTH_SOCK", socketPath)
-	methods, err := svc.buildAgentAuth()
+	methods, err := buildAuthMethodsForTest(t, svc, &model.Session{AuthMethod: model.AuthAgent})
 	require.NoError(t, err)
 	assert.Len(t, methods, 1)
 }
@@ -246,7 +259,7 @@ func TestSessionService_buildAgentAuthInvalidSocket(t *testing.T) {
 
 	// 指向不存在的 socket 文件，触发 net.Dial 失败
 	t.Setenv("SSH_AUTH_SOCK", filepath.Join(t.TempDir(), "nonexistent.sock"))
-	_, err := svc.buildAgentAuth()
+	_, err := buildAuthMethodsForTest(t, svc, &model.Session{AuthMethod: model.AuthAgent})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "ssh agent")
 }
@@ -260,7 +273,7 @@ func TestSessionService_buildAuthMethodsAgentSuccess(t *testing.T) {
 
 	sess := &model.Session{AuthMethod: model.AuthAgent}
 	t.Setenv("SSH_AUTH_SOCK", socketPath)
-	methods, err := svc.buildAuthMethods(sess)
+	methods, err := buildAuthMethodsForTest(t, svc, sess)
 	require.NoError(t, err)
 	assert.NotEmpty(t, methods)
 }

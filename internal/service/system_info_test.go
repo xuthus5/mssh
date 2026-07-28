@@ -19,7 +19,7 @@ func TestSystemInfoCommandProducesParsableOutput(t *testing.T) {
 	if runtime.GOOS != "linux" {
 		t.Skip("system information probe requires Linux procfs")
 	}
-	output, err := exec.Command("sh", "-c", systemInfoCommand).Output()
+	output, err := exec.Command("sh", "-c", systemInfoCommand).CombinedOutput()
 	require.NoError(t, err)
 	info, _, err := parseSystemInfo(strings.Fields(string(output)))
 	require.NoError(t, err)
@@ -113,19 +113,115 @@ func TestWaitSystemProbeTimesOutAndCancels(t *testing.T) {
 	t.Cleanup(func() { systemProbeTimeout = original })
 	cancelled := make(chan struct{})
 	release := make(chan struct{})
-	_, err := waitSystemProbe(func() ([]byte, error) { <-release; return nil, nil }, func() error { close(cancelled); close(release); return nil })
-	require.ErrorContains(t, err, "probe timeout")
+	runExited := make(chan struct{})
+	runErr := errors.New("probe runner stopped")
+	cancelErr := errors.New("probe cancel failed")
+	result := make(chan error, 1)
+	go func() {
+		_, err := waitSystemProbe(func() ([]byte, error) {
+			defer close(runExited)
+			<-release
+			return nil, runErr
+		}, func() error {
+			close(cancelled)
+			return cancelErr
+		})
+		result <- err
+	}()
 	select {
 	case <-cancelled:
-	default:
+	case <-time.After(time.Second):
 		t.Fatal("probe session was not cancelled")
 	}
+	var err error
+	returnedEarly := false
+	select {
+	case err = <-result:
+		returnedEarly = true
+	case <-time.After(20 * time.Millisecond):
+	}
+	close(release)
+	if !returnedEarly {
+		err = <-result
+	}
+	<-runExited
+	require.False(t, returnedEarly, "probe wait returned before the cancelled runner exited")
+	require.ErrorContains(t, err, "probe timeout")
+	require.ErrorIs(t, err, cancelErr)
+	require.ErrorIs(t, err, runErr)
 }
 
 func TestWaitSystemProbeReturnsCommandResult(t *testing.T) {
 	output, err := waitSystemProbe(func() ([]byte, error) { return []byte("ok"), nil }, func() error { return nil })
 	require.NoError(t, err)
 	require.Equal(t, []byte("ok"), output)
+}
+
+func TestWaitSystemProbeReturnsWhenCancellationCannotStopRunner(t *testing.T) {
+	original := systemProbeTimeout
+	originalAbortWait := systemProbeAbortWait
+	systemProbeTimeout = 10 * time.Millisecond
+	systemProbeAbortWait = 20 * time.Millisecond
+	t.Cleanup(func() {
+		systemProbeTimeout = original
+		systemProbeAbortWait = originalAbortWait
+	})
+	release := make(chan struct{})
+	result := make(chan error, 1)
+	go func() {
+		_, err := waitSystemProbe(func() ([]byte, error) {
+			<-release
+			return nil, errors.New("late probe exit")
+		}, func() error { return nil })
+		result <- err
+	}()
+
+	select {
+	case err := <-result:
+		require.ErrorContains(t, err, "probe runner did not stop")
+	case <-time.After(300 * time.Millisecond):
+		close(release)
+		<-result
+		t.Fatal("probe timeout remained blocked after cancellation returned")
+	}
+	close(release)
+}
+
+func TestWaitSystemProbeReturnsWhenCancellationItselfBlocks(t *testing.T) {
+	original := systemProbeTimeout
+	originalAbortWait := systemProbeAbortWait
+	systemProbeTimeout = 10 * time.Millisecond
+	systemProbeAbortWait = 20 * time.Millisecond
+	t.Cleanup(func() {
+		systemProbeTimeout = original
+		systemProbeAbortWait = originalAbortWait
+	})
+	releaseRun := make(chan struct{})
+	releaseCancel := make(chan struct{})
+	result := make(chan error, 1)
+	go func() {
+		_, err := waitSystemProbe(func() ([]byte, error) {
+			<-releaseRun
+			return nil, nil
+		}, func() error {
+			<-releaseCancel
+			return nil
+		})
+		result <- err
+	}()
+
+	select {
+	case err := <-result:
+		require.ErrorContains(t, err, "probe cancellation did not finish")
+		require.ErrorContains(t, err, "probe runner did not stop")
+	case <-time.After(300 * time.Millisecond):
+		close(releaseCancel)
+		close(releaseRun)
+		<-result
+		t.Fatal("probe timeout remained blocked in cancellation")
+	}
+	close(releaseCancel)
+	close(releaseRun)
 }
 
 func TestCPUPercent(t *testing.T) {

@@ -1,4 +1,4 @@
-import { ArrowDownToLine, ArrowUpFromLine, RotateCcw, Trash2, X } from 'lucide-react'
+import { ArrowDownToLine, ArrowUpFromLine, LoaderCircle, RotateCcw, Trash2, X } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -13,14 +13,15 @@ interface TransferItemProps {
   onCancel: (transfer: TransferJob) => void
   onRetry: (transfer: TransferJob) => void
   onRemove: (transfer: TransferJob) => void
+  pending?: boolean
 }
 
 const statusLabels: Record<TransferJob['status'], string> = {
-  queued: t('排队中'),
-  running: t('传输中'),
-  completed: t('已完成'),
-  failed: t('失败'),
-  cancelled: t('已取消'),
+  queued: '排队中',
+  running: '传输中',
+  completed: '已完成',
+  failed: '失败',
+  cancelled: '已取消',
 }
 
 function statusVariant(status: TransferJob['status']): 'default' | 'secondary' | 'destructive' | 'outline' {
@@ -52,7 +53,7 @@ function progressValue(transfer: TransferJob): number | null {
   return Math.min(100, Math.round((transfer.transferredBytes / transfer.totalBytes) * 100))
 }
 
-export function TransferItem({ transfer, onCancel, onRetry, onRemove }: TransferItemProps) {
+export function TransferItem({ transfer, onCancel, onRetry, onRemove, pending = false }: TransferItemProps) {
   const active = isActiveTransfer(transfer)
   const percentage = progressValue(transfer)
   const DirectionIcon = transfer.direction === 'upload' ? ArrowUpFromLine : ArrowDownToLine
@@ -64,12 +65,12 @@ export function TransferItem({ transfer, onCancel, onRetry, onRemove }: Transfer
         <CardTitle className="truncate text-sm">{transfer.fileName}</CardTitle>
         <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
           <Badge variant="outline">{transfer.sessionName}</Badge>
-          <Badge variant={statusVariant(transfer.status)}>{statusLabels[transfer.status]}</Badge>
+          <Badge variant={statusVariant(transfer.status)}>{t(statusLabels[transfer.status])}</Badge>
         </div>
       </div>
-      {active && <Button size="icon-xs" variant="ghost" aria-label={t('取消 ${}', transfer.fileName)} onClick={() => onCancel(transfer)}><X /></Button>}
-      {transfer.status === 'failed' && transfer.error !== t('会话已删除') && transfer.error !== '会话已删除' && <Button size="icon-xs" variant="outline" aria-label={t('重试 ${}', transfer.fileName)} onClick={() => onRetry(transfer)}><RotateCcw /></Button>}
-      {!active && <Button size="icon-xs" variant="ghost" aria-label={t('移除 ${}', transfer.fileName)} onClick={() => onRemove(transfer)}><Trash2 /></Button>}
+      {active && <Button size="icon-xs" variant="ghost" aria-label={t('取消 ${}', transfer.fileName)} aria-busy={pending} disabled={pending} onClick={() => onCancel(transfer)}>{pending ? <LoaderCircle className="animate-spin" /> : <X />}</Button>}
+      {transfer.status === 'failed' && transfer.error !== t('会话已删除') && transfer.error !== '会话已删除' && <Button size="icon-xs" variant="outline" aria-label={t('重试 ${}', transfer.fileName)} aria-busy={pending} disabled={pending} onClick={() => onRetry(transfer)}>{pending ? <LoaderCircle className="animate-spin" /> : <RotateCcw />}</Button>}
+      {!active && <Button size="icon-xs" variant="ghost" aria-label={t('移除 ${}', transfer.fileName)} disabled={pending} onClick={() => onRemove(transfer)}><Trash2 /></Button>}
     </CardHeader>
     <CardContent className="flex flex-col gap-2 px-3">
       {active && <>
