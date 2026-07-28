@@ -57,7 +57,7 @@ function ProviderSelect({ ariaLabel, placeholder, emptyLabel, value, providers, 
 }
 
 function ProviderEditorCard({ controller, model }: { controller: AISettingsController; model: AIProviderPanelRuntime }) {
-  return <Card className="min-w-0 shadow-sm"><CardHeader><CardTitle className="text-sm">{model.draft.id ? t('编辑提供商') : t('新增提供商')}</CardTitle></CardHeader><CardContent className="grid gap-4"><ProviderFields model={model} /><ProviderActions controller={controller} model={model} /></CardContent></Card>
+  return <Card className="min-w-0 shadow-sm"><CardHeader><CardTitle className="text-sm">{model.draft.id ? t('编辑提供商') : t('新增提供商')}</CardTitle></CardHeader><CardContent className="grid gap-4">{controller.error ? <div className="rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive" role="alert">{controller.error}</div> : null}<ProviderFields model={model} /><ProviderActions controller={controller} model={model} /></CardContent></Card>
 }
 
 function ProviderFields({ model }: { model: AIProviderPanelRuntime }) {
