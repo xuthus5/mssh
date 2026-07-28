@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"net"
 	"net/http"
@@ -160,6 +161,35 @@ func sameHTTPHost(left, right string) bool {
 	return strings.EqualFold(strings.TrimSpace(left), strings.TrimSpace(right))
 }
 
+// providerHTTPClient returns an HTTP client that honors per-provider TLS verification settings.
+// When skipTLS is true, certificate verification is disabled (InsecureSkipVerify).
+func providerHTTPClient(base *http.Client, skipTLS bool) *http.Client {
+	if !skipTLS {
+		return base
+	}
+	cloned := *base
+	transport := base.Transport
+	if transport == nil {
+		transport = http.DefaultTransport
+	}
+	if tr, ok := transport.(*http.Transport); ok {
+		clone := tr.Clone()
+		clone.TLSClientConfig = clone.TLSClientConfig.Clone()
+		if clone.TLSClientConfig == nil {
+			clone.TLSClientConfig = &tls.Config{}
+		}
+		clone.TLSClientConfig.InsecureSkipVerify = true
+		transport = clone
+	} else {
+		transport = &http.Transport{
+			TLSClientConfig:     &tls.Config{InsecureSkipVerify: true},
+			ForceAttemptHTTP2:  true,
+		}
+	}
+	cloned.Transport = transport
+	return &cloned
+}
+
 // validateOutboundHTTPURL enforces scheme/host policy for outbound application HTTP.
 func validateOutboundHTTPURL(raw string) error {
 	parsed, err := url.Parse(raw)
@@ -180,10 +210,7 @@ func validateOutboundHTTPURL(raw string) error {
 	if isBlockedOutboundHost(host) {
 		return fmt.Errorf("outbound URL host is not allowed")
 	}
-	// HTTPS required unless host is loopback (local dev / ollama / test servers).
-	if scheme != "https" && !isLoopbackHost(host) {
-		return fmt.Errorf("outbound URL must use HTTPS for non-loopback hosts")
-	}
+	// HTTP and HTTPS are both allowed; SSRF host blocklist above guards unsafe targets.
 	return nil
 }
 

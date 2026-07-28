@@ -34,7 +34,7 @@ func chatOpenAINativeSearch(ctx context.Context, client *http.Client, profile mo
 			} `json:"content"`
 		} `json:"output"`
 	}
-	if err := postJSON(ctx, client, providerBaseURL(profile)+"/responses", apiKey, "", payload, &response); err != nil {
+	if err := postJSON(ctx, client, providerBaseURL(profile)+"/responses", apiKey, "", profile.CustomHeaders, payload, &response); err != nil {
 		return "", err
 	}
 	if response.OutputText != "" {
@@ -51,7 +51,7 @@ func chatAnthropicNativeSearch(ctx context.Context, client *http.Client, profile
 			Text string `json:"text"`
 		} `json:"content"`
 	}
-	if err := postJSON(ctx, client, providerBaseURL(profile)+"/v1/messages", apiKey, "anthropic", payload, &response); err != nil {
+	if err := postJSON(ctx, client, providerBaseURL(profile)+"/v1/messages", apiKey, "anthropic", profile.CustomHeaders, payload, &response); err != nil {
 		return "", err
 	}
 	parts := make([]string, 0, len(response.Content))
@@ -75,7 +75,7 @@ func chatGeminiNativeSearch(ctx context.Context, client *http.Client, profile mo
 			} `json:"content"`
 		} `json:"candidates"`
 	}
-	if err := postJSON(ctx, client, endpoint, apiKey, "gemini", payload, &response); err != nil {
+	if err := postJSON(ctx, client, endpoint, apiKey, "gemini", profile.CustomHeaders, payload, &response); err != nil {
 		return "", err
 	}
 	if len(response.Candidates) == 0 || len(response.Candidates[0].Content.Parts) == 0 {

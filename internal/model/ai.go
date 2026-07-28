@@ -12,26 +12,42 @@ const (
 )
 
 type AIProviderProfile struct {
-	ID                    int64          `json:"id"`
-	Name                  string         `json:"name"`
-	Provider              AIProviderType `json:"provider"`
-	BaseURL               string         `json:"base_url"`
-	DefaultModel          string         `json:"default_model"`
-	Enabled               bool           `json:"enabled"`
-	CredentialSaved       bool           `json:"credential_saved"`
-	CredentialSessionOnly bool           `json:"credential_session_only"`
-	CreatedAt             time.Time      `json:"created_at"`
-	UpdatedAt             time.Time      `json:"updated_at"`
+	ID                    int64             `json:"id"`
+	Name                  string            `json:"name"`
+	Provider              AIProviderType    `json:"provider"`
+	BaseURL               string            `json:"base_url"`
+	DefaultModel          string            `json:"default_model"`
+	Enabled               bool              `json:"enabled"`
+	CredentialSaved       bool              `json:"credential_saved"`
+	CredentialSessionOnly bool              `json:"credential_session_only"`
+	ContextWindowSize     int               `json:"context_window_size"`
+	SkipTLSVerify         bool              `json:"skip_tls_verify"`
+	MaxTokens             int               `json:"max_tokens"`
+	Temperature           *float64          `json:"temperature"`
+	TopP                  *float64          `json:"top_p"`
+	FrequencyPenalty      *float64          `json:"frequency_penalty"`
+	PresencePenalty       *float64          `json:"presence_penalty"`
+	CustomHeaders         map[string]string `json:"custom_headers"`
+	CreatedAt             time.Time         `json:"created_at"`
+	UpdatedAt             time.Time         `json:"updated_at"`
 }
 
 type AIProviderProfileInput struct {
-	ID           int64          `json:"id"`
-	Name         string         `json:"name"`
-	Provider     AIProviderType `json:"provider"`
-	BaseURL      string         `json:"base_url"`
-	DefaultModel string         `json:"default_model"`
-	Enabled      bool           `json:"enabled"`
-	APIKey       string         `json:"api_key"`
+	ID                 int64             `json:"id"`
+	Name               string            `json:"name"`
+	Provider           AIProviderType    `json:"provider"`
+	BaseURL            string            `json:"base_url"`
+	DefaultModel       string            `json:"default_model"`
+	Enabled            bool              `json:"enabled"`
+	APIKey             string            `json:"api_key"`
+	ContextWindowSize  int               `json:"context_window_size"`
+	SkipTLSVerify      bool              `json:"skip_tls_verify"`
+	MaxTokens          int               `json:"max_tokens"`
+	Temperature        *float64          `json:"temperature"`
+	TopP               *float64          `json:"top_p"`
+	FrequencyPenalty   *float64          `json:"frequency_penalty"`
+	PresencePenalty    *float64          `json:"presence_penalty"`
+	CustomHeaders      map[string]string `json:"custom_headers"`
 }
 
 type AIInteractionSettings struct {

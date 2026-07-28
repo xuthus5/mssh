@@ -7,11 +7,11 @@ import { requestConfirm } from '@/lib/confirmDialog'
 import { t } from '@/i18n'
 
 export function emptyProvider(): AIProviderProfileInput {
-  return { id: 0, name: '', provider: AIProviderType.AIProviderOpenAICompatible, base_url: 'https://api.openai.com/v1', default_model: '', enabled: true, api_key: '' }
+  return { id: 0, name: '', provider: AIProviderType.AIProviderOpenAICompatible, base_url: 'https://api.openai.com/v1', default_model: '', enabled: true, api_key: '', context_window_size: 0, skip_tls_verify: false, max_tokens: 0, temperature: null, top_p: null, frequency_penalty: null, presence_penalty: null, custom_headers: {} }
 }
 
 function providerInput(profile: AIProviderProfile): AIProviderProfileInput {
-  return { id: profile.id, name: profile.name, provider: profile.provider, base_url: profile.base_url, default_model: profile.default_model, enabled: profile.enabled, api_key: '' }
+  return { id: profile.id, name: profile.name, provider: profile.provider, base_url: profile.base_url, default_model: profile.default_model, enabled: profile.enabled, api_key: '', context_window_size: profile.context_window_size, skip_tls_verify: profile.skip_tls_verify, max_tokens: profile.max_tokens, temperature: profile.temperature, top_p: profile.top_p, frequency_penalty: profile.frequency_penalty, presence_penalty: profile.presence_penalty, custom_headers: profile.custom_headers ? { ...profile.custom_headers } : {} }
 }
 
 function useProviderLifecycle() {

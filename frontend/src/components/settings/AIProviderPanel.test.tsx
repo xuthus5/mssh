@@ -237,7 +237,7 @@ function renderProviderPanel(controller: ReturnType<typeof providerController>) 
 }
 
 function providerProfile(id: number, name: string) {
-  return { id, name, provider: 'openai_compatible', base_url: 'https://api.openai.com/v1', default_model: 'gpt', enabled: true, credential_saved: true, credential_session_only: false, created_at: '', updated_at: '' }
+  return { id, name, provider: 'openai_compatible', base_url: 'https://api.openai.com/v1', default_model: 'gpt', enabled: true, credential_saved: true, credential_session_only: false, context_window_size: 0, skip_tls_verify: false, max_tokens: 0, temperature: null, top_p: null, frequency_penalty: null, presence_penalty: null, custom_headers: {}, created_at: '', updated_at: '' }
 }
 
 function deferred<T>() {

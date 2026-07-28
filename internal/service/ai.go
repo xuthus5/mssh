@@ -10,7 +10,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-	"unicode/utf8"
 
 	"github.com/xuthus5/mssh/internal/crypto"
 	"github.com/xuthus5/mssh/internal/model"
@@ -266,28 +265,8 @@ const (
 	maxAIProviderModelRunes  = 256
 	maxAIProviderURLBytes    = 2048
 	maxAIProviderAPIKeyBytes = 8 * 1024
+	maxAIContextWindowSize   = 1 << 22 // 4M tokens upper bound
+	maxAIMaxTokens            = 1 << 22
+	maxAICustomHeaderCount    = 32
+	maxAICustomHeaderKeyRunes = 128
 )
-
-func validateAIProviderFields(input model.AIProviderProfileInput) error {
-	if strings.ContainsRune(input.Name, 0) || strings.ContainsRune(input.DefaultModel, 0) || strings.ContainsRune(input.BaseURL, 0) {
-		return errors.New("AI provider fields must not contain NUL")
-	}
-	if utf8.RuneCountInString(input.Name) > maxAIProviderNameRunes {
-		return fmt.Errorf("provider name must not exceed %d characters", maxAIProviderNameRunes)
-	}
-	if utf8.RuneCountInString(input.DefaultModel) > maxAIProviderModelRunes {
-		return fmt.Errorf("default model must not exceed %d characters", maxAIProviderModelRunes)
-	}
-	if len(input.BaseURL) > maxAIProviderURLBytes {
-		return fmt.Errorf("provider URL must not exceed %d bytes", maxAIProviderURLBytes)
-	}
-	if len(input.APIKey) > maxAIProviderAPIKeyBytes {
-		return fmt.Errorf("API key exceeds size limit")
-	}
-	switch input.Provider {
-	case model.AIProviderOpenAICompatible, model.AIProviderAnthropic, model.AIProviderGemini, model.AIProviderOllama:
-	default:
-		return fmt.Errorf("unsupported AI provider %s", input.Provider)
-	}
-	return nil
-}
