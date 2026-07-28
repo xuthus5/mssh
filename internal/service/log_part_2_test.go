@@ -75,7 +75,7 @@ func TestLogService_HandleOutput(t *testing.T) {
 	sessionSvc := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
 	sess := model.Session{
 		Name: "test-handle-out", Host: "10.0.0.1", Port: 22, Username: "root",
-		AuthMethod: model.AuthPassword, Password: "enc", KeepAlive: 30, TermType: "xterm",
+		AuthMethod: model.AuthPassword, KeepAlive: 30, TermType: "xterm",
 	}
 	createdSess, err := sessionSvc.CreateSession(model.SessionInputFrom(sess))
 	require.NoError(t, err)

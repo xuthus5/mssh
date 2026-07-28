@@ -14,79 +14,57 @@ interface Props {
   onLoginChange: (value: boolean) => void
 }
 
-export function TerminalLocalShellSettingsSection({
-  shell,
-  args,
-  cwd,
-  login,
-  onShellChange,
-  onArgsChange,
-  onCwdChange,
-  onLoginChange,
-}: Props) {
-  return (
-    <section className="rounded-xl border border-border bg-card p-3 shadow-sm">
-      <div className="mb-3">
-        <h3 className="text-sm font-medium text-foreground">{t('本地终端')}</h3>
-        <p className="mt-1 text-xs text-muted-foreground">
-          {t('配置本机交互 Shell 的默认路径、参数、工作目录与登录行为。')}
-        </p>
-      </div>
-      <div className="grid gap-3 md:grid-cols-2">
-        <Field className="md:col-span-2">
-          <FieldContent>
-            <FieldLabel htmlFor="terminal-local-shell">{t('Shell 路径')}</FieldLabel>
-            <p className="text-xs text-muted-foreground">{t('仅允许系统认可的 Shell（Unix 参考 /etc/shells）。')}</p>
-            <FieldDescription>
-              {t('留空则使用系统默认（Unix: $SHELL，Windows: ComSpec/cmd.exe）。')}
-            </FieldDescription>
-          </FieldContent>
-          <Input
-            id="terminal-local-shell"
-            aria-label={t('Shell 路径')}
-            value={shell}
-            placeholder="/bin/zsh"
-            onChange={(event) => onShellChange(event.target.value)}
-          />
-        </Field>
-        <Field>
-          <FieldLabel htmlFor="terminal-local-shell-args">{t('启动参数')}</FieldLabel>
-          <Input
-            id="terminal-local-shell-args"
-            aria-label={t('启动参数')}
-            value={args}
-            placeholder="-l"
-            onChange={(event) => onArgsChange(event.target.value)}
-          />
-        </Field>
-        <Field>
-          <FieldContent>
-            <FieldLabel htmlFor="terminal-local-shell-cwd">{t('工作目录')}</FieldLabel>
-            <FieldDescription>{t('留空则使用用户家目录。')}</FieldDescription>
-          </FieldContent>
-          <Input
-            id="terminal-local-shell-cwd"
-            aria-label={t('工作目录')}
-            value={cwd}
-            placeholder="~"
-            onChange={(event) => onCwdChange(event.target.value)}
-          />
-        </Field>
-        <Field orientation="horizontal" className="md:col-span-2">
-          <FieldContent>
-            <FieldLabel htmlFor="terminal-local-shell-login">{t('以登录 Shell 启动')}</FieldLabel>
-            <FieldDescription>
-              {t('Unix 下默认附加 -l；若自定义了启动参数则不再自动附加。')}
-            </FieldDescription>
-          </FieldContent>
-          <Switch
-            id="terminal-local-shell-login"
-            aria-label={t('以登录 Shell 启动')}
-            checked={login}
-            onCheckedChange={onLoginChange}
-          />
-        </Field>
-      </div>
-    </section>
-  )
+function ShellPathField({ value, onChange }: { value: string; onChange: Props['onShellChange'] }) {
+  return <Field className="md:col-span-2">
+    <FieldContent>
+      <FieldLabel htmlFor="terminal-local-shell">{t('Shell 路径')}</FieldLabel>
+      <p className="text-xs text-muted-foreground">{t('仅允许系统认可的 Shell（Unix 参考 /etc/shells）。')}</p>
+      <FieldDescription>{t('留空则使用系统默认（Unix: $SHELL，Windows: ComSpec/cmd.exe）。')}</FieldDescription>
+    </FieldContent>
+    <Input id="terminal-local-shell" aria-label={t('Shell 路径')} value={value}
+      placeholder="/bin/zsh" onChange={(event) => onChange(event.target.value)} />
+  </Field>
+}
+
+function ShellArgumentFields({ args, cwd, onArgsChange, onCwdChange }: Pick<Props, 'args' | 'cwd' | 'onArgsChange' | 'onCwdChange'>) {
+  return <>
+    <Field>
+      <FieldLabel htmlFor="terminal-local-shell-args">{t('启动参数')}</FieldLabel>
+      <Input id="terminal-local-shell-args" aria-label={t('启动参数')} value={args}
+        placeholder="-l" onChange={(event) => onArgsChange(event.target.value)} />
+    </Field>
+    <Field>
+      <FieldContent>
+        <FieldLabel htmlFor="terminal-local-shell-cwd">{t('工作目录')}</FieldLabel>
+        <FieldDescription>{t('留空则使用用户家目录。')}</FieldDescription>
+      </FieldContent>
+      <Input id="terminal-local-shell-cwd" aria-label={t('工作目录')} value={cwd}
+        placeholder="~" onChange={(event) => onCwdChange(event.target.value)} />
+    </Field>
+  </>
+}
+
+function ShellLoginField({ checked, onChange }: { checked: boolean; onChange: Props['onLoginChange'] }) {
+  return <Field orientation="horizontal" className="md:col-span-2">
+    <FieldContent>
+      <FieldLabel htmlFor="terminal-local-shell-login">{t('以登录 Shell 启动')}</FieldLabel>
+      <FieldDescription>{t('Unix 下默认附加 -l；若自定义了启动参数则不再自动附加。')}</FieldDescription>
+    </FieldContent>
+    <Switch id="terminal-local-shell-login" aria-label={t('以登录 Shell 启动')}
+      checked={checked} onCheckedChange={onChange} />
+  </Field>
+}
+
+export function TerminalLocalShellSettingsSection(props: Props) {
+  return <section className="rounded-xl border border-border bg-card p-3 shadow-sm">
+    <div className="mb-3">
+      <h3 className="text-sm font-medium text-foreground">{t('本地终端')}</h3>
+      <p className="mt-1 text-xs text-muted-foreground">{t('配置本机交互 Shell 的默认路径、参数、工作目录与登录行为。')}</p>
+    </div>
+    <div className="grid gap-3 md:grid-cols-2">
+      <ShellPathField value={props.shell} onChange={props.onShellChange} />
+      <ShellArgumentFields args={props.args} cwd={props.cwd} onArgsChange={props.onArgsChange} onCwdChange={props.onCwdChange} />
+      <ShellLoginField checked={props.login} onChange={props.onLoginChange} />
+    </div>
+  </section>
 }

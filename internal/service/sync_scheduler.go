@@ -46,7 +46,7 @@ func (s *SyncService) NotifyVaultUnlocked() {
 		return
 	}
 	s.schedulerMu.Lock()
-	if s.schedulerStopped {
+	if s.schedulerStopped || !s.unlockCatchUpRunning.CompareAndSwap(false, true) {
 		s.schedulerMu.Unlock()
 		return
 	}
@@ -58,6 +58,7 @@ func (s *SyncService) NotifyVaultUnlocked() {
 	s.schedulerMu.Unlock()
 	go func() {
 		defer s.schedulerWG.Done()
+		defer s.unlockCatchUpRunning.Store(false)
 		s.runScheduledSync(ctx)
 	}()
 }
@@ -69,7 +70,7 @@ func (s *SyncService) restartScheduler() {
 		return
 	}
 	s.stopSchedulerLocked()
-	config, err := s.LoadConfig()
+	config, err := s.loadConfig()
 	if err != nil || !config.Enabled || config.IntervalMinutes == 0 {
 		return
 	}
@@ -107,7 +108,7 @@ func (s *SyncService) runScheduledSync(ctx context.Context) {
 		}
 		return
 	}
-	config, err := s.LoadConfig()
+	config, err := s.loadConfig()
 	if err != nil || !config.Enabled {
 		return
 	}

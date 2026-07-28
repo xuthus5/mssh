@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -163,5 +163,61 @@ describe('TerminalComposePanel', () => {
     view.rerender(<TerminalComposePanel open={false} terminalID="term-1" sessionID={7} onClose={vi.fn()} />)
     view.rerender(<TerminalComposePanel open terminalID="term-1" sessionID={7} onClose={vi.fn()} />)
     await waitFor(() => expect(macroService.list).toHaveBeenCalledTimes(2))
+  })
+
+  it('does not commit a command after the panel is unmounted', async () => {
+    const writing = deferred<number>()
+    terminalWrite.mockReturnValueOnce(writing.promise)
+    const view = render(<TerminalComposePanel open terminalID="term-1" sessionID={7} onClose={vi.fn()} />)
+    const input = screen.getByRole('textbox', { name: '撰写终端内容' })
+    await userEvent.type(input, 'uname -a')
+    await userEvent.click(screen.getByRole('button', { name: '执行' }))
+    view.unmount()
+    await act(async () => { writing.resolve(0); await Promise.resolve() })
+    expect(recordCommand).not.toHaveBeenCalled()
+  })
+
+  it('does not commit a command to a terminal that was replaced while writing', async () => {
+    const writing = deferred<number>()
+    terminalWrite.mockReturnValueOnce(writing.promise)
+    const view = render(<TerminalComposePanel open terminalID="term-1" sessionID={7} onClose={vi.fn()} />)
+    const input = screen.getByRole('textbox', { name: '撰写终端内容' })
+    await userEvent.type(input, 'echo old')
+    await userEvent.click(screen.getByRole('button', { name: '执行' }))
+    view.rerender(<TerminalComposePanel open terminalID="term-2" sessionID={7} onClose={vi.fn()} />)
+
+    const currentInput = screen.getByRole('textbox', { name: '撰写终端内容' })
+    expect(currentInput).toBeDisabled()
+    fireEvent.click(screen.getByRole('button', { name: /执行$/ }))
+    expect(terminalWrite).toHaveBeenCalledTimes(1)
+
+    await act(async () => { writing.resolve(0); await Promise.resolve() })
+    expect(recordCommand).not.toHaveBeenCalled()
+    await waitFor(() => expect(currentInput).toBeEnabled())
+    expect(currentInput).toHaveValue('echo old')
+  })
+
+  it('keeps a terminal write single-flight when the panel closes and reopens', async () => {
+    const writing = deferred<number>()
+    terminalWrite.mockReturnValueOnce(writing.promise)
+    const onClose = vi.fn()
+    const view = render(<TerminalComposePanel open terminalID="term-1" sessionID={7} onClose={onClose} />)
+    await userEvent.type(screen.getByRole('textbox', { name: '撰写终端内容' }), 'echo once')
+    await userEvent.click(screen.getByRole('button', { name: '执行' }))
+    const close = screen.getByRole('button', { name: '关闭撰写面板' })
+    expect(close).toBeDisabled()
+    await userEvent.click(close)
+    expect(onClose).not.toHaveBeenCalled()
+
+    view.rerender(<TerminalComposePanel open={false} terminalID="term-1" sessionID={7} onClose={onClose} />)
+    view.rerender(<TerminalComposePanel open terminalID="term-1" sessionID={7} onClose={onClose} />)
+    await screen.findByText('暂无可用宏')
+    expect(screen.getByRole('textbox', { name: '撰写终端内容' })).toBeDisabled()
+    fireEvent.click(screen.getByRole('button', { name: /执行$/ }))
+    expect(terminalWrite).toHaveBeenCalledOnce()
+
+    await act(async () => { writing.resolve(0); await Promise.resolve() })
+    expect(recordCommand).toHaveBeenCalledWith(7, 'echo once')
+    await waitFor(() => expect(screen.getByRole('textbox', { name: '撰写终端内容' })).toBeEnabled())
   })
 })

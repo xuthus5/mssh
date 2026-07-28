@@ -8,6 +8,7 @@ import {
   persistTabSplitLayout,
   restoreSplitTreeFromLayout,
 } from '@/components/terminal/splitPersistence'
+import type { SplitLayoutSnapshot } from '@/components/terminal/splitLayout'
 import { useAppStore } from '@/store/appStore'
 import { __clearHandlers, __registerHandler } from '@/test/__mocks__/wails-runtime'
 
@@ -58,6 +59,16 @@ describe('splitPersistence', () => {
     expect(restored?.extraTerminalIDs).toEqual(['extra-1'])
   })
 
+  it('rejects malformed layouts before opening extra panes', async () => {
+    const openOne = vi.fn(async () => 'unexpected')
+    const invalid: SplitLayoutSnapshot = {
+      paneCount: 2,
+      tree: { kind: 'leaf', role: 0 },
+    }
+    await expect(restoreSplitTreeFromLayout(invalid, 'primary', openOne)).rejects.toThrow('invalid')
+    expect(openOne).not.toHaveBeenCalled()
+  })
+
   it('cleans partial opens when a later open fails', async () => {
     __registerHandler(terminal + 'Close', async () => undefined)
     let calls = 0
@@ -72,8 +83,14 @@ describe('splitPersistence', () => {
   it('closes provided extra panes for cancelled restores', async () => {
     const close = vi.fn(async () => undefined)
     __registerHandler(terminal + 'Close', close)
+    useAppStore.setState({
+      connectionStatus: { 'extra-a': 'connected', 'extra-b': 'connected' },
+      terminalOpenReservations: new Set(['extra-a', 'extra-b']),
+    } as never)
     closeExtraSplitPanes(['extra-a', 'extra-b'], 'test cleanup')
     await vi.waitFor(() => expect(close).toHaveBeenCalledTimes(2))
+    expect(useAppStore.getState().connectionStatus).toEqual({})
+    expect(useAppStore.getState().terminalOpenReservations).toEqual(new Set())
   })
 
   it('inherits open size from preferred terminal', async () => {

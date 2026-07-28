@@ -18,20 +18,30 @@ import (
 
 // FileService manages SFTP file operations with progress tracking.
 type FileService struct {
-	sessions            *SessionService
-	eventBus            EventBus
-	mu                  sync.Mutex
-	tasks               map[string]context.CancelFunc
-	taskClosers         map[string]func() error
-	taskSessions        map[string]int64
-	workers             sync.WaitGroup
-	stopping            bool
-	progress            sync.Mutex
-	startsAt            map[string]time.Time
-	lastProgressPersist map[string]time.Time
-	lastProgressBytes   map[string]int64
-	logger              *slog.Logger
-	db                  *sql.DB
+	sessions             *SessionService
+	eventBus             EventBus
+	mu                   sync.Mutex
+	closeMu              sync.Mutex
+	tasks                map[string]context.CancelFunc
+	taskClosers          map[string]func() error
+	taskSessions         map[string]int64
+	taskRuntimes         map[string]*transferTaskRuntime
+	transferSlots        chan struct{}
+	maxQueuedTransfers   int
+	workers              sync.WaitGroup
+	operationWG          sync.WaitGroup
+	stopping             bool
+	shuttingDown         bool
+	progress             sync.Mutex
+	startsAt             map[string]time.Time
+	lastProgressPersist  map[string]time.Time
+	lastProgressBytes    map[string]int64
+	finalizationMu       sync.Mutex
+	pendingFinalizations map[string]transferFinalization
+	finalizationJournal  *transferFinalizationJournalStore
+	transferOperations   fileTransferOperations
+	logger               *slog.Logger
+	db                   *sql.DB
 }
 
 const (
@@ -39,36 +49,60 @@ const (
 	transferProgressPersistMinDelta    = 256 * 1024 // 256 KiB
 )
 
+var sftpMetadataOperationTimeout = 15 * time.Second
+
 type FileServiceOption func(*FileService)
 
 func WithTransferDB(db *sql.DB) FileServiceOption {
 	return func(service *FileService) { service.db = db }
 }
 
+func WithTransferJournalDataDir(dataDir string) FileServiceOption {
+	return func(service *FileService) {
+		service.finalizationJournal = newTransferFinalizationJournalStore(dataDir)
+	}
+}
+
 // NewFileService creates a new FileService.
 func NewFileService(sessions *SessionService, eventBus EventBus, logger *slog.Logger, options ...FileServiceOption) *FileService {
 	service := &FileService{
-		sessions:            sessions,
-		eventBus:            eventBus,
-		tasks:               make(map[string]context.CancelFunc),
-		taskClosers:         make(map[string]func() error),
-		taskSessions:        make(map[string]int64),
-		startsAt:            make(map[string]time.Time),
-		lastProgressPersist: make(map[string]time.Time),
-		lastProgressBytes:   make(map[string]int64),
-		logger:              logger,
+		sessions:             sessions,
+		eventBus:             eventBus,
+		tasks:                make(map[string]context.CancelFunc),
+		taskClosers:          make(map[string]func() error),
+		taskSessions:         make(map[string]int64),
+		taskRuntimes:         make(map[string]*transferTaskRuntime),
+		transferSlots:        make(chan struct{}, defaultMaxConcurrentTransfers),
+		maxQueuedTransfers:   defaultMaxQueuedTransfers,
+		startsAt:             make(map[string]time.Time),
+		lastProgressPersist:  make(map[string]time.Time),
+		lastProgressBytes:    make(map[string]int64),
+		pendingFinalizations: make(map[string]transferFinalization),
+		transferOperations:   defaultFileTransferOperations(),
+		logger:               logger,
 	}
 	for _, option := range options {
 		option(service)
 	}
+	service.loadTransferFinalizationJournal()
 	return service
 }
 
 func (f *FileService) ListTransfers() ([]model.TransferJob, error) {
+	finish, err := f.beginOperation()
+	if err != nil {
+		return nil, err
+	}
+	defer finish()
 	if f.db == nil {
 		return []model.TransferJob{}, nil
 	}
-	return store.ListTransferJobs(f.db)
+	f.reconcilePendingTransferFinalizations()
+	jobs, err := store.ListTransferJobs(f.db)
+	if err != nil {
+		return nil, err
+	}
+	return f.overlayPendingTransferFinalizations(jobs), nil
 }
 
 // ListDir lists remote directory entries via SFTP.
@@ -76,6 +110,11 @@ func (f *FileService) ListDir(sessionID int64, path string) ([]ssh.FileEntry, er
 	if err := validateRemotePath(path); err != nil {
 		return nil, fmt.Errorf("list dir: %w", err)
 	}
+	finish, err := f.beginOperation()
+	if err != nil {
+		return nil, err
+	}
+	defer finish()
 	f.logger.Info("listing directory", "sessionID", sessionID, "path", path)
 	wrapper, connID, err := f.connect(context.Background(), sessionID)
 	if err != nil {
@@ -83,78 +122,23 @@ func (f *FileService) ListDir(sessionID int64, path string) ([]ssh.FileEntry, er
 		return nil, fmt.Errorf("list dir: %w", err)
 	}
 	defer f.disconnect(connID)
+	deadline, err := setSFTPMetadataDeadline(wrapper)
+	if err != nil {
+		return nil, fmt.Errorf("list dir: %w", err)
+	}
 
 	sftpClient, err := ssh.OpenSFTP(wrapper)
 	if err != nil {
 		f.logger.Error("list dir failed", "sessionID", sessionID, "error", err)
-		return nil, fmt.Errorf("list dir: %w", err)
+		return nil, sftpMetadataError("list dir", deadline, err)
 	}
 	defer func() { _ = sftpClient.Close() }()
 
-	return ssh.ListDir(sftpClient, path)
-}
-
-// Upload starts an async file upload and returns a task ID.
-func (f *FileService) Delete(sessionID int64, path string) error {
-	if err := validateRemotePath(path); err != nil {
-		return fmt.Errorf("delete: %w", err)
-	}
-	wrapper, connID, err := f.connect(context.Background(), sessionID)
+	entries, err := ssh.ListDir(sftpClient, path)
 	if err != nil {
-		return fmt.Errorf("delete: %w", err)
+		return nil, sftpMetadataError("list dir", deadline, err)
 	}
-	defer f.disconnect(connID)
-
-	sftpClient, err := ssh.OpenSFTP(wrapper)
-	if err != nil {
-		return fmt.Errorf("delete: %w", err)
-	}
-	defer func() { _ = sftpClient.Close() }()
-
-	return ssh.RemoveFile(sftpClient, path)
-}
-
-// Mkdir creates a remote directory via SFTP.
-func (f *FileService) Mkdir(sessionID int64, path string) error {
-	if err := validateRemotePath(path); err != nil {
-		return fmt.Errorf("mkdir: %w", err)
-	}
-	wrapper, connID, err := f.connect(context.Background(), sessionID)
-	if err != nil {
-		return fmt.Errorf("mkdir: %w", err)
-	}
-	defer f.disconnect(connID)
-
-	sftpClient, err := ssh.OpenSFTP(wrapper)
-	if err != nil {
-		return fmt.Errorf("mkdir: %w", err)
-	}
-	defer func() { _ = sftpClient.Close() }()
-
-	return ssh.Mkdir(sftpClient, path)
-}
-
-// Rename renames a remote file via SFTP.
-func (f *FileService) Rename(sessionID int64, oldPath, newPath string) error {
-	if err := validateRemotePath(oldPath); err != nil {
-		return fmt.Errorf("rename: %w", err)
-	}
-	if err := validateRemotePath(newPath); err != nil {
-		return fmt.Errorf("rename: %w", err)
-	}
-	wrapper, connID, err := f.connect(context.Background(), sessionID)
-	if err != nil {
-		return fmt.Errorf("rename: %w", err)
-	}
-	defer f.disconnect(connID)
-
-	sftpClient, err := ssh.OpenSFTP(wrapper)
-	if err != nil {
-		return fmt.Errorf("rename: %w", err)
-	}
-	defer func() { _ = sftpClient.Close() }()
-
-	return ssh.Rename(sftpClient, oldPath, newPath)
+	return entries, nil
 }
 
 // connect establishes a temporary SSH connection for a file operation.
@@ -193,15 +177,6 @@ func (f *FileService) createTransfer(taskID string, sessionID int64, direction, 
 	return nil
 }
 
-func (f *FileService) finishTransfer(taskID, status, errorMessage string) {
-	if f.db == nil {
-		return
-	}
-	if err := store.FinishTransferJob(f.db, taskID, status, errorMessage); err != nil {
-		f.logger.Error("persist transfer completion failed", "taskID", taskID, "error", err)
-	}
-}
-
 func (f *FileService) getFileSize(localPath string) int64 {
 	info, err := os.Stat(localPath)
 	if err != nil {
@@ -212,7 +187,7 @@ func (f *FileService) getFileSize(localPath string) int64 {
 
 // getRemoteFileSize queries the remote file size via SFTP Stat.
 func (f *FileService) getRemoteFileSize(client *ssh.SFTPClient, remotePath string) int64 {
-	size, err := ssh.RemoteFileSize(client, remotePath)
+	size, err := f.transferOperations.remoteFileSize(client, remotePath)
 	if err != nil {
 		f.logger.Debug("get remote file size failed", "path", remotePath, "error", err)
 		return 0

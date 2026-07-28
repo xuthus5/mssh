@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { KeyRound, Network, Server } from 'lucide-react'
 import { KeyManager } from '@/components/settings/KeyManager'
 import TunnelDialog from '@/components/session/TunnelDialog'
@@ -16,15 +16,34 @@ import { useAppStore } from '@/store/appStore'
 import { AuditPanel } from '@/components/layout/AuditPanel'
 import { SerialPortCenter } from '@/components/serial/SerialPortCenter'
 import { t } from '@/i18n'
+import type { OverviewSection } from '@/store/tabNavigation'
 
 
 export function OverviewContent() {
   const selected = useAppStore((state) => state.overviewSection)
-  if (selected === 'keys') return <OverviewKeys />
-  if (selected === 'tunnels') return <OverviewTunnels />
-  if (selected === 'serial') return <SerialPortCenter />
-  if (selected === 'audit') return <AuditPanel />
-  return <SessionAssetCenter />
+  const visited = useRef(new Set<OverviewSection>())
+  visited.current.add(selected)
+  return <>
+    {overviewSections().map(({ id, content }) => visited.current.has(id)
+      ? <OverviewLayer key={id} active={selected === id}>{content}</OverviewLayer>
+      : null)}
+  </>
+}
+
+function overviewSections(): Array<{ id: OverviewSection; content: ReactNode }> {
+  return [
+    { id: 'sessions', content: <SessionAssetCenter /> },
+    { id: 'keys', content: <OverviewKeys /> },
+    { id: 'tunnels', content: <OverviewTunnels /> },
+    { id: 'serial', content: <SerialPortCenter /> },
+    { id: 'audit', content: <AuditPanel /> },
+  ]
+}
+
+function OverviewLayer({ active, children }: { active: boolean; children: ReactNode }) {
+  return <div hidden={!active} inert={active ? undefined : true} aria-hidden={!active} className="flex min-h-0 flex-1 flex-col">
+    {children}
+  </div>
 }
 
 function OverviewKeys() {

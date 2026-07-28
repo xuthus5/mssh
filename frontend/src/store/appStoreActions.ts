@@ -64,7 +64,8 @@ function removeTabState(state: AppState, id: string): Partial<AppState> {
   return { tabs, ...scrubTerminalRuntime(state, paneIDs), activeSurface, workspaceTab }
 }
 
-function replaceTerminalConnectionState(state: AppState, tabID: string, previousTerminalID: string, nextTerminalID: string): Partial<AppState> {
+function replaceTerminalConnectionState(...args: [AppState, string, string, string]): Partial<AppState> {
+  const [state, tabID, previousTerminalID, nextTerminalID] = args
   const tab = state.tabs.find((item) => item.id === tabID)
   if (tab?.type !== 'terminal' || tab.terminalId !== previousTerminalID) return {}
   const terminalPool = new Map(state.terminalPool)
@@ -96,7 +97,8 @@ function replaceTerminalConnectionState(state: AppState, tabID: string, previous
   }
 }
 
-function promoteTerminalConnectionState(state: AppState, tabID: string, previousTerminalID: string, nextTerminalID: string): Partial<AppState> {
+function promoteTerminalConnectionState(...args: [AppState, string, string, string]): Partial<AppState> {
+  const [state, tabID, previousTerminalID, nextTerminalID] = args
   const tab = state.tabs.find((item) => item.id === tabID)
   if (tab?.type !== 'terminal' || tab.terminalId !== previousTerminalID) return {}
   const terminalPool = new Map(state.terminalPool)
@@ -117,7 +119,8 @@ function promoteTerminalConnectionState(state: AppState, tabID: string, previous
   }
 }
 
-function activateTab(set: StoreSet, get: StoreGet, id: string, focus: boolean) {
+function activateTab(...args: [StoreSet, StoreGet, string, boolean]) {
+  const [set, get, id, focus] = args
   const state = get()
   const tab = state.tabs.find((item) => item.id === id)
   if (!tab) return
@@ -225,6 +228,25 @@ function evictLRUState(state: AppState): Partial<AppState> {
   return applyTerminalPoolEviction(state, victimID)
 }
 
+function unregisterTerminalState(state: AppState, id: string): Partial<AppState> {
+  const terminalPool = new Map(state.terminalPool)
+  terminalPool.delete(id)
+  const terminalOpenReservations = new Set(state.terminalOpenReservations ?? [])
+  terminalOpenReservations.delete(id)
+  return { terminalPool, terminalOpenReservations }
+}
+
+function forgetTerminalState(state: AppState, id: string): Partial<AppState> {
+  const connectionStatus = { ...state.connectionStatus }
+  const recordingState = { ...state.recordingState }
+  delete connectionStatus[id]
+  delete recordingState[id]
+  return {
+    ...unregisterTerminalState(state, id), connectionStatus, recordingState,
+    activePaneId: state.activePaneId === id ? null : state.activePaneId,
+  }
+}
+
 export function createPoolActions(set: StoreSet, get: StoreGet): PoolActions {
   return {
     registerTerminal: (id, terminal) => {
@@ -242,30 +264,8 @@ export function createPoolActions(set: StoreSet, get: StoreGet): PoolActions {
         return { terminalPool, terminalOpenReservations }
       })
     },
-    unregisterTerminal: (id) => set((state) => {
-      const terminalPool = new Map(state.terminalPool)
-      terminalPool.delete(id)
-      const terminalOpenReservations = new Set(state.terminalOpenReservations ?? [])
-      terminalOpenReservations.delete(id)
-      return { terminalPool, terminalOpenReservations }
-    }),
-    forgetTerminal: (id) => set((state) => {
-      const terminalPool = new Map(state.terminalPool)
-      terminalPool.delete(id)
-      const terminalOpenReservations = new Set(state.terminalOpenReservations ?? [])
-      terminalOpenReservations.delete(id)
-      const connectionStatus = { ...state.connectionStatus }
-      delete connectionStatus[id]
-      const recordingState = { ...state.recordingState }
-      delete recordingState[id]
-      return {
-        terminalPool,
-        terminalOpenReservations,
-        connectionStatus,
-        recordingState,
-        activePaneId: state.activePaneId === id ? null : state.activePaneId,
-      }
-    }),
+    unregisterTerminal: (id) => set((state) => unregisterTerminalState(state, id)),
+    forgetTerminal: (id) => set((state) => forgetTerminalState(state, id)),
     updateLastUsed: (id) => set((state) => {
       const entry = state.terminalPool.get(id)
       if (!entry) return {}

@@ -108,6 +108,18 @@ func EndSessionLog(db *sql.DB, id int64) error {
 	return nil
 }
 
+func EndIncompleteSessionLogs(db *sql.DB) (int64, error) {
+	result, err := db.Exec("UPDATE session_logs SET ended_at = datetime('now') WHERE ended_at IS NULL")
+	if err != nil {
+		return 0, fmt.Errorf("end incomplete session logs: %w", err)
+	}
+	updated, err := result.RowsAffected()
+	if err != nil {
+		return 0, fmt.Errorf("end incomplete session logs: rows affected: %w", err)
+	}
+	return updated, nil
+}
+
 func DeleteSessionLog(db *sql.DB, id int64) error {
 	_, err := db.Exec("DELETE FROM session_logs WHERE id = ?", id)
 	if err != nil {

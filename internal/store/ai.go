@@ -65,8 +65,16 @@ func SaveAIProviderProfile(db *sql.DB, input model.AIProviderProfileInput) (*mod
 }
 
 func DeleteAIProviderProfile(db *sql.DB, id int64) error {
-	if _, err := db.Exec("DELETE FROM ai_provider_profiles WHERE id = ?", id); err != nil {
+	result, err := db.Exec("DELETE FROM ai_provider_profiles WHERE id = ?", id)
+	if err != nil {
 		return fmt.Errorf("delete ai provider profile: %w", err)
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("check ai provider profile delete: %w", err)
+	}
+	if affected == 0 {
+		return fmt.Errorf("ai provider profile %d not found", id)
 	}
 	return nil
 }
@@ -114,6 +122,32 @@ func LoadAISettings(db *sql.DB, defaults model.AISettings) (model.AISettings, er
 }
 
 func SaveAISettings(db *sql.DB, settings model.AISettings) error {
+	return saveAISettings(db, settings)
+}
+
+func SaveAISettingsAndPrune(db *sql.DB, settings model.AISettings) error {
+	tx, err := db.Begin()
+	if err != nil {
+		return fmt.Errorf("begin AI settings transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	if err := saveAISettings(tx, settings); err != nil {
+		return err
+	}
+	if err := pruneAIConversations(tx, settings.Interaction.HistoryRetentionDays, settings.Interaction.MaxConversations); err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit AI settings transaction: %w", err)
+	}
+	return nil
+}
+
+type aiExecer interface {
+	Exec(query string, args ...any) (sql.Result, error)
+}
+
+func saveAISettings(execer aiExecer, settings model.AISettings) error {
 	interactionJSON, err := json.Marshal(settings.Interaction)
 	if err != nil {
 		return fmt.Errorf("encode ai interaction settings: %w", err)
@@ -126,7 +160,7 @@ func SaveAISettings(db *sql.DB, settings model.AISettings) error {
 	if err != nil {
 		return fmt.Errorf("encode ai security settings: %w", err)
 	}
-	_, err = db.Exec(`INSERT INTO ai_settings (id, default_provider_id, fallback_provider_id, interaction_json, search_json, security_json, updated_at) VALUES (1, ?, ?, ?, ?, ?, datetime('now')) ON CONFLICT(id) DO UPDATE SET default_provider_id=excluded.default_provider_id, fallback_provider_id=excluded.fallback_provider_id, interaction_json=excluded.interaction_json, search_json=excluded.search_json, security_json=excluded.security_json, updated_at=datetime('now')`, settings.DefaultProviderID, settings.FallbackProviderID, interactionJSON, searchJSON, securityJSON)
+	_, err = execer.Exec(`INSERT INTO ai_settings (id, default_provider_id, fallback_provider_id, interaction_json, search_json, security_json, updated_at) VALUES (1, ?, ?, ?, ?, ?, datetime('now')) ON CONFLICT(id) DO UPDATE SET default_provider_id=excluded.default_provider_id, fallback_provider_id=excluded.fallback_provider_id, interaction_json=excluded.interaction_json, search_json=excluded.search_json, security_json=excluded.security_json, updated_at=datetime('now')`, settings.DefaultProviderID, settings.FallbackProviderID, interactionJSON, searchJSON, securityJSON)
 	if err != nil {
 		return fmt.Errorf("save ai settings: %w", err)
 	}

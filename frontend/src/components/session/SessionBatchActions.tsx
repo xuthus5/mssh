@@ -1,103 +1,28 @@
-import { useEffect, useState } from 'react'
 import { Cable, Play, SquareTerminal, Trash2 } from 'lucide-react'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { MacroService, SessionService } from '@/lib/wails'
 import type { BatchSessionResult } from '@/lib/sessionBatch'
 import { t } from '@/i18n'
+import { useSessionBatchActions, type PendingAction, type SessionBatchOptions } from '@/components/session/useSessionBatchActions'
 
-interface MacroOption { id: number; name: string; command: string }
-type PendingAction =
-  | { type: 'connect' }
-  | { type: 'macro'; macro: MacroOption }
-  | { type: 'delete' }
-
-interface Props {
-  selectedIDs: string[]
-  onBatchConnect: (sessionIDs: string[]) => Promise<BatchSessionResult[]>
-  onBatchExecuteMacro: (sessionIDs: string[], command: string) => Promise<BatchSessionResult[]>
-  onBatchDelete: (sessionIDs: string[]) => Promise<BatchSessionResult[]>
-  onComplete: () => void
-}
-
-export function SessionBatchActions({ selectedIDs, onBatchConnect, onBatchExecuteMacro, onBatchDelete, onComplete }: Props) {
-  const [macros, setMacros] = useState<MacroOption[]>([])
-  const [pendingAction, setPendingAction] = useState<PendingAction | null>(null)
-  const [results, setResults] = useState<BatchSessionResult[] | null>(null)
-  const [executing, setExecuting] = useState(false)
-  const [deleteImpact, setDeleteImpact] = useState<{ tunnels: number; history: number; recordings: number; transfers: number } | null>(null)
-  const [macroError, setMacroError] = useState('')
-  const [impactError, setImpactError] = useState('')
-  const [executeError, setExecuteError] = useState('')
-
-  useEffect(() => {
-    let current = true
-    void MacroService.List().then((items) => {
-      if (!current) return
-      setMacros(items ?? [])
-      setMacroError('')
-    }).catch((error) => {
-      if (!current) return
-      setMacros([])
-      setMacroError(error instanceof Error ? error.message : String(error))
-    })
-    return () => { current = false }
-  }, [])
-
-  useEffect(() => {
-    if (pendingAction?.type !== 'delete') {
-      setDeleteImpact(null)
-      setImpactError('')
-      return
-    }
-    let current = true
-    void SessionService.SessionsDeleteImpact(selectedIDs.map(Number))
-      .then((value) => {
-        if (!current) return
-        setImpactError('')
-        setDeleteImpact(value ? { tunnels: value.tunnels, history: value.history, recordings: value.recordings, transfers: value.transfers ?? 0 } : { tunnels: 0, history: 0, recordings: 0, transfers: 0 })
-      })
-      .catch((error) => {
-        if (!current) return
-        setDeleteImpact(null)
-        setImpactError(error instanceof Error ? error.message : String(error))
-      })
-    return () => { current = false }
-  }, [pendingAction, selectedIDs])
-
-  const execute = async () => {
-    if (!pendingAction) return
-    setExecuting(true)
-    setExecuteError('')
-    try {
-      const nextResults = pendingAction.type === 'connect'
-        ? await onBatchConnect(selectedIDs)
-        : pendingAction.type === 'macro'
-          ? await onBatchExecuteMacro(selectedIDs, pendingAction.macro.command)
-          : await onBatchDelete(selectedIDs)
-      setResults(nextResults)
-      setPendingAction(null)
-      onComplete()
-    } catch (error) {
-      setExecuteError(t('批量操作失败: ${}', error instanceof Error ? error.message : String(error)))
-    } finally {
-      setExecuting(false)
-    }
-  }
+export function SessionBatchActions(props: SessionBatchOptions) {
+  const controller = useSessionBatchActions(props)
+  const pendingAction = controller.target?.action ?? null
+  const pendingCount = controller.target?.sessionIDs.length ?? 0
 
   return <>
     <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 shadow-sm">
-      <Badge variant="secondary">{t('已选')} {selectedIDs.length} {t('项')}</Badge>
-      <Button size="sm" variant="outline" disabled={selectedIDs.length === 0 || executing} onClick={() => setPendingAction({ type: 'connect' })}><Cable />{t('批量连接')}</Button>
-      <DropdownMenu><DropdownMenuTrigger render={<Button size="sm" variant="outline" disabled={selectedIDs.length === 0 || macros.length === 0 || executing} title={macroError || undefined} />}><Play />{t('执行宏')}</DropdownMenuTrigger><DropdownMenuContent align="start"><DropdownMenuGroup>{macros.map((macro) => <DropdownMenuItem key={macro.id} onClick={() => setPendingAction({ type: 'macro', macro })}><SquareTerminal />{macro.name}</DropdownMenuItem>)}</DropdownMenuGroup></DropdownMenuContent></DropdownMenu>
-      <Button size="sm" variant="destructive" disabled={selectedIDs.length === 0 || executing} onClick={() => setPendingAction({ type: 'delete' })}><Trash2 />{t('批量删除')}</Button>
-      {selectedIDs.length > 0 && <Button size="sm" variant="ghost" className="ml-auto" onClick={onComplete}>{t('清除选择')}</Button>}
-      {macroError ? <p className="basis-full text-xs text-destructive" role="alert">{t('加载宏失败: ${}', macroError)}</p> : null}
+      <Badge variant="secondary">{t('已选')} {props.selectedIDs.length} {t('项')}</Badge>
+      <Button size="sm" variant="outline" disabled={props.selectedIDs.length === 0 || controller.executing} onClick={() => controller.openAction({ type: 'connect' })}><Cable />{t('批量连接')}</Button>
+      <DropdownMenu><DropdownMenuTrigger render={<Button size="sm" variant="outline" disabled={props.selectedIDs.length === 0 || controller.macros.length === 0 || controller.executing} title={controller.macroError || undefined} />}><Play />{t('执行宏')}</DropdownMenuTrigger><DropdownMenuContent align="start"><DropdownMenuGroup>{controller.macros.map((macro) => <DropdownMenuItem key={macro.id} onClick={() => controller.openAction({ type: 'macro', macro })}><SquareTerminal />{macro.name}</DropdownMenuItem>)}</DropdownMenuGroup></DropdownMenuContent></DropdownMenu>
+      <Button size="sm" variant="destructive" disabled={props.selectedIDs.length === 0 || controller.executing} onClick={() => controller.openAction({ type: 'delete' })}><Trash2 />{t('批量删除')}</Button>
+      {props.selectedIDs.length > 0 && <Button size="sm" variant="ghost" className="ml-auto" onClick={() => props.onComplete(props.selectedIDs)}>{t('清除选择')}</Button>}
+      {controller.macroError ? <p className="basis-full text-xs text-destructive" role="alert">{t('加载宏失败: ${}', controller.macroError)}</p> : null}
     </div>
-    <BatchConfirmation action={pendingAction} count={selectedIDs.length} executing={executing} deleteImpact={deleteImpact} impactError={impactError} executeError={executeError} onOpenChange={(open) => { if (!open && !executing) { setPendingAction(null); setExecuteError('') } }} onConfirm={() => { void execute() }} />
-    <BatchResults results={results} onClose={() => setResults(null)} />
+    <BatchConfirmation action={pendingAction} count={pendingCount} executing={controller.executing} deleteImpact={controller.deleteImpact} impactError={controller.impactError} executeError={controller.executeError} onOpenChange={(open) => { if (!open) controller.closeAction() }} onConfirm={() => { void controller.execute() }} />
+    <BatchResults results={controller.results} onClose={() => controller.setResults(null)} />
   </>
 }
 

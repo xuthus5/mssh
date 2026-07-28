@@ -51,6 +51,11 @@ type sessionCSVRecord struct {
 }
 
 func (s *SessionService) ExportCSV(path string, options model.SessionCSVExportOptions) (model.SessionCSVExportResult, error) {
+	finish, err := s.beginOperation()
+	if err != nil {
+		return model.SessionCSVExportResult{}, err
+	}
+	defer finish()
 	result := model.SessionCSVExportResult{IncludedPasswords: options.IncludePasswords}
 	cleaned, pathErr := validateLocalFilePath(path)
 	if pathErr != nil {
@@ -63,18 +68,28 @@ func (s *SessionService) ExportCSV(path string, options model.SessionCSVExportOp
 			Action: "export", TargetType: "session_csv", Summary: fmt.Sprintf("导出 %d 个 SSH 会话", result.Count), Outcome: outcome,
 		})
 	}()
-	sessions, err := s.sessionsForCSV(options.SessionIDs)
+	var sessions []model.Session
+	err = withCryptoOperation(s.crypto, func() error {
+		var loadErr error
+		sessions, loadErr = s.sessionsForCSV(options.SessionIDs)
+		if loadErr != nil {
+			return loadErr
+		}
+		if !options.IncludePasswords {
+			return nil
+		}
+		if confirmErr := s.requireExportPasswordConfirmation(options.ConfirmPassword); confirmErr != nil {
+			return confirmErr
+		}
+		decrypted, decryptErr := s.decryptSessionPasswordsForExport(sessions)
+		if decryptErr != nil {
+			return decryptErr
+		}
+		sessions = decrypted
+		return nil
+	})
 	if err != nil {
 		return result, fmt.Errorf("export session csv: %w", err)
-	}
-	if options.IncludePasswords {
-		if err := s.requireExportPasswordConfirmation(options.ConfirmPassword); err != nil {
-			return result, err
-		}
-		sessions, err = s.decryptSessionPasswordsForExport(sessions)
-		if err != nil {
-			return result, fmt.Errorf("export session csv: %w", err)
-		}
 	}
 	folderPaths, err := loadSessionCSVFolderPaths(s.db)
 	if err != nil {
@@ -265,33 +280,4 @@ func assetProjectName(value *model.AssetProject) string {
 		return ""
 	}
 	return protectCSVCell(value.Name)
-}
-
-func (s *SessionService) decryptSessionPasswordsForExport(sessions []model.Session) ([]model.Session, error) {
-	if s.crypto == nil {
-		return sessions, nil
-	}
-	out := make([]model.Session, len(sessions))
-	copy(out, sessions)
-	for i := range out {
-		if out[i].Password == "" {
-			continue
-		}
-		plain, err := openSessionPassword(s.crypto, out[i].Password)
-		if err != nil {
-			return nil, fmt.Errorf("decrypt session %d password: %w", out[i].ID, err)
-		}
-		out[i].Password = plain
-	}
-	return out, nil
-}
-
-func (s *SessionService) requireExportPasswordConfirmation(password string) error {
-	if s.passwords == nil {
-		return fmt.Errorf("export with passwords requires application password verification")
-	}
-	if err := s.passwords.VerifyPassword(password); err != nil {
-		return fmt.Errorf("confirm application password: %w", err)
-	}
-	return nil
 }

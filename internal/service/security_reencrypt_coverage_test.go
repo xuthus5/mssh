@@ -3,6 +3,7 @@ package service
 import (
 	"bytes"
 	"database/sql"
+	"encoding/base64"
 	"encoding/json"
 	"strings"
 	"testing"
@@ -60,7 +61,8 @@ func TestSecurityRotateReencryptsKeysAndPasswords(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotEmpty(t, plain)
 
-	proxy, saved := settingSvc.loadProxyPassword()
+	proxy, saved, err := settingSvc.loadProxyPassword()
+	require.NoError(t, err)
 	assert.True(t, saved)
 	assert.Equal(t, "proxy-secret", proxy)
 
@@ -91,11 +93,11 @@ func TestTunnelHandleAcceptLoopExitCleansActiveReservation(t *testing.T) {
 	sessionSvc := NewSessionService(db, bus, 30, t.TempDir(), nil, testutil.NewTestLogger())
 	svc := NewTunnelService(db, sessionSvc, bus, testutil.NewTestLogger())
 
-	reservation := &TunnelState{}
+	reservation := &TunnelState{ID: 42}
 	svc.mu.Lock()
 	svc.tunnels[42] = reservation
 	svc.mu.Unlock()
-	svc.handleAcceptLoopExit(42, reservation, "")
+	svc.handleAcceptLoopExit(42, reservation)
 	svc.mu.Lock()
 	_, exists := svc.tunnels[42]
 	svc.mu.Unlock()
@@ -107,7 +109,7 @@ func TestTunnelHandleAcceptLoopExitCleansActiveReservation(t *testing.T) {
 	svc.mu.Lock()
 	svc.tunnels[7] = current
 	svc.mu.Unlock()
-	svc.handleAcceptLoopExit(7, stale, "")
+	svc.handleAcceptLoopExit(7, stale)
 	svc.mu.Lock()
 	_, exists = svc.tunnels[7]
 	svc.mu.Unlock()
@@ -216,4 +218,83 @@ func TestApplySessionPasswordUpdateNotFound(t *testing.T) {
 	t.Cleanup(func() { _ = tx.Rollback() })
 	err = applySessionPasswordUpdate(tx, reencryptSessionUpdate{id: 99999, password: "x"})
 	require.Error(t, err)
+}
+
+func TestSecretHelpersClearTemporaryPlaintextBuffers(t *testing.T) {
+	crypto := &zeroizationCrypto{}
+	_, err := sealSessionPassword(crypto, "session-secret")
+	require.NoError(t, err)
+	assertCleared(t, crypto.encryptInput)
+
+	crypto.decryptOutput = []byte("session-secret")
+	opened, err := openSessionPassword(crypto, sessionPasswordPrefix+zeroizationCiphertext())
+	require.NoError(t, err)
+	assert.Equal(t, "session-secret", opened)
+	assertCleared(t, crypto.decryptOutput)
+
+	_, err = encryptProxyPasswordValue(crypto, "proxy-secret")
+	require.NoError(t, err)
+	assertCleared(t, crypto.encryptInput)
+
+	crypto.decryptOutput = []byte("proxy-secret")
+	opened, err = decryptProxyPasswordValue(crypto, proxyPasswordEncPrefix+"cipher")
+	require.NoError(t, err)
+	assert.Equal(t, "proxy-secret", opened)
+	assertCleared(t, crypto.decryptOutput)
+
+	syncService := &SyncService{crypto: crypto}
+	_, err = syncService.encryptedSecretSetting(syncGistTokenSetting, "gist-secret")
+	require.NoError(t, err)
+	assertCleared(t, crypto.encryptInput)
+
+	db := testutil.NewTestDB(t)
+	require.NoError(t, writeSyncSetting(db, syncGistTokenSetting, "cipher"))
+	syncService.db = db
+	crypto.decryptOutput = []byte("gist-secret")
+	opened, err = syncService.loadSecretUnlocked(syncGistTokenSetting)
+	require.NoError(t, err)
+	assert.Equal(t, "gist-secret", opened)
+	assertCleared(t, crypto.decryptOutput)
+}
+
+func TestReencryptPlanClearsDecryptedBuffers(t *testing.T) {
+	oldCrypto := &zeroizationCrypto{decryptOutput: []byte("private-key")}
+	newCrypto := &zeroizationCrypto{}
+	sealed, err := reencryptSSHPrivateKey(oldCrypto, newCrypto, 7, "cipher")
+	require.NoError(t, err)
+	assert.Equal(t, zeroizationCiphertext(), sealed)
+	assertCleared(t, oldCrypto.decryptOutput)
+	assertCleared(t, newCrypto.encryptInput)
+
+	db := testutil.NewTestDB(t)
+	require.NoError(t, writeSyncSetting(db, syncGistTokenSetting, "cipher"))
+	oldCrypto.decryptOutput = []byte("gist-secret")
+	setting, err := planSyncCredentialSetting(db, syncGistTokenSetting, oldCrypto, newCrypto)
+	require.NoError(t, err)
+	require.NotNil(t, setting)
+	assertCleared(t, oldCrypto.decryptOutput)
+	assertCleared(t, newCrypto.encryptInput)
+}
+
+type zeroizationCrypto struct {
+	encryptInput  []byte
+	decryptOutput []byte
+}
+
+func (c *zeroizationCrypto) Encrypt(plaintext []byte) ([]byte, error) {
+	c.encryptInput = plaintext
+	return []byte(zeroizationCiphertext()), nil
+}
+
+func (c *zeroizationCrypto) Decrypt([]byte) ([]byte, error) {
+	return c.decryptOutput, nil
+}
+
+func zeroizationCiphertext() string {
+	return base64.StdEncoding.EncodeToString(make([]byte, sessionPasswordCiphertextOverhead))
+}
+
+func assertCleared(t *testing.T, value []byte) {
+	t.Helper()
+	assert.Equal(t, make([]byte, len(value)), value)
 }

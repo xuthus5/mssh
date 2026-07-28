@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -19,8 +19,9 @@ import (
 )
 
 type aiTerminalStub struct {
-	writes   []string
-	writeErr error
+	sessionID int64
+	writes    []string
+	writeErr  error
 }
 
 func (s *aiTerminalStub) Write(_ string, data string) (int, error) {
@@ -66,12 +67,18 @@ func (s *aiTerminalStub) SystemInfo(string) (*model.SystemInfo, error) {
 	return &model.SystemInfo{OSName: "Linux", KernelVersion: "6.0", CPUPercent: 12, Load1: 0.5, MemoryUsed: 1, MemoryTotal: 2}, nil
 }
 
+func (s *aiTerminalStub) terminalSessionID(string) (int64, bool) {
+	return s.sessionID, s.sessionID > 0
+}
+
+func (s *aiTerminalStub) Close(string) error { return nil }
+
 func TestAIServiceChatAndExecute(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	session := createAIServiceSession(t, db)
 	server := aiTestServer(t, http.StatusOK, `{"choices":[{"message":{"content":"检查完成\nCOMMAND: systemctl status nginx | PURPOSE: 检查服务"}}]}`)
 	defer server.Close()
-	terminal := &aiTerminalStub{}
+	terminal := &aiTerminalStub{sessionID: session.ID}
 	service := NewAIService(db, nil, nil, testutil.NewTestLogger())
 	service.terminals = terminal
 	service.httpClient = server.Client()
@@ -111,7 +118,7 @@ func TestAIServiceBlocksDangerousCommand(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	session := createAIServiceSession(t, db)
 	service := NewAIService(db, nil, nil, testutil.NewTestLogger())
-	service.terminals = &aiTerminalStub{}
+	service.terminals = &aiTerminalStub{sessionID: session.ID}
 	err := service.ExecuteCommand(model.AICommandExecutionInput{SessionID: session.ID, TerminalID: "term-1", Command: "rm -rf /", Approved: true})
 	assert.ErrorContains(t, err, "blocked")
 	assert.Empty(t, service.terminals.(*aiTerminalStub).writes)
@@ -153,6 +160,9 @@ func TestAIServiceValidatesSettingsAndProvider(t *testing.T) {
 	input = aiSettingsInput(defaultAISettings())
 	input.Interaction.PanelWidth = 100
 	assert.ErrorContains(t, service.SaveSettings(input), "panel width")
+	input = aiSettingsInput(defaultAISettings())
+	input.Interaction.PanelWidth = 721
+	assert.ErrorContains(t, service.SaveSettings(input), "panel width")
 }
 
 func TestAIServiceTestProviderAndConversationMethods(t *testing.T) {
@@ -183,15 +193,32 @@ func TestAIServiceExecutionErrors(t *testing.T) {
 	service := NewAIService(db, nil, nil, testutil.NewTestLogger())
 	err := service.ExecuteCommand(model.AICommandExecutionInput{SessionID: session.ID, TerminalID: "term", Command: "echo change"})
 	assert.ErrorContains(t, err, "approval")
-	service.terminals = &aiTerminalStub{writeErr: errors.New("write failed")}
+	service.terminals = &aiTerminalStub{sessionID: session.ID, writeErr: errors.New("write failed")}
 	err = service.ExecuteCommand(model.AICommandExecutionInput{SessionID: session.ID, TerminalID: "term", Command: "echo change", Approved: true})
 	assert.ErrorContains(t, err, "write failed")
+}
+
+func TestAIServiceDoesNotAutoExecuteCompoundReadOnlyCommand(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	session := createAIServiceSession(t, db)
+	terminal := &aiTerminalStub{sessionID: session.ID}
+	service := NewAIService(db, nil, nil, testutil.NewTestLogger())
+	service.terminals = terminal
+	settings := defaultAISettings()
+	settings.Security.AutoExecuteReadOnly = true
+	require.NoError(t, store.SaveAISettings(db, settings))
+
+	err := service.ExecuteCommand(model.AICommandExecutionInput{SessionID: session.ID, TerminalID: "term", Command: "uptime\ntouch /tmp/mssh-policy-test"})
+	require.ErrorContains(t, err, "approval")
+	assert.Empty(t, terminal.writes)
+	require.NoError(t, service.ExecuteCommand(model.AICommandExecutionInput{SessionID: session.ID, TerminalID: "term", Command: "uptime"}))
+	assert.Equal(t, []string{"uptime\n"}, terminal.writes)
 }
 
 func TestAIServiceChatValidationSearchAndExistingConversation(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	session := createAIServiceSession(t, db)
-	providerServer := aiTestServer(t, http.StatusOK, `{"choices":[{"message":{"content":"answer"}}]}`)
+	providerServer := aiTestServer(t, http.StatusOK, `{"choices":[{"message":{"content":"answer [1]"}}]}`)
 	defer providerServer.Close()
 	searchServer := aiTestServer(t, http.StatusOK, `{"web":{"results":[{"title":"Docs","url":"https://example.com","description":"result"}]}}`)
 	defer searchServer.Close()
@@ -213,6 +240,74 @@ func TestAIServiceChatValidationSearchAndExistingConversation(t *testing.T) {
 	require.Len(t, response.Citations, 1)
 	_, err = service.Chat(model.AIChatRequest{})
 	assert.ErrorContains(t, err, "required")
+}
+
+func TestAIServiceRejectsCrossSessionTargetsBeforeSideEffects(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	firstSession := createAIServiceSession(t, db)
+	secondSession := createAIServiceSession(t, db)
+	conversationID, err := store.CreateAIConversation(db, firstSession.ID, "first session")
+	require.NoError(t, err)
+	var providerCalls atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		providerCalls.Add(1)
+		_, writeErr := writer.Write([]byte(`{"choices":[{"message":{"content":"answer"}}]}`))
+		require.NoError(t, writeErr)
+	}))
+	defer server.Close()
+	terminal := &aiTerminalStub{sessionID: secondSession.ID}
+	service := NewAIService(db, nil, nil, testutil.NewTestLogger())
+	service.terminals = terminal
+	service.httpClient = server.Client()
+	provider, err := service.SaveProvider(model.AIProviderProfileInput{Name: "test", Provider: model.AIProviderOpenAICompatible, BaseURL: server.URL, DefaultModel: "model", Enabled: true, APIKey: "secret"})
+	require.NoError(t, err)
+	settings := defaultAISettings()
+	settings.DefaultProviderID = &provider.ID
+	require.NoError(t, store.SaveAISettings(db, settings))
+
+	_, err = service.Chat(model.AIChatRequest{ConversationID: conversationID, SessionID: secondSession.ID, TerminalID: "term", Prompt: "cross session"})
+	require.ErrorContains(t, err, "conversation")
+	assert.Zero(t, providerCalls.Load())
+	messages, listErr := store.ListAIMessages(db, conversationID)
+	require.NoError(t, listErr)
+	assert.Empty(t, messages)
+
+	err = service.ExecuteCommand(model.AICommandExecutionInput{ConversationID: conversationID, SessionID: secondSession.ID, TerminalID: "term", Command: "echo unsafe", Approved: true})
+	require.ErrorContains(t, err, "conversation")
+	assert.Empty(t, terminal.writes)
+
+	terminal.sessionID = firstSession.ID
+	_, err = service.Chat(model.AIChatRequest{SessionID: secondSession.ID, TerminalID: "term", Prompt: "wrong terminal"})
+	require.ErrorContains(t, err, "terminal")
+	assert.Zero(t, providerCalls.Load())
+	err = service.ExecuteCommand(model.AICommandExecutionInput{SessionID: secondSession.ID, TerminalID: "term", Command: "echo wrong target", Approved: true})
+	require.ErrorContains(t, err, "terminal")
+	assert.Empty(t, terminal.writes)
+}
+
+func TestAIServiceChatRollsBackPartialExchange(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	session := createAIServiceSession(t, db)
+	conversationID, err := store.CreateAIConversation(db, session.ID, "existing")
+	require.NoError(t, err)
+	_, err = db.Exec(`CREATE TRIGGER fail_assistant_message BEFORE INSERT ON ai_messages WHEN NEW.role = 'assistant' BEGIN SELECT RAISE(ABORT, 'assistant persistence failed'); END`)
+	require.NoError(t, err)
+	server := aiTestServer(t, http.StatusOK, `{"choices":[{"message":{"content":"answer"}}]}`)
+	defer server.Close()
+	service := NewAIService(db, nil, nil, testutil.NewTestLogger())
+	service.terminals = &aiTerminalStub{sessionID: session.ID}
+	service.httpClient = server.Client()
+	provider, err := service.SaveProvider(model.AIProviderProfileInput{Name: "test", Provider: model.AIProviderOpenAICompatible, BaseURL: server.URL, DefaultModel: "model", Enabled: true, APIKey: "secret"})
+	require.NoError(t, err)
+	settings := defaultAISettings()
+	settings.DefaultProviderID = &provider.ID
+	require.NoError(t, store.SaveAISettings(db, settings))
+
+	_, err = service.Chat(model.AIChatRequest{ConversationID: conversationID, SessionID: session.ID, TerminalID: "term", Prompt: "question"})
+	require.ErrorContains(t, err, "assistant persistence failed")
+	messages, listErr := store.ListAIMessages(db, conversationID)
+	require.NoError(t, listErr)
+	assert.Empty(t, messages)
 }
 
 func TestAIServiceProviderLoadingErrors(t *testing.T) {
@@ -269,43 +364,11 @@ func createAIServiceSession(t *testing.T, db *sql.DB) *model.Session {
 	return session
 }
 
-type slowAITerminalStub struct {
-	delay time.Duration
-}
-
-func (s *slowAITerminalStub) Write(_ string, data string) (int, error) {
-	time.Sleep(s.delay)
-	return len(data), nil
-}
-
-func (s *slowAITerminalStub) SystemInfo(string) (*model.SystemInfo, error) {
-	return &model.SystemInfo{}, nil
-}
-
-func TestAIServiceExecuteCommandWriteTimeout(t *testing.T) {
-	db := testutil.NewTestDB(t)
-	session := createAIServiceSession(t, db)
-	service := NewAIService(db, nil, nil, testutil.NewTestLogger())
-	service.terminals = &slowAITerminalStub{delay: 200 * time.Millisecond}
-	settings := defaultAISettings()
-	settings.Security.CommandTimeoutSeconds = 1
-	// Use sub-second by writing through helper directly with short timeout.
-	err := writeTerminalWithTimeout(service.terminals, "term", "echo ok\n", 50*time.Millisecond)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "timed out")
-
-	// Fast path still succeeds.
-	service.terminals = &aiTerminalStub{}
-	require.NoError(t, service.ExecuteCommand(model.AICommandExecutionInput{
-		SessionID: session.ID, TerminalID: "term", Command: "echo ok", Approved: true,
-	}))
-}
-
 func TestAIServiceExecuteCommandRejectsOversizedCommand(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	session := createAIServiceSession(t, db)
 	service := NewAIService(db, nil, nil, testutil.NewTestLogger())
-	service.terminals = &aiTerminalStub{}
+	service.terminals = &aiTerminalStub{sessionID: session.ID}
 	huge := strings.Repeat("a", maxAICommandBytes)
 	err := service.ExecuteCommand(model.AICommandExecutionInput{
 		SessionID: session.ID, TerminalID: "term", Command: huge, Approved: true,
@@ -358,6 +421,16 @@ func TestAIServiceChatRejectsBlankTerminalID(t *testing.T) {
 	service := NewAIService(db, nil, nil, testutil.NewTestLogger())
 	_, err := service.Chat(model.AIChatRequest{SessionID: 1, TerminalID: "  ", Prompt: "hi"})
 	require.Error(t, err)
+}
+
+func TestAIServiceTargetValidationErrors(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	service := NewAIService(db, nil, nil, testutil.NewTestLogger())
+	assert.ErrorContains(t, service.validateAIConversationTarget(-1, 1), "invalid")
+	service.terminals = &aiTerminalStub{}
+	assert.ErrorContains(t, service.validateAITarget(0, 1, "missing"), "unavailable")
+	require.NoError(t, db.Close())
+	assert.ErrorContains(t, service.validateAIConversationTarget(1, 1), "validate")
 }
 
 func TestAIServiceSaveProviderRejectsNegativeID(t *testing.T) {

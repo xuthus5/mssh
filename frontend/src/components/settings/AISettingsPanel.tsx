@@ -4,8 +4,9 @@ import { AIProviderPanel } from '@/components/settings/AIProviderPanel'
 import { AIAgentPanel } from '@/components/settings/AIAgentPanel'
 import { AutoSaveStatusIndicator } from '@/components/settings/AutoSaveStatus'
 import { AIInteractionSettingsSection, AISearchSettingsSection, AISecuritySettingsSection } from '@/components/settings/AISettingsSections'
-import { useAutoSave } from '@/hooks/useAutoSave'
+import { useAutoSave, type UseAutoSaveResult } from '@/hooks/useAutoSave'
 import { useDraftSync } from '@/hooks/useDraftSync'
+import { useSettingsWindowHide } from '@/hooks/useSettingsWindowHide'
 import type { AISettingsController } from '@/hooks/useAISettings'
 import { AISearchMode, AISearchProvider, type AISettingsDashboard, type AISettingsInput } from '../../../bindings/github.com/xuthus5/mssh/internal/model/models'
 import { t } from '@/i18n'
@@ -66,13 +67,19 @@ function createDraft(dashboard: AISettingsDashboard | null): AISettingsInput {
 }
 
 export function AISettingsPanel({ controller }: { controller: AISettingsController }) {
-  const dashboard = controller.dashboard
-  const { draft, setDraft, acknowledgeSaved } = useDraftSync({ source: dashboard, createDraft })
+  const state = useAISettingsPanelState(controller)
+  if (controller.loading && !state.dashboard) return <AISettingsLoading />
+  if (!state.dashboard) return <AISettingsFailure error={controller.error} />
+  return <AISettingsTabs controller={controller} {...state} dashboard={state.dashboard} />
+}
 
+function useAISettingsPanelState(controller: AISettingsController) {
+  const dashboard = controller.dashboard
+  const { draft, setDraft, acknowledgeSaved, baselineRevision } = useDraftSync({ source: dashboard, createDraft })
   const persist = useCallback(
     async (next: AISettingsInput) => {
       await controller.saveSettings(next, { quiet: true })
-      acknowledgeSaved(next)
+      acknowledgeSaved(next, savedAISettingsDraft(next))
     },
     [acknowledgeSaved, controller],
   )
@@ -81,31 +88,54 @@ export function AISettingsPanel({ controller }: { controller: AISettingsControll
     onSave: async (next) => {
       await persist(next)
     },
-    enabled: dashboard !== null,
+    enabled: dashboard !== null && (controller.pending === null || controller.pending === 'settings'),
     isReady: dashboard !== null,
     delayMs: 450,
+    baselineRevision,
   })
+  useSettingsWindowHide(useCallback(() => {
+    if (!draft.search.api_key) return
+    const redacted = savedAISettingsDraft(draft)
+    autoSave.redact(draft, redacted)
+    setDraft(redacted)
+  }, [autoSave.redact, draft, setDraft]))
+  const update = useCallback((changes: Partial<AISettingsInput>) => {
+    setDraft((current) => ({ ...current, ...changes }))
+  }, [setDraft])
+  const removeProvider = useCallback((providerID: number) => {
+    setDraft((current) => ({
+      ...current,
+      default_provider_id: current.default_provider_id === providerID ? null : current.default_provider_id,
+      fallback_provider_id: current.fallback_provider_id === providerID ? null : current.fallback_provider_id,
+    }))
+  }, [setDraft])
+  return { dashboard, draft, autoSave, update, removeProvider }
+}
 
-  if (controller.loading && !dashboard) {
-    return <p className="p-8 text-center text-sm text-muted-foreground">{t('正在加载 AI 配置...')}</p>
-  }
-  if (!dashboard) {
-    return (
-      <div className="space-y-2 p-8 text-center">
-        <p className="text-sm text-destructive">{t('AI 配置加载失败')}</p>
-        {controller.error ? (
-          <div className="rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive" role="alert">
-            {controller.error}
-          </div>
-        ) : null}
-      </div>
-    )
-  }
+function AISettingsLoading() {
+  return <p className="p-8 text-center text-sm text-muted-foreground">{t('正在加载 AI 配置...')}</p>
+}
 
-  const update = (changes: Partial<AISettingsInput>) => setDraft((current) => ({ ...current, ...changes }))
+function savedAISettingsDraft(input: AISettingsInput): AISettingsInput {
+  return { ...input, search: { ...input.search, api_key: '' } }
+}
 
-  return (
-    <Tabs defaultValue="providers" className="min-h-0 flex flex-col gap-4" orientation="horizontal">
+function AISettingsFailure({ error }: { error: string | null }) {
+  return <div className="space-y-2 p-8 text-center">
+    <p className="text-sm text-destructive">{t('AI 配置加载失败')}</p>
+    {error ? <div className="rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive" role="alert">{error}</div> : null}
+  </div>
+}
+
+function AISettingsTabs({ controller, dashboard, draft, autoSave, update, removeProvider }: {
+  controller: AISettingsController
+  dashboard: AISettingsDashboard
+  draft: AISettingsInput
+  autoSave: UseAutoSaveResult<AISettingsInput>
+  update: (changes: Partial<AISettingsInput>) => void
+  removeProvider: (providerID: number) => void
+}) {
+  return <Tabs defaultValue="providers" className="min-h-0 flex flex-col gap-4" orientation="horizontal">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <TabsList className="mssh-tab-strip-scroll h-auto min-w-0 flex-1 flex-row flex-nowrap justify-start overflow-x-auto overflow-y-hidden">
           <TabsTrigger value="providers">{t('提供商')}</TabsTrigger>
@@ -117,7 +147,7 @@ export function AISettingsPanel({ controller }: { controller: AISettingsControll
         <AutoSaveStatusIndicator status={autoSave.status} error={autoSave.error} />
       </div>
       <TabsContent value="providers" className="min-h-0 overflow-y-auto">
-        <AIProviderPanel controller={controller} />
+        <AIProviderPanel controller={controller} priorities={draft} onPriorityChange={update} onProviderDeleted={removeProvider} />
       </TabsContent>
       <TabsContent value="agents" className="min-h-0 overflow-y-auto">
         <AIAgentPanel controller={controller} />
@@ -132,5 +162,4 @@ export function AISettingsPanel({ controller }: { controller: AISettingsControll
         <AISecuritySettingsSection draft={draft} update={update} />
       </TabsContent>
     </Tabs>
-  )
 }

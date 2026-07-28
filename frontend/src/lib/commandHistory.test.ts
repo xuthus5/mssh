@@ -6,6 +6,10 @@ import {
   recordCommand,
   trimCommandHistory,
 } from '@/lib/commandHistory'
+import {
+  onCommandHistoryChanged,
+  resetCommandHistoryMutationCoordinator,
+} from '@/lib/commandHistoryMutationCoordinator'
 
 const historyService = vi.hoisted(() => ({
   Add: vi.fn(async () => null),
@@ -17,6 +21,7 @@ vi.mock('@/lib/wails', () => ({ CommandHistoryService: historyService }))
 describe('command history', () => {
   beforeEach(() => {
     localStorage.clear()
+    resetCommandHistoryMutationCoordinator()
     historyService.Add.mockClear()
     historyService.Clear.mockClear()
   })
@@ -53,6 +58,18 @@ describe('command history', () => {
     const trimmed = trimCommandHistory(entries, { maxEntries: 5, maxBytes: 800 })
     expect(trimmed.length).toBeLessThanOrEqual(5)
     expect(trimmed.length).toBeGreaterThan(0)
+  })
+
+  it('notifies open panels after command persistence succeeds', async () => {
+    const changed = vi.fn()
+    const stop = onCommandHistoryChanged(1, Symbol('panel'), changed)
+
+    recordCommand(1, 'git status')
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect(changed).toHaveBeenCalledOnce()
+    stop()
   })
 })
 

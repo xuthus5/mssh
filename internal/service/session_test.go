@@ -134,7 +134,7 @@ func TestSessionService_SessionCRUD(t *testing.T) {
 
 	sess := model.Session{
 		Name: "web-server", Host: "10.0.0.1", Port: 22, Username: "root",
-		AuthMethod: model.AuthPassword, Password: "encrypted", KeepAlive: 30, TermType: "xterm-256color",
+		AuthMethod: model.AuthPassword, KeepAlive: 30, TermType: "xterm-256color",
 	}
 	created, err := svc.CreateSession(model.SessionInputFrom(sess))
 	require.NoError(t, err)

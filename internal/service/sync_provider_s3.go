@@ -39,7 +39,11 @@ func newS3SyncProvider(ctx context.Context, config model.S3SyncConfig, secretKey
 		awsconfig.WithCredentialsProvider(credentialsProvider),
 	}
 	if len(httpClient) > 0 && httpClient[0] != nil {
-		loadOptions = append(loadOptions, awsconfig.WithHTTPClient(httpClient[0]))
+		scopedClient, clientErr := s3HTTPClient(httpClient[0], config.Endpoint)
+		if clientErr != nil {
+			return nil, clientErr
+		}
+		loadOptions = append(loadOptions, awsconfig.WithHTTPClient(scopedClient))
 	}
 	awsConfig, err := awsconfig.LoadDefaultConfig(ctx, loadOptions...)
 	if err != nil {

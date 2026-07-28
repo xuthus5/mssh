@@ -26,12 +26,13 @@ export function closeSplitTerminalInBackground(terminalID: string, context: stri
   closeInBackground(terminalID, context, isTerminalNotFoundError)
 }
 
-export function openSplitPane(
-  sessionId: number,
-  connectionKind: 'ssh' | 'serial' | 'local' | undefined,
-  serialPortId: number | undefined,
-  preferredTerminalID: string,
-) {
+export function openSplitPane(...args: [
+  number,
+  'ssh' | 'serial' | 'local' | undefined,
+  number | undefined,
+  string,
+]) {
+  const [sessionId, connectionKind, serialPortId, preferredTerminalID] = args
   return openSplitTerminal(sessionId, connectionKind, serialPortId, t('串口终端为设备独占，不支持分屏'), preferredTerminalID)
 }
 
@@ -54,6 +55,11 @@ type SplitActionContext = {
   lastUsed: (terminalID: string) => number
   onPaneClosed?: (terminalID: string) => void
   onPaneReplaced?: (previousID: string, nextID: string) => void
+}
+
+function commitSplitTree(ctx: SplitActionContext, next: SplitNode) {
+  ctx.treeRef.current = next
+  ctx.setTree(() => next)
 }
 
 export async function splitPane(direction: SplitDirection, ctx: SplitActionContext) {
@@ -79,7 +85,13 @@ export async function splitPane(direction: SplitDirection, ctx: SplitActionConte
       closeSplitTerminalInBackground(terminalID, 'TerminalSplit: cancelled split cleanup failed')
       return
     }
-    ctx.setTree((current) => insertSplit(current, targetID, terminalID, direction, crypto.randomUUID()))
+    const current = ctx.treeRef.current
+    const next = insertSplit(current, targetID, terminalID, direction, crypto.randomUUID())
+    if (next === current) {
+      closeSplitTerminalInBackground(terminalID, 'TerminalSplit: stale split cleanup failed')
+      return
+    }
+    commitSplitTree(ctx, next)
     useAppStore.getState().setConnectionStatus(terminalID, 'connected')
     ctx.requestFocus(terminalID)
   } catch (error: unknown) {
@@ -109,7 +121,7 @@ export async function closeSplitPane(terminalID: string, ctx: SplitActionContext
     } else {
       useAppStore.getState().forgetTerminal(terminalID)
     }
-    ctx.setTree(() => result.node)
+    commitSplitTree(ctx, result.node)
     ctx.onPaneClosed?.(terminalID)
     ctx.requestFocus(result.focusID)
   } catch (error: unknown) {
@@ -135,7 +147,13 @@ export async function reconnectSplitPane(terminalID: string, ctx: SplitActionCon
       closeSplitTerminalInBackground(nextID, 'TerminalSplit: cancelled reconnect cleanup failed')
       return
     }
-    ctx.setTree((current) => replaceTerminal(current, terminalID, nextID))
+    const current = ctx.treeRef.current
+    const next = replaceTerminal(current, terminalID, nextID)
+    if (next === current) {
+      closeSplitTerminalInBackground(nextID, 'TerminalSplit: stale reconnect cleanup failed')
+      return
+    }
+    commitSplitTree(ctx, next)
     if (terminalID === ctx.primaryID) {
       ctx.primaryRef.current = nextID
       useAppStore.getState().replaceTerminalConnection(ctx.tabID, terminalID, nextID)

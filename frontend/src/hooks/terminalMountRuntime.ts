@@ -1,25 +1,14 @@
 import type { RefObject } from 'react'
 import { FitAddon } from '@xterm/addon-fit'
-import { SearchAddon } from '@xterm/addon-search'
-import { Unicode11Addon } from '@xterm/addon-unicode11'
 import type { Terminal } from '@xterm/xterm'
 import type { TerminalRuntimeErrorReporter } from '@/components/terminal/TerminalErrorBoundary'
-import { installTerminalCopyOnSelect } from '@/components/terminal/terminalBehaviorRuntime'
-import { installHistoryCommandPredict } from '@/components/terminal/terminalHistoryPredictRuntime'
-import { resolveSessionId, subscribeToTerminalData } from '@/hooks/terminalInputRuntime'
-import { subscribeToRenderer, subscribeToScrollback } from '@/hooks/terminalBehaviorSubscriptions'
 import { runTerminalRuntime } from '@/components/terminal/terminalRuntime'
 import { logger } from '@/lib/logger'
 import { applyTerminalTheme } from '@/lib/terminalTheme'
 import { TerminalService } from '@/lib/wails'
 import { useAppStore, type AppState } from '@/store/appStore'
-import { useTerminalBehaviorStore } from '@/store/terminalBehaviorStore'
-import { TerminalCommandCapture } from '@/lib/terminalCommandCapture'
-import { registerTerminalSearch, unregisterTerminalSearch } from '@/lib/terminalSearchRegistry'
 import { fitAndRefresh } from '@/hooks/terminalFitRuntime'
-import { createTerminalInstance, createTerminalRendererController, safelyDisposeTerminalResource } from '@/hooks/terminalInstanceRuntime'
-import { subscribeToSynchronizedOutputQuery, subscribeToTerminalOutput, subscribeToTerminalVersionQuery } from '@/hooks/terminalOutputRuntime'
-import { subscribeToTerminalWorkingDirectory } from '@/hooks/terminalDirectoryRuntime'
+import { createTerminalMountSession } from '@/hooks/terminalMountSession'
 
 export const RESIZE_DEBOUNCE_MS = 80
 
@@ -40,7 +29,8 @@ export interface TerminalLifecycleRefs {
   outputFlushRef: RefObject<(() => void) | null>
 }
 
-function reportResize(terminalID: string, term: Terminal, context: string, lastResizeRef: RefObject<{ terminalID: string; cols: number; rows: number } | null>) {
+function reportResize(...args: [string, Terminal, string, RefObject<{ terminalID: string; cols: number; rows: number } | null>]) {
+  const [terminalID, term, context, lastResizeRef] = args
   if (term.cols < 1 || term.rows < 1) return
   const previous = lastResizeRef.current
   if (previous?.terminalID === terminalID && previous.cols === term.cols && previous.rows === term.rows) return
@@ -153,119 +143,8 @@ function observeResize({ term, fitAddon, containerRef, refs, reportRuntimeError 
 }
 
 export function initializeTerminal(containerRef: RefObject<HTMLDivElement | null>, refs: TerminalLifecycleRefs, reportRuntimeError: TerminalRuntimeErrorReporter) {
-  let disposed = false
-  let addonOwnedByTerminal = false
-  let unicodeAddonOwnedByTerminal = false
-  let searchAddonOwnedByTerminal = false
-  let cleanupCopyOnSelect: (() => void) | undefined
-  const container = containerRef.current
-  const term = createTerminalInstance()
-  const fitAddon = new FitAddon()
-  const unicodeAddon = new Unicode11Addon()
-  const searchAddon = new SearchAddon({ highlightLimit: 1000 })
-  const initialTerminalID = refs.terminalIDRef.current
-  refs.termRef.current = term
-  refs.fitAddonRef.current = fitAddon
-  const rendererController = createTerminalRendererController(term)
-  if (container) {
-    term.open(container)
-    rendererController.apply(useTerminalBehaviorStore.getState().renderer)
-    term.loadAddon(unicodeAddon)
-    unicodeAddonOwnedByTerminal = true
-    if (term.unicode) term.unicode.activeVersion = '11'
-    term.loadAddon(searchAddon)
-    searchAddonOwnedByTerminal = true
-    registerTerminalSearch(initialTerminalID, searchAddon)
-    cleanupCopyOnSelect = installTerminalCopyOnSelect(term, 'terminal')
-    term.loadAddon(fitAddon)
-    addonOwnedByTerminal = true
-    refs.storeRef.current.registerTerminal(initialTerminalID, term)
-  }
-  const commandCapture = new TerminalCommandCapture()
-  const historyPredict = installHistoryCommandPredict(term, {
-    getSessionId: () => resolveSessionId(refs),
-    getBuffer: () => commandCapture.current(),
-    applyCompletion: (suffix) => {
-      writeTerminalInput(suffix, refs)
-      commandCapture.feed(suffix)
-    },
+  return createTerminalMountSession({
+    containerRef, refs, reportRuntimeError, writeTerminalInput, cancelActivationFrame,
+    scheduleBackendResize, subscribeToTheme, observeResize,
   })
-  const focusHandler = () => runTerminalRuntime(reportRuntimeError, 'terminal pane activation', () => refs.storeRef.current.setActivePane(refs.terminalIDRef.current))
-  container?.addEventListener('focusin', focusHandler)
-  container?.addEventListener('pointerdown', focusHandler)
-  const dataDispose = subscribeToTerminalData(term, refs, commandCapture, (data) => writeTerminalInput(data, refs))
-  const synchronizedOutputQueryDispose = subscribeToSynchronizedOutputQuery(term)
-  const terminalVersionQueryDispose = subscribeToTerminalVersionQuery(term)
-  const terminalDirectoryDispose = subscribeToTerminalWorkingDirectory(term, refs.terminalIDRef)
-  const outputSubscription = subscribeToTerminalOutput({
-    term,
-    terminalIDRef: refs.terminalIDRef,
-    reportRuntimeError,
-    shouldCoalesce: () => !refs.activeRef.current,
-  })
-  refs.outputFlushRef.current = () => outputSubscription.flush()
-  const unsubscribeTheme = subscribeToTheme({ term, fitAddon, containerRef, refs, reportRuntimeError })
-  const unsubscribeScrollback = subscribeToScrollback(term, reportRuntimeError)
-  const unsubscribeRenderer = subscribeToRenderer((mode) => {
-    rendererController.apply(mode)
-  }, reportRuntimeError)
-  const resizeObserver = observeResize({ term, fitAddon, containerRef, refs, reportRuntimeError })
-  if (container) resizeObserver.observe(container)
-  const onHostMoved = (event: Event) => {
-    const detail = (event as CustomEvent<{ terminalID?: string }>).detail
-    if (!detail?.terminalID || detail.terminalID !== refs.terminalIDRef.current) return
-    // Reparent can leave both active and inactive panes at zero size or with a lost GL context.
-    // Retry across frames even when the pane is not focused (common after split on the old shell).
-    cancelActivationFrame(refs.activationFrameRef)
-    refs.recoveryPendingRef.current = true
-    let attempts = 0
-    const recoverMovedHost = () => {
-      refs.activationFrameRef.current = null
-      attempts += 1
-      let recovered = false
-      const succeeded = runTerminalRuntime(reportRuntimeError, 'terminal host reparent', () => {
-        rendererController.apply(useTerminalBehaviorStore.getState().renderer)
-        if (!fitAndRefresh(term, fitAddon, containerRef.current)) return
-        recovered = true
-        refs.recoveryPendingRef.current = false
-        scheduleBackendResize(term, refs)
-      })
-      if (!succeeded || recovered || attempts >= 30 || disposed) return
-      refs.activationFrameRef.current = window.requestAnimationFrame(recoverMovedHost)
-    }
-    refs.activationFrameRef.current = window.requestAnimationFrame(recoverMovedHost)
-  }
-  window.addEventListener('mssh:terminal-host-moved', onHostMoved)
-
-  return () => {
-    if (disposed) return
-    disposed = true
-    refs.outputFlushRef.current = null
-    cancelActivationFrame(refs.activationFrameRef)
-    if (refs.resizeTimerRef.current !== null) window.clearTimeout(refs.resizeTimerRef.current)
-    container?.removeEventListener('focusin', focusHandler)
-    container?.removeEventListener('pointerdown', focusHandler)
-    safelyDisposeTerminalResource('history predict', historyPredict.dispose)
-    safelyDisposeTerminalResource('data subscription', () => dataDispose.dispose())
-    safelyDisposeTerminalResource('synchronized output query', () => synchronizedOutputQueryDispose.dispose())
-    safelyDisposeTerminalResource('terminal version query', () => terminalVersionQueryDispose.dispose())
-    safelyDisposeTerminalResource('terminal working directory', () => terminalDirectoryDispose.dispose())
-    safelyDisposeTerminalResource('output subscription', outputSubscription.dispose)
-    safelyDisposeTerminalResource('theme subscription', unsubscribeTheme)
-    safelyDisposeTerminalResource('scrollback subscription', unsubscribeScrollback)
-    safelyDisposeTerminalResource('renderer subscription', unsubscribeRenderer)
-    safelyDisposeTerminalResource('renderer addon', () => rendererController.dispose())
-    safelyDisposeTerminalResource('resize observer', () => resizeObserver.disconnect())
-    window.removeEventListener('mssh:terminal-host-moved', onHostMoved)
-    if (cleanupCopyOnSelect) safelyDisposeTerminalResource('copy-on-select subscription', cleanupCopyOnSelect)
-    unregisterTerminalSearch(refs.registeredTerminalIDRef.current)
-    if (!addonOwnedByTerminal) safelyDisposeTerminalResource('fit addon', () => fitAddon.dispose())
-    if (!unicodeAddonOwnedByTerminal) safelyDisposeTerminalResource('unicode addon', () => unicodeAddon.dispose())
-    if (!searchAddonOwnedByTerminal) safelyDisposeTerminalResource('search addon', () => searchAddon.dispose())
-    refs.storeRef.current.unregisterTerminal(refs.terminalIDRef.current)
-    safelyDisposeTerminalResource('instance', () => term.dispose())
-    refs.fitAddonRef.current = null
-    refs.termRef.current = null
-  }
 }
-

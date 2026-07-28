@@ -18,7 +18,12 @@ import { TerminalSplit, type TerminalSplitHandle } from '@/components/terminal/T
 import { TerminalService } from '@/lib/wails'
 import { useAppStore } from '@/store/appStore'
 import { ToastContainer, useToastStore } from '@/components/ui/toast'
-import { TERMINAL_CLOSED_SPLIT_PANE_EVENT } from '@/hooks/sessionReconnect'
+import {
+  RECONNECT_SPLIT_PANE_EVENT,
+  TERMINAL_CLOSED_SPLIT_PANE_EVENT,
+  type ReconnectSplitPaneDetail,
+} from '@/hooks/sessionReconnect'
+import { DEFAULT_TERMINAL_BEHAVIOR, useTerminalBehaviorStore } from '@/store/terminalBehaviorStore'
 
 const focusRequest = { sequence: 0, targetTerminalID: null }
 const splitStateChange = vi.fn()
@@ -57,7 +62,9 @@ describe('TerminalSplit', () => {
       activeSurface: { type: 'terminal', id: 'tab-1' },
       activePaneId: 'primary-1',
       focusRequest: { id: 'tab-1', terminalId: 'primary-1', sequence: 1 },
+      maxPoolSize: 32,
       terminalPool: new Map(),
+      terminalOpenReservations: new Set(),
       connectionStatus: { 'primary-1': 'connected' },
     })
   })
@@ -146,6 +153,36 @@ describe('TerminalSplit', () => {
     fireEvent.click(screen.getByRole('button', { name: '重试' }))
     await screen.findByTestId('pane-split-1')
     await waitFor(() => expect(screen.queryByText(/恢复分屏布局失败/)).not.toBeInTheDocument())
+  })
+
+  it('does not restart a persisted restore when busy state rerenders the split', async () => {
+    const opening = deferred<string>()
+    useAppStore.setState({
+      tabs: [{
+        id: 'tab-1', title: 'Terminal', type: 'terminal', terminalId: 'primary-1', sessionId: 1,
+        splitLayout: {
+          paneCount: 2,
+          tree: {
+            kind: 'branch', direction: 'horizontal', ratio: 0.5,
+            first: { kind: 'leaf', role: 0 }, second: { kind: 'leaf', role: 1 },
+          },
+        },
+        splitPaneIDs: ['primary-1'],
+      }],
+      activeSurface: { type: 'terminal', id: 'tab-1' },
+      activePaneId: 'primary-1',
+      terminalPool: new Map(),
+      connectionStatus: { 'primary-1': 'connected' },
+    })
+    vi.mocked(TerminalService.Open).mockReset().mockReturnValue(opening.promise as never)
+
+    render(<Harness />)
+
+    await waitFor(() => expect(TerminalService.Open).toHaveBeenCalledOnce())
+    await act(async () => { await Promise.resolve() })
+    expect(TerminalService.Open).toHaveBeenCalledOnce()
+    act(() => opening.resolve('split-1'))
+    await screen.findByTestId('pane-split-1')
   })
 
   it('resizes a split with the pointer divider', async () => {
@@ -238,6 +275,101 @@ describe('TerminalSplit', () => {
     expect(useAppStore.getState().terminalPool.has('split-1')).toBe(false)
     expect(TerminalService.Close).toHaveBeenCalledWith('split-1')
     expect(useAppStore.getState().connectionStatus['split-2']).toBe('connected')
+  })
+
+  it('discards a new split when its target pane closes while opening', async () => {
+    render(<Harness />)
+    fireEvent.click(screen.getByText('向右'))
+    await screen.findByTestId('pane-split-1')
+    act(() => useAppStore.getState().setActivePane('split-1'))
+
+    const opening = deferred<string>()
+    vi.mocked(TerminalService.Open).mockReset()
+      .mockReturnValue(opening.promise as unknown as ReturnType<typeof TerminalService.Open>)
+    fireEvent.click(screen.getByText('向下'))
+    await waitFor(() => expect(TerminalService.Open).toHaveBeenCalledOnce())
+    act(() => window.dispatchEvent(new CustomEvent(TERMINAL_CLOSED_SPLIT_PANE_EVENT, {
+      detail: { tabID: 'tab-1', terminalID: 'split-1' },
+    })))
+    await waitFor(() => expect(screen.queryByTestId('pane-split-1')).not.toBeInTheDocument())
+
+    act(() => opening.resolve('stale-split'))
+    await waitFor(() => expect(TerminalService.Close).toHaveBeenCalledWith('stale-split'))
+    expect(screen.queryByTestId('pane-stale-split')).not.toBeInTheDocument()
+    expect(screen.getByTestId('pane-primary-1')).toBeInTheDocument()
+    expect(useAppStore.getState().connectionStatus['stale-split']).toBeUndefined()
+  })
+
+  it('discards a reconnect replacement when its pane closes while opening', async () => {
+    render(<Harness />)
+    fireEvent.click(screen.getByText('向右'))
+    await screen.findByTestId('pane-split-1')
+    act(() => useAppStore.getState().setConnectionStatus('split-1', 'disconnected'))
+
+    const opening = deferred<string>()
+    vi.mocked(TerminalService.Open).mockReset()
+      .mockReturnValue(opening.promise as unknown as ReturnType<typeof TerminalService.Open>)
+    fireEvent.click(screen.getByRole('button', { name: '重新连接' }))
+    await waitFor(() => expect(TerminalService.Open).toHaveBeenCalledOnce())
+    act(() => window.dispatchEvent(new CustomEvent(TERMINAL_CLOSED_SPLIT_PANE_EVENT, {
+      detail: { tabID: 'tab-1', terminalID: 'split-1' },
+    })))
+    await waitFor(() => expect(screen.queryByTestId('pane-split-1')).not.toBeInTheDocument())
+
+    act(() => opening.resolve('stale-reconnect'))
+    await waitFor(() => expect(TerminalService.Close).toHaveBeenCalledWith('stale-reconnect'))
+    expect(screen.queryByTestId('pane-stale-reconnect')).not.toBeInTheDocument()
+    expect(screen.getByTestId('pane-primary-1')).toBeInTheDocument()
+    expect(useAppStore.getState().connectionStatus['stale-reconnect']).toBeUndefined()
+  })
+
+  it('queues simultaneous auto reconnects for multiple split panes', async () => {
+    useTerminalBehaviorStore.setState({ ...DEFAULT_TERMINAL_BEHAVIOR, autoReconnect: true })
+    render(<Harness />)
+    fireEvent.click(screen.getByText('向右'))
+    await screen.findByTestId('pane-split-1')
+    act(() => useAppStore.getState().setActivePane('split-1'))
+    fireEvent.click(screen.getByText('向下'))
+    await screen.findByTestId('pane-split-2')
+
+    const firstReconnect = deferred<string>()
+    vi.mocked(TerminalService.Open).mockReset()
+      .mockReturnValueOnce(firstReconnect.promise as unknown as ReturnType<typeof TerminalService.Open>)
+      .mockResolvedValueOnce('split-4')
+    act(() => {
+      useAppStore.getState().setConnectionStatus('split-1', 'disconnected')
+      useAppStore.getState().setConnectionStatus('split-2', 'disconnected')
+    })
+
+    let firstCompletion = Promise.resolve()
+    let secondCompletion = Promise.resolve()
+    act(() => {
+      window.dispatchEvent(new CustomEvent<ReconnectSplitPaneDetail>(RECONNECT_SPLIT_PANE_EVENT, {
+        detail: {
+          tabID: 'tab-1',
+          terminalID: 'split-1',
+          accept: (start) => { firstCompletion = start() },
+        },
+      }))
+      window.dispatchEvent(new CustomEvent<ReconnectSplitPaneDetail>(RECONNECT_SPLIT_PANE_EVENT, {
+        detail: {
+          tabID: 'tab-1',
+          terminalID: 'split-2',
+          accept: (start) => { secondCompletion = start() },
+        },
+      }))
+    })
+
+    await waitFor(() => expect(TerminalService.Open).toHaveBeenCalledOnce())
+    act(() => firstReconnect.resolve('split-3'))
+    await firstCompletion
+    await waitFor(() => expect(TerminalService.Open).toHaveBeenCalledTimes(2))
+    await secondCompletion
+
+    expect(screen.getByTestId('pane-split-3')).toBeInTheDocument()
+    expect(screen.getByTestId('pane-split-4')).toBeInTheDocument()
+    expect(screen.queryByTestId('pane-split-1')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('pane-split-2')).not.toBeInTheDocument()
   })
 
   it('removes a secondary pane when the backend closes it', async () => {

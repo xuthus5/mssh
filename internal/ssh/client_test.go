@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -302,6 +303,99 @@ func TestAppendKnownHostConcurrent(t *testing.T) {
 	require.Len(t, lines, 2)
 	assert.Contains(t, string(content), "a.example.com")
 	assert.Contains(t, string(content), "b.example.com")
+}
+
+func TestConcurrentFirstSeenSameKeyPromptsOnce(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "known_hosts")
+	public, _, err := ed25519.GenerateKey(rand.Reader)
+	require.NoError(t, err)
+	key, err := gossh.NewPublicKey(public)
+	require.NoError(t, err)
+	started := make(chan struct{}, 1)
+	release := make(chan struct{})
+	var calls atomic.Int32
+	verifier := func(_, _, _ string) bool {
+		if calls.Add(1) == 1 {
+			started <- struct{}{}
+			<-release
+		}
+		return true
+	}
+	first, err := createHostKeyCallback(path, verifier, slog.Default())
+	require.NoError(t, err)
+	second, err := createHostKeyCallback(path, verifier, slog.Default())
+	require.NoError(t, err)
+	remote := &net.TCPAddr{IP: net.IPv4(10, 0, 0, 1), Port: 22}
+	results := make(chan error, 2)
+	go func() { results <- first("example.com:22", remote, key) }()
+	<-started
+	go func() { results <- second("example.com:22", remote, key) }()
+	close(release)
+	require.NoError(t, <-results)
+	require.NoError(t, <-results)
+	assert.Equal(t, int32(1), calls.Load())
+	content, err := os.ReadFile(path)
+	require.NoError(t, err)
+	assert.Len(t, strings.Split(strings.TrimSpace(string(content)), "\n"), 1)
+}
+
+func TestFirstSeenHostKeyPromptsAreSerialized(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "known_hosts")
+	firstKey := newTestPublicKey(t)
+	secondKey := newTestPublicKey(t)
+	started := make(chan string, 2)
+	releaseFirst := make(chan struct{})
+	verifier := func(hostname, _, _ string) bool {
+		started <- hostname
+		if strings.Contains(hostname, "one.internal") {
+			<-releaseFirst
+		}
+		return true
+	}
+	first, err := createHostKeyCallback(path, verifier, slog.Default())
+	require.NoError(t, err)
+	second, err := createHostKeyCallback(path, verifier, slog.Default())
+	require.NoError(t, err)
+	remote := &net.TCPAddr{IP: net.IPv4(10, 0, 0, 2), Port: 22}
+	results := make(chan error, 2)
+	go func() { results <- first("one.internal:22", remote, firstKey) }()
+	assert.Contains(t, <-started, "one.internal")
+	go func() { results <- second("two.internal:22", remote, secondKey) }()
+	select {
+	case hostname := <-started:
+		t.Fatalf("second prompt started before first decision: %s", hostname)
+	case <-time.After(50 * time.Millisecond):
+	}
+	close(releaseFirst)
+	assert.Contains(t, <-started, "two.internal")
+	require.NoError(t, <-results)
+	require.NoError(t, <-results)
+}
+
+func TestAcceptedHostKeyFailsClosedWhenFileChangesDuringPrompt(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "known_hosts")
+	presented := newTestPublicKey(t)
+	other := newTestPublicKey(t)
+	verifier := func(_, _, _ string) bool {
+		require.NoError(t, appendKnownHost(path, "example.com:22", other))
+		return true
+	}
+	callback, err := createHostKeyCallback(path, verifier, slog.Default())
+	require.NoError(t, err)
+	err = callback("example.com:22", &net.TCPAddr{IP: net.IPv4(10, 0, 0, 3), Port: 22}, presented)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "changed")
+	assert.Contains(t, err.Error(), gossh.FingerprintSHA256(other))
+	assert.Contains(t, err.Error(), gossh.FingerprintSHA256(presented))
+}
+
+func newTestPublicKey(t *testing.T) gossh.PublicKey {
+	t.Helper()
+	public, _, err := ed25519.GenerateKey(rand.Reader)
+	require.NoError(t, err)
+	key, err := gossh.NewPublicKey(public)
+	require.NoError(t, err)
+	return key
 }
 
 func TestWithKnownHostsLockSerializes(t *testing.T) {

@@ -22,21 +22,36 @@ const (
 
 type MacroService struct {
 	db        *sql.DB
-	terminals *TerminalService
+	terminals terminalCommandWriter
 	logger    *slog.Logger
+	lifecycle macroServiceLifecycle
 }
 
 func NewMacroService(db *sql.DB, terminals *TerminalService, logger *slog.Logger) *MacroService {
-	return &MacroService{db: db, terminals: terminals, logger: logger}
+	var terminalWriter terminalCommandWriter
+	if terminals != nil {
+		terminalWriter = terminals
+	}
+	return &MacroService{db: db, terminals: terminalWriter, logger: logger}
 }
 
 func (m *MacroService) List() ([]model.Macro, error) {
+	_, finish, err := m.beginOperation()
+	if err != nil {
+		return nil, err
+	}
+	defer finish()
 	return store.ListMacros(m.db)
 }
 
 func (m *MacroService) Create(input model.MacroInput) (*model.Macro, error) {
+	_, finish, err := m.beginOperation()
+	if err != nil {
+		return nil, err
+	}
+	defer finish()
 	macro := input.Macro()
-	if err := validateMacroPayload(macro); err != nil {
+	if err = validateMacroPayload(macro); err != nil {
 		return nil, err
 	}
 	m.logger.Info("creating macro", "name", macro.Name)
@@ -44,11 +59,16 @@ func (m *MacroService) Create(input model.MacroInput) (*model.Macro, error) {
 }
 
 func (m *MacroService) Update(input model.MacroInput) error {
+	_, finish, err := m.beginOperation()
+	if err != nil {
+		return err
+	}
+	defer finish()
 	macro := input.Macro()
 	if macro.ID <= 0 {
 		return fmt.Errorf("invalid macro id")
 	}
-	if err := validateMacroPayload(macro); err != nil {
+	if err = validateMacroPayload(macro); err != nil {
 		return err
 	}
 	m.logger.Info("updating macro", "id", macro.ID, "name", macro.Name)
@@ -93,6 +113,11 @@ func validateMacroPayload(macro model.Macro) error {
 }
 
 func (m *MacroService) Delete(id int64) error {
+	_, finish, err := m.beginOperation()
+	if err != nil {
+		return err
+	}
+	defer finish()
 	if id <= 0 {
 		return fmt.Errorf("invalid macro id")
 	}
@@ -101,6 +126,11 @@ func (m *MacroService) Delete(id int64) error {
 }
 
 func (m *MacroService) Execute(terminalID, command string) error {
+	operationContext, finish, err := m.beginOperation()
+	if err != nil {
+		return err
+	}
+	defer finish()
 	if strings.TrimSpace(terminalID) == "" {
 		return fmt.Errorf("invalid terminal id")
 	}
@@ -131,7 +161,7 @@ func (m *MacroService) Execute(terminalID, command string) error {
 	if timeout < time.Second {
 		timeout = time.Duration(defaultAISettings().Security.CommandTimeoutSeconds) * time.Second
 	}
-	err := writeTerminalWithTimeout(m.terminals, terminalID, command, timeout)
+	err = writeTerminalWithContext(operationContext, m.terminals, terminalID, command, timeout)
 	outcome := "success"
 	if err != nil {
 		outcome = "failed"

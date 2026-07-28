@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"log/slog"
@@ -10,41 +11,71 @@ import (
 	"unicode/utf8"
 
 	"github.com/xuthus5/mssh/internal/model"
+	ssh "github.com/xuthus5/mssh/internal/ssh"
 	"github.com/xuthus5/mssh/internal/store"
-	"github.com/xuthus5/mssh/pkg/event"
 )
 
 type TunnelState struct {
-	ID       int64
-	connID   string
-	closed   func() error
-	starting bool
+	ID             int64
+	sessionID      int64
+	connID         string
+	closed         func() error
+	starting       bool
+	startCancelled bool
+	stopping       bool
+	startDone      chan struct{}
+	startErr       error
+	startCtx       context.Context
+	startCancel    context.CancelFunc
+	startClient    *ssh.ClientWrapper
+	startDoneOnce  sync.Once
 }
 
 type TunnelService struct {
-	db       *sql.DB
-	sessions *SessionService
-	eventBus EventBus
-	mu       sync.Mutex
-	tunnels  map[int64]*TunnelState
-	logger   *slog.Logger
+	db              *sql.DB
+	sessions        *SessionService
+	eventBus        EventBus
+	mu              sync.Mutex
+	configMu        sync.Mutex
+	closeMu         sync.Mutex
+	runtimeWG       sync.WaitGroup
+	lifecycle       serviceOperationGate
+	tunnels         map[int64]*TunnelState
+	blockedSessions map[int64]int
+	logger          *slog.Logger
+	closing         bool
+	shuttingDown    bool
 }
 
 func NewTunnelService(db *sql.DB, sessions *SessionService, eventBus EventBus, logger *slog.Logger) *TunnelService {
+	if logger == nil {
+		logger = slog.Default()
+	}
 	return &TunnelService{
-		db:       db,
-		sessions: sessions,
-		eventBus: eventBus,
-		tunnels:  make(map[int64]*TunnelState),
-		logger:   logger,
+		db:              db,
+		sessions:        sessions,
+		eventBus:        eventBus,
+		tunnels:         make(map[int64]*TunnelState),
+		blockedSessions: make(map[int64]int),
+		logger:          logger,
 	}
 }
 
 func (t *TunnelService) List() ([]model.Tunnel, error) {
+	finish, err := t.beginOperation()
+	if err != nil {
+		return nil, err
+	}
+	defer finish()
 	return store.ListTunnels(t.db)
 }
 
 func (t *TunnelService) Create(input model.TunnelInput) (*model.Tunnel, error) {
+	finish, err := t.beginOperation()
+	if err != nil {
+		return nil, err
+	}
+	defer finish()
 	tunnel := input.Tunnel()
 	if err := validateTunnelBind(tunnel); err != nil {
 		return nil, err
@@ -54,6 +85,11 @@ func (t *TunnelService) Create(input model.TunnelInput) (*model.Tunnel, error) {
 }
 
 func (t *TunnelService) Update(input model.TunnelInput) error {
+	finish, err := t.beginOperation()
+	if err != nil {
+		return err
+	}
+	defer finish()
 	tunnel := input.Tunnel()
 	if tunnel.ID <= 0 {
 		return fmt.Errorf("invalid tunnel id")
@@ -61,106 +97,55 @@ func (t *TunnelService) Update(input model.TunnelInput) error {
 	if err := validateTunnelBind(tunnel); err != nil {
 		return err
 	}
+	t.configMu.Lock()
+	defer t.configMu.Unlock()
+	if t.tunnelRuntimeActive(tunnel.ID) {
+		return fmt.Errorf("tunnel %d is in use and cannot be modified", tunnel.ID)
+	}
 	t.logger.Info("updating tunnel", "id", tunnel.ID, "name", tunnel.Name)
 	return store.UpdateTunnel(t.db, tunnel)
 }
 
 func (t *TunnelService) Delete(id int64) error {
+	finish, err := t.beginOperation()
+	if err != nil {
+		return err
+	}
+	defer finish()
+	finishRuntime, err := t.beginRuntimeOperation()
+	if err != nil {
+		return err
+	}
+	defer finishRuntime()
 	if id <= 0 {
 		return fmt.Errorf("invalid tunnel id")
 	}
+	t.configMu.Lock()
+	defer t.configMu.Unlock()
+	return t.deleteTunnel(id)
+}
+
+func (t *TunnelService) deleteTunnel(id int64) error {
 	t.logger.Info("deleting tunnel", "id", id)
-	t.mu.Lock()
-	state, ok := t.tunnels[id]
-	if ok {
-		delete(t.tunnels, id)
+	state, active, err := t.beginTunnelCleanup(id)
+	if err != nil {
+		return fmt.Errorf("delete tunnel: %w", err)
 	}
-	t.mu.Unlock()
-	if ok {
-		t.finalizeStoppedTunnel(state, false)
+	if active {
+		cleanupErr := t.cleanupTunnelState(state, false)
+		t.finishTunnelCleanup(state, cleanupErr == nil)
+		if cleanupErr != nil {
+			return fmt.Errorf("delete tunnel: %w", cleanupErr)
+		}
 	}
 	return store.DeleteTunnel(t.db, id)
 }
 
-func (t *TunnelService) Stop(tunnelID int64) error {
-	if tunnelID <= 0 {
-		return fmt.Errorf("invalid tunnel id")
-	}
-	t.logger.Info("stopping tunnel", "tunnelID", tunnelID)
+func (t *TunnelService) tunnelRuntimeActive(tunnelID int64) bool {
 	t.mu.Lock()
-	state, ok := t.tunnels[tunnelID]
-	if !ok {
-		t.mu.Unlock()
-		return fmt.Errorf("tunnel %d not running", tunnelID)
-	}
-	delete(t.tunnels, tunnelID)
-	t.mu.Unlock()
-
-	t.finalizeStoppedTunnel(state, true)
-	return nil
-}
-
-func (t *TunnelService) StopAll() {
-	t.mu.Lock()
-	states := make([]*TunnelState, 0, len(t.tunnels))
-	for id, state := range t.tunnels {
-		states = append(states, state)
-		delete(t.tunnels, id)
-	}
-	t.mu.Unlock()
-	for _, state := range states {
-		t.finalizeStoppedTunnel(state, false)
-	}
-}
-
-// StopForSessions stops in-memory tunnels owned by the given sessions before DB rows are deleted.
-//
-//wails:ignore
-func (t *TunnelService) StopForSessions(sessionIDs []int64) {
-	if len(sessionIDs) == 0 {
-		return
-	}
-	wanted := make(map[int64]struct{}, len(sessionIDs))
-	for _, sessionID := range sessionIDs {
-		if sessionID > 0 {
-			wanted[sessionID] = struct{}{}
-		}
-	}
-	if len(wanted) == 0 {
-		return
-	}
-	tunnels, err := store.ListTunnels(t.db)
-	if err != nil {
-		t.logger.Error("list tunnels before session delete failed", "error", err)
-		return
-	}
-	for _, tunnel := range tunnels {
-		if _, ok := wanted[tunnel.SessionID]; !ok {
-			continue
-		}
-		if err := t.Stop(tunnel.ID); err != nil {
-			// not running is expected for most tunnels
-			t.logger.Debug("stop tunnel for deleted session", "tunnelID", tunnel.ID, "error", err)
-		}
-	}
-}
-
-func (t *TunnelService) finalizeStoppedTunnel(state *TunnelState, emit bool) {
-	if state == nil {
-		return
-	}
-	if state.closed != nil {
-		_ = state.closed()
-	}
-	if state.connID != "" {
-		_ = t.sessions.disconnect(state.connID, false)
-	}
-	if emit {
-		t.eventBus.Emit(event.TunnelState, event.ConnectionStatePayload{
-			TerminalID: fmt.Sprintf("tunnel-%d", state.ID),
-			State:      "stopped",
-		})
-	}
+	defer t.mu.Unlock()
+	_, active := t.tunnels[tunnelID]
+	return active
 }
 
 const (

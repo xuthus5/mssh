@@ -1,5 +1,5 @@
-import { act, renderHook } from '@testing-library/react'
-import { useState } from 'react'
+import { act, renderHook, waitFor } from '@testing-library/react'
+import { useCallback, useRef, useState } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useSessionAssetCatalog } from '@/hooks/useSessionAssetCatalog'
 import { __clearHandlers, __registerHandler } from '@/test/__mocks__/wails-runtime'
@@ -20,7 +20,20 @@ function useHarness() {
   const [sessions, setSessions] = useState<Session[]>([])
   const [recentSessions, setRecentSessions] = useState<Session[]>([])
   const [error, setError] = useState('')
-  const catalog = useSessionAssetCatalog({ environments, projects, setEnvironments, setProjects, setTags, setSessions, setRecentSessions, setError })
+  const sessionRequest = useRef(0)
+  const recentRequest = useRef(0)
+  const beginSessionSnapshot = useCallback(() => {
+    const request = ++sessionRequest.current
+    return () => sessionRequest.current === request
+  }, [])
+  const beginRecentSnapshot = useCallback(() => {
+    const request = ++recentRequest.current
+    return () => recentRequest.current === request
+  }, [])
+  const catalog = useSessionAssetCatalog({
+    environments, projects, setEnvironments, setProjects, setTags, setSessions, setRecentSessions, setError,
+    beginSessionSnapshot, beginRecentSnapshot,
+  })
   return { ...catalog, environments, projects, tags, sessions, recentSessions, error }
 }
 
@@ -97,5 +110,95 @@ describe('useSessionAssetCatalog', () => {
     expect(result.current.error).toBe('refresh only failed')
     expect(useToastStore.getState().toasts.some((item) => item.message.includes('refresh only failed'))).toBe(false)
   })
+
+  it('keeps the newest asset catalog when loads resolve out of order', async () => {
+    const first = deferred<unknown[]>()
+    const second = deferred<unknown[]>()
+    let loads = 0
+    __registerHandler(service + 'AssetCatalogService.ListEnvironments', async () => {
+      loads++
+      return loads === 1 ? first.promise : second.promise
+    })
+    const { result } = renderHook(() => useHarness())
+    let firstLoad!: Promise<void>
+    act(() => { firstLoad = result.current.listAssetCatalogs() })
+    await waitFor(() => expect(loads).toBe(1))
+    let secondLoad!: Promise<void>
+    act(() => { secondLoad = result.current.listAssetCatalogs() })
+    await waitFor(() => expect(loads).toBe(2))
+    await act(async () => { second.resolve([bindingEnvironment(2, '新环境')]); await secondLoad })
+    expect(result.current.environments[0].name).toBe('新环境')
+    await act(async () => { first.resolve([bindingEnvironment(1, '旧环境')]); await firstLoad })
+    expect(result.current.environments[0].name).toBe('新环境')
+  })
+
+  it('shares latest-wins ordering between catalog and full refresh loads', async () => {
+    const first = deferred<unknown[]>()
+    const second = deferred<unknown[]>()
+    let loads = 0
+    __registerHandler(service + 'AssetCatalogService.ListEnvironments', async () => {
+      loads++
+      return loads === 1 ? first.promise : second.promise
+    })
+    const { result } = renderHook(() => useHarness())
+    let catalogLoad!: Promise<void>
+    act(() => { catalogLoad = result.current.listAssetCatalogs() })
+    await waitFor(() => expect(loads).toBe(1))
+    let fullRefresh!: Promise<void>
+    act(() => { fullRefresh = result.current.refreshAssets() })
+    await waitFor(() => expect(loads).toBe(2))
+    await act(async () => { second.resolve([bindingEnvironment(2, '刷新环境')]); await fullRefresh })
+    await act(async () => { first.resolve([bindingEnvironment(1, '旧目录')]); await catalogLoad })
+    expect(result.current.environments[0].name).toBe('刷新环境')
+  })
+
+  it('invalidates an older catalog load after creating an asset', async () => {
+    const pending = deferred<unknown[]>()
+    __registerHandler(service + 'AssetCatalogService.ListEnvironments', async () => pending.promise)
+    __registerHandler(service + 'AssetCatalogService.CreateEnvironment', async () => bindingEnvironment(2, '新环境'))
+    const { result } = renderHook(() => useHarness())
+    let catalogLoad!: Promise<void>
+    act(() => { catalogLoad = result.current.listAssetCatalogs() })
+    await act(async () => { await result.current.createEnvironment('新环境', 'green') })
+    await act(async () => { pending.resolve([bindingEnvironment(1, '旧环境')]); await catalogLoad })
+    expect(result.current.environments.map((item) => item.name)).toEqual(['新环境'])
+  })
+
+  it('clears a previous catalog error after a successful retry', async () => {
+    let attempts = 0
+    __registerHandler(service + 'AssetCatalogService.ListEnvironments', async () => {
+      attempts++
+      if (attempts === 1) throw new Error('temporary failure')
+      return [bindingEnvironment(1, '恢复环境')]
+    })
+    const { result } = renderHook(() => useHarness())
+    await act(async () => result.current.listAssetCatalogs())
+    expect(result.current.error).toBe('temporary failure')
+    await act(async () => result.current.listAssetCatalogs())
+    expect(result.current.error).toBe('')
+  })
+
+  it('does not write a completed load after unmount', async () => {
+    const pending = deferred<unknown[]>()
+    const setEnvironments = vi.fn()
+    const setters = {
+      environments: [], projects: [], setEnvironments, setProjects: vi.fn(), setTags: vi.fn(),
+      setSessions: vi.fn(), setRecentSessions: vi.fn(), setError: vi.fn(),
+      beginSessionSnapshot: () => () => true, beginRecentSnapshot: () => () => true,
+    }
+    __registerHandler(service + 'AssetCatalogService.ListEnvironments', async () => pending.promise)
+    const { result, unmount } = renderHook(() => useSessionAssetCatalog(setters))
+    let catalogLoad!: Promise<void>
+    act(() => { catalogLoad = result.current.listAssetCatalogs() })
+    unmount()
+    await act(async () => { pending.resolve([bindingEnvironment(1, '卸载环境')]); await catalogLoad })
+    expect(setEnvironments).not.toHaveBeenCalled()
+    expect(setters.setError).not.toHaveBeenCalled()
+  })
 })
 
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((resolvePromise) => { resolve = resolvePromise })
+  return { promise, resolve }
+}

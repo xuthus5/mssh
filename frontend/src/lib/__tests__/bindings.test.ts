@@ -7,6 +7,7 @@ import {
   SettingService,
   AuditService,
   AIService,
+  SecurityService,
   TunnelService,
   MacroService,
   ThemeService,
@@ -111,6 +112,29 @@ describe('Generated Bindings Barrel', () => {
 
   it('exports TerminalService.OpenSerial', () => {
     expect(typeof TerminalService.OpenSerial).toBe('function')
+  })
+
+  it('does not expose backend-only wiring and lifecycle methods', () => {
+    expect('CancelAll' in FileService).toBe(false)
+    expect('WaitForTransfers' in FileService).toBe(false)
+    expect('HandleOutput' in LogService).toBe(false)
+    expect('StopTerminalRecordingIfActive' in LogService).toBe(false)
+    expect('RecoverPendingRotation' in SecurityService).toBe(false)
+    expect('RequireUnlocked' in SecurityService).toBe(false)
+    expect('SetAfterUnlock' in SecurityService).toBe(false)
+    expect('SyncSecret' in SecurityService).toBe(false)
+    expect('VerifyPassword' in SecurityService).toBe(false)
+    expect('ExportVaultFile' in SecurityService).toBe(false)
+    expect('InstallVaultFromExport' in SecurityService).toBe(false)
+    expect('PrepareVaultFromExport' in SecurityService).toBe(false)
+    expect('AdoptVaultFromContent' in SyncService).toBe(false)
+    expect('CloseAll' in SessionService).toBe(false)
+    expect('ConnectionCount' in SessionService).toBe(false)
+    expect('GetClientWrapper' in SessionService).toBe(false)
+    expect('Count' in TerminalService).toBe(false)
+    expect('SetCloseHandler' in TerminalService).toBe(false)
+    expect('SetOutputHandler' in TerminalService).toBe(false)
+    expect('StopAll' in TunnelService).toBe(false)
   })
 
 })

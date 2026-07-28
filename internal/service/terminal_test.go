@@ -21,7 +21,7 @@ func TestNewTerminalService(t *testing.T) {
 
 	svc := NewTerminalService(sessionSvc, bus, 0, testutil.NewTestLogger())
 	require.NotNil(t, svc)
-	assert.Equal(t, 32, svc.maxSize)
+	assert.Equal(t, DefaultTerminalPoolSize, svc.maxSize)
 	assert.NotNil(t, svc.ptys)
 	assert.NotNil(t, svc.lastUsed)
 	assert.NotNil(t, svc.attached)

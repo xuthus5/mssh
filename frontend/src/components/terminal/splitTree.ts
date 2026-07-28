@@ -29,7 +29,8 @@ export function hasTerminal(node: SplitNode, terminalID: string): boolean {
     : hasTerminal(node.first, terminalID) || hasTerminal(node.second, terminalID)
 }
 
-export function insertSplit(node: SplitNode, targetID: string, terminalID: string, direction: SplitDirection, branchID: string): SplitNode {
+export function insertSplit(...args: [SplitNode, string, string, SplitDirection, string]): SplitNode {
+  const [node, targetID, terminalID, direction, branchID] = args
   if (node.kind === 'leaf') {
     if (node.terminalID !== targetID) return node
     return { kind: 'branch', id: branchID, direction, ratio: 50, first: node, second: splitLeaf(terminalID) }

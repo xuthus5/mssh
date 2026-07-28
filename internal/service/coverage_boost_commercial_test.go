@@ -50,21 +50,27 @@ func TestSessionCSVPasswordSealBranches(t *testing.T) {
 
 	input = model.SessionInputFrom(model.Session{Password: sessionPasswordPrefix + "keep"})
 	require.NoError(t, svc.sealSessionPasswordForCSV(&input, false))
-	assert.Equal(t, sessionPasswordPrefix+"keep", input.Password)
+	assert.NotEqual(t, sessionPasswordPrefix+"keep", input.Password)
+	assert.Contains(t, input.Password, sessionPasswordPrefix)
+	opened, err := openSessionPassword(runtime, input.Password)
+	require.NoError(t, err)
+	assert.Equal(t, sessionPasswordPrefix+"keep", opened)
 
-	input = model.SessionInputFrom(model.Session{Password: "plain"})
+	sealed, err := sealSessionPassword(runtime, "plain")
+	require.NoError(t, err)
+	input = model.SessionInputFrom(model.Session{Password: sealed})
 	require.NoError(t, svc.sealSessionPasswordForCSV(&input, true))
-	assert.Equal(t, "plain", input.Password)
+	assert.Equal(t, sealed, input.Password)
 
 	input = model.SessionInputFrom(model.Session{Password: "plain"})
 	require.NoError(t, svc.sealSessionPasswordForCSV(&input, false))
 	assert.NotEqual(t, "plain", input.Password)
 	assert.True(t, len(input.Password) > 0)
 
-	// nil crypto keeps plaintext (legacy/test path)
+	// Missing crypto fails closed instead of persisting plaintext.
 	svc = &SessionService{}
 	input = model.SessionInputFrom(model.Session{Password: "plain"})
-	require.NoError(t, svc.sealSessionPasswordForCSV(&input, false))
+	assert.ErrorIs(t, svc.sealSessionPasswordForCSV(&input, false), ErrVaultLocked)
 	assert.Equal(t, "plain", input.Password)
 }
 
@@ -100,9 +106,10 @@ func TestAssetCatalogUpdateTagRoundTrip(t *testing.T) {
 
 func TestAIDeleteProviderMissing(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	svc := NewAIService(db, nil, &memoryKeychain{}, testutil.NewTestLogger())
-	// missing provider delete is idempotent
-	assert.NoError(t, svc.DeleteProvider(9999))
+	keychain := &memoryKeychain{data: map[string][]byte{providerSecretAccount(9999): []byte("retained")}}
+	svc := NewAIService(db, nil, keychain, testutil.NewTestLogger())
+	assert.ErrorContains(t, svc.DeleteProvider(9999), "not found")
+	assert.Equal(t, []byte("retained"), keychain.data[providerSecretAccount(9999)])
 }
 
 func TestTerminalDetachMissing(t *testing.T) {

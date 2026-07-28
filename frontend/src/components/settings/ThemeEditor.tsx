@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { RotateCcw, SquareTerminal } from 'lucide-react'
 import { AutoSaveStatusIndicator } from '@/components/settings/AutoSaveStatus'
 import { useAutoSave } from '@/hooks/useAutoSave'
@@ -21,6 +21,7 @@ import { TerminalThemePreview } from '@/components/settings/TerminalThemePreview
 import { ThemeModeSelector } from '@/components/settings/ThemeModeSelector'
 import { buildThemeConfiguration, configurationProfileIDs, createThemeDrafts, effectiveDraftTheme, profileIDForSlot, validTerminalFontFamily, validTerminalFontSize, type ThemeDraft, type ThemeEditorSlot } from '@/components/settings/themeEditorState'
 import { hasValidTerminalThemeColors, isHexColor } from '@/components/settings/terminalThemeValidation'
+import { useSettingsWindowHide } from '@/hooks/useSettingsWindowHide'
 import type { ColorMode } from '@/lib/effectiveTerminalTheme'
 import type { TerminalTheme } from '@/hooks/useSettings'
 import type { BuiltinThemeResetResult, TerminalGlobalStyle, ThemeAssignments, ThemeConfigurationInput, ThemeProfile } from '../../../bindings/github.com/xuthus5/mssh/internal/model/models'
@@ -70,7 +71,7 @@ export function ThemeEditor({ profiles, assignments, globalStyle, colorMode, onS
   const sharedLabels = !state.draftAssignments.follow_interface_mode ? fixedProfileSharing(state.draftAssignments) : []
 
   return <div className="flex flex-col gap-5 pb-2 pt-2">
-    <div className="flex items-start justify-between gap-4"><div><h2 className="text-lg font-semibold text-foreground">{t('终端主题')}</h2><p className="text-sm text-muted-foreground">{t('选择终端是否跟随应用模式，或固定使用一个独立主题。')}</p></div><div className="flex items-center gap-3"><AutoSaveStatusIndicator status={valid ? autoSave.status : 'idle'} error={autoSave.error} /><BuiltinThemeResetControl canReset={canReset} dirty={state.dirty} saving={autoSave.status === 'saving'} resetting={state.resetting} includesFixed={!assignments.follow_interface_mode} onResettingChange={state.setResetting} onReset={onResetBuiltins} /></div></div>
+    <div className="flex items-start justify-between gap-4"><div><h2 className="text-lg font-semibold text-foreground">{t('终端主题')}</h2><p className="text-sm text-muted-foreground">{t('选择终端是否跟随应用模式，或固定使用一个独立主题。')}</p></div><div className="flex items-center gap-3"><AutoSaveStatusIndicator status={valid ? autoSave.status : 'idle'} error={autoSave.error} /><BuiltinThemeResetControl canReset={canReset} dirty={state.dirty} saving={autoSave.status === 'saving'} resetting={state.resetting} includesFixed={!assignments.follow_interface_mode} targetKey={themeResetTargetKey(assignments)} onResettingChange={state.setResetting} onReset={onResetBuiltins} /></div></div>
     {!valid && state.dirty && <Alert variant="destructive"><AlertDescription>{t('当前主题配置无效，自动保存已暂停，请修正颜色或字体后继续。')}</AlertDescription></Alert>}
     <ThemeStrategyCard assignments={state.draftAssignments} busy={busy} onFollowChange={actions.setFollowInterfaceMode} />
     <TerminalGlobalStyleEditor style={state.draftGlobalStyle} disabled={busy} onChange={actions.updateGlobalStyle} />
@@ -174,20 +175,46 @@ function ThemeWorkspace({ profile, draft, effectiveTheme, globalStyle, editorSlo
   </div>
 }
 
-function BuiltinThemeResetControl({ canReset, dirty, saving, resetting, includesFixed, onResettingChange, onReset }: { canReset: boolean; dirty: boolean; saving: boolean; resetting: boolean; includesFixed: boolean; onResettingChange: (resetting: boolean) => void; onReset: () => Promise<BuiltinThemeResetResult> }) {
+function BuiltinThemeResetControl({ canReset, dirty, saving, resetting, includesFixed, targetKey, onResettingChange, onReset }: { canReset: boolean; dirty: boolean; saving: boolean; resetting: boolean; includesFixed: boolean; targetKey: string; onResettingChange: (resetting: boolean) => void; onReset: () => Promise<BuiltinThemeResetResult> }) {
   const [open, setOpen] = useState(false)
   const [error, setError] = useState('')
+  const lifecycle = useRef(0)
+  const generation = useRef(0)
+  const requestID = useRef(0)
+  const resettingRef = useRef(resetting)
+  resettingRef.current = resetting
+  useEffect(() => {
+    const token = ++lifecycle.current
+    return () => { if (lifecycle.current === token) { lifecycle.current++; requestID.current++ } }
+  }, [])
+  useEffect(() => {
+    generation.current++
+    if (resettingRef.current) {
+      setOpen(false)
+    }
+  }, [targetKey])
+  useSettingsWindowHide(() => {
+    setOpen(false)
+    setError('')
+  })
   const reset = async () => {
+    if (resetting) return
+    const lifecycleToken = lifecycle.current
+    const generationToken = generation.current
+    const request = ++requestID.current
+    const isLatest = () => lifecycle.current === lifecycleToken && requestID.current === request
+    const isCurrent = () => isLatest() && generation.current === generationToken
     onResettingChange(true)
     setError('')
     try {
       const result = await onReset()
+      if (!isCurrent()) return
       toast(resetResultMessage(result), 'success')
       setOpen(false)
-    } catch (error) {
-      setError(t('重置内置主题失败: ${}', error instanceof Error ? error.message : String(error)))
+    } catch (reason) {
+      if (isCurrent()) setError(t('重置内置主题失败: ${}', reason instanceof Error ? reason.message : String(reason)))
     } finally {
-      onResettingChange(false)
+      if (isLatest()) onResettingChange(false)
     }
   }
   const disabled = !canReset || dirty || saving || resetting
@@ -203,6 +230,10 @@ function resetResultMessage(result: BuiltinThemeResetResult): string {
 }
 
 function findProfile(profiles: ThemeProfile[], id: number) { return profiles.find((profile) => profile.id === id) }
+
+function themeResetTargetKey(assignments: ThemeAssignments): string {
+  return [assignments.follow_interface_mode, assignments.dark_profile_id, assignments.light_profile_id, assignments.fixed_profile_id].join(':')
+}
 
 function fixedProfileSharing(assignments: ThemeAssignments): string[] {
   const labels: string[] = []

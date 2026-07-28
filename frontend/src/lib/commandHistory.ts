@@ -1,5 +1,7 @@
 import * as Wails from '@/lib/wails'
 import { logger } from '@/lib/logger'
+import { readStorageItem, removeStorageItem, writeStorageItem } from '@/lib/safeStorage'
+import { emitCommandHistoryChanged } from '@/lib/commandHistoryMutationCoordinator'
 
 export interface CommandHistoryEntry { id: string; command: string; createdAt: number }
 
@@ -39,7 +41,7 @@ export function trimCommandHistory(
 
 export function readCommandHistory(sessionID: number): CommandHistoryEntry[] {
   try {
-    const parsed = JSON.parse(localStorage.getItem(`${prefix}${sessionID}`) ?? '[]') as CommandHistoryEntry[]
+    const parsed = JSON.parse(readStorageItem(`${prefix}${sessionID}`) ?? '[]') as CommandHistoryEntry[]
     return Array.isArray(parsed) ? trimCommandHistory(parsed) : []
   } catch {
     return []
@@ -67,18 +69,24 @@ export function recordCommand(sessionID: number, command: string, limits: Comman
   const value = command.trim()
   if (!value || isSensitiveCommand(value)) return
   const persist = commandHistoryAPI()?.Add
+  let notifyAfterPersist = false
   if (sessionID > 0 && typeof persist === 'function') {
-    void persist(sessionID, value).catch((error: unknown) => logger.error('command history persistence failed', error))
+    notifyAfterPersist = true
+    void persist(sessionID, value)
+      .then(() => emitCommandHistoryChanged(sessionID))
+      .catch((error: unknown) => logger.error('command history persistence failed', error))
   }
   const entries = readCommandHistory(sessionID)
   entries.unshift({ id: `${Date.now()}-${Math.random().toString(36).slice(2)}`, command: value, createdAt: Date.now() })
-  localStorage.setItem(`${prefix}${sessionID}`, JSON.stringify(trimCommandHistory(entries, limits)))
+  writeStorageItem(`${prefix}${sessionID}`, JSON.stringify(trimCommandHistory(entries, limits)))
+  if (!notifyAfterPersist) emitCommandHistoryChanged(sessionID)
 }
 
-export async function clearCommandHistory(sessionID: number): Promise<void> {
+export async function clearCommandHistory(sessionID: number, source?: symbol): Promise<void> {
   const clear = commandHistoryAPI()?.Clear
   if (sessionID > 0 && typeof clear === 'function') {
     await clear(sessionID)
   }
-  localStorage.removeItem(`${prefix}${sessionID}`)
+  removeStorageItem(`${prefix}${sessionID}`)
+  emitCommandHistoryChanged(sessionID, source)
 }

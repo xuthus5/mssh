@@ -1,15 +1,16 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Dialogs } from '@wailsio/runtime'
-import { FontService, KeyService, SyncService } from '@/lib/wails'
+import { FontService, SyncService } from '@/lib/wails'
 import { logger } from '@/lib/logger'
 import { toast } from '@/components/ui/toast'
-import { KeyType } from '../../bindings/github.com/xuthus5/mssh/internal/model/models'
 import { useGeneralSettings } from '@/hooks/useGeneralSettings'
 import { useSFTPSettings } from '@/hooks/useSFTPSettings'
+import { useKeySettingsRuntime } from '@/hooks/keySettingsRuntime'
+import { useSettingsWindowHide } from '@/hooks/useSettingsWindowHide'
 import { t } from '@/i18n'
 
 
-export type { GeneralSettings } from '@/hooks/useGeneralSettings'
+export type { GeneralSettings, GeneralSettingsSaveOptions } from '@/hooks/useGeneralSettings'
 
 export interface TerminalTheme {
   background: string
@@ -22,154 +23,112 @@ export interface TerminalTheme {
   ansi: string[]
 }
 
-export interface KeyInfo {
-  id: string
-  name: string
-  type: 'rsa' | 'ed25519' | 'ecdsa'
-  bits: number
-  publicKey: string
-  createdAt: string
-}
-
-export interface KeyMaterial extends KeyInfo {
-  privateKey: string
-}
-
-export interface KeyImportFile {
-  name: string
-  privateKey: string
-}
-
-function keyTypeName(type: KeyType): KeyInfo['type'] {
-  return ({
-    [KeyType.KeyTypeRSA]: 'rsa',
-    [KeyType.KeyTypeED25519]: 'ed25519',
-    [KeyType.KeyTypeECDSA]: 'ecdsa',
-  } as Record<string, KeyInfo['type']>)[String(type)] ?? 'ed25519'
-}
-
-function keyInfo(key: { id: number; name: string; type: KeyType; public_key: string; created_at: string }, bits: number): KeyInfo {
-  return { id: String(key.id), name: key.name, type: keyTypeName(key.type), bits, publicKey: key.public_key, createdAt: key.created_at }
-}
-
-function keyMaterial(key: { id: number; name: string; type: KeyType; private_key: string; public_key: string; created_at: string }, bits: number): KeyMaterial {
-  return { ...keyInfo(key, bits), privateKey: key.private_key }
-}
+export type { KeyImportFile, KeyInfo, KeyMaterial } from '@/hooks/keySettingsRuntime'
 
 function rethrowKeyError(action: string, error: unknown): never {
   logger.error(`${action} failed`, error)
   throw error instanceof Error ? error : new Error(String(error))
 }
 
+type ConfigTransferPhase = 'idle' | 'picker' | 'transfer'
+
+function useConfigTransferRuntime() {
+  const lifecycle = useRef(0)
+  const requestID = useRef(0)
+  const windowGeneration = useRef(0)
+  const active = useRef(false)
+  const phase = useRef<ConfigTransferPhase>('idle')
+  useEffect(() => {
+    const token = ++lifecycle.current
+    return () => {
+      if (lifecycle.current === token) lifecycle.current++
+    }
+  }, [])
+  useSettingsWindowHide(() => {
+    if (phase.current !== 'picker') return
+    windowGeneration.current++
+  })
+  return useMemo(() => ({ lifecycle, requestID, windowGeneration, active, phase }), [])
+}
+
+type ConfigTransferRuntime = ReturnType<typeof useConfigTransferRuntime>
+
+function beginConfigTransfer(runtime: ConfigTransferRuntime) {
+  if (runtime.active.current) return 0
+  runtime.active.current = true
+  runtime.phase.current = 'picker'
+  return ++runtime.requestID.current
+}
+
+function finishConfigTransfer(runtime: ConfigTransferRuntime, request: number) {
+  if (runtime.requestID.current !== request) return
+  runtime.active.current = false
+  runtime.phase.current = 'idle'
+}
+
+async function runConfigTransfer(options: {
+  runtime: ConfigTransferRuntime
+  selectPath: () => Promise<string>
+  transfer: (path: string) => Promise<void>
+  success: string
+  action: string
+}) {
+  const request = beginConfigTransfer(options.runtime)
+  if (request === 0) return
+  const lifecycleToken = options.runtime.lifecycle.current
+  const windowToken = options.runtime.windowGeneration.current
+  const isCurrent = () => options.runtime.lifecycle.current === lifecycleToken
+    && options.runtime.requestID.current === request && options.runtime.windowGeneration.current === windowToken
+  let transferStarted = false
+  try {
+    const path = await options.selectPath()
+    if (!path || !isCurrent()) return
+    transferStarted = true
+    options.runtime.phase.current = 'transfer'
+    await options.transfer(path)
+    if (isCurrent()) toast(options.success, 'success')
+  } catch (error) {
+    if (!transferStarted && !isCurrent()) return
+    rethrowKeyError(options.action, error)
+  } finally {
+    finishConfigTransfer(options.runtime, request)
+  }
+}
+
 function useSystemFonts() {
   const [systemFonts, setSystemFonts] = useState<string[]>([])
-  const loadSystemFonts = useCallback(async () => {
-    try { setSystemFonts(await FontService.List()) }
-    catch (error) { logger.debug('loadSystemFonts error', error); setSystemFonts(['sans-serif']) }
+  useEffect(() => {
+    let active = true
+    void FontService.List().then((fonts) => {
+      if (active) setSystemFonts(fonts ?? [])
+    }).catch((error: unknown) => {
+      logger.debug('loadSystemFonts error', error)
+      if (active) setSystemFonts(['sans-serif'])
+    })
+    return () => { active = false }
   }, [])
-  useEffect(() => { void loadSystemFonts() }, [loadSystemFonts])
   return systemFonts
 }
 
 export function useKeySettings() {
-  const [keys, setKeys] = useState<KeyInfo[]>([])
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(true)
-  const listKeys = useCallback(async () => {
-    setLoading(true)
-    try {
-      setKeys((await KeyService.List() ?? []).map((key) => keyInfo(key, 0)))
-      setError('')
-    } catch (error) {
-      logger.error('listKeys error', error)
-      setError(error instanceof Error ? error.message : String(error))
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-  const generateKey = useCallback(async (name: string, type: KeyInfo['type'], bits: number) => {
-    try {
-      const keyType = ({ rsa: KeyType.KeyTypeRSA, ed25519: KeyType.KeyTypeED25519, ecdsa: KeyType.KeyTypeECDSA } as const)[type]
-      const result = await KeyService.Generate(name, keyType, bits)
-      if (!result) return undefined
-      const material = keyMaterial(result, bits)
-      setKeys((current) => [...current, keyInfo(result, bits)])
-      return material
-    } catch (error) { rethrowKeyError(t('生成密钥'), error) }
-  }, [])
-  const importKey = useCallback(async (name: string, privateKey: string) => {
-    try {
-      const result = await KeyService.Import(name, privateKey)
-      if (!result) return undefined
-      const imported = keyInfo(result, 0)
-      setKeys((current) => [...current, imported])
-      return imported
-    } catch (error) { rethrowKeyError(t('导入密钥'), error) }
-  }, [])
-  const deleteKey = useCallback(async (id: string) => {
-    try {
-      await KeyService.Delete(Number(id))
-      setKeys((current) => current.filter((key) => key.id !== id))
-    } catch (error) {
-      rethrowKeyError(t('删除密钥'), error)
-    }
-  }, [])
-  const exportKey = useCallback(async (id: string) => {
-    try { return await KeyService.ExportPublicKey(Number(id)) }
-    catch (error) { rethrowKeyError(t('复制公钥'), error) }
-  }, [])
-  const loadKeyMaterial = useCallback(async (id: string) => {
-    try {
-      const result = await KeyService.GetMaterial(Number(id))
-      if (!result) throw new Error(t('密钥不存在或无法读取'))
-      return keyMaterial(result, 0)
-    } catch (error) {
-      logger.error('loadKeyMaterial failed', error)
-      throw error
-    }
-  }, [])
-  const updateKey = useCallback(async (material: KeyMaterial) => {
-    try {
-      const result = await KeyService.Update({ id: Number(material.id), name: material.name, private_key: material.privateKey, public_key: material.publicKey })
-      if (!result) return undefined
-      const updated = keyMaterial(result, material.bits)
-      setKeys((current) => current.map((key) => key.id === updated.id ? keyInfo(result, material.bits) : key))
-      return updated
-    } catch (error) { rethrowKeyError(t('更新密钥'), error) }
-  }, [])
-  const selectKeyImportFile = useCallback(async (): Promise<KeyImportFile | undefined> => {
-    try {
-      const file = await KeyService.SelectImportFile()
-      return file ? { name: file.name, privateKey: file.private_key } : undefined
-    } catch (error) { rethrowKeyError(t('读取私钥文件'), error) }
-  }, [])
-  useEffect(() => { void listKeys() }, [listKeys])
-  return { keys, error, loading, listKeys, generateKey, importKey, deleteKey, exportKey, loadKeyMaterial, updateKey, selectKeyImportFile }
+  return useKeySettingsRuntime()
 }
 
 function useConfigTransfer() {
-  const exportConfig = useCallback(async () => {
-    try {
-      const path = await Dialogs.SaveFile({ Title: t('导出 MSSH 加密备份'), Filename: 'mssh-backup.msshbackup', CanCreateDirectories: true, Filters: [{ DisplayName: 'MSSH Backup', Pattern: '*.msshbackup' }] })
-      if (!path) return
-      await SyncService.Export(path)
-      toast(t('本地备份已导出'), 'success')
-    } catch (error) {
-      // Sync panel owns failure banner for fixed export/import actions.
-      rethrowKeyError(t('导出本地备份'), error)
-    }
-  }, [])
-  const importConfig = useCallback(async () => {
-    try {
+  const runtime = useConfigTransferRuntime()
+  const exportConfig = useCallback(() => runConfigTransfer({
+    runtime,
+    selectPath: async () => await Dialogs.SaveFile({ Title: t('导出 MSSH 加密备份'), Filename: 'mssh-backup.msshbackup', CanCreateDirectories: true, Filters: [{ DisplayName: 'MSSH Backup', Pattern: '*.msshbackup' }] }) ?? '',
+    transfer: (path) => SyncService.Export(path), success: t('本地备份已导出'), action: t('导出本地备份'),
+  }), [runtime])
+  const importConfig = useCallback(() => runConfigTransfer({
+    runtime,
+    selectPath: async () => {
       const selected = await Dialogs.OpenFile({ Title: t('导入 MSSH 加密备份'), CanChooseFiles: true, AllowsMultipleSelection: false, Filters: [{ DisplayName: 'MSSH Backup', Pattern: '*.msshbackup' }] })
-      const path = typeof selected === 'string' ? selected : selected[0]
-      if (!path) return
-      await SyncService.Import(path)
-      toast(t('本地备份已导入'), 'success')
-    } catch (error) {
-      rethrowKeyError(t('导入本地备份'), error)
-    }
-  }, [])
+      return typeof selected === 'string' ? selected : selected?.[0] ?? ''
+    },
+    transfer: (path) => SyncService.Import(path), success: t('本地备份已导入'), action: t('导入本地备份'),
+  }), [runtime])
   return { exportConfig, importConfig }
 }
 

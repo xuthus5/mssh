@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -22,10 +23,14 @@ func (t *TerminalService) OpenLocal(ctx context.Context, cols, rows int) (string
 	if err := contextError(ctx); err != nil {
 		return "", err
 	}
+	finish, err := t.beginOperation()
+	if err != nil {
+		return "", err
+	}
+	defer finish()
 	if err := t.beginOpen(); err != nil {
 		return "", err
 	}
-	defer t.finishOpen()
 	outcome := "failed"
 	defer func() {
 		if t.sessionSvc != nil {
@@ -49,7 +54,9 @@ func (t *TerminalService) OpenLocal(ctx context.Context, cols, rows int) (string
 		return "", err
 	}
 	terminalID := uuid.New().String()
-	t.registerTerminal(terminalID, "", 0, session)
+	if err := t.registerTerminal(terminalID, "", 0, session); err != nil {
+		return "", errors.Join(fmt.Errorf("register local terminal: %w", err), session.Close())
+	}
 	t.logger.Info("local shell terminal opened", "terminalID", terminalID, "shell", opts.Shell)
 	outcome = "success"
 	return terminalID, nil

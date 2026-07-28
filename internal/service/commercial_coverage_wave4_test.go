@@ -43,14 +43,18 @@ func TestAIDeleteProviderSecretDeleteError(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	kc := &failingDeleteKeychain{}
 	svc := NewAIService(db, nil, kc, testutil.NewTestLogger())
-	// seed volatile secret via SaveProvider then force keychain delete fail
 	created, err := svc.SaveProvider(model.AIProviderProfileInput{
 		Name: "p", Provider: model.AIProviderOpenAICompatible, BaseURL: "https://api.openai.com/v1", DefaultModel: "m", Enabled: true, APIKey: "k",
 	})
 	require.NoError(t, err)
-	// put account into keychain path: SaveProvider may store volatile if keychain set fails
-	// Force keychain present with Set succeeding (memory) but Delete failing.
 	assert.Error(t, svc.DeleteProvider(created.ID))
+	stored, loadErr := store.GetAIProviderProfile(db, created.ID)
+	require.NoError(t, loadErr)
+	require.NotNil(t, stored)
+	secret, exists, secretErr := svc.secrets.get(providerSecretAccount(created.ID))
+	require.NoError(t, secretErr)
+	assert.True(t, exists)
+	assert.Equal(t, "k", secret)
 }
 
 func TestReencryptProtectedDataErrorPaths(t *testing.T) {

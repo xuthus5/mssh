@@ -13,10 +13,46 @@ const (
 	pendingOutputTTL         = time.Minute
 )
 
+type terminalTimer interface {
+	Stop() bool
+}
+
+type pendingOutputExpiry struct {
+	timer terminalTimer
+	done  chan struct{}
+	once  sync.Once
+}
+
+func newPendingOutputExpiry() *pendingOutputExpiry {
+	return &pendingOutputExpiry{done: make(chan struct{})}
+}
+
+func (e *pendingOutputExpiry) finish() {
+	if e == nil {
+		return
+	}
+	e.once.Do(func() { close(e.done) })
+}
+
+func (e *pendingOutputExpiry) stopAndWait() {
+	if e == nil {
+		return
+	}
+	if e.timer == nil || e.timer.Stop() {
+		e.finish()
+	}
+	<-e.done
+}
+
 func (t *TerminalService) Attach(terminalID string) error {
 	if err := validateTerminalID(terminalID); err != nil {
 		return err
 	}
+	finish, err := t.beginOperation()
+	if err != nil {
+		return err
+	}
+	defer finish()
 	t.mu.Lock()
 	_, active := t.ptys[terminalID]
 	_, buffered := t.pendingOutput[terminalID]
@@ -24,14 +60,21 @@ func (t *TerminalService) Attach(terminalID string) error {
 		t.mu.Unlock()
 		return fmt.Errorf("terminal %s not found", terminalID)
 	}
+	if flow := t.outputFlows[terminalID]; flow != nil {
+		flow.resume()
+	}
 	if t.attached[terminalID] {
+		expiry := t.takePendingOutputExpiryLocked(terminalID)
 		t.mu.Unlock()
+		expiry.stopAndWait()
 		return nil
 	}
 	t.outputMu.Lock()
 	t.attached[terminalID] = true
 	pending := t.pendingOutput[terminalID]
 	delete(t.pendingOutput, terminalID)
+	delete(t.pendingSessionIDs, terminalID)
+	expiry := t.takePendingOutputExpiryLocked(terminalID)
 	handler := t.outputHandler
 	dispatcher := t.outputDispatcherLocked(terminalID)
 	t.outputMu.Unlock()
@@ -40,6 +83,7 @@ func (t *TerminalService) Attach(terminalID string) error {
 		delete(t.attached, terminalID)
 	}
 	t.mu.Unlock()
+	expiry.stopAndWait()
 	if len(pending) > 0 {
 		t.dispatchTerminalOutputLocked(terminalID, pending, handler)
 	}
@@ -48,24 +92,36 @@ func (t *TerminalService) Attach(terminalID string) error {
 }
 
 func (t *TerminalService) handlePTYOutput(terminalID string, data []byte) {
-	t.mu.Lock()
-	if _, ok := t.ptys[terminalID]; !ok {
-		t.mu.Unlock()
-		return
-	}
-	if !t.attached[terminalID] {
-		remaining := maxPendingTerminalOutput - len(t.pendingOutput[terminalID])
-		if remaining > 0 {
-			if len(data) > remaining {
-				data = data[:remaining]
-			}
-			t.pendingOutput[terminalID] = append(t.pendingOutput[terminalID], data...)
+	remaining := data
+	for {
+		stage := t.stagePTYOutput(terminalID, remaining)
+		if !stage.active {
+			return
 		}
+		if stage.attached {
+			if stage.flow != nil && !stage.flow.wait() {
+				return
+			}
+			if len(stage.remaining) > 0 {
+				t.dispatchLiveOutput(terminalID, stage.remaining)
+			}
+			return
+		}
+		if !stage.wait || stage.flow == nil || !stage.flow.wait() {
+			return
+		}
+		remaining = stage.remaining
+	}
+}
+
+func (t *TerminalService) dispatchLiveOutput(terminalID string, data []byte) {
+	t.mu.Lock()
+	if _, ok := t.ptys[terminalID]; !ok || !t.attached[terminalID] {
 		t.mu.Unlock()
 		return
 	}
 	handler := t.outputHandler
-	dispatcher := t.outputDispatcher(terminalID)
+	dispatcher := t.outputDispatcherLocked(terminalID)
 	dispatcher.Lock()
 	t.mu.Unlock()
 	t.dispatchTerminalOutputLocked(terminalID, data, handler)
@@ -78,18 +134,40 @@ func (t *TerminalService) dispatchTerminalOutputLocked(terminalID string, data [
 		t.outputSequences = make(map[string]uint64)
 	}
 	// Wails dispatches each event asynchronously, so the frontend restores PTY byte order with this sequence.
-	// Clone once for the async bus; source buffers (PTY read/pending) are reused or truncated and must not be shared.
-	t.outputSequences[terminalID]++
-	sequence := t.outputSequences[terminalID]
+	// Split oversized callbacks before cloning so the event cap never drops bytes.
+	chunks := splitTerminalOutput(data)
+	payloads := make([]event.TerminalOutputPayload, 0, len(chunks))
+	for _, chunk := range chunks {
+		t.outputSequences[terminalID]++
+		sequence := t.outputSequences[terminalID]
+		payloads = append(payloads, event.TerminalOutputPayload{
+			TerminalID: terminalID,
+			Sequence:   sequence,
+			Data:       cloneTerminalOutput(chunk),
+		})
+	}
 	t.outputMu.Unlock()
-	t.eventBus.Emit(event.TerminalOutput, event.TerminalOutputPayload{
-		TerminalID: terminalID,
-		Sequence:   sequence,
-		Data:       cloneTerminalOutput(data),
-	})
+	for _, payload := range payloads {
+		t.eventBus.Emit(event.TerminalOutput, payload)
+	}
 	if handler != nil {
 		handler(terminalID, data)
 	}
+}
+
+func splitTerminalOutput(data []byte) [][]byte {
+	if len(data) == 0 {
+		return [][]byte{nil}
+	}
+	chunks := make([][]byte, 0, (len(data)+maxPendingTerminalOutput-1)/maxPendingTerminalOutput)
+	for start := 0; start < len(data); start += maxPendingTerminalOutput {
+		end := start + maxPendingTerminalOutput
+		if end > len(data) {
+			end = len(data)
+		}
+		chunks = append(chunks, data[start:end])
+	}
+	return chunks
 }
 
 func (t *TerminalService) outputDispatcher(terminalID string) *sync.Mutex {
@@ -138,10 +216,62 @@ func cloneTerminalOutput(data []byte) []byte {
 }
 
 func (t *TerminalService) expirePendingOutput(terminalID string) {
+	t.expirePendingOutputIfCurrent(terminalID, nil)
+}
+
+func (t *TerminalService) schedulePendingOutputExpiry(terminalID string) {
 	t.mu.Lock()
-	if _, active := t.ptys[terminalID]; !active && !t.attached[terminalID] {
+	if t.closing || t.shuttingDown || t.attached[terminalID] || len(t.pendingOutput[terminalID]) == 0 {
+		t.mu.Unlock()
+		return
+	}
+	previous := t.takePendingOutputExpiryLocked(terminalID)
+	expiry := newPendingOutputExpiry()
+	expiry.timer = time.AfterFunc(pendingOutputTTL, func() {
+		defer expiry.finish()
+		t.expirePendingOutputIfCurrent(terminalID, expiry)
+	})
+	if t.pendingExpiries == nil {
+		t.pendingExpiries = make(map[string]*pendingOutputExpiry)
+	}
+	t.pendingExpiries[terminalID] = expiry
+	t.mu.Unlock()
+	previous.stopAndWait()
+}
+
+func (t *TerminalService) stopPendingOutputExpiries() {
+	t.mu.Lock()
+	expiries := make([]*pendingOutputExpiry, 0, len(t.pendingExpiries))
+	for terminalID, expiry := range t.pendingExpiries {
+		expiries = append(expiries, expiry)
+		delete(t.pendingExpiries, terminalID)
+	}
+	t.mu.Unlock()
+	for _, expiry := range expiries {
+		expiry.stopAndWait()
+	}
+}
+
+func (t *TerminalService) takePendingOutputExpiryLocked(terminalID string) *pendingOutputExpiry {
+	expiry := t.pendingExpiries[terminalID]
+	delete(t.pendingExpiries, terminalID)
+	return expiry
+}
+
+func (t *TerminalService) expirePendingOutputIfCurrent(terminalID string, expected *pendingOutputExpiry) {
+	t.mu.Lock()
+	if expected != nil {
+		if t.pendingExpiries[terminalID] != expected {
+			t.mu.Unlock()
+			return
+		}
+		delete(t.pendingExpiries, terminalID)
+	}
+	_, buffered := t.pendingOutput[terminalID]
+	if _, active := t.ptys[terminalID]; buffered && !active && !t.attached[terminalID] {
 		dispatcher := t.lockOutputDispatcher(terminalID)
 		delete(t.pendingOutput, terminalID)
+		delete(t.pendingSessionIDs, terminalID)
 		t.outputMu.Lock()
 		delete(t.outputSequences, terminalID)
 		t.outputMu.Unlock()

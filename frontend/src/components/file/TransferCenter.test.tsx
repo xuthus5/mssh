@@ -103,4 +103,88 @@ describe('TransferCenter', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('重试失败: retry boom')
     expect(useToastStore.getState().toasts.filter((item) => item.type === 'error')).toHaveLength(0)
   })
+
+  it('keeps the newest action error when older transfer actions finish later', async () => {
+    const cancel = deferred<void>()
+    const retry = deferred<string>()
+    __registerHandler('github.com/xuthus5/mssh/internal/service.FileService.CancelTransfer', async () => cancel.promise)
+    __registerHandler('github.com/xuthus5/mssh/internal/service.FileService.Download', async () => retry.promise)
+    useAppStore.setState({ transferCenterOpen: true, transfers: [
+      { ...baseJob, id: 'running', fileName: 'app.tar.gz', direction: 'upload', status: 'running' },
+      { ...baseJob, id: 'failed', fileName: 'backup.sql', direction: 'download', sourcePath: '/remote/backup.sql', targetPath: '/local/backup.sql', status: 'failed', error: 'denied', completedAt: 2 },
+    ] })
+    render(<TransferCenter />)
+    await userEvent.click(screen.getByRole('button', { name: '取消 app.tar.gz' }))
+    await userEvent.click(screen.getByRole('button', { name: '重试 backup.sql' }))
+    await act(async () => { retry.reject(new Error('retry boom')); await Promise.resolve() })
+    expect(await screen.findByRole('alert')).toHaveTextContent('重试失败: retry boom')
+    await act(async () => { cancel.reject(new Error('cancel boom')); await Promise.resolve() })
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('重试失败: retry boom'))
+  })
+
+  it('keeps each transfer mutation single-flight while allowing different jobs concurrently', async () => {
+    const cancel = deferred<void>()
+    const retry = deferred<string>()
+    let cancelCalls = 0
+    let retryCalls = 0
+    __registerHandler('github.com/xuthus5/mssh/internal/service.FileService.CancelTransfer', async () => {
+      cancelCalls += 1
+      return cancel.promise
+    })
+    __registerHandler('github.com/xuthus5/mssh/internal/service.FileService.Download', async () => {
+      retryCalls += 1
+      return retry.promise
+    })
+    useAppStore.setState({ transferCenterOpen: true, transfers: [
+      { ...baseJob, id: 'running', fileName: 'app.tar.gz', direction: 'upload', status: 'running' },
+      { ...baseJob, id: 'failed', fileName: 'backup.sql', direction: 'download', sourcePath: '/remote/backup.sql', targetPath: '/local/backup.sql', status: 'failed', error: 'denied', completedAt: 2 },
+    ] })
+    render(<TransferCenter />)
+
+    const cancelButton = screen.getByRole('button', { name: '取消 app.tar.gz' })
+    const retryButton = screen.getByRole('button', { name: '重试 backup.sql' })
+    await userEvent.click(cancelButton)
+    await userEvent.click(cancelButton)
+    await userEvent.click(retryButton)
+    await userEvent.click(retryButton)
+
+    expect(cancelCalls).toBe(1)
+    expect(retryCalls).toBe(1)
+    expect(cancelButton).toBeDisabled()
+    expect(retryButton).toBeDisabled()
+    await act(async () => {
+      cancel.resolve()
+      retry.resolve('retry-1')
+      await Promise.all([cancel.promise, retry.promise])
+    })
+  })
+
+  it('keeps transfer restoration single-flight until the request settles', async () => {
+    const restore = deferred<unknown[]>()
+    let calls = 0
+    __registerHandler('github.com/xuthus5/mssh/internal/service.FileService.ListTransfers', async () => {
+      calls += 1
+      return restore.promise
+    })
+    useAppStore.setState({ transferCenterOpen: true, transfers: [], transfersLoadError: 'load failed' })
+    render(<TransferCenter />)
+
+    const retryButton = screen.getByRole('button', { name: '重试' })
+    await userEvent.click(retryButton)
+    await userEvent.click(retryButton)
+
+    expect(calls).toBe(1)
+    expect(retryButton).toBeDisabled()
+    await act(async () => {
+      restore.resolve([])
+      await restore.promise
+    })
+  })
 })
+
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  let reject!: (error: unknown) => void
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => { resolve = resolvePromise; reject = rejectPromise })
+  return { promise, resolve, reject }
+}

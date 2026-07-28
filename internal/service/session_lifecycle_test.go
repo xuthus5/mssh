@@ -80,6 +80,33 @@ func TestSessionServiceCloseAllTemporarilyBlocksNewConnects(t *testing.T) {
 	assert.False(t, strings.Contains(err.Error(), "shutting down"))
 }
 
+func TestSessionServiceCloseAllRetainsFailedConnectionsForRetry(t *testing.T) {
+	closeErr := errors.New("client close failed")
+	retryableConnection := &retryableSSHConn{closeErr: closeErr}
+	successfulConnection := &retryableSSHConn{}
+	service := NewSessionService(nil, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
+	retryableManagedConnection := newManagedSSHConnection(retryableConnection)
+	service.conns["retry"] = retryableManagedConnection
+	service.conns["success"] = newManagedSSHConnection(successfulConnection)
+
+	err := service.CloseAll()
+	require.ErrorIs(t, err, closeErr)
+	service.mu.RLock()
+	retainedConnection := service.conns["retry"]
+	_, successfulConnectionRegistered := service.conns["success"]
+	service.mu.RUnlock()
+	assert.Same(t, retryableManagedConnection, retainedConnection)
+	assert.False(t, successfulConnectionRegistered)
+	assert.Equal(t, 1, service.ConnectionCount())
+	assert.Equal(t, 1, retryableConnection.CloseCalls())
+	assert.Equal(t, 1, successfulConnection.CloseCalls())
+
+	require.NoError(t, service.CloseAll())
+	assert.Equal(t, 0, service.ConnectionCount())
+	assert.Equal(t, 2, retryableConnection.CloseCalls())
+	assert.Equal(t, 1, successfulConnection.CloseCalls())
+}
+
 func TestSessionServiceShutdownRejectsNewConnects(t *testing.T) {
 	service := NewSessionService(testutil.NewTestDB(t), newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
 	require.NoError(t, service.Shutdown())
@@ -90,14 +117,30 @@ func TestSessionServiceShutdownRejectsNewConnects(t *testing.T) {
 	assert.Contains(t, err.Error(), "shutting down")
 }
 
+func TestSessionServiceShutdownRetainsFailedConnectionsForRetry(t *testing.T) {
+	closeErr := errors.New("client close failed")
+	retryableConnection := &retryableSSHConn{closeErr: closeErr}
+	service := NewSessionService(nil, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
+	service.conns["retry"] = newManagedSSHConnection(retryableConnection)
+
+	err := service.Shutdown()
+	require.ErrorIs(t, err, closeErr)
+	assert.Equal(t, 1, service.ConnectionCount())
+	assert.Equal(t, 1, retryableConnection.CloseCalls())
+
+	require.NoError(t, service.Shutdown())
+	assert.Equal(t, 0, service.ConnectionCount())
+	assert.Equal(t, 2, retryableConnection.CloseCalls())
+}
+
 func TestSessionLifecycleNilAndCleanupBranches(t *testing.T) {
 	var service *SessionService
 	service.CancelConnectAttempts()
 	require.NoError(t, service.Shutdown())
 	require.NoError(t, service.CloseAll())
-	require.NoError(t, closeManagedConnections(map[string]*managedConn{"nil": nil}))
 
 	active := NewSessionService(testutil.NewTestDB(t), newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
+	require.NoError(t, active.closeManagedConnections(map[string]*managedConn{"nil": nil}))
 	_, err := active.connect(nil, 999, false)
 	require.Error(t, err)
 	assert.False(t, errors.Is(err, context.Canceled))

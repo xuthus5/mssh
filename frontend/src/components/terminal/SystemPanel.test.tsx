@@ -1,6 +1,6 @@
 import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { SystemPanel } from '@/components/terminal/SystemPanel'
 
 const systemInfo = { cpu_percent: 42, cpu_count: 8, memory_used: 2 * 1024 ** 3, memory_total: 8 * 1024 ** 3, disk_used: 10 * 1024 ** 3, disk_total: 100 * 1024 ** 3, download_rate: 1024, upload_rate: 2048, swap_used: 0, swap_total: 0, load_1: 1.2, load_5: 0.8, load_15: 0.4, uptime_seconds: 3661, os_name: 'A B C', kernel_version: '6.8' }
@@ -15,6 +15,8 @@ describe('SystemPanel', () => {
     terminalService.SystemInfo.mockResolvedValue(systemInfo)
     terminalService.ProcessInfo.mockResolvedValue(processInfo)
   })
+
+  afterEach(() => vi.useRealTimers())
 
   it('renders overview metrics and refreshes from the terminal service', async () => {
     render(<SystemPanel terminalID="term-1" onClose={vi.fn()} />)
@@ -47,6 +49,16 @@ describe('SystemPanel', () => {
       .mockRejectedValueOnce(new Error('probe failed'))
       .mockResolvedValueOnce(systemInfo)
     render(<SystemPanel terminalID="term-3" onClose={vi.fn()} />)
+    expect(await screen.findByRole('alert')).toHaveTextContent('系统信息采集失败')
+    await userEvent.click(screen.getByRole('button', { name: '重试' }))
+    expect(await screen.findByText('42% (8c)')).toBeInTheDocument()
+  })
+
+  it('treats an empty system response as a collection failure', async () => {
+    terminalService.SystemInfo
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(systemInfo)
+    render(<SystemPanel terminalID="term-empty" onClose={vi.fn()} />)
     expect(await screen.findByRole('alert')).toHaveTextContent('系统信息采集失败')
     await userEvent.click(screen.getByRole('button', { name: '重试' }))
     expect(await screen.findByText('42% (8c)')).toBeInTheDocument()
@@ -88,4 +100,56 @@ describe('SystemPanel', () => {
     expect(calls).toBe(after)
     vi.useRealTimers()
   })
+
+  it('does not overlap slow overview polls', async () => {
+    vi.useFakeTimers()
+    const first = deferred<typeof systemInfo>()
+    terminalService.SystemInfo.mockImplementationOnce(() => first.promise).mockResolvedValue({ ...systemInfo, cpu_percent: 20 })
+    render(<SystemPanel terminalID="term-race" onClose={vi.fn()} />)
+    await act(async () => { await Promise.resolve() })
+    await act(async () => { await vi.advanceTimersByTimeAsync(9000) })
+    expect(terminalService.SystemInfo).toHaveBeenCalledOnce()
+    await act(async () => { first.resolve({ ...systemInfo, cpu_percent: 80 }); await Promise.resolve() })
+    expect(screen.getByText('80% (8c)')).toBeInTheDocument()
+    await act(async () => { await vi.advanceTimersByTimeAsync(3000) })
+    expect(terminalService.SystemInfo).toHaveBeenCalledTimes(2)
+  })
+
+  it('hides previous host metrics while a new terminal loads', async () => {
+    const next = deferred<typeof systemInfo>()
+    terminalService.SystemInfo
+      .mockResolvedValueOnce({ ...systemInfo, os_name: 'old-host' })
+      .mockImplementationOnce(() => next.promise)
+    const view = render(<SystemPanel terminalID="term-old" onClose={vi.fn()} />)
+    expect(await screen.findByText('old-host')).toBeInTheDocument()
+
+    view.rerender(<SystemPanel terminalID="term-new" onClose={vi.fn()} />)
+    expect(screen.queryByText('old-host')).not.toBeInTheDocument()
+    expect(screen.getByText('正在采集系统信息...')).toBeInTheDocument()
+
+    await act(async () => { next.resolve({ ...systemInfo, os_name: 'new-host' }); await Promise.resolve() })
+    expect(await screen.findByText('new-host')).toBeInTheDocument()
+  })
+
+  it('hides previous host processes while a new terminal loads', async () => {
+    const next = deferred<typeof processInfo>()
+    terminalService.ProcessInfo
+      .mockResolvedValueOnce([{ ...processInfo[0], command: 'old-process' }])
+      .mockImplementationOnce(() => next.promise)
+    const view = render(<SystemPanel terminalID="term-old" onClose={vi.fn()} />)
+    await userEvent.click(screen.getByRole('tab', { name: '进程' }))
+    expect((await screen.findAllByText('old-process')).length).toBeGreaterThan(0)
+
+    view.rerender(<SystemPanel terminalID="term-new" onClose={vi.fn()} />)
+    expect(screen.queryByText('old-process')).not.toBeInTheDocument()
+
+    await act(async () => { next.resolve([{ ...processInfo[0], command: 'new-process' }]); await Promise.resolve() })
+    expect((await screen.findAllByText('new-process')).length).toBeGreaterThan(0)
+  })
 })
+
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((resolvePromise) => { resolve = resolvePromise })
+  return { promise, resolve }
+}

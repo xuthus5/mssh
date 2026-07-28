@@ -2,6 +2,7 @@ package ssh
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -55,38 +56,51 @@ func UploadFile(client *sftp.Client, src, dst string, onProgress ProgressFn) err
 }
 
 func UploadFileContext(ctx context.Context, client *sftp.Client, src, dst string, onProgress ProgressFn) error {
-	local, err := os.Open(src)
+	_, err := uploadFileContext(ctx, client, src, dst, false, onProgress)
+	return err
+}
+
+func uploadFileContext(
+	ctx context.Context, client *sftp.Client, src, dst string, exclusive bool, onProgress ProgressFn,
+) (bool, error) {
+	local, info, err := openUploadSource(src)
 	if err != nil {
-		return fmt.Errorf("open local: %w", err)
+		return false, fmt.Errorf("open local: %w", err)
 	}
 	defer func() { _ = local.Close() }()
-	info, err := local.Stat()
-	if err != nil {
-		return fmt.Errorf("stat local: %w", err)
-	}
 
 	remoteDir := remotePathDir(dst)
 	if remoteDir != "." && remoteDir != "/" {
 		if err := client.MkdirAll(remoteDir); err != nil {
-			return fmt.Errorf("create remote dir: %w", err)
+			return false, fmt.Errorf("create remote dir: %w", err)
 		}
 	}
 
-	remote, err := client.Create(dst)
+	remote, err := openRemoteUploadTarget(client, dst, exclusive)
 	if err != nil {
-		return fmt.Errorf("create remote: %w", err)
+		return false, fmt.Errorf("create remote: %w", err)
 	}
-	defer func() { _ = remote.Close() }()
+	remoteClosed := false
+	defer func() {
+		if !remoteClosed {
+			_ = remote.Close()
+		}
+	}()
 
-	_, err = copyWithContext(ctx, remote, local, func(transferred int64) {
+	_, copyErr := copyWithContext(ctx, remote, local, func(transferred int64) {
 		if onProgress != nil {
 			onProgress(transferred, info.Size())
 		}
 	})
-	if err != nil {
-		return fmt.Errorf("copy: %w", err)
+	remoteClosed = true
+	closeErr := finalizeUploadedFile(remote)
+	if copyErr != nil {
+		return true, errors.Join(fmt.Errorf("copy: %w", copyErr), closeErr)
 	}
-	return nil
+	if closeErr != nil {
+		return true, closeErr
+	}
+	return true, nil
 }
 
 func remotePathJoin(base, name string) string {
@@ -102,34 +116,83 @@ func DownloadFile(client *sftp.Client, src, dst string, onProgress ProgressFn) e
 }
 
 func DownloadFileContext(ctx context.Context, client *sftp.Client, src, dst string, onProgress ProgressFn) error {
+	_, err := downloadFileContext(ctx, client, src, dst, false, onProgress)
+	return err
+}
+
+// DownloadFileExclusiveContext downloads into a path that must not already exist.
+func DownloadFileExclusiveContext(ctx context.Context, client *sftp.Client, src, dst string, onProgress ProgressFn) error {
+	_, err := downloadFileContext(ctx, client, src, dst, true, onProgress)
+	return err
+}
+
+func downloadFileContext(
+	ctx context.Context, client *sftp.Client, src, dst string, exclusive bool, onProgress ProgressFn,
+) (bool, error) {
 	remote, err := client.Open(src)
 	if err != nil {
-		return fmt.Errorf("open remote: %w", err)
+		return false, fmt.Errorf("open remote: %w", err)
 	}
 	defer func() { _ = remote.Close() }()
 	info, err := remote.Stat()
 	if err != nil {
-		return fmt.Errorf("stat remote: %w", err)
+		return false, fmt.Errorf("stat remote: %w", err)
 	}
 
 	localDir := filepath.Dir(dst)
 	if err := os.MkdirAll(localDir, 0o700); err != nil {
-		return fmt.Errorf("create local dir: %w", err)
+		return false, fmt.Errorf("create local dir: %w", err)
 	}
 
-	local, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
+	local, err := openDownloadTarget(dst, exclusive)
 	if err != nil {
-		return fmt.Errorf("open local: %w", err)
+		return false, err
 	}
-	defer func() { _ = local.Close() }()
+	localClosed := false
+	defer func() {
+		if !localClosed {
+			_ = local.Close()
+		}
+	}()
 
-	_, err = copyWithContext(ctx, local, remote, func(transferred int64) {
+	_, copyErr := copyWithContext(ctx, local, remote, func(transferred int64) {
 		if onProgress != nil {
 			onProgress(transferred, info.Size())
 		}
 	})
-	if err != nil {
-		return fmt.Errorf("copy: %w", err)
+	if copyErr != nil {
+		localClosed = true
+		closeErr := closeFile(local, "close partial local download")
+		return true, errors.Join(fmt.Errorf("copy: %w", copyErr), closeErr)
+	}
+	localClosed = true
+	return true, finalizeDownloadedFile(local)
+}
+
+type durableDownloadedFile interface {
+	Sync() error
+	Close() error
+}
+
+func finalizeDownloadedFile(file durableDownloadedFile) error {
+	syncErr := file.Sync()
+	closeErr := file.Close()
+	if syncErr != nil {
+		syncErr = fmt.Errorf("sync local download: %w", syncErr)
+	}
+	if closeErr != nil {
+		closeErr = fmt.Errorf("close local download: %w", closeErr)
+	}
+	return errors.Join(syncErr, closeErr)
+}
+
+func finalizeUploadedFile(file io.Closer) error {
+	return closeFile(file, "close remote upload")
+}
+
+func closeFile(file io.Closer, operation string) error {
+	if err := file.Close(); err != nil {
+		return fmt.Errorf("%s: %w", operation, err)
 	}
 	return nil
 }

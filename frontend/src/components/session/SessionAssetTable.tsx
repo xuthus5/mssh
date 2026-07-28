@@ -1,19 +1,27 @@
-import { MoreHorizontal, Server } from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
+import { useMemo, useRef, type ReactNode, type RefObject } from 'react'
+import { useVirtualizer, type VirtualItem } from '@tanstack/react-virtual'
+import { Server } from 'lucide-react'
 import { Checkbox } from '@/components/ui/checkbox'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import {
+  SESSION_ASSET_HEADER_HEIGHT,
+  SESSION_ASSET_VIRTUAL_INITIAL_RECT,
+  SESSION_ASSET_VIRTUAL_OVERSCAN,
+  SESSION_ASSET_VIRTUAL_ROW_HEIGHT,
+  SESSION_ASSET_VIRTUALIZATION_THRESHOLD,
+} from '@/components/session/SessionAssetTable.constants'
+import { SessionAssetTableRow } from '@/components/session/SessionAssetTableRow'
 import type { Folder, Session } from '@/hooks/useSession'
 import { t } from '@/i18n'
-
+import { cn } from '@/lib/utils'
 
 interface Props {
   sessions: Session[]
   folders: Folder[]
   selectedIDs: Set<string>
   recent?: boolean
+  movingSessionIDs?: ReadonlySet<string>
   onSelectionChange: (ids: Set<string>) => void
   onConnect: (id: string) => void
   onOpenDetail: (session: Session) => void
@@ -23,27 +31,155 @@ interface Props {
 }
 
 export function SessionAssetTable(props: Props) {
-  if (props.sessions.length === 0) return <Empty className="min-h-64 border"><EmptyHeader><EmptyMedia variant="icon"><Server /></EmptyMedia><EmptyTitle>{props.recent ? t('暂无最近连接') : t('暂无会话节点')}</EmptyTitle><EmptyDescription>{props.recent ? t('成功连接会话后会显示在这里。') : t('调整筛选条件或创建第一个会话。')}</EmptyDescription></EmptyHeader></Empty>
+  if (props.sessions.length === 0) return <SessionAssetEmpty recent={props.recent} />
+  return <PopulatedSessionAssetTable {...props} />
+}
+
+function PopulatedSessionAssetTable(props: Props) {
+  const folderNames = useMemo(() => buildFolderNameIndex(props.folders), [props.folders])
   const allSelected = props.sessions.every((session) => props.selectedIDs.has(session.id))
-  const toggleAll = () => { const next = new Set(props.selectedIDs); props.sessions.forEach((session) => allSelected ? next.delete(session.id) : next.add(session.id)); props.onSelectionChange(next) }
-  return <div className="overflow-auto rounded-xl border border-border shadow-sm"><Table><TableHeader><TableRow><TableHead className="w-10"><Checkbox aria-label={t('选择当前列表全部会话')} checked={allSelected} onCheckedChange={toggleAll} /></TableHead><TableHead>{t('名称')}</TableHead><TableHead>{t('端点')}</TableHead><TableHead>{t('环境')}</TableHead><TableHead>{t('项目')}</TableHead><TableHead>{t('标签')}</TableHead><TableHead>{t('分组')}</TableHead>{props.recent && <TableHead>{t('最近连接')}</TableHead>}<TableHead className="w-24 text-right">{t('操作')}</TableHead></TableRow></TableHeader><TableBody>{props.sessions.map((session) => <AssetRow key={session.id} session={session} {...props} />)}</TableBody></Table></div>
+  const toggleAll = () => props.onSelectionChange(toggleAllSessions(props, allSelected))
+
+  if (props.sessions.length > SESSION_ASSET_VIRTUALIZATION_THRESHOLD) {
+    return <VirtualizedSessionAssetTable {...props} allSelected={allSelected} folderNames={folderNames} onToggleAll={toggleAll} />
+  }
+  return <FullSessionAssetTable {...props} allSelected={allSelected} folderNames={folderNames} onToggleAll={toggleAll} />
 }
 
-function AssetRow({ session, folders, selectedIDs, recent, onSelectionChange, onConnect, onOpenDetail, onEdit, onDelete, onMove }: Props & { session: Session }) {
-  const selected = selectedIDs.has(session.id)
-  const toggle = () => { const next = new Set(selectedIDs); if (selected) next.delete(session.id); else next.add(session.id); onSelectionChange(next) }
-  const tags = session.tags ?? []
-  return <TableRow data-state={selected ? 'selected' : undefined} className="cursor-pointer" tabIndex={0} onClick={() => onOpenDetail(session)} onDoubleClick={() => onConnect(session.id)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.ctrlKey) onOpenDetail(session); if (event.key === 'Enter' && event.ctrlKey) onConnect(session.id) }}>
-    <TableCell onClick={(event) => event.stopPropagation()} onDoubleClick={(event) => event.stopPropagation()}><Checkbox aria-label={t('选择 ${}', session.name)} checked={selected} onCheckedChange={toggle} /></TableCell>
-    <TableCell className="font-medium">{session.name}</TableCell><TableCell>{session.username}@{session.host}:{session.port}</TableCell>
-    <TableCell>{session.environment ? <Badge variant="outline" data-asset-color={session.environment.colorToken} className="asset-color-badge">{session.environment.name}</Badge> : <span className="text-xs text-muted-foreground">{t('未设置')}</span>}</TableCell>
-    <TableCell>{session.project ? <Badge variant="secondary">{session.project.code || session.project.name}</Badge> : <span className="text-xs text-muted-foreground">{t('未关联')}</span>}</TableCell>
-    <TableCell><div className="flex max-w-48 items-center gap-1">{tags.slice(0, 2).map((tag) => <Badge key={tag.id} variant="outline" data-asset-color={tag.colorToken} className="asset-color-badge max-w-20 truncate">{tag.name}</Badge>)}{tags.length > 2 && <span className="text-xs text-muted-foreground">+{tags.length - 2}</span>}{tags.length === 0 && <span className="text-xs text-muted-foreground">{t('无')}</span>}</div></TableCell>
-    <TableCell>{folders.find((folder) => folder.id === session.folderId)?.name ?? t('未分组')}</TableCell>{recent && <TableCell>{formatRecent(session)}</TableCell>}
-    <TableCell onClick={(event) => event.stopPropagation()} onDoubleClick={(event) => event.stopPropagation()}><div className="flex justify-end gap-1"><Button size="xs" onClick={() => onConnect(session.id)}>{t('连接')}</Button><DropdownMenu><DropdownMenuTrigger render={<Button size="icon-xs" variant="ghost" aria-label={t('${} 更多操作', session.name)} />}><MoreHorizontal /></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuGroup><DropdownMenuItem onClick={() => onEdit(session)}>{t('编辑')}</DropdownMenuItem><DropdownMenuSub><DropdownMenuSubTrigger>{t('移动到分组')}</DropdownMenuSubTrigger><DropdownMenuSubContent><DropdownMenuGroup>{folders.map((folder) => <DropdownMenuItem key={folder.id} disabled={folder.id === session.folderId} onClick={() => { void Promise.resolve(onMove(session.id, folder.id)).catch(() => undefined) }}>{folder.name}</DropdownMenuItem>)}</DropdownMenuGroup></DropdownMenuSubContent></DropdownMenuSub><DropdownMenuItem variant="destructive" onClick={() => onDelete(session)}>{t('删除')}</DropdownMenuItem></DropdownMenuGroup></DropdownMenuContent></DropdownMenu></div></TableCell>
-  </TableRow>
+interface PopulatedProps extends Props {
+  allSelected: boolean
+  folderNames: ReadonlyMap<string, string>
+  onToggleAll: () => void
 }
 
-function formatRecent(session: Session) {
-  return t('${} · ${} 次', session.lastConnectedAt ? new Date(session.lastConnectedAt).toLocaleString() : '-', session.connectionCount ?? 0)
+function FullSessionAssetTable(props: PopulatedProps) {
+  return (
+    <AssetTableSurface {...props}>
+      <TableBody>
+        {props.sessions.map((session, index) => (
+          <SessionAssetTableRow key={session.id} {...props} session={session} folderName={folderNameFor(props.folderNames, session)} ariaRowIndex={index + 2} />
+        ))}
+      </TableBody>
+    </AssetTableSurface>
+  )
+}
+
+function VirtualizedSessionAssetTable(props: PopulatedProps) {
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const rowVirtualizer = useVirtualizer({
+    count: props.sessions.length,
+    estimateSize: estimateAssetRowSize,
+    getItemKey: (index) => props.sessions[index].id,
+    getScrollElement: () => scrollRef.current,
+    initialRect: SESSION_ASSET_VIRTUAL_INITIAL_RECT,
+    overscan: SESSION_ASSET_VIRTUAL_OVERSCAN,
+    scrollMargin: SESSION_ASSET_HEADER_HEIGHT,
+  })
+  const virtualRows = rowVirtualizer.getVirtualItems()
+
+  return (
+    <AssetTableSurface {...props} scrollRef={scrollRef} virtualized>
+      <VirtualTableBody {...props} totalSize={rowVirtualizer.getTotalSize()} virtualRows={virtualRows} />
+    </AssetTableSurface>
+  )
+}
+
+interface VirtualBodyProps extends PopulatedProps {
+  totalSize: number
+  virtualRows: VirtualItem[]
+}
+
+function VirtualTableBody(props: VirtualBodyProps) {
+  const firstRow = props.virtualRows[0]
+  const lastRow = props.virtualRows.at(-1)
+  const topPadding = firstRow ? firstRow.start - SESSION_ASSET_HEADER_HEIGHT : 0
+  const bottomPadding = lastRow ? props.totalSize - lastRow.end + SESSION_ASSET_HEADER_HEIGHT : 0
+
+  return (
+    <TableBody>
+      <VirtualSpacer height={topPadding} recent={props.recent} />
+      {props.virtualRows.map((virtualRow) => {
+        const session = props.sessions[virtualRow.index]
+        return <SessionAssetTableRow key={session.id} {...props} session={session} folderName={folderNameFor(props.folderNames, session)} ariaRowIndex={virtualRow.index + 2} virtualized />
+      })}
+      <VirtualSpacer height={bottomPadding} recent={props.recent} />
+    </TableBody>
+  )
+}
+
+interface SurfaceProps extends PopulatedProps {
+  children: ReactNode
+  scrollRef?: RefObject<HTMLDivElement | null>
+  virtualized?: boolean
+}
+
+function AssetTableSurface(props: SurfaceProps) {
+  return (
+    <div
+      ref={props.scrollRef}
+      data-virtualized={props.virtualized ? 'true' : undefined}
+      className={cn('overflow-auto rounded-xl border border-border shadow-sm', props.virtualized && 'h-[36rem]')}
+    >
+      <Table aria-rowcount={props.sessions.length + 1}>
+        <SessionAssetTableHeader recent={props.recent} allSelected={props.allSelected} onToggleAll={props.onToggleAll} />
+        {props.children}
+      </Table>
+    </div>
+  )
+}
+
+function SessionAssetTableHeader({ recent, allSelected, onToggleAll }: Pick<SurfaceProps, 'recent' | 'allSelected' | 'onToggleAll'>) {
+  return (
+    <TableHeader>
+      <TableRow aria-rowindex={1}>
+        <TableHead className="w-10"><Checkbox aria-label={t('选择当前列表全部会话')} checked={allSelected} onCheckedChange={onToggleAll} /></TableHead>
+        <TableHead>{t('名称')}</TableHead><TableHead>{t('端点')}</TableHead><TableHead>{t('环境')}</TableHead>
+        <TableHead>{t('项目')}</TableHead><TableHead>{t('标签')}</TableHead><TableHead>{t('分组')}</TableHead>
+        {recent ? <TableHead>{t('最近连接')}</TableHead> : null}
+        <TableHead className="w-24 text-right">{t('操作')}</TableHead>
+      </TableRow>
+    </TableHeader>
+  )
+}
+
+function VirtualSpacer({ height, recent }: { height: number; recent?: boolean }) {
+  if (height <= 0) return null
+  return <TableRow aria-hidden="true" className="border-0 hover:bg-transparent"><TableCell className="p-0" colSpan={recent ? 9 : 8} style={{ height }} /></TableRow>
+}
+
+function SessionAssetEmpty({ recent }: Pick<Props, 'recent'>) {
+  return (
+    <Empty className="min-h-64 border">
+      <EmptyHeader><EmptyMedia variant="icon"><Server /></EmptyMedia>
+        <EmptyTitle>{recent ? t('暂无最近连接') : t('暂无会话节点')}</EmptyTitle>
+        <EmptyDescription>{recent ? t('成功连接会话后会显示在这里。') : t('调整筛选条件或创建第一个会话。')}</EmptyDescription>
+      </EmptyHeader>
+    </Empty>
+  )
+}
+
+function buildFolderNameIndex(folders: readonly Folder[]) {
+  const names = new Map<string, string>()
+  for (const folder of folders) {
+    if (!names.has(folder.id)) names.set(folder.id, folder.name)
+  }
+  return names
+}
+
+function folderNameFor(folderNames: ReadonlyMap<string, string>, session: Session) {
+  if (!session.folderId) return t('未分组')
+  return folderNames.get(session.folderId) ?? t('未分组')
+}
+
+function toggleAllSessions(props: Props, allSelected: boolean) {
+  const next = new Set(props.selectedIDs)
+  for (const session of props.sessions) {
+    if (allSelected) next.delete(session.id)
+    else next.add(session.id)
+  }
+  return next
+}
+
+function estimateAssetRowSize() {
+  return SESSION_ASSET_VIRTUAL_ROW_HEIGHT
 }

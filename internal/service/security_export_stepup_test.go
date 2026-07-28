@@ -13,7 +13,7 @@ import (
 
 func TestExportCSVWithPasswordsRequiresConfirmation(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	svc := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
+	svc := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), newUnlockedSessionTestCrypto(), testutil.NewTestLogger())
 	_, err := svc.CreateSession(model.SessionInputFrom(model.Session{
 		Name: "s1", Host: "h", Port: 22, Username: "u", AuthMethod: model.AuthPassword,
 		Password: "secret", KeepAlive: 30, TermType: "xterm",

@@ -9,13 +9,6 @@ import { Call as $Call, CancellablePromise as $CancellablePromise, Create as $Cr
 // @ts-ignore: Unused imports
 import * as model$0 from "../model/models.js";
 
-/**
- * AdoptVaultFromContent installs the vault envelope embedded in a sync/backup artifact.
- */
-export function AdoptVaultFromContent(password: string, content: string): $CancellablePromise<void> {
-    return $Call.ByName("github.com/xuthus5/mssh/internal/service.SyncService.AdoptVaultFromContent", password, content);
-}
-
 export function Dashboard(): $CancellablePromise<model$0.SyncDashboard> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.SyncService.Dashboard").then(($result: any) => {
         return $$createType0($result);

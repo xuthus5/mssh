@@ -1,5 +1,5 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react'
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -20,6 +20,7 @@ vi.mock('@/components/ui/alert-dialog', () => ({
 import SessionLog from '@/components/terminal/SessionLog'
 import { logger } from '@/lib/logger'
 import { ToastContainer, useToastStore } from '@/components/ui/toast'
+import { resetRecordingMutationCoordinator } from '@/lib/recordingMutationCoordinator'
 
 const recording = {
   id: 7,
@@ -42,6 +43,7 @@ function deferred<T>() {
 describe('SessionLog', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    resetRecordingMutationCoordinator()
     useToastStore.setState({ toasts: [] })
     listRecordings.mockResolvedValue([recording])
   })
@@ -110,5 +112,90 @@ describe('SessionLog', () => {
     expect(screen.getByText('1 条')).toBeInTheDocument()
     expect(screen.getByText('录制 #7')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '删除' })).toBeEnabled()
+  })
+
+  it('keeps the latest session recordings when lists finish out of order', async () => {
+    const pending = new Map<number, (items: typeof recording[]) => void>()
+    listRecordings.mockImplementation((sessionID: number) => new Promise((resolve) => { pending.set(sessionID, resolve) }))
+    const view = render(<SessionLog sessionId={1} onPlayback={vi.fn()} onDeleteRecording={vi.fn(async () => {})} onClose={vi.fn()} />)
+    view.rerender(<SessionLog sessionId={2} onPlayback={vi.fn()} onDeleteRecording={vi.fn(async () => {})} onClose={vi.fn()} />)
+
+    await act(async () => {
+      pending.get(2)?.([{ ...recording, id: 8, session_id: 2 }])
+      await Promise.resolve()
+    })
+    expect(screen.getByText('录制 #8')).toBeInTheDocument()
+    await act(async () => {
+      pending.get(1)?.([{ ...recording, id: 7, session_id: 1 }])
+      await Promise.resolve()
+    })
+    expect(screen.getByText('录制 #8')).toBeInTheDocument()
+    expect(screen.queryByText('录制 #7')).not.toBeInTheDocument()
+  })
+
+  it('closes an old delete flow but keeps its lease when switching sessions', async () => {
+    const deletion = deferred<void>()
+    listRecordings.mockImplementation(async (sessionID: number) => ([{ ...recording, id: sessionID === 1 ? 7 : 8, session_id: sessionID }]))
+    const view = render(<SessionLog sessionId={1} onPlayback={vi.fn()} onDeleteRecording={() => deletion.promise} onClose={vi.fn()} />)
+    expect(await screen.findByText('录制 #7')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: '删除录制 #7' }))
+    await userEvent.click(screen.getByRole('button', { name: '删除' }))
+
+    view.rerender(<SessionLog sessionId={2} onPlayback={vi.fn()} onDeleteRecording={() => deletion.promise} onClose={vi.fn()} />)
+    expect(await screen.findByText('录制 #8')).toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '删除录制 #8' })).toBeDisabled()
+    await act(async () => {
+      deletion.reject(new Error('old delete failed'))
+      await deletion.promise.catch(() => undefined)
+    })
+    expect(screen.queryByText('old delete failed')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '删除录制 #8' })).toBeEnabled()
+  })
+
+  it('deletes a recording only once during a pending request', async () => {
+    const deletion = deferred<void>()
+    const onDelete = vi.fn(() => deletion.promise)
+    render(<SessionLog sessionId={1} onPlayback={vi.fn()} onDeleteRecording={onDelete} onClose={vi.fn()} />)
+    expect(await screen.findByText('录制 #7')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: '删除录制 #7' }))
+    const confirm = await screen.findByRole('button', { name: '删除' })
+    act(() => {
+      fireEvent.click(confirm)
+      fireEvent.click(confirm)
+    })
+    expect(onDelete).toHaveBeenCalledOnce()
+    await act(async () => { deletion.resolve(); await Promise.resolve() })
+  })
+
+  it('shares delete state and refreshes recording lists across split panes', async () => {
+    const deletion = deferred<void>()
+    let deleted = false
+    listRecordings.mockImplementation(async () => deleted ? [] : [recording])
+    const onDelete = vi.fn(async () => {
+      await deletion.promise
+      deleted = true
+    })
+    render(<>
+      <section data-testid="first-log"><SessionLog sessionId={1} onPlayback={vi.fn()}
+        onDeleteRecording={onDelete} onClose={vi.fn()} /></section>
+      <section data-testid="second-log"><SessionLog sessionId={1} onPlayback={vi.fn()}
+        onDeleteRecording={onDelete} onClose={vi.fn()} /></section>
+    </>)
+    const first = within(screen.getByTestId('first-log'))
+    const second = within(screen.getByTestId('second-log'))
+    expect(await first.findByText('录制 #7')).toBeInTheDocument()
+    expect(await second.findByText('录制 #7')).toBeInTheDocument()
+
+    await userEvent.click(first.getByRole('button', { name: '删除录制 #7' }))
+    await userEvent.click(within(first.getByRole('dialog')).getByRole('button', { name: '删除' }))
+
+    expect(second.getByRole('button', { name: '删除录制 #7' })).toBeDisabled()
+    expect(second.getByRole('button', { name: '播放录制 #7' })).toBeDisabled()
+    expect(onDelete).toHaveBeenCalledOnce()
+
+    await act(async () => { deletion.resolve(); await deletion.promise })
+    await waitFor(() => expect(first.queryByText('录制 #7')).not.toBeInTheDocument())
+    await waitFor(() => expect(second.queryByText('录制 #7')).not.toBeInTheDocument())
   })
 })

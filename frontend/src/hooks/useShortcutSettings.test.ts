@@ -10,6 +10,7 @@ import {
 } from '@/lib/shortcuts'
 import { useShortcutStore } from '@/store/shortcutStore'
 import { useToastStore } from '@/components/ui/toast'
+import { syncDataChangedEvent } from '@/lib/syncDataReload'
 
 describe('useShortcutSettings', () => {
   beforeEach(() => {
@@ -50,6 +51,38 @@ describe('useShortcutSettings', () => {
     await waitFor(() => expect(useShortcutStore.getState().bindings['close-tab']).toBeNull())
   })
 
+  it('reloads persisted shortcuts after synchronized data changes', async () => {
+    let shortcut = 'Mod+Shift+S'
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.Get', async () => shortcutSetting(shortcut))
+    const { result } = renderHook(() => useShortcutSettings())
+    await waitFor(() => expect(result.current.bindings['new-session']?.key).toBe('s'))
+
+    shortcut = 'Mod+Shift+N'
+    act(() => __emitEvent(syncDataChangedEvent, { data: { changed: true } }))
+
+    await waitFor(() => expect(result.current.bindings['new-session']?.key).toBe('n'))
+  })
+
+  it('keeps the newest shortcuts when reloads resolve out of order', async () => {
+    const first = deferred<unknown>()
+    const second = deferred<unknown>()
+    let loads = 0
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.Get', async () => {
+      loads++
+      return loads === 1 ? first.promise : second.promise
+    })
+    const { result } = renderHook(() => useShortcutSettings())
+    await waitFor(() => expect(loads).toBe(1))
+    let latestReload!: Promise<void>
+    act(() => { latestReload = result.current.reload() })
+    await waitFor(() => expect(loads).toBe(2))
+
+    await act(async () => { second.resolve(shortcutSetting('Mod+Shift+N')); await latestReload })
+    expect(result.current.bindings['new-session']?.key).toBe('n')
+    await act(async () => { first.resolve(shortcutSetting('Mod+Shift+S')); await first.promise })
+    expect(result.current.bindings['new-session']?.key).toBe('n')
+  })
+
   it('falls back to defaults and surfaces load error without toast', async () => {
     __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.Get', async () => {
       throw new Error('shortcut load failed')
@@ -87,3 +120,20 @@ describe('useShortcutSettings', () => {
   })
 
 })
+
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((resolvePromise) => { resolve = resolvePromise })
+  return { promise, resolve }
+}
+
+function shortcutSetting(value: string) {
+  return {
+    key: SHORTCUT_SETTING_KEY,
+    namespace: 'application',
+    value: JSON.stringify({ 'new-session': value }),
+    value_type: 'object',
+    version: 1,
+    updated_at: '',
+  }
+}

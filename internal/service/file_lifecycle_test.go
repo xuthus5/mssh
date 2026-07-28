@@ -10,7 +10,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/xuthus5/mssh/internal/model"
 	"github.com/xuthus5/mssh/internal/service/testutil"
+	"github.com/xuthus5/mssh/internal/store"
 	"github.com/xuthus5/mssh/pkg/event"
 )
 
@@ -31,7 +33,7 @@ func TestCancelTransferClosesBlockingTransport(t *testing.T) {
 	assert.ErrorIs(t, ctx.Err(), context.Canceled)
 }
 
-func TestCancelTransferCancelsWhileTaskRegistryIsLocked(t *testing.T) {
+func TestCancelTransferCancelsOutsideTaskRegistryLock(t *testing.T) {
 	service := NewFileService(nil, newMockEventBus(), testutil.NewTestLogger())
 	ctx, cancel := context.WithCancel(context.Background())
 	var cancelledUnderLock atomic.Bool
@@ -40,11 +42,11 @@ func TestCancelTransferCancelsWhileTaskRegistryIsLocked(t *testing.T) {
 	service.mu.Unlock()
 
 	require.NoError(t, service.CancelTransfer("active"))
-	assert.True(t, cancelledUnderLock.Load())
+	assert.False(t, cancelledUnderLock.Load())
 	assert.ErrorIs(t, ctx.Err(), context.Canceled)
 }
 
-func TestCancelAllCancelsWhileTaskRegistryIsLocked(t *testing.T) {
+func TestCancelAllCancelsOutsideTaskRegistryLock(t *testing.T) {
 	service := NewFileService(nil, newMockEventBus(), testutil.NewTestLogger())
 	ctx, cancel := context.WithCancel(context.Background())
 	var cancelledUnderLock atomic.Bool
@@ -53,7 +55,7 @@ func TestCancelAllCancelsWhileTaskRegistryIsLocked(t *testing.T) {
 	service.mu.Unlock()
 
 	service.CancelAll()
-	assert.True(t, cancelledUnderLock.Load())
+	assert.False(t, cancelledUnderLock.Load())
 	assert.ErrorIs(t, ctx.Err(), context.Canceled)
 }
 
@@ -113,11 +115,13 @@ func TestStopAndWaitCancelsWorkersAndRejectsNewTransfers(t *testing.T) {
 	service := NewFileService(nil, newMockEventBus(), testutil.NewTestLogger())
 	ctx, cancel := context.WithCancel(context.Background())
 	var closed atomic.Bool
+	closedSignal := make(chan struct{})
 	service.mu.Lock()
 	service.tasks["active"] = cancel
 	service.taskSessions["active"] = 1
 	service.taskClosers["active"] = func() error {
 		closed.Store(true)
+		close(closedSignal)
 		return nil
 	}
 	service.workers.Add(1)
@@ -133,6 +137,11 @@ func TestStopAndWaitCancelsWorkersAndRejectsNewTransfers(t *testing.T) {
 	case <-ctx.Done():
 	case <-time.After(time.Second):
 		t.Fatal("stop did not cancel active transfer")
+	}
+	select {
+	case <-closedSignal:
+	case <-time.After(time.Second):
+		t.Fatal("stop did not close active transfer transport")
 	}
 	assert.True(t, closed.Load())
 	select {
@@ -153,10 +162,95 @@ func TestStopAndWaitCancelsWorkersAndRejectsNewTransfers(t *testing.T) {
 	assert.ErrorContains(t, service.registerTask("new", 2, newCancel), "shutting down")
 }
 
+func TestStopAndWaitWaitsForActiveTransferMetadataRead(t *testing.T) {
+	database := testutil.NewTestDB(t)
+	service := NewFileService(nil, newMockEventBus(), testutil.NewTestLogger(), WithTransferDB(database))
+	assertDatabaseServiceShutdownWaits(t, database, func() error {
+		_, err := service.ListTransfers()
+		return err
+	}, service.StopAndWait)
+}
+
+func TestFileServiceRejectsOperationsAfterShutdown(t *testing.T) {
+	database := testutil.NewTestDB(t)
+	service := NewFileService(nil, newMockEventBus(), testutil.NewTestLogger(), WithTransferDB(database))
+	service.StopAndWait()
+
+	_, err := service.ListTransfers()
+	require.ErrorContains(t, err, "shutting down")
+	_, err = service.ListDir(1, ".")
+	require.ErrorContains(t, err, "shutting down")
+	require.ErrorContains(t, service.Delete(1, "."), "shutting down")
+	require.ErrorContains(t, service.Mkdir(1, "new-dir"), "shutting down")
+	require.ErrorContains(t, service.Rename(1, "old", "new"), "shutting down")
+	_, err = service.Upload(1, "source", "target")
+	require.ErrorContains(t, err, "shutting down")
+	_, err = service.Download(1, "source", "target")
+	require.ErrorContains(t, err, "shutting down")
+	require.ErrorContains(t, service.CancelTransfer("task"), "shutting down")
+}
+
+func TestPauseAndWaitCancelsWorkersAndAllowsNewTransfers(t *testing.T) {
+	service := NewFileService(nil, newMockEventBus(), testutil.NewTestLogger())
+	ctx, cancel := context.WithCancel(context.Background())
+	service.mu.Lock()
+	service.tasks["active"] = cancel
+	service.workers.Add(1)
+	service.mu.Unlock()
+
+	pauseDone := make(chan struct{})
+	go func() {
+		service.PauseAndWait()
+		close(pauseDone)
+	}()
+
+	select {
+	case <-ctx.Done():
+	case <-time.After(time.Second):
+		t.Fatal("pause did not cancel active transfer")
+	}
+	service.workers.Done()
+	select {
+	case <-pauseDone:
+	case <-time.After(time.Second):
+		t.Fatal("pause did not wait for worker completion")
+	}
+
+	_, newCancel := context.WithCancel(context.Background())
+	require.NoError(t, service.registerTask("new", 2, newCancel))
+	service.releaseRegisteredTask("new", newCancel)
+}
+
+func TestPauseAndWaitReconcilesPendingTransferFinalizations(t *testing.T) {
+	database := testutil.NewTestDB(t)
+	require.NoError(t, store.CreateTransferJob(database, model.TransferJob{
+		ID: "pause-finalization", SessionID: 1, SessionName: "server", Direction: "upload",
+		SourcePath: "/tmp/source", TargetPath: "/remote/target", Status: "running", StartedAt: time.Now(),
+	}))
+	require.NoError(t, createTransferFinalizationTrigger(database))
+	service := NewFileService(nil, newMockEventBus(), testutil.NewTestLogger(), WithTransferDB(database))
+	service.finishTransfer(transferFinalization{
+		taskID: "pause-finalization", status: "completed", transferred: 64, total: 64,
+	})
+	require.NoError(t, dropTransferFinalizationTrigger(database))
+
+	service.PauseAndWait()
+
+	jobs, err := store.ListTransferJobs(database)
+	require.NoError(t, err)
+	require.Len(t, jobs, 1)
+	assert.Equal(t, "completed", jobs[0].Status)
+	assert.Equal(t, int64(64), jobs[0].TransferredBytes)
+	finish, err := service.beginOperation()
+	require.NoError(t, err)
+	finish()
+}
+
 func TestFileServiceLifecycleMethodsHandleNilReceiver(t *testing.T) {
 	var service *FileService
 
 	service.WaitForTransfers()
+	service.PauseAndWait()
 	service.StopAndWait()
 	service.CancelForSessions([]int64{1})
 }
@@ -203,7 +297,7 @@ func TestFileServiceCancelForSessionsEmitsCancelled(t *testing.T) {
 
 	service.CancelForSessions([]int64{7})
 	assert.ErrorIs(t, ctx.Err(), context.Canceled)
-	assert.True(t, cancelledUnderLock.Load())
+	assert.False(t, cancelledUnderLock.Load())
 	assert.True(t, bus.hasEvent(event.TransferComplete))
 	assert.True(t, hasCancelledTransferEvent(bus, "task-cancel-ui"))
 }

@@ -8,37 +8,6 @@ import { Create as $Create } from "@wailsio/runtime";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
 import * as model$0 from "../model/models.js";
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore: Unused imports
-import * as ssh$0 from "../../../../../golang.org/x/crypto/ssh/models.js";
-
-/**
- * ClientWrapper wraps an SSH client with keep-alive lifecycle management.
- */
-export class ClientWrapper {
-    "Inner": ssh$0.Client | null;
-
-    /** Creates a new ClientWrapper instance. */
-    constructor($$source: Partial<ClientWrapper> = {}) {
-        if (!("Inner" in $$source)) {
-            this["Inner"] = null;
-        }
-
-        Object.assign(this, $$source);
-    }
-
-    /**
-     * Creates a new ClientWrapper instance from a string or object.
-     */
-    static createFrom($$source: any = {}): ClientWrapper {
-        const $$createField0_0 = $$createType1;
-        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
-        if ("Inner" in $$parsedSource) {
-            $$parsedSource["Inner"] = $$createField0_0($$parsedSource["Inner"]);
-        }
-        return new ClientWrapper($$parsedSource as Partial<ClientWrapper>);
-    }
-}
 
 export class FileEntry {
     "name": string;
@@ -105,7 +74,7 @@ export class Player {
      * Creates a new Player instance from a string or object.
      */
     static createFrom($$source: any = {}): Player {
-        const $$createField3_0 = $$createType3;
+        const $$createField3_0 = $$createType1;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("entries" in $$parsedSource) {
             $$parsedSource["entries"] = $$createField3_0($$parsedSource["entries"]);
@@ -115,7 +84,5 @@ export class Player {
 }
 
 // Private type creation functions
-const $$createType0 = ssh$0.Client.createFrom;
-const $$createType1 = $Create.Nullable($$createType0);
-const $$createType2 = model$0.RecordingEntry.createFrom;
-const $$createType3 = $Create.Array($$createType2);
+const $$createType0 = model$0.RecordingEntry.createFrom;
+const $$createType1 = $Create.Array($$createType0);

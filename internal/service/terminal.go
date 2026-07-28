@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"sync"
@@ -15,45 +16,60 @@ import (
 )
 
 type TerminalService struct {
-	mu                sync.RWMutex
-	closeMu           sync.Mutex
-	outputMu          sync.Mutex
-	ptys              map[string]terminalIO
-	connIDs           map[string]string
-	sessionIDs        map[string]int64
-	attached          map[string]bool
-	pendingOutput     map[string][]byte
-	outputSequences   map[string]uint64
-	outputDispatchers map[string]*sync.Mutex
-	eventBus          EventBus
-	maxSize           int
-	lastUsed          map[string]time.Time
-	sessionSvc        *SessionService
-	serialSvc         *SerialService
-	outputHandler     func(terminalID string, data []byte)
-	closeHandler      func(terminalID string)
-	systemMu          sync.Mutex
-	systemSamples     map[string]systemSample
-	openWG            sync.WaitGroup
-	closing           bool
-	shuttingDown      bool
-	logger            *slog.Logger
+	mu                     sync.RWMutex
+	closeMu                sync.Mutex
+	resourceMu             sync.Mutex
+	outputMu               sync.Mutex
+	ptys                   map[string]terminalIO
+	closingPTYs            map[string]terminalIO
+	pendingSerialCleanups  map[string]unregisteredSerialResource
+	connIDs                map[string]string
+	sessionIDs             map[string]int64
+	pendingSessionIDs      map[string]int64
+	blockedSessions        map[int64]int
+	sessionOpenGenerations map[int64]uint64
+	attached               map[string]bool
+	pendingOutput          map[string][]byte
+	pendingExpiries        map[string]*pendingOutputExpiry
+	outputSequences        map[string]uint64
+	outputDispatchers      map[string]*sync.Mutex
+	outputFlows            map[string]*terminalOutputFlow
+	eventBus               EventBus
+	maxSize                int
+	lastUsed               map[string]time.Time
+	sessionSvc             *SessionService
+	serialSvc              *SerialService
+	outputHandler          func(terminalID string, data []byte)
+	closeHandler           func(terminalID string)
+	systemMu               sync.Mutex
+	systemSamples          map[string]systemSample
+	operationWG            sync.WaitGroup
+	exitMu                 sync.Mutex
+	exitWG                 sync.WaitGroup
+	exitGeneration         uint64
+	exitStopping           bool
+	closing                bool
+	shuttingDown           bool
+	logger                 *slog.Logger
 }
 
 var _openPTY = ssh.PreparePTY
 
+//wails:ignore
 func (t *TerminalService) SetOutputHandler(fn func(terminalID string, data []byte)) {
 	t.mu.Lock()
 	t.outputHandler = fn
 	t.mu.Unlock()
 }
 
+//wails:ignore
 func (t *TerminalService) SetCloseHandler(fn func(terminalID string)) {
 	t.mu.Lock()
 	t.closeHandler = fn
 	t.mu.Unlock()
 }
 
+//wails:ignore
 func (t *TerminalService) SetSerialService(serialSvc *SerialService) {
 	t.mu.Lock()
 	t.serialSvc = serialSvc
@@ -62,22 +78,29 @@ func (t *TerminalService) SetSerialService(serialSvc *SerialService) {
 
 func NewTerminalService(sessionSvc *SessionService, eventBus EventBus, maxSize int, logger *slog.Logger) *TerminalService {
 	if maxSize <= 0 {
-		maxSize = 32
+		maxSize = DefaultTerminalPoolSize
 	}
 	return &TerminalService{
-		ptys:              make(map[string]terminalIO),
-		connIDs:           make(map[string]string),
-		sessionIDs:        make(map[string]int64),
-		attached:          make(map[string]bool),
-		pendingOutput:     make(map[string][]byte),
-		outputSequences:   make(map[string]uint64),
-		outputDispatchers: make(map[string]*sync.Mutex),
-		eventBus:          eventBus,
-		maxSize:           maxSize,
-		lastUsed:          make(map[string]time.Time),
-		sessionSvc:        sessionSvc,
-		logger:            logger,
-		systemSamples:     make(map[string]systemSample),
+		ptys:                   make(map[string]terminalIO),
+		closingPTYs:            make(map[string]terminalIO),
+		pendingSerialCleanups:  make(map[string]unregisteredSerialResource),
+		connIDs:                make(map[string]string),
+		sessionIDs:             make(map[string]int64),
+		pendingSessionIDs:      make(map[string]int64),
+		blockedSessions:        make(map[int64]int),
+		sessionOpenGenerations: make(map[int64]uint64),
+		attached:               make(map[string]bool),
+		pendingOutput:          make(map[string][]byte),
+		pendingExpiries:        make(map[string]*pendingOutputExpiry),
+		outputSequences:        make(map[string]uint64),
+		outputDispatchers:      make(map[string]*sync.Mutex),
+		outputFlows:            make(map[string]*terminalOutputFlow),
+		eventBus:               eventBus,
+		maxSize:                maxSize,
+		lastUsed:               make(map[string]time.Time),
+		sessionSvc:             sessionSvc,
+		logger:                 logger,
+		systemSamples:          make(map[string]systemSample),
 	}
 }
 
@@ -88,16 +111,24 @@ func (t *TerminalService) Open(ctx context.Context, sessionID int64, cols, rows 
 	if err := validateTerminalSize(cols, rows); err != nil {
 		return "", err
 	}
+	finish, err := t.beginOperation()
+	if err != nil {
+		return "", err
+	}
+	defer finish()
 	if err := t.beginOpen(); err != nil {
 		return "", err
 	}
-	defer t.finishOpen()
+	sessionGeneration, err := t.beginSessionOpen(sessionID)
+	if err != nil {
+		return "", err
+	}
 	outcome := "failed"
 	defer func() {
 		recordAudit(t.sessionSvc.db, t.logger, model.AuditEvent{Action: "connect", TargetType: "session", TargetID: fmt.Sprint(sessionID), SessionID: &sessionID, Summary: "SSH 连接", Outcome: outcome})
 	}()
 	t.logger.Info("opening terminal", "sessionID", sessionID, "cols", cols, "rows", rows)
-	terminalID, err := t.openTerminalSession(ctx, sessionID, cols, rows)
+	terminalID, err := t.openTerminalSession(ctx, sessionID, sessionGeneration, cols, rows)
 	if err != nil {
 		t.logger.Error("terminal open failed", "sessionID", sessionID, "error", err)
 		return "", fmt.Errorf("terminal open: %w", err)
@@ -107,7 +138,7 @@ func (t *TerminalService) Open(ctx context.Context, sessionID int64, cols, rows 
 	return terminalID, nil
 }
 
-func (t *TerminalService) openTerminalSession(ctx context.Context, sessionID int64, cols, rows int) (string, error) {
+func (t *TerminalService) openTerminalSession(ctx context.Context, sessionID int64, generation uint64, cols, rows int) (string, error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -118,16 +149,33 @@ func (t *TerminalService) openTerminalSession(ctx context.Context, sessionID int
 	terminalID := uuid.New().String()
 	pty, err := _openPTY(wrapper, termType, cols, rows)
 	if err != nil {
-		_ = t.sessionSvc.disconnect(connID, false)
-		return "", err
+		return "", errors.Join(err, t.cleanupTerminalResources(connID, nil))
 	}
 	if err := ctx.Err(); err != nil {
-		_ = pty.Close()
-		_ = t.sessionSvc.disconnect(connID, false)
-		return "", err
+		return "", errors.Join(err, t.cleanupTerminalResources(connID, pty))
 	}
-	t.registerTerminal(terminalID, connID, sessionID, pty)
+	registration := terminalRegistration{
+		terminalID: terminalID, connID: connID, sessionID: sessionID, generation: generation, pty: pty,
+	}
+	if err := t.registerSessionTerminal(registration); err != nil {
+		return "", errors.Join(err, t.cleanupTerminalResources(connID, pty))
+	}
 	return terminalID, nil
+}
+
+func (t *TerminalService) cleanupTerminalResources(connID string, pty terminalIO) error {
+	var cleanupErr error
+	if pty != nil {
+		if err := pty.Close(); err != nil {
+			cleanupErr = errors.Join(cleanupErr, fmt.Errorf("close terminal IO: %w", err))
+		}
+	}
+	if t.sessionSvc != nil && connID != "" {
+		if err := t.sessionSvc.disconnect(connID, false); err != nil {
+			cleanupErr = errors.Join(cleanupErr, fmt.Errorf("disconnect terminal connection: %w", err))
+		}
+	}
+	return cleanupErr
 }
 
 func (t *TerminalService) prepareTerminalConnection(ctx context.Context, sessionID int64) (string, *ssh.ClientWrapper, string, error) {
@@ -137,13 +185,11 @@ func (t *TerminalService) prepareTerminalConnection(ctx context.Context, session
 	}
 	wrapper, err := t.sessionSvc.GetClientWrapper(connID)
 	if err != nil {
-		_ = t.sessionSvc.disconnect(connID, false)
-		return "", nil, "", err
+		return "", nil, "", errors.Join(err, t.cleanupTerminalResources(connID, nil))
 	}
 	sess, err := t.sessionSvc.GetSession(sessionID)
 	if err != nil {
-		_ = t.sessionSvc.disconnect(connID, false)
-		return "", nil, "", err
+		return "", nil, "", errors.Join(err, t.cleanupTerminalResources(connID, nil))
 	}
 	termType := sess.TermType
 	if termType == "" {
@@ -152,70 +198,79 @@ func (t *TerminalService) prepareTerminalConnection(ctx context.Context, session
 	return connID, wrapper, termType, nil
 }
 
-func (t *TerminalService) registerTerminal(terminalID, connID string, sessionID int64, pty terminalIO) {
-	t.mu.Lock()
-	var evicted evictedTerminal
-	if len(t.ptys) >= t.maxSize {
-		evicted = t.detachLRUVictimLocked()
-	}
-	t.ptys[terminalID] = pty
-	t.connIDs[terminalID] = connID
-	t.sessionIDs[terminalID] = sessionID
-	t.lastUsed[terminalID] = time.Now()
-	t.mu.Unlock()
-	t.finishEviction(evicted)
-	pty.SetReadCallback(func(data []byte) { t.handlePTYOutput(terminalID, data) })
-	exitReady := make(chan struct{})
-	pty.SetExitCallback(func(err error) {
-		<-exitReady
-		t.handlePTYExit(terminalID, pty, err)
+func (t *TerminalService) registerTerminal(terminalID, connID string, sessionID int64, pty terminalIO) error {
+	return t.registerTerminalState(terminalRegistration{
+		terminalID: terminalID, connID: connID, sessionID: sessionID, pty: pty,
 	})
-	pty.Start()
-	t.eventBus.Emit(event.ConnectionState, event.ConnectionStatePayload{TerminalID: terminalID, State: "connected"})
-	close(exitReady)
 }
 
-func (t *TerminalService) handlePTYExit(terminalID string, exitedPTY terminalIO, exitErr error) {
-	t.mu.Lock()
-	currentPTY, ok := t.ptys[terminalID]
-	if !ok || currentPTY != exitedPTY {
-		t.mu.Unlock()
-		return
-	}
-	dispatcher := t.lockOutputDispatcher(terminalID)
-	t.outputMu.Lock()
-	delete(t.ptys, terminalID)
-	delete(t.lastUsed, terminalID)
-	if t.attached[terminalID] {
-		delete(t.attached, terminalID)
-		delete(t.pendingOutput, terminalID)
-	}
-	connID := t.connIDs[terminalID]
-	delete(t.connIDs, terminalID)
-	delete(t.sessionIDs, terminalID)
-	delete(t.outputSequences, terminalID)
-	closeHandler := t.closeHandler
-	expirePending := !t.attached[terminalID] && len(t.pendingOutput[terminalID]) > 0
-	t.outputMu.Unlock()
-	t.unlockOutputDispatcher(terminalID, dispatcher)
-	t.mu.Unlock()
-	t.deleteSystemSample(terminalID)
+func (t *TerminalService) registerSessionTerminal(registration terminalRegistration) error {
+	registration.enforceGeneration = true
+	return t.registerTerminalState(registration)
+}
 
-	if closeHandler != nil {
-		closeHandler(terminalID)
+func (t *TerminalService) registerTerminalState(registration terminalRegistration) error {
+	t.resourceMu.Lock()
+	defer t.resourceMu.Unlock()
+
+	t.mu.Lock()
+	if err := t.validateTerminalRegistrationLocked(registration); err != nil {
+		t.mu.Unlock()
+		return err
 	}
-	t.releaseSerialDevice(terminalID, exitedPTY)
-	if t.sessionSvc != nil && connID != "" {
-		if err := t.sessionSvc.disconnect(connID, false); err != nil {
-			t.logger.Debug("remote terminal connection cleanup failed", "terminalID", terminalID, "error", err)
+	maxSize := t.maxSize
+	t.mu.Unlock()
+
+	evictionErr := t.reduceTerminalCountLocked(maxSize - 1)
+	t.mu.Lock()
+	if err := t.validateTerminalRegistrationLocked(registration); err != nil {
+		t.mu.Unlock()
+		return err
+	}
+	if len(t.ptys) >= maxSize {
+		t.mu.Unlock()
+		return errors.Join(evictionErr, fmt.Errorf("terminal pool remains at capacity %d", maxSize))
+	}
+	t.ptys[registration.terminalID] = registration.pty
+	t.outputFlowLocked(registration.terminalID)
+	t.connIDs[registration.terminalID] = registration.connID
+	t.sessionIDs[registration.terminalID] = registration.sessionID
+	delete(t.pendingSessionIDs, registration.terminalID)
+	t.lastUsed[registration.terminalID] = time.Now()
+	t.mu.Unlock()
+	if evictionErr != nil {
+		t.logger.Warn("terminal pool eviction completed with cleanup errors", "error", evictionErr)
+	}
+	registration.pty.SetReadCallback(func(data []byte) { t.handlePTYOutput(registration.terminalID, data) })
+	exitReady := make(chan struct{})
+	exitGeneration := t.terminalExitGeneration()
+	registration.pty.SetExitCallback(func(err error) {
+		<-exitReady
+		finish, ok := t.beginTerminalExitCallback(exitGeneration)
+		if !ok {
+			return
 		}
-	}
-	t.eventBus.Emit(event.ConnectionState, event.ConnectionStatePayload{
-		TerminalID: terminalID,
-		State:      "disconnected",
+		defer finish()
+		t.handlePTYExit(registration.terminalID, registration.pty, err)
 	})
-	if expirePending {
-		time.AfterFunc(pendingOutputTTL, func() { t.expirePendingOutput(terminalID) })
+	registration.pty.Start()
+	t.eventBus.Emit(event.ConnectionState, event.ConnectionStatePayload{TerminalID: registration.terminalID, State: "connected"})
+	close(exitReady)
+	return nil
+}
+
+func (t *TerminalService) validateTerminalRegistrationLocked(registration terminalRegistration) error {
+	if t.maxSize <= 0 {
+		return fmt.Errorf("terminal pool size must be greater than zero")
 	}
-	t.logger.Info("terminal disconnected by remote", "terminalID", terminalID, "error", exitErr)
+	if !registration.enforceGeneration {
+		return nil
+	}
+	if t.blockedSessions[registration.sessionID] > 0 {
+		return fmt.Errorf("session deletion in progress for session %d", registration.sessionID)
+	}
+	if t.sessionOpenGenerations[registration.sessionID] != registration.generation {
+		return fmt.Errorf("session changed during terminal open for session %d", registration.sessionID)
+	}
+	return nil
 }

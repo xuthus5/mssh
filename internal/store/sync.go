@@ -76,6 +76,13 @@ func SetSyncVersionProtected(db *sql.DB, id int64, protected bool) error {
 	return setSyncVersionProtected(db, id, protected)
 }
 
+func SetSyncVersionSize(db *sql.DB, id, size int64) error {
+	if _, err := db.Exec("UPDATE sync_versions SET size_bytes = ? WHERE id = ?", size, id); err != nil {
+		return fmt.Errorf("update sync version size: %w", err)
+	}
+	return nil
+}
+
 // SetSyncVersionProtectedTx updates protection inside a caller-owned transaction.
 func SetSyncVersionProtectedTx(tx *sql.Tx, id int64, protected bool) error {
 	if tx == nil {

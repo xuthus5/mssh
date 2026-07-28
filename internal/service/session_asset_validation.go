@@ -27,6 +27,12 @@ func validateSessionAssetInput(input model.SessionInput, updating bool) error {
 	if utf8.RuneCountInString(input.Notes) > sessionNotesLimit {
 		return fmt.Errorf("session notes must not exceed %d characters", sessionNotesLimit)
 	}
+	if !utf8.ValidString(input.Notes) {
+		return fmt.Errorf("session notes must be valid UTF-8")
+	}
+	if strings.ContainsRune(input.Notes, 0) {
+		return fmt.Errorf("session notes contain NUL")
+	}
 	if err := validateOptionalAssetID("environment", input.EnvironmentID); err != nil {
 		return err
 	}
@@ -38,6 +44,9 @@ func validateSessionAssetInput(input model.SessionInput, updating bool) error {
 	}
 	if err := validateOptionalAssetID("key", input.KeyID); err != nil {
 		return err
+	}
+	if _, err := normalizeAssetSortOrder(input.SortOrder); err != nil {
+		return fmt.Errorf("session %w", err)
 	}
 	seen := make(map[int64]struct{}, len(input.TagIDs))
 	for _, id := range input.TagIDs {
@@ -59,17 +68,11 @@ func validateSessionCoreFields(input model.SessionInput) error {
 	if err := validateSessionText("host", strings.TrimSpace(input.Host), 1, sessionHostLimit); err != nil {
 		return err
 	}
-	if strings.ContainsRune(input.Host, 0) {
-		return fmt.Errorf("host contains NUL")
-	}
 	if input.Port < 1 || input.Port > 65535 {
 		return fmt.Errorf("port must be between 1 and 65535")
 	}
 	if err := validateSessionText("username", strings.TrimSpace(input.Username), 1, sessionUsernameLimit); err != nil {
 		return err
-	}
-	if strings.ContainsRune(input.Username, 0) {
-		return fmt.Errorf("username contains NUL")
 	}
 	if err := validateSessionAuthMethod(input.AuthMethod); err != nil {
 		return err
@@ -97,6 +100,12 @@ func validateSessionAuthMethod(method model.AuthMethod) error {
 }
 
 func validateSessionText(name, value string, minimum, maximum int) error {
+	if !utf8.ValidString(value) {
+		return fmt.Errorf("%s must be valid UTF-8", name)
+	}
+	if strings.ContainsRune(value, 0) {
+		return fmt.Errorf("%s contains NUL", name)
+	}
 	length := utf8.RuneCountInString(value)
 	if length < minimum || length > maximum {
 		return fmt.Errorf("%s must contain between %d and %d characters", name, minimum, maximum)
@@ -115,6 +124,9 @@ const sessionFolderNameLimit = 128
 
 func validateFolderName(name string) (string, error) {
 	normalized := strings.TrimSpace(name)
+	if !utf8.ValidString(normalized) {
+		return "", fmt.Errorf("folder name must be valid UTF-8")
+	}
 	if normalized == "" || utf8.RuneCountInString(normalized) > sessionFolderNameLimit {
 		return "", fmt.Errorf("folder name must contain between 1 and %d characters", sessionFolderNameLimit)
 	}

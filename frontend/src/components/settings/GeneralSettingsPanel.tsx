@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import { useCallback, type SetStateAction } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { LabeledSelect } from '@/components/ui/labeled-select'
@@ -7,9 +7,10 @@ import { ApplicationBehaviorSettingsSection } from '@/components/settings/Applic
 import { ApplicationLogSettingsSection } from '@/components/settings/ApplicationLogSettings'
 import { ApplicationNetworkProxySettingsSection } from '@/components/settings/ApplicationNetworkProxySettings'
 import { AutoSaveStatusIndicator } from '@/components/settings/AutoSaveStatus'
-import { useAutoSave } from '@/hooks/useAutoSave'
+import { useAutoSave, type UseAutoSaveResult } from '@/hooks/useAutoSave'
 import { useDraftSync } from '@/hooks/useDraftSync'
-import type { GeneralSettings } from '@/hooks/useSettings'
+import { useSettingsWindowHide } from '@/hooks/useSettingsWindowHide'
+import type { GeneralSettings, GeneralSettingsSaveOptions } from '@/hooks/useSettings'
 import { t } from '@/i18n'
 
 interface GeneralDraft {
@@ -32,7 +33,7 @@ interface GeneralDraft {
 interface Props {
   general: GeneralSettings
   systemFonts: string[]
-  onSave: (settings: GeneralSettings) => Promise<void>
+  onSave: (settings: GeneralSettings, options?: GeneralSettingsSaveOptions) => Promise<void>
   onPreviewUIFont: (fontFamily: string, fallbackFamily: string, fontSize: number) => void
   settingsReady?: boolean
   loadError?: string
@@ -78,84 +79,96 @@ function buildSavePayload(general: GeneralSettings, draft: GeneralDraft): Genera
   }
 }
 
-function UIFontSettings({
-  draft,
-  systemFonts,
-  onChange,
-}: {
+function savedDraft(draft: GeneralDraft): GeneralDraft {
+  return {
+    ...draft,
+    proxyPassword: '',
+    proxyPasswordSaved: draft.clearProxyPassword ? false : (draft.proxyPasswordSaved || draft.proxyPassword !== ''),
+    clearProxyPassword: false,
+  }
+}
+
+function redactedDraft(draft: GeneralDraft): GeneralDraft {
+  return { ...draft, proxyPassword: '', clearProxyPassword: false }
+}
+
+interface UIFontProps {
   draft: GeneralDraft
   systemFonts: string[]
   onChange: (draft: GeneralDraft) => void
-}) {
+}
+
+function UIFontFamilyFields({ draft, systemFonts, onChange }: UIFontProps) {
   const primaryOptions = systemFonts.includes(draft.uiFontFamily)
     ? systemFonts
     : [draft.uiFontFamily, ...systemFonts]
   const fallbackOptions = systemFonts.includes(draft.uiFontFallbackFamily)
     ? systemFonts
     : [draft.uiFontFallbackFamily, ...systemFonts]
-  return (
-    <section className="rounded-xl border border-border bg-card p-3 shadow-sm">
-      <div className="mb-3">
-        <h3 className="text-sm font-medium text-foreground">{t('界面字体')}</h3>
-        <p className="mt-1 text-xs text-muted-foreground">
-          {t('仅调整应用界面。终端排版请在“终端”分类中配置。')}
-        </p>
+  return <div className="grid grid-cols-2 gap-3">
+    <div className="flex min-w-0 flex-col gap-1.5">
+      <label className="text-xs font-medium text-muted-foreground">{t('字体类型')}</label>
+      <SearchableSelect ariaLabel={t('界面字体')} value={draft.uiFontFamily} options={primaryOptions}
+        onValueChange={(value) => onChange({
+          ...draft,
+          uiFontFamily: value,
+          uiFontFallbackFamily: value === draft.uiFontFallbackFamily ? 'sans-serif' : draft.uiFontFallbackFamily,
+        })}
+        placeholder={t('搜索系统字体')} />
+    </div>
+    <div className="flex min-w-0 flex-col gap-1.5">
+      <label className="text-xs font-medium text-muted-foreground">{t('Fallback 字体')}</label>
+      <SearchableSelect ariaLabel={t('Fallback 字体')} value={draft.uiFontFallbackFamily}
+        options={fallbackOptions} disabledValues={[draft.uiFontFamily]}
+        onValueChange={(value) => onChange({ ...draft, uiFontFallbackFamily: value })}
+        placeholder={t('搜索备用字体')} />
+    </div>
+    <div className="flex flex-col gap-1.5">
+      <label htmlFor="ui-font-size" className="text-xs font-medium text-muted-foreground">{t('界面字号')}</label>
+      <Input id="ui-font-size" type="number" min={12} max={24} value={draft.uiFontSize}
+        onChange={(event) => onChange({ ...draft, uiFontSize: event.target.value })} />
+    </div>
+  </div>
+}
+
+function UIFontPreview({ draft }: { draft: GeneralDraft }) {
+  return <div className="mt-3 rounded-lg border border-border bg-background px-3 py-2" style={{
+    fontFamily: `${JSON.stringify(draft.uiFontFamily)}, ${JSON.stringify(draft.uiFontFallbackFamily)}, sans-serif`,
+    fontSize: `${parseInt(draft.uiFontSize, 10) || 14}px`,
+  }}>
+    <p className="text-foreground">{t('MSSH 安全连接 · Secure Shell 0123456789 → ✓ ★')}</p>
+    <p className="mt-1 text-xs text-muted-foreground">{t('中文、English、数字与符号预览')}</p>
+  </div>
+}
+
+function UIFontSettings(props: UIFontProps) {
+  return <section className="rounded-xl border border-border bg-card p-3 shadow-sm">
+    <div className="mb-3">
+      <h3 className="text-sm font-medium text-foreground">{t('界面字体')}</h3>
+      <p className="mt-1 text-xs text-muted-foreground">{t('仅调整应用界面。终端排版请在“终端”分类中配置。')}</p>
+    </div>
+    <UIFontFamilyFields {...props} />
+    <UIFontPreview draft={props.draft} />
+  </section>
+}
+
+function GeneralSettingsHeader({ loadError, onReload, autoSave }: {
+  loadError: string
+  onReload?: () => void
+  autoSave: UseAutoSaveResult<GeneralDraft>
+}) {
+  return <>
+    {loadError ? (
+      <div className="rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">
+        {t('加载设置失败: ${}', loadError)}
+        {onReload ? <Button type="button" size="xs" variant="outline" className="ml-2" onClick={onReload}>{t('重试')}</Button> : null}
       </div>
-      <div className="grid grid-cols-2 gap-3">
-        <div className="flex min-w-0 flex-col gap-1.5">
-          <label className="text-xs font-medium text-muted-foreground">{t('字体类型')}</label>
-          <SearchableSelect
-            ariaLabel={t('界面字体')}
-            value={draft.uiFontFamily}
-            options={primaryOptions}
-            onValueChange={(value) =>
-              onChange({
-                ...draft,
-                uiFontFamily: value,
-                uiFontFallbackFamily:
-                  value === draft.uiFontFallbackFamily ? 'sans-serif' : draft.uiFontFallbackFamily,
-              })
-            }
-            placeholder={t('搜索系统字体')}
-          />
-        </div>
-        <div className="flex min-w-0 flex-col gap-1.5">
-          <label className="text-xs font-medium text-muted-foreground">{t('Fallback 字体')}</label>
-          <SearchableSelect
-            ariaLabel={t('Fallback 字体')}
-            value={draft.uiFontFallbackFamily}
-            options={fallbackOptions}
-            disabledValues={[draft.uiFontFamily]}
-            onValueChange={(value) => onChange({ ...draft, uiFontFallbackFamily: value })}
-            placeholder={t('搜索备用字体')}
-          />
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor="ui-font-size" className="text-xs font-medium text-muted-foreground">
-            {t('界面字号')}
-          </label>
-          <Input
-            id="ui-font-size"
-            type="number"
-            min={12}
-            max={24}
-            value={draft.uiFontSize}
-            onChange={(event) => onChange({ ...draft, uiFontSize: event.target.value })}
-          />
-        </div>
-      </div>
-      <div
-        className="mt-3 rounded-lg border border-border bg-background px-3 py-2"
-        style={{
-          fontFamily: `${JSON.stringify(draft.uiFontFamily)}, ${JSON.stringify(draft.uiFontFallbackFamily)}, sans-serif`,
-          fontSize: `${parseInt(draft.uiFontSize, 10) || 14}px`,
-        }}
-      >
-        <p className="text-foreground">{t('MSSH 安全连接 · Secure Shell 0123456789 → ✓ ★')}</p>
-        <p className="mt-1 text-xs text-muted-foreground">{t('中文、English、数字与符号预览')}</p>
-      </div>
-    </section>
-  )
+    ) : null}
+    <div className="flex items-center justify-between gap-3">
+      <p className="text-xs text-muted-foreground">{t('通用设置包含界面外观与应用级偏好。')}</p>
+      <AutoSaveStatusIndicator status={autoSave.status} error={autoSave.error} />
+    </div>
+  </>
 }
 
 function LanguageSettings({
@@ -187,37 +200,36 @@ function LanguageSettings({
   )
 }
 
-export function GeneralSettingsPanel({ general, systemFonts, onSave, onPreviewUIFont, settingsReady = true, loadError = '', onReload }: Props) {
-  const { draft, setDraft, acknowledgeSaved } = useDraftSync({ source: general, createDraft })
-
+function useGeneralSettingsDraft({ general, onSave, onPreviewUIFont, settingsReady = true }: Props) {
+  const { draft, setDraft, acknowledgeSaved, baselineRevision } = useDraftSync({ source: general, createDraft })
   const previewDraft = (next: GeneralDraft) => {
     setDraft(next)
     onPreviewUIFont(next.uiFontFamily, next.uiFontFallbackFamily, parseInt(next.uiFontSize, 10) || 14)
   }
-
   const persist = useCallback(
     async (next: GeneralDraft) => {
-      await onSave(buildSavePayload(general, next))
-      acknowledgeSaved(next)
+      await onSave(buildSavePayload(general, next), { scope: 'general' })
+      acknowledgeSaved(next, savedDraft(next))
     },
     [acknowledgeSaved, general, onSave],
   )
-  const autoSave = useAutoSave({ value: draft, onSave: persist, isReady: settingsReady, delayMs: 450 })
+  const autoSave = useAutoSave({ value: draft, onSave: persist, isReady: settingsReady, delayMs: 450, baselineRevision })
+  useSettingsWindowHide(useCallback(() => {
+    if (!draft.proxyPassword && !draft.clearProxyPassword) return
+    const redacted = redactedDraft(draft)
+    autoSave.redact(draft, redacted)
+    setDraft(redacted)
+  }, [autoSave.redact, draft, setDraft]))
+  return { draft, setDraft, previewDraft, autoSave }
+}
 
-  return (
-    <div className="flex flex-col gap-3 pt-2">
-      {loadError ? (
-        <div className="rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">
-          {t('加载设置失败: ${}', loadError)}
-          {onReload ? (
-            <Button type="button" size="xs" variant="outline" className="ml-2" onClick={() => { onReload() }}>{t('重试')}</Button>
-          ) : null}
-        </div>
-      ) : null}
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-xs text-muted-foreground">{t('通用设置包含界面外观与应用级偏好。')}</p>
-        <AutoSaveStatusIndicator status={autoSave.status} error={autoSave.error} />
-      </div>
+function GeneralSettingsSections({ draft, setDraft, systemFonts, previewDraft }: {
+  draft: GeneralDraft
+  setDraft: (value: SetStateAction<GeneralDraft>) => void
+  systemFonts: string[]
+  previewDraft: (next: GeneralDraft) => void
+}) {
+  return <>
       <LanguageSettings draft={draft} setDraft={setDraft} />
       <UIFontSettings draft={draft} systemFonts={systemFonts} onChange={previewDraft} />
       <ApplicationBehaviorSettingsSection
@@ -249,6 +261,13 @@ export function GeneralSettingsPanel({ general, systemFonts, onSave, onPreviewUI
           proxyPassword: value ? '' : draft.proxyPassword,
         })}
       />
-    </div>
-  )
+  </>
+}
+
+export function GeneralSettingsPanel(props: Props) {
+  const { draft, setDraft, previewDraft, autoSave } = useGeneralSettingsDraft(props)
+  return <div className="flex flex-col gap-3 pt-2">
+    <GeneralSettingsHeader loadError={props.loadError ?? ''} onReload={props.onReload} autoSave={autoSave} />
+    <GeneralSettingsSections draft={draft} setDraft={setDraft} systemFonts={props.systemFonts} previewDraft={previewDraft} />
+  </div>
 }

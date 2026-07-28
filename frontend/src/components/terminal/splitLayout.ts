@@ -80,19 +80,34 @@ function mapRolesToTree(node: SplitLayoutNode, terminalIDs: string[]): SplitNode
 
 export function isSplitLayoutSnapshot(value: unknown): value is SplitLayoutSnapshot {
   if (!isRecord(value) || !Number.isSafeInteger(value.paneCount) || Number(value.paneCount) < 2) return false
-  if (Number(value.paneCount) > 8) return false
-  return isSplitLayoutNode(value.tree, Number(value.paneCount))
+  const paneCount = Number(value.paneCount)
+  if (paneCount > 8) return false
+  const validation: SplitLayoutValidation = { paneCount, nodeCount: 0, leafCount: 0, roles: new Set() }
+  if (!isSplitLayoutNode(value.tree, validation)) return false
+  return validation.leafCount === paneCount && validation.roles.size === paneCount
 }
 
-function isSplitLayoutNode(value: unknown, paneCount: number): value is SplitLayoutNode {
+interface SplitLayoutValidation {
+  paneCount: number
+  nodeCount: number
+  leafCount: number
+  roles: Set<number>
+}
+
+function isSplitLayoutNode(value: unknown, validation: SplitLayoutValidation): value is SplitLayoutNode {
   if (!isRecord(value)) return false
+  validation.nodeCount++
+  if (validation.nodeCount > validation.paneCount * 2 - 1) return false
   if (value.kind === 'leaf') {
-    return Number.isSafeInteger(value.role) && Number(value.role) >= 0 && Number(value.role) < paneCount
+    if (!Number.isSafeInteger(value.role) || Number(value.role) < 0 || Number(value.role) >= validation.paneCount) return false
+    validation.leafCount++
+    validation.roles.add(Number(value.role))
+    return true
   }
   if (value.kind !== 'branch') return false
   if (value.direction !== 'horizontal' && value.direction !== 'vertical') return false
   if (typeof value.ratio !== 'number' || !Number.isFinite(value.ratio)) return false
-  return isSplitLayoutNode(value.first, paneCount) && isSplitLayoutNode(value.second, paneCount)
+  return isSplitLayoutNode(value.first, validation) && isSplitLayoutNode(value.second, validation)
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

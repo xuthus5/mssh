@@ -65,7 +65,7 @@ func TestFileServiceListTransfersPersistsLifecycle(t *testing.T) {
 	assert.Equal(t, "xfer", jobs[0].SessionName)
 
 	require.NoError(t, svc.createTransfer("file-task-2", created.ID, "download", "/remote", "/local"))
-	svc.finishTransfer("file-task-2", "completed", "")
+	svc.finishTransfer(transferFinalization{taskID: "file-task-2", status: "completed"})
 	jobs, err = svc.ListTransfers()
 	require.NoError(t, err)
 	require.GreaterOrEqual(t, len(jobs), 1)
@@ -85,7 +85,7 @@ func TestFileServiceListTransfersPersistsLifecycle(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, listed)
 	require.NoError(t, noDB.createTransfer("x", created.ID, "download", "a", "b"))
-	noDB.finishTransfer("x", "failed", "boom")
+	noDB.finishTransfer(transferFinalization{taskID: "x", status: "failed", errorMessage: "boom"})
 }
 
 func TestFileServiceCreateTransferMissingSession(t *testing.T) {
@@ -105,6 +105,7 @@ func TestSyncServiceSaveGistIDAndProviderHelpers(t *testing.T) {
 	config := defaultSyncConfig()
 	config.Provider = model.SyncProviderGist
 	config.Gist.GistID = "old"
+	require.NoError(t, writeSyncSetting(db, syncConfigSetting, config))
 	require.NoError(t, service.saveGistID(config, "gist-new"))
 
 	loaded, err := service.LoadConfig()
@@ -233,7 +234,9 @@ func TestNormalizeGistIDAndReadGistFile(t *testing.T) {
 		_, _ = io.WriteString(w, "raw-body")
 	}))
 	t.Cleanup(server.Close)
-	content, err = provider.readGistFile(context.Background(), gistFile{Truncated: true, RawURL: server.URL})
+	rawProvider, err := newGistSyncProvider(server.Client(), server.URL, "gist", "token")
+	require.NoError(t, err)
+	content, err = rawProvider.readGistFile(context.Background(), gistFile{Truncated: true, RawURL: server.URL})
 	require.NoError(t, err)
 	assert.Equal(t, []byte("raw-body"), content)
 
@@ -241,7 +244,9 @@ func TestNormalizeGistIDAndReadGistFile(t *testing.T) {
 		w.WriteHeader(http.StatusBadRequest)
 	}))
 	t.Cleanup(bad.Close)
-	_, err = provider.readGistFile(context.Background(), gistFile{Truncated: true, RawURL: bad.URL})
+	badProvider, err := newGistSyncProvider(bad.Client(), bad.URL, "gist", "token")
+	require.NoError(t, err)
+	_, err = badProvider.readGistFile(context.Background(), gistFile{Truncated: true, RawURL: bad.URL})
 	require.Error(t, err)
 }
 
@@ -268,8 +273,7 @@ func TestTunnelServiceStopAllCleansActiveTunnels(t *testing.T) {
 	closed := false
 	svc.mu.Lock()
 	svc.tunnels[1] = &TunnelState{
-		ID:     1,
-		connID: "missing-conn",
+		ID: 1,
 		closed: func() error {
 			closed = true
 			return nil
@@ -291,7 +295,8 @@ func TestResolveConflictCancelAndUnsupported(t *testing.T) {
 	service.setRuntimeState(syncRuntimeState{
 		State: model.SyncStateConflict,
 		Conflict: &syncConflictState{
-			Remote: decodedSyncArtifact{Metadata: syncArtifactMetadata{VersionNumber: 3, VersionID: "r1", SnapshotFingerprint: "fp"}},
+			RemoteContent:  []byte("remote-content"),
+			RemoteMetadata: syncArtifactMetadata{VersionNumber: 3, VersionID: "r1", SnapshotFingerprint: "fp"},
 		},
 	})
 
@@ -305,7 +310,8 @@ func TestResolveConflictCancelAndUnsupported(t *testing.T) {
 	service.setRuntimeState(syncRuntimeState{
 		State: model.SyncStateConflict,
 		Conflict: &syncConflictState{
-			Remote: decodedSyncArtifact{Metadata: syncArtifactMetadata{VersionNumber: 3, VersionID: "r2", SnapshotFingerprint: "fp2"}},
+			RemoteContent:  []byte("remote-content"),
+			RemoteMetadata: syncArtifactMetadata{VersionNumber: 3, VersionID: "r2", SnapshotFingerprint: "fp2"},
 		},
 	})
 	_, err = service.ResolveConflict(model.SyncConflictChoice("nope"))
@@ -660,14 +666,18 @@ func TestCompleteNoopAndFinishSuccessfulSync(t *testing.T) {
 	result, err := service.completeNoop(cfg, artifact, "etag")
 	require.NoError(t, err)
 	assert.Equal(t, model.SyncStateSynced, result.State)
-	require.NoError(t, service.finishSuccessfulSync(cfg, artifact.Metadata, "etag", 1))
+	require.NoError(t, service.finishSuccessfulSync(syncCompletion{
+		Config: cfg, Metadata: artifact.Metadata, ETag: "etag", LocalVersionID: 1,
+	}))
 }
 
 func TestSaveCloudMetadataAndS3ErrorCode(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	service := newTestSyncService(db, syncTestMasterKey)
 	require.NoError(t, service.saveCloudMetadata("etag-x", "upload"))
-	assert.Equal(t, "etag-x", service.cloudETag())
+	etag, err := service.cloudETag()
+	require.NoError(t, err)
+	assert.Equal(t, "etag-x", etag)
 	assert.Equal(t, "", s3ErrorCode(errors.New("plain")))
 }
 
@@ -1099,7 +1109,7 @@ func TestClosedDBErrorBranches(t *testing.T) {
 	_, err = fileSvc.ListTransfers()
 	require.Error(t, err)
 	require.Error(t, fileSvc.createTransfer("t", 1, "upload", "a", "b"))
-	fileSvc.finishTransfer("t", "failed", "x")
+	fileSvc.finishTransfer(transferFinalization{taskID: "t", status: "failed", errorMessage: "x"})
 	fileSvc.reportProgress("t", 1, 2)
 }
 

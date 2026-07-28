@@ -9,6 +9,14 @@ import (
 	"github.com/xuthus5/mssh/internal/model"
 )
 
+type reencryptCommitError struct{ cause error }
+
+func (e *reencryptCommitError) Error() string {
+	return fmt.Sprintf("commit reencrypt transaction: %v", e.cause)
+}
+
+func (e *reencryptCommitError) Unwrap() error { return e.cause }
+
 func applyReencryptPlan(db *sql.DB, plan reencryptPlan) error {
 	return applyReencryptPlanWithCleanup(db, plan, nil)
 }
@@ -43,7 +51,7 @@ func applyReencryptPlanWithCleanup(db *sql.DB, plan reencryptPlan, cleanup func(
 		}
 	}
 	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("commit reencrypt transaction: %w", err)
+		return &reencryptCommitError{cause: err}
 	}
 	return nil
 }
@@ -122,6 +130,7 @@ func decryptProxyPasswordValue(crypto KeyCrypto, raw string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	defer clear(plaintext)
 	return string(plaintext), nil
 }
 
@@ -129,7 +138,9 @@ func encryptProxyPasswordValue(crypto KeyCrypto, plaintext string) (string, erro
 	if crypto == nil {
 		return "", fmt.Errorf("proxy password encryption is unavailable")
 	}
-	encrypted, err := crypto.Encrypt([]byte(plaintext))
+	plain := []byte(plaintext)
+	defer clear(plain)
+	encrypted, err := crypto.Encrypt(plain)
 	if err != nil {
 		return "", err
 	}

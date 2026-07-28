@@ -85,6 +85,39 @@ func TestEvictLRUReleasesSerialDevice(t *testing.T) {
 	require.Equal(t, 0, term.Count())
 }
 
+func TestTerminalCloseRetainsSerialLeaseUntilRetrySucceeds(t *testing.T) {
+	db, err := store.OpenDB(t.TempDir())
+	require.NoError(t, err)
+	require.NoError(t, store.InitializeSchema(db))
+	t.Cleanup(func() { _ = db.Close() })
+
+	serialSvc := NewSerialService(db, slog.Default())
+	term := NewTerminalService(nil, discardEventBus{}, 2, slog.Default())
+	term.SetSerialService(serialSvc)
+	const terminalID = "term-serial-retry"
+	device := "/dev/ttyTEST-mssh-close-retry"
+	require.NoError(t, serialSvc.reserveDevice(device, terminalID))
+	port := &retryCloseSerialPort{
+		liveSerialPort: liveSerialPort{closeC: make(chan struct{})},
+		firstCloseErr:  errors.New("serial close failed once"),
+	}
+	session := serial.NewLivePortSessionForTest(device, port)
+	term.ptys[terminalID] = session
+	term.lastUsed[terminalID] = time.Now()
+
+	err = term.Close(terminalID)
+
+	require.ErrorIs(t, err, port.firstCloseErr)
+	require.Equal(t, 1, term.Count())
+	require.Equal(t, terminalID, serialSvc.ActiveDeviceMap()[device])
+	require.Equal(t, 1, port.CloseCount())
+
+	require.NoError(t, term.Close(terminalID))
+	require.Equal(t, 0, term.Count())
+	require.Empty(t, serialSvc.ActiveDeviceMap())
+	require.Equal(t, 2, port.CloseCount())
+}
+
 func TestOpenSerialSuccessAndControl(t *testing.T) {
 	db, err := store.OpenDB(t.TempDir())
 	require.NoError(t, err)
@@ -181,6 +214,32 @@ type liveSerialPort struct {
 	closeC chan struct{}
 	dtr    bool
 	rts    bool
+}
+
+type retryCloseSerialPort struct {
+	liveSerialPort
+	firstCloseErr error
+	closeCalls    int
+}
+
+func (p *retryCloseSerialPort) Close() error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.closeCalls++
+	if p.closeCalls == 1 {
+		return p.firstCloseErr
+	}
+	if !p.closed {
+		p.closed = true
+		close(p.closeC)
+	}
+	return nil
+}
+
+func (p *retryCloseSerialPort) CloseCount() int {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.closeCalls
 }
 
 func newLiveSerialSession(device string) *serial.PortSession {

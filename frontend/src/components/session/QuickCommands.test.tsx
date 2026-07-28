@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import QuickCommands from '@/components/session/QuickCommands'
@@ -93,6 +93,23 @@ describe('QuickCommands', () => {
     expect(button.className).toContain('sm:opacity-0')
   })
 
+  it('locks add and delete mutations when an external lease is active', async () => {
+    vi.mocked(requestConfirm).mockClear()
+    const onAdd = vi.fn()
+    const onDelete = vi.fn()
+    render(<QuickCommands commands={commands} onExecute={vi.fn()} onAdd={onAdd} onDelete={onDelete} mutationDisabled />)
+
+    const add = screen.getByRole('button', { name: '添加快捷命令' })
+    const remove = screen.getByRole('button', { name: '删除 List files' })
+    expect(add).toBeDisabled()
+    expect(remove).toBeDisabled()
+    fireEvent.click(add)
+    fireEvent.click(remove)
+    expect(onAdd).not.toHaveBeenCalled()
+    expect(onDelete).not.toHaveBeenCalled()
+    expect(requestConfirm).not.toHaveBeenCalled()
+  })
+
   it('executes a command from the keyboard and labels the add action', () => {
     const onExecute = vi.fn()
     render(<QuickCommands commands={commands} onExecute={onExecute} onAdd={vi.fn()} onDelete={vi.fn()} />)
@@ -118,4 +135,56 @@ describe('QuickCommands', () => {
     await waitFor(() => expect(onAdd).toHaveBeenCalled())
     expect(screen.getByPlaceholderText('名称')).toHaveValue('Deploy')
     expect(screen.getByPlaceholderText('命令')).toHaveValue('deploy')
+    expect(screen.getByPlaceholderText('名称')).toBeEnabled()
+    expect(screen.getByRole('button', { name: '添加' })).toBeEnabled()
   })
+
+  it('keeps the add form locked until the pending request settles', async () => {
+    const pending = deferred<void>()
+    const onAdd = vi.fn(() => pending.promise)
+    const user = userEvent.setup()
+    render(<QuickCommands commands={[]} onExecute={vi.fn()} onAdd={onAdd} onDelete={vi.fn()} />)
+    const toggle = screen.getByRole('button', { name: '添加快捷命令' })
+    await user.click(toggle)
+    await user.type(screen.getByPlaceholderText('名称'), 'Deploy')
+    await user.type(screen.getByPlaceholderText('命令'), 'deploy')
+    await user.click(screen.getByRole('button', { name: '添加' }))
+
+    expect(toggle).toBeDisabled()
+    expect(screen.getByPlaceholderText('名称')).toBeDisabled()
+    expect(screen.getByPlaceholderText('快捷键 (可选)')).toBeDisabled()
+    expect(screen.getByPlaceholderText('命令')).toBeDisabled()
+    expect(screen.getByRole('button', { name: '取消' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: '添加中...' })).toBeDisabled()
+    await user.click(toggle)
+    await user.click(screen.getByRole('button', { name: '取消' }))
+    fireEvent.click(screen.getByRole('button', { name: '添加中...' }))
+    expect(onAdd).toHaveBeenCalledOnce()
+    expect(screen.getByPlaceholderText('名称')).toHaveValue('Deploy')
+
+    await act(async () => { pending.resolve(); await Promise.resolve() })
+    expect(screen.queryByPlaceholderText('名称')).not.toBeInTheDocument()
+    expect(toggle).toBeEnabled()
+  })
+
+  it('adds a command only once during a pending request', async () => {
+    const pending = deferred<void>()
+    const onAdd = vi.fn(() => pending.promise)
+    render(<QuickCommands commands={[]} onExecute={vi.fn()} onAdd={onAdd} onDelete={vi.fn()} />)
+    await userEvent.click(screen.getByRole('button', { name: '添加快捷命令' }))
+    await userEvent.type(screen.getByPlaceholderText('名称'), 'Deploy')
+    await userEvent.type(screen.getByPlaceholderText('命令'), 'deploy')
+    const add = screen.getByRole('button', { name: '添加' })
+    act(() => {
+      fireEvent.click(add)
+      fireEvent.click(add)
+    })
+    expect(onAdd).toHaveBeenCalledOnce()
+    await act(async () => { pending.resolve(); await Promise.resolve() })
+  })
+
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((resolvePromise) => { resolve = resolvePromise })
+  return { promise, resolve }
+}

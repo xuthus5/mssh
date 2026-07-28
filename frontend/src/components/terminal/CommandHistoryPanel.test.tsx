@@ -1,13 +1,14 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { CommandHistoryPanel } from '@/components/terminal/CommandHistoryPanel'
 import { useToastStore } from '@/components/ui/toast'
 import { recordCommand, readCommandHistory } from '@/lib/commandHistory'
 import { requestConfirm } from '@/lib/confirmDialog'
+import { resetCommandHistoryMutationCoordinator } from '@/lib/commandHistoryMutationCoordinator'
 
 const { listHistory, clearHistory } = vi.hoisted(() => ({
-  listHistory: vi.fn(async () => [{ id: 1, command: 'git status' }, { id: 2, command: 'npm test' }]),
+  listHistory: vi.fn(async (_sessionID: number, _query: string) => [{ id: 1, command: 'git status' }, { id: 2, command: 'npm test' }]),
   clearHistory: vi.fn(async () => {}),
 }))
 vi.mock('@/lib/wails', () => ({ CommandHistoryService: { List: listHistory, Clear: clearHistory, Add: vi.fn(async () => null) } }))
@@ -16,8 +17,10 @@ vi.mock('@/lib/confirmDialog', () => ({ requestConfirm: vi.fn(async () => true) 
 describe('CommandHistoryPanel', () => {
   beforeEach(() => {
     localStorage.clear()
+    resetCommandHistoryMutationCoordinator()
     listHistory.mockReset()
     clearHistory.mockReset()
+    vi.mocked(requestConfirm).mockReset()
     listHistory.mockResolvedValue([{ id: 1, command: 'git status' }, { id: 2, command: 'npm test' }])
     clearHistory.mockResolvedValue(undefined)
     vi.mocked(requestConfirm).mockResolvedValue(true)
@@ -92,4 +95,93 @@ describe('CommandHistoryPanel', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('复制失败: clipboard unavailable')
     expect(useToastStore.getState().toasts.filter((item) => item.type === 'error')).toHaveLength(0)
   })
+
+  it('keeps the newest session history when list responses arrive out of order', async () => {
+    const pending = new Map<number, (items: Array<{ id: number; command: string }>) => void>()
+    listHistory.mockImplementation((sessionID: number) => new Promise((resolve) => { pending.set(sessionID, resolve) }))
+    const view = render(<CommandHistoryPanel sessionID={1} onClose={vi.fn()} onFill={vi.fn()} />)
+    view.rerender(<CommandHistoryPanel sessionID={2} onClose={vi.fn()} onFill={vi.fn()} />)
+
+    await act(async () => {
+      pending.get(2)?.([{ id: 2, command: 'new command' }])
+      await Promise.resolve()
+    })
+    expect(screen.getByText('new command')).toBeInTheDocument()
+    await act(async () => {
+      pending.get(1)?.([{ id: 1, command: 'old command' }])
+      await Promise.resolve()
+    })
+    expect(screen.getByText('new command')).toBeInTheDocument()
+    expect(screen.queryByText('old command')).not.toBeInTheDocument()
+  })
+
+  it('does not clear a new session panel when an old clear finishes', async () => {
+    let resolveClear: (() => void) | undefined
+    listHistory.mockImplementation(async (sessionID: number) => (
+      sessionID === 1 ? [{ id: 1, command: 'old command' }] : [{ id: 2, command: 'new command' }]
+    ))
+    clearHistory.mockImplementationOnce(() => new Promise<void>((resolve) => { resolveClear = resolve }))
+    const view = render(<CommandHistoryPanel sessionID={1} onClose={vi.fn()} onFill={vi.fn()} />)
+    expect(await screen.findByText('old command')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: '清空历史' }))
+    await waitFor(() => expect(clearHistory).toHaveBeenCalledWith(1))
+
+    view.rerender(<CommandHistoryPanel sessionID={2} onClose={vi.fn()} onFill={vi.fn()} />)
+    expect(await screen.findByText('new command')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '清空历史' })).toBeDisabled()
+    await act(async () => {
+      resolveClear?.()
+      await Promise.resolve()
+    })
+    expect(screen.getByText('new command')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '清空历史' })).toBeEnabled()
+    expect(useToastStore.getState().toasts.some((item) => item.message.includes('已清空'))).toBe(false)
+  })
+
+  it('opens only one confirmation for rapid clear clicks', async () => {
+    const confirmation = deferred<boolean>()
+    vi.mocked(requestConfirm).mockImplementationOnce(() => confirmation.promise)
+    render(<CommandHistoryPanel sessionID={6} onClose={vi.fn()} onFill={vi.fn()} />)
+    expect(await screen.findByText('git status')).toBeInTheDocument()
+    const clear = screen.getByRole('button', { name: '清空历史' })
+    act(() => {
+      fireEvent.click(clear)
+      fireEvent.click(clear)
+    })
+    expect(requestConfirm).toHaveBeenCalledOnce()
+    await act(async () => confirmation.resolve(false))
+  })
+
+  it('shares clear state and refreshes history across split panes', async () => {
+    const clearing = deferred<void>()
+    let cleared = false
+    listHistory.mockImplementation(async () => cleared ? [] : [{ id: 1, command: 'git status' }])
+    clearHistory.mockImplementation(async () => {
+      await clearing.promise
+      cleared = true
+    })
+    render(<>
+      <section data-testid="first-history"><CommandHistoryPanel sessionID={7} onClose={vi.fn()} onFill={vi.fn()} /></section>
+      <section data-testid="second-history"><CommandHistoryPanel sessionID={7} onClose={vi.fn()} onFill={vi.fn()} /></section>
+    </>)
+    const first = within(screen.getByTestId('first-history'))
+    const second = within(screen.getByTestId('second-history'))
+    expect(await first.findByText('git status')).toBeInTheDocument()
+    expect(await second.findByText('git status')).toBeInTheDocument()
+
+    await userEvent.click(first.getByRole('button', { name: '清空历史' }))
+    await waitFor(() => expect(clearHistory).toHaveBeenCalledOnce())
+
+    expect(second.getByRole('button', { name: '清空历史' })).toBeDisabled()
+    expect(second.getByRole('button', { name: '关闭历史' })).toBeEnabled()
+    await act(async () => { clearing.resolve(); await clearing.promise })
+    await waitFor(() => expect(first.queryByText('git status')).not.toBeInTheDocument())
+    await waitFor(() => expect(second.queryByText('git status')).not.toBeInTheDocument())
+  })
 })
+
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((resolvePromise) => { resolve = resolvePromise })
+  return { promise, resolve }
+}

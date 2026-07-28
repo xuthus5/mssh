@@ -31,6 +31,7 @@ import { DEFAULT_TERMINAL_BEHAVIOR, useTerminalBehaviorStore } from '@/store/ter
 describe('WorkspacePersistence', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    services.set.mockReset().mockResolvedValue(undefined)
     useToastStore.setState({ toasts: [] })
     useAppStore.setState({
       tabs: [],
@@ -103,6 +104,34 @@ describe('WorkspacePersistence', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('恢复工作区失败: workspace restore failed')
   })
 
+  it('does not overwrite the saved workspace after restore fails and resumes after retry', async () => {
+    services.get
+      .mockRejectedValueOnce(new Error('workspace restore failed'))
+      .mockResolvedValueOnce({
+        value: JSON.stringify({
+          version: 2,
+          tabs: [{ type: 'terminal', title: 'prod', sessionId: 7, toolPanel: 'history' }],
+          active: { type: 'tab', index: 0 },
+          workspaceTab: 'sessions',
+          overviewSection: 'keys',
+        }),
+      })
+    render(<><WorkspacePersistence /><WorkspaceRestoreBanner /></>)
+
+    await waitFor(() => expect(useAppStore.getState().workspaceRestoreError).toBe('workspace restore failed'))
+    act(() => useAppStore.setState({ workspaceTab: 'macros' }))
+    await waitPastSaveDelay()
+    expect(services.set).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('button', { name: '重试' }))
+    await waitFor(() => expect(useAppStore.getState().tabs[0]).toMatchObject({ terminalId: 'fresh-terminal' }))
+    await waitPastSaveDelay()
+    expect(services.set).not.toHaveBeenCalled()
+
+    act(() => useAppStore.setState({ workspaceTab: 'macros' }))
+    await waitFor(() => expect(services.set).toHaveBeenCalledOnce(), { timeout: 1000 })
+  })
+
   it('surfaces workspace save failures in banner without toast', async () => {
     services.get.mockResolvedValue({
       value: JSON.stringify({
@@ -120,6 +149,49 @@ describe('WorkspacePersistence', () => {
     await waitFor(() => expect(useAppStore.getState().workspaceSaveError).toBe('workspace save failed'), { timeout: 1000 })
     expect(await screen.findByRole('alert')).toHaveTextContent('保存工作区失败: workspace save failed')
     expect(useToastStore.getState().toasts.filter((item) => item.type === 'error')).toHaveLength(0)
+  })
+
+  it('persists the first real layout change when no saved workspace exists', async () => {
+    services.get.mockResolvedValue(null)
+    render(<WorkspacePersistence />)
+    await waitFor(() => expect(services.get).toHaveBeenCalledOnce())
+    await waitPastSaveDelay()
+    expect(services.set).not.toHaveBeenCalled()
+
+    act(() => useAppStore.setState({ workspaceTab: 'macros' }))
+    await waitFor(() => expect(services.set).toHaveBeenCalledOnce(), { timeout: 1000 })
+  })
+
+  it('serializes slow saves and persists only the latest queued snapshot', async () => {
+    services.get.mockResolvedValue({
+      value: JSON.stringify({
+        version: 2,
+        tabs: [],
+        active: null,
+        workspaceTab: 'sessions',
+        overviewSection: 'sessions',
+      }),
+    })
+    let resolveFirst: (() => void) | undefined
+    services.set
+      .mockImplementationOnce(() => new Promise<void>((resolve) => { resolveFirst = resolve }))
+      .mockResolvedValue(undefined)
+    render(<WorkspacePersistence />)
+    await waitFor(() => expect(services.get).toHaveBeenCalled())
+
+    act(() => useAppStore.setState({ workspaceTab: 'macros' }))
+    await waitFor(() => expect(services.set).toHaveBeenCalledTimes(1), { timeout: 1000 })
+    act(() => useAppStore.setState({ overviewSection: 'keys' }))
+    await new Promise((resolve) => setTimeout(resolve, 350))
+    expect(services.set).toHaveBeenCalledTimes(1)
+
+    await act(async () => {
+      resolveFirst?.()
+      await Promise.resolve()
+    })
+    await waitFor(() => expect(services.set).toHaveBeenCalledTimes(2))
+    const saved = JSON.parse(services.set.mock.calls[1][0].value)
+    expect(saved).toMatchObject({ workspaceTab: 'macros', overviewSection: 'keys' })
   })
 
   it('skips restoring terminal tabs when restore-on-startup is disabled', async () => {
@@ -141,7 +213,7 @@ describe('WorkspacePersistence', () => {
     })
     useTerminalBehaviorStore.setState({
       ...DEFAULT_TERMINAL_BEHAVIOR,
-      settingsHydrated: false,
+      settingsHydrated: true,
       restoreTabsOnStartup: false,
     })
     services.get.mockResolvedValue({
@@ -154,17 +226,14 @@ describe('WorkspacePersistence', () => {
       }),
     })
     const view = render(<WorkspacePersistence />)
-    act(() => {
-      useTerminalBehaviorStore.setState({
-        settingsHydrated: true,
-        restoreTabsOnStartup: false,
-        renderer: 'dom',
-        historyPredict: false,
-      })
-    })
     await waitFor(() => expect(services.get).not.toHaveBeenCalled())
     expect(services.open).not.toHaveBeenCalled()
     expect(useAppStore.getState().tabs).toHaveLength(0)
+    await waitPastSaveDelay()
+    expect(services.set).not.toHaveBeenCalled()
+
+    act(() => useAppStore.setState({ workspaceTab: 'macros' }))
+    await waitFor(() => expect(services.set).toHaveBeenCalledOnce(), { timeout: 1000 })
     view.unmount()
   })
 
@@ -205,3 +274,9 @@ describe('WorkspacePersistence', () => {
   })
 
 })
+
+async function waitPastSaveDelay() {
+  await act(async () => {
+    await new Promise((resolve) => window.setTimeout(resolve, 350))
+  })
+}

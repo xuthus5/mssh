@@ -2075,6 +2075,20 @@ export class SecurityUnlockInput {
 }
 
 /**
+ * SerialLineEnding controls how Enter / newline is sent to the device.
+ */
+export enum SerialLineEnding {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    SerialLineEndingCR = "cr",
+    SerialLineEndingLF = "lf",
+    SerialLineEndingCRLF = "crlf",
+};
+
+/**
  * SerialParity represents serial parity mode.
  */
 export enum SerialParity {
@@ -2251,6 +2265,51 @@ export class SerialPortInput {
 }
 
 /**
+ * SerialSignals is the runtime modem line state for an open serial terminal.
+ * DTR/RTS are outputs (last requested). CTS/DSR/DCD/RI are inputs from GetModemStatusBits.
+ */
+export class SerialSignals {
+    "dtr": boolean;
+    "rts": boolean;
+    "cts": boolean;
+    "dsr": boolean;
+    "dcd": boolean;
+    "ri": boolean;
+
+    /** Creates a new SerialSignals instance. */
+    constructor($$source: Partial<SerialSignals> = {}) {
+        if (!("dtr" in $$source)) {
+            this["dtr"] = false;
+        }
+        if (!("rts" in $$source)) {
+            this["rts"] = false;
+        }
+        if (!("cts" in $$source)) {
+            this["cts"] = false;
+        }
+        if (!("dsr" in $$source)) {
+            this["dsr"] = false;
+        }
+        if (!("dcd" in $$source)) {
+            this["dcd"] = false;
+        }
+        if (!("ri" in $$source)) {
+            this["ri"] = false;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new SerialSignals instance from a string or object.
+     */
+    static createFrom($$source: any = {}): SerialSignals {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new SerialSignals($$parsedSource as Partial<SerialSignals>);
+    }
+}
+
+/**
  * SerialStopBits represents serial stop bit configuration.
  */
 export enum SerialStopBits {
@@ -2373,6 +2432,10 @@ export enum SessionCSVConflictPolicy {
 export class SessionCSVExportOptions {
     "session_ids": number[];
     "include_passwords": boolean;
+
+    /**
+     * ConfirmPassword is required when IncludePasswords is true (step-up auth).
+     */
     "confirm_password"?: string;
 
     /** Creates a new SessionCSVExportOptions instance. */
@@ -4183,62 +4246,3 @@ const $$createType45 = ThemeImportResult.createFrom;
 const $$createType46 = $Create.Array($$createType45);
 const $$createType47 = ThemeDefinition.createFrom;
 const $$createType48 = $Create.Nullable($$createType47);
-/**
- * SerialLineEnding controls how Enter / newline is sent to the device.
- */
-export enum SerialLineEnding {
-    /**
-     * The Go zero value for the underlying type of the enum.
-     */
-    $zero = "",
-
-    SerialLineEndingCR = "cr",
-    SerialLineEndingLF = "lf",
-    SerialLineEndingCRLF = "crlf",
-}
-
-/**
- * SerialSignals is the runtime modem line state for an open serial terminal.
- * DTR/RTS are outputs; CTS/DSR/DCD/RI are inputs from the modem status bits.
- */
-export class SerialSignals {
-    "dtr": boolean;
-    "rts": boolean;
-    "cts": boolean;
-    "dsr": boolean;
-    "dcd": boolean;
-    "ri": boolean;
-
-    /** Creates a new SerialSignals instance. */
-    constructor($$source: Partial<SerialSignals> = {}) {
-        if (!("dtr" in $$source)) {
-            this["dtr"] = false;
-        }
-        if (!("rts" in $$source)) {
-            this["rts"] = false;
-        }
-        if (!("cts" in $$source)) {
-            this["cts"] = false;
-        }
-        if (!("dsr" in $$source)) {
-            this["dsr"] = false;
-        }
-        if (!("dcd" in $$source)) {
-            this["dcd"] = false;
-        }
-        if (!("ri" in $$source)) {
-            this["ri"] = false;
-        }
-        Object.assign(this, $$source);
-    }
-
-    /**
-     * Creates a new SerialSignals instance from a string or object.
-     */
-    static createFrom($$source: any = {}): SerialSignals {
-        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
-        return new SerialSignals($$parsedSource as Partial<SerialSignals>);
-    }
-}
-
-

@@ -1,9 +1,7 @@
-import { create } from 'zustand'
-import { SessionService } from '@/lib/wails'
-import { t } from '@/i18n'
+import { create, type StateCreator } from 'zustand'
+import { logger } from '@/lib/logger'
 
-
-export type ConnectState = 'idle' | 'connecting' | 'awaiting-host-key' | 'connected' | 'failed' | 'cancelling'
+export type ConnectState = 'idle' | 'connecting' | 'connected' | 'failed' | 'cancelling'
 
 interface ConnectDialogState {
   open: boolean
@@ -12,101 +10,105 @@ interface ConnectDialogState {
   port: number
   user: string
   error: string
-  fingerprint: string
-  algorithm: string
-  attemptId: string
   sessionId: string
+  dialogId: number
+  cancelRequest: (() => void) | null
   retry: (() => void) | null
-  openDialog: (host: string, port: number, user: string, retry: () => void, sessionId?: string) => void
-  setState: (s: ConnectState) => void
-  setError: (msg: string) => void
-  setAttempt: (attemptId: string) => void
-  setFingerprint: (attemptId: string, fp: string, algorithm: string) => void
-  acceptHostKey: () => Promise<void>
-  rejectHostKey: () => Promise<void>
+  openDialog: (host: string, port: number, user: string, retry: () => void, sessionId?: string) => number
+  setCancelHandler: (dialogId: number, cancelRequest: () => void) => void
+  completeDialog: (dialogId: number) => void
+  failDialog: (dialogId: number, message: string) => void
   cancelConnection: () => Promise<void>
-  closeDialog: () => void
-  /** Close dialog if it is tracking one of the given sessions (e.g. session deleted). */
+  closeDialog: (dialogId?: number) => void
   dismissForSessions: (sessionIDs: Iterable<string>) => void
 }
 
-export const useConnectDialog = create<ConnectDialogState>((set) => ({
+let nextDialogId = 1
+
+const idleDialog = () => ({
   open: false,
-  state: 'idle',
+  state: 'idle' as ConnectState,
   host: '',
   port: 0,
   user: '',
   error: '',
-  fingerprint: '',
-  algorithm: '',
-  attemptId: '',
   sessionId: '',
+  dialogId: 0,
+  cancelRequest: null,
   retry: null,
-  openDialog: (host, port, user, retry, sessionId = '') => set({
-    open: true,
-    state: 'connecting',
-    host,
-    port,
-    user,
-    retry,
-    sessionId: sessionId ? String(sessionId) : '',
-    error: '',
-    fingerprint: '',
-    algorithm: '',
-    attemptId: '',
-  }),
-  setState: (s) => {
-    if (s === 'connected') set({ open: false, state: 'idle' })
-    else set({ state: s })
+})
+
+type DialogSet = Parameters<StateCreator<ConnectDialogState>>[0]
+type DialogGet = Parameters<StateCreator<ConnectDialogState>>[1]
+
+function createDialogLifecycleActions(set: DialogSet, get: DialogGet) {
+  return {
+  openDialog: (...args: Parameters<ConnectDialogState['openDialog']>) => {
+    const [host, port, user, retry, sessionId = ''] = args
+    const dialogId = nextDialogId++
+    set({
+      open: true,
+      state: 'connecting',
+      host,
+      port,
+      user,
+      retry,
+      sessionId: sessionId ? String(sessionId) : '',
+      error: '',
+      dialogId,
+      cancelRequest: null,
+    })
+    return dialogId
   },
-  setError: (msg) => set({ state: 'failed', error: msg }),
-  setAttempt: (attemptId) => set({ attemptId }),
-  setFingerprint: (attemptId, fingerprint, algorithm) => set({ attemptId, fingerprint, algorithm, state: 'awaiting-host-key' }),
-  acceptHostKey: async () => {
-    const { attemptId } = useConnectDialog.getState()
-    if (!attemptId) {
-      const message = t('连接尝试尚未就绪')
-      set({ state: 'failed', error: message })
-      throw new Error(message)
-    }
-    try {
-      await SessionService.DecideHostKey(attemptId, true)
-      set({ state: 'connecting', fingerprint: '', algorithm: '' })
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error)
-      set({ state: 'failed', error: message })
-      throw error
-    }
+  setCancelHandler: (dialogId: number, cancelRequest: () => void) => {
+    if (get().dialogId === dialogId) set({ cancelRequest })
   },
-  rejectHostKey: async () => {
-    const { attemptId } = useConnectDialog.getState()
-    try {
-      if (attemptId) await SessionService.DecideHostKey(attemptId, false)
-      set({ open: false, state: 'idle', fingerprint: '', algorithm: '', attemptId: '', sessionId: '', error: '' })
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error)
-      set({ state: 'failed', error: message })
-      throw error
-    }
+  completeDialog: (dialogId: number) => {
+    if (get().dialogId === dialogId) set(idleDialog())
   },
+  failDialog: (dialogId: number, message: string) => {
+    if (get().dialogId === dialogId) set({ state: 'failed', error: message })
+  },
+  }
+}
+
+function createDialogCloseActions(set: DialogSet, get: DialogGet) {
+  return {
   cancelConnection: async () => {
-    const { attemptId } = useConnectDialog.getState()
+    const current = get()
+    if (!current.open) return
     set({ state: 'cancelling' })
     try {
-      if (attemptId) await SessionService.CancelConnect(attemptId)
-      set({ open: false, state: 'idle', attemptId: '', sessionId: '', fingerprint: '', algorithm: '', error: '' })
+      current.cancelRequest?.()
+      if (get().dialogId === current.dialogId) set(idleDialog())
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
-      set({ state: 'failed', error: message })
+      if (get().dialogId === current.dialogId) set({ state: 'failed', error: message })
       throw error
     }
   },
-  closeDialog: () => set({ open: false, state: 'idle', attemptId: '', sessionId: '', fingerprint: '', algorithm: '', retry: null }),
-  dismissForSessions: (sessionIDs) => {
+  closeDialog: (dialogId?: number) => {
+    const current = get()
+    if (dialogId && current.dialogId !== dialogId) return
+    try {
+      current.cancelRequest?.()
+    } catch (error: unknown) {
+      logger.error('cancel dialog request failed', error)
+    }
+    set(idleDialog())
+  },
+  dismissForSessions: (sessionIDs: Iterable<string>) => {
     const targets = new Set([...sessionIDs].map(String).filter(Boolean))
     if (targets.size === 0) return
-    const current = useConnectDialog.getState()
+    const current = get()
     if (!current.open || !current.sessionId || !targets.has(String(current.sessionId))) return
-    useConnectDialog.getState().closeDialog()
+    get().closeDialog(current.dialogId)
   },
+  }
+}
+
+export const useConnectDialog = create<ConnectDialogState>((set, get) => ({
+  ...idleDialog(),
+  ...createDialogLifecycleActions(set, get),
+  ...createDialogCloseActions(set, get),
 }))

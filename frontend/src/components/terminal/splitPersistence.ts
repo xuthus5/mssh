@@ -5,6 +5,7 @@ import { openTerminalWithPoolCapacity, releaseAppTerminalOpenReservation } from 
 import {
   materializeSplitLayout,
   serializeSplitLayout,
+  isSplitLayoutSnapshot,
   type SplitLayoutSnapshot,
 } from '@/components/terminal/splitLayout'
 import { splitLeaf, terminalIDs, type SplitNode } from '@/components/terminal/splitTree'
@@ -17,7 +18,8 @@ export function readTabSplitLayout(tabID: string): SplitLayoutSnapshot | null {
   return tab.splitLayout ?? null
 }
 
-export function persistTabSplitLayout(tabID: string, tree: SplitNode, primaryID: string, connectionKind?: string) {
+export function persistTabSplitLayout(...args: [string, SplitNode, string, string?]) {
+  const [tabID, tree, primaryID, connectionKind] = args
   const paneIDs = terminalIDs(tree)
   if (connectionKind === 'serial') {
     useAppStore.getState().updateTerminalWorkspace(tabID, { splitLayout: null, splitPaneIDs: paneIDs })
@@ -31,7 +33,7 @@ type OpenFn = () => Promise<string>
 
 export function closeExtraSplitPanes(terminalIDs: string[], context: string): void {
 	for (const id of terminalIDs) {
-		releaseAppTerminalOpenReservation(id)
+		useAppStore.getState().forgetTerminal(id)
 		void TerminalService.Close(id).catch((closeErr: unknown) => {
       logger.error(context, closeErr)
     })
@@ -68,13 +70,14 @@ export async function restoreSplitTreeFromLayout(
   openOne: OpenFn,
 ): Promise<RestoredSplitLayout | null> {
   if (!layout || layout.paneCount < 2) return null
+  if (!isSplitLayoutSnapshot(layout)) throw new Error('split layout snapshot is invalid')
   const extra = layout.paneCount - 1
   const extras = await openExtraSplitPanes(extra, openOne)
   const terminalIDs = [primaryID, ...extras]
   const tree = materializeSplitLayout(layout, terminalIDs)
   if (!tree) {
     closeExtraSplitPanes(extras, 'split restore materialize cleanup failed')
-    return null
+    throw new Error('split layout could not be materialized')
   }
   return { tree, extraTerminalIDs: extras }
 }
@@ -84,13 +87,14 @@ export function initialSplitTree(primaryID: string): SplitNode {
   return splitLeaf(primaryID)
 }
 
-export function openSplitTerminal(
-  sessionId: number,
-  connectionKind: 'ssh' | 'serial' | 'local' | undefined,
-  serialPortId: number | undefined,
-  serialBlockedMessage: string,
-  preferredTerminalID?: string | null,
-): Promise<string> {
+export function openSplitTerminal(...args: [
+  number,
+  'ssh' | 'serial' | 'local' | undefined,
+  number | undefined,
+  string,
+  (string | null)?,
+]): Promise<string> {
+  const [sessionId, connectionKind, serialPortId, serialBlockedMessage, preferredTerminalID] = args
   const size = resolveOpenTerminalSize(preferredTerminalID)
   if (connectionKind === 'local') return TerminalService.OpenLocal(size.cols, size.rows)
   if (connectionKind === 'serial') throw new Error(serialBlockedMessage)

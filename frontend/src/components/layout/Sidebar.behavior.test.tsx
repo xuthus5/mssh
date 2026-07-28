@@ -1,7 +1,7 @@
-import { act, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { useToastStore } from '@/components/ui/toast'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const workspace = vi.hoisted(() => ({
   folders: [] as any[],
@@ -50,6 +50,8 @@ vi.mock('@/components/layout/SidebarDialogs', () => ({
 }))
 
 import Sidebar from '@/components/layout/Sidebar'
+import { MacrosWorkspace } from '@/components/layout/MacrosWorkspace'
+import { useLanguageStore } from '@/i18n'
 import { useAppStore } from '@/store/appStore'
 
 const folders = [
@@ -63,6 +65,10 @@ const sessions = [
 const sessionDraft = { name: 'Saved', host: 'saved.internal', port: 22, username: 'root', authMethod: 'password', keepAlive: 30, termType: 'xterm', folderId: null }
 
 describe('Sidebar behavior', () => {
+  afterEach(() => {
+    useLanguageStore.getState().setLanguage('zh-CN')
+  })
+
   beforeEach(() => {
     Object.assign(workspace, { folders: [...folders], sessions: [...sessions], loading: false, error: '' })
     for (const value of Object.values(workspace)) if (typeof value === 'function' && 'mockClear' in value) value.mockClear()
@@ -134,6 +140,40 @@ describe('Sidebar behavior', () => {
     await user.click(screen.getByRole('button', { name: 'session-close' }))
     expect(screen.getByTestId('session-dialog')).toHaveTextContent('session:false:new')
 
+  })
+
+  it('keeps a newly opened session dialog when an older save completes', async () => {
+    let resolveCreate: (() => void) | undefined
+    workspace.createSession.mockImplementationOnce(() => new Promise<void>((resolve) => { resolveCreate = resolve }))
+    render(<Sidebar />)
+
+    act(() => window.dispatchEvent(new CustomEvent('mssh:new-session')))
+    await userEvent.click(screen.getByRole('button', { name: 'session-save' }))
+    act(() => window.dispatchEvent(new CustomEvent('mssh:edit-session', { detail: sessions[1] })))
+    expect(screen.getByTestId('session-dialog')).toHaveTextContent('session:true:Database')
+    await act(async () => {
+      resolveCreate?.()
+      await Promise.resolve()
+    })
+    expect(screen.getByTestId('session-dialog')).toHaveTextContent('session:true:Database')
+  })
+
+  it('does not paint an old folder failure into a newly selected folder', async () => {
+    let rejectCreate: ((reason?: unknown) => void) | undefined
+    workspace.createFolder.mockImplementationOnce(() => new Promise<void>((_, reject) => { rejectCreate = reject }))
+    render(<Sidebar />)
+
+    act(() => window.dispatchEvent(new CustomEvent('mssh:new-folder')))
+    await userEvent.type(screen.getByLabelText('mock-folder-name'), 'Old')
+    await userEvent.click(screen.getByRole('button', { name: 'folder-submit' }))
+    act(() => window.dispatchEvent(new CustomEvent('mssh:edit-folder', { detail: folders[1] })))
+    expect(screen.getByTestId('folder-dialog')).toHaveTextContent('folder:true:Databases')
+    await act(async () => {
+      rejectCreate?.(new Error('old folder failed'))
+      await Promise.resolve()
+    })
+    expect(screen.getByTestId('folder-dialog')).toHaveTextContent('folder:true:Databases')
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
   it('keeps the session tree mounted while refreshing existing data', () => {
@@ -219,10 +259,58 @@ describe('Sidebar behavior', () => {
     await waitFor(() => expect(macroService.Execute).toHaveBeenCalled())
   })
 
+  it('shares one macro mutation lease across sidebar and workspace surfaces', async () => {
+    const deletion = deferred<void>()
+    const initial = [{ id: 1, name: 'Initial', shortcut: '', command: 'initial' }]
+    macroService.List.mockReset()
+      .mockResolvedValueOnce(initial)
+      .mockResolvedValueOnce(initial)
+      .mockResolvedValue([])
+    macroService.Delete.mockImplementationOnce(() => deletion.promise)
+    useAppStore.setState({ workspaceTab: 'macros', activeSurface: { type: 'workspace', id: 'macros' } })
+    render(<><Sidebar /><MacrosWorkspace /></>)
+
+    expect(await screen.findAllByText('Initial')).toHaveLength(2)
+    const deleteButtons = screen.getAllByRole('button', { name: '删除 Initial' })
+    await userEvent.click(deleteButtons[0])
+    await waitFor(() => expect(macroService.Delete).toHaveBeenCalledOnce())
+    expect(deleteButtons[0]).toBeDisabled()
+    expect(deleteButtons[1]).toBeDisabled()
+    expect(screen.getByRole('button', { name: '添加快捷命令' })).toBeDisabled()
+
+    fireEvent.click(deleteButtons[1])
+    expect(macroService.Delete).toHaveBeenCalledOnce()
+    await act(async () => deletion.resolve())
+    await waitFor(() => expect(screen.queryByText('Initial')).not.toBeInTheDocument())
+  })
+
   it('logs macro loading failures', async () => {
     macroService.List.mockRejectedValue(new Error('list failed'))
     render(<Sidebar />)
     await waitFor(() => expect(logger.error).toHaveBeenCalledWith('Sidebar: list macros error', expect.any(Error)))
+  })
+
+  it('keeps English macro action failures distinct from load failures', async () => {
+    useLanguageStore.getState().setLanguage('en')
+    useAppStore.setState({
+      workspaceTab: 'macros',
+      activeSurface: { type: 'workspace', id: 'macros' },
+    })
+    macroService.Create.mockRejectedValueOnce(new Error('create failed'))
+    render(<Sidebar />)
+
+    const quickCommands = await screen.findByText('Quick commands')
+    const panel = quickCommands.parentElement?.parentElement
+    if (!panel) throw new Error('quick commands were not rendered')
+    await userEvent.click(within(panel).getAllByRole('button')[0])
+    await userEvent.type(screen.getByPlaceholderText('Name'), 'Deploy')
+    await userEvent.type(screen.getByPlaceholderText('Command'), 'deploy')
+    await userEvent.click(screen.getByRole('button', { name: 'Add' }))
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent('Failed to create macro: create failed')
+    expect(alert).not.toHaveTextContent('Failed to load macros')
+    expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument()
   })
 
   it('navigates overview sections and returns to the previous workspace', async () => {
@@ -242,3 +330,9 @@ describe('Sidebar behavior', () => {
     expect(useAppStore.getState().activeSurface).toBeNull()
   })
 })
+
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((resolvePromise) => { resolve = resolvePromise })
+  return { promise, resolve }
+}

@@ -15,9 +15,14 @@ const catalog = vi.hoisted(() => ({
 vi.mock('@/hooks/useSettings', () => ({ useSettings: () => settings }))
 vi.mock('@/hooks/useCloudSyncCenter', () => ({ useCloudSyncCenter: () => ({ dashboard: null, loading: false, pending: null, error: null, reload: vi.fn(async () => {}), saveConfig: vi.fn(async () => {}), testProvider: vi.fn(async () => {}), syncNow: vi.fn(async () => {}), pushNow: vi.fn(async () => {}), pullNow: vi.fn(async () => {}), resolveConflict: vi.fn(async () => {}), restoreVersion: vi.fn(async () => {}), deleteVersion: vi.fn(async () => {}), resetLocalData: vi.fn(async () => {}) }) }))
 vi.mock('@/hooks/useThemeCatalog', () => ({ useThemeCatalog: () => catalog }))
+vi.mock('@/hooks/useAISettings', () => ({ useAISettings: () => ({}) }))
 vi.mock('@/components/settings/SettingsView', () => ({ SettingsView: () => <main>settings-content</main> }))
 vi.mock('@/components/settings/SettingsWindowTitleBar', () => ({ SettingsWindowTitleBar: () => <header>设置</header> }))
-vi.mock('@/components/security/VaultGate', () => ({ VaultGate: ({ children }: { children: React.ReactNode }) => children }))
+vi.mock('@/components/security/VaultGate', () => ({
+  VaultGate: ({ children, clearOnSettingsHide }: { children: React.ReactNode; clearOnSettingsHide?: boolean }) => (
+    <div data-testid="vault-gate" data-clear-on-settings-hide={String(clearOnSettingsHide)}>{children}</div>
+  ),
+}))
 
 import { SettingsWindowApp } from '@/components/settings/SettingsWindowApp'
 
@@ -26,6 +31,7 @@ describe('SettingsWindowApp', () => {
     render(<SettingsWindowApp />)
     expect(screen.getByRole('banner')).toHaveTextContent('设置')
     expect(screen.getByRole('main')).toHaveTextContent('settings-content')
+    expect(screen.getByTestId('vault-gate')).toHaveAttribute('data-clear-on-settings-hide', 'true')
     expect(screen.queryByText('Secure Shell Client & Session Manager')).not.toBeInTheDocument()
   })
 })

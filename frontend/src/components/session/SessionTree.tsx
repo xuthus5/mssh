@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type KeyboardEvent, type MouseEvent } from 'react'
+import { useRef, type MouseEvent, type ReactNode } from 'react'
 import {
   ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuItem,
   ContextMenuSeparator, ContextMenuSub, ContextMenuSubTrigger, ContextMenuSubContent,
@@ -7,9 +7,9 @@ import { ChevronRight, ChevronDown, Folder as FolderIcon, Server } from 'lucide-
 import type { Folder, Session } from '@/hooks/useSession'
 import { Badge } from '@/components/ui/badge'
 import { VirtualList } from '@/components/ui/virtual-list'
-import { buildVisibleSessionTreeNodes, type SessionTreeNode } from '@/lib/sessionTreeModel'
-import { isTreeNavigationKey, nextTreeIndex } from '@/lib/treeKeyboard'
+import type { SessionTreeNode } from '@/lib/sessionTreeModel'
 import { t } from '@/i18n'
+import { useSessionTreeNavigation } from '@/components/session/useSessionTreeNavigation'
 
 interface Props {
   folders: Folder[]
@@ -29,110 +29,68 @@ const ROW = 32
 const VIRTUALIZE_AFTER = 80
 
 export default function SessionTree(props: Props) {
-  const {
-    folders, sessions, onConnect, onEditSession, onDeleteSession, onEditFolder, onDeleteFolder,
-    onMoveToFolder, onSelectFolder, navigationOnly = false, revealAll = false,
-  } = props
-  const [expanded, setExpanded] = useState<Set<string>>(new Set())
-  const [activeIndex, setActiveIndex] = useState(0)
-  const toggleFolder = (id: string) => {
-    setExpanded((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
-  }
-  const nodes = useMemo(
-    () => buildVisibleSessionTreeNodes(folders, sessions, expanded, revealAll),
-    [folders, sessions, expanded, revealAll],
-  )
-  const activeId = nodes[Math.min(Math.max(activeIndex, 0), Math.max(nodes.length - 1, 0))]?.id
-
-  useEffect(() => {
-    if (!activeId) return
-    const element = document.getElementById(activeId)
-    if (element && typeof element.scrollIntoView === 'function') {
-      element.scrollIntoView({ block: 'nearest' })
-    }
-  }, [activeId])
-
-  const handleNodeKey = (event: KeyboardEvent, index: number, node: SessionTreeNode) => {
-    if (event.key === 'ArrowDown' || event.key === 'ArrowUp' || event.key === 'Home' || event.key === 'End') {
-      if (!isTreeNavigationKey(event.key)) return
-      const next = nextTreeIndex(index, event.key, nodes.length)
-      if (next !== null) { setActiveIndex(next); event.preventDefault() }
-      return
-    }
-    if (node.kind === 'folder') {
-      if (event.key === 'Enter' || event.key === ' ') {
-        toggleFolder(node.folder.id); onSelectFolder?.(node.folder.id); event.preventDefault()
-      } else if (event.key === 'ArrowRight' && !node.expanded) {
-        toggleFolder(node.folder.id); event.preventDefault()
-      } else if (event.key === 'ArrowLeft' && node.expanded) {
-        toggleFolder(node.folder.id); event.preventDefault()
-      }
-      return
-    }
-    if (event.key === 'Enter' || event.key === ' ') {
-      onConnect(node.session.id)
-      event.preventDefault()
-    }
-  }
-
+  const { folders, sessions, onConnect, onSelectFolder, navigationOnly = false, revealAll = false } = props
+  const treeRef = useRef<HTMLDivElement>(null)
+  const navigation = useSessionTreeNavigation({ folders, sessions, revealAll, onConnect, onSelectFolder })
   const renderNode = (node: SessionTreeNode, index: number) => (
     <TreeRow
+      {...props}
       key={node.id}
       node={node}
-      active={index === activeIndex}
+      active={index === navigation.activeIndex}
       navigationOnly={navigationOnly}
-      folders={folders}
-      onActivate={() => setActiveIndex(index)}
-      onKeyDown={(event) => { event.stopPropagation(); handleNodeKey(event, index, node) }}
-      onToggleFolder={toggleFolder}
-      onSelectFolder={onSelectFolder}
-      onConnect={onConnect}
-      onEditSession={onEditSession}
-      onDeleteSession={onDeleteSession}
-      onEditFolder={onEditFolder}
-      onDeleteFolder={onDeleteFolder}
-      onMoveToFolder={onMoveToFolder}
+      onActivate={() => {
+        navigation.setActiveIndex(index)
+        treeRef.current?.focus()
+      }}
+      onToggleFolder={navigation.toggleFolder}
     />
   )
 
   return (
     <div
+      ref={treeRef}
       role="tree"
       aria-label={t('会话列表')}
-      aria-activedescendant={activeId}
+      aria-activedescendant={navigation.activeId}
       tabIndex={0}
       className="flex h-full flex-col p-2 outline-none"
       onKeyDown={(event) => {
-        const node = nodes[activeIndex]
-        if (node) handleNodeKey(event, activeIndex, node)
+        const node = navigation.nodes[navigation.activeIndex]
+        if (node) navigation.handleNodeKey(event, navigation.activeIndex, node)
       }}
     >
       <div className="mb-2 px-1 text-xs font-medium text-muted-foreground">{t('会话列表')}</div>
       <div className="min-h-0 flex-1 overflow-y-auto">
-        {nodes.length === 0 ? (
-          <p className="px-1 text-xs text-muted-foreground">{t('暂无会话')}</p>
-        ) : nodes.length > VIRTUALIZE_AFTER ? (
-          <VirtualList items={nodes} estimateSize={ROW} getKey={(node) => node.id} renderItem={(node, index) => renderNode(node, index)} />
-        ) : (
-          nodes.map((node, index) => renderNode(node, index))
-        )}
+        <SessionTreeRows navigation={navigation} renderNode={renderNode} />
       </div>
     </div>
   )
 }
 
-function TreeRow(props: {
+interface SessionTreeRowsProps {
+  navigation: ReturnType<typeof useSessionTreeNavigation>
+  renderNode: (node: SessionTreeNode, index: number) => ReactNode
+}
+
+function SessionTreeRows({ navigation, renderNode }: SessionTreeRowsProps) {
+  if (navigation.nodes.length === 0) return <p className="px-1 text-xs text-muted-foreground">{t('暂无会话')}</p>
+  if (navigation.nodes.length <= VIRTUALIZE_AFTER) return navigation.nodes.map(renderNode)
+  return <VirtualList
+    items={navigation.nodes}
+    estimateSize={ROW}
+    getKey={(node) => node.id}
+    renderItem={renderNode}
+    scrollToIndex={navigation.activeIndex}
+  />
+}
+
+interface TreeRowProps {
   node: SessionTreeNode
   active: boolean
   navigationOnly: boolean
   folders: Folder[]
   onActivate: () => void
-  onKeyDown: (event: KeyboardEvent) => void
   onToggleFolder: (id: string) => void
   onSelectFolder?: (folderId: string) => void
   onConnect: (sessionId: string) => void
@@ -141,53 +99,52 @@ function TreeRow(props: {
   onEditFolder?: (folder: Folder) => void
   onDeleteFolder?: (folderId: string) => void
   onMoveToFolder?: (sessionId: string, folderId: string | null) => void | Promise<void>
-}) {
-  if (props.node.kind === 'folder') {
-    const folder = props.node.folder
-    const row = (
+}
+
+function TreeRow(props: TreeRowProps) {
+  return props.node.kind === 'folder' ? <FolderTreeRow {...props} node={props.node} /> : <SessionTreeRow {...props} node={props.node} />
+}
+
+function FolderTreeRow(props: TreeRowProps & { node: Extract<SessionTreeNode, { kind: 'folder' }> }) {
+  const folder = props.node.folder
+  const row = (
       <div
         id={props.node.id}
         role="treeitem"
         aria-expanded={props.node.expanded}
-        tabIndex={0}
+        aria-selected={props.active}
         className={`flex cursor-pointer select-none items-center gap-1 rounded px-1 py-1 text-sm hover:bg-muted/50 ${props.active ? 'bg-muted' : ''}`}
         style={{ paddingLeft: 4 + props.node.depth * 12 }}
         onClick={() => { props.onActivate(); props.onToggleFolder(folder.id); props.onSelectFolder?.(folder.id) }}
         onDoubleClick={(event: MouseEvent) => { event.preventDefault(); event.stopPropagation() }}
-        onKeyDown={props.onKeyDown}
       >
         <span className="shrink-0">{props.node.expanded ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}</span>
         <FolderIcon className="size-3.5 shrink-0 text-muted-foreground" />
         <span className="truncate">{folder.name}</span>
         {folder.isDefault ? <Badge className="ml-auto">{t('默认')}</Badge> : null}
       </div>
-    )
-    if (props.navigationOnly) return row
-    return (
-      <ContextMenu>
-        <ContextMenuTrigger>{row}</ContextMenuTrigger>
-        <ContextMenuContent>
-          <ContextMenuItem onClick={() => props.onEditFolder?.(folder)}>{t('编辑')}</ContextMenuItem>
-          <ContextMenuItem variant="destructive" onClick={() => props.onDeleteFolder?.(folder.id)}>{t('删除')}</ContextMenuItem>
-        </ContextMenuContent>
-      </ContextMenu>
-    )
-  }
+  )
+  if (props.navigationOnly) return row
+  return <TreeContextMenu row={row}>
+    <ContextMenuItem onClick={() => props.onEditFolder?.(folder)}>{t('编辑')}</ContextMenuItem>
+    <ContextMenuItem variant="destructive" onClick={() => props.onDeleteFolder?.(folder.id)}>{t('删除')}</ContextMenuItem>
+  </TreeContextMenu>
+}
 
+function SessionTreeRow(props: TreeRowProps & { node: Extract<SessionTreeNode, { kind: 'session' }> }) {
   const session = props.node.session
   const detail = t('主机：${}\n端口：${}\n用户：${}', session.host, session.port, session.username)
   const row = (
     <div
       id={props.node.id}
       role="treeitem"
-      tabIndex={0}
+      aria-selected={props.active}
       title={detail}
       aria-label={session.name}
       className={`flex cursor-pointer select-none items-center gap-1 rounded px-1 py-1 text-sm hover:bg-muted/50 ${props.active ? 'bg-muted' : ''}`}
       style={{ paddingLeft: 4 + props.node.depth * 12 }}
       onClick={props.onActivate}
       onDoubleClick={(event: MouseEvent) => { event.preventDefault(); props.onConnect(session.id) }}
-      onKeyDown={props.onKeyDown}
     >
       <Server className="size-3.5 shrink-0 text-muted-foreground" />
       <span className="truncate">{session.name}</span>
@@ -197,29 +154,33 @@ function TreeRow(props: {
     </div>
   )
   if (props.navigationOnly) return row
-  return (
-    <ContextMenu>
-      <ContextMenuTrigger>{row}</ContextMenuTrigger>
-      <ContextMenuContent>
-        <ContextMenuItem onClick={() => props.onConnect(session.id)}>{t('连接')}</ContextMenuItem>
-        <ContextMenuItem onClick={() => props.onEditSession?.(session)}>{t('编辑')}</ContextMenuItem>
-        {props.onMoveToFolder ? (
-          <>
-            <ContextMenuSeparator />
-            <ContextMenuSub>
-              <ContextMenuSubTrigger>{t('移动到')}</ContextMenuSubTrigger>
-              <ContextMenuSubContent>
-                <ContextMenuItem onClick={() => { void Promise.resolve(props.onMoveToFolder?.(session.id, null)).catch(() => undefined) }}>{t('根目录')}</ContextMenuItem>
-                {props.folders.map((folder) => (
-                  <ContextMenuItem key={folder.id} onClick={() => { void Promise.resolve(props.onMoveToFolder?.(session.id, folder.id)).catch(() => undefined) }}>{folder.name}</ContextMenuItem>
-                ))}
-              </ContextMenuSubContent>
-            </ContextMenuSub>
-          </>
-        ) : null}
-        <ContextMenuSeparator />
-        <ContextMenuItem variant="destructive" onClick={() => props.onDeleteSession?.(session.id)}>{t('删除')}</ContextMenuItem>
-      </ContextMenuContent>
-    </ContextMenu>
-  )
+  return <TreeContextMenu row={row}><SessionTreeActions {...props} session={session} /></TreeContextMenu>
+}
+
+function SessionTreeActions(props: TreeRowProps & { session: Session }) {
+  const { session } = props
+  return <>
+    <ContextMenuItem onClick={() => props.onConnect(session.id)}>{t('连接')}</ContextMenuItem>
+    <ContextMenuItem onClick={() => props.onEditSession?.(session)}>{t('编辑')}</ContextMenuItem>
+    {props.onMoveToFolder ? <SessionMoveActions {...props} session={session} /> : null}
+    <ContextMenuSeparator />
+    <ContextMenuItem variant="destructive" onClick={() => props.onDeleteSession?.(session.id)}>{t('删除')}</ContextMenuItem>
+  </>
+}
+
+function SessionMoveActions(props: TreeRowProps & { session: Session }) {
+  return <><ContextMenuSeparator /><ContextMenuSub><ContextMenuSubTrigger>{t('移动到')}</ContextMenuSubTrigger>
+    <ContextMenuSubContent>
+      <ContextMenuItem onClick={() => moveSession(props, null)}>{t('根目录')}</ContextMenuItem>
+      {props.folders.map((folder) => <ContextMenuItem key={folder.id} onClick={() => moveSession(props, folder.id)}>{folder.name}</ContextMenuItem>)}
+    </ContextMenuSubContent>
+  </ContextMenuSub></>
+}
+
+function TreeContextMenu({ row, children }: { row: ReactNode; children: ReactNode }) {
+  return <ContextMenu><ContextMenuTrigger>{row}</ContextMenuTrigger><ContextMenuContent>{children}</ContextMenuContent></ContextMenu>
+}
+
+function moveSession(props: TreeRowProps & { session: Session }, folderId: string | null) {
+  void Promise.resolve(props.onMoveToFolder?.(props.session.id, folderId)).catch(() => undefined)
 }

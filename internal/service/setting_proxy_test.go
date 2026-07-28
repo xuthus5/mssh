@@ -121,11 +121,44 @@ func TestSettingProxyPasswordEncryptedAndRedacted(t *testing.T) {
 	})))
 	assert.Equal(t, "s3cret-pass", proxy.config.Password)
 
-	// Clear sentinel removes secret.
-	clearPayload, err := json.Marshal(proxyPasswordClearSentinel)
-	require.NoError(t, err)
+	// JSON null removes the secret.
 	require.NoError(t, svc.Set(model.SettingInputFrom(model.Setting{
-		Key: applicationProxyPasswordSetting, Namespace: "application", Value: string(clearPayload), ValueType: "string", Version: 1,
+		Key: applicationProxyPasswordSetting, Namespace: "application", Value: "null", ValueType: "null", Version: 1,
 	})))
 	assert.Equal(t, "", proxy.config.Password)
+}
+
+func TestApplyStoredProxySettingsRejectsCorruptPassword(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	require.NoError(t, store.SetSettings(db, []model.Setting{
+		{Key: applicationProxyModeSetting, Namespace: "application", Value: `"manual"`, ValueType: "string", Version: 1},
+		{Key: applicationProxyURLSetting, Namespace: "application", Value: `"http://127.0.0.1:1080"`, ValueType: "string", Version: 1},
+		{Key: applicationProxyPasswordSetting, Namespace: "application", Value: `"enc1:corrupt"`, ValueType: "string", Version: 1},
+	}))
+	proxy := &stubProxyConfigurer{config: netproxy.DefaultConfig()}
+	svc := NewSettingService(db, testutil.NewTestLogger(), SettingServiceOptions{Proxy: proxy, Crypto: testProxyCrypto(t)})
+
+	err := svc.ApplyStoredProxySettings()
+	require.ErrorContains(t, err, "decrypt proxy password")
+	assert.Zero(t, proxy.calls)
+}
+
+func TestSettingProxyClearRecoversCorruptPassword(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	require.NoError(t, store.SetSettings(db, []model.Setting{
+		{Key: applicationProxyModeSetting, Namespace: "application", Value: `"manual"`, ValueType: "string", Version: 1},
+		{Key: applicationProxyURLSetting, Namespace: "application", Value: `"http://127.0.0.1:1080"`, ValueType: "string", Version: 1},
+		{Key: applicationProxyPasswordSetting, Namespace: "application", Value: `"enc1:corrupt"`, ValueType: "string", Version: 1},
+	}))
+	proxy := &stubProxyConfigurer{config: netproxy.DefaultConfig()}
+	svc := NewSettingService(db, testutil.NewTestLogger(), SettingServiceOptions{Proxy: proxy, Crypto: testProxyCrypto(t)})
+
+	require.NoError(t, svc.Set(model.SettingInputFrom(model.Setting{
+		Key: applicationProxyPasswordSetting, Namespace: "application", Value: "null", ValueType: "null", Version: 1,
+	})))
+	assert.Empty(t, proxy.config.Password)
+	entry, err := store.GetSettingEntry(db, applicationProxyPasswordSetting)
+	require.NoError(t, err)
+	require.NotNil(t, entry)
+	assert.Equal(t, `""`, entry.Value)
 }

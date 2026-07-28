@@ -70,6 +70,17 @@ func TestParseArgsQuoted(t *testing.T) {
 	assert.Equal(t, []string{`say "hi"`}, ParseArgs(`"say \"hi\""`))
 }
 
+func TestParseArgsForWindowsPreservesPathsAndEmptyValues(t *testing.T) {
+	args := parseArgsForOS(`--profile "C:\Users\alice\Documents\PowerShell" --command "say \"hi\"" ""`, "windows")
+	assert.Equal(t, []string{
+		"--profile",
+		`C:\Users\alice\Documents\PowerShell`,
+		"--command",
+		`say "hi"`,
+		"",
+	}, args)
+}
+
 func TestResolveShellRejectsDisallowedBinary(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()

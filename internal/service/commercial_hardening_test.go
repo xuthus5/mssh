@@ -17,7 +17,7 @@ func TestSessionConnectRequiresDataDirForHostKeys(t *testing.T) {
 	svc := NewSessionService(db, newMockEventBus(), 30, "", nil, testutil.NewTestLogger())
 	created, err := svc.CreateSession(model.SessionInputFrom(model.Session{
 		Name: "no-dir", Host: "127.0.0.1", Port: 22, Username: "root",
-		AuthMethod: model.AuthPassword, Password: "secret", KeepAlive: 30, TermType: "xterm",
+		AuthMethod: model.AuthPassword, KeepAlive: 30, TermType: "xterm",
 	}))
 	require.NoError(t, err)
 	_, err = svc.connect(context.Background(), created.ID, false)

@@ -1,6 +1,7 @@
 package app
 
 import (
+	"errors"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -17,6 +18,20 @@ type discardEventBus struct{}
 
 func (discardEventBus) Emit(string, interface{}) {}
 
+type recordingTransferQuiescer struct{ called bool }
+
+func (q *recordingTransferQuiescer) PauseAndWait() { q.called = true }
+
+type failingTunnelQuiescer struct {
+	calls int
+	err   error
+}
+
+func (q *failingTunnelQuiescer) StopAllWithError() error {
+	q.calls++
+	return q.err
+}
+
 func TestSyncLifecycleAdapterPrepareDestructiveSync(t *testing.T) {
 	require.NoError(t, (syncLifecycleAdapter{}).PrepareDestructiveSync())
 
@@ -27,8 +42,20 @@ func TestSyncLifecycleAdapterPrepareDestructiveSync(t *testing.T) {
 	tunnel := service.NewTunnelService(db, session, discardEventBus{}, logger)
 	// seed an idle tunnel state so StopAll iterates
 	// cannot access unexported map from app package; StopAll on empty is fine.
-	adapter := syncLifecycleAdapter{terminal: terminal, tunnel: tunnel, session: session}
+	transfers := &recordingTransferQuiescer{}
+	adapter := syncLifecycleAdapter{file: transfers, terminal: terminal, tunnel: tunnel, session: session}
 	require.NoError(t, adapter.PrepareDestructiveSync())
+	assert.True(t, transfers.called)
+}
+
+func TestSyncLifecycleAdapterReturnsTunnelCleanupError(t *testing.T) {
+	cleanupErr := errors.New("listener close failed")
+	tunnel := &failingTunnelQuiescer{err: cleanupErr}
+
+	err := (syncLifecycleAdapter{tunnel: tunnel}).PrepareDestructiveSync()
+
+	assert.ErrorIs(t, err, cleanupErr)
+	assert.Equal(t, 1, tunnel.calls)
 }
 
 func TestConfigureTerminalLoggingWiresHandlers(t *testing.T) {

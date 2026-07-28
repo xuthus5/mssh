@@ -24,6 +24,8 @@ type fakePort struct {
 	written  []byte
 	dtr      bool
 	rts      bool
+	dtrErr   error
+	rtsErr   error
 	bits     *goserial.ModemStatusBits
 	bitsErr  error
 	breakErr error
@@ -31,6 +33,7 @@ type fakePort struct {
 	writeN   int
 	closed   bool
 	closeErr error
+	closeN   int
 	timeout  time.Duration
 }
 
@@ -58,6 +61,9 @@ func (f *fakePort) SetDTR(dtr bool) error {
 	if f.closed {
 		return errors.New("closed")
 	}
+	if f.dtrErr != nil {
+		return f.dtrErr
+	}
 	f.dtr = dtr
 	return nil
 }
@@ -67,6 +73,9 @@ func (f *fakePort) SetRTS(rts bool) error {
 	defer f.mu.Unlock()
 	if f.closed {
 		return errors.New("closed")
+	}
+	if f.rtsErr != nil {
+		return f.rtsErr
 	}
 	f.rts = rts
 	return nil
@@ -88,8 +97,15 @@ func (f *fakePort) Break(time.Duration) error {
 func (f *fakePort) Close() error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	f.closeN++
 	f.closed = true
 	return f.closeErr
+}
+
+func (f *fakePort) isClosed() bool {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.closed
 }
 
 func (f *fakePort) Write(p []byte) (int, error) {
@@ -246,6 +262,7 @@ func TestPortSessionStartReadLoopEOFAndError(t *testing.T) {
 		t.Fatal("exit callback timeout")
 	}
 	assert.Equal(t, []byte("out"), got)
+	assert.True(t, port.isClosed(), "serial port must close before exit notification")
 
 	// Already-notified exit does not re-fire for a replacement callback.
 	fired := false
@@ -254,21 +271,34 @@ func TestPortSessionStartReadLoopEOFAndError(t *testing.T) {
 }
 
 func TestPortSessionReadLoopNonEOFError(t *testing.T) {
-	port := &fakePort{
-		writeN: -1,
-		reads:  []readResult{{err: errors.New("read boom")}},
+	port := &retryClosePort{
+		fakePort:      fakePort{writeN: -1, reads: []readResult{{err: errors.New("read boom")}}},
+		firstCloseErr: errors.New("close boom"),
 	}
 	session := newSessionWithPort(port)
 	exitCh := make(chan error, 1)
 	session.SetExitCallback(func(err error) { exitCh <- err })
 	session.Start()
+	require.Eventually(t, func() bool {
+		session.mu.RLock()
+		defer session.mu.RUnlock()
+		return session.closePending
+	}, time.Second, time.Millisecond)
+	select {
+	case err := <-exitCh:
+		t.Fatalf("exit notified before serial close retry succeeded: %v", err)
+	default:
+	}
+	require.NoError(t, session.Close())
 	select {
 	case err := <-exitCh:
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "read boom")
+		assert.ErrorContains(t, err, "read boom")
+		assert.ErrorContains(t, err, "close boom")
 	case <-time.After(2 * time.Second):
 		t.Fatal("exit callback timeout")
 	}
+	assert.True(t, port.isClosed(), "serial port must close before exit notification")
 }
 
 func TestPortSessionSignalsAndBreak(t *testing.T) {
@@ -281,7 +311,8 @@ func TestPortSessionSignalsAndBreak(t *testing.T) {
 	assert.False(t, port.dtr)
 	assert.True(t, port.rts)
 
-	signals := session.Signals()
+	signals, err := session.Signals()
+	require.NoError(t, err)
 	assert.False(t, signals.DTR)
 	assert.True(t, signals.RTS)
 	assert.True(t, signals.CTS)
@@ -293,17 +324,32 @@ func TestPortSessionSignalsAndBreak(t *testing.T) {
 	require.NoError(t, session.Break(5*time.Second)) // clamp high
 
 	port.bitsErr = errors.New("bits unavailable")
-	signals = session.Signals()
+	signals, err = session.Signals()
+	require.ErrorContains(t, err, "bits unavailable")
 	assert.False(t, signals.CTS)
 
 	require.NoError(t, session.Close())
 	require.Error(t, session.SetSignals(true, true))
 	require.Error(t, session.Break(10*time.Millisecond))
 	// Signals after close returns cached outputs without modem inputs.
-	signals = session.Signals()
+	signals, err = session.Signals()
+	require.NoError(t, err)
 	assert.False(t, signals.DTR)
 	assert.True(t, signals.RTS)
 	assert.False(t, signals.CTS)
+}
+
+func TestPortSessionSetSignalsKeepsAppliedDTRWhenRTSFails(t *testing.T) {
+	port := &fakePort{writeN: -1, rtsErr: errors.New("RTS unavailable")}
+	session := newSessionWithPort(port)
+
+	err := session.SetSignals(true, true)
+
+	require.ErrorContains(t, err, "set RTS")
+	assert.True(t, port.dtr)
+	assert.False(t, port.rts)
+	assert.True(t, session.dtr)
+	assert.False(t, session.rts)
 }
 
 func TestPortSessionApplyInitialSignals(t *testing.T) {
@@ -328,12 +374,55 @@ func TestPortSessionClosePropagatesErrorAndNotifyOnce(t *testing.T) {
 	err := session.Close()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "close fail")
-	// Second close is no-op for closeOnce but returns stored error.
+	// A failed close remains retryable and does not publish an exit.
 	err = session.Close()
 	require.Error(t, err)
+	assert.Equal(t, 2, port.closeN)
+	assert.Equal(t, 0, exits)
+	_, err = session.Write([]byte("x"))
+	require.Error(t, err)
+}
+
+func TestPortSessionCloseRetriesUnderlyingPortAfterTransientFailure(t *testing.T) {
+	port := &retryClosePort{fakePort: fakePort{writeN: -1}, firstCloseErr: errors.New("close failed once")}
+	session := newSessionWithPort(port)
+	exits := 0
+	session.SetExitCallback(func(error) { exits++ })
+
+	err := session.Close()
+
+	require.ErrorIs(t, err, port.firstCloseErr)
+	assert.Equal(t, 1, port.CloseCount())
+	assert.Equal(t, 0, exits)
+
+	require.NoError(t, session.Close())
+	assert.Equal(t, 2, port.CloseCount())
 	assert.Equal(t, 1, exits)
 	_, err = session.Write([]byte("x"))
 	require.Error(t, err)
+}
+
+type retryClosePort struct {
+	fakePort
+	firstCloseErr error
+	closeCalls    int
+}
+
+func (p *retryClosePort) Close() error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.closeCalls++
+	if p.closeCalls == 1 {
+		return p.firstCloseErr
+	}
+	p.closed = true
+	return nil
+}
+
+func (p *retryClosePort) CloseCount() int {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.closeCalls
 }
 
 func TestMapOpenErrorPortErrorCodes(t *testing.T) {

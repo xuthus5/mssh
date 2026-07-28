@@ -4,11 +4,9 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
-	"crypto/rsa"
 	"errors"
 	"io"
 	"log/slog"
-	"net"
 	"os"
 	"path/filepath"
 	"testing"
@@ -17,7 +15,6 @@ import (
 	"github.com/pkg/sftp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	gossh "golang.org/x/crypto/ssh"
 
 	"github.com/xuthus5/mssh/internal/model"
 	"github.com/xuthus5/mssh/internal/ssh/testutil"
@@ -75,60 +72,7 @@ func TestCopyWithContextTreatsEOFAfterCancelAsCancelled(t *testing.T) {
 
 func startSFTPServer(t *testing.T) (string, func()) {
 	t.Helper()
-	config := &gossh.ServerConfig{
-		NoClientAuth: true,
-	}
-	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
-	require.NoError(t, err)
-	signer, err := gossh.NewSignerFromSigner(privateKey)
-	require.NoError(t, err)
-	config.AddHostKey(signer)
-
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
-	require.NoError(t, err)
-
-	go func() {
-		for {
-			conn, err := listener.Accept()
-			if err != nil {
-				return
-			}
-			go func() {
-				sconn, chans, reqs, err := gossh.NewServerConn(conn, config)
-				if err != nil {
-					return
-				}
-				go gossh.DiscardRequests(reqs)
-				for ch := range chans {
-					if ch.ChannelType() != "session" {
-						_ = ch.Reject(gossh.UnknownChannelType, "unknown channel type")
-						continue
-					}
-					channel, requests, err := ch.Accept()
-					if err != nil {
-						return
-					}
-					go func(in <-chan *gossh.Request) {
-						for req := range in {
-							ok := false
-							if req.Type == "subsystem" && len(req.Payload) > 4 && string(req.Payload[4:]) == "sftp" {
-								ok = true
-							}
-							_ = req.Reply(ok, nil)
-						}
-					}(requests)
-					handler := sftp.InMemHandler()
-					srv := sftp.NewRequestServer(channel, handler)
-					_ = srv.Serve()
-					_ = srv.Close()
-				}
-				_ = sconn.Close()
-			}()
-		}
-	}()
-
-	cleanup := func() { _ = listener.Close() }
-	return listener.Addr().String(), cleanup
+	return startSFTPServerWithHandlers(t, sftp.InMemHandler())
 }
 
 func connectSFTP(t *testing.T, addr string) (cw *ClientWrapper, client *sftp.Client) {

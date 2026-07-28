@@ -220,6 +220,8 @@ func TestNormalizedKeyNameLengthAndNUL(t *testing.T) {
 	assert.Error(t, err)
 	_, err = normalizedKeyName(string([]byte{'k', 0}))
 	assert.Error(t, err)
+	_, err = normalizedKeyName(string([]byte{0xff}))
+	assert.Error(t, err)
 	name, err := normalizedKeyName("  deploy ")
 	require.NoError(t, err)
 	assert.Equal(t, "deploy", name)

@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -31,6 +31,7 @@ vi.mock('@/lib/confirmDialog', () => ({ requestConfirm: vi.fn(async () => true) 
 
 import { executeMacroOnActiveTerminal, WorkspaceContent } from '@/components/layout/WorkspaceContent'
 import { useAppStore } from '@/store/appStore'
+import { useMacroMutationState } from '@/lib/macroMutationCoordinator'
 
 describe('WorkspaceContent accessibility', () => {
   beforeEach(() => {
@@ -171,4 +172,86 @@ describe('MacrosWorkspace execute path', () => {
     expect(toast).not.toHaveBeenCalled()
   })
 
+  it('prevents duplicate manual macro refreshes while keeping the current list visible', async () => {
+    let resolveRefresh: ((items: Array<{ id: number; name: string; command: string }>) => void) | undefined
+    listMacros.mockReset()
+      .mockResolvedValueOnce([{ id: 0, name: 'initial macro', command: 'initial' }])
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveRefresh = resolve }))
+    render(<WorkspaceContent />)
+    expect(await screen.findByText('initial macro')).toBeInTheDocument()
+    const refresh = screen.getByRole('button', { name: '刷新' })
+    await userEvent.click(refresh)
+    expect(refresh).toBeDisabled()
+    expect(screen.getByText('initial macro')).toBeInTheDocument()
+    await userEvent.click(refresh)
+    expect(listMacros).toHaveBeenCalledTimes(2)
+    await act(async () => { resolveRefresh?.([{ id: 2, name: 'new macro', command: 'new' }]) })
+    expect(await screen.findByText('new macro')).toBeInTheDocument()
+  })
+
+  it('rejects same-frame duplicate macro refreshes before loading state renders', async () => {
+    const refresh = deferred<Array<{ id: number; name: string; command: string }>>()
+    listMacros.mockReset()
+      .mockResolvedValueOnce([{ id: 0, name: 'initial macro', command: 'initial' }])
+      .mockImplementationOnce(() => refresh.promise)
+    render(<WorkspaceContent />)
+    expect(await screen.findByText('initial macro')).toBeInTheDocument()
+
+    const refreshButton = screen.getByRole('button', { name: '刷新' })
+    act(() => {
+      fireEvent.click(refreshButton)
+      fireEvent.click(refreshButton)
+    })
+
+    expect(listMacros).toHaveBeenCalledTimes(2)
+    await act(async () => refresh.resolve([{ id: 2, name: 'new macro', command: 'new' }]))
+  })
+
+  it('waits for an active macro refresh before deleting and reloads afterward', async () => {
+    const refresh = deferred<Array<{ id: number; name: string; command: string }>>()
+    listMacros.mockReset()
+      .mockResolvedValueOnce([{ id: 7, name: 'Uptime', command: 'uptime' }])
+      .mockImplementationOnce(() => refresh.promise)
+      .mockResolvedValueOnce([])
+    render(<WorkspaceContent />)
+    expect(await screen.findByText('Uptime')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: '刷新' }))
+    fireEvent.click(screen.getByRole('button', { name: '删除 Uptime' }))
+    await waitFor(() => expect(deleteMacro).not.toHaveBeenCalled())
+    await waitFor(() => expect(useMacroMutationState.getState().busy).toBe(true))
+
+    await act(async () => refresh.resolve([{ id: 7, name: 'Uptime', command: 'uptime' }]))
+    await waitFor(() => expect(deleteMacro).toHaveBeenCalledWith(7))
+    await waitFor(() => expect(listMacros).toHaveBeenCalledTimes(3))
+  })
+
+  it('keeps a pending macro deletion locked across workspace changes', async () => {
+    const deleting = deferred<void>()
+    deleteMacro.mockImplementationOnce(() => deleting.promise)
+    render(<WorkspaceContent />)
+    await userEvent.click(await screen.findByRole('button', { name: '删除 Uptime' }))
+    await waitFor(() => expect(deleteMacro).toHaveBeenCalledOnce())
+
+    act(() => useAppStore.setState({
+      activeSurface: { type: 'workspace', id: 'sessions' }, workspaceTab: 'sessions',
+    }))
+    act(() => useAppStore.setState({
+      activeSurface: { type: 'workspace', id: 'macros' }, workspaceTab: 'macros',
+    }))
+    const remove = await screen.findByRole('button', { name: '删除 Uptime' })
+    expect(remove).toBeDisabled()
+    await userEvent.click(remove)
+    expect(deleteMacro).toHaveBeenCalledOnce()
+
+    await act(async () => { deleting.resolve(); await deleting.promise })
+    await waitFor(() => expect(remove).toBeEnabled())
+  })
+
 })
+
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((resolvePromise) => { resolve = resolvePromise })
+  return { promise, resolve }
+}

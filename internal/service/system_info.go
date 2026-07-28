@@ -2,6 +2,7 @@ package service
 
 import (
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -10,53 +11,20 @@ import (
 	ssh "github.com/xuthus5/mssh/internal/ssh"
 )
 
-const maxSystemProbeOutput = 4 * 1024 * 1024
-
-var systemProbeTimeout = 5 * time.Second
-
-var _runSystemInfoCommand = func(wrapper *ssh.ClientWrapper, command string) ([]byte, error) {
-	session, err := wrapper.Inner.NewSession()
-	if err != nil {
-		return nil, fmt.Errorf("system info session: %w", err)
-	}
-	defer func() { _ = session.Close() }()
-	output, err := waitSystemProbe(func() ([]byte, error) { return session.CombinedOutput(command) }, session.Close)
-	if err != nil {
-		return nil, fmt.Errorf("system info command: %w", err)
-	}
-	if len(output) > maxSystemProbeOutput {
-		return nil, fmt.Errorf("system info command: output exceeds %d bytes", maxSystemProbeOutput)
-	}
-	return output, nil
-}
-
 type systemSample struct {
 	total, idle, received, transmitted uint64
 	at                                 time.Time
-}
-
-func waitSystemProbe(run func() ([]byte, error), cancel func() error) ([]byte, error) {
-	type result struct {
-		output []byte
-		err    error
-	}
-	completed := make(chan result, 1)
-	go func() { output, err := run(); completed <- result{output: output, err: err} }()
-	timer := time.NewTimer(systemProbeTimeout)
-	defer timer.Stop()
-	select {
-	case value := <-completed:
-		return value.output, value.err
-	case <-timer.C:
-		_ = cancel()
-		return nil, fmt.Errorf("probe timeout after %s", systemProbeTimeout)
-	}
 }
 
 func (t *TerminalService) SystemInfo(terminalID string) (*model.SystemInfo, error) {
 	if err := validateTerminalID(terminalID); err != nil {
 		return nil, err
 	}
+	finish, err := t.beginOperation()
+	if err != nil {
+		return nil, err
+	}
+	defer finish()
 	wrapper, err := t.systemInfoClient(terminalID)
 	if err != nil {
 		return nil, err
@@ -87,11 +55,16 @@ func (t *TerminalService) ProcessInfo(terminalID string) ([]model.ProcessInfo, e
 	if err := validateTerminalID(terminalID); err != nil {
 		return nil, err
 	}
+	finish, err := t.beginOperation()
+	if err != nil {
+		return nil, err
+	}
+	defer finish()
 	wrapper, err := t.systemInfoClient(terminalID)
 	if err != nil {
 		return nil, err
 	}
-	output, err := _runSystemInfoCommand(wrapper, `ps -eo pid=,ppid=,user=,state=,%cpu=,rss=,comm= --sort=-%cpu`)
+	output, err := _runSystemInfoCommand(wrapper, processInfoCommand)
 	if err != nil {
 		return nil, err
 	}
@@ -150,7 +123,7 @@ func parseSystemInfoField(result *model.SystemInfo, sample *systemSample, values
 	}
 	float := func(value string) float64 {
 		parsed, err := strconv.ParseFloat(value, 64)
-		valid = valid && err == nil
+		valid = valid && err == nil && !math.IsNaN(parsed) && !math.IsInf(parsed, 0)
 		return parsed
 	}
 	if consumed := parseWideSystemInfoField(result, sample, values, uint, float); consumed != 0 {
@@ -185,6 +158,13 @@ func parseDetailSystemInfoField(result *model.SystemInfo, values []string, uint 
 		count, err := strconv.Atoi(values[1])
 		*valid = *valid && err == nil && count > 0
 		result.CPUCount = count
+	case "CPUPERCENT":
+		percent := float(values[1])
+		if percent < 0 || percent > 100 {
+			*valid = false
+		} else {
+			result.CPUPercent = percent
+		}
 	case "SWAPTOTAL":
 		result.SwapTotal = uint(values[1])
 	case "SWAPFREE":
@@ -216,7 +196,7 @@ func systemInfoValueLength(values []string) int {
 
 func isSystemInfoField(value string) bool {
 	switch value {
-	case "CPU", "MEMTOTAL", "MEMAVAILABLE", "NET", "DISK", "LOAD", "UPTIME", "KERNEL", "OS", "CPUCOUNT", "SWAPTOTAL", "SWAPFREE":
+	case "CPU", "CPUPERCENT", "MEMTOTAL", "MEMAVAILABLE", "NET", "DISK", "LOAD", "UPTIME", "KERNEL", "OS", "CPUCOUNT", "SWAPTOTAL", "SWAPFREE":
 		return true
 	default:
 		return false
@@ -263,5 +243,3 @@ func cpuPercent(previous, current systemSample) float64 {
 	}
 	return float64(total-idle) / float64(total) * 100
 }
-
-const systemInfoCommand = `awk '{print "LOAD",$1,$2,$3}' /proc/loadavg; awk '{print "UPTIME",$1}' /proc/uptime; printf 'KERNEL '; uname -r; awk '/^cpu / {print "CPU", $2+$3+$4+$5+$6+$7+$8+$9, $5+$6} /^MemTotal:/ {print "MEMTOTAL", $2*1024} /^MemAvailable:/ {print "MEMAVAILABLE", $2*1024} /^SwapTotal:/ {print "SWAPTOTAL", $2*1024} /^SwapFree:/ {print "SWAPFREE", $2*1024}' /proc/stat /proc/meminfo; awk 'NR>2 {rx+=$2; tx+=$10} END {print "NET", rx, tx}' /proc/net/dev; df -P -B1 / | awk 'NR==2 {print "DISK", $3, $2}'; printf 'CPUCOUNT '; nproc; awk '/^PRETTY_NAME=/ {value=substr($0,index($0,"=")+1); sub(/^"/,"",value); sub(/"$/,"",value); print "OS",value}' /etc/os-release 2>/dev/null`

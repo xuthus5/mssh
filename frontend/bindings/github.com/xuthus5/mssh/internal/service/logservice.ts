@@ -22,10 +22,6 @@ export function GetRecording(path: string): $CancellablePromise<ssh$0.Player | n
     });
 }
 
-export function HandleOutput(terminalID: string, data: string): $CancellablePromise<void> {
-    return $Call.ByName("github.com/xuthus5/mssh/internal/service.LogService.HandleOutput", terminalID, data);
-}
-
 export function List(sessionID: number | null): $CancellablePromise<model$0.SessionLog[]> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.LogService.List", sessionID).then(($result: any) => {
         return $$createType3($result);
@@ -38,10 +34,6 @@ export function StartTerminalRecording(terminalID: string, sessionID: number, co
 
 export function StopTerminalRecording(terminalID: string): $CancellablePromise<void> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.LogService.StopTerminalRecording", terminalID);
-}
-
-export function StopTerminalRecordingIfActive(terminalID: string): $CancellablePromise<void> {
-    return $Call.ByName("github.com/xuthus5/mssh/internal/service.LogService.StopTerminalRecordingIfActive", terminalID);
 }
 
 // Private type creation functions

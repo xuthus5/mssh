@@ -32,6 +32,8 @@ type resolvedConfig struct {
 	Env   []string
 }
 
+const maxPTYDimension = 1<<16 - 1
+
 func resolveOptions(opts Options) (resolvedConfig, error) {
 	shell, err := resolveShell(opts.Shell)
 	if err != nil {
@@ -41,7 +43,10 @@ func resolveOptions(opts Options) (resolvedConfig, error) {
 	if err != nil {
 		return resolvedConfig{}, err
 	}
-	cols, rows := normalizeSize(opts.Cols, opts.Rows)
+	cols, rows, err := normalizeSize(opts.Cols, opts.Rows)
+	if err != nil {
+		return resolvedConfig{}, err
+	}
 	term := strings.TrimSpace(opts.Term)
 	if term == "" {
 		term = "xterm-256color"
@@ -126,14 +131,27 @@ func resolveCWD(raw string) (string, error) {
 	return cwd, nil
 }
 
-func normalizeSize(cols, rows int) (int, int) {
+func normalizeSize(cols, rows int) (int, int, error) {
 	if cols <= 0 {
 		cols = 80
 	}
 	if rows <= 0 {
 		rows = 24
 	}
-	return cols, rows
+	if err := validateSize(cols, rows); err != nil {
+		return 0, 0, err
+	}
+	return cols, rows, nil
+}
+
+func validateSize(cols, rows int) error {
+	if cols > maxPTYDimension {
+		return fmt.Errorf("local shell cols must be at most %d", maxPTYDimension)
+	}
+	if rows > maxPTYDimension {
+		return fmt.Errorf("local shell rows must be at most %d", maxPTYDimension)
+	}
+	return nil
 }
 
 func resolveArgs(args []string, login bool) []string {

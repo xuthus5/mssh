@@ -1,5 +1,6 @@
 import { FileService } from '@/lib/wails'
 import { useAppStore, type TransferJob } from '@/store/appStore'
+import { registerStartedTransfer } from '@/store/eventBridge'
 
 interface TransferRequest {
   sessionId: number
@@ -35,7 +36,7 @@ async function startTransfer(direction: TransferJob['direction'], request: Trans
     ? await FileService.Upload(request.sessionId, request.sourcePath, request.targetPath)
     : await FileService.Download(request.sessionId, request.sourcePath, request.targetPath)
   const transfer = queuedTransfer(id, direction, request)
-  useAppStore.getState().addTransfer(transfer)
+  registerStartedTransfer(transfer)
   return transfer
 }
 

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from 'react'
-import { Activity, Bot, ChevronDown, Circle, ClipboardPaste, Columns2, Copy, FolderOpen, History, Network, PenLine, Rows2, Search, Split, Square, Trash2 } from 'lucide-react'
+import { Activity, Bot, ChevronDown, Circle, ClipboardPaste, Columns2, Copy, FolderOpen, History, LoaderCircle, Network, PenLine, Rows2, Search, Split, Square, Trash2 } from 'lucide-react'
 import SessionLog from '@/components/terminal/SessionLog'
 import TunnelDialog from '@/components/session/TunnelDialog'
 import { useTunnelManager } from '@/hooks/useTunnelManager'
@@ -21,6 +21,7 @@ interface TerminalToolbarProps {
   terminalID: string
   sessionId: number
   isRecording: boolean
+  recordingBusy?: boolean
   recordingLogId: number | null
   recordingError?: string
   onToggleRecording: () => void
@@ -140,13 +141,13 @@ function SplitAction({ disabled, paneCount, onSplit }: { disabled: boolean; pane
   </DropdownMenu>
 }
 
-function RecordingAction({ active, onToggle }: { active: boolean; onToggle: () => void }) {
+function RecordingAction({ active, busy, onToggle }: { active: boolean; busy: boolean; onToggle: () => void }) {
   const className = active
     ? 'bg-destructive/20 text-destructive'
     : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
-  return <button type="button" className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-xs transition-colors ${className}`}
-    onClick={onToggle} title={active ? t('停止录制') : t('开始录制')}>
-    {active ? <Square className="h-3 w-3 fill-current" /> : <Circle className="h-3 w-3" />}
+  return <button type="button" disabled={busy} aria-busy={busy} className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-xs transition-colors ${className} disabled:pointer-events-none disabled:opacity-50`}
+    onClick={onToggle} title={busy ? t('处理中...') : active ? t('停止录制') : t('开始录制')}>
+    {busy ? <LoaderCircle className="h-3 w-3 animate-spin" /> : active ? <Square className="h-3 w-3 fill-current" /> : <Circle className="h-3 w-3" />}
     <span className="hidden sm:inline">{active ? t('录制中') : t('录制')}</span>
   </button>
 }
@@ -187,7 +188,7 @@ function SessionLogPopover({ open, sessionId, setOpen, setBlocked, onOpenChange 
   </Popover>
 }
 
-interface ToolbarActionsProps extends Pick<TerminalToolbarProps, 'sessionId' | 'isRecording' | 'onToggleRecording' | 'onOpenFiles' | 'filesSupported' | 'onSplit' | 'splitDisabled' | 'paneCount' | 'searchOpen' | 'onToggleSearch' | 'composeOpen' | 'onToggleCompose'> {
+interface ToolbarActionsProps extends Pick<TerminalToolbarProps, 'sessionId' | 'isRecording' | 'recordingBusy' | 'onToggleRecording' | 'onOpenFiles' | 'filesSupported' | 'onSplit' | 'splitDisabled' | 'paneCount' | 'searchOpen' | 'onToggleSearch' | 'composeOpen' | 'onToggleCompose'> {
   clipboard: ReturnType<typeof useClipboardActions>
   logOpen: boolean
   setLogOpen: Dispatch<SetStateAction<boolean>>
@@ -231,7 +232,7 @@ function ToolbarActions(props: ToolbarActionsProps) {
     <div className="w-px h-4 bg-border mx-0.5" />
     <SplitAction disabled={props.splitDisabled} paneCount={props.paneCount} onSplit={props.onSplit} />
     <div className="w-px h-4 bg-border mx-0.5" />
-    <RecordingAction active={props.isRecording} onToggle={props.onToggleRecording} />
+    <RecordingAction active={props.isRecording} busy={props.recordingBusy ?? false} onToggle={props.onToggleRecording} />
     <SessionLogPopover open={props.logOpen} sessionId={props.sessionId} setOpen={props.setLogOpen}
       setBlocked={props.setLogBlocked} onOpenChange={props.onLogOpenChange} />
   </div>

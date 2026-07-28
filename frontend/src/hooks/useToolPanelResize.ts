@@ -1,17 +1,18 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react'
 import { t } from '@/i18n'
+import { readStorageNumber, writeStorageItem } from '@/lib/safeStorage'
 
 
 export type ToolPanelKind = 'history' | 'files' | 'system' | 'ai'
 
-const MIN_WIDTH = 280
 const MAX_WIDTH = 720
 const KEYBOARD_STEP = 24
 const DEFAULT_WIDTHS: Record<ToolPanelKind, number> = { history: 340, files: 340, system: 440, ai: 420 }
+const MIN_WIDTHS: Record<ToolPanelKind, number> = { history: 280, files: 280, system: 280, ai: 300 }
 
-function clampWidth(width: number): number {
-  if (!Number.isFinite(width)) return MIN_WIDTH
-  return Math.min(Math.max(width, MIN_WIDTH), MAX_WIDTH)
+function clampWidth(kind: ToolPanelKind, width: number): number {
+	if (!Number.isFinite(width)) return MIN_WIDTHS[kind]
+	return Math.min(Math.max(width, MIN_WIDTHS[kind]), MAX_WIDTH)
 }
 
 function storageKey(kind: ToolPanelKind): string {
@@ -19,17 +20,16 @@ function storageKey(kind: ToolPanelKind): string {
 }
 
 function initialWidth(kind: ToolPanelKind): number {
-  const persisted = localStorage.getItem(storageKey(kind))
-  return persisted === null ? DEFAULT_WIDTHS[kind] : clampWidth(Number(persisted))
+	return clampWidth(kind, readStorageNumber(storageKey(kind), DEFAULT_WIDTHS[kind]))
 }
 
 export function useToolPanelResize(kind: ToolPanelKind) {
   const [width, setWidth] = useState(() => initialWidth(kind))
   const dragRef = useRef<{ pointerID: number; startX: number; startWidth: number } | null>(null)
   const resize = useCallback((nextWidth: number) => {
-    const normalized = clampWidth(nextWidth)
+	const normalized = clampWidth(kind, nextWidth)
     setWidth(normalized)
-    localStorage.setItem(storageKey(kind), String(normalized))
+    writeStorageItem(storageKey(kind), String(normalized))
   }, [kind])
   useEffect(() => {
     const move = (event: PointerEvent) => {
@@ -56,5 +56,5 @@ export function useToolPanelResize(kind: ToolPanelKind) {
     event.preventDefault()
   }
   const panelStyle: CSSProperties = { width, maxWidth: 'calc(100% - 120px)' }
-  return { width, panelStyle, resizeHandleProps: { onPointerDown, onDoubleClick: () => resize(DEFAULT_WIDTHS[kind]), onKeyDown, role: 'separator' as const, tabIndex: 0, 'aria-label': t('调整工具面板宽度'), 'aria-orientation': 'vertical' as const, 'aria-valuemin': MIN_WIDTH, 'aria-valuemax': MAX_WIDTH, 'aria-valuenow': width } }
+  return { width, panelStyle, resizeHandleProps: { onPointerDown, onDoubleClick: () => resize(DEFAULT_WIDTHS[kind]), onKeyDown, role: 'separator' as const, tabIndex: 0, 'aria-label': t('调整工具面板宽度'), 'aria-orientation': 'vertical' as const, 'aria-valuemin': MIN_WIDTHS[kind], 'aria-valuemax': MAX_WIDTH, 'aria-valuenow': width } }
 }

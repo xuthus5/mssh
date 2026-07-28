@@ -1,9 +1,11 @@
 package crypto
 
 import (
+	"encoding/base64"
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -76,8 +78,30 @@ func TestSaveVaultFileOverwritesExistingVault(t *testing.T) {
 }
 
 func TestValidateAppPassword(t *testing.T) {
-	assert.Error(t, ValidateAppPassword("short"))
-	assert.NoError(t, ValidateAppPassword("twelve chars"))
+	tests := []struct {
+		name     string
+		password string
+		wantErr  bool
+	}{
+		{name: "too short", password: "short", wantErr: true},
+		{name: "invalid UTF-8", password: strings.Repeat("\xff", MinAppPasswordLen), wantErr: true},
+		{name: "UTF-8 characters below minimum", password: strings.Repeat("密", 6), wantErr: true},
+		{name: "minimum accepted", password: "twelve chars"},
+		{name: "UTF-8 minimum accepted", password: strings.Repeat("密", MinAppPasswordLen)},
+		{name: "maximum accepted", password: strings.Repeat("x", MaxAppPasswordBytes)},
+		{name: "ASCII over maximum", password: strings.Repeat("x", MaxAppPasswordBytes+1), wantErr: true},
+		{name: "UTF-8 over maximum", password: strings.Repeat("密", 342), wantErr: true},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			err := ValidateAppPassword(test.password)
+			if test.wantErr {
+				assert.Error(t, err)
+				return
+			}
+			assert.NoError(t, err)
+		})
+	}
 }
 
 func TestInstallVaultFile(t *testing.T) {
@@ -110,6 +134,41 @@ func TestValidateVaultFileRejectsBadValues(t *testing.T) {
 func TestLoadVaultFileMissing(t *testing.T) {
 	_, err := LoadVaultFile(filepath.Join(t.TempDir(), "missing.json"))
 	assert.Error(t, err)
+}
+
+func TestLoadVaultFileRejectsOversizedFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "vault.json")
+	file, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY, 0o600)
+	require.NoError(t, err)
+	require.NoError(t, file.Truncate(maxVaultFileBytes+1))
+	require.NoError(t, file.Close())
+
+	_, err = LoadVaultFile(path)
+
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "vault file exceeds")
+}
+
+func TestLoadVaultFileRejectsNonRegularPath(t *testing.T) {
+	_, err := LoadVaultFile(t.TempDir())
+
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "not a regular file")
+}
+
+func TestLoadVaultFileRejectsSymbolicLink(t *testing.T) {
+	directory := t.TempDir()
+	target := filepath.Join(directory, "target.json")
+	require.NoError(t, os.WriteFile(target, []byte("{}"), 0o600))
+	link := filepath.Join(directory, "vault.json")
+	if err := os.Symlink(target, link); err != nil {
+		t.Skipf("symbolic links unavailable: %v", err)
+	}
+
+	_, err := LoadVaultFile(link)
+
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "regular file")
 }
 
 func TestSaveVaultFileCreatesDir(t *testing.T) {
@@ -149,29 +208,60 @@ func TestLoadVaultFileInvalidJSONAndValidate(t *testing.T) {
 	assert.Error(t, err)
 
 	require.NoError(t, os.WriteFile(path, []byte(`{"format_version":1,"cipher":"AES-256-GCM","kdf":"Argon2id","argon_time":1,"argon_memory":1,"argon_threads":1,"salt":"YQ==","nonce":"YQ==","wrapped_dek":"YQ=="}`), 0o600))
-	vault, err := LoadVaultFile(path)
-	require.NoError(t, err)
-	_, err = UnlockVault("initial-pass-12", vault)
-	assert.Error(t, err)
+	_, err = LoadVaultFile(path)
+	assert.ErrorContains(t, err, "unsupported vault KDF parameters")
 
 	assert.Error(t, InstallVaultFile(t.TempDir(), VaultFile{}))
 	assert.Error(t, SaveVaultFile(filepath.Join(t.TempDir(), "v.json"), VaultFile{}))
 }
 
 func TestUnwrapRejectsBadBase64Fields(t *testing.T) {
-	vault := VaultFile{
-		FormatVersion: VaultFormatVersion, Cipher: "AES-256-GCM", KDF: "Argon2id",
-		ArgonTime: 1, ArgonMemory: 8, ArgonThreads: 1,
-		Salt: "!!!", Nonce: "YQ==", WrappedDEK: "YQ==",
-	}
-	_, err := UnlockVault("initial-pass-12", vault)
-	assert.Error(t, err)
-	vault.Salt = "YQ=="
+	vault, _, err := CreateVault("initial-pass-12")
+	require.NoError(t, err)
+	valid := vault
+	vault.Salt = "!!!"
+	_, err = UnlockVault("initial-pass-12", vault)
+	assert.ErrorContains(t, err, "decode vault salt")
+	vault = valid
 	vault.Nonce = "!!!"
 	_, err = UnlockVault("initial-pass-12", vault)
-	assert.Error(t, err)
-	vault.Nonce = "YQ=="
+	assert.ErrorContains(t, err, "decode vault nonce")
+	vault = valid
 	vault.WrappedDEK = "!!!"
 	_, err = UnlockVault("initial-pass-12", vault)
-	assert.Error(t, err)
+	assert.ErrorContains(t, err, "decode wrapped DEK")
+}
+
+func TestUnlockVaultRejectsUnsupportedKDFParameters(t *testing.T) {
+	vault, _, err := CreateVault("initial-pass-12")
+	require.NoError(t, err)
+	vault.ArgonTime--
+
+	_, err = UnlockVault("initial-pass-12", vault)
+
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "unsupported vault KDF parameters")
+}
+
+func TestUnlockVaultRejectsInvalidFieldLengthsBeforeKDF(t *testing.T) {
+	vault, _, err := CreateVault("initial-pass-12")
+	require.NoError(t, err)
+	tests := []struct {
+		name   string
+		mutate func(*VaultFile)
+		want   string
+	}{
+		{name: "salt", mutate: func(item *VaultFile) { item.Salt = base64.StdEncoding.EncodeToString([]byte("short")) }, want: "invalid vault salt length"},
+		{name: "nonce", mutate: func(item *VaultFile) { item.Nonce = base64.StdEncoding.EncodeToString([]byte("short")) }, want: "invalid vault nonce length"},
+		{name: "wrapped DEK", mutate: func(item *VaultFile) { item.WrappedDEK = base64.StdEncoding.EncodeToString([]byte("short")) }, want: "invalid wrapped DEK length"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			candidate := vault
+			test.mutate(&candidate)
+			_, unlockErr := UnlockVault("initial-pass-12", candidate)
+			require.Error(t, unlockErr)
+			assert.ErrorContains(t, unlockErr, test.want)
+		})
+	}
 }

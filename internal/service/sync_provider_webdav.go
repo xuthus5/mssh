@@ -20,6 +20,9 @@ type webDAVSyncProvider struct {
 }
 
 func newWebDAVSyncProvider(client *http.Client, endpoint, username, password string) (*webDAVSyncProvider, error) {
+	if client == nil {
+		return nil, errors.New("HTTP client is required")
+	}
 	parsed, err := url.ParseRequestURI(strings.TrimSpace(endpoint))
 	if err != nil {
 		return nil, errors.New("WebDAV URL is invalid")
@@ -31,7 +34,10 @@ func newWebDAVSyncProvider(client *http.Client, endpoint, username, password str
 	if err != nil {
 		return nil, fmt.Errorf("build WebDAV backup URL: %w", err)
 	}
-	return &webDAVSyncProvider{client: client, baseURL: parsed.String(), fileURL: fileURL, username: username, password: password}, nil
+	return &webDAVSyncProvider{
+		client: sameOriginHTTPClient(client, parsed), baseURL: parsed.String(), fileURL: fileURL,
+		username: username, password: password,
+	}, nil
 }
 
 func (w *webDAVSyncProvider) Test(ctx context.Context) error {
@@ -93,7 +99,7 @@ func (w *webDAVSyncProvider) Put(ctx context.Context, content []byte, etag strin
 	if response.StatusCode == http.StatusPreconditionFailed || response.StatusCode == http.StatusConflict {
 		return syncRemoteObject{}, errSyncConflict
 	}
-	if response.StatusCode < 200 || response.StatusCode >= 300 {
+	if !isCompletedSyncUploadStatus(response.StatusCode) {
 		return syncRemoteObject{}, fmt.Errorf("WebDAV upload returned %s", response.Status)
 	}
 	return syncRemoteObject{Content: content, ETag: response.Header.Get("ETag")}, nil

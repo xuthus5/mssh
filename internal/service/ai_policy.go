@@ -27,6 +27,14 @@ var (
 	aiReadOnlyPatterns = []*regexp.Regexp{
 		regexp.MustCompile(`^(pwd|whoami|id|uname(\s+-a)?|hostname|date|uptime|df(\s+[^|;&]+)?|free(\s+[^|;&]+)?|ps(\s+[^|;&]+)?|top(\s+[^|;&]+)?|env|printenv|systemctl\s+status(\s+[^|;&]+)?|journalctl\s+[^|;&]+|ls(\s+[^|;&]+)?|find\s+[^|;&]+|cat\s+[^|;&]+)$`),
 	}
+	aiAutoReadOnlyPatterns = []*regexp.Regexp{
+		regexp.MustCompile(`^(pwd|whoami|id|uname(\s+-a)?|hostname|date|uptime|df(\s+[^|;&]+)?|free(\s+[^|;&]+)?)$`),
+	}
+	aiUnsafeReadOnlyPattern = regexp.MustCompile("[\r\n|;&<>`]|\\$\\(")
+	aiMutatingReadPatterns  = []*regexp.Regexp{
+		regexp.MustCompile(`(?i)^find\b.*\s-(delete|exec|execdir|ok|okdir|fprint|fprintf|fls)\b`),
+		regexp.MustCompile(`(?i)^journalctl\b.*\s--(vacuum-(size|time|files)|rotate|flush|sync|relinquish-var|setup-keys|update-catalog)\b`),
+	}
 )
 
 // clampAITextBytes keeps the trailing UTF-8 text within maxBytes, dropping whole runes from the start.
@@ -81,11 +89,28 @@ func classifyAICommand(command string, security model.AISecuritySettings) model.
 	if matchedUserPattern(command, security.DenyPatterns) {
 		return blockedAICommand(proposal, model.AICommandRiskHigh, "命令命中自定义禁止规则")
 	}
-	if matchedUserPattern(command, security.AllowPatterns) || matchedBuiltinPattern(command, aiReadOnlyPatterns) {
+	if matchedUserAllowPattern(command, security.AllowPatterns) || isBuiltinAutoReadOnlyCommand(command) {
 		return autoReadOnlyAICommand(proposal, security.AutoExecuteReadOnly)
+	}
+	if isBuiltinReadOnlyCommand(command) {
+		return autoReadOnlyAICommand(proposal, false)
 	}
 	proposal.Risk = model.AICommandRiskModify
 	return proposal
+}
+
+func isBuiltinAutoReadOnlyCommand(command string) bool {
+	if aiUnsafeReadOnlyPattern.MatchString(command) || matchedBuiltinPattern(command, aiMutatingReadPatterns) {
+		return false
+	}
+	return matchedBuiltinPattern(command, aiAutoReadOnlyPatterns)
+}
+
+func isBuiltinReadOnlyCommand(command string) bool {
+	if aiUnsafeReadOnlyPattern.MatchString(command) || matchedBuiltinPattern(command, aiMutatingReadPatterns) {
+		return false
+	}
+	return matchedBuiltinPattern(command, aiReadOnlyPatterns)
 }
 
 func blockedAICommand(proposal model.AICommandProposal, risk model.AICommandRisk, reason string) model.AICommandProposal {
@@ -123,6 +148,19 @@ func matchedUserPattern(command string, expressions []string) bool {
 	return false
 }
 
+func matchedUserAllowPattern(command string, expressions []string) bool {
+	for _, expression := range expressions {
+		if err := validateUserRegexp(expression); err != nil {
+			continue
+		}
+		match := regexp.MustCompile(expression).FindStringIndex(command)
+		if len(match) == 2 && match[0] == 0 && match[1] == len(command) {
+			return true
+		}
+	}
+	return false
+}
+
 func validateAISettings(settings model.AISettings) error {
 	if settings.DefaultProviderID != nil && *settings.DefaultProviderID <= 0 {
 		return fmt.Errorf("invalid default provider id")
@@ -140,8 +178,8 @@ func validateAISettings(settings model.AISettings) error {
 }
 
 func validateAIInteractionSettings(settings model.AIInteractionSettings) error {
-	if settings.PanelWidth < 300 || settings.PanelWidth > 900 {
-		return fmt.Errorf("AI panel width must be between 300 and 900")
+	if settings.PanelWidth < 300 || settings.PanelWidth > 720 {
+		return fmt.Errorf("AI panel width must be between 300 and 720")
 	}
 	if settings.ContextLines < 0 || settings.ContextLines > 500 {
 		return fmt.Errorf("AI context lines must be between 0 and 500")
@@ -156,6 +194,16 @@ func validateAIInteractionSettings(settings model.AIInteractionSettings) error {
 }
 
 func validateAISearchSettings(settings model.AISearchSettings) error {
+	switch settings.Mode {
+	case model.AISearchDisabled, model.AISearchAuto, model.AISearchNative, model.AISearchIndependent:
+	default:
+		return fmt.Errorf("unsupported AI search mode %s", settings.Mode)
+	}
+	switch settings.Provider {
+	case model.AISearchProviderBrave, model.AISearchProviderTavily, model.AISearchProviderSerper:
+	default:
+		return fmt.Errorf("unsupported AI search provider %s", settings.Provider)
+	}
 	if settings.TimeoutSeconds < 1 || settings.TimeoutSeconds > 60 {
 		return fmt.Errorf("AI search timeout must be between 1 and 60 seconds")
 	}

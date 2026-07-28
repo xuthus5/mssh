@@ -1,6 +1,7 @@
 package service
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"os"
@@ -14,26 +15,33 @@ import (
 )
 
 func (s *SyncService) ListVersions() ([]model.SyncVersion, error) {
+	finish, err := s.beginReadOperation()
+	if err != nil {
+		return nil, err
+	}
+	defer finish()
 	return store.ListSyncVersions(s.db, 200)
 }
 
 func (s *SyncService) ListEvents() ([]model.SyncEvent, error) {
+	finish, err := s.beginReadOperation()
+	if err != nil {
+		return nil, err
+	}
+	defer finish()
 	return store.ListSyncEvents(s.db, 300)
 }
 
 func (s *SyncService) saveVersion(content []byte, metadata syncArtifactMetadata, provider model.SyncProvider, source string, protected bool) (*model.SyncVersion, error) {
+	if len(content) > maxCloudBackupSize {
+		return nil, fmt.Errorf("sync version exceeds %d bytes", maxCloudBackupSize)
+	}
 	existing, err := store.FindSyncVersionByFingerprint(s.db, metadata.SnapshotFingerprint)
 	if err != nil {
 		return nil, err
 	}
 	if existing != nil {
-		if protected && !existing.Protected {
-			if err := store.SetSyncVersionProtected(s.db, existing.ID, true); err != nil {
-				return nil, err
-			}
-			existing.Protected = true
-		}
-		return existing, nil
+		return s.reuseVersion(existing, content, protected)
 	}
 	if err := s.ensureVersionDirectory(); err != nil {
 		return nil, err
@@ -53,10 +61,83 @@ func (s *SyncService) saveVersion(content []byte, metadata syncArtifactMetadata,
 	}
 	version, err = store.InsertSyncVersion(s.db, version)
 	if err != nil {
-		_ = os.Remove(path)
+		if removeErr := os.Remove(path); removeErr != nil && !errors.Is(removeErr, os.ErrNotExist) {
+			return nil, errors.Join(err, fmt.Errorf("remove untracked sync version file: %w", removeErr))
+		}
 		return nil, err
 	}
 	return &version, nil
+}
+
+func (s *SyncService) reuseVersion(existing *model.SyncVersion, content []byte, protected bool) (*model.SyncVersion, error) {
+	if err := s.ensureVersionFile(existing, content); err != nil {
+		return nil, err
+	}
+	if protected && !existing.Protected {
+		if err := store.SetSyncVersionProtected(s.db, existing.ID, true); err != nil {
+			return nil, err
+		}
+		existing.Protected = true
+	}
+	return existing, nil
+}
+
+func (s *SyncService) ensureVersionFile(version *model.SyncVersion, content []byte) error {
+	healthy, size, err := s.inspectVersionFile(*version, content)
+	if err != nil {
+		return err
+	}
+	path := s.versionFilePath(*version)
+	if !healthy {
+		if err := s.ensureVersionDirectory(); err != nil {
+			return err
+		}
+		if err := writePrivateFileAtomic(path, content); err != nil {
+			return fmt.Errorf("rebuild sync version file: %w", err)
+		}
+		size = int64(len(content))
+	}
+	if size != version.SizeBytes {
+		if err := store.SetSyncVersionSize(s.db, version.ID, size); err != nil {
+			return err
+		}
+		version.SizeBytes = size
+	}
+	return nil
+}
+
+func (s *SyncService) inspectVersionFile(version model.SyncVersion, candidate []byte) (bool, int64, error) {
+	path := s.versionFilePath(version)
+	info, err := os.Lstat(path)
+	if err == nil {
+		if !info.Mode().IsRegular() {
+			return false, 0, errors.New("sync version path is not a regular file")
+		}
+		if info.Size() > maxCloudBackupSize {
+			return false, info.Size(), nil
+		}
+		content, openedInfo, readErr := readBoundedRegularFileWithInfo(
+			path, "sync version file", maxCloudBackupSize,
+		)
+		if readErr != nil {
+			return false, 0, fmt.Errorf("read sync version file: %w", readErr)
+		}
+		private := !privateFileModeNeedsRepair(openedInfo.Mode())
+		if bytes.Equal(content, candidate) {
+			return private, int64(len(content)), nil
+		}
+		masterKey, keyErr := s.masterKey()
+		if keyErr != nil {
+			return false, 0, keyErr
+		}
+		artifact, decodeErr := decodeSyncArtifact(content, masterKey)
+		return private && decodeErr == nil && artifact.Metadata.SnapshotFingerprint == version.SnapshotFingerprint,
+			int64(len(content)), nil
+	}
+	if !errors.Is(err, os.ErrNotExist) {
+		return false, 0, fmt.Errorf("inspect sync version file: %w", err)
+	}
+	return false, 0, nil
 }
 
 func (s *SyncService) saveCurrentVersion(provider model.SyncProvider, source string, protected bool) (*model.SyncVersion, error) {
@@ -92,6 +173,14 @@ func (s *SyncService) DeleteVersion(id int64) error {
 	if id <= 0 {
 		return errors.New("invalid sync version id")
 	}
+	if err := s.beginSyncOperation(); err != nil {
+		return err
+	}
+	defer s.operationMu.Unlock()
+	return s.deleteVersion(id)
+}
+
+func (s *SyncService) deleteVersion(id int64) error {
 	version, err := store.GetSyncVersion(s.db, id)
 	if err != nil {
 		return err
@@ -102,11 +191,61 @@ func (s *SyncService) DeleteVersion(id int64) error {
 	if version.Protected {
 		return errors.New("protected sync version cannot be deleted")
 	}
-	if err := store.DeleteSyncVersion(s.db, id); err != nil {
+	staged, err := stageVersionFile(s.versionFilePath(*version))
+	if err != nil {
 		return err
 	}
-	if err := os.Remove(s.versionFilePath(*version)); err != nil && !errors.Is(err, os.ErrNotExist) {
-		return fmt.Errorf("delete sync version file: %w", err)
+	if err := store.DeleteSyncVersion(s.db, id); err != nil {
+		return errors.Join(err, staged.rollback())
+	}
+	if err := staged.remove(); err != nil && s.logger != nil {
+		s.logger.Warn("remove staged sync version failed", "versionID", id, "path", staged.stagedPath, "error", err)
+	}
+	return nil
+}
+
+type stagedVersionFile struct {
+	originalPath string
+	stagedPath   string
+	exists       bool
+}
+
+func stageVersionFile(path string) (stagedVersionFile, error) {
+	info, err := os.Lstat(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return stagedVersionFile{originalPath: path}, nil
+	}
+	if err != nil {
+		return stagedVersionFile{}, fmt.Errorf("inspect sync version file: %w", err)
+	}
+	if !info.Mode().IsRegular() {
+		return stagedVersionFile{}, errors.New("sync version path is not a regular file")
+	}
+	staged := stagedVersionFile{
+		originalPath: path, stagedPath: path + ".deleting-" + uuid.NewString(), exists: true,
+	}
+	if err := os.Rename(staged.originalPath, staged.stagedPath); err != nil {
+		return stagedVersionFile{}, fmt.Errorf("stage sync version deletion: %w", err)
+	}
+	return staged, nil
+}
+
+func (s stagedVersionFile) rollback() error {
+	if !s.exists {
+		return nil
+	}
+	if err := os.Rename(s.stagedPath, s.originalPath); err != nil {
+		return fmt.Errorf("restore sync version file: %w", err)
+	}
+	return nil
+}
+
+func (s stagedVersionFile) remove() error {
+	if !s.exists {
+		return nil
+	}
+	if err := os.Remove(s.stagedPath); err != nil {
+		return fmt.Errorf("delete staged sync version file: %w", err)
 	}
 	return nil
 }
@@ -121,7 +260,7 @@ func (s *SyncService) applyRetention(config model.SyncConfig) error {
 		if version.Protected || index < config.RetentionCount && !version.CreatedAt.Before(cutoff) {
 			continue
 		}
-		if err := s.DeleteVersion(version.ID); err != nil {
+		if err := s.deleteVersion(version.ID); err != nil {
 			return err
 		}
 	}

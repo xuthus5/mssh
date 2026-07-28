@@ -1,4 +1,5 @@
 import type { Tab } from '@/store/appStore'
+import { readStorageItem, readStorageNumber, writeStorageItem } from '@/lib/safeStorage'
 
 export type WorkspaceID = 'overview' | 'sessions' | 'macros'
 export type OverviewSection = 'sessions' | 'keys' | 'tunnels' | 'serial' | 'audit'
@@ -45,22 +46,19 @@ export function fallbackAfterClose(tabs: Tab[], closingID: string): ActiveSurfac
 }
 
 export function initialNavigationState() {
-  const persistedWidth = localStorage.getItem(SIDEBAR_WIDTH_STORAGE_KEY)
   return {
-    navigationCollapsed: localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY) === 'true',
-    sidebarWidth: persistedWidth === null
-      ? DEFAULT_SIDEBAR_WIDTH
-      : clampSidebarWidth(Number(persistedWidth)),
+    navigationCollapsed: readStorageItem(SIDEBAR_COLLAPSED_STORAGE_KEY) === 'true',
+    sidebarWidth: clampSidebarWidth(readStorageNumber(SIDEBAR_WIDTH_STORAGE_KEY, DEFAULT_SIDEBAR_WIDTH)),
   }
 }
 
 export function persistNavigationCollapsed(navigationCollapsed: boolean) {
-  localStorage.setItem(SIDEBAR_COLLAPSED_STORAGE_KEY, String(navigationCollapsed))
+  writeStorageItem(SIDEBAR_COLLAPSED_STORAGE_KEY, String(navigationCollapsed))
 }
 
 export function persistSidebarWidth(sidebarWidth: number): number {
   const clampedWidth = clampSidebarWidth(sidebarWidth)
-  localStorage.setItem(SIDEBAR_WIDTH_STORAGE_KEY, String(clampedWidth))
+  writeStorageItem(SIDEBAR_WIDTH_STORAGE_KEY, String(clampedWidth))
   return clampedWidth
 }
 

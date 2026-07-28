@@ -16,8 +16,23 @@ COMMAND: <完整命令> | PURPOSE: <用途>
 不要假设命令已执行，不要输出密钥、密码或令牌。`
 
 func (s *AIService) Chat(request model.AIChatRequest) (model.AIChatResponse, error) {
+	operationContext, finish, err := s.beginOperation()
+	if err != nil {
+		return model.AIChatResponse{}, err
+	}
+	defer finish()
+	return s.chat(operationContext, request)
+}
+
+func (s *AIService) chat(ctx context.Context, request model.AIChatRequest) (model.AIChatResponse, error) {
 	if strings.TrimSpace(request.Prompt) == "" || request.SessionID <= 0 || strings.TrimSpace(request.TerminalID) == "" {
 		return model.AIChatResponse{}, errors.New("session, terminal and prompt are required")
+	}
+	if err := validateAIChatRequestSize(request); err != nil {
+		return model.AIChatResponse{}, err
+	}
+	if err := s.validateAITarget(request.ConversationID, request.SessionID, request.TerminalID); err != nil {
+		return model.AIChatResponse{}, err
 	}
 	settings, err := store.LoadAISettings(s.db, defaultAISettings())
 	if err != nil {
@@ -29,12 +44,21 @@ func (s *AIService) Chat(request model.AIChatRequest) (model.AIChatResponse, err
 	terminalContext = s.appendAIContext(request, settings, terminalContext)
 	// Re-clamp after metadata/system summary may have expanded context.
 	terminalContext = clampAITextBytes(terminalContext, settings.Security.MaxOutputBytes)
-	citations, searchContext, err := s.chatSearchContext(request, settings, prompt)
+	citations, searchContext, err := s.chatSearchContext(ctx, request, settings, prompt)
 	if err != nil {
 		return model.AIChatResponse{}, err
 	}
+	systemPrompt, err := prepareAICitationPolicy(request, settings, citations)
+	if err != nil {
+		s.auditAIChat(request.SessionID, "failed")
+		return model.AIChatResponse{}, err
+	}
 	nativeSearch := request.UseSearch && settings.Search.Enabled && settings.Search.Mode == model.AISearchNative
-	answer, providerID, err := s.chatWithFallback(settings, aiChatInput{System: aiSystemPrompt, Prompt: prompt, Context: terminalContext + searchContext, NativeSearch: nativeSearch})
+	requiredCitationCount := 0
+	if requiresAICitations(request, settings) {
+		requiredCitationCount = len(citations)
+	}
+	answer, providerID, err := s.chatWithFallbackContext(ctx, settings, aiChatInput{System: systemPrompt, Prompt: prompt, Context: terminalContext + searchContext, NativeSearch: nativeSearch, RequiredCitationCount: requiredCitationCount})
 	if err != nil {
 		s.auditAIChat(request.SessionID, "failed")
 		return model.AIChatResponse{}, err
@@ -66,18 +90,22 @@ func (s *AIService) appendAIContext(request model.AIChatRequest, settings model.
 	return builder.String() + "终端上下文:\n" + contextText
 }
 
-func (s *AIService) chatSearchContext(request model.AIChatRequest, settings model.AISettings, prompt string) ([]model.AICitation, string, error) {
-	if !request.UseSearch || !settings.Search.Enabled || settings.Search.Mode == model.AISearchNative {
+func (s *AIService) chatSearchContext(ctx context.Context, request model.AIChatRequest, settings model.AISettings, prompt string) ([]model.AICitation, string, error) {
+	if !request.UseSearch || !settings.Search.Enabled || settings.Search.Mode == model.AISearchDisabled || settings.Search.Mode == model.AISearchNative {
 		return []model.AICitation{}, "", nil
 	}
-	secret, _, err := s.secrets.get(searchSecretAccount(settings.Search.Provider))
+	secret, exists, err := s.secrets.get(searchSecretAccount(settings.Search.Provider))
 	if err != nil {
 		return nil, "", err
 	}
-	citations, err := searchAI(context.Background(), s.httpClient, settings.Search, secret, prompt)
+	if !exists || strings.TrimSpace(secret) == "" {
+		return nil, "", fmt.Errorf("AI search credential is required")
+	}
+	citations, err := searchAI(ctx, s.httpClient, settings.Search, secret, prompt)
 	if err != nil {
 		return nil, "", err
 	}
+	citations = filterValidAICitations(citations)
 	var builder strings.Builder
 	if len(citations) > 0 {
 		builder.WriteString("\n\n网络搜索结果:\n")
@@ -89,6 +117,10 @@ func (s *AIService) chatSearchContext(request model.AIChatRequest, settings mode
 }
 
 func (s *AIService) chatWithFallback(settings model.AISettings, input aiChatInput) (string, int64, error) {
+	return s.chatWithFallbackContext(context.Background(), settings, input)
+}
+
+func (s *AIService) chatWithFallbackContext(ctx context.Context, settings model.AISettings, input aiChatInput) (string, int64, error) {
 	ids := providerOrder(settings)
 	if len(ids) == 0 {
 		return "", 0, errors.New("no AI provider is configured")
@@ -97,15 +129,21 @@ func (s *AIService) chatWithFallback(settings model.AISettings, input aiChatInpu
 	for index, id := range ids {
 		profile, secret, err := s.loadProvider(id)
 		if err == nil {
-			ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
-			answer, chatErr := chatWithProvider(ctx, s.httpClient, *profile, secret, input)
+			requestContext, cancel := context.WithTimeout(ctx, 45*time.Second)
+			answer, chatErr := chatWithProvider(requestContext, s.httpClient, *profile, secret, input)
 			cancel()
+			if chatErr == nil {
+				chatErr = validateAIProviderAnswer(input, answer)
+			}
 			if chatErr == nil {
 				return answer, id, nil
 			}
 			err = chatErr
 		}
 		lastErr = err
+		if ctx.Err() != nil {
+			return "", 0, fmt.Errorf("AI request canceled: %w", ctx.Err())
+		}
 		if index == len(ids)-1 || !canFallbackAI(err) {
 			break
 		}
@@ -126,6 +164,9 @@ func providerOrder(settings model.AISettings) []int64 {
 }
 
 func canFallbackAI(err error) bool {
+	if errors.Is(err, errAICitationPolicy) || errors.Is(err, errAIProviderProtocol) || errors.Is(err, errAIProviderUnavailable) {
+		return true
+	}
 	var providerErr *aiProviderError
 	if !errors.As(err, &providerErr) {
 		return false
@@ -134,25 +175,19 @@ func canFallbackAI(err error) bool {
 }
 
 func (s *AIService) saveAIChat(request model.AIChatRequest, settings model.AISettings, prompt, answer string) (int64, error) {
-	conversationID := request.ConversationID
-	var err error
-	if conversationID == 0 {
-		title := []rune(prompt)
-		if len(title) > 40 {
-			title = title[:40]
-		}
-		conversationID, err = store.CreateAIConversation(s.db, request.SessionID, string(title))
-		if err != nil {
-			return 0, err
-		}
+	title := []rune(prompt)
+	if len(title) > 40 {
+		title = title[:40]
 	}
-	if err := store.AddAIMessage(s.db, conversationID, "user", prompt); err != nil {
-		return 0, err
-	}
-	if err := store.AddAIMessage(s.db, conversationID, "assistant", redactAIText(answer, settings.Security.RedactionPatterns)); err != nil {
-		return 0, err
-	}
-	return conversationID, store.PruneAIConversations(s.db, settings.Interaction.HistoryRetentionDays, settings.Interaction.MaxConversations)
+	return store.SaveAIConversationExchange(s.db, store.AIConversationExchange{
+		ConversationID:   request.ConversationID,
+		SessionID:        request.SessionID,
+		Title:            string(title),
+		UserContent:      prompt,
+		AssistantContent: redactAIText(answer, settings.Security.RedactionPatterns),
+		RetentionDays:    settings.Interaction.HistoryRetentionDays,
+		MaxConversations: settings.Interaction.MaxConversations,
+	})
 }
 
 func (s *AIService) auditAIChat(sessionID int64, outcome string) {

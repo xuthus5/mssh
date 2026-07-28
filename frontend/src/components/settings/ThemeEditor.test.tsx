@@ -1,9 +1,11 @@
 import type { ComponentProps } from 'react'
-import { act, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { Events } from '@wailsio/runtime'
 import { ThemeEditor } from '@/components/settings/ThemeEditor'
 import { useToastStore } from '@/components/ui/toast'
+import { SETTINGS_PREVIEW_CANCELLED_EVENT } from '@/lib/settingsWindowEvents'
 
 const profiles = [
   profile({ id: 1, name: 'GitHub Dark', mode: 'dark', background: '#0d1117' }),
@@ -182,6 +184,34 @@ describe('ThemeEditor dual mode profiles', () => {
     expect(useToastStore.getState().toasts.at(-1)?.message).toBe('已重置 Dark、Light 内置主题')
   })
 
+  it('closes an unconfirmed built-in reset when the settings window hides', async () => {
+    const onResetBuiltins = vi.fn(async () => ({ dark_reset: true, light_reset: true, fixed_reset: false }))
+    renderEditor({ onResetBuiltins })
+
+    await userEvent.click(screen.getByRole('button', { name: '重置内置主题' }))
+    expect(screen.getByRole('alertdialog')).toBeInTheDocument()
+    await act(async () => { await Events.Emit(SETTINGS_PREVIEW_CANCELLED_EVENT, { data: null }) })
+
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+    expect(onResetBuiltins).not.toHaveBeenCalled()
+  })
+
+  it('keeps a confirmed built-in reset running after the settings window hides', async () => {
+    let resolveReset: ((result: { dark_reset: boolean; light_reset: boolean; fixed_reset: boolean }) => void) | undefined
+    const onResetBuiltins = vi.fn(() => new Promise<{ dark_reset: boolean; light_reset: boolean; fixed_reset: boolean }>((resolve) => { resolveReset = resolve }))
+    renderEditor({ onResetBuiltins })
+
+    await userEvent.click(screen.getByRole('button', { name: '重置内置主题' }))
+    await userEvent.click(screen.getByRole('button', { name: '确认重置' }))
+    await act(async () => { await Events.Emit(SETTINGS_PREVIEW_CANCELLED_EVENT, { data: null }) })
+
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+    expect(onResetBuiltins).toHaveBeenCalledOnce()
+    expect(screen.getByLabelText('全局终端字体')).toBeDisabled()
+    await act(async () => { resolveReset?.({ dark_reset: true, light_reset: true, fixed_reset: false }) })
+    await waitFor(() => expect(screen.getByRole('button', { name: '重置内置主题' })).toBeEnabled())
+  })
+
   it('disables reset when neither assigned profile is built in', () => {
     const customProfiles = [profile({ id: 1, name: 'Custom Dark', mode: 'dark', background: '#111111', builtIn: false }), profile({ id: 2, name: 'Custom Light', mode: 'light', background: '#eeeeee', builtIn: false })]
     render(<ThemeEditor profiles={customProfiles as never} assignments={{ dark_profile_id: 1, light_profile_id: 2, follow_interface_mode: true, fixed_profile_id: 0 } as never} globalStyle={globalStyle as never} colorMode="dark" onSave={vi.fn()} onResetBuiltins={vi.fn()} />)
@@ -287,6 +317,24 @@ describe('ThemeEditor dual mode profiles', () => {
     expect(screen.getByRole('button', { name: /重置中/ })).toBeDisabled()
     expect(onResetBuiltins).toHaveBeenCalledOnce()
     await act(async () => { resolveReset?.({ dark_reset: true, light_reset: false, fixed_reset: false }) })
+  })
+
+  it('ignores a reset result after the bound theme target changes', async () => {
+    let resolveReset: ((result: { dark_reset: boolean; light_reset: boolean; fixed_reset: boolean }) => void) | undefined
+    const onResetBuiltins = vi.fn(() => new Promise<{ dark_reset: boolean; light_reset: boolean; fixed_reset: boolean }>((resolve) => { resolveReset = resolve }))
+    const view = renderEditor({ onResetBuiltins })
+    await userEvent.click(screen.getByRole('button', { name: '重置内置主题' }))
+    await userEvent.click(screen.getByRole('button', { name: '确认重置' }))
+
+    view.rerender(<ThemeEditor profiles={profiles as never} assignments={{ dark_profile_id: 3, light_profile_id: 2, follow_interface_mode: true, fixed_profile_id: 0 } as never} globalStyle={globalStyle as never} colorMode="dark" onSave={vi.fn()} onResetBuiltins={onResetBuiltins} />)
+    const reset = screen.getByRole('button', { name: '重置内置主题' })
+    expect(reset).toBeDisabled()
+    fireEvent.click(reset)
+    expect(onResetBuiltins).toHaveBeenCalledOnce()
+    await act(async () => { resolveReset?.({ dark_reset: true, light_reset: false, fixed_reset: false }) })
+
+    expect(useToastStore.getState().toasts).toHaveLength(0)
+    await waitFor(() => expect(reset).toBeEnabled())
   })
 
   it.each([

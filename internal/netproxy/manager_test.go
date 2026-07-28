@@ -61,6 +61,17 @@ func TestManagerConfigureAndProxyModes(t *testing.T) {
 	require.NotNil(t, client.Transport)
 }
 
+func TestSocks5TransportUsesDialContextInsteadOfHTTPProxy(t *testing.T) {
+	manager := New()
+	require.NoError(t, manager.Configure(Config{Mode: ModeManual, URL: "socks5://127.0.0.1:1080"}))
+
+	transport := manager.Transport()
+	proxy, err := transport.Proxy(&http.Request{URL: mustURL(t, "https://example.com")})
+	require.NoError(t, err)
+	assert.Nil(t, proxy)
+	assert.NotNil(t, transport.DialContext)
+}
+
 func TestShouldBypass(t *testing.T) {
 	assert.False(t, shouldBypass(mustURL(t, "https://a.com"), ""))
 	assert.True(t, shouldBypass(mustURL(t, "https://a.com"), "*"))
@@ -99,11 +110,12 @@ func TestNilManagerAndManualProxyURL(t *testing.T) {
 	assert.True(t, isBlockedProxyHost("169.254.169.254"))
 	assert.False(t, isBlockedProxyHost("proxy.example"))
 }
-func TestNormalizeTrimsFields(t *testing.T) {
+
+func TestNormalizeTrimsAddressFieldsButPreservesPassword(t *testing.T) {
 	got := Normalize(Config{Mode: " MANUAL ", URL: " http://p ", NoProxy: " a,b ", Username: " u ", Password: " p "})
 	assert.Equal(t, ModeManual, got.Mode)
 	assert.Equal(t, "http://p", got.URL)
 	assert.Equal(t, "a,b", got.NoProxy)
 	assert.Equal(t, "u", got.Username)
-	assert.Equal(t, "p", got.Password)
+	assert.Equal(t, " p ", got.Password)
 }

@@ -49,7 +49,6 @@ func TestSaveVaultFileRejectsInvalid(t *testing.T) {
 	require.Error(t, err)
 }
 
-
 func TestUnlockVaultInvalidFile(t *testing.T) {
 	_, err := UnlockVault("twelve chars!", VaultFile{})
 	require.Error(t, err)

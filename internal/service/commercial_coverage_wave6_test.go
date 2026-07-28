@@ -18,9 +18,11 @@ import (
 func TestStoreSyncVersionHelpersErrorPaths(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	require.NoError(t, store.SetSyncVersionProtected(db, 1, true))
+	require.NoError(t, store.SetSyncVersionSize(db, 1, 42))
 	require.NoError(t, store.DeleteSyncVersion(db, 1))
 	require.NoError(t, db.Close())
 	assert.Error(t, store.SetSyncVersionProtected(db, 1, true))
+	assert.Error(t, store.SetSyncVersionSize(db, 1, 42))
 	assert.Error(t, store.DeleteSyncVersion(db, 1))
 }
 
@@ -74,7 +76,7 @@ func TestSyncImportWithPasswordInstallerError(t *testing.T) {
 	require.NoError(t, err)
 	svc := NewSyncService(db, testutil.NewTestLogger(), WithSyncDataDir(t.TempDir()),
 		WithSyncSecretSource(func() (string, error) { return "secret-from-vault-xx", nil }),
-		WithVaultInstaller(func(string, crypto.VaultFile) error { return assert.AnError }),
+		WithVaultTransactionInstaller(func(string, crypto.VaultFile) (VaultInstallTransaction, error) { return nil, assert.AnError }),
 	)
 	data, err := svc.snapshot()
 	require.NoError(t, err)
@@ -95,9 +97,7 @@ func TestSyncAdoptVaultNilVaultAndInstallerFail(t *testing.T) {
 	require.NoError(t, err)
 	content, err := encodeSyncArtifact(data, "secret-from-vault-xx", syncArtifactMetadata{SnapshotFingerprint: fp, CreatedAt: time.Now().UTC()}, nil)
 	require.NoError(t, err)
-	svc := NewSyncService(db, testutil.NewTestLogger(), WithSyncDataDir(t.TempDir()),
-		WithVaultInstaller(func(string, crypto.VaultFile) error { return nil }),
-	)
+	svc := NewSyncService(db, testutil.NewTestLogger(), WithSyncDataDir(t.TempDir()))
 	assert.ErrorIs(t, svc.AdoptVaultFromContent("initial-pass-12", content), errSyncVaultMissing)
 }
 

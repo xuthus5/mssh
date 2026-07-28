@@ -1,4 +1,4 @@
-import { Loader2, CheckCircle, XCircle, ShieldAlert, Fingerprint } from 'lucide-react'
+import { Loader2, CheckCircle, XCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -12,105 +12,49 @@ import { formatConnectError } from '@/lib/connectError'
 
 
 export function ConnectDialog() {
-  const { open, state, host, port, user, error, fingerprint, algorithm, retry, closeDialog, acceptHostKey, rejectHostKey, cancelConnection } =
-    useConnectDialog()
-
-  return (
-    <Dialog open={open} onOpenChange={(v) => { if (!v && state === 'failed') closeDialog() }}>
+  const dialog = useConnectDialog()
+  return <Dialog open={dialog.open} onOpenChange={(open) => { if (!open && dialog.state === 'failed') dialog.closeDialog() }}>
       <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>{t('SSH 连接')}</DialogTitle>
-        </DialogHeader>
-
+        <DialogHeader><DialogTitle>{t('SSH 连接')}</DialogTitle></DialogHeader>
         <div className="flex flex-col items-center gap-3 py-6">
-          {/* Connecting state */}
-          {(state === 'connecting' || state === 'cancelling') && (
-            <>
-              <div className="relative">
-                <Loader2 className="h-10 w-10 text-blue-500 animate-spin" />
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="h-6 w-6 rounded-full bg-blue-500/20" />
-                </div>
-              </div>
-              <div className="text-sm text-center">
-                <p className="font-medium text-foreground">
-                  {t('正在连接到')} {user}@{host}:{port}
-                </p>
-                <p className="text-xs text-muted-foreground mt-2">
-                  {state === 'cancelling' ? t('正在取消连接...') : t('SSH 握手进行中...')}
-                </p>
-              </div>
-              <Button variant="outline" size="sm" disabled={state === 'cancelling'} onClick={() => { void cancelConnection().catch(() => undefined) }}>
-                {t('取消连接')}
-              </Button>
-            </>
-          )}
-
-          {/* Fingerprint confirm state */}
-          {state === 'awaiting-host-key' && fingerprint && (
-            <>
-              <Fingerprint className="h-10 w-10 text-yellow-500" />
-              <div className="text-sm text-center">
-                <p className="font-medium">{t('主机指纹确认')}</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {t('首次连接到')} {host}:{port}
-                </p>
-                <div className="mt-3 p-2 bg-muted rounded text-xs font-mono break-all">
-                  {fingerprint}
-                </div>
-                {algorithm && <p className="mt-2 text-xs text-muted-foreground">{t('算法：')}{algorithm}</p>}
-              </div>
-              <div className="flex gap-2 mt-2">
-                <Button variant="outline" size="sm" onClick={() => { void rejectHostKey().catch(() => undefined) }}>
-                  {t('拒绝')}
-                </Button>
-                <Button size="sm" onClick={() => { void acceptHostKey().catch(() => undefined) }}>
-                  {t('信任并连接')}
-                </Button>
-              </div>
-            </>
-          )}
-
-          {/* Connected state */}
-          {state === 'connected' && (
-            <>
-              <CheckCircle className="h-10 w-10 text-green-500" />
-              <div className="text-sm text-center">
-                <p className="font-medium text-green-600">{t('连接成功')}</p>
-                <p className="text-xs text-muted-foreground mt-2">
-                  {t('已连接到')} {user}@{host}:{port}
-                </p>
-              </div>
-            </>
-          )}
-
-          {/* Failed state */}
-          {state === 'failed' && (
-            <>
-              <XCircle className="h-10 w-10 text-destructive" />
-              <div className="text-sm text-center max-w-xs">
-                <p className="font-medium text-destructive">{t('连接失败')}</p>
-                <p className="text-xs text-muted-foreground mt-2 break-all whitespace-pre-wrap">
-                  {formatConnectError(error, t)}
-                </p>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                className="mt-2"
-                onClick={closeDialog}
-              >
-                {t('关闭')}
-              </Button>
-              {retry && (
-                <Button size="sm" onClick={() => { closeDialog(); retry() }}>
-                  {t('重试')}
-                </Button>
-              )}
-            </>
-          )}
+          <ConnectStateContent dialog={dialog} />
         </div>
       </DialogContent>
     </Dialog>
-  )
+}
+
+type ConnectDialogModel = ReturnType<typeof useConnectDialog.getState>
+
+function ConnectStateContent({ dialog }: { dialog: ConnectDialogModel }) {
+  if (dialog.state === 'connecting' || dialog.state === 'cancelling') return <ConnectingState dialog={dialog} />
+  if (dialog.state === 'connected') return <ConnectedState dialog={dialog} />
+  if (dialog.state === 'failed') return <FailedState dialog={dialog} />
+  return null
+}
+
+function ConnectingState({ dialog }: { dialog: ConnectDialogModel }) {
+  return <>
+    <div className="relative"><Loader2 className="h-10 w-10 text-blue-500 animate-spin" /><div className="absolute inset-0 flex items-center justify-center"><div className="h-6 w-6 rounded-full bg-blue-500/20" /></div></div>
+    <div className="text-sm text-center">
+      <p className="font-medium text-foreground">{t('正在连接到')} {dialog.user}@{dialog.host}:{dialog.port}</p>
+      <p className="text-xs text-muted-foreground mt-2">{dialog.state === 'cancelling' ? t('正在取消连接...') : t('SSH 握手进行中...')}</p>
+    </div>
+    <Button variant="outline" size="sm" disabled={dialog.state === 'cancelling'} onClick={() => { void dialog.cancelConnection().catch(() => undefined) }}>{t('取消连接')}</Button>
+  </>
+}
+
+function ConnectedState({ dialog }: { dialog: ConnectDialogModel }) {
+  return <>
+    <CheckCircle className="h-10 w-10 text-green-500" />
+    <div className="text-sm text-center"><p className="font-medium text-green-600">{t('连接成功')}</p><p className="text-xs text-muted-foreground mt-2">{t('已连接到')} {dialog.user}@{dialog.host}:{dialog.port}</p></div>
+  </>
+}
+
+function FailedState({ dialog }: { dialog: ConnectDialogModel }) {
+  return <>
+    <XCircle className="h-10 w-10 text-destructive" />
+    <div className="text-sm text-center max-w-xs"><p className="font-medium text-destructive">{t('连接失败')}</p><p className="text-xs text-muted-foreground mt-2 break-all whitespace-pre-wrap">{formatConnectError(dialog.error, t)}</p></div>
+    <Button variant="outline" size="sm" className="mt-2" onClick={() => dialog.closeDialog()}>{t('关闭')}</Button>
+    {dialog.retry ? <Button size="sm" onClick={() => { dialog.closeDialog(); dialog.retry?.() }}>{t('重试')}</Button> : null}
+  </>
 }

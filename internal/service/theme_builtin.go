@@ -14,6 +14,15 @@ type builtinCatalogState struct {
 }
 
 func (service *ThemeService) InitializeDefaults() error {
+	finish, err := service.beginOperation()
+	if err != nil {
+		return err
+	}
+	defer finish()
+	return service.initializeDefaults()
+}
+
+func (service *ThemeService) initializeDefaults() error {
 	tx, err := service.db.Begin()
 	if err != nil {
 		return fmt.Errorf("begin initialize terminal themes: %w", err)
@@ -133,7 +142,12 @@ func initializeThemeAssignments(tx *sql.Tx, defaults map[string]int64) error {
 }
 
 func (service *ThemeService) ResetBuiltinStyles() (model.BuiltinThemeResetResult, error) {
-	if err := service.InitializeDefaults(); err != nil {
+	finish, err := service.beginOperation()
+	if err != nil {
+		return model.BuiltinThemeResetResult{}, err
+	}
+	defer finish()
+	if err = service.initializeDefaults(); err != nil {
 		return model.BuiltinThemeResetResult{}, fmt.Errorf("prepare built-in theme reset: %w", err)
 	}
 	tx, err := service.db.Begin()

@@ -1,26 +1,103 @@
+import { waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useToastStore } from '@/components/ui/toast'
 import { __clearHandlers, __emitEvent, __registerHandler } from '@/test/__mocks__/wails-runtime'
 import { restoreTransfers, startEventBridge } from '@/store/eventBridge'
 import { useAppStore } from '@/store/appStore'
 import { useConnectDialog } from '@/store/connectDialog'
+import { useHostKeyPromptDialog } from '@/store/hostKeyPromptDialog'
 import { TERMINAL_CLOSED_SPLIT_PANE_EVENT } from '@/hooks/sessionReconnect'
+
+const sessionService = 'github.com/xuthus5/mssh/internal/service.SessionService.'
 
 describe('eventBridge', () => {
   beforeEach(() => {
     __clearHandlers()
+    __registerHandler('github.com/xuthus5/mssh/internal/service.FileService.ListTransfers', async () => [])
+    __registerHandler(sessionService + 'DecideHostKey', async () => {})
+    __registerHandler(sessionService + 'CancelConnect', async () => {})
     useAppStore.setState({ tabs: [], transfers: [], tunnelState: {}, connectionStatus: {} })
-    useConnectDialog.setState({ open: false, state: 'idle', attemptId: '', sessionId: '', fingerprint: '', algorithm: '', error: '' })
+    useConnectDialog.setState({
+      open: false, state: 'idle', host: '', port: 0, user: '', sessionId: '', error: '',
+      dialogId: 0, cancelRequest: null, retry: null,
+    })
+    useHostKeyPromptDialog.setState({ active: null, pending: false, error: '' })
   })
 
-  it('maps host-key attempt and fingerprint events', () => {
+  it('shows a host key prompt without replacing a busy connection dialog', () => {
+    useConnectDialog.getState().openDialog('foreground.internal', 22, 'root', vi.fn(), '9')
     const stop = startEventBridge()
-    __emitEvent('session:attempt', { data: {} })
-    __emitEvent('session:fingerprint', { data: { attempt_id: 'attempt-ignored' } })
-    __emitEvent('session:attempt', { data: { attempt_id: 'attempt-1' } })
-    __emitEvent('session:fingerprint', { data: { attempt_id: 'attempt-1', fingerprint: 'SHA256:key', algorithm: 'ssh-ed25519' } })
-    expect(useConnectDialog.getState()).toMatchObject({ attemptId: 'attempt-1', fingerprint: 'SHA256:key', algorithm: 'ssh-ed25519' })
+    __emitEvent('session:fingerprint', { data: {
+      attempt_id: 'attempt-background', hostname: '[2001:db8::1]:2222',
+      fingerprint: 'SHA256:key', algorithm: 'ssh-ed25519',
+    } })
+    expect(useHostKeyPromptDialog.getState().active).toMatchObject({
+      endpoint: { host: '2001:db8::1', port: 2222 },
+      prompt: { attemptId: 'attempt-background', fingerprint: 'SHA256:key', algorithm: 'ssh-ed25519' },
+    })
+    expect(useConnectDialog.getState()).toMatchObject({
+      open: true, state: 'connecting', host: 'foreground.internal', sessionId: '9',
+    })
+    __emitEvent('session:attempt', { data: { attempt_id: 'attempt-unrelated' } })
+    expect(useHostKeyPromptDialog.getState().active?.prompt.attemptId).toBe('attempt-background')
     stop()
+  })
+
+  it('queues additional fingerprints behind the active security prompt', async () => {
+    const stop = startEventBridge()
+    emitFingerprint('first')
+    emitFingerprint('second')
+    expect(useHostKeyPromptDialog.getState().active?.prompt.attemptId).toBe('attempt-first')
+
+    await useHostKeyPromptDialog.getState().decide(true)
+
+    await waitFor(() => expect(useHostKeyPromptDialog.getState().active?.prompt.attemptId).toBe('attempt-second'))
+    stop()
+  })
+
+  it('rejects fingerprints that exceed the bounded prompt queue', async () => {
+    const decide = vi.fn(async () => {})
+    __registerHandler(sessionService + 'DecideHostKey', decide)
+    const stop = startEventBridge()
+
+    for (let index = 1; index <= 34; index++) {
+      __emitEvent('session:fingerprint', { data: {
+        attempt_id: `attempt-${index}`, hostname: `host-${index}.internal:22`,
+        fingerprint: `SHA256:${index}`, algorithm: 'ssh-ed25519',
+      } })
+    }
+
+    await waitFor(() => expect(decide).toHaveBeenCalledWith('attempt-34', false))
+    stop()
+  })
+
+  it('fails closed when a fingerprint event omits endpoint data', async () => {
+    const decide = vi.fn(async () => {})
+    __registerHandler(sessionService + 'DecideHostKey', decide)
+    const stop = startEventBridge()
+
+    __emitEvent('session:fingerprint', { data: {
+      attempt_id: 'attempt-malformed', fingerprint: 'SHA256:malformed', algorithm: 'ssh-ed25519',
+    } })
+
+    await waitFor(() => expect(decide).toHaveBeenCalledWith('attempt-malformed', false))
+    expect(useHostKeyPromptDialog.getState().active).toBeNull()
+    stop()
+  })
+
+  it('rejects active and queued prompts when the event bridge stops', async () => {
+    const decide = vi.fn(async () => {})
+    __registerHandler(sessionService + 'DecideHostKey', decide)
+    const stop = startEventBridge()
+    emitFingerprint('first')
+    emitFingerprint('second')
+
+    stop()
+    await waitFor(() => {
+      expect(decide).toHaveBeenCalledWith('attempt-first', false)
+      expect(decide).toHaveBeenCalledWith('attempt-second', false)
+    })
+    expect(useHostKeyPromptDialog.getState().active).toBeNull()
   })
 
   it('maps transfer terminal states and errors', () => {
@@ -130,6 +207,15 @@ describe('eventBridge', () => {
   })
 })
 
+function emitFingerprint(suffix: string) {
+  __emitEvent('session:fingerprint', { data: {
+    attempt_id: `attempt-${suffix}`,
+    hostname: `${suffix}.internal:22`,
+    fingerprint: `SHA256:${suffix}`,
+    algorithm: 'ssh-ed25519',
+  } })
+}
+
 describe('restoreTransfers', () => {
   beforeEach(() => {
     useToastStore.setState({ toasts: [] })
@@ -151,4 +237,28 @@ describe('restoreTransfers', () => {
     expect(useAppStore.getState().transfersLoadError).toBe('list transfers failed')
     expect(useToastStore.getState().toasts).toHaveLength(0)
   })
+
+  it('keeps the newest transfer restore when responses resolve out of order', async () => {
+    __clearHandlers()
+    const first = deferred<unknown[]>()
+    const second = deferred<unknown[]>()
+    let call = 0
+    __registerHandler('github.com/xuthus5/mssh/internal/service.FileService.ListTransfers', async () => {
+      call += 1
+      return (call === 1 ? first : second).promise
+    })
+    const firstRestore = restoreTransfers()
+    const secondRestore = restoreTransfers()
+    second.resolve([{ id: 'new', session_id: 1, session_name: 'new', direction: 'upload', source_path: '/new', target_path: '/remote/new', total_bytes: 1, transferred_bytes: 1, speed: 1, eta: 0, status: 'completed', error: '', started_at: '2026-07-25T00:00:00Z', completed_at: '2026-07-25T00:00:01Z' }])
+    await secondRestore
+    first.resolve([{ id: 'old', session_id: 1, session_name: 'old', direction: 'upload', source_path: '/old', target_path: '/remote/old', total_bytes: 1, transferred_bytes: 1, speed: 1, eta: 0, status: 'completed', error: '', started_at: '2026-07-25T00:00:00Z', completed_at: '2026-07-25T00:00:01Z' }])
+    await firstRestore
+    expect(useAppStore.getState().transfers[0].id).toBe('new')
+  })
 })
+
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((resolvePromise) => { resolve = resolvePromise })
+  return { promise, resolve }
+}

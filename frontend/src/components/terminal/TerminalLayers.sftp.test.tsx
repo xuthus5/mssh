@@ -46,11 +46,12 @@ vi.mock('@/components/terminal/TerminalTab', () => ({
 }))
 vi.mock('@/components/terminal/PlaybackTab', () => ({ PlaybackTab: () => null }))
 vi.mock('@/components/file/FilePanel', () => ({
-  default: ({ dropTargetId, showHiddenFiles, defaultView, actionError, onSyncCurrentDirectory, onUpload, onDownload }: {
+  default: ({ dropTargetId, showHiddenFiles, defaultView, actionError, transferActionPending, onSyncCurrentDirectory, onUpload, onDownload }: {
     dropTargetId: string
     showHiddenFiles: boolean
     defaultView: string
     actionError?: string
+    transferActionPending?: 'upload' | 'download' | null
     onSyncCurrentDirectory: () => void
     onUpload: () => void
     onDownload: (path: string) => void
@@ -58,8 +59,8 @@ vi.mock('@/components/file/FilePanel', () => ({
     <div data-testid="file-panel" data-drop-target-id={dropTargetId} data-show-hidden={String(showHiddenFiles)} data-default-view={defaultView}>
       {actionError ? <div role="alert">{actionError}</div> : null}
       <button type="button" onClick={onSyncCurrentDirectory}>同步当前目录</button>
-      <button type="button" onClick={onUpload}>upload</button>
-      <button type="button" onClick={() => onDownload('/remote/app.log')}>download</button>
+      <button type="button" disabled={transferActionPending !== null && transferActionPending !== undefined} onClick={onUpload}>upload</button>
+      <button type="button" disabled={transferActionPending !== null && transferActionPending !== undefined} onClick={() => onDownload('/remote/app.log')}>download</button>
     </div>
   ),
 }))
@@ -190,6 +191,75 @@ describe('TerminalLayers SFTP isolation', () => {
     expect(transfer.download).not.toHaveBeenCalled()
   })
 
+  it('keeps upload and download native pickers single-flight', async () => {
+    const picker = deferred<string>()
+    runtime.openFile.mockReturnValueOnce(picker.promise)
+    render(<TerminalLayers />)
+    const terminalA = (await screen.findByTestId('terminal-term-a')).closest('[data-layer-id="terminal-a"]') as HTMLElement
+    fireEvent.click(within(terminalA).getByRole('button', { name: 'files' }))
+    const upload = await within(terminalA).findByRole('button', { name: 'upload' })
+    const download = within(terminalA).getByRole('button', { name: 'download' })
+
+    act(() => {
+      fireEvent.click(upload)
+      fireEvent.click(upload)
+      fireEvent.click(download)
+    })
+
+    expect(runtime.openFile).toHaveBeenCalledOnce()
+    expect(runtime.saveFile).not.toHaveBeenCalled()
+    expect(upload).toBeDisabled()
+    expect(download).toBeDisabled()
+    await act(async () => { picker.resolve('/tmp/current.txt'); await Promise.resolve() })
+    expect(transfer.upload).toHaveBeenCalledWith('/tmp/current.txt', '/')
+  })
+
+  it('retains the native picker lease when the selected terminal changes', async () => {
+    const firstPicker = deferred<string>()
+    runtime.openFile.mockReturnValueOnce(firstPicker.promise)
+    runtime.saveFile.mockResolvedValueOnce('/tmp/fresh.log')
+    render(<TerminalLayers />)
+    const terminalA = (await screen.findByTestId('terminal-term-a')).closest('[data-layer-id="terminal-a"]') as HTMLElement
+    fireEvent.click(within(terminalA).getByRole('button', { name: 'files' }))
+    fireEvent.click(await within(terminalA).findByRole('button', { name: 'upload' }))
+
+    fireEvent.click(within(terminalA).getByRole('button', { name: 'split files' }))
+    const upload = await within(terminalA).findByRole('button', { name: 'upload' })
+    const download = within(terminalA).getByRole('button', { name: 'download' })
+    expect(upload).toBeDisabled()
+    expect(download).toBeDisabled()
+    fireEvent.click(upload)
+    fireEvent.click(download)
+    expect(runtime.openFile).toHaveBeenCalledOnce()
+    expect(runtime.saveFile).not.toHaveBeenCalled()
+
+    await act(async () => { firstPicker.resolve('/tmp/stale.txt'); await Promise.resolve() })
+    expect(transfer.upload).not.toHaveBeenCalled()
+    await waitFor(() => expect(download).toBeEnabled())
+    fireEvent.click(download)
+    await waitFor(() => expect(runtime.saveFile).toHaveBeenCalledOnce())
+    expect(transfer.download).toHaveBeenCalledWith('/remote/app.log', '/tmp/fresh.log')
+  })
+
+  it('ignores an upload picker after the file panel closes and allows a fresh picker after reopen', async () => {
+    const firstPicker = deferred<string>()
+    runtime.openFile.mockReturnValueOnce(firstPicker.promise).mockResolvedValueOnce('/tmp/fresh.txt')
+    render(<TerminalLayers />)
+    const terminalA = (await screen.findByTestId('terminal-term-a')).closest('[data-layer-id="terminal-a"]') as HTMLElement
+    const filesButton = within(terminalA).getByRole('button', { name: 'files' })
+    fireEvent.click(filesButton)
+    fireEvent.click(await within(terminalA).findByRole('button', { name: 'upload' }))
+    fireEvent.click(filesButton)
+
+    await act(async () => { firstPicker.resolve('/tmp/stale.txt'); await Promise.resolve() })
+    expect(transfer.upload).not.toHaveBeenCalled()
+
+    fireEvent.click(filesButton)
+    fireEvent.click(await within(terminalA).findByRole('button', { name: 'upload' }))
+    await waitFor(() => expect(transfer.upload).toHaveBeenCalledWith('/tmp/fresh.txt', '/'))
+    expect(runtime.openFile).toHaveBeenCalledTimes(2)
+  })
+
   it('loads the initial directory without toast when listFiles fails', async () => {
     // Matches production listFiles: sets panel error and resolves without rejecting.
     transfer.listFiles.mockImplementationOnce(async () => {
@@ -220,4 +290,102 @@ describe('TerminalLayers SFTP isolation', () => {
     expect(await within(terminalA).findByRole('alert')).toHaveTextContent('上传失败: drop denied')
     expect(notify).not.toHaveBeenCalledWith(expect.stringContaining('上传失败'), 'error')
   })
+
+  it('rejects oversized dropped batches before starting partial uploads', async () => {
+    let dropHandler: DropHandler | undefined
+    runtime.onFilesDropped.mockImplementation((handler?: DropHandler) => {
+      dropHandler = handler
+      return vi.fn()
+    })
+    render(<TerminalLayers />)
+    const terminalA = (await screen.findByTestId('terminal-term-a')).closest('[data-layer-id="terminal-a"]') as HTMLElement
+    fireEvent.click(within(terminalA).getByRole('button', { name: 'files' }))
+    await within(terminalA).findByTestId('file-panel')
+
+    dropHandler?.({ data: {
+      files: Array.from({ length: 33 }, (_, index) => `/tmp/file-${index}.txt`),
+      details: { id: 'sftp-drop-zone-term-a' },
+    } })
+
+    expect(transfer.uploadMany).not.toHaveBeenCalled()
+    expect(await within(terminalA).findByRole('alert')).toHaveTextContent('单次最多拖拽 32 个文件')
+  })
+
+  it('keeps dropped upload batches single-flight per file panel', async () => {
+    let dropHandler: DropHandler | undefined
+    const activeBatch = deferred<void>()
+    runtime.onFilesDropped.mockImplementation((handler?: DropHandler) => {
+      dropHandler = handler
+      return vi.fn()
+    })
+    transfer.uploadMany.mockReturnValueOnce(activeBatch.promise)
+    render(<TerminalLayers />)
+    const terminalA = (await screen.findByTestId('terminal-term-a')).closest('[data-layer-id="terminal-a"]') as HTMLElement
+    fireEvent.click(within(terminalA).getByRole('button', { name: 'files' }))
+    await within(terminalA).findByTestId('file-panel')
+
+    dropHandler?.({ data: { files: ['/tmp/first.txt'], details: { id: 'sftp-drop-zone-term-a' } } })
+    await waitFor(() => expect(transfer.uploadMany).toHaveBeenCalledOnce())
+    dropHandler?.({ data: { files: ['/tmp/second.txt'], details: { id: 'sftp-drop-zone-term-a' } } })
+
+    expect(transfer.uploadMany).toHaveBeenCalledOnce()
+    expect(await within(terminalA).findByRole('alert')).toHaveTextContent('上传队列正在处理，请稍后重试')
+    await act(async () => { activeBatch.resolve(); await activeBatch.promise })
+  })
+
+  it('does not report sync success after the SFTP panel is closed', async () => {
+    const writing = deferred<number>()
+    terminalService.write.mockImplementationOnce(async (terminalID: string) => {
+      await writing.promise
+      useTerminalDirectoryStore.getState().setDirectory(terminalID, '/manual-sync')
+      return 0
+    })
+    render(<TerminalLayers />)
+    const terminalA = (await screen.findByTestId('terminal-term-a')).closest('[data-layer-id="terminal-a"]') as HTMLElement
+    fireEvent.click(within(terminalA).getByRole('button', { name: 'files' }))
+    fireEvent.click(await within(terminalA).findByRole('button', { name: '同步当前目录' }))
+    await waitFor(() => expect(terminalService.write).toHaveBeenCalled())
+    act(() => useAppStore.setState({ tabs: [{ id: 'terminal-a', title: 'Terminal', type: 'terminal', terminalId: 'term-a', sessionId: 1 }] }))
+    writing.resolve(0)
+    await act(async () => { await Promise.resolve() })
+    expect(notify).not.toHaveBeenCalledWith(expect.stringContaining('已同步当前目录'), 'success')
+  })
+
+  it('does not let a stale directory sync release the current terminal lease', async () => {
+    const firstWrite = deferred<number>()
+    const secondWrite = deferred<number>()
+    terminalService.write
+      .mockImplementationOnce(async (terminalID: string) => {
+        await firstWrite.promise
+        useTerminalDirectoryStore.getState().setDirectory(terminalID, '/first-sync')
+        return 0
+      })
+      .mockImplementationOnce(async (terminalID: string) => {
+        await secondWrite.promise
+        useTerminalDirectoryStore.getState().setDirectory(terminalID, '/second-sync')
+        return 0
+      })
+    render(<TerminalLayers />)
+    const terminalA = (await screen.findByTestId('terminal-term-a')).closest('[data-layer-id="terminal-a"]') as HTMLElement
+    fireEvent.click(within(terminalA).getByRole('button', { name: 'files' }))
+    fireEvent.click(await within(terminalA).findByRole('button', { name: '同步当前目录' }))
+    await waitFor(() => expect(terminalService.write).toHaveBeenCalledWith('term-a', MANUAL_TERMINAL_DIRECTORY_REPORT))
+
+    fireEvent.click(within(terminalA).getByRole('button', { name: 'split files' }))
+    await waitFor(() => expect(within(terminalA).getByTestId('file-panel')).toHaveAttribute('data-drop-target-id', 'sftp-drop-zone-split-term-a'))
+    fireEvent.click(within(terminalA).getByRole('button', { name: '同步当前目录' }))
+    await waitFor(() => expect(terminalService.write).toHaveBeenCalledTimes(2))
+
+    await act(async () => { firstWrite.resolve(0); await Promise.resolve() })
+    fireEvent.click(within(terminalA).getByRole('button', { name: '同步当前目录' }))
+    expect(terminalService.write).toHaveBeenCalledTimes(2)
+
+    await act(async () => { secondWrite.resolve(0); await Promise.resolve() })
+  })
 })
+
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((resolvePromise) => { resolve = resolvePromise })
+  return { promise, resolve }
+}

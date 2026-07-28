@@ -52,6 +52,23 @@ type wiringEventBus struct{}
 
 func (wiringEventBus) Emit(string, interface{}) {}
 
+type retryProxyConfigurer struct {
+	config   netproxy.Config
+	calls    int
+	firstErr error
+}
+
+func (p *retryProxyConfigurer) Configure(config netproxy.Config) error {
+	p.calls++
+	if p.calls == 1 && p.firstErr != nil {
+		return p.firstErr
+	}
+	p.config = config
+	return nil
+}
+
+func (p *retryProxyConfigurer) Config() netproxy.Config { return p.config }
+
 func TestNewSettingServiceWithAndWithoutLogManager(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	logger := testutil.NewTestLogger()
@@ -77,9 +94,11 @@ func TestNewSyncServiceWiresOptions(t *testing.T) {
 	require.NoError(t, err)
 	session := service.NewSessionService(db, bus, 30, dir, runtime, logger)
 	terminal := service.NewTerminalService(session, bus, 8, logger)
+	file := service.NewFileService(session, bus, logger, service.WithTransferDB(db))
 	tunnel := service.NewTunnelService(db, session, bus, logger)
+	settings := service.NewSettingService(db, logger, service.SettingServiceOptions{Crypto: runtime})
 	input := serviceInitialization{db: db, logger: logger, eventBus: bus, opts: Options{DataDir: dir}}
-	assert.NotNil(t, newSyncService(input, runtime, security, terminal, tunnel, session))
+	assert.NotNil(t, newSyncService(input, runtime, security, file, terminal, tunnel, session, settings))
 }
 
 func TestNewSyncServiceVaultSourceErrorWhenLocked(t *testing.T) {
@@ -92,9 +111,11 @@ func TestNewSyncServiceVaultSourceErrorWhenLocked(t *testing.T) {
 	// no setup => ExportVaultFile fails
 	session := service.NewSessionService(db, bus, 30, dir, runtime, logger)
 	terminal := service.NewTerminalService(session, bus, 8, logger)
+	file := service.NewFileService(session, bus, logger, service.WithTransferDB(db))
 	tunnel := service.NewTunnelService(db, session, bus, logger)
+	settings := service.NewSettingService(db, logger, service.SettingServiceOptions{Crypto: runtime})
 	input := serviceInitialization{db: db, logger: logger, eventBus: bus, opts: Options{DataDir: dir}}
-	syncSvc := newSyncService(input, runtime, security, terminal, tunnel, session)
+	syncSvc := newSyncService(input, runtime, security, file, terminal, tunnel, session, settings)
 	// exercise wired vault source by exporting recovery which uses artifactVault
 	// cannot call unexported; use exported Export after setup of secret? SyncSecret fails locked.
 	assert.NotNil(t, syncSvc)
@@ -125,9 +146,11 @@ func TestNewSyncServiceExportHitsVaultSource(t *testing.T) {
 	require.NoError(t, err)
 	session := service.NewSessionService(db, bus, 30, dir, runtime, logger)
 	terminal := service.NewTerminalService(session, bus, 8, logger)
+	file := service.NewFileService(session, bus, logger, service.WithTransferDB(db))
 	tunnel := service.NewTunnelService(db, session, bus, logger)
+	settings := service.NewSettingService(db, logger, service.SettingServiceOptions{Crypto: runtime})
 	input := serviceInitialization{db: db, logger: logger, eventBus: bus, opts: Options{DataDir: dir}}
-	syncSvc := newSyncService(input, runtime, security, terminal, tunnel, session)
+	syncSvc := newSyncService(input, runtime, security, file, terminal, tunnel, session, settings)
 	require.NoError(t, syncSvc.Export(dir+"/out.msshbackup"))
 }
 
@@ -153,4 +176,33 @@ func TestStartAppAppliesStoredProxySettings(t *testing.T) {
 	cfg := proxy.Config()
 	assert.Equal(t, netproxy.ModeManual, cfg.Mode)
 	assert.Equal(t, "http://127.0.0.1:18080", cfg.URL)
+}
+
+func TestApplyStartupSettingsRetriesProxyWhenAlreadyUnlocked(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	dir := t.TempDir()
+	runtime := service.NewCryptoRuntime()
+	security := service.NewSecurityService(db, dir, runtime, &memoryKeychain{}, testutil.NewTestLogger())
+	_, err := security.Setup(model.SecuritySetupInput{Password: "initial-pass-12"})
+	require.NoError(t, err)
+	require.True(t, runtime.Unlocked())
+	require.NoError(t, store.SetSettings(db, []model.Setting{
+		{Key: "application.proxy_mode", Namespace: "application", Value: `"manual"`, ValueType: "string", Version: 1},
+		{Key: "application.proxy_url", Namespace: "application", Value: `"http://127.0.0.1:18080"`, ValueType: "string", Version: 1},
+	}))
+
+	proxy := &retryProxyConfigurer{
+		config:   netproxy.DefaultConfig(),
+		firstErr: errors.New("temporary proxy failure"),
+	}
+	setting := service.NewSettingService(db, testutil.NewTestLogger(), service.SettingServiceOptions{
+		Proxy:  proxy,
+		Crypto: runtime,
+	})
+
+	applyStartupSettings(&App{Setting: setting, Security: security}, slog.Default())
+
+	assert.Equal(t, 2, proxy.calls)
+	assert.Equal(t, netproxy.ModeManual, proxy.config.Mode)
+	assert.Equal(t, "http://127.0.0.1:18080", proxy.config.URL)
 }

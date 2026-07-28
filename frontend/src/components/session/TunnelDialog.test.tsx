@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import TunnelDialog from '@/components/session/TunnelDialog'
@@ -109,6 +109,17 @@ describe('TunnelDialog', () => {
     expect(screen.getByText(/安全边界/)).toBeInTheDocument()
   })
 
+  it('provides accessible names for tunnel controls', async () => {
+    render(<TunnelDialog {...dialogProps()} />)
+    await userEvent.click(screen.getByRole('button', { name: '新建隧道' }))
+
+    expect(screen.getByRole('combobox', { name: '类型' })).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: '本地地址' })).toBeInTheDocument()
+    expect(screen.getByRole('spinbutton', { name: '本地端口' })).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: '远程地址' })).toBeInTheDocument()
+    expect(screen.getByRole('spinbutton', { name: '远程端口' })).toBeInTheDocument()
+  })
+
   it('deletes existing tunnels after confirm', async () => {
     const user = userEvent.setup()
     const props = dialogProps()
@@ -152,6 +163,35 @@ describe('TunnelDialog', () => {
     expect(screen.queryByText('无隧道')).not.toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: '重试' }))
     expect(onReload).toHaveBeenCalled()
+  })
+
+  it('does not reset a reopened form when an older start completes', async () => {
+    const pending = deferred<void>()
+    const props = dialogProps()
+    props.onStart = vi.fn(() => pending.promise)
+    const view = render(<TunnelDialog {...props} />)
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: '新建隧道' }))
+    await user.click(screen.getByRole('button', { name: '启动' }))
+    view.rerender(<TunnelDialog {...props} open={false} />)
+    view.rerender(<TunnelDialog {...props} open />)
+    await act(async () => { pending.resolve(); await Promise.resolve() })
+    expect(screen.getByPlaceholderText('8080')).toBeInTheDocument()
+  })
+
+  it('starts a new tunnel only once during a pending request', async () => {
+    const pending = deferred<void>()
+    const props = dialogProps()
+    props.onStart = vi.fn(() => pending.promise)
+    render(<TunnelDialog {...props} />)
+    await userEvent.click(screen.getByRole('button', { name: '新建隧道' }))
+    const submit = screen.getByRole('button', { name: '启动' })
+    act(() => {
+      fireEvent.click(submit)
+      fireEvent.click(submit)
+    })
+    expect(props.onStart).toHaveBeenCalledOnce()
+    await act(async () => { pending.resolve(); await Promise.resolve() })
   })
 })
 
@@ -218,4 +258,10 @@ function tunnel(id: string, type: Tunnel['type'], running: boolean): Tunnel {
     remotePort: 80,
     running,
   }
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((resolvePromise) => { resolve = resolvePromise })
+  return { promise, resolve }
 }

@@ -22,6 +22,54 @@ type synchronousExitPTY struct {
 	closeCount   int
 }
 
+type blockingWritePTY struct {
+	started chan struct{}
+	release chan struct{}
+	once    sync.Once
+}
+
+type closeInterruptsWritePTY struct {
+	started   chan struct{}
+	release   chan struct{}
+	startOnce sync.Once
+	closeOnce sync.Once
+}
+
+func (p *blockingWritePTY) Write(data []byte) (int, error) {
+	p.once.Do(func() { close(p.started) })
+	<-p.release
+	return len(data), nil
+}
+
+func (p *blockingWritePTY) Resize(int, int) error { return nil }
+
+func (p *blockingWritePTY) Close() error { return nil }
+
+func (p *blockingWritePTY) SetReadCallback(func([]byte)) {}
+
+func (p *blockingWritePTY) SetExitCallback(func(error)) {}
+
+func (p *blockingWritePTY) Start() {}
+
+func (p *closeInterruptsWritePTY) Write([]byte) (int, error) {
+	p.startOnce.Do(func() { close(p.started) })
+	<-p.release
+	return 0, errors.New("terminal closed")
+}
+
+func (p *closeInterruptsWritePTY) Resize(int, int) error { return nil }
+
+func (p *closeInterruptsWritePTY) Close() error {
+	p.closeOnce.Do(func() { close(p.release) })
+	return nil
+}
+
+func (p *closeInterruptsWritePTY) SetReadCallback(func([]byte)) {}
+
+func (p *closeInterruptsWritePTY) SetExitCallback(func(error)) {}
+
+func (p *closeInterruptsWritePTY) Start() {}
+
 func (p *synchronousExitPTY) Write(data []byte) (int, error) {
 	return len(data), nil
 }
@@ -75,6 +123,29 @@ func TestRegisterTerminalEvictsSynchronousExitWithoutBlocking(t *testing.T) {
 	}
 	require.Equal(t, 1, oldPTY.CloseCount())
 	require.Equal(t, 1, service.Count())
+}
+
+func TestRegisterTerminalEvictionInterruptsInFlightWrite(t *testing.T) {
+	service := NewTerminalService(nil, newMockEventBus(), 1, testutil.NewTestLogger())
+	oldPTY := &closeInterruptsWritePTY{started: make(chan struct{}), release: make(chan struct{})}
+	service.registerTerminal("old", "", 0, oldPTY)
+	writeDone := make(chan error, 1)
+	go func() {
+		_, err := service.Write("old", "payload")
+		writeDone <- err
+	}()
+	select {
+	case <-oldPTY.started:
+	case <-time.After(time.Second):
+		t.Fatal("terminal write did not start")
+	}
+
+	service.registerTerminal("new", "", 0, &synchronousExitPTY{})
+
+	require.ErrorContains(t, <-writeDone, "terminal closed")
+	assert.NotContains(t, service.ptys, "old")
+	assert.Contains(t, service.ptys, "new")
+	assert.Equal(t, 1, service.Count())
 }
 
 func TestHandlePTYExitDeletesSystemSampleUnderSystemLock(t *testing.T) {
@@ -159,6 +230,75 @@ func TestCloseAllTerminalsWaitsForInFlightOpen(t *testing.T) {
 	_, err = service.Open(context.Background(), 999, 80, 24)
 	require.Error(t, err)
 	assert.NotContains(t, err.Error(), "shutting down")
+}
+
+func TestCloseAllTerminalsWaitsForInFlightWrite(t *testing.T) {
+	service := NewTerminalService(nil, newMockEventBus(), 4, testutil.NewTestLogger())
+	pty := &blockingWritePTY{started: make(chan struct{}), release: make(chan struct{})}
+	service.ptys["term-1"] = pty
+	service.lastUsed["term-1"] = time.Now()
+
+	writeDone := make(chan error, 1)
+	go func() {
+		_, err := service.Write("term-1", "payload")
+		writeDone <- err
+	}()
+	<-pty.started
+
+	closeDone := make(chan error, 1)
+	go func() { closeDone <- CloseAllTerminals(service) }()
+	select {
+	case <-closeDone:
+		t.Fatal("CloseAllTerminals returned before the in-flight write completed")
+	case <-time.After(50 * time.Millisecond):
+	}
+
+	close(pty.release)
+	require.NoError(t, <-writeDone)
+	require.NoError(t, <-closeDone)
+}
+
+func TestTerminalServiceShutdownWaitsForInFlightWrite(t *testing.T) {
+	service := NewTerminalService(nil, newMockEventBus(), 4, testutil.NewTestLogger())
+	pty := &blockingWritePTY{started: make(chan struct{}), release: make(chan struct{})}
+	service.ptys["term-1"] = pty
+	service.lastUsed["term-1"] = time.Now()
+
+	writeDone := make(chan error, 1)
+	go func() {
+		_, err := service.Write("term-1", "payload")
+		writeDone <- err
+	}()
+	<-pty.started
+
+	shutdownDone := make(chan error, 1)
+	go func() { shutdownDone <- service.Shutdown() }()
+	select {
+	case <-shutdownDone:
+		t.Fatal("terminal shutdown returned before the in-flight write completed")
+	case <-time.After(50 * time.Millisecond):
+	}
+
+	close(pty.release)
+	require.NoError(t, <-writeDone)
+	require.NoError(t, <-shutdownDone)
+}
+
+func TestTerminalServiceRejectsOperationsAfterShutdown(t *testing.T) {
+	service := NewTerminalService(nil, newMockEventBus(), 4, testutil.NewTestLogger())
+	require.NoError(t, service.Shutdown())
+
+	_, err := service.Write("term-1", "payload")
+	assert.Contains(t, err.Error(), "shutting down")
+	assert.Contains(t, service.Resize("term-1", 80, 24).Error(), "shutting down")
+	assert.Contains(t, service.Close("term-1").Error(), "shutting down")
+	assert.Contains(t, service.Attach("term-1").Error(), "shutting down")
+	assert.Contains(t, service.SetOutputPaused("term-1", true).Error(), "shutting down")
+	assert.Contains(t, service.SetMaxSize(8).Error(), "shutting down")
+	_, err = service.SystemInfo("term-1")
+	assert.Contains(t, err.Error(), "shutting down")
+	_, err = service.ProcessInfo("term-1")
+	assert.Contains(t, err.Error(), "shutting down")
 }
 
 func TestTerminalServiceShutdownRejectsNewOpens(t *testing.T) {

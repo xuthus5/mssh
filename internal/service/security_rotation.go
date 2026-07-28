@@ -67,9 +67,16 @@ func (s *SecurityService) saveVault(vault crypto.VaultFile) error {
 }
 
 // RecoverPendingRotation restores the old vault after an interrupted rotation.
+//
+//wails:ignore
 func (s *SecurityService) RecoverPendingRotation() error {
-	s.rotationMu.Lock()
-	defer s.rotationMu.Unlock()
+	finish, err := s.beginOperation()
+	if err != nil {
+		return err
+	}
+	defer finish()
+	s.stateMu.Lock()
+	defer s.stateMu.Unlock()
 	return s.recoverPendingRotation()
 }
 

@@ -30,13 +30,16 @@ type Config struct {
 
 // Manager applies a shared proxy configuration to HTTP clients.
 type Manager struct {
-	mu     sync.RWMutex
-	config Config
+	mu        sync.RWMutex
+	config    Config
+	transport *http.Transport
 }
 
 // New returns a manager with system proxy defaults.
 func New() *Manager {
-	return &Manager{config: DefaultConfig()}
+	manager := &Manager{config: DefaultConfig()}
+	manager.transport = transportForConfig(manager.config)
+	return manager
 }
 
 // DefaultConfig returns system proxy mode with empty manual fields.
@@ -50,8 +53,7 @@ func Normalize(config Config) Config {
 	config.URL = strings.TrimSpace(config.URL)
 	config.NoProxy = strings.TrimSpace(config.NoProxy)
 	config.Username = strings.TrimSpace(config.Username)
-	// password may intentionally contain spaces; only strip ends
-	config.Password = strings.TrimSpace(config.Password)
+	// Password is opaque credential data; preserve it exactly.
 	return config
 }
 
@@ -102,7 +104,7 @@ func Validate(config Config) error {
 }
 
 func isBlockedProxyHost(host string) bool {
-	normalized := strings.Trim(strings.ToLower(strings.TrimSpace(host)), "[]")
+	normalized := normalizeHost(strings.Trim(strings.ToLower(strings.TrimSpace(host)), "[]"))
 	switch normalized {
 	case "metadata", "metadata.google.internal", "metadata.goog":
 		return true
@@ -111,13 +113,7 @@ func isBlockedProxyHost(host string) bool {
 	if ip == nil {
 		return false
 	}
-	if ip.IsUnspecified() || ip.IsMulticast() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() {
-		return true
-	}
-	if ip4 := ip.To4(); ip4 != nil && ip4[0] == 169 && ip4[1] == 254 {
-		return true
-	}
-	return false
+	return isBlockedProxyIP(ip)
 }
 
 // Configure replaces the active proxy configuration.
@@ -129,9 +125,20 @@ func (m *Manager) Configure(config Config) error {
 	if err := Validate(config); err != nil {
 		return err
 	}
+	nextTransport := transportForConfig(config)
 	m.mu.Lock()
+	if m.transport != nil && m.config == config {
+		m.mu.Unlock()
+		nextTransport.CloseIdleConnections()
+		return nil
+	}
+	previousTransport := m.transport
 	m.config = config
+	m.transport = nextTransport
 	m.mu.Unlock()
+	if previousTransport != nil {
+		previousTransport.CloseIdleConnections()
+	}
 	return nil
 }
 
@@ -147,30 +154,28 @@ func (m *Manager) Config() Config {
 
 // Client returns an HTTP client with the current proxy settings and timeout.
 func (m *Manager) Client(timeout time.Duration) *http.Client {
-	return &http.Client{Timeout: timeout, Transport: m.Transport()}
+	if m == nil {
+		return &http.Client{Timeout: timeout, Transport: transportForConfig(DefaultConfig())}
+	}
+	_ = m.currentTransport()
+	return &http.Client{Timeout: timeout, Transport: m}
 }
 
 // Transport builds a fresh transport bound to the current proxy config.
 func (m *Manager) Transport() *http.Transport {
-	base := http.DefaultTransport
-	transport, ok := base.(*http.Transport)
-	if ok {
-		transport = transport.Clone()
-	} else {
-		transport = &http.Transport{}
-	}
-	transport.Proxy = m.proxyFunc()
-	return transport
+	return transportForConfig(m.Config())
 }
 
 func (m *Manager) proxyFunc() func(*http.Request) (*url.URL, error) {
+	return proxyFuncForConfig(m.Config())
+}
+
+func proxyFuncForConfig(config Config) func(*http.Request) (*url.URL, error) {
+	config = Normalize(config)
 	return func(req *http.Request) (*url.URL, error) {
-		if m == nil {
-			return http.ProxyFromEnvironment(req)
+		if req == nil || req.URL == nil {
+			return nil, fmt.Errorf("proxy request URL is required")
 		}
-		m.mu.RLock()
-		config := m.config
-		m.mu.RUnlock()
 		switch config.Mode {
 		case ModeDirect:
 			return nil, nil
@@ -178,7 +183,14 @@ func (m *Manager) proxyFunc() func(*http.Request) (*url.URL, error) {
 			if shouldBypass(req.URL, config.NoProxy) {
 				return nil, nil
 			}
-			return manualProxyURL(config)
+			proxyURL, err := manualProxyURL(config)
+			if err != nil {
+				return nil, err
+			}
+			if isSOCKSScheme(proxyURL.Scheme) {
+				return nil, nil
+			}
+			return proxyURL, nil
 		default:
 			return http.ProxyFromEnvironment(req)
 		}
@@ -190,6 +202,7 @@ func manualProxyURL(config Config) (*url.URL, error) {
 	if err != nil {
 		return nil, err
 	}
+	parsed.Scheme = strings.ToLower(parsed.Scheme)
 	if config.Username != "" || config.Password != "" {
 		if config.Password != "" {
 			parsed.User = url.UserPassword(config.Username, config.Password)

@@ -1,19 +1,15 @@
-import { FileText, Keyboard, Plus, Shield, Terminal, Workflow } from 'lucide-react'
+import { useRef, type ReactNode } from 'react'
+import { FileText, Keyboard, Plus, Shield, Terminal } from 'lucide-react'
 import { OverviewContent } from '@/components/layout/OverviewContent'
 import { Button } from '@/components/ui/button'
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
 import { useAppStore } from '@/store/appStore'
 import { WORKSPACE_PANEL_ID, workspaceTabID } from '@/store/tabNavigation'
 import { APP_NEW_LOCAL_TERMINAL_EVENT, APP_NEW_SESSION_EVENT, emitAppEvent } from '@/lib/appEvents'
 import { SESSION_QUICK_SEARCH_EVENT } from '@/lib/sessionQuickSearch'
-import QuickCommands from '@/components/session/QuickCommands'
-import { useEffect, useState } from 'react'
-import { MacroService } from '@/lib/wails'
-import { logger } from '@/lib/logger'
 import { t } from '@/i18n'
-import { executeMacroOnActiveTerminal } from '@/lib/executeMacro'
+import { MacrosWorkspace } from '@/components/layout/MacrosWorkspace'
 
-export { executeMacroOnActiveTerminal }
+export { executeMacroOnActiveTerminal } from '@/lib/executeMacro'
 import { useShortcutStore } from '@/store/shortcutStore'
 import { SHORTCUT_DEFINITIONS, formatChordDisplay } from '@/lib/shortcuts'
 
@@ -82,110 +78,17 @@ function Feature({ icon: Icon, label }: { icon: typeof Terminal; label: string }
     </div>
   )
 }
-
-
-
-function MacrosWorkspace() {
-  const [macros, setMacros] = useState<Array<{ id: string; name: string; shortcut: string; command: string }>>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-  const [actionError, setActionError] = useState('')
-  const reload = async () => {
-    setLoading(true)
-    setError('')
-    setActionError('')
-    try {
-      const items = await MacroService.List()
-      setMacros((items ?? []).map((item: { id: number | string; name: string; shortcut?: string; command: string }) => ({
-        id: String(item.id),
-        name: item.name,
-        shortcut: item.shortcut ?? '',
-        command: item.command,
-      })))
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err)
-      setError(message)
-      logger.error('macros workspace load failed', err)
-    } finally {
-      setLoading(false)
-    }
-  }
-  useEffect(() => { void reload() }, [])
-  if (loading) return <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">{t('加载宏...')}</div>
-  if (error) {
-    return (
-      <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6">
-        <Empty>
-          <EmptyHeader>
-            <EmptyMedia variant="icon"><Workflow /></EmptyMedia>
-            <EmptyTitle>{t('宏加载失败')}</EmptyTitle>
-            <EmptyDescription>{error}</EmptyDescription>
-          </EmptyHeader>
-        </Empty>
-        <Button onClick={() => { void reload() }}>{t('重试')}</Button>
-      </div>
-    )
-  }
-  if (macros.length === 0) {
-    return (
-      <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6" aria-label={t('宏工作区')}>
-        <Empty>
-          <EmptyHeader>
-            <EmptyMedia variant="icon"><Workflow /></EmptyMedia>
-            <EmptyTitle>{t('还没有宏')}</EmptyTitle>
-            <EmptyDescription>{t('在侧边栏「宏」中新增命令，或在此管理快捷命令模板。')}</EmptyDescription>
-          </EmptyHeader>
-        </Empty>
-        <Button variant="outline" onClick={() => useAppStore.getState().activateWorkspace('macros')}>{t('打开侧边栏宏面板')}</Button>
-      </div>
-    )
-  }
-  return (
-    <div className="flex min-h-0 flex-1 flex-col bg-background p-4" aria-label={t('宏工作区')}>
-      <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-sm font-medium">{t('宏工作区')}</h2>
-        <Button size="sm" variant="outline" onClick={() => { void reload() }}>{t('刷新')}</Button>
-      </div>
-      {actionError ? (
-        <div className="mb-3 rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive" role="alert">
-          {actionError}
-        </div>
-      ) : null}
-      <div className="min-h-0 flex-1 overflow-hidden rounded-xl border border-border">
-        <QuickCommands
-          commands={macros}
-          showAddForm={false}
-          onExecute={(command) => {
-            void executeMacroOnActiveTerminal(command).catch((error: unknown) => {
-              const message = error instanceof Error ? error.message : String(error)
-              setActionError(t('执行宏失败: ${}', message))
-              logger.error('execute macro failed', error)
-            })
-          }}
-          onAdd={() => {}}
-          onDelete={async (id) => {
-            try {
-              setActionError('')
-              await MacroService.Delete(Number(id))
-              await reload()
-            } catch (error: unknown) {
-              const message = error instanceof Error ? error.message : String(error)
-              setActionError(t('删除宏失败: ${}', message))
-              logger.error('delete macro failed', error)
-              throw error instanceof Error ? error : new Error(message)
-            }
-          }}
-        />
-      </div>
-      {/* keep workspace connect available for empty states elsewhere */}
-    </div>
-  )
-}
-
 export function WorkspaceContent() {
   const activeSurface = useAppStore((state) => state.activeSurface)
   const workspaceTab = useAppStore((state) => state.workspaceTab)
   const active = activeSurface === null || activeSurface.type === 'workspace'
+  const overviewActive = activeSurface?.type === 'workspace' && activeSurface.id === 'overview'
+  const macrosActive = !overviewActive && activeSurface !== null && workspaceTab === 'macros'
+  const welcomeActive = activeSurface === null || !overviewActive && workspaceTab === 'sessions'
+  const overviewVisited = useRef(false)
+  const macrosVisited = useRef(false)
+  if (overviewActive) overviewVisited.current = true
+  if (macrosActive) macrosVisited.current = true
 
   return (
     <div
@@ -197,13 +100,15 @@ export function WorkspaceContent() {
       inert={active ? undefined : true}
       className={`absolute inset-0 flex flex-col ${active ? 'visible' : 'invisible pointer-events-none'}`}
     >
-      {activeSurface === null
-        ? <WelcomeScreen />
-        : activeSurface.type === 'workspace' && activeSurface.id === 'overview'
-          ? <OverviewContent />
-          : workspaceTab === 'sessions'
-            ? <WelcomeScreen />
-            : <MacrosWorkspace />}
+      {welcomeActive ? <WelcomeScreen /> : null}
+      {overviewVisited.current ? <WorkspaceLayer active={overviewActive}><OverviewContent /></WorkspaceLayer> : null}
+      {macrosVisited.current ? <WorkspaceLayer active={macrosActive}><MacrosWorkspace /></WorkspaceLayer> : null}
     </div>
   )
+}
+
+function WorkspaceLayer({ active, children }: { active: boolean; children: ReactNode }) {
+  return <div hidden={!active} inert={active ? undefined : true} aria-hidden={!active} className="flex min-h-0 flex-1 flex-col">
+    {children}
+  </div>
 }

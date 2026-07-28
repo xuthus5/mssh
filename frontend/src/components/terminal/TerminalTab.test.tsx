@@ -1,4 +1,4 @@
-import { forwardRef, useImperativeHandle } from 'react'
+import { forwardRef, useEffect, useImperativeHandle } from 'react'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -27,19 +27,29 @@ vi.mock('@/components/terminal/TerminalComposePanel', () => ({
     ? <div data-testid={`compose-${terminalID}`}><button type="button" onClick={onClose}>关闭撰写</button></div>
     : null,
 }))
+const aiPanel = vi.hoisted(() => ({ mounts: 0 }))
+vi.mock('@/components/terminal/AITerminalPanel', () => ({
+  AITerminalPanel: ({ open }: { open: boolean }) => {
+    useEffect(() => { aiPanel.mounts += 1 }, [])
+    return <div hidden={!open} data-testid="ai-panel" />
+  },
+}))
 vi.mock('@/components/terminal/TerminalToolbar', () => ({
-  TerminalToolbar: ({ isRecording, onToggleRecording, onSplit, onToggleSearch, onToggleCompose, recordingError }: {
+  TerminalToolbar: ({ isRecording, recordingBusy, onToggleRecording, onSplit, onToggleSearch, onToggleCompose, onOpenAI, recordingError }: {
     isRecording: boolean
+    recordingBusy?: boolean
     onToggleRecording: () => void
     onSplit: (direction: 'horizontal') => void
     onToggleSearch: () => void
     onToggleCompose: () => void
+    onOpenAI: () => void
     recordingError?: string
   }) => <div>
-    <button type="button" onClick={onToggleRecording}>{isRecording ? '停止录制' : '开始录制'}</button>
+    <button type="button" disabled={recordingBusy} onClick={onToggleRecording}>{isRecording ? '停止录制' : '开始录制'}</button>
     <button type="button" onClick={() => onSplit('horizontal')}>向右分屏</button>
     <button type="button" onClick={onToggleSearch}>搜索终端</button>
     <button type="button" onClick={onToggleCompose}>撰写终端</button>
+    <button type="button" onClick={onOpenAI}>AI 面板</button>
     {recordingError ? <p role="alert">{recordingError}</p> : null}
   </div>,
 }))
@@ -55,6 +65,7 @@ const focusRequest = { sequence: 0, targetTerminalID: null }
 describe('TerminalTab', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    aiPanel.mounts = 0
     useAppStore.setState({
       tabs: [{ id: 'tab-1', title: 'server', type: 'terminal', terminalId: 'term-1', sessionId: 7 }],
       terminalPool: new Map([['term-1', { terminal: { cols: 120, rows: 40 } as never, lastUsed: 0 }]]),
@@ -89,6 +100,20 @@ describe('TerminalTab', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '关闭撰写' }))
     expect(screen.queryByTestId('compose-split-1')).not.toBeInTheDocument()
+  })
+
+  it('keeps the visited AI panel mounted while hidden', () => {
+    render(<TerminalTab terminalID="term-1" sessionId={7} active focusRequest={focusRequest} onOpenFiles={vi.fn()} />)
+    expect(screen.queryByTestId('ai-panel')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'AI 面板' }))
+    expect(screen.getByTestId('ai-panel')).toBeVisible()
+    expect(aiPanel.mounts).toBe(1)
+    fireEvent.click(screen.getByRole('button', { name: 'AI 面板' }))
+    expect(screen.getByTestId('ai-panel')).not.toBeVisible()
+    fireEvent.click(screen.getByRole('button', { name: 'AI 面板' }))
+    expect(screen.getByTestId('ai-panel')).toBeVisible()
+    expect(aiPanel.mounts).toBe(1)
   })
 
   it('starts and stops recording with the active terminal dimensions', async () => {
@@ -136,6 +161,66 @@ describe('TerminalTab', () => {
     await waitFor(() => expect(logService.start).toHaveBeenCalledTimes(2))
     expect(useAppStore.getState().recordingState['term-1']).toBe('recording')
     expect(loggerError).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not submit recording start twice during a rapid repeat', async () => {
+    let resolveStart: (() => void) | undefined
+    logService.start.mockImplementationOnce(() => new Promise<void>((resolve) => { resolveStart = resolve }))
+    render(<TerminalTab terminalID="term-1" sessionId={7} active focusRequest={focusRequest} onOpenFiles={vi.fn()} />)
+
+    const start = screen.getByRole('button', { name: '开始录制' })
+    fireEvent.click(start)
+    fireEvent.click(start)
+
+    expect(logService.start).toHaveBeenCalledOnce()
+    await act(async () => { resolveStart?.() })
+  })
+
+  it('keeps a recording failure scoped to the terminal that initiated it', async () => {
+    let rejectStart: ((reason?: unknown) => void) | undefined
+    logService.start.mockImplementationOnce(() => new Promise<void>((_, reject) => { rejectStart = reject }))
+    const view = render(<TerminalTab terminalID="term-1" sessionId={7} active focusRequest={focusRequest} onOpenFiles={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button', { name: '开始录制' }))
+
+    act(() => {
+      useAppStore.setState({
+        activePaneId: 'split-1',
+        terminalPool: new Map([
+          ['term-1', { terminal: { cols: 120, rows: 40 } as never, lastUsed: 0 }],
+          ['split-1', { terminal: { cols: 90, rows: 30 } as never, lastUsed: 1 }],
+        ]),
+      })
+    })
+    view.rerender(<TerminalTab terminalID="term-1" sessionId={7} active focusRequest={focusRequest} onOpenFiles={vi.fn()} />)
+    await act(async () => { rejectStart?.(new Error('late start failed')) })
+
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('keeps recording controls busy after the active split changes', async () => {
+    let resolveStart: (() => void) | undefined
+    logService.start.mockImplementationOnce(() => new Promise<void>((resolve) => { resolveStart = resolve }))
+    const view = render(<TerminalTab terminalID="term-1" sessionId={7} active focusRequest={focusRequest} onOpenFiles={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button', { name: '开始录制' }))
+
+    act(() => {
+      useAppStore.setState({
+        activePaneId: 'split-1',
+        terminalPool: new Map([
+          ['term-1', { terminal: { cols: 120, rows: 40 } as never, lastUsed: 0 }],
+          ['split-1', { terminal: { cols: 90, rows: 30 } as never, lastUsed: 1 }],
+        ]),
+      })
+    })
+    view.rerender(<TerminalTab terminalID="term-1" sessionId={7} active focusRequest={focusRequest} onOpenFiles={vi.fn()} />)
+
+    const recording = screen.getByRole('button', { name: '开始录制' })
+    expect(recording).toBeDisabled()
+    fireEvent.click(recording)
+    expect(logService.start).toHaveBeenCalledOnce()
+
+    await act(async () => { resolveStart?.() })
+    await waitFor(() => expect(recording).toBeEnabled())
   })
 
 })

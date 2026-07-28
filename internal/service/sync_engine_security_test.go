@@ -205,9 +205,12 @@ func TestFinishSuccessfulSyncRollsBackProtectionWhenBaselineWriteFails(t *testin
 
 	config := defaultSyncConfig()
 	config.Provider = model.SyncProviderWebDAV
-	err = service.finishSuccessfulSync(config, syncArtifactMetadata{
-		VersionID: "new", VersionNumber: 2, ParentVersionID: "old", SnapshotFingerprint: "new-fingerprint",
-	}, `"new"`, newVersion.ID)
+	err = service.finishSuccessfulSync(syncCompletion{
+		Config: config, Metadata: syncArtifactMetadata{
+			VersionID: "new", VersionNumber: 2, ParentVersionID: "old", SnapshotFingerprint: "new-fingerprint",
+		},
+		ETag: `"new"`, LocalVersionID: newVersion.ID,
+	})
 	require.ErrorContains(t, err, "forced baseline failure")
 
 	oldAfter, err := store.GetSyncVersion(db, oldVersion.ID)

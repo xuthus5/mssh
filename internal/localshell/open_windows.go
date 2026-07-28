@@ -5,16 +5,16 @@ package localshell
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/UserExistsError/conpty"
+	"golang.org/x/sys/windows"
 )
 
 func openPlatformContext(ctx context.Context, cfg resolvedConfig) (*Session, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	commandLine := quoteWindowsCommand(cfg.Shell, cfg.Args)
+	commandLine := composeWindowsCommandLine(cfg.Shell, cfg.Args)
 	options := []conpty.ConPtyOption{
 		conpty.ConPtyDimensions(cfg.Cols, cfg.Rows),
 	}
@@ -56,30 +56,9 @@ func openPlatformContext(ctx context.Context, cfg resolvedConfig) (*Session, err
 	return session, nil
 }
 
-func quoteWindowsCommand(shell string, args []string) string {
-	parts := make([]string, 0, 1+len(args))
-	parts = append(parts, quoteWindowsArg(shell))
-	for _, arg := range args {
-		parts = append(parts, quoteWindowsArg(arg))
-	}
-	return strings.Join(parts, " ")
-}
-
-func quoteWindowsArg(arg string) string {
-	if arg == "" {
-		return `""`
-	}
-	if !strings.ContainsAny(arg, " \t\"") {
-		return arg
-	}
-	var b strings.Builder
-	b.WriteByte('"')
-	for i := 0; i < len(arg); i++ {
-		if arg[i] == '"' {
-			b.WriteByte('\\')
-		}
-		b.WriteByte(arg[i])
-	}
-	b.WriteByte('"')
-	return b.String()
+func composeWindowsCommandLine(shell string, args []string) string {
+	commandArgs := make([]string, 1, len(args)+1)
+	commandArgs[0] = shell
+	commandArgs = append(commandArgs, args...)
+	return windows.ComposeCommandLine(commandArgs)
 }

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type MutableRefObject } from 'react'
 import { Events } from '@wailsio/runtime'
 import { SettingService } from '@/lib/wails'
 import { logger } from '@/lib/logger'
@@ -12,6 +12,7 @@ import {
 } from '@/lib/shortcuts'
 import { settingEntry } from '@/hooks/useGeneralSettings'
 import { useShortcutStore } from '@/store/shortcutStore'
+import { syncDataChangedEvent } from '@/lib/syncDataReload'
 
 interface EventEnvelope<T> { data?: T }
 
@@ -39,34 +40,63 @@ function applyBindings(bindings: ShortcutBindings) {
   useShortcutStore.getState().markSettingsHydrated()
 }
 
+function useShortcutRequestRuntime() {
+  const lifecycle = useRef(0)
+  const requestID = useRef(0)
+  useEffect(() => {
+    const token = ++lifecycle.current
+    return () => { if (lifecycle.current === token) lifecycle.current++ }
+  }, [])
+  return { lifecycle, requestID }
+}
+
+function useShortcutEventSync({ reload, requestID, setBindings, setError, setLoading }: {
+  reload: () => Promise<void>
+  requestID: MutableRefObject<number>
+  setBindings: (bindings: ShortcutBindings) => void
+  setError: (error: string) => void
+  setLoading: (loading: boolean) => void
+}) {
+  useEffect(() => {
+    void reload()
+    const stop = Events.On(SHORTCUTS_CHANGED_EVENT, (event: EventEnvelope<ShortcutBindings>) => {
+      if (!event.data) return
+      requestID.current++
+      const normalized = normalizeShortcutBindings(event.data)
+      setBindings(normalized)
+      applyBindings(normalized)
+      setError('')
+      setLoading(false)
+    })
+    const stopSync = Events.On(syncDataChangedEvent, () => { void reload() })
+    return () => { stop(); stopSync() }
+  }, [reload, requestID, setBindings, setError, setLoading])
+}
+
 export function useShortcutSettings() {
   const [bindings, setBindings] = useState<ShortcutBindings>(() => useShortcutStore.getState().bindings)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const { lifecycle, requestID } = useShortcutRequestRuntime()
 
   const reload = useCallback(async () => {
+    const lifecycleToken = lifecycle.current
+    const currentRequest = ++requestID.current
     const next = await loadPersistedBindings()
+    if (lifecycle.current !== lifecycleToken || requestID.current !== currentRequest) return
     setBindings(next.bindings)
     applyBindings(next.bindings)
     setError(next.error)
     setLoading(false)
   }, [])
 
-  useEffect(() => {
-    void reload()
-    const stop = Events.On(SHORTCUTS_CHANGED_EVENT, (event: EventEnvelope<ShortcutBindings>) => {
-      if (!event.data) return
-      const normalized = normalizeShortcutBindings(event.data)
-      setBindings(normalized)
-      applyBindings(normalized)
-    })
-    return () => { stop() }
-  }, [reload])
+  useShortcutEventSync({ reload, requestID, setBindings, setError, setLoading })
 
   const saveBindings = useCallback(async (next: ShortcutBindings, options?: { quiet?: boolean }) => {
     const normalized = normalizeShortcutBindings(next)
     try {
       await persistBindings(normalized)
+      requestID.current++
       setBindings(normalized)
       applyBindings(normalized)
       void Events.Emit(SHORTCUTS_CHANGED_EVENT, normalized).catch((error: unknown) => {
@@ -86,17 +116,26 @@ export function useShortcutSettings() {
 export function useShortcutRuntimeHydration() {
   useEffect(() => {
     let cancelled = false
-    void loadPersistedBindings().then((next) => {
-      if (cancelled) return
-      applyBindings(next.bindings)
-    })
+    let revision = 0
+    const reload = () => {
+      const request = ++revision
+      void loadPersistedBindings().then((next) => {
+        if (cancelled || request !== revision) return
+        applyBindings(next.bindings)
+      })
+    }
+    reload()
     const stop = Events.On(SHORTCUTS_CHANGED_EVENT, (event: EventEnvelope<ShortcutBindings>) => {
       if (!event.data) return
+      revision++
       applyBindings(normalizeShortcutBindings(event.data))
     })
+    const stopSync = Events.On(syncDataChangedEvent, reload)
     return () => {
       cancelled = true
+      revision++
       stop()
+      stopSync()
     }
   }, [])
 }

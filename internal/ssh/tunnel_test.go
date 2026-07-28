@@ -190,13 +190,7 @@ func newRemoteCapableSSHServer(t *testing.T) (string, func()) {
 									}
 									go gossh.DiscardRequests(chReqs)
 									go func() {
-										defer ch.Close()
-										defer fwdConn.Close()
-										var wg sync.WaitGroup
-										wg.Add(2)
-										go func() { defer wg.Done(); _, _ = io.Copy(ch, fwdConn) }()
-										go func() { defer wg.Done(); _, _ = io.Copy(fwdConn, ch) }()
-										wg.Wait()
+										copyBidirectional(ch, fwdConn)
 									}()
 								}
 							}()
@@ -225,17 +219,12 @@ func newRemoteCapableSSHServer(t *testing.T) (string, func()) {
 						go gossh.DiscardRequests(requests)
 						dest := parseDirectTCPIPDest(ch.ExtraData())
 						go func() {
-							defer channel.Close()
 							destConn, dErr := net.Dial("tcp", dest)
 							if dErr != nil {
+								_ = channel.Close()
 								return
 							}
-							defer destConn.Close()
-							var wg sync.WaitGroup
-							wg.Add(2)
-							go func() { defer wg.Done(); _, _ = io.Copy(channel, destConn) }()
-							go func() { defer wg.Done(); _, _ = io.Copy(destConn, channel) }()
-							wg.Wait()
+							copyBidirectional(channel, destConn)
 						}()
 					default:
 						_ = ch.Reject(gossh.UnknownChannelType, "unknown")
@@ -282,17 +271,12 @@ func connectToSSH(t *testing.T, addr string) *ClientWrapper {
 }
 
 func forwardHandlerToEcho(destAddr string, channel gossh.Channel, _ <-chan *gossh.Request) {
-	defer channel.Close()
 	destConn, err := net.Dial("tcp", destAddr)
 	if err != nil {
+		_ = channel.Close()
 		return
 	}
-	defer destConn.Close()
-	var wg sync.WaitGroup
-	wg.Add(2)
-	go func() { defer wg.Done(); _, _ = io.Copy(channel, destConn) }()
-	go func() { defer wg.Done(); _, _ = io.Copy(destConn, channel) }()
-	wg.Wait()
+	copyBidirectional(channel, destConn)
 }
 
 func echoData(t *testing.T, addr string, data string) {
@@ -420,16 +404,16 @@ func TestStartLocalForward_ClosedWrapper(t *testing.T) {
 	cw := connectToSSH(t, sshAddr)
 	ln, err := StartLocalForward(cw, "127.0.0.1:0", "127.0.0.1:9999", nil)
 	require.NoError(t, err)
-	cw.Close()
+	listenAddress := ln.Addr().String()
+	require.NoError(t, cw.Close())
 
-	conn, err := net.DialTimeout("tcp", ln.Addr().String(), 500*time.Millisecond)
-	require.NoError(t, err)
-	defer conn.Close()
-
-	_ = conn.SetReadDeadline(time.Now().Add(300 * time.Millisecond))
-	buf := make([]byte, 64)
-	_, err = conn.Read(buf)
-	assert.Error(t, err)
+	require.Eventually(t, func() bool {
+		conn, dialErr := net.DialTimeout("tcp", listenAddress, 20*time.Millisecond)
+		if dialErr == nil {
+			_ = conn.Close()
+		}
+		return dialErr != nil
+	}, time.Second, 10*time.Millisecond)
 	_ = ln.Close()
 }
 
@@ -565,16 +549,16 @@ func TestStartDynamicForward_ClosedWrapper(t *testing.T) {
 	cw := connectToSSH(t, sshAddr)
 	ln, err := StartDynamicForward(cw, "127.0.0.1:0", nil)
 	require.NoError(t, err)
-	cw.Close()
+	listenAddress := ln.Addr().String()
+	require.NoError(t, cw.Close())
 
-	conn, err := net.DialTimeout("tcp", ln.Addr().String(), 500*time.Millisecond)
-	require.NoError(t, err)
-	defer conn.Close()
-
-	_ = conn.SetReadDeadline(time.Now().Add(300 * time.Millisecond))
-	buf := make([]byte, 64)
-	_, err = conn.Read(buf)
-	assert.Error(t, err)
+	require.Eventually(t, func() bool {
+		conn, dialErr := net.DialTimeout("tcp", listenAddress, 20*time.Millisecond)
+		if dialErr == nil {
+			_ = conn.Close()
+		}
+		return dialErr != nil
+	}, time.Second, 10*time.Millisecond)
 	_ = ln.Close()
 }
 
@@ -708,6 +692,64 @@ func TestStartForward_UnknownType(t *testing.T) {
 	_, _, err := StartForward(cw, cfg)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unknown tunnel type")
+}
+
+func TestCopyBidirectionalPreservesResponseAfterHalfClose(t *testing.T) {
+	client, inbound := newTCPConnectionPair(t)
+	outbound, server := newTCPConnectionPair(t)
+	done := make(chan struct{})
+	go func() {
+		copyBidirectional(inbound, outbound)
+		close(done)
+	}()
+
+	require.NoError(t, client.SetDeadline(time.Now().Add(2*time.Second)))
+	require.NoError(t, server.SetDeadline(time.Now().Add(2*time.Second)))
+	_, err := client.Write([]byte("request"))
+	require.NoError(t, err)
+	require.NoError(t, client.CloseWrite())
+	request, err := io.ReadAll(server)
+	require.NoError(t, err)
+	assert.Equal(t, "request", string(request))
+
+	_, err = server.Write([]byte("response"))
+	require.NoError(t, err)
+	_ = server.CloseWrite()
+	response, err := io.ReadAll(client)
+	require.NoError(t, err)
+	assert.Equal(t, "response", string(response))
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("bidirectional copy did not exit")
+	}
+}
+
+func newTCPConnectionPair(t *testing.T) (*net.TCPConn, *net.TCPConn) {
+	t.Helper()
+	listener, err := net.ListenTCP("tcp", &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1)})
+	require.NoError(t, err)
+	accepted := make(chan struct {
+		connection *net.TCPConn
+		err        error
+	}, 1)
+	go func() {
+		connection, acceptErr := listener.AcceptTCP()
+		accepted <- struct {
+			connection *net.TCPConn
+			err        error
+		}{connection: connection, err: acceptErr}
+	}()
+	client, err := net.DialTCP("tcp", nil, listener.Addr().(*net.TCPAddr))
+	require.NoError(t, err)
+	result := <-accepted
+	require.NoError(t, listener.Close())
+	require.NoError(t, result.err)
+	t.Cleanup(func() {
+		_ = client.Close()
+		_ = result.connection.Close()
+	})
+	return client, result.connection
 }
 
 func TestSOCKS5_BadProtocolVersion(t *testing.T) {

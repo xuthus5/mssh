@@ -5,6 +5,7 @@ import { resolveProxyPasswordWrite, useGeneralSettings } from '@/hooks/useGenera
 import { useAppStore } from '@/store/appStore'
 import { __clearHandlers, __emitEvent, __registerHandler } from '@/test/__mocks__/wails-runtime'
 import { SETTINGS_GENERAL_CHANGED_EVENT, SETTINGS_GENERAL_PREVIEW_EVENT, SETTINGS_PREVIEW_CANCELLED_EVENT } from '@/lib/settingsWindowEvents'
+import { syncDataChangedEvent } from '@/lib/syncDataReload'
 
 function setting(key: string, value: unknown) {
   return { key, namespace: key.split('.')[0], value: JSON.stringify(value), value_type: typeof value, version: 1, updated_at: '' }
@@ -72,12 +73,124 @@ describe('useGeneralSettings cross-window sync', () => {
     expect(useAppStore.getState().maxPoolSize).toBe(24)
   })
 
+  it('reloads persisted settings after synchronized data changes', async () => {
+    let synchronized = false
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.GetMany', async () => synchronized ? {
+      'terminal.max_pool_size': setting('terminal.max_pool_size', 24),
+      'appearance.ui_font_family': setting('appearance.ui_font_family', 'Synced Font'),
+      'application.log_dir': setting('application.log_dir', '/synced/logs'),
+    } : {
+      'terminal.max_pool_size': setting('terminal.max_pool_size', 10),
+      'appearance.ui_font_family': setting('appearance.ui_font_family', 'Old Font'),
+      'application.log_dir': setting('application.log_dir', '/old/logs'),
+    })
+    const { result } = renderHook(() => useGeneralSettings())
+    await waitFor(() => expect(result.current.general.uiFontFamily).toBe('Old Font'))
+
+    synchronized = true
+    act(() => __emitEvent(syncDataChangedEvent, { data: { changed: true } }))
+
+    await waitFor(() => expect(result.current.general).toMatchObject({
+      maxPoolSize: 24,
+      uiFontFamily: 'Synced Font',
+      logDir: '/synced/logs',
+    }))
+  })
+
+  it('keeps a newer cross-window update when the initial load resolves later', async () => {
+    const initialLoad = deferred<Record<string, unknown>>()
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.GetMany', async () => initialLoad.promise)
+    const { result } = renderHook(() => useGeneralSettings())
+
+    await waitFor(() => expect(result.current.settingsReady).toBe(false))
+    act(() => __emitEvent(SETTINGS_GENERAL_CHANGED_EVENT, { data: savedGeneral }))
+    expect(result.current.general.maxPoolSize).toBe(24)
+
+    await act(async () => {
+      initialLoad.resolve({ 'terminal.max_pool_size': setting('terminal.max_pool_size', 11) })
+      await initialLoad.promise
+    })
+
+    expect(result.current.general.maxPoolSize).toBe(24)
+  })
+
+  it('reapplies the newest pool limit after a stale load update finishes', async () => {
+    const stalePoolUpdate = deferred<void>()
+    const setMaxSize = vi.fn(async (size: number) => {
+      if (size === 11) await stalePoolUpdate.promise
+    })
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.GetMany', async () => ({
+      'terminal.max_pool_size': setting('terminal.max_pool_size', 11),
+    }))
+    __registerHandler('github.com/xuthus5/mssh/internal/service.TerminalService.SetMaxSize', setMaxSize)
+    const { result } = renderHook(() => useGeneralSettings())
+    await waitFor(() => expect(setMaxSize).toHaveBeenCalledWith(11))
+
+    act(() => __emitEvent(SETTINGS_GENERAL_CHANGED_EVENT, { data: savedGeneral }))
+    expect(result.current.general.maxPoolSize).toBe(24)
+
+    await act(async () => {
+      stalePoolUpdate.resolve(undefined)
+      await stalePoolUpdate.promise
+    })
+
+    await waitFor(() => expect(setMaxSize).toHaveBeenLastCalledWith(24))
+  })
+
+  it('applies the persisted terminal pool limit to the backend during load', async () => {
+    const setMaxSize = vi.fn(async () => {})
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.GetMany', async () => ({
+      'terminal.max_pool_size': setting('terminal.max_pool_size', 22),
+    }))
+    __registerHandler('github.com/xuthus5/mssh/internal/service.TerminalService.SetMaxSize', setMaxSize)
+
+    const { result } = renderHook(() => useGeneralSettings())
+    await waitFor(() => expect(result.current.settingsReady).toBe(true))
+
+    expect(setMaxSize).toHaveBeenCalledWith(22)
+  })
+
+  it('does not update the backend pool limit when settings persistence fails', async () => {
+    const setMaxSize = vi.fn(async () => {})
+    __registerHandler('github.com/xuthus5/mssh/internal/service.TerminalService.SetMaxSize', setMaxSize)
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.SetMany', async () => {
+      throw new Error('settings write failed')
+    })
+    const { result } = renderHook(() => useGeneralSettings())
+    await waitFor(() => expect(result.current.settingsReady).toBe(true))
+    const callsAfterLoad = setMaxSize.mock.calls.length
+
+    await expect(result.current.saveGeneral({ ...result.current.general, maxPoolSize: 18 })).rejects.toThrow('settings write failed')
+
+    expect(setMaxSize).toHaveBeenCalledTimes(callsAfterLoad)
+  })
+
   it('reloads persisted settings after preview cancellation', async () => {
     const { result } = renderHook(() => useGeneralSettings())
     await act(async () => {})
     maxPoolSize = 33
     act(() => __emitEvent(SETTINGS_PREVIEW_CANCELLED_EVENT, { data: null }))
     await waitFor(() => expect(result.current.general.maxPoolSize).toBe(33))
+  })
+
+  it('keeps the newest general settings when reloads resolve out of order', async () => {
+    const first = deferred<Record<string, unknown>>()
+    const second = deferred<Record<string, unknown>>()
+    let loads = 0
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.GetMany', async () => {
+      loads++
+      return loads === 1 ? first.promise : second.promise
+    })
+    const { result } = renderHook(() => useGeneralSettings())
+    await waitFor(() => expect(loads).toBe(1))
+    let latestReload!: Promise<void>
+    act(() => { latestReload = result.current.reloadGeneral() })
+    await waitFor(() => expect(loads).toBe(2))
+
+    await act(async () => { second.resolve({ 'terminal.max_pool_size': setting('terminal.max_pool_size', 22) }); await latestReload })
+    expect(result.current.general.maxPoolSize).toBe(22)
+    await act(async () => { first.resolve({ 'terminal.max_pool_size': setting('terminal.max_pool_size', 11) }); await first.promise })
+    expect(result.current.general.maxPoolSize).toBe(22)
   })
 
   it('broadcasts normalized settings after a successful save', async () => {
@@ -259,15 +372,90 @@ describe('useGeneralSettings cross-window sync', () => {
       expect.objectContaining({ key: 'terminal.local_shell_login', value: 'true' }),
     ]))
   })
+
+  it('serializes concurrent saves so the newest settings persist last', async () => {
+    const firstWrite = deferred<void>()
+    const writes: Array<{ poolSize: number; fontSize: number }> = []
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.SetMany', async (entries: Array<{ key: string; value: string }>) => {
+      writes.push({
+        poolSize: Number(entries.find((entry) => entry.key === 'terminal.max_pool_size')?.value),
+        fontSize: Number(entries.find((entry) => entry.key === 'appearance.ui_font_size')?.value),
+      })
+      if (writes.length === 1) await firstWrite.promise
+    })
+    const { result } = renderHook(() => useGeneralSettings())
+    await waitFor(() => expect(result.current.settingsReady).toBe(true))
+
+    let olderSave!: Promise<void>
+    let newerSave!: Promise<void>
+    act(() => {
+      olderSave = result.current.saveGeneral({ ...result.current.general, uiFontSize: 18 }, { scope: 'general' })
+      newerSave = result.current.saveGeneral({ ...result.current.general, maxPoolSize: 22 }, { scope: 'terminal' })
+    })
+
+    await waitFor(() => expect(writes).toEqual([{ poolSize: 10, fontSize: 18 }]))
+    await act(async () => {
+      firstWrite.resolve(undefined)
+      await Promise.all([olderSave, newerSave])
+    })
+
+    expect(writes).toEqual([
+      { poolSize: 10, fontSize: 18 },
+      { poolSize: 22, fontSize: 18 },
+    ])
+    expect(result.current.general.maxPoolSize).toBe(22)
+    expect(result.current.general.uiFontSize).toBe(18)
+  })
+
+  it('continues the save queue after an earlier write fails', async () => {
+    const writes: number[] = []
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.SetMany', async (entries: Array<{ key: string; value: string }>) => {
+      const poolSize = Number(entries.find((entry) => entry.key === 'terminal.max_pool_size')?.value)
+      writes.push(poolSize)
+      if (poolSize === 21) throw new Error('first write failed')
+    })
+    const { result } = renderHook(() => useGeneralSettings())
+    await waitFor(() => expect(result.current.settingsReady).toBe(true))
+
+    const olderSave = result.current.saveGeneral({ ...result.current.general, maxPoolSize: 21 })
+    const newerSave = result.current.saveGeneral({ ...result.current.general, maxPoolSize: 22 })
+
+    await expect(olderSave).rejects.toThrow('first write failed')
+    await act(async () => { await newerSave })
+
+    expect(writes).toEqual([21, 22])
+    expect(result.current.general.maxPoolSize).toBe(22)
+  })
 })
 
 describe('resolveProxyPasswordWrite', () => {
-  it('keeps empty writes, clears with sentinel, and passes new secrets', () => {
+  it('keeps empty writes, clears with null, and passes exact new secrets', () => {
     expect(resolveProxyPasswordWrite({ proxyPassword: '', clearProxyPassword: false })).toBe('')
-    expect(resolveProxyPasswordWrite({ proxyPassword: 'x', clearProxyPassword: true })).toBe('__clear_proxy_password__')
+    expect(resolveProxyPasswordWrite({ proxyPassword: 'x', clearProxyPassword: true })).toBeNull()
     expect(resolveProxyPasswordWrite({ proxyPassword: 'new-secret', clearProxyPassword: false })).toBe('new-secret')
+    expect(resolveProxyPasswordWrite({ proxyPassword: '__clear_proxy_password__', clearProxyPassword: false })).toBe('__clear_proxy_password__')
   })
 })
+
+describe('proxy password persistence state', () => {
+  it('treats whitespace-only passwords as exact saved credentials', async () => {
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.GetMany', async () => ({}))
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.SetMany', async () => {})
+    __registerHandler('github.com/xuthus5/mssh/internal/service.TerminalService.SetMaxSize', async () => {})
+    const { result } = renderHook(() => useGeneralSettings())
+    await waitFor(() => expect(result.current.settingsReady).toBe(true))
+    await act(async () => {
+      await result.current.saveGeneral({ ...result.current.general, proxyPassword: '   ' })
+    })
+    expect(result.current.general.proxyPasswordSaved).toBe(true)
+  })
+})
+
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((resolvePromise) => { resolve = resolvePromise })
+  return { promise, resolve }
+}
 
 describe('quiet autosave error feedback', () => {
   it('does not toast errors when quiet is true', async () => {
@@ -329,4 +517,3 @@ describe('quiet autosave error feedback', () => {
   })
 
 })
-

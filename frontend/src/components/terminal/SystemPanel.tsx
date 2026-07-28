@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { logger } from '@/lib/logger'
 import { useToolPanelResize } from '@/hooks/useToolPanelResize'
+import { AsyncPoller } from '@/lib/asyncPoller'
 import { TerminalService } from '@/lib/wails'
 import { t } from '@/i18n'
 import { isTerminalGone } from '@/lib/terminalGone'
@@ -21,6 +22,8 @@ type Process = {
   pid: number; ppid: number; user: string; state: string
   cpu_percent: number; memory_bytes: number; command: string
 }
+
+type TerminalSnapshot<T> = { terminalID: string; value: T }
 
 const BYTE_UNITS = ['B', 'K', 'M', 'G', 'T'] as const
 
@@ -114,74 +117,95 @@ function ProcessesView({ processes, query, onQueryChange }: { processes: Process
 }
 
 function useSystemInfo(terminalID: string) {
-  const [info, setInfo] = useState<Info | null>(null)
-  const [failed, setFailed] = useState(false)
+  const [snapshot, setSnapshot] = useState<TerminalSnapshot<Info> | null>(null)
+  const [failedTerminalID, setFailedTerminalID] = useState<string | null>(null)
   const [attempt, setAttempt] = useState(0)
   useEffect(() => {
     let cancelled = false
-    let timer: number | null = null
-    const stop = () => {
-      if (timer !== null) {
-        window.clearInterval(timer)
-        timer = null
-      }
-    }
+    let requestID = 0
+    let poller: AsyncPoller | null = null
     const load = async () => {
+      const currentRequest = ++requestID
       try {
         const value = await TerminalService.SystemInfo(terminalID)
-        if (!cancelled) { setInfo(value); setFailed(false) }
+        if (!value) {
+          logger.error('system panel info collection returned empty response')
+          if (!cancelled && currentRequest === requestID) setFailedTerminalID(terminalID)
+          return
+        }
+        if (!cancelled && currentRequest === requestID) {
+          setSnapshot({ terminalID, value })
+          setFailedTerminalID(null)
+        }
       } catch (error: unknown) {
         if (isTerminalGone(error)) {
-          if (!cancelled) setFailed(true)
-          stop()
+          if (!cancelled && currentRequest === requestID) setFailedTerminalID(terminalID)
+          poller?.stop()
           return
         }
         logger.error('system panel info collection failed', error)
-        if (!cancelled) setFailed(true)
+        if (!cancelled && currentRequest === requestID) setFailedTerminalID(terminalID)
       }
     }
-    setFailed(false)
-    void load()
-    timer = window.setInterval(() => { void load() }, 3000)
-    return () => { cancelled = true; stop() }
+    setFailedTerminalID((current) => current === terminalID ? null : current)
+    poller = new AsyncPoller({ task: load, delayMs: 3000, onError: (error) => logger.error('system info polling failed', error) })
+    void poller.start()
+    return () => { cancelled = true; requestID += 1; poller?.stop() }
   }, [terminalID, attempt])
-  return { info, failed, retry: () => setAttempt((value) => value + 1) }
+  const retry = () => {
+    setSnapshot(null)
+    setFailedTerminalID(null)
+    setAttempt((value) => value + 1)
+  }
+  return {
+    info: snapshot?.terminalID === terminalID ? snapshot.value : null,
+    failed: failedTerminalID === terminalID,
+    retry,
+  }
 }
 
 function useProcesses(terminalID: string, active: boolean) {
-  const [processes, setProcesses] = useState<Process[]>([])
-  const [failed, setFailed] = useState(false)
+  const [snapshot, setSnapshot] = useState<TerminalSnapshot<Process[]> | null>(null)
+  const [failedTerminalID, setFailedTerminalID] = useState<string | null>(null)
   const [attempt, setAttempt] = useState(0)
   useEffect(() => {
     if (!active) return
     let cancelled = false
-    let timer: number | null = null
-    const stop = () => {
-      if (timer !== null) {
-        window.clearInterval(timer)
-        timer = null
-      }
-    }
+    let requestID = 0
+    let poller: AsyncPoller | null = null
     const load = async () => {
+      const currentRequest = ++requestID
       try {
         const value = await TerminalService.ProcessInfo(terminalID)
-        if (!cancelled) { setProcesses(value); setFailed(false) }
+        if (!cancelled && currentRequest === requestID) {
+          setSnapshot({ terminalID, value })
+          setFailedTerminalID(null)
+        }
       } catch (error: unknown) {
         if (isTerminalGone(error)) {
-          if (!cancelled) setFailed(true)
-          stop()
+          if (!cancelled && currentRequest === requestID) setFailedTerminalID(terminalID)
+          poller?.stop()
           return
         }
         logger.error('system panel process collection failed', error)
-        if (!cancelled) setFailed(true)
+        if (!cancelled && currentRequest === requestID) setFailedTerminalID(terminalID)
       }
     }
-    setFailed(false)
-    void load()
-    timer = window.setInterval(() => { void load() }, 5000)
-    return () => { cancelled = true; stop() }
+    setFailedTerminalID((current) => current === terminalID ? null : current)
+    poller = new AsyncPoller({ task: load, delayMs: 5000, onError: (error) => logger.error('process info polling failed', error) })
+    void poller.start()
+    return () => { cancelled = true; requestID += 1; poller?.stop() }
   }, [active, terminalID, attempt])
-  return { processes, failed, retry: () => setAttempt((value) => value + 1) }
+  const retry = () => {
+    setSnapshot(null)
+    setFailedTerminalID(null)
+    setAttempt((value) => value + 1)
+  }
+  return {
+    processes: snapshot?.terminalID === terminalID ? snapshot.value : [],
+    failed: failedTerminalID === terminalID,
+    retry,
+  }
 }
 
 function CollectionError({ message, onRetry }: { message: string; onRetry: () => void }) {

@@ -2,21 +2,42 @@ import { useAppStore } from '@/store/appStore'
 import { TerminalService } from '@/lib/wails'
 import { logger } from '@/lib/logger'
 import { createTerminalTab } from '@/lib/terminalTabs'
-import { openTerminalWithPoolCapacity } from '@/lib/openTerminal'
+import { openTerminalWithPoolCapacity, releaseAppTerminalOpenReservation } from '@/lib/openTerminal'
 import { resolveOpenTerminalSize } from '@/lib/terminalOpenSize'
 import type { Session } from '@/lib/sessionModels'
 import { t } from '@/i18n'
+import { bindWailsCallToSignal } from '@/lib/wailsCancellation'
 
-export async function openSessionTab(session: Session): Promise<string> {
+export async function openSessionTab(session: Session, signal?: AbortSignal): Promise<string> {
   const size = resolveOpenTerminalSize()
   const terminalId = await openTerminalWithPoolCapacity(
-    () => TerminalService.Open(Number(session.id), size.cols, size.rows),
+    () => bindWailsCallToSignal(TerminalService.Open(Number(session.id), size.cols, size.rows), signal),
   )
+  if (signal?.aborted) {
+    await closeCancelledTerminal(terminalId)
+    throw connectionCancelledError(signal)
+  }
   const store = useAppStore.getState()
   const tab = createTerminalTab({ sessionID: Number(session.id), sessionName: session.name, terminalID: terminalId, tabs: store.tabs })
   store.setConnectionStatus(terminalId, 'connected')
   store.openTab(tab)
   return terminalId
+}
+
+async function closeCancelledTerminal(terminalId: string) {
+  releaseAppTerminalOpenReservation(terminalId)
+  try {
+    await TerminalService.Close(terminalId)
+  } catch (error: unknown) {
+    logger.error('close cancelled terminal failed', error)
+  }
+}
+
+function connectionCancelledError(signal: AbortSignal) {
+  if (signal.reason instanceof Error) return signal.reason
+  const error = new Error('connection cancelled')
+  error.name = 'AbortError'
+  return error
 }
 
 
@@ -53,4 +74,3 @@ export function cancelTransfersForSessions(sessionIDs: Iterable<string>) {
     })
   }
 }
-

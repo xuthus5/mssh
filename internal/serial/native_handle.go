@@ -32,10 +32,24 @@ func extractNativeHandle(port any) (uintptr, error) {
 	readable := reflect.NewAt(field.Type(), unsafe.Pointer(field.UnsafeAddr())).Elem()
 	switch readable.Kind() {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		return uintptr(readable.Int()), nil
+		raw := readable.Int()
+		if raw < 0 {
+			return 0, fmt.Errorf("serial port handle is negative")
+		}
+		return nativeHandleFromUint(uint64(raw))
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
-		return uintptr(readable.Uint()), nil
+		return nativeHandleFromUint(readable.Uint())
 	default:
 		return 0, fmt.Errorf("unsupported serial handle kind %s", readable.Kind())
 	}
+}
+
+func nativeHandleFromUint(value uint64) (uintptr, error) {
+	if value == 0 {
+		return 0, fmt.Errorf("serial port handle is zero")
+	}
+	if value > uint64(^uintptr(0)) {
+		return 0, fmt.Errorf("serial port handle exceeds uintptr range")
+	}
+	return uintptr(value), nil //nolint:gosec // range is checked against uintptr above.
 }

@@ -164,6 +164,7 @@ tasks:
       - npm run check:source-limits
       - npm run check:bundle-budget
       - npm test
+      - npm audit --audit-level=high --registry=https://registry.npmjs.org
 
   test:e2e:
     summary: Run real SSH/tmux/SFTP/serial integration tests

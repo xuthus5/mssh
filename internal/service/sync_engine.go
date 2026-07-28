@@ -24,6 +24,11 @@ func (s *SyncService) TestProvider(input model.SyncConfigInput) error {
 	if err := validateSyncConfig(config); err != nil {
 		return err
 	}
+	operationContext, finish, err := s.beginCancelableSyncOperation(context.Background())
+	if err != nil {
+		return err
+	}
+	defer finish()
 	secrets, err := s.providerSecrets(config, &input)
 	if err != nil {
 		return err
@@ -31,7 +36,7 @@ func (s *SyncService) TestProvider(input model.SyncConfigInput) error {
 	if err := validateProviderReady(config, secrets); err != nil {
 		return err
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), syncNetworkTimeout)
+	ctx, cancel := context.WithTimeout(operationContext, syncNetworkTimeout)
 	defer cancel()
 	provider, err := s.providerFactory.Create(ctx, config, secrets)
 	if err == nil {
@@ -59,20 +64,19 @@ func (s *SyncService) PullNow() (model.SyncResult, error) {
 }
 
 func (s *SyncService) runManualSync(direction syncDirection) (model.SyncResult, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 2*syncNetworkTimeout)
-	defer cancel()
-	return s.runSync(ctx, direction, "manual")
+	return s.runSync(context.Background(), direction, "manual")
 }
 
 func (s *SyncService) runSync(ctx context.Context, direction syncDirection, action string) (model.SyncResult, error) {
-	if !s.operationMu.TryLock() {
-		return model.SyncResult{}, errors.New("sync operation is already running")
+	operationContext, finish, err := s.beginCancelableSyncOperation(ctx)
+	if err != nil {
+		return model.SyncResult{}, err
 	}
-	defer s.operationMu.Unlock()
-	operationContext, cancel := context.WithTimeout(ctx, 2*syncNetworkTimeout)
+	defer finish()
+	operationContext, cancel := context.WithTimeout(operationContext, 2*syncNetworkTimeout)
 	defer cancel()
 	ctx = operationContext
-	config, err := s.LoadConfig()
+	config, err := s.loadConfig()
 	if err != nil {
 		return model.SyncResult{}, err
 	}
@@ -101,24 +105,30 @@ func (s *SyncService) executeSync(ctx context.Context, config model.SyncConfig, 
 	if err != nil {
 		return model.SyncResult{}, err
 	}
-	local, err := s.currentSnapshot()
-	if err != nil {
-		return model.SyncResult{}, err
-	}
-	remoteObject, remoteArtifact, remoteFound, err := s.fetchRemote(ctx, provider)
-	if err != nil {
-		return model.SyncResult{}, err
-	}
-	baseline, err := s.loadBaseline(config.Provider)
-	if err != nil {
-		return model.SyncResult{}, err
-	}
-	if remoteFound {
-		if err := validateRemoteArtifactLineage(remoteArtifact.Metadata, baseline); err != nil {
-			return model.SyncResult{}, err
+	var result model.SyncResult
+	err = withCryptoOperation(s.crypto, func() error {
+		local, snapshotErr := s.currentSnapshot()
+		if snapshotErr != nil {
+			return snapshotErr
 		}
-	}
-	return s.chooseSyncAction(ctx, config, direction, provider, local, remoteObject, remoteArtifact, remoteFound, baseline)
+		remoteObject, remoteArtifact, remoteFound, fetchErr := s.fetchRemote(ctx, provider)
+		if fetchErr != nil {
+			return fetchErr
+		}
+		baseline, baselineErr := s.loadBaseline(config.Provider)
+		if baselineErr != nil {
+			return baselineErr
+		}
+		if remoteFound {
+			if lineageErr := validateRemoteArtifactLineage(remoteArtifact.Metadata, baseline); lineageErr != nil {
+				return lineageErr
+			}
+		}
+		var chooseErr error
+		result, chooseErr = s.chooseSyncAction(ctx, config, direction, provider, local, remoteObject, remoteArtifact, remoteFound, baseline)
+		return chooseErr
+	})
+	return result, err
 }
 
 func (s *SyncService) currentSnapshot() (syncCurrentSnapshot, error) {
@@ -236,7 +246,8 @@ func (s *SyncService) uploadSnapshot(ctx context.Context, config model.SyncConfi
 			return model.SyncResult{}, err
 		}
 	}
-	if err := s.finishSuccessfulSync(config, metadata, updated.ETag, version.ID); err != nil {
+	completion := syncCompletion{Config: config, Metadata: metadata, ETag: updated.ETag, LocalVersionID: version.ID}
+	if err := s.finishSuccessfulSync(completion); err != nil {
 		return model.SyncResult{}, err
 	}
 	s.recordSyncEvent("upload", config, model.SyncEventSuccess, version.ID, metadata.VersionNumber, "已上传本地版本")

@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { SerialPortCenter } from '@/components/serial/SerialPortCenter'
@@ -103,5 +103,82 @@ describe('SerialPortCenter', () => {
     await waitFor(() => expect(screen.getByText('删除串口配置失败: del failed')).toBeInTheDocument())
     expect(screen.getByRole('alertdialog')).toBeInTheDocument()
     expect(useToastStore.getState().toasts.filter((item) => item.type === 'error')).toHaveLength(0)
+  })
+
+  it('prevents duplicate serial connect submissions', async () => {
+    let resolveOpen: ((terminalID: string) => void) | undefined
+    const openSerial = vi.fn(() => new Promise<string>((resolve) => { resolveOpen = resolve }))
+    __registerHandler(terminal + 'OpenSerial', openSerial)
+    render(<SerialPortCenter />)
+    const connect = await screen.findByRole('button', { name: '连接' })
+    await userEvent.click(connect)
+    expect(screen.getByRole('button', { name: '连接中...' })).toBeDisabled()
+    await userEvent.click(screen.getByRole('button', { name: '连接中...' }))
+    expect(openSerial).toHaveBeenCalledOnce()
+    await act(async () => { resolveOpen?.('term-serial-1') })
+  })
+
+  it('prevents duplicate serial profile copies', async () => {
+    let resolveCreate: ((port: typeof samplePort) => void) | undefined
+    const create = vi.fn(() => new Promise<typeof samplePort>((resolve) => { resolveCreate = resolve }))
+    __registerHandler(serial + 'Create', create)
+    render(<SerialPortCenter />)
+    const copy = await screen.findByRole('button', { name: '复制' })
+    await userEvent.click(copy)
+    expect(copy).toBeDisabled()
+    await userEvent.click(copy)
+    expect(create).toHaveBeenCalledOnce()
+    await act(async () => { resolveCreate?.({ ...samplePort, id: 2 }) })
+  })
+
+  it('shares a row lease across connect copy and delete actions', async () => {
+    let resolveOpen: ((terminalID: string) => void) | undefined
+    const openSerial = vi.fn(() => new Promise<string>((resolve) => { resolveOpen = resolve }))
+    const create = vi.fn(async (input: typeof samplePort) => ({ ...samplePort, ...input, id: 2 }))
+    __registerHandler(terminal + 'OpenSerial', openSerial)
+    __registerHandler(serial + 'Create', create)
+    render(<SerialPortCenter />)
+
+    const connect = await screen.findByRole('button', { name: '连接' })
+    const copy = screen.getByRole('button', { name: '复制' })
+    const edit = screen.getByRole('button', { name: '编辑' })
+    const remove = screen.getByRole('button', { name: '删除' })
+    act(() => {
+      fireEvent.click(connect)
+      fireEvent.click(copy)
+      fireEvent.click(edit)
+      fireEvent.click(remove)
+    })
+
+    await waitFor(() => expect(openSerial).toHaveBeenCalledOnce())
+    expect(create).not.toHaveBeenCalled()
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: '编辑串口配置' })).not.toBeInTheDocument()
+    expect(copy).toBeDisabled()
+    expect(edit).toBeDisabled()
+    expect(remove).toBeDisabled()
+    await act(async () => { resolveOpen?.('term-serial-1') })
+  })
+
+  it('allows non-conflicting actions on different serial profiles', async () => {
+    const secondPort = { ...samplePort, id: 2, name: 'Arduino', device: '/dev/ttyACM0' }
+    let resolveOpen: ((terminalID: string) => void) | undefined
+    const openSerial = vi.fn(() => new Promise<string>((resolve) => { resolveOpen = resolve }))
+    const create = vi.fn(async (input: typeof samplePort) => ({ ...samplePort, ...input, id: 3 }))
+    __registerHandler(serial + 'List', async () => ([samplePort, secondPort]))
+    __registerHandler(terminal + 'OpenSerial', openSerial)
+    __registerHandler(serial + 'Create', create)
+    render(<SerialPortCenter />)
+
+    const firstRow = (await screen.findByText('ESP32')).closest('tr')!
+    const secondRow = screen.getByText('Arduino').closest('tr')!
+    act(() => {
+      fireEvent.click(within(firstRow).getByRole('button', { name: '连接' }))
+      fireEvent.click(within(secondRow).getByRole('button', { name: '复制' }))
+    })
+
+    await waitFor(() => expect(openSerial).toHaveBeenCalledOnce())
+    await waitFor(() => expect(create).toHaveBeenCalledOnce())
+    await act(async () => { resolveOpen?.('term-serial-1') })
   })
 })

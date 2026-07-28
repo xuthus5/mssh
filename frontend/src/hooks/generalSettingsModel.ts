@@ -30,6 +30,8 @@ export const generalSettingKeys = [
   LANGUAGE_SETTING_KEY,
 ]
 
+export const DEFAULT_TERMINAL_POOL_SIZE = 10
+
 export type CloseButtonAction = 'tray' | 'exit'
 export type NetworkProxyMode = 'system' | 'direct' | 'manual'
 
@@ -73,7 +75,7 @@ export interface GeneralPreview {
 export interface EventEnvelope<T> { data?: T }
 
 export const defaultGeneralSettings: GeneralSettings = {
-  maxPoolSize: 10, defaultKeepAlive: 60, defaultTermType: 'xterm-256color',
+  maxPoolSize: DEFAULT_TERMINAL_POOL_SIZE, defaultKeepAlive: 60, defaultTermType: 'xterm-256color',
   uiFontFamily: DEFAULT_UI_FONT_FAMILY, uiFontFallbackFamily: DEFAULT_UI_FONT_FALLBACK_FAMILY,
   uiFontSize: DEFAULT_UI_FONT_SIZE,
   rightClickAction: 'menu', copyOnSelect: false, scrollbackLines: DEFAULT_TERMINAL_SCROLLBACK_LINES, autoReconnect: false, restoreTabsOnStartup: true, renderer: DEFAULT_TERMINAL_RENDERER, historyPredict: false, localShell: '', localShellArgs: '', localShellCwd: '', localShellLogin: true,
@@ -96,6 +98,12 @@ export function normalizeCloseButtonAction(value: unknown): CloseButtonAction {
 
 export function normalizeLogDir(value: unknown): string {
   return typeof value === 'string' ? value.trim() : ''
+}
+
+export function normalizeMaxPoolSize(value: unknown): number {
+  const parsed = typeof value === 'number' ? value : Number(value)
+  if (!Number.isFinite(parsed) || parsed < 1) return DEFAULT_TERMINAL_POOL_SIZE
+  return Math.floor(parsed)
 }
 
 export function normalizeLogRetentionDays(value: unknown): number {
@@ -129,6 +137,7 @@ export function normalizeGeneral(settings: GeneralSettings): GeneralSettings {
   const uiFontFamily = normalizeUIFontFamily(settings.uiFontFamily)
   return {
     ...settings,
+    maxPoolSize: normalizeMaxPoolSize(settings.maxPoolSize),
     uiFontFamily,
     uiFontFallbackFamily: normalizeUIFontFallbackFamily(settings.uiFontFallbackFamily, uiFontFamily),
     uiFontSize: clampUIFontSize(settings.uiFontSize),
@@ -160,7 +169,7 @@ export function normalizeGeneral(settings: GeneralSettings): GeneralSettings {
 export function parseGeneral(settings: { [_ in string]?: Setting }): GeneralSettings {
   const uiFontFamily = normalizeUIFontFamily(settingValue(settings, 'appearance.ui_font_family', DEFAULT_UI_FONT_FAMILY))
   return normalizeGeneral({
-    maxPoolSize: settingValue(settings, 'terminal.max_pool_size', 10),
+    maxPoolSize: settingValue(settings, 'terminal.max_pool_size', DEFAULT_TERMINAL_POOL_SIZE),
     defaultKeepAlive: settingValue(settings, 'terminal.default_keep_alive', 60),
     defaultTermType: settingValue(settings, 'terminal.default_term_type', 'xterm-256color'),
     rightClickAction: settingValue(settings, 'terminal.right_click_action', 'menu'),
@@ -212,27 +221,27 @@ export async function loadPersistedGeneral() {
 }
 
 export async function persistGeneral(settings: GeneralSettings) {
-  await Promise.all([SettingService.SetMany([
-    settingEntry('terminal.max_pool_size', settings.maxPoolSize), settingEntry('terminal.default_keep_alive', settings.defaultKeepAlive),
-    settingEntry('terminal.default_term_type', settings.defaultTermType), settingEntry('terminal.right_click_action', settings.rightClickAction),
-    settingEntry('terminal.copy_on_select', settings.copyOnSelect), settingEntry('terminal.scrollback_lines', settings.scrollbackLines), settingEntry('terminal.auto_reconnect', settings.autoReconnect), settingEntry('terminal.restore_tabs_on_startup', settings.restoreTabsOnStartup), settingEntry('terminal.renderer', settings.renderer), settingEntry('terminal.history_predict', settings.historyPredict), settingEntry('terminal.local_shell', settings.localShell), settingEntry('terminal.local_shell_args', settings.localShellArgs), settingEntry('terminal.local_shell_cwd', settings.localShellCwd), settingEntry('terminal.local_shell_login', settings.localShellLogin), settingEntry('appearance.ui_font_family', settings.uiFontFamily),
-    settingEntry('appearance.ui_font_fallback_family', settings.uiFontFallbackFamily), settingEntry('appearance.ui_font_size', settings.uiFontSize),
-    settingEntry('application.close_button_action', settings.closeButtonAction),
-    settingEntry('application.log_dir', settings.logDir),
-    settingEntry('application.log_retention_days', settings.logRetentionDays),
-    settingEntry('application.proxy_mode', settings.proxyMode),
-    settingEntry('application.proxy_url', settings.proxyURL),
-    settingEntry('application.proxy_no_proxy', settings.proxyNoProxy),
-    settingEntry('application.proxy_username', settings.proxyUsername),
-    settingEntry('application.proxy_password', resolveProxyPasswordWrite(settings)),
-    settingEntry(LANGUAGE_SETTING_KEY, settings.language),
-  ]), TerminalService.SetMaxSize(settings.maxPoolSize)])
+  const normalized = normalizeGeneral(settings)
+  await SettingService.SetMany([
+    settingEntry('terminal.max_pool_size', normalized.maxPoolSize), settingEntry('terminal.default_keep_alive', normalized.defaultKeepAlive),
+    settingEntry('terminal.default_term_type', normalized.defaultTermType), settingEntry('terminal.right_click_action', normalized.rightClickAction),
+    settingEntry('terminal.copy_on_select', normalized.copyOnSelect), settingEntry('terminal.scrollback_lines', normalized.scrollbackLines), settingEntry('terminal.auto_reconnect', normalized.autoReconnect), settingEntry('terminal.restore_tabs_on_startup', normalized.restoreTabsOnStartup), settingEntry('terminal.renderer', normalized.renderer), settingEntry('terminal.history_predict', normalized.historyPredict), settingEntry('terminal.local_shell', normalized.localShell), settingEntry('terminal.local_shell_args', normalized.localShellArgs), settingEntry('terminal.local_shell_cwd', normalized.localShellCwd), settingEntry('terminal.local_shell_login', normalized.localShellLogin), settingEntry('appearance.ui_font_family', normalized.uiFontFamily),
+    settingEntry('appearance.ui_font_fallback_family', normalized.uiFontFallbackFamily), settingEntry('appearance.ui_font_size', normalized.uiFontSize),
+    settingEntry('application.close_button_action', normalized.closeButtonAction),
+    settingEntry('application.log_dir', normalized.logDir),
+    settingEntry('application.log_retention_days', normalized.logRetentionDays),
+    settingEntry('application.proxy_mode', normalized.proxyMode),
+    settingEntry('application.proxy_url', normalized.proxyURL),
+    settingEntry('application.proxy_no_proxy', normalized.proxyNoProxy),
+    settingEntry('application.proxy_username', normalized.proxyUsername),
+    settingEntry('application.proxy_password', resolveProxyPasswordWrite(normalized)),
+    settingEntry(LANGUAGE_SETTING_KEY, normalized.language),
+  ])
+  await TerminalService.SetMaxSize(normalized.maxPoolSize)
 }
 
-/** Empty keeps existing secret; clear sentinel deletes; non-empty stores a new encrypted password. */
-export function resolveProxyPasswordWrite(settings: Pick<GeneralSettings, 'proxyPassword' | 'clearProxyPassword'>): string {
-  if (settings.clearProxyPassword) return '__clear_proxy_password__'
+/** Empty keeps the existing secret; null clears it; non-empty stores the exact password. */
+export function resolveProxyPasswordWrite(settings: Pick<GeneralSettings, 'proxyPassword' | 'clearProxyPassword'>): string | null {
+  if (settings.clearProxyPassword) return null
   return typeof settings.proxyPassword === 'string' ? settings.proxyPassword : ''
 }
-
-

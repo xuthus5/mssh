@@ -105,20 +105,31 @@ func TestSyncAdoptVaultAndImportWithPassword(t *testing.T) {
 	dir := t.TempDir()
 	vault, _, err := crypto.CreateVault("initial-pass-12")
 	require.NoError(t, err)
+	dek, err := crypto.UnlockVault("initial-pass-12", vault)
+	require.NoError(t, err)
+	secret := crypto.SyncSecretFromDEK(dek)
 
 	var installed bool
 	svc := NewSyncService(db, testutil.NewTestLogger(), WithSyncDataDir(dir),
-		WithSyncSecretSource(func() (string, error) { return "secret-from-vault-xx", nil }),
-		WithVaultInstaller(func(password string, v crypto.VaultFile) error {
+		WithSyncSecretSource(func() (string, error) { return secret, nil }),
+		WithVaultTransactionInstaller(func(password string, v crypto.VaultFile) (VaultInstallTransaction, error) {
 			assert.Equal(t, "initial-pass-12", password)
 			assert.Equal(t, vault.WrappedDEK, v.WrappedDEK)
-			installed = true
-			return nil
+			return &stubVaultInstallTransaction{commit: func() error {
+				installed = true
+				return nil
+			}}, nil
 		}),
 	)
 
-	content, err := encodeSyncArtifact(ExportData{Tables: map[string][]map[string]any{}}, "secret-from-vault-xx",
-		syncArtifactMetadata{SnapshotFingerprint: mustFingerprint(t, ExportData{Tables: map[string][]map[string]any{}}), CreatedAt: time.Now().UTC()},
+	tables := make(map[string][]map[string]any, len(backupTables))
+	for _, table := range backupTables {
+		tables[table] = nil
+	}
+	tables["session_folders"] = []map[string]any{snapshotFolderRow(1, nil, true, "root")}
+	data := ExportData{FormatVersion: syncFormatVersion, Tables: tables}
+	content, err := encodeSyncArtifact(data, secret,
+		syncArtifactMetadata{SnapshotFingerprint: mustFingerprint(t, data), CreatedAt: time.Now().UTC()},
 		&vault,
 	)
 	require.NoError(t, err)
@@ -129,7 +140,7 @@ func TestSyncAdoptVaultAndImportWithPassword(t *testing.T) {
 	assert.Error(t, noInstaller.AdoptVaultFromContent("initial-pass-12", content))
 
 	// missing vault path
-	legacy, err := encodeEncryptedSnapshot(ExportData{Tables: map[string][]map[string]any{}}, "secret-from-vault-xx")
+	legacy, err := encodeEncryptedSnapshot(data, secret)
 	require.NoError(t, err)
 	assert.ErrorIs(t, svc.AdoptVaultFromContent("initial-pass-12", legacy), errSyncVaultMissing)
 

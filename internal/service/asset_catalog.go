@@ -10,8 +10,9 @@ import (
 )
 
 type AssetCatalogService struct {
-	db     *sql.DB
-	logger *slog.Logger
+	db        *sql.DB
+	logger    *slog.Logger
+	lifecycle serviceOperationGate
 }
 
 func NewAssetCatalogService(db *sql.DB, logger *slog.Logger) *AssetCatalogService {
@@ -19,6 +20,11 @@ func NewAssetCatalogService(db *sql.DB, logger *slog.Logger) *AssetCatalogServic
 }
 
 func (s *AssetCatalogService) ListEnvironments() ([]model.AssetEnvironment, error) {
+	finish, err := s.beginOperation()
+	if err != nil {
+		return nil, err
+	}
+	defer finish()
 	rows, err := s.db.Query(`SELECT e.id, e.name, e.color_token, e.sort_order, COUNT(se.id), e.created_at, e.updated_at FROM asset_environments e LEFT JOIN sessions se ON se.environment_id = e.id GROUP BY e.id ORDER BY e.sort_order, e.name_key`)
 	if err != nil {
 		return nil, fmt.Errorf("list environments: %w", err)
@@ -36,6 +42,11 @@ func (s *AssetCatalogService) ListEnvironments() ([]model.AssetEnvironment, erro
 }
 
 func (s *AssetCatalogService) ListProjects() ([]model.AssetProject, error) {
+	finish, err := s.beginOperation()
+	if err != nil {
+		return nil, err
+	}
+	defer finish()
 	rows, err := s.db.Query(`SELECT p.id, p.name, p.code, p.description, p.sort_order, COUNT(se.id), p.created_at, p.updated_at FROM asset_projects p LEFT JOIN sessions se ON se.project_id = p.id GROUP BY p.id ORDER BY p.sort_order, p.name_key`)
 	if err != nil {
 		return nil, fmt.Errorf("list projects: %w", err)
@@ -53,6 +64,11 @@ func (s *AssetCatalogService) ListProjects() ([]model.AssetProject, error) {
 }
 
 func (s *AssetCatalogService) ListTags() ([]model.AssetTag, error) {
+	finish, err := s.beginOperation()
+	if err != nil {
+		return nil, err
+	}
+	defer finish()
 	rows, err := s.db.Query(`SELECT t.id, t.name, t.color_token, COUNT(st.session_id), t.created_at, t.updated_at FROM asset_tags t LEFT JOIN session_tags st ON st.tag_id = t.id GROUP BY t.id ORDER BY t.name_key`)
 	if err != nil {
 		return nil, fmt.Errorf("list tags: %w", err)
@@ -70,6 +86,11 @@ func (s *AssetCatalogService) ListTags() ([]model.AssetTag, error) {
 }
 
 func (s *AssetCatalogService) CreateEnvironment(input model.AssetEnvironmentInput) (*model.AssetEnvironment, error) {
+	finish, err := s.beginOperation()
+	if err != nil {
+		return nil, err
+	}
+	defer finish()
 	name, key, err := normalizeAssetName(input.Name, 64)
 	if err != nil {
 		return nil, err
@@ -104,6 +125,11 @@ func (s *AssetCatalogService) CreateEnvironment(input model.AssetEnvironmentInpu
 }
 
 func (s *AssetCatalogService) UpdateEnvironment(input model.AssetEnvironmentInput) error {
+	finish, err := s.beginOperation()
+	if err != nil {
+		return err
+	}
+	defer finish()
 	name, key, err := normalizeAssetName(input.Name, 64)
 	if err != nil {
 		return err
@@ -121,6 +147,11 @@ func (s *AssetCatalogService) UpdateEnvironment(input model.AssetEnvironmentInpu
 }
 
 func (s *AssetCatalogService) CreateProject(input model.AssetProjectInput) (*model.AssetProject, error) {
+	finish, err := s.beginOperation()
+	if err != nil {
+		return nil, err
+	}
+	defer finish()
 	name, key, code, codeKey, description, err := normalizeProject(input)
 	if err != nil {
 		return nil, err
@@ -152,6 +183,11 @@ func (s *AssetCatalogService) CreateProject(input model.AssetProjectInput) (*mod
 }
 
 func (s *AssetCatalogService) UpdateProject(input model.AssetProjectInput) error {
+	finish, err := s.beginOperation()
+	if err != nil {
+		return err
+	}
+	defer finish()
 	name, key, code, codeKey, description, err := normalizeProject(input)
 	if err != nil {
 		return err
@@ -166,6 +202,11 @@ func (s *AssetCatalogService) UpdateProject(input model.AssetProjectInput) error
 }
 
 func (s *AssetCatalogService) CreateTag(input model.AssetTagInput) (*model.AssetTag, error) {
+	finish, err := s.beginOperation()
+	if err != nil {
+		return nil, err
+	}
+	defer finish()
 	name, key, err := normalizeAssetName(input.Name, 32)
 	if err != nil {
 		return nil, err
@@ -196,6 +237,11 @@ func (s *AssetCatalogService) CreateTag(input model.AssetTagInput) (*model.Asset
 }
 
 func (s *AssetCatalogService) UpdateTag(input model.AssetTagInput) error {
+	finish, err := s.beginOperation()
+	if err != nil {
+		return err
+	}
+	defer finish()
 	name, key, err := normalizeAssetName(input.Name, 32)
 	if err != nil {
 		return err
@@ -209,68 +255,13 @@ func (s *AssetCatalogService) UpdateTag(input model.AssetTagInput) error {
 }
 
 func (s *AssetCatalogService) GetSessionAssetDetail(sessionID int64) (*model.Session, error) {
+	finish, err := s.beginOperation()
+	if err != nil {
+		return nil, err
+	}
+	defer finish()
 	if sessionID <= 0 {
 		return nil, fmt.Errorf("invalid session id")
 	}
 	return store.GetSession(s.db, sessionID)
-}
-
-func (s *AssetCatalogService) environment(id int64) (*model.AssetEnvironment, error) {
-	item, err := scanEnvironment(s.db.QueryRow(`SELECT e.id, e.name, e.color_token, e.sort_order, COUNT(se.id), e.created_at, e.updated_at FROM asset_environments e LEFT JOIN sessions se ON se.environment_id=e.id WHERE e.id=? GROUP BY e.id`, id))
-	if err != nil {
-		return nil, fmt.Errorf("get environment: %w", err)
-	}
-	return &item, nil
-}
-
-func (s *AssetCatalogService) project(id int64) (*model.AssetProject, error) {
-	item, err := scanProject(s.db.QueryRow(`SELECT p.id, p.name, p.code, p.description, p.sort_order, COUNT(se.id), p.created_at, p.updated_at FROM asset_projects p LEFT JOIN sessions se ON se.project_id=p.id WHERE p.id=? GROUP BY p.id`, id))
-	if err != nil {
-		return nil, fmt.Errorf("get project: %w", err)
-	}
-	return &item, nil
-}
-
-func (s *AssetCatalogService) tag(id int64) (*model.AssetTag, error) {
-	item, err := scanTag(s.db.QueryRow(`SELECT t.id, t.name, t.color_token, COUNT(st.session_id), t.created_at, t.updated_at FROM asset_tags t LEFT JOIN session_tags st ON st.tag_id=t.id WHERE t.id=? GROUP BY t.id`, id))
-	if err != nil {
-		return nil, fmt.Errorf("get tag: %w", err)
-	}
-	return &item, nil
-}
-
-func requireAssetAffected(result sql.Result, kind string) error {
-	count, err := result.RowsAffected()
-	if err != nil {
-		return err
-	}
-	if count == 0 {
-		return fmt.Errorf("%s not found", kind)
-	}
-	return nil
-}
-
-func (s *AssetCatalogService) updateCatalogItem(kind string, id int64, summary string, update func(*sql.Tx) (sql.Result, error)) error {
-	if id <= 0 {
-		return fmt.Errorf("invalid %s id", kind)
-	}
-	tx, err := s.db.Begin()
-	if err != nil {
-		return fmt.Errorf("update %s: %w", kind, err)
-	}
-	defer func() { _ = tx.Rollback() }()
-	result, err := update(tx)
-	if err != nil {
-		return fmt.Errorf("update %s: %w", kind, err)
-	}
-	if err := requireAssetAffected(result, kind); err != nil {
-		return err
-	}
-	if err := appendCatalogAudit(tx, "update", kind, id, summary); err != nil {
-		return fmt.Errorf("update %s audit: %w", kind, err)
-	}
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("update %s: %w", kind, err)
-	}
-	return nil
 }

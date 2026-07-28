@@ -23,7 +23,7 @@ func TestLogService_ListBySessionNoMatch(t *testing.T) {
 	sessionSvc := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
 	sess := model.Session{
 		Name: "test-nomatch", Host: "10.0.0.1", Port: 22, Username: "root",
-		AuthMethod: model.AuthPassword, Password: "enc", KeepAlive: 30, TermType: "xterm",
+		AuthMethod: model.AuthPassword, KeepAlive: 30, TermType: "xterm",
 	}
 	createdSess, err := sessionSvc.CreateSession(model.SessionInputFrom(sess))
 	require.NoError(t, err)
@@ -54,7 +54,7 @@ func TestLogService_StopTerminalRecordingTwice(t *testing.T) {
 	sessionSvc := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
 	sess := model.Session{
 		Name: "test-stoptwice", Host: "10.0.0.1", Port: 22, Username: "root",
-		AuthMethod: model.AuthPassword, Password: "enc", KeepAlive: 30, TermType: "xterm",
+		AuthMethod: model.AuthPassword, KeepAlive: 30, TermType: "xterm",
 	}
 	createdSess, err := sessionSvc.CreateSession(model.SessionInputFrom(sess))
 	require.NoError(t, err)
@@ -113,7 +113,7 @@ func TestLogService_DeleteWithDataPath(t *testing.T) {
 	sessionSvc := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
 	sess := model.Session{
 		Name: "test-del-path", Host: "10.0.0.1", Port: 22, Username: "root",
-		AuthMethod: model.AuthPassword, Password: "enc", KeepAlive: 30, TermType: "xterm",
+		AuthMethod: model.AuthPassword, KeepAlive: 30, TermType: "xterm",
 	}
 	createdSess, err := sessionSvc.CreateSession(model.SessionInputFrom(sess))
 	require.NoError(t, err)
@@ -144,7 +144,7 @@ func TestLogService_StartTerminalRecording(t *testing.T) {
 	sessionSvc := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
 	sess := model.Session{
 		Name: "test-term-rec", Host: "10.0.0.1", Port: 22, Username: "root",
-		AuthMethod: model.AuthPassword, Password: "enc", KeepAlive: 30, TermType: "xterm",
+		AuthMethod: model.AuthPassword, KeepAlive: 30, TermType: "xterm",
 	}
 	createdSess, err := sessionSvc.CreateSession(model.SessionInputFrom(sess))
 	require.NoError(t, err)

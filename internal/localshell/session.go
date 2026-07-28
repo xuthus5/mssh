@@ -2,6 +2,7 @@ package localshell
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"sync"
@@ -22,7 +23,9 @@ type Session struct {
 	exitNotified bool
 	closeOnce    sync.Once
 	closeErr     error
+	workers      sync.WaitGroup
 	startOnce    sync.Once
+	closed       bool
 }
 
 const maxPendingRead = 1 << 20
@@ -49,12 +52,33 @@ func OpenContext(ctx context.Context, opts Options) (*Session, error) {
 
 func (s *Session) Start() {
 	s.startOnce.Do(func() {
-		go s.readLoop()
-		go s.waitLoop()
+		s.mu.Lock()
+		if s.closed || s.pty == nil {
+			s.mu.Unlock()
+			return
+		}
+		hasProcessWait := s.processWait != nil
+		s.workers.Add(1)
+		if hasProcessWait {
+			s.workers.Add(1)
+		}
+		s.mu.Unlock()
+		go s.runReadLoop()
+		if hasProcessWait {
+			go s.runWaitLoop()
+		}
 	})
 }
 
-func (s *Session) readLoop() {
+func (s *Session) runReadLoop() {
+	exitErr, notify := s.readLoop()
+	s.workers.Done()
+	if notify {
+		s.notifyExit(exitErr)
+	}
+}
+
+func (s *Session) readLoop() (error, bool) {
 	buf := make([]byte, 4096)
 	for {
 		n, err := s.pty.Read(buf)
@@ -66,21 +90,30 @@ func (s *Session) readLoop() {
 		if err == nil {
 			continue
 		}
-		if err == io.EOF {
-			s.notifyExit(nil)
-			return
+		if s.processWait != nil {
+			_ = s.closeResources()
+			return nil, false
 		}
-		s.notifyExit(err)
-		return
+		if err == io.EOF {
+			return nil, true
+		}
+		return err, true
 	}
 }
 
-func (s *Session) waitLoop() {
+func (s *Session) runWaitLoop() {
+	exitErr := s.waitLoop()
+	s.workers.Done()
+	s.notifyExit(exitErr)
+}
+
+func (s *Session) waitLoop() error {
 	if s.processWait == nil {
-		return
+		return nil
 	}
-	err := s.processWait()
-	s.notifyExit(err)
+	waitErr := s.processWait()
+	cleanupErr := s.closeResources()
+	return errors.Join(waitErr, cleanupErr)
 }
 
 func (s *Session) SetReadCallback(fn func([]byte)) {
@@ -155,6 +188,9 @@ func (s *Session) Resize(cols, rows int) error {
 	if cols <= 0 || rows <= 0 {
 		return nil
 	}
+	if err := validateSize(cols, rows); err != nil {
+		return err
+	}
 	if s.resizeFn == nil {
 		return nil
 	}
@@ -162,13 +198,22 @@ func (s *Session) Resize(cols, rows int) error {
 }
 
 func (s *Session) Close() error {
+	closeErr := s.closeResources()
+	s.notifyExit(io.EOF)
+	s.workers.Wait()
+	return closeErr
+}
+
+func (s *Session) closeResources() error {
 	s.closeOnce.Do(func() {
+		s.mu.Lock()
+		s.closed = true
+		s.mu.Unlock()
 		if s.closeFn != nil {
 			s.closeErr = s.closeFn()
 		} else if s.pty != nil {
 			s.closeErr = s.pty.Close()
 		}
-		s.notifyExit(io.EOF)
 	})
 	return s.closeErr
 }

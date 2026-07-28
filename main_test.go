@@ -1,12 +1,15 @@
 package main
 
 import (
+	"io/fs"
 	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/wailsapp/wails/v3/pkg/application"
 
 	"github.com/xuthus5/mssh/internal/windowing"
@@ -52,6 +55,12 @@ func TestConfigureWindowsCreatesAndReusesSettingsWindow(t *testing.T) {
 func TestEmbeddedApplicationIconIsPNG(t *testing.T) {
 	assert.Greater(t, len(appIcon), 8)
 	assert.Equal(t, []byte{0x89, 'P', 'N', 'G', 0x0d, 0x0a, 0x1a, 0x0a}, appIcon[:8])
+}
+
+func TestFrontendAssetsAvailableWithoutProductionBuild(t *testing.T) {
+	content, err := fs.ReadFile(frontendAssets(), "index.html")
+	require.NoError(t, err)
+	assert.Contains(t, strings.ToLower(string(content)), "<html")
 }
 
 func TestSystemTrayMenuContainsRequiredActions(t *testing.T) {

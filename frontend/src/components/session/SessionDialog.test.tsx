@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import SessionDialog from '@/components/session/SessionDialog'
 import { useToastStore } from '@/components/ui/toast'
@@ -220,4 +220,67 @@ describe('SessionDialog', () => {
     expect(defaultProps.onSave).not.toHaveBeenCalled()
   })
 
+  it('ignores key responses from an older dialog generation', async () => {
+    const first = deferred<Array<{ id: number; name: string; type: string }>>()
+    const second = deferred<Array<{ id: number; name: string; type: string }>>()
+    listKeys.mockImplementationOnce(() => first.promise).mockImplementationOnce(() => second.promise)
+    const props = { ...defaultProps, session: { id: '1', name: 'key-host', host: '10.0.0.1', port: 22, username: 'root', authMethod: 'key', keepAlive: 0, termType: 'xterm', folderId: null } as never }
+    const view = render(<SessionDialog {...props} />)
+    await waitFor(() => expect(listKeys).toHaveBeenCalledTimes(1))
+    view.rerender(<SessionDialog {...props} open={false} />)
+    view.rerender(<SessionDialog {...props} />)
+    await waitFor(() => expect(listKeys).toHaveBeenCalledTimes(2))
+    await act(async () => { second.resolve([{ id: 2, name: 'new-key', type: 'ed25519' }]); await Promise.resolve() })
+    await act(async () => { first.resolve([{ id: 1, name: 'old-key', type: 'rsa' }]); await Promise.resolve() })
+    await userEvent.click(screen.getByRole('combobox', { name: 'SSH 密钥' }))
+    expect(await screen.findByRole('option', { name: 'new-key (ed25519)' })).toBeInTheDocument()
+    expect(screen.queryByRole('option', { name: 'old-key (rsa)' })).not.toBeInTheDocument()
+  })
+
+  it('keeps the save lease while isolating completion after the session target changes', async () => {
+    const save = deferred<void>()
+    const onOpenChange = vi.fn()
+    const onSave = vi.fn(() => save.promise)
+    const view = render(<SessionDialog {...defaultProps} onOpenChange={onOpenChange} session={{
+      id: '1', name: 'host', host: '10.0.0.1', port: 22, username: 'root', authMethod: 'password', keepAlive: 0, termType: 'xterm', folderId: null,
+    }} onSave={onSave} />)
+    await userEvent.click(screen.getByRole('button', { name: '保存' }))
+    view.rerender(<SessionDialog {...defaultProps} onOpenChange={onOpenChange} session={{
+      id: '2', name: 'new-host', host: '10.0.0.2', port: 22, username: 'admin', authMethod: 'password', keepAlive: 0, termType: 'xterm', folderId: null,
+    }} onSave={onSave} />)
+    expect(screen.getByLabelText('名称')).toHaveValue('new-host')
+    expect(screen.getByRole('button', { name: '保存中...' })).toBeDisabled()
+    fireEvent.click(screen.getByRole('button', { name: '保存中...' }))
+    expect(onSave).toHaveBeenCalledOnce()
+    await act(async () => { save.resolve(); await Promise.resolve() })
+    expect(onOpenChange).not.toHaveBeenCalledWith(false)
+    expect(screen.getByRole('button', { name: '保存' })).toBeEnabled()
+  })
+
+  it('locks the form, blocks dismissal, and submits only once during save', async () => {
+    const save = deferred<void>()
+    const onSave = vi.fn(() => save.promise)
+    const onOpenChange = vi.fn()
+    render(<SessionDialog {...defaultProps} session={{
+      id: '1', name: 'host', host: '10.0.0.1', port: 22, username: 'root', authMethod: 'password', keepAlive: 0, termType: 'xterm', folderId: null,
+    }} onSave={onSave} onOpenChange={onOpenChange} />)
+    const submit = screen.getByRole('button', { name: '保存' })
+    act(() => {
+      fireEvent.click(submit)
+      fireEvent.click(submit)
+    })
+    expect(onSave).toHaveBeenCalledOnce()
+    expect(screen.getByLabelText('名称')).toBeDisabled()
+    fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' })
+    expect(onOpenChange).not.toHaveBeenCalledWith(false)
+    await act(async () => { save.resolve(); await Promise.resolve() })
+    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
+  })
+
 })
+
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((resolvePromise) => { resolve = resolvePromise })
+  return { promise, resolve }
+}

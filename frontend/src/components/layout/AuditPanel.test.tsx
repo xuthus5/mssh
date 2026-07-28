@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -56,4 +56,48 @@ describe('AuditPanel', () => {
     expect(await screen.findByText('toggle failed')).toBeInTheDocument()
     expect(useToastStore.getState().toasts).toHaveLength(0)
   })
+
+  it('does not submit audit toggles twice while the first request is pending', async () => {
+    let resolveToggle: (() => void) | undefined
+    audit.setEnabled.mockImplementationOnce(() => new Promise<void>((resolve) => { resolveToggle = resolve }))
+    render(<AuditPanel />)
+    await screen.findAllByText('SSH 连接')
+    const toggle = screen.getByRole('switch', { name: '启用审计日志' })
+
+    fireEvent.click(toggle)
+    toggle.removeAttribute('disabled')
+    fireEvent.click(toggle)
+
+    expect(audit.setEnabled).toHaveBeenCalledOnce()
+    await act(async () => { resolveToggle?.() })
+  })
+
+  it('does not surface an old filter error after a newer result succeeds', async () => {
+    const first = deferred<unknown[]>()
+    const second = deferred<unknown[]>()
+    audit.list.mockReset()
+      .mockImplementationOnce(() => first.promise)
+      .mockImplementationOnce(() => second.promise)
+    const user = userEvent.setup()
+    render(<AuditPanel />)
+    await waitFor(() => expect(audit.list).toHaveBeenCalledTimes(1))
+
+    await user.click(screen.getByRole('combobox', { name: '审计会话' }))
+    await user.click(await screen.findByRole('option', { name: '生产服务器' }))
+    await waitFor(() => expect(audit.list).toHaveBeenCalledTimes(2))
+    await act(async () => { second.resolve([]) })
+    await act(async () => { first.reject(new Error('stale filter failed')) })
+
+    expect(screen.queryByText('stale filter failed')).not.toBeInTheDocument()
+  })
 })
+
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  let reject!: (reason?: unknown) => void
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise
+    reject = rejectPromise
+  })
+  return { promise, resolve, reject }
+}

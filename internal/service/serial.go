@@ -2,11 +2,10 @@ package service
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"log/slog"
-	"strings"
 	"sync"
-	"unicode/utf8"
 
 	"github.com/xuthus5/mssh/internal/model"
 	"github.com/xuthus5/mssh/internal/serial"
@@ -15,8 +14,9 @@ import (
 
 // SerialService manages serial port profiles and device discovery.
 type SerialService struct {
-	db     *sql.DB
-	logger *slog.Logger
+	db        *sql.DB
+	logger    *slog.Logger
+	lifecycle serviceOperationGate
 
 	activeMu sync.RWMutex
 	// device path -> terminal id currently holding the exclusive open
@@ -32,10 +32,20 @@ func NewSerialService(db *sql.DB, logger *slog.Logger) *SerialService {
 }
 
 func (s *SerialService) List() ([]model.SerialPort, error) {
+	finish, err := s.beginOperation()
+	if err != nil {
+		return nil, err
+	}
+	defer finish()
 	return store.ListSerialPorts(s.db)
 }
 
 func (s *SerialService) Get(id int64) (*model.SerialPort, error) {
+	finish, err := s.beginOperation()
+	if err != nil {
+		return nil, err
+	}
+	defer finish()
 	if id <= 0 {
 		return nil, fmt.Errorf("invalid serial port id")
 	}
@@ -43,6 +53,11 @@ func (s *SerialService) Get(id int64) (*model.SerialPort, error) {
 }
 
 func (s *SerialService) Create(input model.SerialPortInput) (*model.SerialPort, error) {
+	finish, err := s.beginOperation()
+	if err != nil {
+		return nil, err
+	}
+	defer finish()
 	port, err := normalizeSerialPort(input.SerialPort())
 	if err != nil {
 		return nil, err
@@ -51,6 +66,11 @@ func (s *SerialService) Create(input model.SerialPortInput) (*model.SerialPort, 
 }
 
 func (s *SerialService) Update(input model.SerialPortInput) error {
+	finish, err := s.beginOperation()
+	if err != nil {
+		return err
+	}
+	defer finish()
 	if input.ID <= 0 {
 		return fmt.Errorf("serial port id is required")
 	}
@@ -58,14 +78,26 @@ func (s *SerialService) Update(input model.SerialPortInput) error {
 	if err != nil {
 		return err
 	}
+	s.activeMu.Lock()
+	defer s.activeMu.Unlock()
+	if err := s.ensureProfilesNotInUseLocked([]int64{input.ID}); err != nil {
+		return err
+	}
 	return store.UpdateSerialPort(s.db, port)
 }
 
 func (s *SerialService) Delete(id int64) error {
+	finish, err := s.beginOperation()
+	if err != nil {
+		return err
+	}
+	defer finish()
 	if id <= 0 {
 		return fmt.Errorf("invalid serial port id")
 	}
-	if err := s.ensureProfilesNotInUse([]int64{id}); err != nil {
+	s.activeMu.Lock()
+	defer s.activeMu.Unlock()
+	if err := s.ensureProfilesNotInUseLocked([]int64{id}); err != nil {
 		return err
 	}
 	return store.DeleteSerialPort(s.db, id)
@@ -73,51 +105,66 @@ func (s *SerialService) Delete(id int64) error {
 
 // DeleteMany removes multiple serial profiles.
 func (s *SerialService) DeleteMany(ids []int64) (int64, error) {
+	finish, err := s.beginOperation()
+	if err != nil {
+		return 0, err
+	}
+	defer finish()
+	clean := normalizeSerialProfileIDs(ids)
+	s.activeMu.Lock()
+	defer s.activeMu.Unlock()
+	if err := s.ensureProfilesNotInUseLocked(clean); err != nil {
+		return 0, err
+	}
+	return store.DeleteSerialPorts(s.db, clean)
+}
+
+func normalizeSerialProfileIDs(ids []int64) []int64 {
 	clean := make([]int64, 0, len(ids))
 	seen := make(map[int64]struct{}, len(ids))
 	for _, id := range ids {
 		if id <= 0 {
 			continue
 		}
-		if _, ok := seen[id]; ok {
+		if _, exists := seen[id]; exists {
 			continue
 		}
 		seen[id] = struct{}{}
 		clean = append(clean, id)
 	}
-	if err := s.ensureProfilesNotInUse(clean); err != nil {
-		return 0, err
-	}
-	return store.DeleteSerialPorts(s.db, clean)
+	return clean
 }
 
-func (s *SerialService) ensureProfilesNotInUse(ids []int64) error {
-	if len(ids) == 0 {
-		return nil
-	}
-	active := s.ActiveDeviceMap()
-	if len(active) == 0 {
-		return nil
-	}
+func (s *SerialService) ensureProfilesNotInUseLocked(ids []int64) error {
 	for _, id := range ids {
 		port, err := store.GetSerialPort(s.db, id)
-		if err != nil {
-			// Missing profiles are ignored so delete remains idempotent for callers.
+		if errors.Is(err, sql.ErrNoRows) {
 			continue
 		}
-		if _, ok := active[serial.CanonicalDevicePath(port.Device)]; ok {
-			return fmt.Errorf("serial profile %q is in use and cannot be deleted", port.Name)
+		if err != nil {
+			return fmt.Errorf("check serial profile usage: %w", err)
+		}
+		if _, active := s.activeDevices[serial.CanonicalDevicePath(port.Device)]; active {
+			return fmt.Errorf("serial profile %q is in use and cannot be modified", port.Name)
 		}
 	}
 	return nil
 }
 
 func (s *SerialService) ListDevices() ([]string, error) {
+	finish, err := s.beginOperation()
+	if err != nil {
+		return nil, err
+	}
+	defer finish()
 	return serial.ListDevices()
 }
 
 // ActiveDeviceMap returns device path -> terminal id for currently open serial sessions.
 func (s *SerialService) ActiveDeviceMap() map[string]string {
+	if s == nil {
+		return map[string]string{}
+	}
 	s.activeMu.RLock()
 	defer s.activeMu.RUnlock()
 	out := make(map[string]string, len(s.activeDevices))
@@ -127,13 +174,54 @@ func (s *SerialService) ActiveDeviceMap() map[string]string {
 	return out
 }
 
+func (s *SerialService) reserveProfile(profile model.SerialPort, terminalID string) error {
+	finish, err := s.beginOperation()
+	if err != nil {
+		return err
+	}
+	defer finish()
+	device := serial.CanonicalDevicePath(profile.Device)
+	if profile.ID <= 0 || device == "" {
+		return fmt.Errorf("serial profile is invalid")
+	}
+	s.activeMu.Lock()
+	defer s.activeMu.Unlock()
+	if err := s.verifyProfileSnapshotLocked(profile); err != nil {
+		return err
+	}
+	return s.reserveDeviceLocked(device, terminalID)
+}
+
+func (s *SerialService) verifyProfileSnapshotLocked(profile model.SerialPort) error {
+	current, err := store.GetSerialPort(s.db, profile.ID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return fmt.Errorf("serial profile is no longer available")
+	}
+	if err != nil {
+		return fmt.Errorf("verify serial profile: %w", err)
+	}
+	if !serialOpenConfigurationEqual(*current, profile) {
+		return fmt.Errorf("serial profile changed; retry connection")
+	}
+	return nil
+}
+
 func (s *SerialService) reserveDevice(device, terminalID string) error {
+	finish, err := s.beginOperation()
+	if err != nil {
+		return err
+	}
+	defer finish()
 	device = serial.CanonicalDevicePath(device)
 	if device == "" {
 		return fmt.Errorf("serial device is required")
 	}
 	s.activeMu.Lock()
 	defer s.activeMu.Unlock()
+	return s.reserveDeviceLocked(device, terminalID)
+}
+
+func (s *SerialService) reserveDeviceLocked(device, terminalID string) error {
 	if owner, ok := s.activeDevices[device]; ok && owner != terminalID {
 		return fmt.Errorf("serial device %s is already open in another terminal", device)
 	}
@@ -142,6 +230,9 @@ func (s *SerialService) reserveDevice(device, terminalID string) error {
 }
 
 func (s *SerialService) releaseDevice(device, terminalID string) {
+	if s == nil {
+		return
+	}
 	device = serial.CanonicalDevicePath(device)
 	if device == "" {
 		return
@@ -151,102 +242,4 @@ func (s *SerialService) releaseDevice(device, terminalID string) {
 	if owner, ok := s.activeDevices[device]; ok && owner == terminalID {
 		delete(s.activeDevices, device)
 	}
-}
-
-const (
-	maxSerialNameRunes  = 128
-	maxSerialNotesRunes = 2000
-	maxSerialSortOrder  = 1_000_000
-)
-
-func normalizeSerialPort(port model.SerialPort) (model.SerialPort, error) {
-	port.Name = strings.TrimSpace(port.Name)
-	device, err := serial.ValidateDevicePath(port.Device)
-	if err != nil {
-		return model.SerialPort{}, err
-	}
-	port.Device = device
-	port.Notes = strings.TrimSpace(port.Notes)
-	port.FlowControl = strings.TrimSpace(port.FlowControl)
-	port.LineEnding = model.SerialLineEnding(strings.TrimSpace(string(port.LineEnding)))
-	if port.Name == "" {
-		return model.SerialPort{}, fmt.Errorf("serial port name is required")
-	}
-	if strings.ContainsRune(port.Name, 0) {
-		return model.SerialPort{}, fmt.Errorf("serial port name contains NUL")
-	}
-	if utf8.RuneCountInString(port.Name) > maxSerialNameRunes {
-		return model.SerialPort{}, fmt.Errorf("serial port name must not exceed %d characters", maxSerialNameRunes)
-	}
-	if strings.ContainsRune(port.Notes, 0) {
-		return model.SerialPort{}, fmt.Errorf("serial notes contain NUL")
-	}
-	if utf8.RuneCountInString(port.Notes) > maxSerialNotesRunes {
-		return model.SerialPort{}, fmt.Errorf("serial notes must not exceed %d characters", maxSerialNotesRunes)
-	}
-	if port.SortOrder < 0 || port.SortOrder > maxSerialSortOrder {
-		return model.SerialPort{}, fmt.Errorf("serial sort order must be between 0 and %d", maxSerialSortOrder)
-	}
-	baud, err := normalizeBaudRate(port.BaudRate)
-	if err != nil {
-		return model.SerialPort{}, err
-	}
-	port.BaudRate = baud
-	if port.DataBits == 0 {
-		port.DataBits = 8
-	}
-	if port.DataBits < 5 || port.DataBits > 8 {
-		return model.SerialPort{}, fmt.Errorf("data bits must be 5-8")
-	}
-	if err := normalizeSerialEnums(&port); err != nil {
-		return model.SerialPort{}, err
-	}
-	// DTR/RTS defaults stay as provided by SerialPortInput conversion.
-	return port, nil
-}
-
-func normalizeBaudRate(baud int) (int, error) {
-	if baud <= 0 {
-		baud = 115200
-	}
-	if baud < 300 || baud > 4_000_000 {
-		return 0, fmt.Errorf("baud rate must be between 300 and 4000000")
-	}
-	return baud, nil
-}
-
-func normalizeSerialEnums(port *model.SerialPort) error {
-	if port.Parity == "" {
-		port.Parity = model.SerialParityNone
-	}
-	switch port.Parity {
-	case model.SerialParityNone, model.SerialParityOdd, model.SerialParityEven, model.SerialParityMark, model.SerialParitySpace:
-	default:
-		return fmt.Errorf("unsupported parity %q", port.Parity)
-	}
-	if port.StopBits == "" {
-		port.StopBits = model.SerialStopBitsOne
-	}
-	switch port.StopBits {
-	case model.SerialStopBitsOne, model.SerialStopBitsOnePointFive, model.SerialStopBitsTwo:
-	default:
-		return fmt.Errorf("unsupported stop bits %q", port.StopBits)
-	}
-	if port.FlowControl == "" {
-		port.FlowControl = "none"
-	}
-	switch port.FlowControl {
-	case "none", "xonxoff", "rtscts", "dsrdtr":
-	default:
-		return fmt.Errorf("unsupported flow control %q", port.FlowControl)
-	}
-	if port.LineEnding == "" {
-		port.LineEnding = model.SerialLineEndingCR
-	}
-	switch port.LineEnding {
-	case model.SerialLineEndingCR, model.SerialLineEndingLF, model.SerialLineEndingCRLF:
-	default:
-		return fmt.Errorf("unsupported line ending %q", port.LineEnding)
-	}
-	return nil
 }

@@ -1,7 +1,9 @@
 package service
 
 import (
+	"errors"
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	"github.com/xuthus5/mssh/internal/model"
@@ -9,6 +11,11 @@ import (
 )
 
 func (s *SessionService) DeleteSession(id int64) error {
+	finish, err := s.beginOperation()
+	if err != nil {
+		return err
+	}
+	defer finish()
 	if id <= 0 {
 		return fmt.Errorf("invalid session id")
 	}
@@ -17,12 +24,19 @@ func (s *SessionService) DeleteSession(id int64) error {
 		recordAudit(s.db, s.logger, model.AuditEvent{Action: "delete", TargetType: "session", TargetID: fmt.Sprint(id), SessionID: &id, Summary: "删除 SSH 会话", Outcome: outcome})
 	}()
 	s.logger.Info("deleting session", "id", id)
-	s.CancelConnectForSessions([]int64{id})
-	s.closeTerminalsForSessions([]int64{id})
-	s.stopTunnelsForSessions([]int64{id})
-	s.cancelTransfersForSessions([]int64{id})
-	s.DisconnectForSessions([]int64{id})
-	err := store.DeleteSession(s.db, id)
+	releaseConnectGuard := s.beginSessionDeletion([]int64{id})
+	defer releaseConnectGuard()
+	releaseTerminalGuard := s.guardTerminalOpensForDeletion([]int64{id})
+	defer releaseTerminalGuard()
+	releaseTunnelGuard := s.guardTunnelStartsForDeletion([]int64{id})
+	defer releaseTunnelGuard()
+	if err := s.prepareSessionsForDeletion([]int64{id}); err != nil {
+		s.logger.Error("prepare session deletion failed", "id", id, "error", err)
+		return err
+	}
+	err = s.normalizeSessionDeleteError(
+		store.DeleteSessionWithRecordingDirectory(s.db, id, s.recordingsDirectory()),
+	)
 	if err != nil {
 		s.logger.Error("delete session failed", "error", err)
 	} else {
@@ -32,6 +46,11 @@ func (s *SessionService) DeleteSession(id int64) error {
 }
 
 func (s *SessionService) DeleteSessions(ids []int64) (int, error) {
+	finish, err := s.beginOperation()
+	if err != nil {
+		return 0, err
+	}
+	defer finish()
 	normalized, err := normalizedSessionIDs(ids)
 	if err != nil {
 		return 0, err
@@ -44,12 +63,20 @@ func (s *SessionService) DeleteSessions(ids []int64) (int, error) {
 		})
 	}()
 	s.logger.Info("deleting sessions", "count", len(normalized))
-	s.CancelConnectForSessions(normalized)
-	s.closeTerminalsForSessions(normalized)
-	s.stopTunnelsForSessions(normalized)
-	s.cancelTransfersForSessions(normalized)
-	s.DisconnectForSessions(normalized)
-	if err := store.DeleteSessions(s.db, normalized); err != nil {
+	releaseConnectGuard := s.beginSessionDeletion(normalized)
+	defer releaseConnectGuard()
+	releaseTerminalGuard := s.guardTerminalOpensForDeletion(normalized)
+	defer releaseTerminalGuard()
+	releaseTunnelGuard := s.guardTunnelStartsForDeletion(normalized)
+	defer releaseTunnelGuard()
+	if err := s.prepareSessionsForDeletion(normalized); err != nil {
+		s.logger.Error("prepare sessions deletion failed", "error", err)
+		return 0, err
+	}
+	err = s.normalizeSessionDeleteError(
+		store.DeleteSessionsWithRecordingDirectory(s.db, normalized, s.recordingsDirectory()),
+	)
+	if err != nil {
 		s.logger.Error("delete sessions failed", "error", err)
 		return 0, err
 	}
@@ -57,7 +84,51 @@ func (s *SessionService) DeleteSessions(ids []int64) (int, error) {
 	return len(normalized), nil
 }
 
+func (s *SessionService) prepareSessionsForDeletion(sessionIDs []int64) error {
+	s.CancelConnectForSessions(sessionIDs)
+	terminalErr := s.closeTerminalsForSessions(sessionIDs)
+	tunnelErr := s.stopTunnelsForSessions(sessionIDs)
+	s.cancelTransfersForSessions(sessionIDs)
+	connectionErr := s.DisconnectForSessions(sessionIDs)
+	var cleanupErr error
+	if terminalErr != nil {
+		cleanupErr = errors.Join(cleanupErr, fmt.Errorf("close session terminals: %w", terminalErr))
+	}
+	if tunnelErr != nil {
+		cleanupErr = errors.Join(cleanupErr, fmt.Errorf("stop session tunnels: %w", tunnelErr))
+	}
+	if connectionErr != nil {
+		cleanupErr = errors.Join(cleanupErr, fmt.Errorf("disconnect session connections: %w", connectionErr))
+	}
+	return cleanupErr
+}
+
+func (s *SessionService) normalizeSessionDeleteError(err error) error {
+	if err == nil {
+		return nil
+	}
+	if !errors.Is(err, store.ErrRecordingCleanupDeferred) {
+		return err
+	}
+	if s.logger != nil {
+		s.logger.Warn("session recordings pending maintenance cleanup", "error", err)
+	}
+	return nil
+}
+
+func (s *SessionService) recordingsDirectory() string {
+	if strings.TrimSpace(s.dataDir) == "" {
+		return ""
+	}
+	return filepath.Join(s.dataDir, "recordings")
+}
+
 func (s *SessionService) SessionsDeleteImpact(ids []int64) (*model.SessionDeleteImpact, error) {
+	finish, err := s.beginOperation()
+	if err != nil {
+		return nil, err
+	}
+	defer finish()
 	normalized, err := normalizedSessionIDs(ids)
 	if err != nil {
 		return nil, err
@@ -107,6 +178,11 @@ func normalizedSessionIDs(ids []int64) ([]int64, error) {
 }
 
 func (s *SessionService) SessionDeleteImpact(id int64) (*model.SessionDeleteImpact, error) {
+	finish, err := s.beginOperation()
+	if err != nil {
+		return nil, err
+	}
+	defer finish()
 	if id <= 0 {
 		return nil, fmt.Errorf("invalid session id")
 	}

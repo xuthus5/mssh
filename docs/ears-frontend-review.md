@@ -26,7 +26,7 @@
 | P0 | 终端池 LRU 驱逐可能静默关闭仍在 Tab 中的终端 | **已闭环**：Open 前 `ensureTerminalPoolCapacity`；orphan 优先；保护 Tab 需 confirm；toast 提示可从会话列表重连；见 `terminalPoolReclaim.ts` |
 | P0 | 云同步成功后 `window.location.reload()` 硬刷新 | **已闭环**：热更新 workspace；失败 confirm 后才 hard reload |
 | P1 | 大列表无虚拟化（会话树 / 文件列表 / 命令历史） | **已闭环**：VirtualList / computeVirtualWindow |
-| P1 | 终端层保留全部不可见 Tab DOM | **已闭环 soft-throttle**：保活 write；停 cursorBlink；激活恢复 fit（未默认 detach） |
+| P1 | 终端层保留全部不可见 Tab DOM | **已闭环 soft-throttle + 无损背压**：保活 write；停 cursorBlink；xterm 高/低水位联动 PTY pause/resume；激活恢复 fit（未默认 detach） |
 | P1 | 状态栏每秒 + 系统信息 3s 轮询导致底部区域高频重渲染 | **已闭环**：子组件隔离 + visibility 停轮询 |
 | P1 | 类型安全缺口与空 catch | **已闭环**：typed transferDTO + logger 错误 |
 | P1 | 代码规模门禁局部突破 | **已闭环**：check-source-limits.mjs 门禁 |
@@ -91,6 +91,7 @@
 | FE-PERF-008 | 当用户调整面板宽度时，拖拽过程必须仅更新必要样式（transform/width），避免每次 pointermove 触发重型子树协调。 | done | useResizablePanel/useToolPanelResize pointermove rAF 合并 |
 | FE-PERF-009 | 当路由/窗口切换到设置独立窗时，主窗口终端资源不得被错误销毁；两窗状态同步不得全量 reload。 | done | main.tsx settings 独立入口，不销毁主窗终端树 |
 | FE-PERF-010 | 当打包生产构建时，系统必须保持终端/SFTP/回放等重模块懒加载，并监控主包体积回归。 | done | TerminalLayers lazy 保持；见 frontend-performance-notes.md |
+| FE-PERF-011 | 当终端输出速率超过 xterm 解析速率时，前端必须以高/低水位串行化写入并请求后端暂停/恢复，卸载或退出时释放暂停状态，不得丢失输出。 | done | `TerminalOutputFlowControl` + `terminalOutputRuntime.flow.test.ts`；后端 `SetOutputPaused` 配套 |
 
 ---
 
@@ -177,7 +178,7 @@
 
 以下不是缺陷清单，而是产品增强方向（随本轮持续收敛）：
 
-1. ~~终端海量输出：非活动 Tab 有界合并写~~ **已做**：`TerminalOutputCoalescer` + 激活 flush + metrics；更完整活动 Tab 背压 UI 仍可选。
+1. ~~终端海量输出：非活动 Tab 有界合并写~~ **已做**：`TerminalOutputCoalescer` + 激活 flush + `TerminalOutputFlowControl` 高/低水位无损背压 + metrics；真机 FPS/long-task 抽样仍属非阻塞产品增强。
 2. ~~文件树大数据集虚拟化~~ **已做**（>80 `VirtualList`）；真机 FPS/long-task 抽样可选。
 3. ~~宏工作区：对当前活动终端一键执行~~ **已做**；多宏批量执行仍可选。
 4. ~~主包体积预算 CI~~ **已做轻量门禁**（`check:bundle-budget`：禁止 App 静态 xterm、保持 lazy 重模块）。
@@ -186,3 +187,14 @@
 7. ~~敏感命令过滤矩阵扩展~~ **已做**（可继续按产品场景补模式）。
 
 **停止条件（本目标）**：P0/P1 缺陷已闭环；前端测试/source-limits/bundle-budget/`wails3 build` 通过；残留仅增强项。
+
+## 12. 2026-07-26 异步与动态 i18n 收口
+
+| ID | EARS 验收条件 | 状态 | 证据 / 备注 |
+|---|---|---|---|
+| FE-ASYNC-011 | 当同一组件收到快速重复提交时，必须使用请求锁或单飞代际，确保同一后端 mutation 只执行一次。 | done | SessionDialog、TunnelDialog、QuickCommands、SessionLog 增加 ref 单飞锁及回归用例 |
+| FE-ASYNC-012 | 当组件目标、会话或打开状态变化时，旧 Promise 完成不得写入当前 state；关闭后不得恢复旧 pending/error。 | done | 对话框、资产中心、录制列表使用 lifecycle/generation/request 校验 |
+| FE-ASYNC-013 | 当资产中心动作并发发生时，重复动作必须去重，旧失败不得覆盖较新的动作结果。 | done | 动作键集合 + 最新 request owner；删除确认由 dialog inline alert 承接 |
+| FE-ASYNC-014 | 当 AI 提供商保存期间用户继续编辑时，后端响应不得覆盖未提交草稿；切换提供商后旧响应不得回切目标。 | done | draft revision/dirty gate + target generation |
+| FE-I18N-002 | 当语言运行时切换时，所有 UI 翻译必须从当前语言读取；模块级 `t()` 与 `useState(t())` 必须由 AST 守卫阻断。 | done | `staticTranslationGuard.test.ts` + 动态词条修复 |
+| FE-QA-004 | 当提交本轮前端改动时，必须通过 TypeScript、source-limits、bundle-budget、Vitest 及完整项目 CI 门禁。 | done | `wails3 task ci` EXIT 0；186 个测试文件、1148 个用例通过；source-limits、bundle-budget 与生产构建通过 |

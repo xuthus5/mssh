@@ -3,6 +3,7 @@ import Sidebar from '@/components/layout/Sidebar'
 import StatusBar from '@/components/layout/StatusBar'
 import { ToastContainer, toast } from '@/components/ui/toast'
 import { ConnectDialog } from '@/components/layout/ConnectDialog'
+import { HostKeyPromptDialog } from '@/components/layout/HostKeyPromptDialog'
 import { useAppStore, type AppState, type Tab } from '@/store/appStore'
 import { logger } from '@/lib/logger'
 import { WindowTitleBar } from '@/components/layout/WindowTitleBar'
@@ -49,14 +50,21 @@ function activeTerminalID(state: AppState): string | null {
   return tab?.type === 'terminal' ? tab.terminalId : null
 }
 
+function terminalEntryIsCurrent(terminalID: string | null, entry: NonNullable<ReturnType<typeof activeTerminalEntry>>): boolean {
+  if (!terminalID) return false
+  return useAppStore.getState().terminalPool.get(terminalID)?.terminal === entry.terminal
+}
+
 function copySelection(state: AppState): boolean {
   const entry = activeTerminalEntry(state)
-  const selection = entry?.terminal.getSelection()
+  if (!entry) return false
+  const selection = entry.terminal.getSelection()
   if (!selection) return false
   const terminalID = activeTerminalID(state)
   getClipboard().writeText(selection)
     .then(() => logger.debug('Shortcut: Ctrl+Shift+C: copied selection'))
     .catch((error: unknown) => {
+      if (!terminalEntryIsCurrent(terminalID, entry)) return
       logger.error('shortcut copy failed', error)
       reportTerminalClipboardError(
         t('复制失败: ${}', error instanceof Error ? error.message : String(error)),
@@ -71,8 +79,13 @@ function pasteClipboard(state: AppState) {
   if (!entry) return
   const terminalID = activeTerminalID(state)
   getClipboard().readText()
-    .then((text) => { entry.terminal.paste(text); logger.debug('Shortcut: Ctrl+Shift+V: pasted') })
+    .then((text) => {
+      if (!terminalEntryIsCurrent(terminalID, entry)) return
+      entry.terminal.paste(text)
+      logger.debug('Shortcut: Ctrl+Shift+V: pasted')
+    })
     .catch((error: unknown) => {
+      if (!terminalEntryIsCurrent(terminalID, entry)) return
       logger.error('shortcut paste failed', error)
       reportTerminalClipboardError(
         t('粘贴失败: ${}', error instanceof Error ? error.message : String(error)),
@@ -178,6 +191,7 @@ function AppShell() {
       <ToastContainer />
       <ConfirmDialogHost />
       <ConnectDialog />
+      <HostKeyPromptDialog />
       <SessionQuickSearchHost />
     </>
   )

@@ -2,6 +2,7 @@ package store
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
@@ -49,6 +50,18 @@ func GetThemeDefinition(db themeDB, id int64) (*model.ThemeDefinition, error) {
 	definition, err := scanThemeDefinition(row)
 	if err != nil {
 		return nil, fmt.Errorf("get theme definition: %w", err)
+	}
+	return &definition, nil
+}
+
+func FindThemeDefinitionByFingerprint(db themeDB, fingerprint string) (*model.ThemeDefinition, error) {
+	row := db.QueryRow(`SELECT id, name, mode, source_type, source_name, source_url, source_author, source_license, source_version, source_fingerprint, color_payload, raw_payload, is_builtin, created_at, updated_at FROM themes WHERE source_fingerprint = ?`, fingerprint)
+	definition, err := scanThemeDefinition(row)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("find theme definition by fingerprint: %w", err)
 	}
 	return &definition, nil
 }

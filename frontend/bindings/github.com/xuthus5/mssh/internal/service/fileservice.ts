@@ -17,10 +17,6 @@ import * as model$0 from "../model/models.js";
 // @ts-ignore: Unused imports
 import * as ssh$0 from "../ssh/models.js";
 
-export function CancelAll(): $CancellablePromise<void> {
-    return $Call.ByName("github.com/xuthus5/mssh/internal/service.FileService.CancelAll");
-}
-
 /**
  * CancelTransfer cancels an in-progress file transfer.
  */

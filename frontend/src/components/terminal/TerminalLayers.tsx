@@ -1,29 +1,22 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
-import { Dialogs, Events } from '@wailsio/runtime'
 import { Spinner } from '@/components/ui/spinner'
 import { TerminalErrorBoundary } from '@/components/terminal/TerminalErrorBoundary'
-import { useFileTransfer } from '@/hooks/useFileTransfer'
 import { useSFTPSettings } from '@/hooks/useSFTPSettings'
-import { MANUAL_TERMINAL_DIRECTORY_REPORT, waitForTerminalWorkingDirectory } from '@/hooks/terminalDirectoryRuntime'
 import type { TerminalFocusRequest } from '@/hooks/useTerminal'
 import { useAppStore, type AppState, type Tab } from '@/store/appStore'
-import { useSFTPSettingsStore } from '@/store/sftpSettingsStore'
-import { useTerminalDirectoryStore } from '@/store/terminalDirectoryStore'
-import { TerminalService } from '@/lib/wails'
-import { toast } from '@/components/ui/toast'
 import { dynamicPanelID, dynamicTabID } from '@/store/tabNavigation'
 import { TabCloseConfirmation, useTabCloseCoordinator } from '@/hooks/useTabCloseCoordinator'
-import { t } from '@/i18n'
-
+import { useFilePanelRuntime } from '@/components/terminal/useFilePanelRuntime'
 
 const TerminalTab = lazy(() => import('@/components/terminal/TerminalTab').then((module) => ({ default: module.TerminalTab })))
 const PlaybackTab = lazy(() => import('@/components/terminal/PlaybackTab').then((module) => ({ default: module.PlaybackTab })))
 const FilePanel = lazy(() => import('@/components/file/FilePanel'))
 
-type FileTransfer = ReturnType<typeof useFileTransfer>
+type FileTransfer = ReturnType<typeof useFilePanelRuntime>['transfer']
 const noFocusRequest: TerminalFocusRequest = { sequence: 0, targetTerminalID: null }
 
-function useLayerFocusRequest(tab: Tab, active: boolean, focusRequest: AppState['focusRequest'], activePaneID: string | null, lastActiveTerminalTabID: string | null) {
+function useLayerFocusRequest(...args: [Tab, boolean, AppState['focusRequest'], string | null, string | null]) {
+  const [tab, active, focusRequest, activePaneID, lastActiveTerminalTabID] = args
   const resolvedRequestRef = useRef<TerminalFocusRequest>(noFocusRequest)
   if (tab.type !== 'terminal' || focusRequest.id !== tab.id || focusRequest.sequence === 0) return noFocusRequest
   if (resolvedRequestRef.current.sequence !== focusRequest.sequence) {
@@ -37,9 +30,10 @@ function useLayerFocusRequest(tab: Tab, active: boolean, focusRequest: AppState[
   return resolvedRequestRef.current
 }
 
-function FilePanelView({ transfer, actionError, onClose, onUpload, onDownload, dropTargetID, showHiddenFiles, defaultView, onLoadDirectory, onSyncCurrentDirectory, syncingCurrentDirectory }: {
+function FilePanelView({ transfer, actionError, transferActionPending, onClose, onUpload, onDownload, dropTargetID, showHiddenFiles, defaultView, onLoadDirectory, onSyncCurrentDirectory, syncingCurrentDirectory }: {
   transfer: FileTransfer
   actionError: string
+  transferActionPending: 'upload' | 'download' | null
   onClose: () => void
   onUpload: () => void
   onDownload: (path: string) => void
@@ -57,99 +51,21 @@ function FilePanelView({ transfer, actionError, onClose, onUpload, onDownload, d
         onNavigateUp={transfer.navigateUp} onDelete={transfer.deleteFile} onRename={transfer.renameFile}
         onMakeDir={transfer.makeDir} onUpload={onUpload} onDownload={onDownload} dropTargetId={dropTargetID}
         showHiddenFiles={showHiddenFiles} defaultView={defaultView} onLoadDirectory={onLoadDirectory}
-        onSyncCurrentDirectory={onSyncCurrentDirectory} syncingCurrentDirectory={syncingCurrentDirectory} />
+        transferActionPending={transferActionPending} onSyncCurrentDirectory={onSyncCurrentDirectory}
+        syncingCurrentDirectory={syncingCurrentDirectory} catalogRevision={transfer.catalogRevision}
+        externalCatalogRevision={transfer.externalCatalogRevision} directoryMutationBusy={transfer.directoryMutationBusy}
+        isMutationBusy={(file) => transfer.isMutationBusy(file.path, file.isDir)} />
     </Suspense>
   )
 }
 
 function FilePanelContainer({ sessionID, terminalID, onClose }: { sessionID: number; terminalID: string; onClose: () => void }) {
-  const transfer = useFileTransfer(sessionID)
-  const showHiddenFiles = useSFTPSettingsStore((state) => state.showHiddenFiles)
-  const followTerminalDirectory = useSFTPSettingsStore((state) => state.followTerminalDirectory)
-  const defaultView = useSFTPSettingsStore((state) => state.defaultView)
-  const terminalDirectory = useTerminalDirectoryStore((state) => state.directories[terminalID])
-  const dropTargetID = `sftp-drop-zone-${terminalID}`
-  const loadedInitialPath = useRef(false)
-  const [syncingCurrentDirectory, setSyncingCurrentDirectory] = useState(false)
-  const [actionError, setActionError] = useState('')
-
-  useEffect(() => {
-    // listFiles owns panel error state; do not wrap with toast (single-owner rule).
-    if (!loadedInitialPath.current) {
-      loadedInitialPath.current = true
-      void transfer.listFiles(followTerminalDirectory && terminalDirectory ? terminalDirectory : '/')
-      return
-    }
-    if (followTerminalDirectory && terminalDirectory) {
-      void transfer.listFiles(terminalDirectory)
-    }
-  }, [followTerminalDirectory, terminalDirectory, transfer.listFiles])
-
-  const syncCurrentDirectory = useCallback(async () => {
-    if (syncingCurrentDirectory) return
-    setSyncingCurrentDirectory(true)
-    setActionError('')
-    const previousRevision = useTerminalDirectoryStore.getState().revisions[terminalID] ?? 0
-    try {
-      await TerminalService.Write(terminalID, MANUAL_TERMINAL_DIRECTORY_REPORT)
-      const path = await waitForTerminalWorkingDirectory(terminalID, previousRevision)
-      if (!followTerminalDirectory || path === transfer.currentPath) await transfer.listFiles(path)
-      toast(t('已同步当前目录: ${}', path), 'success')
-    } catch (error) {
-      setActionError(t('同步当前目录失败: ${}', error instanceof Error ? error.message : String(error)))
-    } finally {
-      setSyncingCurrentDirectory(false)
-    }
-  }, [followTerminalDirectory, syncingCurrentDirectory, terminalID, transfer.currentPath, transfer.listFiles])
-  useEffect(() => Events.On('sftp:files-dropped', (event: { data?: { files?: string[]; details?: { id?: string } } }) => {
-    const files = event.data?.files ?? []
-    const targetID = event.data?.details?.id
-    if (files.length === 0 || targetID !== dropTargetID) return
-    setActionError('')
-    void transfer.uploadMany(files, transfer.currentPath).catch((error: unknown) => {
-      setActionError(t('上传失败: ${}', error instanceof Error ? error.message : String(error)))
-    })
-  }), [dropTargetID, transfer.currentPath, transfer.uploadMany])
-
-  const handleUpload = useCallback(async () => {
-    let localPath = ''
-    setActionError('')
-    try {
-      const selected = await Dialogs.OpenFile({ Title: t('选择要上传的文件'), CanChooseFiles: true, CanChooseDirectories: false, AllowsMultipleSelection: false })
-      localPath = typeof selected === 'string' ? selected : selected?.[0] ?? ''
-    } catch (error) {
-      setActionError(t('选择上传文件失败: ${}', error instanceof Error ? error.message : String(error)))
-      return
-    }
-    if (!localPath) return
-    try {
-      await transfer.upload(localPath, transfer.currentPath)
-    } catch (error) {
-      setActionError(t('上传失败: ${}', error instanceof Error ? error.message : String(error)))
-    }
-  }, [transfer.currentPath, transfer.upload])
-
-  const handleDownload = useCallback(async (remotePath: string) => {
-    let localPath = ''
-    setActionError('')
-    try {
-      localPath = await Dialogs.SaveFile({ Title: t('选择下载位置'), Filename: remotePath.split('/').pop() ?? 'download', CanCreateDirectories: true }) ?? ''
-    } catch (error) {
-      setActionError(t('选择下载位置失败: ${}', error instanceof Error ? error.message : String(error)))
-      return
-    }
-    if (!localPath) return
-    try {
-      await transfer.download(remotePath, localPath)
-    } catch (error) {
-      setActionError(t('下载失败: ${}', error instanceof Error ? error.message : String(error)))
-    }
-  }, [transfer.download])
-
-  return <FilePanelView transfer={transfer} actionError={actionError} onClose={onClose} onUpload={() => { void handleUpload() }}
-    onDownload={(path) => { void handleDownload(path) }} dropTargetID={dropTargetID} showHiddenFiles={showHiddenFiles}
-    defaultView={defaultView} onLoadDirectory={transfer.loadDirectory} onSyncCurrentDirectory={() => { void syncCurrentDirectory() }}
-    syncingCurrentDirectory={syncingCurrentDirectory} />
+  const runtime = useFilePanelRuntime(sessionID, terminalID)
+  return <FilePanelView transfer={runtime.transfer} actionError={runtime.actionError} transferActionPending={runtime.transferActionPending}
+    onClose={onClose} onUpload={() => { void runtime.handleUpload() }}
+    onDownload={(path) => { void runtime.handleDownload(path) }} dropTargetID={runtime.dropTargetID} showHiddenFiles={runtime.showHiddenFiles}
+    defaultView={runtime.defaultView} onLoadDirectory={runtime.transfer.loadDirectory} onSyncCurrentDirectory={() => { void runtime.syncCurrentDirectory() }}
+    syncingCurrentDirectory={runtime.syncingCurrentDirectory} />
 }
 
 function DynamicLayer({ tab, active, activePaneID, fileTargetID, lastActiveTerminalTabID, filePanelOpen, onToggleFiles, onPaneClosed, onPaneReplaced, onCloseFiles, focusRequest, onClose }: {
@@ -186,25 +102,12 @@ function DynamicLayer({ tab, active, activePaneID, fileTargetID, lastActiveTermi
   )
 }
 
-export function TerminalLayers() {
-  useSFTPSettings()
-  const tabs = useAppStore((state) => state.tabs)
-  const activeSurface = useAppStore((state) => state.activeSurface)
-  const focusRequest = useAppStore((state) => state.focusRequest)
-  const activePaneID = useAppStore((state) => state.activePaneId)
-  const updateTerminalWorkspace = useAppStore((state) => state.updateTerminalWorkspace)
+function useFilePanelTargets(tabs: Tab[], updateTerminalWorkspace: AppState['updateTerminalWorkspace']) {
   const [fileTargets, setFileTargets] = useState<Record<string, string>>({})
-  const lastActiveTerminalTabIDRef = useRef<string | null>(null)
-  const closeCoordinator = useTabCloseCoordinator()
-
-  useEffect(() => {
-    if (activeSurface?.type === 'terminal') lastActiveTerminalTabIDRef.current = activeSurface.id
-  }, [activeSurface])
   useEffect(() => {
     const tabIDs = new Set(tabs.map((tab) => tab.id))
     setFileTargets((current) => Object.fromEntries(Object.entries(current).filter(([tabID]) => tabIDs.has(tabID))))
   }, [tabs])
-
   const toggleFiles = useCallback((tabID: string, terminalID: string) => {
     const tab = useAppStore.getState().tabs.find((item) => item.id === tabID)
     if (tab?.type !== 'terminal' || tab.connectionKind === 'serial' || tab.connectionKind === 'local') return
@@ -212,11 +115,9 @@ export function TerminalLayers() {
     setFileTargets((current) => opening ? { ...current, [tabID]: terminalID } : current)
     updateTerminalWorkspace(tabID, { toolPanel: opening ? 'files' : null })
   }, [fileTargets, updateTerminalWorkspace])
-
   const closeFiles = useCallback((tabID: string) => {
     updateTerminalWorkspace(tabID, { toolPanel: null })
   }, [updateTerminalWorkspace])
-
   const handlePaneClosed = useCallback((tabID: string, terminalID: string) => {
     if (fileTargets[tabID] !== terminalID) return
     setFileTargets((current) => {
@@ -226,20 +127,34 @@ export function TerminalLayers() {
     })
     updateTerminalWorkspace(tabID, { toolPanel: null })
   }, [fileTargets, updateTerminalWorkspace])
-
   const handlePaneReplaced = useCallback((tabID: string, previousID: string, nextID: string) => {
-    if (fileTargets[tabID] !== previousID) return
-    setFileTargets((current) => ({ ...current, [tabID]: nextID }))
+    if (fileTargets[tabID] === previousID) setFileTargets((current) => ({ ...current, [tabID]: nextID }))
   }, [fileTargets])
+  return { fileTargets, toggleFiles, closeFiles, handlePaneClosed, handlePaneReplaced }
+}
 
+export function TerminalLayers() {
+  useSFTPSettings()
+  const tabs = useAppStore((state) => state.tabs)
+  const activeSurface = useAppStore((state) => state.activeSurface)
+  const focusRequest = useAppStore((state) => state.focusRequest)
+  const activePaneID = useAppStore((state) => state.activePaneId)
+  const updateTerminalWorkspace = useAppStore((state) => state.updateTerminalWorkspace)
+  const files = useFilePanelTargets(tabs, updateTerminalWorkspace)
+  const lastActiveTerminalTabIDRef = useRef<string | null>(null)
+  const closeCoordinator = useTabCloseCoordinator()
+
+  useEffect(() => {
+    if (activeSurface?.type === 'terminal') lastActiveTerminalTabIDRef.current = activeSurface.id
+  }, [activeSurface])
   return <>{tabs.map((tab) => <DynamicLayer key={tab.id} tab={tab}
     active={activeSurface?.type === tab.type && activeSurface.id === tab.id}
     activePaneID={activePaneID} lastActiveTerminalTabID={lastActiveTerminalTabIDRef.current}
-    fileTargetID={fileTargets[tab.id] ?? null}
-    filePanelOpen={tab.type === 'terminal' && (tab.connectionKind ?? 'ssh') === 'ssh' && tab.toolPanel === 'files'} onToggleFiles={(terminalID) => toggleFiles(tab.id, terminalID)}
-    onPaneClosed={(terminalID) => handlePaneClosed(tab.id, terminalID)}
-    onPaneReplaced={(previousID, nextID) => handlePaneReplaced(tab.id, previousID, nextID)}
-    focusRequest={focusRequest} onCloseFiles={() => closeFiles(tab.id)}
+    fileTargetID={files.fileTargets[tab.id] ?? null}
+    filePanelOpen={tab.type === 'terminal' && (tab.connectionKind ?? 'ssh') === 'ssh' && tab.toolPanel === 'files'} onToggleFiles={(terminalID) => files.toggleFiles(tab.id, terminalID)}
+    onPaneClosed={(terminalID) => files.handlePaneClosed(tab.id, terminalID)}
+    onPaneReplaced={(previousID, nextID) => files.handlePaneReplaced(tab.id, previousID, nextID)}
+    focusRequest={focusRequest} onCloseFiles={() => files.closeFiles(tab.id)}
     onClose={() => closeCoordinator.requestClose(tab.id)} />)}
     <TabCloseConfirmation {...closeCoordinator.confirmation} />
   </>

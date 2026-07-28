@@ -1,32 +1,101 @@
 package service
 
 import (
-	"errors"
+	"fmt"
 	"strings"
+	"unicode/utf8"
+)
+
+const (
+	maxSessionPasswordBytes           = 64 * 1024
+	sessionPasswordCiphertextOverhead = aesGCMEnvelopeOverhead
+	maxSessionPasswordPayloadBytes    = ((maxSessionPasswordBytes + aesGCMEnvelopeOverhead + 2) / 3) * 4
+	maxStoredSessionPasswordBytes     = len(sessionPasswordPrefix) + maxSessionPasswordPayloadBytes
 )
 
 func sealSessionPassword(c KeyCrypto, plain string) (string, error) {
 	if plain == "" {
 		return "", nil
 	}
-	sealed, err := c.Encrypt([]byte(plain))
+	if err := validatePlainSessionPassword(plain); err != nil {
+		return "", err
+	}
+	if err := requireSessionPasswordCrypto(c); err != nil {
+		return "", err
+	}
+	plaintext := []byte(plain)
+	defer clear(plaintext)
+	sealed, err := c.Encrypt(plaintext)
 	if err != nil {
 		return "", err
 	}
-	return sessionPasswordPrefix + string(sealed), nil
+	defer clear(sealed)
+	if len(sealed) > maxSessionPasswordPayloadBytes {
+		return "", fmt.Errorf("encrypted session password exceeds %d bytes", maxSessionPasswordPayloadBytes)
+	}
+	stored := sessionPasswordPrefix + strings.Clone(string(sealed))
+	if err := validateStoredSessionPassword(stored); err != nil {
+		return "", fmt.Errorf("invalid encrypted session password: %w", err)
+	}
+	return stored, nil
 }
 
 func openSessionPassword(c KeyCrypto, stored string) (string, error) {
 	if stored == "" {
 		return "", nil
 	}
-	if !strings.HasPrefix(stored, sessionPasswordPrefix) {
-		// Fresh install policy stores only enc1; treat unexpected values as error.
-		return "", errors.New("session password is not encrypted with application vault")
+	if err := validateStoredSessionPassword(stored); err != nil {
+		return "", err
 	}
-	plain, err := c.Decrypt([]byte(strings.TrimPrefix(stored, sessionPasswordPrefix)))
+	if err := requireSessionPasswordCrypto(c); err != nil {
+		return "", err
+	}
+	payload := []byte(strings.TrimPrefix(stored, sessionPasswordPrefix))
+	defer clear(payload)
+	plain, err := c.Decrypt(payload)
 	if err != nil {
 		return "", err
 	}
-	return string(plain), nil
+	defer clear(plain)
+	if len(plain) > maxSessionPasswordBytes {
+		return "", fmt.Errorf("session password exceeds %d bytes", maxSessionPasswordBytes)
+	}
+	if !utf8.Valid(plain) {
+		return "", fmt.Errorf("session password must be valid UTF-8")
+	}
+	return strings.Clone(string(plain)), nil
+}
+
+func requireSessionPasswordCrypto(c KeyCrypto) error {
+	if c == nil {
+		return ErrVaultLocked
+	}
+	if runtime, ok := c.(*CryptoRuntime); ok {
+		return runtime.RequireUnlocked()
+	}
+	return nil
+}
+
+func validateStoredSessionPassword(stored string) error {
+	if stored == "" {
+		return nil
+	}
+	if len(stored) > maxStoredSessionPasswordBytes {
+		return fmt.Errorf("encrypted session password exceeds %d bytes", maxStoredSessionPasswordBytes)
+	}
+	if !strings.HasPrefix(stored, sessionPasswordPrefix) {
+		return fmt.Errorf("session password is not encrypted with application vault")
+	}
+	payload := strings.TrimPrefix(stored, sessionPasswordPrefix)
+	return validateBase64AESGCMEnvelope(payload, maxSessionPasswordBytes, "session password ciphertext")
+}
+
+func validatePlainSessionPassword(password string) error {
+	if !utf8.ValidString(password) {
+		return fmt.Errorf("session password must be valid UTF-8")
+	}
+	if len(password) > maxSessionPasswordBytes {
+		return fmt.Errorf("session password exceeds %d bytes", maxSessionPasswordBytes)
+	}
+	return nil
 }

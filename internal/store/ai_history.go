@@ -92,13 +92,17 @@ func DeleteAIConversation(db *sql.DB, id int64) error {
 }
 
 func PruneAIConversations(db *sql.DB, retentionDays, maxConversations int) error {
+	return pruneAIConversations(db, retentionDays, maxConversations)
+}
+
+func pruneAIConversations(execer aiExecer, retentionDays, maxConversations int) error {
 	if retentionDays > 0 {
-		if _, err := db.Exec(`DELETE FROM ai_conversations WHERE updated_at < datetime('now', ?)`, fmt.Sprintf("-%d days", retentionDays)); err != nil {
+		if _, err := execer.Exec(`DELETE FROM ai_conversations WHERE updated_at < datetime('now', ?)`, fmt.Sprintf("-%d days", retentionDays)); err != nil {
 			return fmt.Errorf("prune ai conversations by age: %w", err)
 		}
 	}
 	if maxConversations > 0 {
-		if _, err := db.Exec(`DELETE FROM ai_conversations WHERE id NOT IN (SELECT id FROM ai_conversations ORDER BY updated_at DESC LIMIT ?)`, maxConversations); err != nil {
+		if _, err := execer.Exec(`DELETE FROM ai_conversations WHERE id NOT IN (SELECT id FROM ai_conversations ORDER BY updated_at DESC LIMIT ?)`, maxConversations); err != nil {
 			return fmt.Errorf("prune ai conversations by count: %w", err)
 		}
 	}

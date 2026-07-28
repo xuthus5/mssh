@@ -1,86 +1,77 @@
 package service
 
 import (
+	"errors"
+	"fmt"
 	"time"
-
-	"github.com/xuthus5/mssh/pkg/event"
 )
 
-type evictedTerminal struct {
-	terminalID   string
-	pty          terminalIO
-	connID       string
-	closeHandler func(string)
-}
-
 func (t *TerminalService) evictLRU() {
+	t.resourceMu.Lock()
 	t.mu.Lock()
-	evicted := t.detachLRUVictimLocked()
-	t.mu.Unlock()
-	t.finishEviction(evicted)
-}
-
-func (t *TerminalService) detachLRUVictimLocked() evictedTerminal {
 	victimID := t.pickLRUVictimLocked()
-	if victimID == "" {
-		return evictedTerminal{}
+	t.mu.Unlock()
+	var err error
+	if victimID != "" {
+		err = t.closeTerminalStateLocked(victimID, true, "evicted")
 	}
-
-	dispatcher := t.lockOutputDispatcher(victimID)
-	t.outputMu.Lock()
-	evicted := evictedTerminal{
-		terminalID:   victimID,
-		pty:          t.ptys[victimID],
-		connID:       t.connIDs[victimID],
-		closeHandler: t.closeHandler,
+	t.resourceMu.Unlock()
+	if err != nil {
+		t.logger.Debug("evicted terminal cleanup failed", "terminalID", victimID, "error", err)
 	}
-	delete(t.ptys, victimID)
-	delete(t.lastUsed, victimID)
-	delete(t.attached, victimID)
-	delete(t.pendingOutput, victimID)
-	delete(t.outputSequences, victimID)
-	delete(t.connIDs, victimID)
-	delete(t.sessionIDs, victimID)
-	t.outputMu.Unlock()
-	t.unlockOutputDispatcher(victimID, dispatcher)
-	return evicted
 }
 
-func (t *TerminalService) finishEviction(evicted evictedTerminal) {
-	if evicted.terminalID == "" {
-		return
-	}
-	t.deleteSystemSample(evicted.terminalID)
-	if evicted.pty != nil {
-		if err := evicted.pty.Close(); err != nil {
-			t.logger.Debug("evicted terminal close failed", "terminalID", evicted.terminalID, "error", err)
+func (t *TerminalService) reduceTerminalCountLocked(maxCount int) error {
+	attempted := make(map[string]struct{})
+	var evictionErr error
+	for t.Count() > maxCount {
+		victimID := t.pickLRUVictimExcluding(attempted)
+		if victimID == "" {
+			break
+		}
+		attempted[victimID] = struct{}{}
+		if err := t.closeTerminalStateLocked(victimID, true, "evicted"); err != nil {
+			evictionErr = errors.Join(evictionErr, fmt.Errorf("evict terminal %s: %w", victimID, err))
 		}
 	}
-	t.releaseSerialDevice(evicted.terminalID, evicted.pty)
-	if evicted.closeHandler != nil {
-		evicted.closeHandler(evicted.terminalID)
+	if count := t.Count(); count > maxCount {
+		evictionErr = errors.Join(evictionErr, fmt.Errorf("terminal pool has %d resources, target is %d", count, maxCount))
 	}
-	if t.sessionSvc != nil && evicted.connID != "" {
-		if err := t.sessionSvc.disconnect(evicted.connID, false); err != nil {
-			t.logger.Debug("evicted terminal connection cleanup failed", "terminalID", evicted.terminalID, "error", err)
-		}
-	}
-	t.eventBus.Emit(event.TerminalClosed, event.ConnectionStatePayload{TerminalID: evicted.terminalID, State: "evicted"})
+	return evictionErr
+}
+
+func (t *TerminalService) pickLRUVictimExcluding(excluded map[string]struct{}) string {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.pickLRUVictimExcludingLocked(excluded)
 }
 
 // pickLRUVictim prefers terminals that are not currently attached to the UI.
 func (t *TerminalService) pickLRUVictim() string {
-	t.mu.RLock()
-	defer t.mu.RUnlock()
+	t.mu.Lock()
+	defer t.mu.Unlock()
 	return t.pickLRUVictimLocked()
 }
 
 func (t *TerminalService) pickLRUVictimLocked() string {
+	return t.pickLRUVictimExcludingLocked(nil)
+}
+
+func (t *TerminalService) pickLRUVictimExcludingLocked(excluded map[string]struct{}) string {
+	for id := range t.lastUsed {
+		if _, active := t.ptys[id]; !active {
+			delete(t.lastUsed, id)
+		}
+	}
 	var orphanID string
 	var orphanTime time.Time
 	var attachedID string
 	var attachedTime time.Time
-	for id, usedAt := range t.lastUsed {
+	for id := range t.ptys {
+		if _, skip := excluded[id]; skip {
+			continue
+		}
+		usedAt := t.lastUsed[id]
 		if !t.attached[id] {
 			if orphanID == "" || usedAt.Before(orphanTime) {
 				orphanID = id
@@ -97,4 +88,36 @@ func (t *TerminalService) pickLRUVictimLocked() string {
 		return orphanID
 	}
 	return attachedID
+}
+
+//wails:ignore
+func (t *TerminalService) Count() int {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	return len(t.ptys)
+}
+
+//wails:ignore
+func (t *TerminalService) MaxSize() int {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	return t.maxSize
+}
+
+func (t *TerminalService) SetMaxSize(maxSize int) error {
+	if maxSize <= 0 {
+		return fmt.Errorf("max terminal pool size must be greater than zero")
+	}
+	finish, err := t.beginOperation()
+	if err != nil {
+		return err
+	}
+	defer finish()
+	t.resourceMu.Lock()
+	t.mu.Lock()
+	t.maxSize = maxSize
+	t.mu.Unlock()
+	err = t.reduceTerminalCountLocked(maxSize)
+	t.resourceMu.Unlock()
+	return err
 }

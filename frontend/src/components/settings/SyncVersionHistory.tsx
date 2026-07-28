@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { History, RotateCcw, Trash2 } from 'lucide-react'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { useSettingsWindowHide } from '@/hooks/useSettingsWindowHide'
 import { formatSyncBytes, formatSyncDate } from '@/lib/cloudSyncForm'
 import type { SyncVersion } from '../../../bindings/github.com/xuthus5/mssh/internal/model/models'
 import { t } from '@/i18n'
@@ -15,18 +16,56 @@ interface Props {
   onDelete: (id: number) => Promise<void>
 }
 
-type VersionAction = { type: 'restore' | 'delete'; version: SyncVersion } | null
+type VersionAction = { type: 'restore' | 'delete'; versionID: number } | null
 
 export function SyncVersionHistory(props: Props) {
   const [action, setAction] = useState<VersionAction>(null)
-  const confirm = async () => {
-    if (!action) return
-    const operation = action.type === 'restore' ? props.onRestore : props.onDelete
-    try { await operation(action.version.id); setAction(null) } catch { /* error is shown by the controller */ }
+  const [actionPending, setActionPending] = useState(false)
+  const lifecycle = useRef(0)
+  const generation = useRef(0)
+  const requestID = useRef(0)
+  const active = useRef(false)
+  const versionsKey = props.versions.map((version) => version.id).join('|')
+  const actionVersion = action ? props.versions.find((version) => version.id === action.versionID) ?? null : null
+  const actionKey = action ? `${action.type}:${action.versionID}` : ''
+  const previousActionKey = useRef(actionKey)
+  if (previousActionKey.current !== actionKey) {
+    previousActionKey.current = actionKey
+    generation.current++
   }
+  useEffect(() => {
+    const token = ++lifecycle.current
+    return () => { if (lifecycle.current === token) lifecycle.current++ }
+  }, [])
+  useSettingsWindowHide(() => setAction(null))
+  useEffect(() => {
+    setAction((current) => current && !props.versions.some((version) => version.id === current.versionID) ? null : current)
+  }, [versionsKey])
+  const confirm = async () => {
+    if (!action || !actionVersion || active.current || props.pending !== null) return
+    active.current = true
+    const lifecycleToken = lifecycle.current
+    const generationToken = generation.current
+    const request = ++requestID.current
+    const isLatest = () => lifecycle.current === lifecycleToken && requestID.current === request
+    const isCurrent = () => isLatest() && generation.current === generationToken
+    const operation = action.type === 'restore' ? props.onRestore : props.onDelete
+    setActionPending(true)
+    try {
+      await operation(actionVersion.id)
+      if (isCurrent()) setAction(null)
+    } catch { /* error is shown by the controller */ }
+    finally {
+      if (isLatest()) {
+        active.current = false
+        setActionPending(false)
+      }
+    }
+  }
+  const busy = props.pending !== null || actionPending
   return <section className="border-t border-border pt-5"><div className="mb-3 flex items-center gap-2"><History className="size-4" /><div><h4 className="text-sm font-medium">{t('本地版本历史')}</h4><p className="text-xs text-muted-foreground">{t('恢复前会关闭活动终端与隧道，并自动创建恢复点。')}</p></div></div>
-    <div className="overflow-hidden rounded-xl border border-border">{props.versions.length === 0 ? <div className="px-4 py-8 text-center text-sm text-muted-foreground">{t('尚无本地版本')}</div> : props.versions.map((version) => <VersionRow key={version.id} version={version} disabled={props.pending !== null} onAction={(type) => setAction({ type, version })} />)}</div>
-    <VersionActionDialog action={action} pending={props.pending !== null} onOpenChange={(open) => { if (!open && props.pending === null) setAction(null) }} onConfirm={() => void confirm()} />
+    <div className="overflow-hidden rounded-xl border border-border">{props.versions.length === 0 ? <div className="px-4 py-8 text-center text-sm text-muted-foreground">{t('尚无本地版本')}</div> : props.versions.map((version) => <VersionRow key={version.id} version={version} disabled={busy} onAction={(type) => setAction({ type, versionID: version.id })} />)}</div>
+    <VersionActionDialog action={action} pending={busy} onOpenChange={(open) => { if (!open && !busy) setAction(null) }} onConfirm={() => void confirm()} />
   </section>
 }
 

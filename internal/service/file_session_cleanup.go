@@ -14,11 +14,8 @@ func (f *FileService) CancelForSessions(sessionIDs []int64) {
 		return
 	}
 	persistSessionCancellations(f, sessionIDs)
-	taskIDs, cancellations := f.sessionCancellationSnapshot(wanted)
+	cancellations := f.sessionCancellationSnapshot(wanted)
 	f.closeCancelledTasks(cancellations)
-	for _, taskID := range taskIDs {
-		f.emitTransferCancelled(taskID)
-	}
 }
 
 func positiveSessionIDs(sessionIDs []int64) map[int64]struct{} {
@@ -40,10 +37,9 @@ func persistSessionCancellations(f *FileService, sessionIDs []int64) {
 	}
 }
 
-func (f *FileService) sessionCancellationSnapshot(wanted map[int64]struct{}) ([]string, []transferCancellation) {
+func (f *FileService) sessionCancellationSnapshot(wanted map[int64]struct{}) []transferCancellation {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	taskIDs := make([]string, 0)
 	cancellations := make([]transferCancellation, 0)
 	for taskID := range f.tasks {
 		sessionID, ok := f.taskSessions[taskID]
@@ -54,8 +50,7 @@ func (f *FileService) sessionCancellationSnapshot(wanted map[int64]struct{}) ([]
 			continue
 		}
 		cancellation, _ := f.cancelTaskLocked(taskID)
-		taskIDs = append(taskIDs, taskID)
 		cancellations = append(cancellations, cancellation)
 	}
-	return taskIDs, cancellations
+	return cancellations
 }

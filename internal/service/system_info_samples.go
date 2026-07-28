@@ -21,7 +21,9 @@ func (t *TerminalService) updateSystemRates(terminalID string, info *model.Syste
 	if elapsed <= 0 {
 		return
 	}
-	info.CPUPercent = cpuPercent(previous, sample)
+	if previous.total > 0 && sample.total > 0 {
+		info.CPUPercent = cpuPercent(previous, sample)
+	}
 	info.DownloadRate = byteRate(previous.received, sample.received, elapsed)
 	info.UploadRate = byteRate(previous.transmitted, sample.transmitted, elapsed)
 }

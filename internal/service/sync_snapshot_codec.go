@@ -37,32 +37,8 @@ func writePrivateFileAtomic(path string, content []byte) error {
 	if err := ensurePrivateParentDir(dir); err != nil {
 		return err
 	}
-	temporary, err := os.CreateTemp(dir, ".mssh-backup-*.tmp")
-	if err != nil {
-		return err
-	}
-	temporaryPath := temporary.Name()
-	defer func() { _ = os.Remove(temporaryPath) }()
-	if err := temporary.Chmod(0o600); err != nil {
-		_ = temporary.Close()
-		return err
-	}
-	if _, err := temporary.Write(content); err != nil {
-		_ = temporary.Close()
-		return err
-	}
-	if err := temporary.Sync(); err != nil {
-		_ = temporary.Close()
-		return err
-	}
-	if err := temporary.Close(); err != nil {
-		return err
-	}
-	if err := fsutil.ReplaceFile(temporaryPath, path); err != nil {
-		return err
-	}
-	if err := os.Chmod(path, 0o600); err != nil {
-		return fmt.Errorf("secure export file: %w", err)
+	if err := fsutil.WritePrivateFileAtomic(path, content, ".mssh-backup-*.tmp"); err != nil {
+		return fmt.Errorf("write private file: %w", err)
 	}
 	return nil
 }
@@ -89,6 +65,10 @@ func (s *SyncService) writeRecoveryPoint(masterKey string) error {
 	if err != nil {
 		return err
 	}
+	return s.writeRecoveryPointData(masterKey, data)
+}
+
+func (s *SyncService) writeRecoveryPointData(masterKey string, data ExportData) error {
 	fingerprint, err := snapshotFingerprint(data)
 	if err != nil {
 		return err
@@ -126,15 +106,34 @@ func (s *SyncService) recoveryPath() (string, error) {
 
 func validateSnapshot(db *sql.DB, data ExportData) error {
 	for _, table := range backupTables {
+		rows := data.Tables[table]
 		columns, err := tableColumns(db, table)
 		if err != nil {
 			return err
 		}
-		if err := validateTableRows(table, data.Tables[table], columns); err != nil {
+		if err := validateTableRows(table, rows, columns); err != nil {
+			return err
+		}
+		if err := validateSnapshotTable(table, rows); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func validateSnapshotTable(table string, rows []map[string]any) error {
+	switch table {
+	case "session_folders":
+		return validateSnapshotFolders(rows)
+	case "ssh_keys":
+		return validateSnapshotSSHKeys(rows)
+	case "sessions":
+		return validateSnapshotSessions(rows)
+	case "settings":
+		return validateSnapshotSettings(rows)
+	default:
+		return nil
+	}
 }
 
 func tableColumns(db *sql.DB, table string) (map[string]struct{}, error) {

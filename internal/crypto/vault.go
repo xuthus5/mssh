@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+	"unicode/utf8"
 
 	"golang.org/x/crypto/argon2"
 
@@ -17,14 +18,17 @@ import (
 )
 
 const (
-	VaultFormatVersion = 1
-	VaultFileName      = "vault.json"
-	vaultKeyLength     = 32
-	vaultSaltLength    = 16
-	vaultArgonTime     = 3
-	vaultArgonMemory   = 64 * 1024
-	vaultArgonThreads  = 2
-	MinAppPasswordLen  = 12
+	VaultFormatVersion  = 1
+	VaultFileName       = "vault.json"
+	vaultKeyLength      = 32
+	vaultSaltLength     = 16
+	vaultNonceLength    = 12
+	vaultTagLength      = 16
+	vaultArgonTime      = 3
+	vaultArgonMemory    = 64 * 1024
+	vaultArgonThreads   = 2
+	MinAppPasswordLen   = 12
+	MaxAppPasswordBytes = 1024
 )
 
 // VaultFile is the on-disk envelope that wraps a random DEK with a password-derived KEK.
@@ -51,7 +55,13 @@ func VaultPath(dataDir string) string {
 }
 
 func ValidateAppPassword(password string) error {
-	if len(password) < MinAppPasswordLen {
+	if len(password) > MaxAppPasswordBytes {
+		return fmt.Errorf("password must not exceed %d bytes", MaxAppPasswordBytes)
+	}
+	if !utf8.ValidString(password) {
+		return errors.New("password must be valid UTF-8")
+	}
+	if utf8.RuneCountInString(password) < MinAppPasswordLen {
 		return fmt.Errorf("password must contain at least %d characters", MinAppPasswordLen)
 	}
 	return nil
@@ -67,6 +77,7 @@ func CreateVault(password string) (VaultFile, []byte, error) {
 	}
 	vault, err := wrapDEK(password, dek)
 	if err != nil {
+		clear(dek)
 		return VaultFile{}, nil, err
 	}
 	return vault, dek, nil
@@ -88,6 +99,7 @@ func RotateVaultPassword(oldPassword, newPassword string, vault VaultFile, reenc
 	if err != nil {
 		return VaultFile{}, nil, fmt.Errorf("verify current password: %w", err)
 	}
+	defer clear(oldDEK)
 	if err := ValidateAppPassword(newPassword); err != nil {
 		return VaultFile{}, nil, err
 	}
@@ -97,18 +109,20 @@ func RotateVaultPassword(oldPassword, newPassword string, vault VaultFile, reenc
 	}
 	if reencrypt != nil {
 		if err := reencrypt(oldDEK, newDEK); err != nil {
+			clear(newDEK)
 			return VaultFile{}, nil, fmt.Errorf("re-encrypt protected data: %w", err)
 		}
 	}
 	next, err := wrapDEK(newPassword, newDEK)
 	if err != nil {
+		clear(newDEK)
 		return VaultFile{}, nil, err
 	}
 	return next, newDEK, nil
 }
 
 func LoadVaultFile(path string) (VaultFile, error) {
-	data, err := os.ReadFile(path)
+	data, err := readVaultPayload(path)
 	if err != nil {
 		return VaultFile{}, err
 	}
@@ -138,29 +152,8 @@ func SaveVaultFile(path string, vault VaultFile) error {
 		return fmt.Errorf("encode vault: %w", err)
 	}
 	payload = append(payload, '\n')
-	temporary, err := os.CreateTemp(dir, ".mssh-vault-*.tmp")
-	if err != nil {
-		return fmt.Errorf("write vault temp: %w", err)
-	}
-	temporaryPath := temporary.Name()
-	defer func() { _ = os.Remove(temporaryPath) }()
-	if err := temporary.Chmod(0o600); err != nil {
-		_ = temporary.Close()
-		return fmt.Errorf("secure vault temp: %w", err)
-	}
-	if _, err := temporary.Write(payload); err != nil {
-		_ = temporary.Close()
-		return fmt.Errorf("write vault temp: %w", err)
-	}
-	if err := temporary.Sync(); err != nil {
-		_ = temporary.Close()
-		return fmt.Errorf("sync vault temp: %w", err)
-	}
-	if err := temporary.Close(); err != nil {
-		return fmt.Errorf("close vault temp: %w", err)
-	}
-	if err := fsutil.ReplaceFile(temporaryPath, path); err != nil {
-		return fmt.Errorf("replace vault: %w", err)
+	if err := fsutil.WritePrivateFileAtomic(path, payload, ".mssh-vault-*.tmp"); err != nil {
+		return fmt.Errorf("save vault: %w", err)
 	}
 	return nil
 }
@@ -216,13 +209,22 @@ func unwrapDEK(password string, vault VaultFile) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("decode vault salt: %w", err)
 	}
+	if len(salt) != vaultSaltLength {
+		return nil, errors.New("invalid vault salt length")
+	}
 	nonce, err := base64.StdEncoding.DecodeString(vault.Nonce)
 	if err != nil {
 		return nil, fmt.Errorf("decode vault nonce: %w", err)
 	}
+	if len(nonce) != vaultNonceLength {
+		return nil, errors.New("invalid vault nonce length")
+	}
 	wrapped, err := base64.StdEncoding.DecodeString(vault.WrappedDEK)
 	if err != nil {
 		return nil, fmt.Errorf("decode wrapped DEK: %w", err)
+	}
+	if len(wrapped) != vaultKeyLength+vaultTagLength {
+		return nil, errors.New("invalid wrapped DEK length")
 	}
 	kek := argon2.IDKey([]byte(password), salt, vault.ArgonTime, vault.ArgonMemory, vault.ArgonThreads, vaultKeyLength)
 	block, err := aes.NewCipher(kek)
@@ -256,8 +258,8 @@ func validateVaultFile(vault VaultFile) error {
 	if vault.Salt == "" || vault.Nonce == "" || vault.WrappedDEK == "" {
 		return errors.New("vault file is incomplete")
 	}
-	if vault.ArgonTime == 0 || vault.ArgonMemory == 0 || vault.ArgonThreads == 0 {
-		return errors.New("vault KDF parameters are invalid")
+	if vault.ArgonTime != vaultArgonTime || vault.ArgonMemory != vaultArgonMemory || vault.ArgonThreads != vaultArgonThreads {
+		return errors.New("unsupported vault KDF parameters")
 	}
 	return nil
 }

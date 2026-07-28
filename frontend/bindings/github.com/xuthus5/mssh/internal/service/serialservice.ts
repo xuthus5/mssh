@@ -14,15 +14,18 @@ import { Call as $Call, CancellablePromise as $CancellablePromise, Create as $Cr
 // @ts-ignore: Unused imports
 import * as model$0 from "../model/models.js";
 
-export function ActiveDeviceMap(): $CancellablePromise<{ [key: string]: string }> {
+/**
+ * ActiveDeviceMap returns device path -> terminal id for currently open serial sessions.
+ */
+export function ActiveDeviceMap(): $CancellablePromise<{ [_ in string]?: string }> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.SerialService.ActiveDeviceMap").then(($result: any) => {
-        return $$createType4($result);
+        return $$createType0($result);
     });
 }
 
 export function Create(input: model$0.SerialPortInput): $CancellablePromise<model$0.SerialPort | null> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.SerialService.Create", input).then(($result: any) => {
-        return $$createType1($result);
+        return $$createType2($result);
     });
 }
 
@@ -30,25 +33,28 @@ export function Delete(id: number): $CancellablePromise<void> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.SerialService.Delete", id);
 }
 
+/**
+ * DeleteMany removes multiple serial profiles.
+ */
 export function DeleteMany(ids: number[]): $CancellablePromise<number> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.SerialService.DeleteMany", ids);
 }
 
 export function Get(id: number): $CancellablePromise<model$0.SerialPort | null> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.SerialService.Get", id).then(($result: any) => {
-        return $$createType1($result);
+        return $$createType2($result);
     });
 }
 
 export function List(): $CancellablePromise<model$0.SerialPort[]> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.SerialService.List").then(($result: any) => {
-        return $$createType2($result);
+        return $$createType3($result);
     });
 }
 
 export function ListDevices(): $CancellablePromise<string[]> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.SerialService.ListDevices").then(($result: any) => {
-        return $$createType3($result);
+        return $$createType4($result);
     });
 }
 
@@ -57,8 +63,8 @@ export function Update(input: model$0.SerialPortInput): $CancellablePromise<void
 }
 
 // Private type creation functions
-const $$createType0 = model$0.SerialPort.createFrom;
-const $$createType1 = $Create.Nullable($$createType0);
-const $$createType2 = $Create.Array($$createType0);
-const $$createType3 = $Create.Array($Create.Any);
-const $$createType4 = $Create.Map($Create.Any, $Create.Any);
+const $$createType0 = $Create.Map($Create.Any, $Create.Any);
+const $$createType1 = model$0.SerialPort.createFrom;
+const $$createType2 = $Create.Nullable($$createType1);
+const $$createType3 = $Create.Array($$createType1);
+const $$createType4 = $Create.Array($Create.Any);

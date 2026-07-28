@@ -42,24 +42,50 @@ func (s *aiSecretStore) set(account, value string) bool {
 	}
 	if s.keychain != nil && s.keychain.IsAvailable() {
 		if err := s.keychain.Set(aiKeychainService, account, []byte(value)); err == nil {
+			s.replaceVolatile(account, nil)
 			return true
 		}
 	}
-	s.mu.Lock()
-	s.volatile[account] = []byte(value)
-	s.mu.Unlock()
+	s.replaceVolatile(account, []byte(value))
 	return false
 }
 
 func (s *aiSecretStore) delete(account string) error {
-	s.mu.Lock()
-	delete(s.volatile, account)
-	s.mu.Unlock()
-	if s.keychain == nil {
-		return nil
+	if s.keychain != nil {
+		if err := s.keychain.Delete(aiKeychainService, account); err != nil {
+			return fmt.Errorf("delete AI secret: %w", err)
+		}
 	}
-	if err := s.keychain.Delete(aiKeychainService, account); err != nil {
-		return fmt.Errorf("delete AI secret: %w", err)
-	}
+	s.replaceVolatile(account, nil)
 	return nil
+}
+
+func (s *aiSecretStore) replaceVolatile(account string, value []byte) {
+	s.mu.Lock()
+	clear(s.volatile[account])
+	if len(value) == 0 {
+		delete(s.volatile, account)
+	} else {
+		s.volatile[account] = append([]byte(nil), value...)
+	}
+	s.mu.Unlock()
+}
+
+func (s *aiSecretStore) isVolatile(account string) bool {
+	s.mu.RLock()
+	_, exists := s.volatile[account]
+	s.mu.RUnlock()
+	return exists
+}
+
+func (s *aiSecretStore) clearMemory() {
+	if s == nil {
+		return
+	}
+	s.mu.Lock()
+	for account, value := range s.volatile {
+		clear(value)
+		delete(s.volatile, account)
+	}
+	s.mu.Unlock()
 }

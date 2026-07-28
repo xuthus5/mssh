@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 const { info, checkUpdate, openURL } = vi.hoisted(() => ({
   info: vi.fn(async () => ({ current_version: '0.1.0', repository_url: 'https://github.com/xuthus5/mssh' })),
@@ -13,8 +13,13 @@ vi.mock('@wailsio/runtime', () => ({ Browser: { OpenURL: openURL } }))
 
 import { AboutPanel } from '@/components/settings/AboutPanel'
 import { useToastStore } from '@/components/ui/toast'
+import { useLanguageStore } from '@/i18n'
 
 describe('AboutPanel', () => {
+  afterEach(() => {
+    useLanguageStore.getState().setLanguage('zh-CN')
+  })
+
   it('shows versions and opens the community repository', async () => {
     useToastStore.setState({ toasts: [] })
     render(<AboutPanel />)
@@ -41,6 +46,17 @@ describe('AboutPanel', () => {
     await userEvent.click(await screen.findByRole('button', { name: '检查更新' }))
     expect(await screen.findByText('检查更新失败：update failed')).toBeInTheDocument()
     expect(useToastStore.getState().toasts.filter((item) => item.type === 'error')).toHaveLength(0)
+  })
+
+  it('styles English check-update failures as destructive', async () => {
+    useLanguageStore.getState().setLanguage('en')
+    checkUpdate.mockRejectedValueOnce(new Error('offline'))
+    render(<AboutPanel />)
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Check for updates' }))
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent('Check for updates failed: offline')
+    expect(alert).toHaveClass('text-destructive')
   })
 
   it('shows external link open failures as panel message without toast', async () => {

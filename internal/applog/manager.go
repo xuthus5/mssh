@@ -107,17 +107,27 @@ func NormalizeRetentionDays(days int) int {
 
 // Configure updates directory and retention, reopening the active file when needed.
 func (m *Manager) Configure(dir string, retentionDays int) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
 	validated, err := ValidateDir(dir)
 	if err != nil {
 		return err
 	}
-	m.dir = validated
-	m.retention = NormalizeRetentionDays(retentionDays)
-	if err := m.ensureFileLocked(); err != nil {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	retention := NormalizeRetentionDays(retentionDays)
+	day := m.now().Local().Format(logFileLayout)
+	if m.file != nil && m.day == day && m.dir == validated {
+		m.retention = retention
+		m.purgeLocked()
+		return nil
+	}
+	file, err := openDailyLogFile(validated, day)
+	if err != nil {
 		return err
 	}
+	if err := m.replaceFileLocked(file, validated, day); err != nil {
+		return err
+	}
+	m.retention = retention
 	m.purgeLocked()
 	return nil
 }
@@ -164,28 +174,30 @@ func (m *Manager) ensureFileLocked() error {
 	if m.file != nil && m.day == day && m.dir == dir {
 		return nil
 	}
-	if err := os.MkdirAll(dir, 0o700); err != nil {
-		return fmt.Errorf("create log directory: %w", err)
-	}
-	if err := os.Chmod(dir, 0o700); err != nil {
-		return fmt.Errorf("chmod log directory: %w", err)
-	}
-	if err := m.closeFileLocked(); err != nil {
+	file, err := openDailyLogFile(dir, day)
+	if err != nil {
 		return err
 	}
-	path := filepath.Join(dir, day+logFileSuffix)
-	file, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
-	if err != nil {
-		return fmt.Errorf("open log file: %w", err)
+	if err := m.replaceFileLocked(file, dir, day); err != nil {
+		return err
 	}
-	if err := file.Chmod(0o600); err != nil {
-		_ = file.Close()
-		return fmt.Errorf("chmod log file: %w", err)
+	m.purgeLocked()
+	return nil
+}
+
+func (m *Manager) replaceFileLocked(file *os.File, dir, day string) error {
+	previous := m.file
+	if previous != nil {
+		if err := previous.Close(); err != nil {
+			m.file = nil
+			m.day = ""
+			cause := fmt.Errorf("close previous log file: %w", err)
+			return closeLogFileAfterFailure(file, cause)
+		}
 	}
 	m.file = file
 	m.day = day
 	m.dir = dir
-	m.purgeLocked()
 	return nil
 }
 
@@ -203,6 +215,7 @@ func (m *Manager) purgeLocked() {
 	dir := NormalizeDir(m.dir)
 	entries, err := os.ReadDir(dir)
 	if err != nil {
+		m.reportMaintenanceError(fmt.Errorf("read log directory: %w", err))
 		return
 	}
 	// Keep the most recent retention days including today; delete files on or before cutoff.
@@ -223,7 +236,13 @@ func (m *Manager) purgeLocked() {
 			continue
 		}
 		if !parsed.After(cutoff) {
-			_ = os.Remove(filepath.Join(dir, name))
+			if err := os.Remove(filepath.Join(dir, name)); err != nil {
+				m.reportMaintenanceError(fmt.Errorf("remove expired log %s: %w", name, err))
+			}
 		}
 	}
+}
+
+func (m *Manager) reportMaintenanceError(err error) {
+	_, _ = fmt.Fprintf(m.stderr, "application log maintenance failed: %v\n", err)
 }
