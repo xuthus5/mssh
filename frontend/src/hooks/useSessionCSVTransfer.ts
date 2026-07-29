@@ -1,7 +1,8 @@
 import { logger } from '@/lib/logger'
 import { useCallback } from 'react'
 import { SessionService } from '@/lib/wails'
-import type { SessionCSVConflictPolicy, SessionCSVExportResult, SessionCSVImportSummary, SessionCSVPreview } from '../../bindings/github.com/xuthus5/mssh/internal/model/models'
+import { SessionCSVColumn, type SessionCSVConflictPolicy, type SessionCSVExportResult, type SessionCSVImportSummary, type SessionCSVPreview } from '../../bindings/github.com/xuthus5/mssh/internal/model/models'
+import type { SessionCSVValues } from '@/lib/sessionCSVMapping'
 
 interface Refreshers {
   refreshFolders: (options?: { silent?: boolean }) => Promise<unknown>
@@ -18,8 +19,8 @@ export interface SessionCSVExportRequest {
 export interface SessionCSVImportRequest {
   path: string
   conflictPolicy: SessionCSVConflictPolicy
-  headerMapping: Record<string, string>
-  defaultValues: Record<string, string>
+  headerMapping: SessionCSVValues
+  defaultValues: SessionCSVValues
 }
 
 export function useSessionCSVTransfer(refreshers: Refreshers) {
@@ -38,8 +39,8 @@ export function useSessionCSVTransfer(refreshers: Refreshers) {
   const importSessionsCSV = useCallback(async (request: SessionCSVImportRequest): Promise<SessionCSVImportSummary> => {
     const summary = await SessionService.ImportCSV(request.path, {
       conflict_policy: request.conflictPolicy,
-      header_mapping: request.headerMapping,
-      default_values: request.defaultValues,
+      header_mapping: supportedSessionCSVValues(request.headerMapping),
+      default_values: supportedSessionCSVValues(request.defaultValues),
     })
     // Import already completed; refresh noise must not rebrand success as import failure.
     void Promise.all([
@@ -54,4 +55,12 @@ export function useSessionCSVTransfer(refreshers: Refreshers) {
   }, [refreshers.refreshAssets, refreshers.refreshFolders])
 
   return { exportSessionsCSV, previewSessionsCSV, importSessionsCSV }
+}
+
+const supportedSessionCSVColumns: ReadonlySet<string> = new Set(
+  Object.values(SessionCSVColumn).filter((column) => column !== SessionCSVColumn.$zero),
+)
+
+function supportedSessionCSVValues(values: Record<string, string>): SessionCSVValues {
+  return Object.fromEntries(Object.entries(values).filter(([column]) => supportedSessionCSVColumns.has(column))) as SessionCSVValues
 }

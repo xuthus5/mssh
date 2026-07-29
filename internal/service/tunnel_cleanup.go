@@ -38,6 +38,9 @@ func (t *TunnelService) Stop(tunnelID int64) error {
 	return cleanupErr
 }
 
+// StopAll closes every tunnel runtime during application shutdown.
+//
+//wails:ignore
 func (t *TunnelService) StopAll() {
 	if t == nil {
 		return

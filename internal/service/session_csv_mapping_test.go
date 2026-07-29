@@ -47,11 +47,12 @@ func TestSessionService_ImportCSVMapsExternalHeadersAndDefaults(t *testing.T) {
 	})
 	options := model.SessionCSVImportOptions{
 		ConflictPolicy: model.SessionCSVConflictSkip,
-		HeaderMapping: map[string]string{
-			"name": "Session", "host": "Hostname", "port": "Port", "username": "User", "auth_method": "Authentication",
-			"folder_path": "Folder", "tags": "Tags", "notes": "Description",
+		HeaderMapping: map[model.SessionCSVColumn]string{
+			model.SessionCSVColumnName: "Session", model.SessionCSVColumnHost: "Hostname", model.SessionCSVColumnPort: "Port",
+			model.SessionCSVColumnUsername: "User", model.SessionCSVColumnAuthMethod: "Authentication",
+			model.SessionCSVColumnFolderPath: "Folder", model.SessionCSVColumnTags: "Tags", model.SessionCSVColumnNotes: "Description",
 		},
-		DefaultValues: map[string]string{"port": "2022", "environment": "production", "keep_alive": "45"},
+		DefaultValues: map[model.SessionCSVColumn]string{model.SessionCSVColumnPort: "2022", model.SessionCSVColumnEnvironment: "production", model.SessionCSVColumnKeepAlive: "45"},
 	}
 
 	summary, err := service.ImportCSV(path, options)
@@ -82,7 +83,7 @@ func TestSessionCSVMappingValidation(t *testing.T) {
 		defaults map[string]string
 		message  string
 	}{
-		{name: "unknown target", mapping: map[string]string{"unknown": "Name"}, message: "unsupported target"},
+		{name: "removed format version target", mapping: map[string]string{"format_version": "Name"}, message: "unsupported target"},
 		{name: "missing source", mapping: map[string]string{"name": "Missing"}, message: "was not found"},
 		{name: "duplicate source", mapping: map[string]string{"name": "Name", "host": "Name"}, message: "mapped to both"},
 		{name: "unknown default", defaults: map[string]string{"unknown": "value"}, message: "unsupported default"},
@@ -120,7 +121,7 @@ func TestSessionCSVMappingValidatesHeaderOnlyFiles(t *testing.T) {
 	service := NewSessionService(testutil.NewTestDB(t), newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
 	_, err := service.ImportCSV(path, model.SessionCSVImportOptions{
 		ConflictPolicy: model.SessionCSVConflictSkip,
-		HeaderMapping:  map[string]string{"name": "Missing"},
+		HeaderMapping:  map[model.SessionCSVColumn]string{model.SessionCSVColumnName: "Missing"},
 	})
 	assert.ErrorContains(t, err, "was not found")
 }

@@ -1,7 +1,10 @@
+import { SessionCSVColumn } from '../../bindings/github.com/xuthus5/mssh/internal/model/models'
+
 export type SessionCSVProvider = 'mssh' | 'putty' | 'securecrt' | 'mobaxterm' | 'custom'
+export type SessionCSVValues = Partial<Record<SessionCSVColumn, string>>
 
 export interface SessionCSVField {
-  key: string
+  key: SessionCSVColumn
   label: string
   required?: boolean
   placeholder?: string
@@ -11,31 +14,28 @@ export interface SessionCSVTemplate {
   id: SessionCSVProvider
   label: string
   description: string
-  aliases: Record<string, string[]>
+  aliases: Partial<Record<SessionCSVColumn, string[]>>
 }
 
-export type SessionCSVValues = Record<string, string>
-
 export const SESSION_CSV_FIELDS: SessionCSVField[] = [
-  { key: 'name', label: '会话名称', required: true },
-  { key: 'host', label: '主机地址', required: true },
-  { key: 'port', label: '端口', placeholder: '22' },
-  { key: 'username', label: '用户名', required: true },
-  { key: 'auth_method', label: '认证方式', placeholder: 'password' },
-  { key: 'password', label: '密码' },
-  { key: 'key_name', label: '密钥名称' },
-  { key: 'key_public_key', label: '密钥公钥' },
-  { key: 'folder_path', label: '分组路径', placeholder: '[]' },
-  { key: 'environment', label: '环境' },
-  { key: 'project', label: '项目' },
-  { key: 'tags', label: '标签', placeholder: '[]' },
-  { key: 'notes', label: '备注' },
-  { key: 'keep_alive', label: '保活间隔', placeholder: '60' },
-  { key: 'term_type', label: '终端类型', placeholder: 'xterm-256color' },
-  { key: 'format_version', label: '格式版本', placeholder: '1' },
+  { key: SessionCSVColumn.SessionCSVColumnName, label: '会话名称', required: true },
+  { key: SessionCSVColumn.SessionCSVColumnHost, label: '主机地址', required: true },
+  { key: SessionCSVColumn.SessionCSVColumnPort, label: '端口', placeholder: '22' },
+  { key: SessionCSVColumn.SessionCSVColumnUsername, label: '用户名', required: true },
+  { key: SessionCSVColumn.SessionCSVColumnAuthMethod, label: '认证方式', placeholder: 'password' },
+  { key: SessionCSVColumn.SessionCSVColumnPassword, label: '密码' },
+  { key: SessionCSVColumn.SessionCSVColumnKeyName, label: '密钥名称' },
+  { key: SessionCSVColumn.SessionCSVColumnKeyPublicKey, label: '密钥公钥' },
+  { key: SessionCSVColumn.SessionCSVColumnFolderPath, label: '分组路径', placeholder: '[]' },
+  { key: SessionCSVColumn.SessionCSVColumnEnvironment, label: '环境' },
+  { key: SessionCSVColumn.SessionCSVColumnProject, label: '项目' },
+  { key: SessionCSVColumn.SessionCSVColumnTags, label: '标签', placeholder: '[]' },
+  { key: SessionCSVColumn.SessionCSVColumnNotes, label: '备注' },
+  { key: SessionCSVColumn.SessionCSVColumnKeepAlive, label: '保活间隔', placeholder: '60' },
+  { key: SessionCSVColumn.SessionCSVColumnTermType, label: '终端类型', placeholder: 'xterm-256color' },
 ]
 
-const commonAliases: Record<string, string[]> = {
+const commonAliases: Partial<Record<SessionCSVColumn, string[]>> = {
   name: ['name', 'session name', 'session', 'profile', 'profile name'],
   host: ['host', 'hostname', 'host name', 'server', 'address'],
   port: ['port', 'port number', 'ssh port'],
@@ -51,13 +51,12 @@ const commonAliases: Record<string, string[]> = {
   notes: ['notes', 'description', 'comment'],
   keep_alive: ['keep alive', 'keepalive', 'heartbeat'],
   term_type: ['terminal type', 'terminal', 'emulation'],
-  format_version: ['format version', 'format_version'],
 }
 
 export const SESSION_CSV_TEMPLATES: SessionCSVTemplate[] = [
   {
     id: 'mssh', label: 'MSSH', description: 'MSSH 原生 CSV，字段可直接对应。',
-    aliases: Object.fromEntries(SESSION_CSV_FIELDS.map((field) => [field.key, [field.key]])),
+    aliases: Object.fromEntries(SESSION_CSV_FIELDS.map((field) => [field.key, [field.key]])) as Partial<Record<SessionCSVColumn, string[]>>,
   },
   {
     id: 'putty', label: 'PuTTY', description: '匹配 PuTTY 常见 CSV 转换字段。',
@@ -83,7 +82,7 @@ export const SESSION_CSV_TEMPLATES: SessionCSVTemplate[] = [
 
 export function sessionCSVDefaults(): SessionCSVValues {
   return {
-    format_version: '1', port: '22', auth_method: 'password', folder_path: '[]', tags: '[]',
+    port: '22', auth_method: 'password', folder_path: '[]', tags: '[]',
     keep_alive: '60', term_type: 'xterm-256color',
   }
 }
@@ -116,10 +115,10 @@ export function missingSessionCSVFields(mapping: SessionCSVValues, defaults: Ses
   return SESSION_CSV_FIELDS.filter((field) => field.required && !mapping[field.key]?.trim() && !defaults[field.key]?.trim())
 }
 
-export function updateSessionCSVMapping(mapping: SessionCSVValues, target: string, source: string): SessionCSVValues {
+export function updateSessionCSVMapping(mapping: SessionCSVValues, target: SessionCSVColumn, source: string): SessionCSVValues {
   const next = { ...mapping }
-  for (const [key, value] of Object.entries(next)) {
-    if (key !== target && source && value === source) next[key] = ''
+  for (const field of SESSION_CSV_FIELDS) {
+    if (field.key !== target && source && next[field.key] === source) next[field.key] = ''
   }
   next[target] = source
   return next
@@ -135,7 +134,7 @@ export function normalizeSessionCSVHeader(value: string): string {
   return value.trim().toLowerCase().replace(/[\s_.-]+/g, ' ')
 }
 
-function mergeAliases(base: Record<string, string[]>, additions: Record<string, string[]>): Record<string, string[]> {
+function mergeAliases(base: Partial<Record<SessionCSVColumn, string[]>>, additions: Partial<Record<SessionCSVColumn, string[]>>): Partial<Record<SessionCSVColumn, string[]>> {
   const result = Object.fromEntries(Object.entries(base).map(([key, values]) => [key, [...values]]))
   for (const [key, values] of Object.entries(additions)) result[key] = [...values, ...(result[key] ?? [])]
   return result

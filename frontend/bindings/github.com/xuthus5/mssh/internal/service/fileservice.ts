@@ -25,7 +25,7 @@ export function CancelTransfer(taskID: string): $CancellablePromise<void> {
 }
 
 /**
- * Upload starts an async file upload and returns a task ID.
+ * Delete removes a remote file through SFTP.
  */
 export function Delete(sessionID: number, path: string): $CancellablePromise<void> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.FileService.Delete", sessionID, path);
@@ -51,14 +51,14 @@ export function ListTransfers(): $CancellablePromise<model$0.TransferJob[]> {
 }
 
 /**
- * Mkdir creates a remote directory via SFTP.
+ * Mkdir creates a remote directory through SFTP.
  */
 export function Mkdir(sessionID: number, path: string): $CancellablePromise<void> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.FileService.Mkdir", sessionID, path);
 }
 
 /**
- * Rename renames a remote file via SFTP.
+ * Rename renames a remote file through SFTP.
  */
 export function Rename(sessionID: number, oldPath: string, newPath: string): $CancellablePromise<void> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.FileService.Rename", sessionID, oldPath, newPath);

@@ -45,6 +45,7 @@ func TestSessionService_ExportCSV(t *testing.T) {
 
 	records := readCSVFixture(t, content)
 	assert.Equal(t, sessionCSVHeader, records[0])
+	assert.NotContains(t, records[0], "format_version")
 	row := csvRowMap(records[0], records[1])
 	assert.Equal(t, "'=生产服务器", row["name"])
 	assert.Empty(t, row["password"])

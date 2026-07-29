@@ -8,8 +8,8 @@ import { useToastStore } from '@/components/ui/toast'
 const actions = vi.hoisted(() => ({
   exportSessionsCSV: vi.fn(async () => ({ count: 2, included_passwords: true })),
   previewSessionsCSV: vi.fn(async () => ({
-    headers: ['name', 'host', 'port', 'username', 'auth_method', 'password', 'key_name', 'key_public_key', 'folder_path', 'environment', 'project', 'tags', 'notes', 'keep_alive', 'term_type', 'format_version'],
-    sample_rows: [['生产服务器', '10.0.0.1', '22', 'root', 'password', '******', '', '', '[]', '', '', '[]', '', '60', 'xterm-256color', '1']],
+    headers: ['name', 'host', 'port', 'username', 'auth_method', 'password', 'key_name', 'key_public_key', 'folder_path', 'environment', 'project', 'tags', 'notes', 'keep_alive', 'term_type'],
+    sample_rows: [['生产服务器', '10.0.0.1', '22', 'root', 'password', '******', '', '', '[]', '', '', '[]', '', '60', 'xterm-256color']],
     total_rows: 2,
   })),
   importSessionsCSV: vi.fn(async () => ({

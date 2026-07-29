@@ -20,9 +20,11 @@ const (
 )
 
 var sessionCSVHeader = []string{
-	"name", "host", "port", "username", "auth_method", "password",
-	"key_name", "key_public_key", "folder_path", "environment", "project", "tags", "notes",
-	"keep_alive", "term_type",
+	string(model.SessionCSVColumnName), string(model.SessionCSVColumnHost), string(model.SessionCSVColumnPort),
+	string(model.SessionCSVColumnUsername), string(model.SessionCSVColumnAuthMethod), string(model.SessionCSVColumnPassword),
+	string(model.SessionCSVColumnKeyName), string(model.SessionCSVColumnKeyPublicKey), string(model.SessionCSVColumnFolderPath),
+	string(model.SessionCSVColumnEnvironment), string(model.SessionCSVColumnProject), string(model.SessionCSVColumnTags),
+	string(model.SessionCSVColumnNotes), string(model.SessionCSVColumnKeepAlive), string(model.SessionCSVColumnTermType),
 }
 
 type sessionCSVKey struct {

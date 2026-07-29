@@ -11,7 +11,7 @@ interface SessionCSVMappingTableProps {
   defaults: SessionCSVValues
   disabled?: boolean
   onMappingChange: (mapping: SessionCSVValues) => void
-  onDefaultChange: (key: string, value: string) => void
+  onDefaultChange: (key: typeof SESSION_CSV_FIELDS[number]['key'], value: string) => void
 }
 
 export function SessionCSVMappingTable(props: SessionCSVMappingTableProps) {

@@ -105,7 +105,7 @@ func readSessionCSV(path string, options model.SessionCSVImportOptions) ([]parse
 		return nil, err
 	}
 	if len(options.HeaderMapping) > 0 || len(options.DefaultValues) > 0 {
-		records, err = mapSessionCSVRecords(records, options.HeaderMapping, options.DefaultValues)
+		records, err = mapSessionCSVRecords(records, stringSessionCSVValues(options.HeaderMapping), stringSessionCSVValues(options.DefaultValues))
 		if err != nil {
 			return nil, err
 		}
