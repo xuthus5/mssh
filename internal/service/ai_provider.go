@@ -213,7 +213,6 @@ func chatOllama(ctx context.Context, client *http.Client, profile model.AIProvid
 	return response.Message.Content, nil
 }
 
-
 func postJSON(ctx context.Context, client *http.Client, endpoint, apiKey, kind string, headers map[string]string, payload any, output any) error {
 	body, err := json.Marshal(payload)
 	if err != nil {

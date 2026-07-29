@@ -34,9 +34,22 @@ func (s *AIService) DetectAgentCLIs() []model.AIAgentCLIStatus {
 		if operationContext.Err() != nil {
 			break
 		}
-		result = append(result, detectAICLIContext(operationContext, cli.name, cli.command))
+		status := detectAICLIContext(operationContext, cli.name, cli.command)
+		result = append(result, applyAIAgentCLIIsolationStatus(status))
 	}
 	return result
+}
+
+func applyAIAgentCLIIsolationStatus(status model.AIAgentCLIStatus) model.AIAgentCLIStatus {
+	if status.Command != string(model.AIAgentCLICodex) || !status.Installed {
+		return status
+	}
+	if _, err := newAIAgentCLIAdapter(model.AIAgentCLICodex); err != nil {
+		status.Installed = false
+		status.Error = fmt.Sprintf("%s: %v", status.Version, err)
+		status.Version = ""
+	}
+	return status
 }
 
 func detectAICLI(name, command string) model.AIAgentCLIStatus {

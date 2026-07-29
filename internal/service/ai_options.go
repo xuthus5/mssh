@@ -21,6 +21,14 @@ func WithAIModelsDevDataDir(dataDir string) AIServiceOption {
 	return func(service *AIService) {
 		if dataDir != "" {
 			service.modelsDevCachePath = filepath.Join(dataDir, modelsDevCacheFilename)
+			service.dataDir = dataDir
 		}
+	}
+}
+
+func WithAIAgentRuntime(sessions *SessionService, eventBus EventBus) AIServiceOption {
+	return func(service *AIService) {
+		service.sessions = sessions
+		service.eventBus = eventBus
 	}
 }

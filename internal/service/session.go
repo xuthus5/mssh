@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log/slog"
+	"path/filepath"
 	"sync"
 
 	"github.com/google/uuid"
@@ -216,6 +217,35 @@ func (s *SessionService) buildAuthBundleContext(
 	default:
 		return nil, nil, nil
 	}
+}
+
+func (s *SessionService) openAIAgentConnection(ctx context.Context, sessionID int64) (*ssh.ClientWrapper, func(), error) {
+	sess, err := s.sessionForConnect(sessionID)
+	if err != nil {
+		return nil, nil, err
+	}
+	if err = s.resolveKeepAlive(sess); err != nil {
+		return nil, nil, err
+	}
+	auth, cleanup, err := s.buildAuthBundleContext(ctx, sess)
+	if err != nil {
+		return nil, nil, err
+	}
+	knownHostsPath := filepath.Join(s.dataDir, "known_hosts")
+	acceptKnownTestHost := false
+	if accepter, ok := s.eventBus.(hostKeyAutoAccepter); ok {
+		acceptKnownTestHost = accepter.AutoAcceptHostKeys()
+	}
+	client, err := ssh.ConnectWithVerifier(ctx, *sess, auth, knownHostsPath, func(_, _, _ string) bool {
+		return acceptKnownTestHost
+	}, s.logger)
+	if err != nil {
+		if cleanup != nil {
+			cleanup()
+		}
+		return nil, nil, err
+	}
+	return client, cleanup, nil
 }
 
 func generateTerminalID() string {

@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Bot, History, Send, X } from 'lucide-react'
 import { AIMessageView } from '@/components/terminal/AIMessageViews'
 import { useAIMessageAutoScroll } from '@/components/terminal/useAIMessageAutoScroll'
@@ -6,6 +7,7 @@ import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { t } from '@/i18n'
 import type { AITerminalController, AITerminalPanelProps } from '@/components/terminal/AITerminalPanel'
+import { AIAgentSessionPanel } from '@/components/agent/AIAgentTaskViews'
 
 interface AITerminalPanelContentProps {
   controller: AITerminalController
@@ -13,19 +15,18 @@ interface AITerminalPanelContentProps {
 }
 
 export function AITerminalPanelContent({ controller, props }: AITerminalPanelContentProps) {
+  const [mode, setMode] = useState<'chat' | 'agent'>('chat')
   return <>
-    <AIPanelHeader controller={controller} onClose={props.onClose} />
-    <AIConversationHistory controller={controller} />
-    <AIMessageList controller={controller} props={props} />
-    <AIComposer controller={controller} />
+    <AIPanelHeader controller={controller} onClose={props.onClose} mode={mode} setMode={setMode} />
+    {mode === 'chat' ? <><AIConversationHistory controller={controller} /><AIMessageList controller={controller} props={props} /><AIComposer controller={controller} /></> : <AIAgentSessionPanel sessionID={props.sessionID} sessionName={t('当前 SSH 会话')} compact />}
   </>
 }
 
-function AIPanelHeader({ controller, onClose }: { controller: AITerminalController; onClose: () => void }) {
+function AIPanelHeader({ controller, onClose, mode, setMode }: { controller: AITerminalController; onClose: () => void; mode: 'chat' | 'agent'; setMode: (mode: 'chat' | 'agent') => void }) {
   return <header className="flex items-center justify-between border-b border-border px-3 py-2">
-    <span className="flex items-center gap-2 text-sm font-semibold"><Bot className="size-4 text-primary" />{t('AI 运维')}</span>
+    <span className="flex items-center gap-1 rounded-lg border border-border p-0.5"><Button size="xs" variant={mode === 'chat' ? 'secondary' : 'ghost'} onClick={() => setMode('chat')}><Bot data-icon="inline-start" />{t('对话')}</Button><Button size="xs" variant={mode === 'agent' ? 'secondary' : 'ghost'} onClick={() => setMode('agent')}>{t('Agent 任务')}</Button></span>
     <span className="flex items-center gap-1">
-      <Button size="icon-xs" variant={controller.state.historyOpen ? 'secondary' : 'ghost'} aria-label={t('对话历史')} onClick={() => controller.state.setHistoryOpen((value) => !value)}><History /></Button>
+      {mode === 'chat' ? <Button size="icon-xs" variant={controller.state.historyOpen ? 'secondary' : 'ghost'} aria-label={t('对话历史')} onClick={() => controller.state.setHistoryOpen((value) => !value)}><History /></Button> : null}
       <Button size="icon-xs" variant="ghost" aria-label={t('关闭 AI 面板')} onClick={onClose}><X /></Button>
     </span>
   </header>

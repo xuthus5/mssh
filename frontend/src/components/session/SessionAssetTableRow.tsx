@@ -1,5 +1,5 @@
 import type { KeyboardEvent } from 'react'
-import { MoreHorizontal } from 'lucide-react'
+import { Bot, MoreHorizontal } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -17,6 +17,7 @@ import { TableCell, TableRow } from '@/components/ui/table'
 import { SESSION_ASSET_VIRTUAL_ROW_STYLE } from '@/components/session/SessionAssetTable.constants'
 import type { Folder, Session } from '@/hooks/useSession'
 import { t } from '@/i18n'
+import { openAIAgentCenter } from '@/lib/aiAgentEvents'
 
 interface Props {
   session: Session
@@ -93,6 +94,7 @@ function AssetActions(props: Props) {
           <DropdownMenuContent align="end">
             <DropdownMenuGroup>
               <DropdownMenuItem onClick={() => props.onEdit(props.session)}>{t('编辑')}</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => openAIAgentCenter({ sessionID: Number(props.session.id), sessionName: props.session.name })}><Bot />{t('运行 Agent')}</DropdownMenuItem>
               <DropdownMenuSub>
                 <DropdownMenuSubTrigger disabled={moving} className="data-disabled:pointer-events-none data-disabled:opacity-50">{moving ? t('移动中…') : t('移动到分组')}</DropdownMenuSubTrigger>
                 <DropdownMenuSubContent><MoveTargets {...props} moving={moving} /></DropdownMenuSubContent>

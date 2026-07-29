@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { LayoutDashboard, Menu, Minus, Moon, Settings, Square, SquareTerminal, Sun, Workflow, X } from 'lucide-react'
+import { Bot, LayoutDashboard, Menu, Minus, Moon, Settings, Square, SquareTerminal, Sun, Workflow, X } from 'lucide-react'
 import { Events, Window } from '@wailsio/runtime'
 import { logger } from '@/lib/logger'
 import { useAppStore } from '@/store/appStore'
@@ -10,6 +10,7 @@ import { WINDOW_OPEN_SETTINGS_EVENT } from '@/lib/settingsWindowEvents'
 import { APP_NEW_LOCAL_TERMINAL_EVENT, emitAppEvent } from '@/lib/appEvents'
 import { cn } from '@/lib/utils'
 import { t } from '@/i18n'
+import { openAIAgentCenter } from '@/lib/aiAgentEvents'
 
 
 const COLLAPSED_NAVIGATION_WIDTH = 36
@@ -55,6 +56,7 @@ export function WindowTitleBar() {
       {tabsOverflow && <div className="absolute right-full top-0 h-full"><DynamicTabOverflowMenu /></div>}
       <button type="button" aria-label={colorMode === 'dark' ? t('切换到浅色模式') : t('切换到深色模式')} className="grid w-10 place-items-center text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" onClick={toggleColorMode}>{colorMode === 'dark' ? <Sun className="size-4" /> : <Moon className="size-4" />}</button>
       <button type="button" aria-label={t('打开本地终端')} className="grid w-10 place-items-center text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" onClick={() => emitAppEvent(APP_NEW_LOCAL_TERMINAL_EVENT)}><SquareTerminal className="size-4" /></button>
+      <button type="button" aria-label={t('打开 Agent 任务中心')} className="grid w-10 place-items-center text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" onClick={() => openAIAgentCenter()}><Bot className="size-4" /></button>
       <button type="button" aria-label={t('打开设置')} className="grid w-10 place-items-center text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" onClick={() => runWindowAction('open settings', () => Events.Emit(WINDOW_OPEN_SETTINGS_EVENT))}><Settings className="size-4" /></button>
       <span className="my-2 w-px bg-border" />
       <button type="button" aria-label={t('最小化窗口')} className="grid w-11 place-items-center text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" onClick={() => runWindowAction('minimise', Window.Minimise)}><Minus className="size-4" /></button>

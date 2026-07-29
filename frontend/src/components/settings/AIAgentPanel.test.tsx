@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { AIAgentPanel } from '@/components/settings/AIAgentPanel'
 import { OperationBusyError } from '@/lib/operationBusyError'
+import { AIAgentCLI, AIAgentEngine } from '../../../bindings/github.com/xuthus5/mssh/internal/model/models'
 
 describe('AIAgentPanel', () => {
   it('detects and displays installed and missing agents', async () => {
@@ -44,5 +45,17 @@ describe('AIAgentPanel', () => {
     view.rerender(<AIAgentPanel controller={{ agents: [], pending: null, detectAgents } as never} />)
 
     await waitFor(() => expect(detectAgents).toHaveBeenCalledTimes(2))
+  })
+
+  it('updates the default engine and CLI selection', async () => {
+    const detectAgents = vi.fn(async () => {})
+    const update = vi.fn()
+    const controller = { agents: [{ name: 'OpenCode', command: 'opencode', installed: true, path: '/bin/opencode', version: '1.0', error: '', detected_at: '' }], pending: null, detectAgents } as never
+    const draft = { interaction: { panel_width: 420, context_lines: 80, include_session_metadata: true, include_system_summary: true, stream_responses: true, auto_scroll: true, render_markdown: true, history_retention_days: 30, max_conversations: 100, agent: { default_engine: AIAgentEngine.AIAgentEngineNative, default_cli: AIAgentCLI.AIAgentCLIOpenCode } } }
+    const view = render(<AIAgentPanel controller={controller} draft={draft as never} update={update} />)
+    await userEvent.click(screen.getByRole('button', { name: '本机 CLI' }))
+    expect(update).toHaveBeenCalledWith(expect.objectContaining({ interaction: expect.objectContaining({ agent: { default_engine: AIAgentEngine.AIAgentEngineLocalCLI, default_cli: AIAgentCLI.AIAgentCLIOpenCode } }) }))
+    view.rerender(<AIAgentPanel controller={controller} draft={{ ...draft, interaction: { ...draft.interaction, agent: { ...draft.interaction.agent, default_engine: AIAgentEngine.AIAgentEngineLocalCLI } } } as never} update={update} />)
+    expect(screen.getByRole('combobox', { name: '默认 Agent CLI' })).toHaveTextContent('OpenCode · 1.0')
   })
 })

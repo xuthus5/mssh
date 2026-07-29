@@ -182,8 +182,8 @@ func providerHTTPClient(base *http.Client, skipTLS bool) *http.Client {
 		transport = clone
 	} else {
 		transport = &http.Transport{
-			TLSClientConfig:     &tls.Config{InsecureSkipVerify: true},
-			ForceAttemptHTTP2:  true,
+			TLSClientConfig:   &tls.Config{InsecureSkipVerify: true},
+			ForceAttemptHTTP2: true,
 		}
 	}
 	cloned.Transport = transport

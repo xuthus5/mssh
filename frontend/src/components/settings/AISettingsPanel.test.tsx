@@ -6,6 +6,8 @@ import { AISettingsPanel } from '@/components/settings/AISettingsPanel'
 import type { AISettingsController } from '@/hooks/useAISettings'
 import { SETTINGS_PREVIEW_CANCELLED_EVENT } from '@/lib/settingsWindowEvents'
 import {
+  AIAgentCLI,
+  AIAgentEngine,
   AIProviderType,
   AISearchMode,
   AISearchProvider,
@@ -240,7 +242,7 @@ type TestAISettingsController = Omit<AISettingsController, 'dashboard'> & { dash
 
 function aiController(): TestAISettingsController {
   return {
-    dashboard: { keychain_available: true, providers: [], settings: { default_provider_id: null, fallback_provider_id: null, interaction: { panel_width: 420, context_lines: 80, include_session_metadata: true, include_system_summary: true, stream_responses: true, auto_scroll: true, render_markdown: true, history_retention_days: 30, max_conversations: 100 }, search: { enabled: false, mode: AISearchMode.AISearchAuto, provider: AISearchProvider.AISearchProviderBrave, timeout_seconds: 10, max_results: 5, require_citations: true, credential_saved: false, credential_session_only: false }, security: { auto_execute_read_only: false, command_timeout_seconds: 60, max_output_bytes: 65536, max_plan_steps: 5, allow_patterns: [], deny_patterns: [], redaction_patterns: [] } } },
+    dashboard: { keychain_available: true, providers: [], settings: { default_provider_id: null, fallback_provider_id: null, interaction: { panel_width: 420, context_lines: 80, include_session_metadata: true, include_system_summary: true, stream_responses: true, auto_scroll: true, render_markdown: true, history_retention_days: 30, max_conversations: 100, agent: { default_engine: AIAgentEngine.AIAgentEngineNative, default_cli: AIAgentCLI.AIAgentCLICodex } }, search: { enabled: false, mode: AISearchMode.AISearchAuto, provider: AISearchProvider.AISearchProviderBrave, timeout_seconds: 10, max_results: 5, require_citations: true, credential_saved: false, credential_session_only: false }, security: { auto_execute_read_only: false, command_timeout_seconds: 60, max_output_bytes: 65536, max_plan_steps: 5, allow_patterns: [], deny_patterns: [], redaction_patterns: [] } } },
     agents: [], loading: false, pending: null, error: null, reload: vi.fn(), saveProvider: vi.fn(), deleteProvider: vi.fn(), testProvider: vi.fn(), saveSettings: vi.fn(async () => {}), detectAgents: vi.fn(async () => {}),
   }
 }

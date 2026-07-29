@@ -33,33 +33,116 @@ type AIProviderProfile struct {
 }
 
 type AIProviderProfileInput struct {
-	ID                 int64             `json:"id"`
-	Name               string            `json:"name"`
-	Provider           AIProviderType    `json:"provider"`
-	BaseURL            string            `json:"base_url"`
-	DefaultModel       string            `json:"default_model"`
-	Enabled            bool              `json:"enabled"`
-	APIKey             string            `json:"api_key"`
-	ContextWindowSize  int               `json:"context_window_size"`
-	SkipTLSVerify      bool              `json:"skip_tls_verify"`
-	MaxTokens          int               `json:"max_tokens"`
-	Temperature        *float64          `json:"temperature"`
-	TopP               *float64          `json:"top_p"`
-	FrequencyPenalty   *float64          `json:"frequency_penalty"`
-	PresencePenalty    *float64          `json:"presence_penalty"`
-	CustomHeaders      map[string]string `json:"custom_headers"`
+	ID                int64             `json:"id"`
+	Name              string            `json:"name"`
+	Provider          AIProviderType    `json:"provider"`
+	BaseURL           string            `json:"base_url"`
+	DefaultModel      string            `json:"default_model"`
+	Enabled           bool              `json:"enabled"`
+	APIKey            string            `json:"api_key"`
+	ContextWindowSize int               `json:"context_window_size"`
+	SkipTLSVerify     bool              `json:"skip_tls_verify"`
+	MaxTokens         int               `json:"max_tokens"`
+	Temperature       *float64          `json:"temperature"`
+	TopP              *float64          `json:"top_p"`
+	FrequencyPenalty  *float64          `json:"frequency_penalty"`
+	PresencePenalty   *float64          `json:"presence_penalty"`
+	CustomHeaders     map[string]string `json:"custom_headers"`
 }
 
 type AIInteractionSettings struct {
-	PanelWidth             int  `json:"panel_width"`
-	ContextLines           int  `json:"context_lines"`
-	IncludeSessionMetadata bool `json:"include_session_metadata"`
-	IncludeSystemSummary   bool `json:"include_system_summary"`
-	StreamResponses        bool `json:"stream_responses"`
-	AutoScroll             bool `json:"auto_scroll"`
-	RenderMarkdown         bool `json:"render_markdown"`
-	HistoryRetentionDays   int  `json:"history_retention_days"`
-	MaxConversations       int  `json:"max_conversations"`
+	PanelWidth             int             `json:"panel_width"`
+	ContextLines           int             `json:"context_lines"`
+	IncludeSessionMetadata bool            `json:"include_session_metadata"`
+	IncludeSystemSummary   bool            `json:"include_system_summary"`
+	StreamResponses        bool            `json:"stream_responses"`
+	AutoScroll             bool            `json:"auto_scroll"`
+	RenderMarkdown         bool            `json:"render_markdown"`
+	HistoryRetentionDays   int             `json:"history_retention_days"`
+	MaxConversations       int             `json:"max_conversations"`
+	Agent                  AIAgentSettings `json:"agent"`
+}
+
+type AIAgentEngine string
+
+const (
+	AIAgentEngineNative   AIAgentEngine = "native"
+	AIAgentEngineLocalCLI AIAgentEngine = "local_cli"
+)
+
+type AIAgentCLI string
+
+const (
+	AIAgentCLICodex    AIAgentCLI = "codex"
+	AIAgentCLIClaude   AIAgentCLI = "claude"
+	AIAgentCLIOpenCode AIAgentCLI = "opencode"
+)
+
+type AIAgentSettings struct {
+	DefaultEngine AIAgentEngine `json:"default_engine"`
+	DefaultCLI    AIAgentCLI    `json:"default_cli"`
+}
+
+type AIAgentTaskStatus string
+
+const (
+	AIAgentTaskPending         AIAgentTaskStatus = "pending"
+	AIAgentTaskRunning         AIAgentTaskStatus = "running"
+	AIAgentTaskWaitingApproval AIAgentTaskStatus = "waiting_approval"
+	AIAgentTaskCompleted       AIAgentTaskStatus = "completed"
+	AIAgentTaskFailed          AIAgentTaskStatus = "failed"
+	AIAgentTaskCancelled       AIAgentTaskStatus = "cancelled"
+	AIAgentTaskInterrupted     AIAgentTaskStatus = "interrupted"
+)
+
+type AIAgentApprovalStatus string
+
+const (
+	AIAgentApprovalNotRequired AIAgentApprovalStatus = "not_required"
+	AIAgentApprovalPending     AIAgentApprovalStatus = "pending"
+	AIAgentApprovalApproved    AIAgentApprovalStatus = "approved"
+	AIAgentApprovalRejected    AIAgentApprovalStatus = "rejected"
+)
+
+type AIAgentTaskInput struct {
+	SessionID int64          `json:"session_id"`
+	Prompt    string         `json:"prompt"`
+	Engine    *AIAgentEngine `json:"engine"`
+	CLI       *AIAgentCLI    `json:"cli"`
+}
+
+type AIAgentTask struct {
+	ID          int64             `json:"id"`
+	SessionID   int64             `json:"session_id"`
+	SessionName string            `json:"session_name"`
+	Engine      AIAgentEngine     `json:"engine"`
+	CLI         AIAgentCLI        `json:"cli"`
+	Prompt      string            `json:"prompt"`
+	Status      AIAgentTaskStatus `json:"status"`
+	StepCount   int               `json:"step_count"`
+	Result      string            `json:"result"`
+	Error       string            `json:"error"`
+	CreatedAt   time.Time         `json:"created_at"`
+	UpdatedAt   time.Time         `json:"updated_at"`
+	StartedAt   *time.Time        `json:"started_at"`
+	FinishedAt  *time.Time        `json:"finished_at"`
+	Steps       []AIAgentStep     `json:"steps"`
+}
+
+type AIAgentStep struct {
+	ID             int64                 `json:"id"`
+	TaskID         int64                 `json:"task_id"`
+	Sequence       int                   `json:"sequence"`
+	Kind           string                `json:"kind"`
+	ModelOutput    string                `json:"model_output"`
+	ToolName       string                `json:"tool_name"`
+	ToolInput      string                `json:"tool_input"`
+	ToolOutput     string                `json:"tool_output"`
+	Risk           AICommandRisk         `json:"risk"`
+	ApprovalStatus AIAgentApprovalStatus `json:"approval_status"`
+	Error          string                `json:"error"`
+	CreatedAt      time.Time             `json:"created_at"`
+	UpdatedAt      time.Time             `json:"updated_at"`
 }
 
 type AISearchMode string
