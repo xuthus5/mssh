@@ -69,6 +69,7 @@ export {
     SerialSignals,
     SerialStopBits,
     Session,
+    SessionCSVColumn,
     SessionCSVConflictPolicy,
     SessionCSVExportOptions,
     SessionCSVExportResult,
