@@ -85,19 +85,13 @@ func TestSyncServiceExportImportRestoresEncryptedFullSnapshot(t *testing.T) {
 	assert.Len(t, tunnels, 1)
 }
 
-func TestSyncServiceStrictlyRejectsOldOrIncompleteFormats(t *testing.T) {
+func TestSyncServiceRejectsIncompleteSnapshots(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	data, err := newTestSyncService(db, syncTestMasterKey).snapshot()
 	require.NoError(t, err)
-	data.FormatVersion = syncFormatVersion - 1
-	content, err := json.Marshal(data)
-	require.NoError(t, err)
 	var decoded ExportData
-	assert.ErrorContains(t, decodeSnapshot(content, &decoded), "format_version")
-
-	data.FormatVersion = syncFormatVersion
 	delete(data.Tables, "session_tags")
-	content, err = json.Marshal(data)
+	content, err := json.Marshal(data)
 	require.NoError(t, err)
 	assert.ErrorContains(t, decodeSnapshot(content, &decoded), "snapshot table session_tags is required")
 }
@@ -198,7 +192,6 @@ func TestCloudSyncUploadDownloadAndConflict(t *testing.T) {
 	require.NoError(t, syncService.SyncToCloud(server.URL, "", ""))
 	require.NoError(t, syncService.TestCloudConnection(server.URL, "", ""))
 	assert.Equal(t, `"upload"`, settingValue(t, db, syncDirectionSetting))
-	assert.Equal(t, `3`, settingValue(t, db, syncVersionSetting))
 	auditEvents, err := store.ListAuditEvents(db, model.AuditFilter{Action: "cloud_upload", Limit: 10})
 	require.NoError(t, err)
 	require.Len(t, auditEvents, 1)
@@ -298,7 +291,7 @@ func TestSyncCodecAndCloudErrorPaths(t *testing.T) {
 	t.Run("cloud payload decoding errors", func(t *testing.T) {
 		_, err := decodeEncryptedSnapshot([]byte("not-json"), syncTestMasterKey)
 		require.Error(t, err)
-		content, err := encodeEncryptedSnapshot(ExportData{FormatVersion: syncFormatVersion, Tables: map[string][]map[string]any{}}, syncTestMasterKey)
+		content, err := encodeEncryptedSnapshot(ExportData{Tables: map[string][]map[string]any{}}, syncTestMasterKey)
 		require.NoError(t, err)
 		_, err = decodeEncryptedSnapshot(content, "wrong master key")
 		require.Error(t, err)

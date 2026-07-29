@@ -2,7 +2,6 @@ package store
 
 import (
 	"database/sql"
-	"fmt"
 	"os"
 	"testing"
 
@@ -38,10 +37,6 @@ func TestOpenDBUsesSingleConnection(t *testing.T) {
 	assert.Equal(t, databaseMaxOpenConnections, db.Stats().MaxOpenConnections)
 }
 
-func TestDatabaseFormatVersion(t *testing.T) {
-	assert.Equal(t, 6, databaseFormatVersion)
-}
-
 func TestListSessionsAcceptsNullPassword(t *testing.T) {
 	db := setupTestDB(t)
 	_, err := db.Exec(`INSERT INTO sessions (folder_id, name, host, username, auth_method, password) SELECT id, 'agent', '127.0.0.1', 'root', 'agent', NULL FROM session_folders WHERE is_default = 1`)
@@ -52,40 +47,6 @@ func TestListSessionsAcceptsNullPassword(t *testing.T) {
 	require.Len(t, sessions, 1)
 	assert.Empty(t, sessions[0].Password)
 }
-
-func TestInitializeSchemaResetsIncompatibleOlderFormat(t *testing.T) {
-	db, err := OpenDB(t.TempDir())
-	require.NoError(t, err)
-	t.Cleanup(func() { require.NoError(t, db.Close()) })
-	// Simulate an older format with user data present (no full modern schema).
-	_, err = db.Exec("CREATE TABLE sessions (id INTEGER PRIMARY KEY, name TEXT NOT NULL)")
-	require.NoError(t, err)
-	_, err = db.Exec("INSERT INTO sessions (name) VALUES ('stale-data')")
-	require.NoError(t, err)
-	_, err = db.Exec("PRAGMA user_version = 1")
-	require.NoError(t, err)
-
-	// Version mismatch triggers a clean slate: rebuild from scratch, no migration.
-	require.NoError(t, InitializeSchema(db))
-
-	// Stale data is gone; fresh schema is in place with the default folder.
-	assertTableRowCount(t, rowCountExpectation{db: db, table: "sessions", condition: "name = 'stale-data'", expected: 0})
-	assertTableRowCount(t, rowCountExpectation{db: db, table: "session_folders", condition: "is_default = 1", expected: 1})
-	assertSQLiteObjectCount(t, sqliteObjectCountExpectation{db: db, objectType: "table", name: "ai_provider_profiles", expected: 1})
-	assertDatabaseFormatVersion(t, db, databaseFormatVersion)
-}
-
-func TestInitializeSchemaRejectsNewerFormat(t *testing.T) {
-	db, err := OpenDB(t.TempDir())
-	require.NoError(t, err)
-	t.Cleanup(func() { require.NoError(t, db.Close()) })
-	require.NoError(t, InitializeSchema(db))
-	_, err = db.Exec(fmt.Sprintf("PRAGMA user_version = %d", databaseFormatVersion+1))
-	require.NoError(t, err)
-	err = InitializeSchema(db)
-	require.ErrorContains(t, err, "newer than supported")
-}
-
 func TestInitializeSchemaPreservesCurrentDatabaseFormat(t *testing.T) {
 	db, err := OpenDB(t.TempDir())
 	require.NoError(t, err)
@@ -114,30 +75,6 @@ func TestInitializeSchemaAddsAITablesWithoutReset(t *testing.T) {
 	require.NoError(t, InitializeSchema(db))
 	assertTableRowCount(t, rowCountExpectation{db: db, table: "sessions", condition: "name = 'sentinel'", expected: 1})
 	assertSQLiteObjectCount(t, sqliteObjectCountExpectation{db: db, objectType: "table", name: "ai_provider_profiles", expected: 1})
-}
-
-func TestDatabaseFormatResetRollsBackOnFailure(t *testing.T) {
-	db, err := OpenDB(t.TempDir())
-	require.NoError(t, err)
-	t.Cleanup(func() { require.NoError(t, db.Close()) })
-	_, err = db.Exec("CREATE TABLE themes (name TEXT NOT NULL)")
-	require.NoError(t, err)
-	_, err = db.Exec("INSERT INTO themes (name) VALUES ('sentinel')")
-	require.NoError(t, err)
-	_, err = db.Exec("CREATE VIEW session_folders AS SELECT 1 AS id")
-	require.NoError(t, err)
-
-	require.Error(t, InitializeSchema(db))
-
-	assertTableRowCount(t, rowCountExpectation{db: db, table: "themes", condition: "name = 'sentinel'", expected: 1})
-	assertDatabaseFormatVersion(t, db, 0)
-}
-
-func assertDatabaseFormatVersion(t *testing.T, db *sql.DB, expected int) {
-	t.Helper()
-	var actual int
-	require.NoError(t, db.QueryRow("PRAGMA user_version").Scan(&actual))
-	assert.Equal(t, expected, actual)
 }
 
 type rowCountExpectation struct {
@@ -309,18 +246,4 @@ func assertClosedThemeOperations(t *testing.T, db *sql.DB) {
 
 func ptrInt64(v int64) *int64 {
 	return &v
-}
-
-func TestInitializeSchemaRejectsLegacyTablesWithoutVersion(t *testing.T) {
-	db, err := OpenDB(t.TempDir())
-	require.NoError(t, err)
-	t.Cleanup(func() { require.NoError(t, db.Close()) })
-	_, err = db.Exec("CREATE TABLE sessions (name TEXT NOT NULL)")
-	require.NoError(t, err)
-	_, err = db.Exec("INSERT INTO sessions (name) VALUES ('legacy')")
-	require.NoError(t, err)
-	err = InitializeSchema(db)
-	require.ErrorContains(t, err, "legacy database")
-	assertTableRowCount(t, rowCountExpectation{db: db, table: "sessions", condition: "name = 'legacy'", expected: 1})
-	assertDatabaseFormatVersion(t, db, 0)
 }

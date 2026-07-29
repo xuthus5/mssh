@@ -13,7 +13,6 @@ import (
 )
 
 const (
-	BackupFormatVersion       = 1
 	backupKeyLength           = 32
 	backupMinMasterKeyLength  = 12
 	backupSaltLength          = 16
@@ -27,15 +26,14 @@ const (
 )
 
 type BackupEnvelope struct {
-	FormatVersion int    `json:"format_version"`
-	Cipher        string `json:"cipher"`
-	KDF           string `json:"kdf"`
-	ArgonTime     uint32 `json:"argon_time"`
-	ArgonMemory   uint32 `json:"argon_memory"`
-	ArgonThreads  uint8  `json:"argon_threads"`
-	Salt          string `json:"salt"`
-	Nonce         string `json:"nonce"`
-	Ciphertext    string `json:"ciphertext"`
+	Cipher       string `json:"cipher"`
+	KDF          string `json:"kdf"`
+	ArgonTime    uint32 `json:"argon_time"`
+	ArgonMemory  uint32 `json:"argon_memory"`
+	ArgonThreads uint8  `json:"argon_threads"`
+	Salt         string `json:"salt"`
+	Nonce        string `json:"nonce"`
+	Ciphertext   string `json:"ciphertext"`
 }
 
 func EncryptBackup(plaintext, masterKey []byte) (BackupEnvelope, error) {
@@ -63,7 +61,7 @@ func EncryptBackupWithAAD(plaintext, masterKey, additionalData []byte) (BackupEn
 	}
 	ciphertext := aead.Seal(nil, nonce, plaintext, additionalData)
 	return BackupEnvelope{
-		FormatVersion: BackupFormatVersion, Cipher: "AES-256-GCM", KDF: "Argon2id",
+		Cipher: "AES-256-GCM", KDF: "Argon2id",
 		ArgonTime: backupArgonTime, ArgonMemory: backupArgonMemory, ArgonThreads: backupArgonThreads,
 		Salt: base64.StdEncoding.EncodeToString(salt), Nonce: base64.StdEncoding.EncodeToString(nonce),
 		Ciphertext: base64.StdEncoding.EncodeToString(ciphertext),
@@ -129,7 +127,7 @@ func newBackupAEAD(masterKey, salt []byte, time, memory uint32, threads uint8) (
 }
 
 func validateBackupEnvelope(envelope BackupEnvelope, masterKey []byte) error {
-	if envelope.FormatVersion != BackupFormatVersion || envelope.Cipher != "AES-256-GCM" || envelope.KDF != "Argon2id" {
+	if envelope.Cipher != "AES-256-GCM" || envelope.KDF != "Argon2id" {
 		return errors.New("unsupported backup encryption format")
 	}
 	if err := validateBackupMasterKey(masterKey); err != nil {

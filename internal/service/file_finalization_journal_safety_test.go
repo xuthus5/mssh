@@ -24,11 +24,10 @@ func TestTransferFinalizationJournalInvalidFilesDegradeSafely(t *testing.T) {
 		name    string
 		content []byte
 	}{
-		{name: "malformed", content: []byte(`{"version":`)},
-		{name: "unknown version", content: []byte(`{"version":2,"entries":[]}`)},
-		{name: "unknown field", content: []byte(`{"version":1,"entries":[],"extra":true}`)},
+		{name: "malformed", content: []byte(`{"entries":`)},
+		{name: "unknown field", content: []byte(`{"entries":[],"extra":true}`)},
 		{name: "invalid status", content: []byte(fmt.Sprintf(
-			`{"version":1,"entries":[{"task_id":"bad","status":"running","transferred":0,"total":0,"completed_at":%q}]}`,
+			`{"entries":[{"task_id":"bad","status":"running","transferred":0,"total":0,"completed_at":%q}]}`,
 			completedAt,
 		))},
 		{name: "oversized", content: bytes.Repeat([]byte("x"), transferFinalizationJournalMaxBytes+1)},
@@ -169,7 +168,7 @@ func seedFinalizationJournal(t *testing.T, dataDir string, entries ...finalizati
 	t.Helper()
 	journalPath := finalizationJournalPathForTest(dataDir)
 	require.NoError(t, os.MkdirAll(filepath.Dir(journalPath), 0o700))
-	document := finalizationJournalDocumentForTest{Version: 1, Entries: entries}
+	document := finalizationJournalDocumentForTest{Entries: entries}
 	data, err := jsonMarshalForTest(document)
 	require.NoError(t, err)
 	require.NoError(t, os.WriteFile(journalPath, data, 0o600))

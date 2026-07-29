@@ -54,7 +54,7 @@ func TestSyncSnapshotAndRestoreKeepLocalSecurityRotationMarker(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	service := newTestSyncService(db, syncTestMasterKey)
 	require.NoError(t, store.SetSettings(db, []model.Setting{{
-		Key: securityRotationPendingSetting, Namespace: "security", Value: `{"version":1}`, ValueType: "object", Version: 1,
+		Key: securityRotationPendingSetting, Namespace: "security", Value: `{}`, ValueType: "object", Version: 1,
 	}}))
 
 	snapshot, err := service.snapshot()

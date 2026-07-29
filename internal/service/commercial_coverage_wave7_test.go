@@ -344,11 +344,11 @@ func TestTerminalPoolClearDetachAndLRU(t *testing.T) {
 
 func TestParseSessionCSVRecordBasics(t *testing.T) {
 	columns := map[string]int{
-		"format_version": 0, "name": 1, "host": 2, "port": 3, "username": 4, "auth_method": 5,
-		"password": 6, "key_name": 7, "key_public_key": 8, "folder_path": 9, "environment": 10,
-		"project": 11, "tags": 12, "notes": 13, "keep_alive": 14, "term_type": 15,
+		"name": 0, "host": 1, "port": 2, "username": 3, "auth_method": 4,
+		"password": 5, "key_name": 6, "key_public_key": 7, "folder_path": 8, "environment": 9,
+		"project": 10, "tags": 11, "notes": 12, "keep_alive": 13, "term_type": 14,
 	}
-	values := []string{sessionCSVVersion, "n", "h", "22", "u", "password", "p", "", "", "prod/app", "prod", "pay", "db,core", "note", "30", "xterm"}
+	values := []string{"n", "h", "22", "u", "password", "p", "", "", "prod/app", "prod", "pay", "db,core", "note", "30", "xterm"}
 	rec, err := parseSessionCSVRecord(2, columns, values)
 	require.NoError(t, err)
 	assert.Equal(t, "n", rec.Name)
@@ -356,7 +356,7 @@ func TestParseSessionCSVRecordBasics(t *testing.T) {
 	assert.Equal(t, []string{"prod", "app"}, rec.FolderPath)
 	assert.Equal(t, []string{"db", "core"}, rec.Tags)
 
-	_, err = parseSessionCSVRecord(3, columns, []string{"bad", "n", "h", "22", "u", "password", "", "", "", "", "", "", "", "", "30", "xterm"})
+	_, err = parseSessionCSVRecord(3, columns, []string{"n", "h", "not-a-port", "u", "password", "", "", "", "", "", "", "", "", "30", "xterm"})
 	require.Error(t, err)
 }
 

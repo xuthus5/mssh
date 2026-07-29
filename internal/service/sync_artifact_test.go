@@ -12,7 +12,7 @@ import (
 	"github.com/xuthus5/mssh/internal/service/testutil"
 )
 
-func TestSyncArtifactRoundTripAndLegacyCompatibility(t *testing.T) {
+func TestSyncArtifactRoundTrip(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	service := newTestSyncService(db, syncTestMasterKey)
 	data, err := service.snapshot()
@@ -26,11 +26,6 @@ func TestSyncArtifactRoundTripAndLegacyCompatibility(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, metadata, decoded.Metadata)
 
-	legacy, err := encodeEncryptedSnapshot(data, syncTestMasterKey)
-	require.NoError(t, err)
-	decoded, err = decodeSyncArtifact(legacy, syncTestMasterKey)
-	require.NoError(t, err)
-	assert.Equal(t, fingerprint, decoded.Metadata.SnapshotFingerprint)
 }
 
 func TestSyncArtifactRejectsTamperedFingerprint(t *testing.T) {
@@ -96,24 +91,6 @@ func TestSyncArtifactAuthenticatesEmbeddedVault(t *testing.T) {
 
 	_, err = decodeSyncArtifact(tampered, syncTestMasterKey)
 	assert.ErrorContains(t, err, "corrupted backup")
-}
-
-func TestSyncArtifactRejectsUnauthenticatedVersionOne(t *testing.T) {
-	db := testutil.NewTestDB(t)
-	data, err := newTestSyncService(db, syncTestMasterKey).snapshot()
-	require.NoError(t, err)
-	fingerprint, err := snapshotFingerprint(data)
-	require.NoError(t, err)
-	content, err := encodeSyncArtifact(data, syncTestMasterKey, syncArtifactMetadata{SnapshotFingerprint: fingerprint}, nil)
-	require.NoError(t, err)
-	var artifact syncArtifact
-	require.NoError(t, json.Unmarshal(content, &artifact))
-	artifact.ArtifactVersion = 1
-	downgraded, err := json.Marshal(artifact)
-	require.NoError(t, err)
-
-	_, err = decodeSyncArtifact(downgraded, syncTestMasterKey)
-	assert.ErrorContains(t, err, "unsupported sync artifact version 1")
 }
 
 func TestSyncArtifactEmbedsVaultEnvelope(t *testing.T) {

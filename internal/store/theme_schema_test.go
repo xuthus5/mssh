@@ -210,39 +210,12 @@ func TestThemeCatalogSchema(t *testing.T) {
 	assert.Error(t, err)
 }
 
-func TestDatabaseFormatUsesTargetVersion(t *testing.T) {
-	db, err := OpenDB(t.TempDir())
-	require.NoError(t, err)
-	t.Cleanup(func() { require.NoError(t, db.Close()) })
-
-	require.NoError(t, initializeSchema(db, 7, setDatabaseVersion))
-
-	assertDatabaseFormatVersion(t, db, 7)
-}
-
-func TestDatabaseFormatVersionFailureRollsBack(t *testing.T) {
-	db, err := OpenDB(t.TempDir())
-	require.NoError(t, err)
-	t.Cleanup(func() { require.NoError(t, db.Close()) })
-	// Fresh database: schema create succeeds, version write fails, entire init rolls back.
-	setVersion := func(*sql.Tx, int) error { return assert.AnError }
-
-	err = initializeSchema(db, databaseFormatVersion, setVersion)
-	require.ErrorContains(t, err, "set format version")
-
-	assertDatabaseFormatVersion(t, db, 0)
-	var tables int
-	require.NoError(t, db.QueryRow("SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'").Scan(&tables))
-	assert.Equal(t, 0, tables)
-}
-
 func TestInitializeSchemaCreateStageRollsBack(t *testing.T) {
 	db, err := OpenDB(t.TempDir())
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, db.Close()) })
 	tx, err := db.Begin()
 	require.NoError(t, err)
-	require.NoError(t, setDatabaseVersion(tx, databaseFormatVersion))
 	require.NoError(t, tx.Commit())
 	originalStatements := finalSchemaStatements
 	finalSchemaStatements = append([]schemaStatement(nil), finalSchemaStatements...)
@@ -277,16 +250,6 @@ func TestInitializeSchemaDefaultFolderStageRollsBack(t *testing.T) {
 
 	assertSQLiteObjectCount(t, sqliteObjectCountExpectation{db: db, objectType: "table", name: "settings", expected: 0})
 	assertTableRowCount(t, rowCountExpectation{db: db, table: "session_folders", expected: 0})
-}
-
-func createLegacySentinels(t *testing.T, db *sql.DB) {
-	t.Helper()
-	for table := range expectedFinalSchemaSQL {
-		_, err := db.Exec("CREATE TABLE " + table + " (legacy_sentinel TEXT NOT NULL)")
-		require.NoError(t, err)
-		_, err = db.Exec("INSERT INTO "+table+" VALUES (?)", table+"-sentinel")
-		require.NoError(t, err)
-	}
 }
 
 func assertFinalSchema(t *testing.T, db *sql.DB) {

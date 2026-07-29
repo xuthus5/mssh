@@ -39,12 +39,6 @@ func (s *SyncService) ImportWithPassword(path, password string) error {
 
 func (s *SyncService) importPasswordContent(path, password string, content []byte) error {
 	artifact, vault, err := decodePasswordProtectedArtifact(content, password)
-	if errors.Is(err, errSyncVaultMissing) {
-		if importErr := withCryptoOperation(s.crypto, func() error { return s.importSnapshotContent(content) }); importErr != nil {
-			return fmt.Errorf("import: %w", importErr)
-		}
-		return nil
-	}
 	if err != nil {
 		return fmt.Errorf("import: %w", err)
 	}
@@ -117,7 +111,6 @@ func (s *SyncService) masterKey() (string, error) {
 		}
 		return key, nil
 	}
-	// Legacy fallback removed: unified app password is mandatory for encrypted sync.
 	return "", errors.New("application vault is locked or not configured")
 }
 

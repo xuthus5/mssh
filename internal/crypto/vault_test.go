@@ -122,11 +122,10 @@ func TestSyncSecretFromDEK(t *testing.T) {
 }
 
 func TestValidateVaultFileRejectsBadValues(t *testing.T) {
-	assert.Error(t, validateVaultFile(VaultFile{FormatVersion: 99}))
-	assert.Error(t, validateVaultFile(VaultFile{FormatVersion: VaultFormatVersion, Cipher: "x", KDF: "Argon2id"}))
-	assert.Error(t, validateVaultFile(VaultFile{FormatVersion: VaultFormatVersion, Cipher: "AES-256-GCM", KDF: "Argon2id"}))
+	assert.Error(t, validateVaultFile(VaultFile{Cipher: "x", KDF: "Argon2id"}))
+	assert.Error(t, validateVaultFile(VaultFile{Cipher: "AES-256-GCM", KDF: "Argon2id"}))
 	assert.Error(t, validateVaultFile(VaultFile{
-		FormatVersion: VaultFormatVersion, Cipher: "AES-256-GCM", KDF: "Argon2id",
+		Cipher: "AES-256-GCM", KDF: "Argon2id",
 		Salt: "s", Nonce: "n", WrappedDEK: "w", ArgonTime: 0, ArgonMemory: 1, ArgonThreads: 1,
 	}))
 }
@@ -207,7 +206,7 @@ func TestLoadVaultFileInvalidJSONAndValidate(t *testing.T) {
 	_, err := LoadVaultFile(path)
 	assert.Error(t, err)
 
-	require.NoError(t, os.WriteFile(path, []byte(`{"format_version":1,"cipher":"AES-256-GCM","kdf":"Argon2id","argon_time":1,"argon_memory":1,"argon_threads":1,"salt":"YQ==","nonce":"YQ==","wrapped_dek":"YQ=="}`), 0o600))
+	require.NoError(t, os.WriteFile(path, []byte(`{"cipher":"AES-256-GCM","kdf":"Argon2id","argon_time":1,"argon_memory":1,"argon_threads":1,"salt":"YQ==","nonce":"YQ==","wrapped_dek":"YQ=="}`), 0o600))
 	_, err = LoadVaultFile(path)
 	assert.ErrorContains(t, err, "unsupported vault KDF parameters")
 

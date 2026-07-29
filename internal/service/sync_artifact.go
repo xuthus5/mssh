@@ -14,8 +14,7 @@ import (
 )
 
 const (
-	syncArtifactVersion = 2
-	syncNetworkTimeout  = 20 * time.Second
+	syncNetworkTimeout = 20 * time.Second
 )
 
 var errSyncVaultMissing = errors.New("backup does not include application vault metadata")
@@ -30,16 +29,14 @@ type syncArtifactMetadata struct {
 }
 
 type syncArtifact struct {
-	ArtifactVersion int                         `json:"artifact_version"`
-	Metadata        syncArtifactMetadata        `json:"metadata"`
-	Vault           *backupcrypto.VaultFile     `json:"vault,omitempty"`
-	Backup          backupcrypto.BackupEnvelope `json:"backup"`
+	Metadata syncArtifactMetadata        `json:"metadata"`
+	Vault    *backupcrypto.VaultFile     `json:"vault,omitempty"`
+	Backup   backupcrypto.BackupEnvelope `json:"backup"`
 }
 
 type syncArtifactAuthentication struct {
-	ArtifactVersion int                     `json:"artifact_version"`
-	Metadata        syncArtifactMetadata    `json:"metadata"`
-	Vault           *backupcrypto.VaultFile `json:"vault,omitempty"`
+	Metadata syncArtifactMetadata    `json:"metadata"`
+	Vault    *backupcrypto.VaultFile `json:"vault,omitempty"`
 }
 
 type decodedSyncArtifact struct {
@@ -54,7 +51,7 @@ func encodeSyncArtifact(data ExportData, masterKey string, metadata syncArtifact
 	if err != nil {
 		return nil, fmt.Errorf("encode sync snapshot: %w", err)
 	}
-	additionalData, err := syncArtifactAdditionalData(syncArtifactVersion, metadata, vault)
+	additionalData, err := syncArtifactAdditionalData(metadata, vault)
 	if err != nil {
 		return nil, err
 	}
@@ -62,7 +59,7 @@ func encodeSyncArtifact(data ExportData, masterKey string, metadata syncArtifact
 	if err != nil {
 		return nil, fmt.Errorf("encrypt sync snapshot: %w", err)
 	}
-	payload := syncArtifact{ArtifactVersion: syncArtifactVersion, Metadata: metadata, Backup: backup, Vault: vault}
+	payload := syncArtifact{Metadata: metadata, Backup: backup, Vault: vault}
 	content, err := json.MarshalIndent(payload, "", "  ")
 	if err != nil {
 		return nil, fmt.Errorf("encode sync artifact: %w", err)
@@ -75,13 +72,7 @@ func decodeSyncArtifact(content []byte, masterKey string) (decodedSyncArtifact, 
 	if err := json.Unmarshal(content, &artifact); err != nil {
 		return decodedSyncArtifact{}, fmt.Errorf("decode sync artifact: %w", err)
 	}
-	if artifact.ArtifactVersion == 0 {
-		return decodeLegacySyncArtifact(content, masterKey)
-	}
-	if artifact.ArtifactVersion != syncArtifactVersion {
-		return decodedSyncArtifact{}, fmt.Errorf("unsupported sync artifact version %d", artifact.ArtifactVersion)
-	}
-	additionalData, err := syncArtifactAdditionalData(artifact.ArtifactVersion, artifact.Metadata, artifact.Vault)
+	additionalData, err := syncArtifactAdditionalData(artifact.Metadata, artifact.Vault)
 	if err != nil {
 		return decodedSyncArtifact{}, err
 	}
@@ -105,36 +96,10 @@ func peekSyncArtifactVault(content []byte) (*backupcrypto.VaultFile, error) {
 	if err := json.Unmarshal(content, &artifact); err != nil {
 		return nil, fmt.Errorf("decode sync artifact: %w", err)
 	}
-	if artifact.ArtifactVersion == 0 {
-		return nil, errSyncVaultMissing
-	}
-	if artifact.ArtifactVersion != syncArtifactVersion {
-		return nil, fmt.Errorf("unsupported sync artifact version %d", artifact.ArtifactVersion)
-	}
 	if artifact.Vault == nil {
 		return nil, errSyncVaultMissing
 	}
 	return artifact.Vault, nil
-}
-
-func decodeLegacySyncArtifact(content []byte, masterKey string) (decodedSyncArtifact, error) {
-	var envelope backupcrypto.BackupEnvelope
-	if err := json.Unmarshal(content, &envelope); err != nil {
-		return decodedSyncArtifact{}, err
-	}
-	data, err := decryptSyncBackup(envelope, masterKey)
-	if err != nil {
-		return decodedSyncArtifact{}, err
-	}
-	fingerprint, err := snapshotFingerprint(data)
-	if err != nil {
-		return decodedSyncArtifact{}, err
-	}
-	return decodedSyncArtifact{Data: data, Metadata: syncArtifactMetadata{SnapshotFingerprint: fingerprint}, Content: content}, nil
-}
-
-func decryptSyncBackup(envelope backupcrypto.BackupEnvelope, masterKey string) (ExportData, error) {
-	return decryptSyncBackupAuthenticated(envelope, masterKey, nil)
 }
 
 func decryptSyncBackupAuthenticated(envelope backupcrypto.BackupEnvelope, masterKey string, additionalData []byte) (ExportData, error) {
@@ -149,8 +114,8 @@ func decryptSyncBackupAuthenticated(envelope backupcrypto.BackupEnvelope, master
 	return data, nil
 }
 
-func syncArtifactAdditionalData(version int, metadata syncArtifactMetadata, vault *backupcrypto.VaultFile) ([]byte, error) {
-	additionalData, err := json.Marshal(syncArtifactAuthentication{ArtifactVersion: version, Metadata: metadata, Vault: vault})
+func syncArtifactAdditionalData(metadata syncArtifactMetadata, vault *backupcrypto.VaultFile) ([]byte, error) {
+	additionalData, err := json.Marshal(syncArtifactAuthentication{Metadata: metadata, Vault: vault})
 	if err != nil {
 		return nil, fmt.Errorf("encode sync artifact authentication data: %w", err)
 	}
@@ -158,7 +123,7 @@ func syncArtifactAdditionalData(version int, metadata syncArtifactMetadata, vaul
 }
 
 func snapshotFingerprint(data ExportData) (string, error) {
-	canonical := ExportData{FormatVersion: data.FormatVersion, Tables: make(map[string][]map[string]any, len(data.Tables))}
+	canonical := ExportData{Tables: make(map[string][]map[string]any, len(data.Tables))}
 	for table, rows := range data.Tables {
 		ordered := append([]map[string]any(nil), rows...)
 		sort.Slice(ordered, func(left, right int) bool {

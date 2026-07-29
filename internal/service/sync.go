@@ -21,12 +21,10 @@ import (
 
 const (
 	SyncMasterKeySetting = "sync.master_key"
-	syncFormatVersion    = 3
 	syncRecoveryFileName = "pre-import.msshbackup"
 	syncETagSetting      = "sync.etag"
 	syncLastAtSetting    = "sync.last_at"
 	syncDirectionSetting = "sync.last_direction"
-	syncVersionSetting   = "sync.format_version"
 	maxCloudBackupSize   = 32 * 1024 * 1024
 )
 
@@ -84,8 +82,7 @@ func NewSyncService(db *sql.DB, logger *slog.Logger, options ...SyncOption) *Syn
 }
 
 type ExportData struct {
-	FormatVersion int                         `json:"format_version"`
-	Tables        map[string][]map[string]any `json:"tables"`
+	Tables map[string][]map[string]any `json:"tables"`
 }
 
 func (s *SyncService) Export(path string) error {
@@ -173,7 +170,7 @@ func snapshotFromTables(querier tableQuerier) (ExportData, error) {
 		}
 		tables[table] = rows
 	}
-	return ExportData{FormatVersion: syncFormatVersion, Tables: tables}, nil
+	return ExportData{Tables: tables}, nil
 }
 
 func decodeSnapshot(content []byte, data *ExportData) error {
@@ -187,9 +184,6 @@ func decodeSnapshot(content []byte, data *ExportData) error {
 	var trailing any
 	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
 		return errors.New("decode snapshot: trailing JSON value")
-	}
-	if data.FormatVersion != syncFormatVersion {
-		return fmt.Errorf("snapshot format_version must be %d, got %d", syncFormatVersion, data.FormatVersion)
 	}
 	for _, table := range backupTables {
 		if _, ok := data.Tables[table]; !ok {

@@ -76,19 +76,11 @@ func snapshotSettingVersion(row map[string]any) (int, error) {
 	if !exists {
 		return 0, fmt.Errorf("missing version")
 	}
-	if snapshotVersionIsOne(raw) {
-		return 1, nil
+	value, ok := raw.(int64)
+	if !ok || int64(int(value)) != value {
+		return 0, fmt.Errorf("version must be an integer")
 	}
-	return 0, fmt.Errorf("version must be integer 1")
-}
-
-func snapshotVersionIsOne(value any) bool {
-	switch typed := value.(type) {
-	case int64:
-		return typed == 1
-	default:
-		return false
-	}
+	return int(value), nil
 }
 
 func snapshotSettingUpdatedAt(row map[string]any) (time.Time, error) {

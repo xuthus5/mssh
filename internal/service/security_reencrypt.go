@@ -159,12 +159,6 @@ func planProxyPasswordSetting(db *sql.DB, oldCrypto, newCrypto KeyCrypto) (*mode
 	}
 	entry.Value = string(payload)
 	entry.ValueType = "string"
-	if entry.Namespace == "" {
-		entry.Namespace = "application"
-	}
-	if entry.Version == 0 {
-		entry.Version = 1
-	}
 	return entry, nil
 }
 

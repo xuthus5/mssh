@@ -54,14 +54,6 @@ func (s *SyncService) importSnapshot(path string) error {
 	return s.importSnapshotContentWithKey(content, path, masterKey)
 }
 
-func (s *SyncService) importSnapshotContent(content []byte) error {
-	masterKey, err := s.masterKey()
-	if err != nil {
-		return err
-	}
-	return s.importSnapshotContentWithKey(content, "", masterKey)
-}
-
 func (s *SyncService) importSnapshotContentWithKey(content []byte, path, masterKey string) error {
 	artifact, err := decodeSyncArtifact(content, masterKey)
 	if err != nil {
