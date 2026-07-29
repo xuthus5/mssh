@@ -181,10 +181,12 @@ function AppShell() {
       <WindowTitleBar />
       <div className="flex min-h-0 flex-1">
         <div className={activeSurface === null ? 'hidden' : 'contents'}><Sidebar /></div>
-        <main className="relative flex min-w-0 flex-1 flex-col">
+        <main className="flex min-w-0 flex-1 flex-col">
           <WorkspaceRestoreBanner />
-          <WorkspaceContent />
-          <TerminalLayers />
+          <div className="relative min-h-0 flex-1 overflow-hidden">
+            <WorkspaceContent />
+            <TerminalLayers />
+          </div>
         </main>
       </div>
       <StatusBar />
