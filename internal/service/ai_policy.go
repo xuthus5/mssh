@@ -18,9 +18,9 @@ var (
 		regexp.MustCompile(`-----BEGIN [A-Z ]+-----[\s\S]*?-----END [A-Z ]+-----`),
 	}
 	aiBlockedPatterns = []*regexp.Regexp{
-		regexp.MustCompile(`(?i)\brm\s+(-[a-z]*f[a-z]*\s+)?/($|\s)`),
-		regexp.MustCompile(`(?i)\b(mkfs|fdisk|parted)\b`),
-		regexp.MustCompile(`(?i)\bdd\s+.*\bof=/dev/`),
+		regexp.MustCompile(`(?i)\brm\b[^\r\n;&|]*\s(?:--\s+)?/(?:\*+)?(?:\s|$)`),
+		regexp.MustCompile(`(?i)\b(mkfs(?:\.[a-z0-9]+)?|fdisk|cfdisk|sfdisk|parted|sgdisk|wipefs|blkdiscard)\b`),
+		regexp.MustCompile(`(?i)\bdd\s+.*\bof\s*=\s*/dev/`),
 		regexp.MustCompile(`(?i)\b(shutdown|reboot|poweroff|halt)\b`),
 		regexp.MustCompile(`(?i)\b(iptables|nft)\b.*\b(-F|flush|delete)\b`),
 	}
@@ -178,6 +178,9 @@ func validateAISettings(settings model.AISettings) error {
 }
 
 func validateAIInteractionSettings(settings model.AIInteractionSettings) error {
+	if err := validateAIAgentSettings(settings.Agent); err != nil {
+		return err
+	}
 	if settings.PanelWidth < 300 || settings.PanelWidth > 720 {
 		return fmt.Errorf("AI panel width must be between 300 and 720")
 	}
@@ -189,6 +192,21 @@ func validateAIInteractionSettings(settings model.AIInteractionSettings) error {
 	}
 	if settings.MaxConversations < 1 || settings.MaxConversations > 1000 {
 		return fmt.Errorf("AI max conversations must be between 1 and 1000")
+	}
+	return nil
+}
+
+func validateAIAgentSettings(settings model.AIAgentSettings) error {
+	switch settings.DefaultEngine {
+	case model.AIAgentEngineNative:
+	case model.AIAgentEngineLocalCLI:
+		switch settings.DefaultCLI {
+		case model.AIAgentCLICodex, model.AIAgentCLIClaude, model.AIAgentCLIOpenCode:
+		default:
+			return fmt.Errorf("unsupported default AI agent CLI %s", settings.DefaultCLI)
+		}
+	default:
+		return fmt.Errorf("unsupported default AI agent engine %s", settings.DefaultEngine)
 	}
 	return nil
 }
@@ -228,7 +246,7 @@ func validateAISecuritySettings(settings model.AISecuritySettings) error {
 
 func defaultAISettings() model.AISettings {
 	return model.AISettings{
-		Interaction: model.AIInteractionSettings{PanelWidth: 420, ContextLines: 80, IncludeSessionMetadata: true, IncludeSystemSummary: true, StreamResponses: true, AutoScroll: true, RenderMarkdown: true, HistoryRetentionDays: 30, MaxConversations: 100},
+		Interaction: model.AIInteractionSettings{PanelWidth: 420, ContextLines: 80, IncludeSessionMetadata: true, IncludeSystemSummary: true, StreamResponses: true, AutoScroll: true, RenderMarkdown: true, HistoryRetentionDays: 30, MaxConversations: 100, Agent: model.AIAgentSettings{DefaultEngine: model.AIAgentEngineNative, DefaultCLI: model.AIAgentCLICodex}},
 		Search:      model.AISearchSettings{Mode: model.AISearchAuto, Provider: model.AISearchProviderBrave, TimeoutSeconds: 10, MaxResults: 5, RequireCitations: true},
 		Security:    model.AISecuritySettings{CommandTimeoutSeconds: 60, MaxOutputBytes: 64 * 1024, MaxPlanSteps: 5},
 	}

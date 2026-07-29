@@ -68,6 +68,7 @@ type appDependencies struct {
 	openDB                      func(string) (*sql.DB, error)
 	initializeSchema            func(*sql.DB) error
 	recoverInterruptedTransfers func(*sql.DB) error
+	recoverInterruptedAgents    func(*sql.DB) error
 	initializeServices          func(serviceInitialization) (*App, error)
 	closeDB                     func(*sql.DB) error
 	keychain                    crypto.KeychainAdapter
@@ -78,6 +79,7 @@ func defaultAppDependencies(openDB func(string) (*sql.DB, error)) appDependencie
 		openDB:                      openDB,
 		initializeSchema:            store.InitializeSchema,
 		recoverInterruptedTransfers: store.MarkInterruptedTransfers,
+		recoverInterruptedAgents:    store.MarkAIAgentTasksInterrupted,
 		initializeServices:          initializeServices,
 		closeDB:                     func(db *sql.DB) error { return db.Close() },
 		keychain:                    crypto.NewKeychainAdapter(),
@@ -118,13 +120,8 @@ func startApp(opts Options, logger *slog.Logger, dependencies appDependencies) (
 		logger.Error("initialize database schema failed", "error", err)
 		return nil, fmt.Errorf("initialize database schema: %w", err)
 	}
-	recoverInterruptedTransfers := dependencies.recoverInterruptedTransfers
-	if recoverInterruptedTransfers == nil {
-		recoverInterruptedTransfers = store.MarkInterruptedTransfers
-	}
-	if err = recoverInterruptedTransfers(db); err != nil {
-		logger.Error("recover interrupted transfers failed", "error", err)
-		return nil, fmt.Errorf("recover interrupted transfers: %w", err)
+	if err = recoverInterruptedRuntime(db, logger, dependencies); err != nil {
+		return nil, err
 	}
 
 	eventBus := event.NewWailsEventBus(logger)
@@ -284,7 +281,7 @@ func assembleApp(input serviceInitialization, runtime *service.CryptoRuntime, se
 		Font:           service.NewFontService(input.logger),
 		Audit:          service.NewAuditService(input.db, input.logger),
 		AssetCatalog:   service.NewAssetCatalogService(input.db, input.logger),
-		AI:             service.NewAIService(input.db, terminalSvc, input.keychain, input.logger, service.WithAIProxy(input.opts.ProxyManager), service.WithAIModelsDevDataDir(input.opts.DataDir)),
+		AI:             service.NewAIService(input.db, terminalSvc, input.keychain, input.logger, service.WithAIProxy(input.opts.ProxyManager), service.WithAIModelsDevDataDir(input.opts.DataDir), service.WithAIAgentRuntime(sessionSvc, input.eventBus)),
 		Security:       securitySvc,
 		Serial:         serialSvc,
 		logger:         input.logger,

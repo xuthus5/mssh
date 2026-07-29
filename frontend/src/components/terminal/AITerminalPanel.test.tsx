@@ -7,13 +7,13 @@ import { AI_CONFIGURATION_CHANGED_EVENT } from '@/lib/settingsWindowEvents'
 
 const ai = vi.hoisted(() => ({
   dashboard: vi.fn(), listConversations: vi.fn(), listMessages: vi.fn(),
-  chat: vi.fn(), executeCommand: vi.fn(),
+  chat: vi.fn(), executeCommand: vi.fn(), listAgentTasks: vi.fn(),
 }))
 const scrollIntoView = vi.fn()
 
 vi.mock('@/lib/wails', () => ({ AIService: {
   Dashboard: ai.dashboard, ListConversations: ai.listConversations, ListMessages: ai.listMessages,
-  Chat: ai.chat, ExecuteCommand: ai.executeCommand,
+  Chat: ai.chat, ExecuteCommand: ai.executeCommand, ListAgentTasks: ai.listAgentTasks,
 } }))
 
 import { AITerminalPanel } from '@/components/terminal/AITerminalPanel'
@@ -32,6 +32,7 @@ describe('AITerminalPanel', () => {
     ai.listMessages.mockResolvedValue([])
     ai.chat.mockResolvedValue({ conversation_id: 9, answer: '建议先检查服务', provider_id: 1, citations: [], commands: [{ command: 'systemctl status nginx', purpose: '检查服务', risk: 'read_only', blocked: false, blocked_reason: '', can_auto_execute: false, requires_confirmation: true }] })
     ai.executeCommand.mockResolvedValue(undefined)
+    ai.listAgentTasks.mockResolvedValue([])
     Object.defineProperty(Element.prototype, 'scrollIntoView', { configurable: true, value: scrollIntoView })
     scrollIntoView.mockClear()
     useAppStore.setState({ terminalPool: new Map([['term-1', { terminal: terminalWithLines(['old', 'current']) as never, lastUsed: 0 }]]) })
@@ -48,6 +49,16 @@ describe('AITerminalPanel', () => {
     expect(ai.executeCommand).not.toHaveBeenCalled()
     await user.click(await screen.findByRole('button', { name: '审批并执行' }))
     expect(ai.executeCommand).toHaveBeenCalledWith(expect.objectContaining({ command: 'systemctl status nginx', approved: true }))
+  })
+
+  it('switches between chat and Agent task modes', async () => {
+    render(<AITerminalPanel terminalID="term-1" sessionID={7} onClose={vi.fn()} />)
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: 'Agent 任务' }))
+    expect(await screen.findByPlaceholderText('描述要在 当前 SSH 会话 上完成的任务')).toBeInTheDocument()
+    expect(ai.listAgentTasks).toHaveBeenCalledWith(7, 100)
+    await user.click(screen.getByRole('button', { name: '对话' }))
+    expect(screen.getByPlaceholderText('描述要排查或执行的运维任务')).toBeInTheDocument()
   })
 
   it('loads history, enables search, handles citations and closes', async () => {
@@ -402,5 +413,5 @@ function conversationMessage(id: number, content: string): AIMessage {
 }
 
 function aiDashboard(options: { autoScroll?: boolean; contextLines?: number; searchEnabled?: boolean; searchMode?: string } = {}) {
-  return { keychain_available: true, providers: [{ id: 1, name: 'main', provider: 'openai_compatible', base_url: '', default_model: 'model', enabled: true, credential_saved: true, credential_session_only: false, context_window_size: 0, skip_tls_verify: false, max_tokens: 0, temperature: null, top_p: null, frequency_penalty: null, presence_penalty: null, custom_headers: {}, created_at: '', updated_at: '' }], settings: { default_provider_id: 1, fallback_provider_id: null, interaction: { panel_width: 420, context_lines: options.contextLines ?? 80, include_session_metadata: true, include_system_summary: true, stream_responses: true, auto_scroll: options.autoScroll ?? true, render_markdown: true, history_retention_days: 30, max_conversations: 100 }, search: { enabled: options.searchEnabled ?? false, mode: options.searchMode ?? 'auto', provider: 'brave', timeout_seconds: 10, max_results: 5, require_citations: true, credential_saved: false, credential_session_only: false }, security: { auto_execute_read_only: false, command_timeout_seconds: 60, max_output_bytes: 65536, max_plan_steps: 5, allow_patterns: [], deny_patterns: [], redaction_patterns: [] } } }
+  return { keychain_available: true, providers: [{ id: 1, name: 'main', provider: 'openai_compatible', base_url: '', default_model: 'model', enabled: true, credential_saved: true, credential_session_only: false, context_window_size: 0, skip_tls_verify: false, max_tokens: 0, temperature: null, top_p: null, frequency_penalty: null, presence_penalty: null, custom_headers: {}, created_at: '', updated_at: '' }], settings: { default_provider_id: 1, fallback_provider_id: null, interaction: { panel_width: 420, context_lines: options.contextLines ?? 80, include_session_metadata: true, include_system_summary: true, stream_responses: true, auto_scroll: options.autoScroll ?? true, render_markdown: true, history_retention_days: 30, max_conversations: 100, agent: { default_engine: 'native', default_cli: 'codex' } }, search: { enabled: options.searchEnabled ?? false, mode: options.searchMode ?? 'auto', provider: 'brave', timeout_seconds: 10, max_results: 5, require_citations: true, credential_saved: false, credential_session_only: false }, security: { auto_execute_read_only: false, command_timeout_seconds: 60, max_output_bytes: 65536, max_plan_steps: 5, allow_patterns: [], deny_patterns: [], redaction_patterns: [] } } }
 }

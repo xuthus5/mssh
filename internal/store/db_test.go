@@ -47,6 +47,7 @@ func TestListSessionsAcceptsNullPassword(t *testing.T) {
 	require.Len(t, sessions, 1)
 	assert.Empty(t, sessions[0].Password)
 }
+
 func TestInitializeSchemaPreservesCurrentDatabaseFormat(t *testing.T) {
 	db, err := OpenDB(t.TempDir())
 	require.NoError(t, err)

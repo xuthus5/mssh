@@ -8,7 +8,7 @@ import { useAutoSave, type UseAutoSaveResult } from '@/hooks/useAutoSave'
 import { useDraftSync } from '@/hooks/useDraftSync'
 import { useSettingsWindowHide } from '@/hooks/useSettingsWindowHide'
 import type { AISettingsController } from '@/hooks/useAISettings'
-import { AISearchMode, AISearchProvider, type AISettingsDashboard, type AISettingsInput } from '../../../bindings/github.com/xuthus5/mssh/internal/model/models'
+import { AIAgentCLI, AIAgentEngine, AISearchMode, AISearchProvider, type AISettingsDashboard, type AISettingsInput } from '../../../bindings/github.com/xuthus5/mssh/internal/model/models'
 import { t } from '@/i18n'
 
 
@@ -25,6 +25,7 @@ const emptyAISettingsInput: AISettingsInput = {
     render_markdown: true,
     history_retention_days: 30,
     max_conversations: 100,
+    agent: { default_engine: AIAgentEngine.AIAgentEngineNative, default_cli: AIAgentCLI.AIAgentCLICodex },
   },
   search: {
     enabled: false,
@@ -150,7 +151,7 @@ function AISettingsTabs({ controller, dashboard, draft, autoSave, update, remove
         <AIProviderPanel controller={controller} priorities={draft} onPriorityChange={update} onProviderDeleted={removeProvider} />
       </TabsContent>
       <TabsContent value="agents" className="min-h-0 overflow-y-auto">
-        <AIAgentPanel controller={controller} />
+        <AIAgentPanel controller={controller} draft={draft} update={update} />
       </TabsContent>
       <TabsContent value="interaction" className="min-h-0 overflow-y-auto">
         <AIInteractionSettingsSection draft={draft} update={update} />

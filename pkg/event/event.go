@@ -12,6 +12,8 @@ const (
 	TunnelState        = "tunnel:state"
 	HostKeyFingerprint = "session:fingerprint"
 	VaultLocked        = "security:vault-locked"
+	AIAgentTaskChanged = "ai:agent-task-changed"
+	AIAgentStepChanged = "ai:agent-step-changed"
 )
 
 type TerminalOutputPayload struct {

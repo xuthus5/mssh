@@ -229,6 +229,28 @@ const aiCommandExecutionsTableSQL = `CREATE TABLE IF NOT EXISTS ai_command_execu
 	created_at TEXT NOT NULL DEFAULT (datetime('now'))
 )`
 
+const aiAgentTasksTableSQL = `CREATE TABLE IF NOT EXISTS ai_agent_tasks (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	session_id INTEGER NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+	engine TEXT NOT NULL CHECK(engine IN ('native','local_cli')),
+	cli TEXT NOT NULL DEFAULT '' CHECK(cli IN ('','codex','claude','opencode')),
+	prompt TEXT NOT NULL,
+	status TEXT NOT NULL CHECK(status IN ('pending','running','waiting_approval','completed','failed','cancelled','interrupted')),
+	step_count INTEGER NOT NULL DEFAULT 0, result TEXT NOT NULL DEFAULT '', error TEXT NOT NULL DEFAULT '',
+	created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+	started_at TEXT, finished_at TEXT
+)`
+
+const aiAgentStepsTableSQL = `CREATE TABLE IF NOT EXISTS ai_agent_steps (
+	id INTEGER PRIMARY KEY AUTOINCREMENT, task_id INTEGER NOT NULL REFERENCES ai_agent_tasks(id) ON DELETE CASCADE,
+	sequence INTEGER NOT NULL, kind TEXT NOT NULL, model_output TEXT NOT NULL DEFAULT '', tool_name TEXT NOT NULL DEFAULT '',
+	tool_input TEXT NOT NULL DEFAULT '', tool_output TEXT NOT NULL DEFAULT '',
+	risk TEXT NOT NULL DEFAULT 'read_only' CHECK(risk IN ('read_only','modify','high','blocked')),
+	approval_status TEXT NOT NULL DEFAULT 'not_required' CHECK(approval_status IN ('not_required','pending','approved','rejected')),
+	error TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+	UNIQUE(task_id, sequence)
+)`
+
 type schemaStatement struct {
 	name string
 	sql  string
@@ -253,5 +275,10 @@ var finalSchemaStatements = []schemaStatement{
 	{name: "ai_conversations", sql: aiConversationsTableSQL}, {name: "ai_messages", sql: aiMessagesTableSQL},
 	{name: "ai_messages_conversation_idx", sql: "CREATE INDEX IF NOT EXISTS ai_messages_conversation_idx ON ai_messages(conversation_id, id)"},
 	{name: "ai_command_executions", sql: aiCommandExecutionsTableSQL},
+	{name: "ai_agent_tasks", sql: aiAgentTasksTableSQL},
+	{name: "ai_agent_steps", sql: aiAgentStepsTableSQL},
+	{name: "ai_agent_tasks_active_session_idx", sql: "CREATE UNIQUE INDEX IF NOT EXISTS ai_agent_tasks_active_session_idx ON ai_agent_tasks(session_id) WHERE status IN ('pending','running','waiting_approval')"},
+	{name: "ai_agent_tasks_session_idx", sql: "CREATE INDEX IF NOT EXISTS ai_agent_tasks_session_idx ON ai_agent_tasks(session_id, id DESC)"},
+	{name: "ai_agent_steps_task_idx", sql: "CREATE INDEX IF NOT EXISTS ai_agent_steps_task_idx ON ai_agent_steps(task_id, sequence)"},
 	{name: "settings", sql: settingsTableSQL}, {name: "themes", sql: themeDefinitionsSchema}, {name: "terminal_theme_profiles", sql: themeProfilesSchema},
 }
