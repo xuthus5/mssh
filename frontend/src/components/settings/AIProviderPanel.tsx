@@ -12,6 +12,9 @@ import { AIProviderType } from '../../../bindings/github.com/xuthus5/mssh/intern
 import type { AISettingsController } from '@/hooks/useAISettings'
 import { useAIProviderPanelRuntime, type AIProviderPanelRuntime } from '@/components/settings/aiProviderPanelRuntime'
 import { AIProviderAdvancedFields } from '@/components/settings/AIProviderAdvancedFields'
+import { AIProviderCatalogFields } from '@/components/settings/AIProviderCatalogFields'
+import { selectedCatalogModel } from '@/components/settings/aiModelsDevCatalog'
+import { useModelsDevCatalog } from '@/hooks/useModelsDevCatalog'
 import { t } from '@/i18n'
 
 const providerLabels = { openai_compatible: 'OpenAI 兼容', anthropic: 'Anthropic', gemini: 'Gemini', ollama: 'Ollama' } as const
@@ -28,9 +31,10 @@ interface Props {
 
 export function AIProviderPanel({ controller, priorities, onPriorityChange, onProviderDeleted }: Props) {
   const model = useAIProviderPanelRuntime(controller, onProviderDeleted)
+  const catalog = useModelsDevCatalog()
   return <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(220px,0.8fr)_minmax(360px,1.5fr)]">
     <ProviderListCard model={model} priorities={priorities} onPriorityChange={onPriorityChange} />
-    <ProviderEditorCard controller={controller} model={model} />
+    <ProviderEditorCard controller={controller} model={model} catalog={catalog} />
   </div>
 }
 
@@ -57,13 +61,14 @@ function ProviderSelect({ ariaLabel, placeholder, emptyLabel, value, providers, 
   return <Select value={String(value ?? 'none')} onValueChange={onChange}><SelectTrigger aria-label={ariaLabel} className="w-full"><SelectValue placeholder={placeholder} /></SelectTrigger><SelectContent><SelectItem value="none">{emptyLabel}</SelectItem>{providers.map((profile) => <SelectItem key={profile.id} value={String(profile.id)} disabled={!profile.enabled || profile.id === excludedID}>{profile.name}{profile.enabled ? '' : `（${t('未启用')}）`}</SelectItem>)}</SelectContent></Select>
 }
 
-function ProviderEditorCard({ controller, model }: { controller: AISettingsController; model: AIProviderPanelRuntime }) {
-  return <Card className="min-w-0 shadow-sm"><CardHeader><CardTitle className="text-sm">{model.draft.id ? t('编辑提供商') : t('新增提供商')}</CardTitle></CardHeader><CardContent className="grid gap-4">{controller.error ? <div className="rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive" role="alert">{controller.error}</div> : null}<ProviderFields model={model} /><ProviderActions controller={controller} model={model} /></CardContent></Card>
+function ProviderEditorCard({ controller, model, catalog }: { controller: AISettingsController; model: AIProviderPanelRuntime; catalog: ReturnType<typeof useModelsDevCatalog> }) {
+  return <Card className="min-w-0 shadow-sm"><CardHeader><CardTitle className="text-sm">{model.draft.id ? t('编辑提供商') : t('新增提供商')}</CardTitle></CardHeader><CardContent className="grid gap-4">{controller.error ? <div className="rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive" role="alert">{controller.error}</div> : null}<ProviderFields model={model} catalog={catalog} /><ProviderActions controller={controller} model={model} /></CardContent></Card>
 }
 
-function ProviderFields({ model }: { model: AIProviderPanelRuntime }) {
+function ProviderFields({ model, catalog }: { model: AIProviderPanelRuntime; catalog: ReturnType<typeof useModelsDevCatalog> }) {
   const update = model.updateDraft
-  return <><div className="grid gap-3 sm:grid-cols-2"><Field label={t('名称')}><Input aria-label={t('名称')} value={model.draft.name} onChange={(event) => update((current) => ({ ...current, name: event.target.value }))} placeholder={t('例如：主模型')} /></Field><Field label={t('类型')}><Select value={model.draft.provider} onValueChange={(value) => update((current) => ({ ...current, provider: value as AIProviderType, base_url: defaultBaseURL(value as ProviderKind) }))}><SelectTrigger aria-label={t('类型')} className="w-full"><SelectValue /></SelectTrigger><SelectContent>{Object.entries(providerLabels).map(([value, label]) => <SelectItem key={value} value={value}>{t(label)}</SelectItem>)}</SelectContent></Select></Field></div><Field label="Base URL"><Input aria-label="Base URL" value={model.draft.base_url} onChange={(event) => update((current) => ({ ...current, base_url: event.target.value }))} placeholder="https://api.openai.com/v1" /></Field><div className="grid gap-3 sm:grid-cols-2"><Field label={t('默认模型')}><Input aria-label={t('默认模型')} value={model.draft.default_model} onChange={(event) => update((current) => ({ ...current, default_model: event.target.value }))} placeholder={t('模型名称')} /></Field><Field label={model.draft.id && model.selected?.credential_saved ? t('API Key（已保存，留空保持不变）') : 'API Key'}><Input aria-label="API Key" type="password" value={model.draft.api_key} onChange={(event) => update((current) => ({ ...current, api_key: event.target.value }))} autoComplete="new-password" /></Field></div><AIProviderAdvancedFields draft={model.draft} update={model.updateDraft} /><label className="flex items-center justify-between rounded-lg border border-border px-3 py-2 text-sm"><span>{t('启用此提供商')}</span><Switch checked={model.draft.enabled} onCheckedChange={(enabled) => update((current) => ({ ...current, enabled }))} /></label></>
+  const selectedModel = selectedCatalogModel(catalog.catalog, model.draft)
+  return <><AIProviderCatalogFields {...catalog} draft={model.draft} update={update} /><div className="grid gap-3 sm:grid-cols-2"><Field label={t('名称')}><Input aria-label={t('名称')} value={model.draft.name} onChange={(event) => update((current) => ({ ...current, name: event.target.value }))} placeholder={t('例如：主模型')} /></Field><Field label={t('类型')}><Select value={model.draft.provider} onValueChange={(value) => update((current) => ({ ...current, provider: value as AIProviderType, base_url: defaultBaseURL(value as ProviderKind) }))}><SelectTrigger aria-label={t('类型')} className="w-full"><SelectValue /></SelectTrigger><SelectContent>{Object.entries(providerLabels).map(([value, label]) => <SelectItem key={value} value={value}>{t(label)}</SelectItem>)}</SelectContent></Select></Field></div><Field label="Base URL"><Input aria-label="Base URL" value={model.draft.base_url} onChange={(event) => update((current) => ({ ...current, base_url: event.target.value }))} placeholder="https://api.openai.com/v1" /></Field><div className="grid gap-3 sm:grid-cols-2"><Field label={t('默认模型')}><Input aria-label={t('默认模型')} value={model.draft.default_model} onChange={(event) => update((current) => ({ ...current, default_model: event.target.value }))} placeholder={t('模型名称')} /></Field><Field label={model.draft.id && model.selected?.credential_saved ? t('API Key（已保存，留空保持不变）') : 'API Key'}><Input aria-label="API Key" type="password" value={model.draft.api_key} onChange={(event) => update((current) => ({ ...current, api_key: event.target.value }))} autoComplete="new-password" /></Field></div><AIProviderAdvancedFields draft={model.draft} update={model.updateDraft} model={selectedModel} /><label className="flex items-center justify-between rounded-lg border border-border px-3 py-2 text-sm"><span>{t('启用此提供商')}</span><Switch checked={model.draft.enabled} onCheckedChange={(enabled) => update((current) => ({ ...current, enabled }))} /></label></>
 }
 
 function ProviderActions({ controller, model }: { controller: AISettingsController; model: AIProviderPanelRuntime }) {

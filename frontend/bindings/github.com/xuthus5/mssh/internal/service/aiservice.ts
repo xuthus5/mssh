@@ -51,9 +51,18 @@ export function ListMessages(conversationID: number): $CancellablePromise<model$
     });
 }
 
+/**
+ * ModelsDevCatalog returns models.dev entries compatible with MSSH's provider protocols.
+ */
+export function ModelsDevCatalog(refresh: boolean): $CancellablePromise<model$0.ModelsDevCatalog> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.AIService.ModelsDevCatalog", refresh).then(($result: any) => {
+        return $$createType8($result);
+    });
+}
+
 export function SaveProvider(input: model$0.AIProviderProfileInput): $CancellablePromise<model$0.AIProviderProfile | null> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.AIService.SaveProvider", input).then(($result: any) => {
-        return $$createType9($result);
+        return $$createType10($result);
     });
 }
 
@@ -74,5 +83,6 @@ const $$createType4 = model$0.AIConversation.createFrom;
 const $$createType5 = $Create.Array($$createType4);
 const $$createType6 = model$0.AIMessage.createFrom;
 const $$createType7 = $Create.Array($$createType6);
-const $$createType8 = model$0.AIProviderProfile.createFrom;
-const $$createType9 = $Create.Nullable($$createType8);
+const $$createType8 = model$0.ModelsDevCatalog.createFrom;
+const $$createType9 = model$0.AIProviderProfile.createFrom;
+const $$createType10 = $Create.Nullable($$createType9);
