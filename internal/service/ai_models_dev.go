@@ -2,8 +2,10 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
+	"os"
 	"sort"
 	"strings"
 	"time"
@@ -13,7 +15,6 @@ import (
 
 const (
 	modelsDevAPIURL           = "https://models.dev/api.json"
-	modelsDevCacheTTL         = 6 * time.Hour
 	maxModelsDevResponseBytes = 32 * 1024 * 1024
 )
 
@@ -51,12 +52,25 @@ func (s *AIService) ModelsDevCatalog(refresh bool) (model.ModelsDevCatalog, erro
 
 	s.modelsDevMu.Lock()
 	defer s.modelsDevMu.Unlock()
-	if !refresh && !s.modelsDevCache.CachedAt.IsZero() && time.Since(s.modelsDevCache.CachedAt) < modelsDevCacheTTL {
-		return cloneModelsDevCatalog(s.modelsDevCache), nil
+	if !refresh {
+		if !s.modelsDevCache.CachedAt.IsZero() {
+			return cloneModelsDevCatalog(s.modelsDevCache), nil
+		}
+		cached, cacheErr := readModelsDevCatalogCache(s.modelsDevCachePath)
+		if cacheErr == nil {
+			s.modelsDevCache = cached
+			return cloneModelsDevCatalog(cached), nil
+		}
+		if !errors.Is(cacheErr, os.ErrNotExist) && s.logger != nil {
+			s.logger.Warn("read models.dev cache failed", "error", cacheErr)
+		}
 	}
 	catalog, err := s.fetchModelsDevCatalog(ctx)
 	if err != nil {
 		return model.ModelsDevCatalog{}, err
+	}
+	if err := writeModelsDevCatalogCache(s.modelsDevCachePath, catalog); err != nil {
+		return model.ModelsDevCatalog{}, fmt.Errorf("persist models.dev catalog: %w", err)
 	}
 	s.modelsDevCache = catalog
 	return cloneModelsDevCatalog(catalog), nil

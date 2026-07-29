@@ -284,7 +284,7 @@ func assembleApp(input serviceInitialization, runtime *service.CryptoRuntime, se
 		Font:           service.NewFontService(input.logger),
 		Audit:          service.NewAuditService(input.db, input.logger),
 		AssetCatalog:   service.NewAssetCatalogService(input.db, input.logger),
-		AI:             service.NewAIService(input.db, terminalSvc, input.keychain, input.logger, input.opts.ProxyManager),
+		AI:             service.NewAIService(input.db, terminalSvc, input.keychain, input.logger, service.WithAIProxy(input.opts.ProxyManager), service.WithAIModelsDevDataDir(input.opts.DataDir)),
 		Security:       securitySvc,
 		Serial:         serialSvc,
 		logger:         input.logger,

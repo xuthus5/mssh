@@ -1,8 +1,11 @@
 package service
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -48,6 +51,94 @@ func TestAIServiceModelsDevCatalog(t *testing.T) {
 	_, err = service.ModelsDevCatalog(true)
 	require.NoError(t, err)
 	assert.Equal(t, int32(2), requests.Load(), "refresh should bypass the cache")
+}
+
+func TestAIServiceModelsDevCatalogPersistsUntilExplicitRefresh(t *testing.T) {
+	dataDir := t.TempDir()
+	var requests atomic.Int32
+	server := modelsDevTestServer(t, &requests, func(requestNumber int32) (int, string) {
+		return http.StatusOK, modelsDevFixture
+	})
+
+	first := newModelsDevTestService(t, server, WithAIModelsDevDataDir(dataDir))
+	catalog, err := first.ModelsDevCatalog(false)
+	require.NoError(t, err)
+	cachePath := filepath.Join(dataDir, modelsDevCacheFilename)
+	info, err := os.Stat(cachePath)
+	require.NoError(t, err)
+	assert.Equal(t, os.FileMode(0o600), info.Mode().Perm())
+
+	cache := modelsDevCacheFile{FormatVersion: modelsDevCacheFormatVersion, Catalog: catalog}
+	cache.Catalog.CachedAt = time.Unix(1, 0).UTC()
+	content, err := json.Marshal(cache)
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(cachePath, content, 0o600))
+
+	second := newModelsDevTestService(t, server, WithAIModelsDevDataDir(dataDir))
+	loaded, err := second.ModelsDevCatalog(false)
+	require.NoError(t, err)
+	assert.Equal(t, time.Unix(1, 0).UTC(), loaded.CachedAt)
+	assert.Equal(t, int32(1), requests.Load(), "persisted cache should prevent background refresh")
+
+	_, err = second.ModelsDevCatalog(true)
+	require.NoError(t, err)
+	assert.Equal(t, int32(2), requests.Load(), "explicit refresh should request the catalog")
+}
+
+func TestAIServiceModelsDevCatalogRepairsInvalidLocalCache(t *testing.T) {
+	dataDir := t.TempDir()
+	cachePath := filepath.Join(dataDir, modelsDevCacheFilename)
+	require.NoError(t, os.WriteFile(cachePath, []byte(`{`), 0o600))
+	var requests atomic.Int32
+	server := modelsDevTestServer(t, &requests, func(requestNumber int32) (int, string) {
+		return http.StatusOK, modelsDevFixture
+	})
+	service := newModelsDevTestService(t, server, WithAIModelsDevDataDir(dataDir))
+
+	catalog, err := service.ModelsDevCatalog(false)
+	require.NoError(t, err)
+	require.NotEmpty(t, catalog.Providers)
+	assert.Equal(t, int32(1), requests.Load())
+	content, err := os.ReadFile(cachePath)
+	require.NoError(t, err)
+	var cache modelsDevCacheFile
+	require.NoError(t, json.Unmarshal(content, &cache))
+	assert.Equal(t, modelsDevCacheFormatVersion, cache.FormatVersion)
+}
+
+func TestAIServiceModelsDevCatalogRefreshFailurePreservesLocalCache(t *testing.T) {
+	dataDir := t.TempDir()
+	var requests atomic.Int32
+	server := modelsDevTestServer(t, &requests, func(requestNumber int32) (int, string) {
+		if requestNumber == 1 {
+			return http.StatusOK, modelsDevFixture
+		}
+		return http.StatusBadGateway, `{}`
+	})
+	service := newModelsDevTestService(t, server, WithAIModelsDevDataDir(dataDir))
+	first, err := service.ModelsDevCatalog(false)
+	require.NoError(t, err)
+
+	_, err = service.ModelsDevCatalog(true)
+	require.Error(t, err)
+	reloaded := newModelsDevTestService(t, server, WithAIModelsDevDataDir(dataDir))
+	fromCache, err := reloaded.ModelsDevCatalog(false)
+	require.NoError(t, err)
+	assert.Equal(t, first.CachedAt, fromCache.CachedAt)
+	assert.Equal(t, int32(2), requests.Load())
+}
+
+func TestAIServiceModelsDevCatalogReportsCacheWriteFailure(t *testing.T) {
+	dataDir := filepath.Join(t.TempDir(), "missing")
+	var requests atomic.Int32
+	server := modelsDevTestServer(t, &requests, func(requestNumber int32) (int, string) {
+		return http.StatusOK, modelsDevFixture
+	})
+	service := newModelsDevTestService(t, server, WithAIModelsDevDataDir(dataDir))
+
+	_, err := service.ModelsDevCatalog(false)
+	require.ErrorContains(t, err, "persist models.dev catalog")
+	assert.Equal(t, int32(1), requests.Load())
 }
 
 func TestAIServiceModelsDevCatalogErrors(t *testing.T) {
@@ -127,6 +218,27 @@ func modelsDevTextModel(id, name string) modelsDevModelPayload {
 }
 
 func boolPointer(value bool) *bool { return &value }
+
+func modelsDevTestServer(t *testing.T, requests *atomic.Int32, response func(int32) (int, string)) *httptest.Server {
+	t.Helper()
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		requestNumber := requests.Add(1)
+		status, body := response(requestNumber)
+		writer.WriteHeader(status)
+		_, err := writer.Write([]byte(body))
+		require.NoError(t, err)
+	}))
+	t.Cleanup(server.Close)
+	return server
+}
+
+func newModelsDevTestService(t *testing.T, server *httptest.Server, options ...AIServiceOption) *AIService {
+	t.Helper()
+	service := NewAIService(testutil.NewTestDB(t), nil, nil, testutil.NewTestLogger(), options...)
+	service.modelsDevURL = server.URL
+	service.httpClient = server.Client()
+	return service
+}
 
 func catalogProviderIDs(catalog model.ModelsDevCatalog) []string {
 	ids := make([]string, 0, len(catalog.Providers))
