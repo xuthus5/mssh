@@ -45,7 +45,6 @@ func TestInitializeSchemaConcurrentHandlesPreserveFinalData(t *testing.T) {
 	require.NoError(t, waitForInitializeResult(t, secondResult))
 
 	assertConcurrentSentinelCount(t, firstDB, 1)
-	assertConcurrentDatabaseVersion(t, firstDB, databaseFormatVersion)
 	assert.Equal(t, 2, barrier.beginCount())
 }
 
@@ -55,13 +54,6 @@ func assertConcurrentSentinelCount(t *testing.T, db *sql.DB, expected int) {
 	require.NoError(t, db.QueryRow(
 		"SELECT count(*) FROM sessions WHERE name = 'concurrent-sentinel'",
 	).Scan(&actual))
-	assert.Equal(t, expected, actual)
-}
-
-func assertConcurrentDatabaseVersion(t *testing.T, db *sql.DB, expected int) {
-	t.Helper()
-	var actual int
-	require.NoError(t, db.QueryRow("PRAGMA user_version").Scan(&actual))
 	assert.Equal(t, expected, actual)
 }
 

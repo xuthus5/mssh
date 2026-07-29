@@ -44,15 +44,15 @@ func defaultDBOpenDependencies() dbOpenDependencies {
 	}
 }
 
-func openDBWithDependencies(dataDir string, dependencies dbOpenDependencies) (*sql.DB, error) {
-	if err := dependencies.mkdirAll(dataDir, 0o700); err != nil {
+func openDBWithDependencies(dataDir string, deps dbOpenDependencies) (*sql.DB, error) {
+	if err := deps.mkdirAll(dataDir, 0o700); err != nil {
 		return nil, fmt.Errorf("create data directory: %w", err)
 	}
-	if err := dependencies.chmod(dataDir, 0o700); err != nil {
+	if err := deps.chmod(dataDir, 0o700); err != nil {
 		return nil, fmt.Errorf("secure data directory: %w", err)
 	}
 	dbPath := filepath.Join(dataDir, "mssh.db")
-	file, err := dependencies.openFile(dbPath, os.O_RDWR|os.O_CREATE, 0o600)
+	file, err := deps.openFile(dbPath, os.O_RDWR|os.O_CREATE, 0o600)
 	if err != nil {
 		return nil, fmt.Errorf("open database file: %w", err)
 	}
@@ -63,13 +63,13 @@ func openDBWithDependencies(dataDir string, dependencies dbOpenDependencies) (*s
 		return nil, fmt.Errorf("close database file: %w", err)
 	}
 	dsn := dbPath + "?_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)&_pragma=foreign_keys(1)&_txlock=immediate"
-	db, err := dependencies.sqlOpen("sqlite", dsn)
+	db, err := deps.sqlOpen("sqlite", dsn)
 	if err != nil {
-		return nil, errors.Join(fmt.Errorf("open database: %w", err), closeOpenedDB(db, dependencies.closeDB))
+		return nil, errors.Join(fmt.Errorf("open database: %w", err), closeOpenedDB(db, deps.closeDB))
 	}
 	db.SetMaxOpenConns(databaseMaxOpenConnections)
-	if err = dependencies.ping(db); err != nil {
-		return nil, errors.Join(fmt.Errorf("ping database: %w", err), closeOpenedDB(db, dependencies.closeDB))
+	if err = deps.ping(db); err != nil {
+		return nil, errors.Join(fmt.Errorf("ping database: %w", err), closeOpenedDB(db, deps.closeDB))
 	}
 	return db, nil
 }
@@ -92,105 +92,19 @@ func closeOpenedDB(db *sql.DB, closeDB func(*sql.DB) error) error {
 }
 
 func InitializeSchema(db *sql.DB) error {
-	return initializeSchema(db, databaseFormatVersion, setDatabaseVersion)
-}
-
-func initializeSchema(db *sql.DB, targetVersion int, setVersion func(*sql.Tx, int) error) error {
 	tx, err := db.Begin()
 	if err != nil {
 		return fmt.Errorf("initialize schema: begin transaction: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
-	currentVersion, err := databaseVersion(tx)
-	if err != nil {
-		return fmt.Errorf("initialize schema: read format version: %w", err)
-	}
-	if currentVersion > targetVersion {
-		return fmt.Errorf("initialize schema: database format %d is newer than supported %d; upgrade the application", currentVersion, targetVersion)
-	}
-	// Version mismatch: discard the incompatible database and rebuild from scratch.
-	if currentVersion != 0 && currentVersion != targetVersion {
-		if err = dropAllApplicationTables(tx); err != nil {
-			return fmt.Errorf("initialize schema: reset incompatible format %d: %w", currentVersion, err)
-		}
-		currentVersion = 0
-	}
-	if err = rejectLegacyTablesWithoutVersion(tx, currentVersion); err != nil {
-		return err
-	}
 	if err = createFinalSchema(tx); err != nil {
 		return err
 	}
 	if err = initializeDefaultFolder(tx); err != nil {
 		return err
 	}
-	if currentVersion != targetVersion {
-		if err = setVersion(tx, targetVersion); err != nil {
-			return fmt.Errorf("initialize schema: set format version: %w", err)
-		}
-	}
 	if err = tx.Commit(); err != nil {
 		return fmt.Errorf("initialize schema: commit transaction: %w", err)
-	}
-	return nil
-}
-
-// rejectLegacyTablesWithoutVersion refuses half-migrated/legacy tables without a format version.
-func rejectLegacyTablesWithoutVersion(tx *sql.Tx, currentVersion int) error {
-	if currentVersion != 0 {
-		return nil
-	}
-	exists, err := hasApplicationTables(tx)
-	if err != nil {
-		return fmt.Errorf("initialize schema: inspect tables: %w", err)
-	}
-	if exists {
-		return fmt.Errorf("initialize schema: legacy database without supported format version detected; export data and recreate the database")
-	}
-	return nil
-}
-
-func databaseVersion(tx *sql.Tx) (int, error) {
-	var version int
-	if err := tx.QueryRow("PRAGMA user_version").Scan(&version); err != nil {
-		return 0, err
-	}
-	return version, nil
-}
-
-func hasApplicationTables(tx *sql.Tx) (bool, error) {
-	var count int
-	err := tx.QueryRow(`SELECT count(*) FROM sqlite_master WHERE type IN ('table', 'view') AND name NOT LIKE 'sqlite_%'`).Scan(&count)
-	if err != nil {
-		return false, err
-	}
-	return count > 0, nil
-}
-
-// dropAllApplicationTables removes every user table so the schema can be rebuilt.
-// Used when the on-disk database format version does not match the supported version.
-// SQLite automatically drops indexes associated with a dropped table.
-func dropAllApplicationTables(tx *sql.Tx) error {
-	rows, err := tx.Query(`SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'`)
-	if err != nil {
-		return err
-	}
-	var names []string
-	for rows.Next() {
-		var name string
-		if err = rows.Scan(&name); err != nil {
-			_ = rows.Close()
-			return err
-		}
-		names = append(names, name)
-	}
-	if closeErr := rows.Close(); closeErr != nil {
-		return closeErr
-	}
-	for _, name := range names {
-		if _, err = tx.Exec(fmt.Sprintf("DROP TABLE IF EXISTS %q", name)); err != nil {
-			return err
-		}
 	}
 	return nil
 }
@@ -202,11 +116,6 @@ func createFinalSchema(tx *sql.Tx) error {
 		}
 	}
 	return nil
-}
-
-func setDatabaseVersion(tx *sql.Tx, version int) error {
-	_, err := tx.Exec(fmt.Sprintf("PRAGMA user_version = %d", version))
-	return err
 }
 
 func initializeDefaultFolder(tx *sql.Tx) error {

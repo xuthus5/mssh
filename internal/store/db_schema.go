@@ -1,10 +1,5 @@
 package store
 
-const databaseFormatVersion = 6
-
-// DatabaseFormatVersion exposes the supported on-disk format version.
-func DatabaseFormatVersion() int { return databaseFormatVersion }
-
 const foldersTableSQL = `CREATE TABLE IF NOT EXISTS session_folders (
 	id INTEGER PRIMARY KEY AUTOINCREMENT,
 	name TEXT NOT NULL,

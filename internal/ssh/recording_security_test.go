@@ -269,7 +269,6 @@ func writeRecordingFixture(t *testing.T, termTypeLength uint32, entryTimestamp u
 	file, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
 	require.NoError(t, err)
 	require.NoError(t, binary.Write(file, binary.LittleEndian, magicNumber))
-	require.NoError(t, binary.Write(file, binary.LittleEndian, fileVersion))
 	require.NoError(t, binary.Write(file, binary.LittleEndian, uint32(80)))
 	require.NoError(t, binary.Write(file, binary.LittleEndian, uint32(24)))
 	require.NoError(t, binary.Write(file, binary.LittleEndian, termTypeLength))

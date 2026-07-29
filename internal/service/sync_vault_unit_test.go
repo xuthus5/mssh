@@ -100,7 +100,7 @@ func TestSyncServiceAdoptVaultFromContent(t *testing.T) {
 			return &stubVaultInstallTransaction{}, nil
 		}),
 	)
-	// malformed content must remain distinguishable from a legacy artifact.
+	// Malformed content must not start a vault installation.
 	assert.Error(t, svc.AdoptVaultFromContent("initial-pass-12", []byte("{")))
 	assert.False(t, installed)
 }

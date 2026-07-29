@@ -135,13 +135,12 @@ func mapSessionCSVRow(values []string, columns map[string]int, mapping, defaults
 
 func defaultSessionCSVImportValues() map[string]string {
 	return map[string]string{
-		"format_version": sessionCSVVersion,
-		"port":           "22",
-		"auth_method":    string(model.AuthPassword),
-		"folder_path":    "[]",
-		"tags":           "[]",
-		"keep_alive":     strconv.Itoa(DefaultKeepAliveSeconds),
-		"term_type":      "xterm-256color",
+		"port":        "22",
+		"auth_method": string(model.AuthPassword),
+		"folder_path": "[]",
+		"tags":        "[]",
+		"keep_alive":  strconv.Itoa(DefaultKeepAliveSeconds),
+		"term_type":   "xterm-256color",
 	}
 }
 

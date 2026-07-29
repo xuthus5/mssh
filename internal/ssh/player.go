@@ -83,13 +83,6 @@ func (p *Player) parseHeader(r io.Reader) error {
 	if magic != magicNumber {
 		return ErrInvalidMagic
 	}
-	var version uint32
-	if err := binary.Read(r, binary.LittleEndian, &version); err != nil {
-		return fmt.Errorf("read version: %w", err)
-	}
-	if version != uint32(fileVersion) {
-		return fmt.Errorf("unsupported file version %d", version)
-	}
 	var cols, rows uint32
 	if err := binary.Read(r, binary.LittleEndian, &cols); err != nil {
 		return fmt.Errorf("read cols: %w", err)

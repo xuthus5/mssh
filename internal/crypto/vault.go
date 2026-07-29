@@ -18,7 +18,6 @@ import (
 )
 
 const (
-	VaultFormatVersion  = 1
 	VaultFileName       = "vault.json"
 	vaultKeyLength      = 32
 	vaultSaltLength     = 16
@@ -33,16 +32,15 @@ const (
 
 // VaultFile is the on-disk envelope that wraps a random DEK with a password-derived KEK.
 type VaultFile struct {
-	FormatVersion int    `json:"format_version"`
-	Cipher        string `json:"cipher"`
-	KDF           string `json:"kdf"`
-	ArgonTime     uint32 `json:"argon_time"`
-	ArgonMemory   uint32 `json:"argon_memory"`
-	ArgonThreads  uint8  `json:"argon_threads"`
-	Salt          string `json:"salt"`
-	Nonce         string `json:"nonce"`
-	WrappedDEK    string `json:"wrapped_dek"`
-	UpdatedAt     string `json:"updated_at"`
+	Cipher       string `json:"cipher"`
+	KDF          string `json:"kdf"`
+	ArgonTime    uint32 `json:"argon_time"`
+	ArgonMemory  uint32 `json:"argon_memory"`
+	ArgonThreads uint8  `json:"argon_threads"`
+	Salt         string `json:"salt"`
+	Nonce        string `json:"nonce"`
+	WrappedDEK   string `json:"wrapped_dek"`
+	UpdatedAt    string `json:"updated_at"`
 }
 
 // VaultExport is embedded in encrypted backups so another device can restore the same DEK.
@@ -191,16 +189,15 @@ func wrapDEK(password string, dek []byte) (VaultFile, error) {
 	}
 	wrapped := aead.Seal(nil, nonce, dek, nil)
 	return VaultFile{
-		FormatVersion: VaultFormatVersion,
-		Cipher:        "AES-256-GCM",
-		KDF:           "Argon2id",
-		ArgonTime:     vaultArgonTime,
-		ArgonMemory:   vaultArgonMemory,
-		ArgonThreads:  vaultArgonThreads,
-		Salt:          base64.StdEncoding.EncodeToString(salt),
-		Nonce:         base64.StdEncoding.EncodeToString(nonce),
-		WrappedDEK:    base64.StdEncoding.EncodeToString(wrapped),
-		UpdatedAt:     time.Now().UTC().Format(time.RFC3339),
+		Cipher:       "AES-256-GCM",
+		KDF:          "Argon2id",
+		ArgonTime:    vaultArgonTime,
+		ArgonMemory:  vaultArgonMemory,
+		ArgonThreads: vaultArgonThreads,
+		Salt:         base64.StdEncoding.EncodeToString(salt),
+		Nonce:        base64.StdEncoding.EncodeToString(nonce),
+		WrappedDEK:   base64.StdEncoding.EncodeToString(wrapped),
+		UpdatedAt:    time.Now().UTC().Format(time.RFC3339),
 	}, nil
 }
 
@@ -249,9 +246,6 @@ func unwrapDEK(password string, vault VaultFile) ([]byte, error) {
 }
 
 func validateVaultFile(vault VaultFile) error {
-	if vault.FormatVersion != VaultFormatVersion {
-		return fmt.Errorf("unsupported vault format %d", vault.FormatVersion)
-	}
 	if vault.Cipher != "AES-256-GCM" || vault.KDF != "Argon2id" {
 		return errors.New("unsupported vault encryption parameters")
 	}

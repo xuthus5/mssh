@@ -166,13 +166,13 @@ func stoppedSyncMutationCases(service *SyncService, path string) []stoppedSyncMu
 		{name: "test provider", call: func() error { return service.TestProvider(syncTestConfigInput()) }},
 		{name: "save config", call: func() error { _, err := service.SaveConfig(syncTestConfigInput()); return err }},
 		{name: "join", call: func() error { _, err := service.JoinWithPassword(syncTestConfigInput(), "password-123"); return err }},
-		{name: "legacy test", call: func() error { return service.TestCloudConnection("https://sync.example.test/backup", "", "") }},
-		{name: "legacy upload", call: func() error { return service.SyncToCloud("https://sync.example.test/backup", "", "") }},
-		{name: "legacy download", call: func() error { return service.SyncFromCloud("https://sync.example.test/backup", "", "") }},
+		{name: "cloud connection", call: func() error { return service.TestCloudConnection("https://sync.example.test/backup", "", "") }},
+		{name: "cloud upload", call: func() error { return service.SyncToCloud("https://sync.example.test/backup", "", "") }},
+		{name: "cloud download", call: func() error { return service.SyncFromCloud("https://sync.example.test/backup", "", "") }},
 	}
 }
 
-func TestSyncServiceShutdownCancelsLegacyCloudRequests(t *testing.T) {
+func TestSyncServiceShutdownCancelsCloudRequests(t *testing.T) {
 	tests := []struct {
 		name string
 		call func(*SyncService, string) error
@@ -185,12 +185,12 @@ func TestSyncServiceShutdownCancelsLegacyCloudRequests(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			assertLegacyCloudRequestCancelledOnShutdown(t, test.call)
+			assertCloudRequestCancelledOnShutdown(t, test.call)
 		})
 	}
 }
 
-func assertLegacyCloudRequestCancelledOnShutdown(t *testing.T, call func(*SyncService, string) error) {
+func assertCloudRequestCancelledOnShutdown(t *testing.T, call func(*SyncService, string) error) {
 	t.Helper()
 	requestStarted := make(chan struct{})
 	releaseHandler := make(chan struct{})

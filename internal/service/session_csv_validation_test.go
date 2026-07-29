@@ -68,7 +68,6 @@ func TestSessionCSVHeaderAndRecordValidation(t *testing.T) {
 		name   string
 		values map[string]string
 	}{
-		{name: "version", values: map[string]string{"format_version": "2"}},
 		{name: "port type", values: map[string]string{"port": "ssh"}},
 		{name: "port range", values: map[string]string{"port": "70000"}},
 		{name: "keep alive", values: map[string]string{"keep_alive": "90000"}},

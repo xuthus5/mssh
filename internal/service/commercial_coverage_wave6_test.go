@@ -91,8 +91,7 @@ func TestSyncImportWithPasswordInstallerError(t *testing.T) {
 
 func TestSyncAdoptVaultNilVaultAndInstallerFail(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	// content with artifact version but no vault field
-	data := ExportData{FormatVersion: syncFormatVersion, Tables: map[string][]map[string]any{}}
+	data := ExportData{Tables: map[string][]map[string]any{}}
 	fp, err := snapshotFingerprint(data)
 	require.NoError(t, err)
 	content, err := encodeSyncArtifact(data, "secret-from-vault-xx", syncArtifactMetadata{SnapshotFingerprint: fp, CreatedAt: time.Now().UTC()}, nil)

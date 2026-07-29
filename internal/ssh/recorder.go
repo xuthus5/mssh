@@ -12,7 +12,6 @@ import (
 
 const (
 	magicNumber uint64 = 0x474F4C5F4853534D
-	fileVersion uint32 = 1
 )
 
 type Recorder struct {
@@ -68,9 +67,6 @@ func (r *Recorder) writeHeader(cols, rows uint32, termBytes []byte) error {
 		return err
 	}
 	if err := binary.Write(r.file, binary.LittleEndian, magicNumber); err != nil {
-		return err
-	}
-	if err := binary.Write(r.file, binary.LittleEndian, fileVersion); err != nil {
 		return err
 	}
 	if err := binary.Write(r.file, binary.LittleEndian, cols); err != nil {

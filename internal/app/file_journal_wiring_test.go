@@ -47,7 +47,6 @@ func seedAppTransferJournal(t *testing.T, dataDir string) {
 	journalDir := filepath.Join(dataDir, "transfer-finalizations")
 	require.NoError(t, os.MkdirAll(journalDir, 0o700))
 	document := map[string]any{
-		"version": 1,
 		"entries": []map[string]any{{
 			"task_id": "app-journal", "status": "completed", "error_message": "",
 			"transferred": int64(12), "total": int64(12),

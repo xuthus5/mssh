@@ -27,7 +27,7 @@ func (s *SecurityService) rotateProtectedData(input model.SecurityRotateInput) e
 	if err != nil {
 		return err
 	}
-	marker := securityRotationMarker{Version: securityRotationMarkerVersion, OldVault: vault, NewVault: next}
+	marker := securityRotationMarker{OldVault: vault, NewVault: next}
 	if err := s.writePendingRotation(marker); err != nil {
 		return err
 	}

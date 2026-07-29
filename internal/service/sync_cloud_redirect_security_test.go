@@ -13,13 +13,13 @@ import (
 	"github.com/xuthus5/mssh/internal/service/testutil"
 )
 
-func TestLegacyCloudUploadRejectsCrossOriginTemporaryRedirect(t *testing.T) {
+func TestCloudUploadRejectsCrossOriginTemporaryRedirect(t *testing.T) {
 	var attackerCalls atomic.Int32
 	attacker := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		attackerCalls.Add(1)
 		_, readErr := io.ReadAll(request.Body)
 		if readErr != nil {
-			t.Errorf("read redirected legacy cloud body: %v", readErr)
+			t.Errorf("read redirected cloud body: %v", readErr)
 		}
 		writer.WriteHeader(http.StatusNoContent)
 	}))
@@ -36,7 +36,7 @@ func TestLegacyCloudUploadRejectsCrossOriginTemporaryRedirect(t *testing.T) {
 	assert.Zero(t, attackerCalls.Load())
 }
 
-func TestLegacyCloudUploadDoesNotFollowMovedRedirect(t *testing.T) {
+func TestCloudUploadDoesNotFollowMovedRedirect(t *testing.T) {
 	var redirectedCalls atomic.Int32
 	var serverURL string
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
@@ -57,7 +57,7 @@ func TestLegacyCloudUploadDoesNotFollowMovedRedirect(t *testing.T) {
 	assert.Zero(t, redirectedCalls.Load())
 }
 
-func TestLegacyCloudConnectionRejectsCrossOriginRedirect(t *testing.T) {
+func TestCloudConnectionRejectsCrossOriginRedirect(t *testing.T) {
 	var attackerCalls atomic.Int32
 	attacker := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
 		attackerCalls.Add(1)
@@ -76,7 +76,7 @@ func TestLegacyCloudConnectionRejectsCrossOriginRedirect(t *testing.T) {
 	assert.Zero(t, attackerCalls.Load())
 }
 
-func TestLegacyCloudUploadAllowsSameOriginTemporaryRedirect(t *testing.T) {
+func TestCloudUploadAllowsSameOriginTemporaryRedirect(t *testing.T) {
 	var uploadedBytes atomic.Int64
 	var serverURL string
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
@@ -86,7 +86,7 @@ func TestLegacyCloudUploadAllowsSameOriginTemporaryRedirect(t *testing.T) {
 		}
 		content, readErr := io.ReadAll(request.Body)
 		if readErr != nil {
-			t.Errorf("read same-origin legacy cloud body: %v", readErr)
+			t.Errorf("read same-origin cloud body: %v", readErr)
 			return
 		}
 		uploadedBytes.Store(int64(len(content)))
@@ -101,7 +101,7 @@ func TestLegacyCloudUploadAllowsSameOriginTemporaryRedirect(t *testing.T) {
 	assert.Positive(t, uploadedBytes.Load())
 }
 
-func TestLegacyCloudUploadRejectsDeferredStatus(t *testing.T) {
+func TestCloudUploadRejectsDeferredStatus(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
 		writer.WriteHeader(http.StatusAccepted)
 	}))

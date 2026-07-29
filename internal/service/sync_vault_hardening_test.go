@@ -37,24 +37,6 @@ func TestSyncVaultOperationsRejectBusyState(t *testing.T) {
 	assert.ErrorContains(t, err, "sync operation is already running")
 }
 
-func TestImportWithPasswordSupportsLegacyArtifactUnderCryptoGate(t *testing.T) {
-	db := testutil.NewTestDB(t)
-	secret := syncTestMasterKey
-	service := newTestSyncService(db, secret, WithSyncDataDir(t.TempDir()))
-	data, err := service.snapshot()
-	require.NoError(t, err)
-	content, err := encodeEncryptedSnapshot(data, secret)
-	require.NoError(t, err)
-	path := filepath.Join(t.TempDir(), "legacy.msshbackup")
-	require.NoError(t, writePrivateFileAtomic(path, content))
-	require.NoError(t, service.ImportWithPassword(path, "legacy-password-12"))
-
-	broken, err := encodeEncryptedSnapshot(data, "different-master-key")
-	require.NoError(t, err)
-	require.NoError(t, writePrivateFileAtomic(path, broken))
-	assert.Error(t, service.ImportWithPassword(path, "legacy-password-12"))
-}
-
 func TestImportWithPasswordRejectsRestoreSetupAndCommitFailures(t *testing.T) {
 	t.Run("snapshot validation", func(t *testing.T) {
 		db := testutil.NewTestDB(t)

@@ -140,8 +140,6 @@ func TestLoadThemeAssignmentsRejectsInvalidSettingContract(t *testing.T) {
 	}{
 		{name: "namespace mismatch", query: `UPDATE settings SET namespace = 'appearance' WHERE key = ?`, args: []any{darkThemeProfileKey}},
 		{name: "namespace must be terminal", query: `UPDATE settings SET namespace = 'terminal.theme' WHERE key = ?`, args: []any{darkThemeProfileKey}},
-		{name: "legacy namespace", query: `UPDATE settings SET namespace = 'legacy' WHERE key = ?`, args: []any{darkThemeProfileKey}},
-		{name: "unsupported version", query: `UPDATE settings SET version = 2 WHERE key = ?`, args: []any{darkThemeProfileKey}},
 		{name: "invalid timestamp", query: `UPDATE settings SET updated_at = 'invalid' WHERE key = ?`, args: []any{darkThemeProfileKey}},
 		{name: "invalid json", query: `UPDATE settings SET value = '{' WHERE key = ?`, args: []any{darkThemeProfileKey}},
 		{name: "mismatched json type", query: `UPDATE settings SET value = 'true' WHERE key = ?`, args: []any{darkThemeProfileKey}},

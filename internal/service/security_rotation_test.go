@@ -23,7 +23,7 @@ func TestRecoverPendingRotationRestoresOldVaultAfterNewVaultWasInstalled(t *test
 	nextVault, _, err := crypto.RotateVaultPassword("old-password-12", "next-password-12", oldVault, nil)
 	require.NoError(t, err)
 	require.NoError(t, crypto.SaveVaultFile(crypto.VaultPath(dir), oldVault))
-	require.NoError(t, svc.writePendingRotation(securityRotationMarker{Version: securityRotationMarkerVersion, OldVault: oldVault, NewVault: nextVault}))
+	require.NoError(t, svc.writePendingRotation(securityRotationMarker{OldVault: oldVault, NewVault: nextVault}))
 	require.NoError(t, crypto.SaveVaultFile(crypto.VaultPath(dir), nextVault))
 
 	require.NoError(t, svc.RecoverPendingRotation())
@@ -44,7 +44,7 @@ func TestRecoverPendingRotationClearsMarkerWhenDatabaseAndVaultRemainOld(t *test
 	nextVault, _, err := crypto.RotateVaultPassword("old-password-12", "next-password-12", oldVault, nil)
 	require.NoError(t, err)
 	require.NoError(t, crypto.SaveVaultFile(crypto.VaultPath(dir), oldVault))
-	require.NoError(t, svc.writePendingRotation(securityRotationMarker{Version: securityRotationMarkerVersion, OldVault: oldVault, NewVault: nextVault}))
+	require.NoError(t, svc.writePendingRotation(securityRotationMarker{OldVault: oldVault, NewVault: nextVault}))
 
 	require.NoError(t, svc.RecoverPendingRotation())
 	entry, err := store.GetSettingEntry(svc.db, securityRotationPendingSetting)
@@ -63,7 +63,7 @@ func TestRecoverPendingRotationRejectsUnknownVaultState(t *testing.T) {
 	unknownVault, _, err := crypto.CreateVault("unknown-password")
 	require.NoError(t, err)
 	require.NoError(t, crypto.SaveVaultFile(crypto.VaultPath(dir), unknownVault))
-	require.NoError(t, svc.writePendingRotation(securityRotationMarker{Version: securityRotationMarkerVersion, OldVault: oldVault, NewVault: nextVault}))
+	require.NoError(t, svc.writePendingRotation(securityRotationMarker{OldVault: oldVault, NewVault: nextVault}))
 
 	err = svc.RecoverPendingRotation()
 	assert.ErrorContains(t, err, "unknown vault state")
@@ -359,8 +359,7 @@ func TestDecodeRotationMarkerRejectsInvalidPayloads(t *testing.T) {
 		raw  string
 	}{
 		{name: "malformed", raw: "{"},
-		{name: "unsupported version", raw: `{"version":2}`},
-		{name: "incomplete", raw: `{"version":1,"old_vault":{},"new_vault":{}}`},
+		{name: "incomplete", raw: `{"old_vault":{},"new_vault":{}}`},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

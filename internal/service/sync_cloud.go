@@ -271,7 +271,7 @@ func (s *SyncService) cloudETag() (string, error) {
 }
 
 func (s *SyncService) saveCloudMetadata(etag, direction string) error {
-	values := map[string]any{syncETagSetting: etag, syncLastAtSetting: time.Now().UTC().Format(time.RFC3339), syncDirectionSetting: direction, syncVersionSetting: syncFormatVersion}
+	values := map[string]any{syncETagSetting: etag, syncLastAtSetting: time.Now().UTC().Format(time.RFC3339), syncDirectionSetting: direction}
 	tx, err := s.db.Begin()
 	if err != nil {
 		return err

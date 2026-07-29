@@ -76,11 +76,9 @@ func TestValidateSetting(t *testing.T) {
 	}{
 		{name: "empty key", setting: model.Setting{Namespace: "appearance", Value: `null`, ValueType: "null", Version: 1}},
 		{name: "empty namespace", setting: model.Setting{Key: "appearance.mode", Value: `null`, ValueType: "null", Version: 1}},
-		{name: "legacy namespace", setting: model.Setting{Key: "max_pool_size", Namespace: "legacy", Value: `32`, ValueType: "number", Version: 1}},
+		{name: "key namespace mismatch", setting: model.Setting{Key: "max_pool_size", Namespace: "application", Value: `32`, ValueType: "number", Version: 1}},
 		{name: "unprefixed key", setting: model.Setting{Key: "max_pool_size", Namespace: "terminal", Value: `32`, ValueType: "number", Version: 1}},
 		{name: "namespace mismatch", setting: model.Setting{Key: "terminal.mode", Namespace: "appearance", Value: `null`, ValueType: "null", Version: 1}},
-		{name: "missing version", setting: model.Setting{Key: "appearance.mode", Namespace: "appearance", Value: `null`, ValueType: "null"}},
-		{name: "unsupported version", setting: model.Setting{Key: "appearance.mode", Namespace: "appearance", Value: `null`, ValueType: "null", Version: 2}},
 		{name: "invalid json", setting: model.Setting{Key: "appearance.mode", Namespace: "appearance", Value: `{`, ValueType: "object", Version: 1}},
 		{name: "invalid type", setting: model.Setting{Key: "appearance.mode", Namespace: "appearance", Value: `null`, ValueType: "invalid", Version: 1}},
 		{name: "mismatched type", setting: model.Setting{Key: "appearance.mode", Namespace: "appearance", Value: `true`, ValueType: "string", Version: 1}},
@@ -110,8 +108,7 @@ func TestValidateSettingAcceptsMatchingJSONTypes(t *testing.T) {
 func TestSettingsReadsRejectInvalidFinalContract(t *testing.T) {
 	tests := []storedSettingFixture{
 		{name: "namespace mismatch", key: "terminal.mode", namespace: "appearance", value: `"dark"`, valueType: "string", version: 1, updatedAt: "2026-07-15 10:00:00"},
-		{name: "legacy namespace", key: "legacy.mode", namespace: "legacy", value: `"dark"`, valueType: "string", version: 1, updatedAt: "2026-07-15 10:00:00"},
-		{name: "unsupported version", key: "appearance.mode", namespace: "appearance", value: `"dark"`, valueType: "string", version: 2, updatedAt: "2026-07-15 10:00:00"},
+		{name: "key namespace mismatch", key: "terminal.mode", namespace: "appearance", value: `"dark"`, valueType: "string", version: 1, updatedAt: "2026-07-15 10:00:00"},
 		{name: "invalid json", key: "appearance.mode", namespace: "appearance", value: `{`, valueType: "object", version: 1, updatedAt: "2026-07-15 10:00:00"},
 		{name: "invalid value type", key: "appearance.mode", namespace: "appearance", value: `"dark"`, valueType: "invalid", version: 1, updatedAt: "2026-07-15 10:00:00"},
 		{name: "mismatched value type", key: "appearance.mode", namespace: "appearance", value: `true`, valueType: "string", version: 1, updatedAt: "2026-07-15 10:00:00"},

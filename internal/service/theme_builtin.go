@@ -41,7 +41,6 @@ func initializeBuiltinCatalog(tx *sql.Tx) error {
 	if err := initializeTerminalGlobalStyle(tx); err != nil {
 		return err
 	}
-	// 内置 catalog 不兼容变更必须提升 databaseFormatVersion 并触发破坏性重建。
 	definitions := builtinThemeDefinitions()
 	state, err := loadBuiltinCatalogState(tx)
 	if err != nil {

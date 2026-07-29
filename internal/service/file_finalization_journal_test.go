@@ -19,7 +19,6 @@ import (
 )
 
 type finalizationJournalDocumentForTest struct {
-	Version int                               `json:"version"`
 	Entries []finalizationJournalEntryForTest `json:"entries"`
 }
 
@@ -135,7 +134,7 @@ func TestTransferFinalizationJournalRejectsSymbolicLink(t *testing.T) {
 	journal := newTransferFinalizationJournalStore(dataDir)
 	require.NoError(t, os.MkdirAll(journal.directory, 0o700))
 	target := filepath.Join(t.TempDir(), "journal.json")
-	require.NoError(t, os.WriteFile(target, []byte(`{"version":1,"entries":[]}`), 0o600))
+	require.NoError(t, os.WriteFile(target, []byte(`{"entries":[]}`), 0o600))
 	if err := os.Symlink(target, journal.path); err != nil {
 		t.Skipf("symbolic links unavailable: %v", err)
 	}
