@@ -34,6 +34,11 @@ vi.mock('@/components/session/TunnelDialog', () => ({
     <div data-testid="tunnel-dialog" data-open={open} data-session-id={sessionId} data-load-error={loadError ?? ''} />
   ),
 }))
+vi.mock('@/components/terminal/SerialSignalToolbar', () => ({
+  SerialSignalToolbar: ({ terminalID }: { terminalID: string }) => (
+    <div data-testid="serial-signal-toolbar" data-terminal-id={terminalID} />
+  ),
+}))
 
 import { TerminalToolbar } from '@/components/terminal/TerminalToolbar'
 import { useAppStore } from '@/store/appStore'
@@ -88,6 +93,19 @@ describe('TerminalToolbar', () => {
     expect(primary.focus).not.toHaveBeenCalled()
     expect(screen.getByText('server')).toBeInTheDocument()
     expect(screen.getByText('server').parentElement).not.toHaveClass('border-b')
+  })
+
+  it('places serial controls on a dedicated row below the main toolbar', () => {
+    render(<TerminalToolbar terminalID="serial-1" sessionId={0} isRecording={false} recordingLogId={null}
+      onToggleRecording={vi.fn()} hostname="serial" serialControls onSplit={vi.fn()} splitDisabled
+      paneCount={1} searchOpen={false} onToggleSearch={vi.fn()} />)
+
+    const mainToolbar = screen.getByText('serial').parentElement
+    const serialToolbar = screen.getByTestId('serial-signal-toolbar')
+    expect(mainToolbar).toHaveClass('h-8')
+    expect(mainToolbar).not.toContainElement(serialToolbar)
+    expect(serialToolbar.parentElement).toHaveClass('min-h-8', 'border-t', 'py-1')
+    expect(serialToolbar.parentElement?.parentElement).toBe(mainToolbar?.parentElement)
   })
 
   it('opens tunnel management beside the file action', async () => {

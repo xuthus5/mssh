@@ -26,6 +26,8 @@ describe('SerialSignalToolbar', () => {
     await waitFor(() => expect(screen.getByText('DTR')).toBeInTheDocument())
     await waitFor(() => expect(screen.getByTestId('modem-cts')).toBeInTheDocument())
     expect(screen.getByTestId('modem-dcd')).toBeInTheDocument()
+    expect(screen.getByTestId('serial-signal-toolbar')).toHaveClass('w-full', 'min-w-0', 'flex-wrap')
+    expect(screen.getByTestId('serial-signal-toolbar')).not.toHaveClass('border-l')
     await user.click(screen.getByRole('button', { name: 'Break' }))
     await waitFor(() => expect(screen.getByRole('button', { name: 'Break' })).toBeEnabled())
   })

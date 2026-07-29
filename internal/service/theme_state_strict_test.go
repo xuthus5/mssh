@@ -77,7 +77,7 @@ func TestSaveConfigurationRejectsInvalidCurrentGlobalStyleWithoutWrites(t *testi
 		name, query string
 	}{
 		{name: "partial", query: `DELETE FROM settings WHERE key = 'terminal.style.cursor_style'`},
-		{name: "metadata", query: `UPDATE settings SET version = 2 WHERE key = 'terminal.style.font_family'`},
+		{name: "metadata", query: `UPDATE settings SET updated_at = 'invalid' WHERE key = 'terminal.style.font_family'`},
 		{name: "corrupt", query: `UPDATE settings SET value = '{' WHERE key = 'terminal.style.font_family'`},
 		{name: "invalid", query: `UPDATE settings SET value = '2' WHERE key = 'terminal.style.font_size'`},
 	}
