@@ -175,6 +175,32 @@ describe('persistent content layers', () => {
     expect(within(terminalLayer).getByTestId('file-panel')).toBeInTheDocument()
   })
 
+  it('keeps app notices outside the positioned terminal layer container', async () => {
+    useAppStore.getState().openTab({
+      id: 'local-1',
+      title: 'Local',
+      type: 'terminal',
+      terminalId: 'term-local',
+      sessionId: 0,
+      connectionKind: 'local',
+    })
+    render(<App />)
+    const terminal = await screen.findByTestId('terminal-term-local')
+
+    act(() => useAppStore.getState().setWorkspaceRestoreNotice('1 个工作区标签恢复失败'))
+
+    const notice = screen.getByRole('alert')
+    const main = notice.closest('main')
+    const terminalLayer = terminal.closest('[data-layer-id=\"local-1\"]') as HTMLElement
+    const layerContainer = terminalLayer.parentElement
+    expect(main).not.toBeNull()
+    expect(notice.parentElement).toBe(main)
+    expect(layerContainer?.parentElement).toBe(main)
+    expect(layerContainer).toHaveClass('relative', 'min-h-0', 'flex-1', 'overflow-hidden')
+    expect(layerContainer).toContainElement(terminalLayer)
+    expect(layerContainer).not.toContainElement(notice)
+  })
+
   it('preserves layer instances until their tabs are removed', async () => {
     const store = useAppStore.getState()
     store.openTab({ id: 'terminal-1', title: 'Terminal', type: 'terminal', terminalId: 'term-1', sessionId: 1 })
