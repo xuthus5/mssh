@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"sync"
+
+	"github.com/xuthus5/mssh/internal/store"
 )
 
 var errAIServiceStopped = errors.New("AI service is shutting down")
@@ -50,12 +52,20 @@ func (s *AIService) Shutdown() {
 		return
 	}
 	s.lifecycle.initialize()
+	s.agent.mu.Lock()
+	s.agent.stopping = true
+	s.agent.mu.Unlock()
 	s.lifecycle.mu.Lock()
 	s.lifecycle.stopped = true
 	cancel := s.lifecycle.cancel
 	s.lifecycle.mu.Unlock()
 	cancel()
 	s.lifecycle.workers.Wait()
+	if s.db != nil {
+		if err := store.MarkAIAgentTasksInterrupted(s.db); err != nil && s.logger != nil {
+			s.logger.Error("mark AI agent tasks interrupted failed", "error", err)
+		}
+	}
 	if s.secrets != nil {
 		s.secrets.clearMemory()
 	}

@@ -9,6 +9,14 @@ import { Call as $Call, CancellablePromise as $CancellablePromise, Create as $Cr
 // @ts-ignore: Unused imports
 import * as model$0 from "../model/models.js";
 
+export function ApproveAgentStep(taskID: number, stepID: number, approved: boolean): $CancellablePromise<void> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.AIService.ApproveAgentStep", taskID, stepID, approved);
+}
+
+export function CancelAgentTask(taskID: number): $CancellablePromise<void> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.AIService.CancelAgentTask", taskID);
+}
+
 export function Chat(request: model$0.AIChatRequest): $CancellablePromise<model$0.AIChatResponse> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.AIService.Chat", request).then(($result: any) => {
         return $$createType0($result);
@@ -39,15 +47,27 @@ export function ExecuteCommand(input: model$0.AICommandExecutionInput): $Cancell
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.AIService.ExecuteCommand", input);
 }
 
+export function GetAgentTask(taskID: number): $CancellablePromise<model$0.AIAgentTask | null> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.AIService.GetAgentTask", taskID).then(($result: any) => {
+        return $$createType5($result);
+    });
+}
+
+export function ListAgentTasks(sessionID: number, limit: number): $CancellablePromise<model$0.AIAgentTask[]> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.AIService.ListAgentTasks", sessionID, limit).then(($result: any) => {
+        return $$createType6($result);
+    });
+}
+
 export function ListConversations(sessionID: number, limit: number): $CancellablePromise<model$0.AIConversation[]> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.AIService.ListConversations", sessionID, limit).then(($result: any) => {
-        return $$createType5($result);
+        return $$createType8($result);
     });
 }
 
 export function ListMessages(conversationID: number): $CancellablePromise<model$0.AIMessage[]> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.AIService.ListMessages", conversationID).then(($result: any) => {
-        return $$createType7($result);
+        return $$createType10($result);
     });
 }
 
@@ -56,18 +76,30 @@ export function ListMessages(conversationID: number): $CancellablePromise<model$
  */
 export function ModelsDevCatalog(refresh: boolean): $CancellablePromise<model$0.ModelsDevCatalog> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.AIService.ModelsDevCatalog", refresh).then(($result: any) => {
-        return $$createType8($result);
+        return $$createType11($result);
+    });
+}
+
+export function ResumeAgentTask(taskID: number): $CancellablePromise<model$0.AIAgentTask | null> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.AIService.ResumeAgentTask", taskID).then(($result: any) => {
+        return $$createType5($result);
     });
 }
 
 export function SaveProvider(input: model$0.AIProviderProfileInput): $CancellablePromise<model$0.AIProviderProfile | null> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.AIService.SaveProvider", input).then(($result: any) => {
-        return $$createType10($result);
+        return $$createType13($result);
     });
 }
 
 export function SaveSettings(input: model$0.AISettingsInput): $CancellablePromise<void> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.AIService.SaveSettings", input);
+}
+
+export function StartAgentTask(input: model$0.AIAgentTaskInput): $CancellablePromise<model$0.AIAgentTask | null> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.AIService.StartAgentTask", input).then(($result: any) => {
+        return $$createType5($result);
+    });
 }
 
 export function TestProvider(id: number): $CancellablePromise<void> {
@@ -79,10 +111,13 @@ const $$createType0 = model$0.AIChatResponse.createFrom;
 const $$createType1 = model$0.AISettingsDashboard.createFrom;
 const $$createType2 = model$0.AIAgentCLIStatus.createFrom;
 const $$createType3 = $Create.Array($$createType2);
-const $$createType4 = model$0.AIConversation.createFrom;
-const $$createType5 = $Create.Array($$createType4);
-const $$createType6 = model$0.AIMessage.createFrom;
-const $$createType7 = $Create.Array($$createType6);
-const $$createType8 = model$0.ModelsDevCatalog.createFrom;
-const $$createType9 = model$0.AIProviderProfile.createFrom;
-const $$createType10 = $Create.Nullable($$createType9);
+const $$createType4 = model$0.AIAgentTask.createFrom;
+const $$createType5 = $Create.Nullable($$createType4);
+const $$createType6 = $Create.Array($$createType4);
+const $$createType7 = model$0.AIConversation.createFrom;
+const $$createType8 = $Create.Array($$createType7);
+const $$createType9 = model$0.AIMessage.createFrom;
+const $$createType10 = $Create.Array($$createType9);
+const $$createType11 = model$0.ModelsDevCatalog.createFrom;
+const $$createType12 = model$0.AIProviderProfile.createFrom;
+const $$createType13 = $Create.Nullable($$createType12);

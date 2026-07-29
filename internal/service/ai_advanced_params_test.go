@@ -4,10 +4,11 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/xuthus5/mssh/internal/model"
-	"github.com/xuthus5/mssh/internal/service/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/xuthus5/mssh/internal/model"
+	"github.com/xuthus5/mssh/internal/service/testutil"
 )
 
 func TestSaveProviderPersistsAdvancedFields(t *testing.T) {

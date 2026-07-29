@@ -29,6 +29,7 @@ import { resolveShortcutAction } from '@/lib/shortcutRuntime'
 import type { ShortcutActionId } from '@/lib/shortcuts'
 import { emitTerminalSearchToggle } from '@/lib/terminalSearchEvents'
 import { resolveQuickSearchTarget } from '@/lib/quickSearchRouting'
+import { AIAgentTaskCenter } from '@/components/agent/AIAgentTaskCenter'
 
 
 function activeTab(state: AppState): Tab | undefined {
@@ -195,6 +196,7 @@ function AppShell() {
       <ConnectDialog />
       <HostKeyPromptDialog />
       <SessionQuickSearchHost />
+      <AIAgentTaskCenter />
     </>
   )
 }
