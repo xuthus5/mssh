@@ -29,13 +29,16 @@ type aiTerminalWriter interface {
 }
 
 type AIService struct {
-	db         *sql.DB
-	terminals  aiTerminalWriter
-	secrets    *aiSecretStore
-	httpClient *http.Client
-	logger     *slog.Logger
-	lifecycle  aiServiceLifecycle
-	configMu   sync.RWMutex
+	db             *sql.DB
+	terminals      aiTerminalWriter
+	secrets        *aiSecretStore
+	httpClient     *http.Client
+	logger         *slog.Logger
+	lifecycle      aiServiceLifecycle
+	configMu       sync.RWMutex
+	modelsDevMu    sync.Mutex
+	modelsDevURL   string
+	modelsDevCache model.ModelsDevCatalog
 }
 
 func NewAIService(db *sql.DB, terminals *TerminalService, keychain crypto.KeychainAdapter, logger *slog.Logger, proxy ...*netproxy.Manager) *AIService {
@@ -43,7 +46,7 @@ func NewAIService(db *sql.DB, terminals *TerminalService, keychain crypto.Keycha
 	if terminals != nil {
 		terminalController = terminals
 	}
-	return &AIService{db: db, terminals: terminalController, secrets: newAISecretStore(keychain), httpClient: sharedHTTPClient(45*time.Second, firstProxy(proxy...)), logger: logger}
+	return &AIService{db: db, terminals: terminalController, secrets: newAISecretStore(keychain), httpClient: sharedHTTPClient(45*time.Second, firstProxy(proxy...)), logger: logger, modelsDevURL: modelsDevAPIURL}
 }
 
 func (s *AIService) Dashboard() (model.AISettingsDashboard, error) {
@@ -261,11 +264,11 @@ func providerSecretAccount(id int64) string { return fmt.Sprintf("provider:%d", 
 func searchSecretAccount(provider model.AISearchProvider) string { return "search:" + string(provider) }
 
 const (
-	maxAIProviderNameRunes   = 128
-	maxAIProviderModelRunes  = 256
-	maxAIProviderURLBytes    = 2048
-	maxAIProviderAPIKeyBytes = 8 * 1024
-	maxAIContextWindowSize   = 1 << 22 // 4M tokens upper bound
+	maxAIProviderNameRunes    = 128
+	maxAIProviderModelRunes   = 256
+	maxAIProviderURLBytes     = 2048
+	maxAIProviderAPIKeyBytes  = 8 * 1024
+	maxAIContextWindowSize    = 1 << 22 // 4M tokens upper bound
 	maxAIMaxTokens            = 1 << 22
 	maxAICustomHeaderCount    = 32
 	maxAICustomHeaderKeyRunes = 128

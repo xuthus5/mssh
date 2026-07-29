@@ -7,10 +7,30 @@ import { requestConfirm } from '@/lib/confirmDialog'
 import { SETTINGS_PREVIEW_CANCELLED_EVENT } from '@/lib/settingsWindowEvents'
 
 vi.mock('@/lib/confirmDialog', () => ({ requestConfirm: vi.fn(async () => true) }))
+const catalogHook = vi.hoisted(() => vi.fn(() => ({ catalog: modelsDevCatalog(), loading: false, error: null, refresh: vi.fn() })))
+vi.mock('@/hooks/useModelsDevCatalog', () => ({ useModelsDevCatalog: catalogHook }))
 
 describe('AIProviderPanel', () => {
   beforeEach(() => {
     vi.mocked(requestConfirm).mockReset().mockResolvedValue(true)
+    catalogHook.mockReturnValue({ catalog: modelsDevCatalog(), loading: false, error: null, refresh: vi.fn() })
+  })
+
+  it('applies a models.dev provider and model from searchable dropdowns', async () => {
+    const controller = providerController()
+    renderProviderPanel(controller)
+    await userEvent.click(screen.getByRole('button', { name: '新增提供商' }))
+
+    await chooseComboboxItem('models.dev 提供商', /OpenRouter/, 'OpenRouter')
+    expect(screen.getByLabelText('名称')).toHaveValue('OpenRouter')
+    expect(screen.getByLabelText('Base URL')).toHaveValue('https://openrouter.ai/api/v1')
+
+    await chooseComboboxItem('models.dev 模型', 'Vendor Modelvendor/model', 'Vendor Model')
+    expect(screen.getByLabelText('默认模型')).toHaveValue('vendor/model')
+    await userEvent.click(screen.getByRole('button', { name: '高级参数' }))
+    expect(screen.getByLabelText('上下文窗口大小')).toHaveValue(64000)
+    expect(screen.getByLabelText('最大 Token 数')).toHaveValue(4096)
+    expect(screen.getByLabelText('Temperature')).toBeDisabled()
   })
 
   it('edits and saves a provider', async () => {
@@ -214,6 +234,13 @@ async function selectOption(user: ReturnType<typeof userEvent.setup>, label: str
   await user.click(await screen.findByRole('option', { name: option }))
 }
 
+async function chooseComboboxItem(label: string, item: string | RegExp, query: string) {
+  const input = screen.getByRole('combobox', { name: label })
+  await userEvent.click(input)
+  await userEvent.type(input, query)
+  await userEvent.click(await screen.findByRole('option', { name: item }))
+}
+
 function providerController() {
   const profile = providerProfile(1, 'main')
   return { dashboard: { keychain_available: true, providers: [profile], settings: { default_provider_id: 1, fallback_provider_id: null, interaction: { panel_width: 420, context_lines: 80, include_session_metadata: true, include_system_summary: true, stream_responses: true, auto_scroll: true, render_markdown: true, history_retention_days: 30, max_conversations: 100 }, search: { enabled: false, mode: 'auto', provider: 'brave', timeout_seconds: 10, max_results: 5, require_citations: true }, security: { auto_execute_read_only: false, command_timeout_seconds: 60, max_output_bytes: 65536, max_plan_steps: 5, allow_patterns: [], deny_patterns: [], redaction_patterns: [] } } }, pending: null, error: null as string | null, saveProvider: vi.fn(async (input) => ({ ...profile, ...input, id: input.id || 2 })), deleteProvider: vi.fn(async () => {}), testProvider: vi.fn(async () => {}), saveSettings: vi.fn(async () => {}) }
@@ -238,6 +265,13 @@ function renderProviderPanel(controller: ReturnType<typeof providerController>) 
 
 function providerProfile(id: number, name: string) {
   return { id, name, provider: 'openai_compatible', base_url: 'https://api.openai.com/v1', default_model: 'gpt', enabled: true, credential_saved: true, credential_session_only: false, context_window_size: 0, skip_tls_verify: false, max_tokens: 0, temperature: null, top_p: null, frequency_penalty: null, presence_penalty: null, custom_headers: {}, created_at: '', updated_at: '' }
+}
+
+function modelsDevCatalog() {
+  return { cached_at: '', providers: [{
+    id: 'openrouter', name: 'OpenRouter', provider: 'openai_compatible', base_url: 'https://openrouter.ai/api/v1',
+    models: [{ id: 'vendor/model', name: 'Vendor Model', description: 'chat', context_window_size: 64000, max_tokens: 4096, reasoning: false, temperature_supported: false, status: '' }],
+  }] } as never
 }
 
 function deferred<T>() {
