@@ -7,13 +7,25 @@ import { requestConfirm } from '@/lib/confirmDialog'
 import { SETTINGS_PREVIEW_CANCELLED_EVENT } from '@/lib/settingsWindowEvents'
 
 vi.mock('@/lib/confirmDialog', () => ({ requestConfirm: vi.fn(async () => true) }))
-const catalogHook = vi.hoisted(() => vi.fn(() => ({ catalog: modelsDevCatalog(), loading: false, error: null, refresh: vi.fn() })))
+const refreshCatalog = vi.hoisted(() => vi.fn(async () => {}))
+const catalogHook = vi.hoisted(() => vi.fn(() => ({ catalog: modelsDevCatalog(), loading: false, error: null, refresh: refreshCatalog })))
 vi.mock('@/hooks/useModelsDevCatalog', () => ({ useModelsDevCatalog: catalogHook }))
 
 describe('AIProviderPanel', () => {
   beforeEach(() => {
     vi.mocked(requestConfirm).mockReset().mockResolvedValue(true)
-    catalogHook.mockReturnValue({ catalog: modelsDevCatalog(), loading: false, error: null, refresh: vi.fn() })
+    refreshCatalog.mockClear()
+    catalogHook.mockReturnValue({ catalog: modelsDevCatalog(), loading: false, error: null, refresh: refreshCatalog })
+  })
+
+  it('refreshes the models.dev catalog only from the provider refresh button', async () => {
+    const controller = providerController()
+    renderProviderPanel(controller)
+    expect(refreshCatalog).not.toHaveBeenCalled()
+
+    await userEvent.click(screen.getByRole('button', { name: '刷新 models.dev 提供商' }))
+
+    expect(refreshCatalog).toHaveBeenCalledOnce()
   })
 
   it('applies a models.dev provider and model from searchable dropdowns', async () => {

@@ -1422,7 +1422,7 @@
   "重复会话处理": "Duplicate session handling",
   "重复项按名称、主机、端口和用户名识别。未映射或空单元格使用默认值。": "Duplicates are identified by name, host, port, and username. Unmapped or empty cells use defaults.",
   "重新加载": "Reload",
-  "重新加载 models.dev": "Reload models.dev",
+  "刷新 models.dev 提供商": "Refresh models.dev providers",
   "重新检测": "Re-detect",
   "重新连接": "Reconnect",
   "重新连接失败: ${}": "Reconnect failed: ${}",
