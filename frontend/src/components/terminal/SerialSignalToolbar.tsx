@@ -218,7 +218,7 @@ function SerialSignalControls({ snapshot, action, apply, sendBreak }: {
   apply: (nextDtr: boolean, nextRts: boolean) => Promise<void>
   sendBreak: () => Promise<void>
 }) {
-  return <div className="flex max-w-full flex-wrap items-center gap-2 border-l border-border pl-2 text-xs text-muted-foreground">
+  return <div data-testid="serial-signal-toolbar" className="flex w-full min-w-0 flex-wrap items-center gap-2 text-xs text-muted-foreground">
       <Cable className="size-3.5" />
       <label className="flex items-center gap-1">
         <span>DTR</span>

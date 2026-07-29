@@ -264,10 +264,14 @@ export function TerminalToolbar(props: TerminalToolbarProps) {
   return <div className="relative flex flex-shrink-0 flex-col bg-muted/30">
     <div className="flex h-8 items-center gap-1 px-2">
       <span className="mr-2 truncate text-xs text-muted-foreground">{props.hostname ?? 'Terminal'}</span>
-      {props.serialControls ? <SerialSignalToolbar terminalID={props.terminalID} /> : null}
       <ToolbarActions {...props} onOpenSystem={props.onOpenSystem ?? (() => {})} onOpenHistory={props.onOpenHistory ?? (() => {})} onOpenAI={props.onOpenAI ?? (() => {})} onOpenTunnels={() => { setTunnelOpen(true); void tunnels.load() }} clipboard={clipboard} logOpen={showSessionLog} setLogOpen={setShowSessionLog}
         setLogBlocked={setSessionLogBlocked} onLogOpenChange={handleSessionLogOpenChange} />
     </div>
+    {props.serialControls ? (
+      <div className="flex min-h-8 items-center border-t border-border px-2 py-1">
+        <SerialSignalToolbar terminalID={props.terminalID} />
+      </div>
+    ) : null}
     {bannerError ? <p role="alert" className="px-2 pb-1 text-[11px] text-destructive">{bannerError}</p> : null}
     <TunnelDialog open={tunnelOpen} onOpenChange={setTunnelOpen} tunnels={tunnels.tunnels}
       loadError={tunnels.error} onReload={() => tunnels.load()}
