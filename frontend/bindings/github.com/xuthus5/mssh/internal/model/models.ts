@@ -470,7 +470,11 @@ export class AIProviderProfile {
      * Creates a new AIProviderProfile instance from a string or object.
      */
     static createFrom($$source: any = {}): AIProviderProfile {
+        const $$createField15_0 = $$createType4;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("custom_headers" in $$parsedSource) {
+            $$parsedSource["custom_headers"] = $$createField15_0($$parsedSource["custom_headers"]);
+        }
         return new AIProviderProfile($$parsedSource as Partial<AIProviderProfile>);
     }
 }
@@ -547,7 +551,11 @@ export class AIProviderProfileInput {
      * Creates a new AIProviderProfileInput instance from a string or object.
      */
     static createFrom($$source: any = {}): AIProviderProfileInput {
+        const $$createField14_0 = $$createType4;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("custom_headers" in $$parsedSource) {
+            $$parsedSource["custom_headers"] = $$createField14_0($$parsedSource["custom_headers"]);
+        }
         return new AIProviderProfileInput($$parsedSource as Partial<AIProviderProfileInput>);
     }
 }
@@ -721,9 +729,9 @@ export class AISecuritySettings {
      * Creates a new AISecuritySettings instance from a string or object.
      */
     static createFrom($$source: any = {}): AISecuritySettings {
-        const $$createField4_0 = $$createType4;
-        const $$createField5_0 = $$createType4;
-        const $$createField6_0 = $$createType4;
+        const $$createField4_0 = $$createType5;
+        const $$createField5_0 = $$createType5;
+        const $$createField6_0 = $$createType5;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("allow_patterns" in $$parsedSource) {
             $$parsedSource["allow_patterns"] = $$createField4_0($$parsedSource["allow_patterns"]);
@@ -770,9 +778,9 @@ export class AISettings {
      * Creates a new AISettings instance from a string or object.
      */
     static createFrom($$source: any = {}): AISettings {
-        const $$createField2_0 = $$createType5;
-        const $$createField3_0 = $$createType6;
-        const $$createField4_0 = $$createType7;
+        const $$createField2_0 = $$createType6;
+        const $$createField3_0 = $$createType7;
+        const $$createField4_0 = $$createType8;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("interaction" in $$parsedSource) {
             $$parsedSource["interaction"] = $$createField2_0($$parsedSource["interaction"]);
@@ -811,8 +819,8 @@ export class AISettingsDashboard {
      * Creates a new AISettingsDashboard instance from a string or object.
      */
     static createFrom($$source: any = {}): AISettingsDashboard {
-        const $$createField0_0 = $$createType8;
-        const $$createField1_0 = $$createType10;
+        const $$createField0_0 = $$createType9;
+        const $$createField1_0 = $$createType11;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("settings" in $$parsedSource) {
             $$parsedSource["settings"] = $$createField0_0($$parsedSource["settings"]);
@@ -856,9 +864,9 @@ export class AISettingsInput {
      * Creates a new AISettingsInput instance from a string or object.
      */
     static createFrom($$source: any = {}): AISettingsInput {
-        const $$createField2_0 = $$createType5;
-        const $$createField3_0 = $$createType11;
-        const $$createField4_0 = $$createType7;
+        const $$createField2_0 = $$createType6;
+        const $$createField3_0 = $$createType12;
+        const $$createField4_0 = $$createType8;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("interaction" in $$parsedSource) {
             $$parsedSource["interaction"] = $$createField2_0($$parsedSource["interaction"]);
@@ -1357,7 +1365,7 @@ export class BulkAssetAssignmentInput {
      * Creates a new BulkAssetAssignmentInput instance from a string or object.
      */
     static createFrom($$source: any = {}): BulkAssetAssignmentInput {
-        const $$createField0_0 = $$createType12;
+        const $$createField0_0 = $$createType13;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("session_ids" in $$parsedSource) {
             $$parsedSource["session_ids"] = $$createField0_0($$parsedSource["session_ids"]);
@@ -1390,8 +1398,8 @@ export class BulkTagUpdateInput {
      * Creates a new BulkTagUpdateInput instance from a string or object.
      */
     static createFrom($$source: any = {}): BulkTagUpdateInput {
-        const $$createField0_0 = $$createType12;
-        const $$createField1_0 = $$createType12;
+        const $$createField0_0 = $$createType13;
+        const $$createField1_0 = $$createType13;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("session_ids" in $$parsedSource) {
             $$parsedSource["session_ids"] = $$createField0_0($$parsedSource["session_ids"]);
@@ -2466,9 +2474,9 @@ export class Session {
      * Creates a new Session instance from a string or object.
      */
     static createFrom($$source: any = {}): Session {
-        const $$createField9_0 = $$createType14;
-        const $$createField10_0 = $$createType16;
-        const $$createField11_0 = $$createType18;
+        const $$createField9_0 = $$createType15;
+        const $$createField10_0 = $$createType17;
+        const $$createField11_0 = $$createType19;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("environment" in $$parsedSource) {
             $$parsedSource["environment"] = $$createField9_0($$parsedSource["environment"]);
@@ -2482,6 +2490,29 @@ export class Session {
         return new Session($$parsedSource as Partial<Session>);
     }
 }
+
+export enum SessionCSVColumn {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    SessionCSVColumnName = "name",
+    SessionCSVColumnHost = "host",
+    SessionCSVColumnPort = "port",
+    SessionCSVColumnUsername = "username",
+    SessionCSVColumnAuthMethod = "auth_method",
+    SessionCSVColumnPassword = "password",
+    SessionCSVColumnKeyName = "key_name",
+    SessionCSVColumnKeyPublicKey = "key_public_key",
+    SessionCSVColumnFolderPath = "folder_path",
+    SessionCSVColumnEnvironment = "environment",
+    SessionCSVColumnProject = "project",
+    SessionCSVColumnTags = "tags",
+    SessionCSVColumnNotes = "notes",
+    SessionCSVColumnKeepAlive = "keep_alive",
+    SessionCSVColumnTermType = "term_type",
+};
 
 export enum SessionCSVConflictPolicy {
     /**
@@ -2518,7 +2549,7 @@ export class SessionCSVExportOptions {
      * Creates a new SessionCSVExportOptions instance from a string or object.
      */
     static createFrom($$source: any = {}): SessionCSVExportOptions {
-        const $$createField0_0 = $$createType12;
+        const $$createField0_0 = $$createType13;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("session_ids" in $$parsedSource) {
             $$parsedSource["session_ids"] = $$createField0_0($$parsedSource["session_ids"]);
@@ -2554,8 +2585,8 @@ export class SessionCSVExportResult {
 
 export class SessionCSVImportOptions {
     "conflict_policy": SessionCSVConflictPolicy;
-    "header_mapping"?: { [_ in string]?: string };
-    "default_values"?: { [_ in string]?: string };
+    "header_mapping"?: { [_ in SessionCSVColumn]?: string };
+    "default_values"?: { [_ in SessionCSVColumn]?: string };
 
     /** Creates a new SessionCSVImportOptions instance. */
     constructor($$source: Partial<SessionCSVImportOptions> = {}) {
@@ -2570,8 +2601,8 @@ export class SessionCSVImportOptions {
      * Creates a new SessionCSVImportOptions instance from a string or object.
      */
     static createFrom($$source: any = {}): SessionCSVImportOptions {
-        const $$createField1_0 = $$createType19;
-        const $$createField2_0 = $$createType19;
+        const $$createField1_0 = $$createType20;
+        const $$createField2_0 = $$createType20;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("header_mapping" in $$parsedSource) {
             $$parsedSource["header_mapping"] = $$createField1_0($$parsedSource["header_mapping"]);
@@ -2654,7 +2685,7 @@ export class SessionCSVImportSummary {
      * Creates a new SessionCSVImportSummary instance from a string or object.
      */
     static createFrom($$source: any = {}): SessionCSVImportSummary {
-        const $$createField5_0 = $$createType21;
+        const $$createField5_0 = $$createType22;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("results" in $$parsedSource) {
             $$parsedSource["results"] = $$createField5_0($$parsedSource["results"]);
@@ -2687,8 +2718,8 @@ export class SessionCSVPreview {
      * Creates a new SessionCSVPreview instance from a string or object.
      */
     static createFrom($$source: any = {}): SessionCSVPreview {
-        const $$createField0_0 = $$createType4;
-        const $$createField1_0 = $$createType22;
+        const $$createField0_0 = $$createType5;
+        const $$createField1_0 = $$createType23;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("headers" in $$parsedSource) {
             $$parsedSource["headers"] = $$createField0_0($$parsedSource["headers"]);
@@ -2842,7 +2873,7 @@ export class SessionInput {
      * Creates a new SessionInput instance from a string or object.
      */
     static createFrom($$source: any = {}): SessionInput {
-        const $$createField9_0 = $$createType12;
+        const $$createField9_0 = $$createType13;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("tag_ids" in $$parsedSource) {
             $$parsedSource["tag_ids"] = $$createField9_0($$parsedSource["tag_ids"]);
@@ -3015,9 +3046,9 @@ export class SyncConfig {
      * Creates a new SyncConfig instance from a string or object.
      */
     static createFrom($$source: any = {}): SyncConfig {
-        const $$createField7_0 = $$createType23;
-        const $$createField8_0 = $$createType24;
-        const $$createField9_0 = $$createType25;
+        const $$createField7_0 = $$createType24;
+        const $$createField8_0 = $$createType25;
+        const $$createField9_0 = $$createType26;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("gist" in $$parsedSource) {
             $$parsedSource["gist"] = $$createField7_0($$parsedSource["gist"]);
@@ -3084,9 +3115,9 @@ export class SyncConfigInput {
      * Creates a new SyncConfigInput instance from a string or object.
      */
     static createFrom($$source: any = {}): SyncConfigInput {
-        const $$createField7_0 = $$createType26;
-        const $$createField8_0 = $$createType27;
-        const $$createField9_0 = $$createType28;
+        const $$createField7_0 = $$createType27;
+        const $$createField8_0 = $$createType28;
+        const $$createField9_0 = $$createType29;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("gist" in $$parsedSource) {
             $$parsedSource["gist"] = $$createField7_0($$parsedSource["gist"]);
@@ -3121,8 +3152,8 @@ export class SyncConflict {
      * Creates a new SyncConflict instance from a string or object.
      */
     static createFrom($$source: any = {}): SyncConflict {
-        const $$createField0_0 = $$createType29;
-        const $$createField1_0 = $$createType29;
+        const $$createField0_0 = $$createType30;
+        const $$createField1_0 = $$createType30;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("local" in $$parsedSource) {
             $$parsedSource["local"] = $$createField0_0($$parsedSource["local"]);
@@ -3184,12 +3215,12 @@ export class SyncDashboard {
      * Creates a new SyncDashboard instance from a string or object.
      */
     static createFrom($$source: any = {}): SyncDashboard {
-        const $$createField0_0 = $$createType30;
-        const $$createField4_0 = $$createType32;
-        const $$createField5_0 = $$createType33;
-        const $$createField6_0 = $$createType35;
-        const $$createField7_0 = $$createType36;
-        const $$createField8_0 = $$createType38;
+        const $$createField0_0 = $$createType31;
+        const $$createField4_0 = $$createType33;
+        const $$createField5_0 = $$createType34;
+        const $$createField6_0 = $$createType36;
+        const $$createField7_0 = $$createType37;
+        const $$createField8_0 = $$createType39;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("config" in $$parsedSource) {
             $$parsedSource["config"] = $$createField0_0($$parsedSource["config"]);
@@ -3347,7 +3378,7 @@ export class SyncResult {
      * Creates a new SyncResult instance from a string or object.
      */
     static createFrom($$source: any = {}): SyncResult {
-        const $$createField2_0 = $$createType35;
+        const $$createField2_0 = $$createType36;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("conflict" in $$parsedSource) {
             $$parsedSource["conflict"] = $$createField2_0($$parsedSource["conflict"]);
@@ -3527,7 +3558,7 @@ export class SystemInfo {
      * Creates a new SystemInfo instance from a string or object.
      */
     static createFrom($$source: any = {}): SystemInfo {
-        const $$createField17_0 = $$createType40;
+        const $$createField17_0 = $$createType41;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("interfaces" in $$parsedSource) {
             $$parsedSource["interfaces"] = $$createField17_0($$parsedSource["interfaces"]);
@@ -3692,9 +3723,9 @@ export class ThemeConfigurationInput {
      * Creates a new ThemeConfigurationInput instance from a string or object.
      */
     static createFrom($$source: any = {}): ThemeConfigurationInput {
-        const $$createField0_0 = $$createType41;
-        const $$createField1_0 = $$createType43;
-        const $$createField2_0 = $$createType44;
+        const $$createField0_0 = $$createType42;
+        const $$createField1_0 = $$createType44;
+        const $$createField2_0 = $$createType45;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("global_style" in $$parsedSource) {
             $$parsedSource["global_style"] = $$createField0_0($$parsedSource["global_style"]);
@@ -3854,7 +3885,7 @@ export class ThemeImportSummary {
      * Creates a new ThemeImportSummary instance from a string or object.
      */
     static createFrom($$source: any = {}): ThemeImportSummary {
-        const $$createField0_0 = $$createType46;
+        const $$createField0_0 = $$createType47;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("results" in $$parsedSource) {
             $$parsedSource["results"] = $$createField0_0($$parsedSource["results"]);
@@ -3927,7 +3958,7 @@ export class ThemeProfile {
      * Creates a new ThemeProfile instance from a string or object.
      */
     static createFrom($$source: any = {}): ThemeProfile {
-        const $$createField3_0 = $$createType48;
+        const $$createField3_0 = $$createType49;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("definition" in $$parsedSource) {
             $$parsedSource["definition"] = $$createField3_0($$parsedSource["definition"]);
@@ -4265,48 +4296,49 @@ const $$createType0 = AICommandProposal.createFrom;
 const $$createType1 = $Create.Array($$createType0);
 const $$createType2 = AICitation.createFrom;
 const $$createType3 = $Create.Array($$createType2);
-const $$createType4 = $Create.Array($Create.Any);
-const $$createType5 = AIInteractionSettings.createFrom;
-const $$createType6 = AISearchSettings.createFrom;
-const $$createType7 = AISecuritySettings.createFrom;
-const $$createType8 = AISettings.createFrom;
-const $$createType9 = AIProviderProfile.createFrom;
-const $$createType10 = $Create.Array($$createType9);
-const $$createType11 = AISearchSettingsInput.createFrom;
-const $$createType12 = $Create.Array($Create.Any);
-const $$createType13 = AssetEnvironment.createFrom;
-const $$createType14 = $Create.Nullable($$createType13);
-const $$createType15 = AssetProject.createFrom;
-const $$createType16 = $Create.Nullable($$createType15);
-const $$createType17 = AssetTag.createFrom;
-const $$createType18 = $Create.Array($$createType17);
-const $$createType19 = $Create.Map($Create.Any, $Create.Any);
-const $$createType20 = SessionCSVImportResult.createFrom;
-const $$createType21 = $Create.Array($$createType20);
-const $$createType22 = $Create.Array($$createType4);
-const $$createType23 = GistSyncConfig.createFrom;
-const $$createType24 = WebDAVSyncConfig.createFrom;
-const $$createType25 = S3SyncConfig.createFrom;
-const $$createType26 = GistSyncConfigInput.createFrom;
-const $$createType27 = WebDAVSyncConfigInput.createFrom;
-const $$createType28 = S3SyncConfigInput.createFrom;
-const $$createType29 = SyncRemoteVersion.createFrom;
-const $$createType30 = SyncConfig.createFrom;
-const $$createType31 = SyncVersion.createFrom;
-const $$createType32 = $Create.Nullable($$createType31);
-const $$createType33 = $Create.Nullable($$createType29);
-const $$createType34 = SyncConflict.createFrom;
-const $$createType35 = $Create.Nullable($$createType34);
-const $$createType36 = $Create.Array($$createType31);
-const $$createType37 = SyncEvent.createFrom;
-const $$createType38 = $Create.Array($$createType37);
-const $$createType39 = NetworkInterface.createFrom;
-const $$createType40 = $Create.Array($$createType39);
-const $$createType41 = TerminalGlobalStyleInput.createFrom;
-const $$createType42 = ThemeProfileInput.createFrom;
-const $$createType43 = $Create.Array($$createType42);
-const $$createType44 = ThemeAssignmentsInput.createFrom;
-const $$createType45 = ThemeImportResult.createFrom;
-const $$createType46 = $Create.Array($$createType45);
-const $$createType47 = ThemeDefinition.createFrom;
-const $$createType48 = $Create.Nullable($$createType47);
+const $$createType4 = $Create.Map($Create.Any, $Create.Any);
+const $$createType5 = $Create.Array($Create.Any);
+const $$createType6 = AIInteractionSettings.createFrom;
+const $$createType7 = AISearchSettings.createFrom;
+const $$createType8 = AISecuritySettings.createFrom;
+const $$createType9 = AISettings.createFrom;
+const $$createType10 = AIProviderProfile.createFrom;
+const $$createType11 = $Create.Array($$createType10);
+const $$createType12 = AISearchSettingsInput.createFrom;
+const $$createType13 = $Create.Array($Create.Any);
+const $$createType14 = AssetEnvironment.createFrom;
+const $$createType15 = $Create.Nullable($$createType14);
+const $$createType16 = AssetProject.createFrom;
+const $$createType17 = $Create.Nullable($$createType16);
+const $$createType18 = AssetTag.createFrom;
+const $$createType19 = $Create.Array($$createType18);
+const $$createType20 = $Create.Map($Create.Any, $Create.Any);
+const $$createType21 = SessionCSVImportResult.createFrom;
+const $$createType22 = $Create.Array($$createType21);
+const $$createType23 = $Create.Array($$createType5);
+const $$createType24 = GistSyncConfig.createFrom;
+const $$createType25 = WebDAVSyncConfig.createFrom;
+const $$createType26 = S3SyncConfig.createFrom;
+const $$createType27 = GistSyncConfigInput.createFrom;
+const $$createType28 = WebDAVSyncConfigInput.createFrom;
+const $$createType29 = S3SyncConfigInput.createFrom;
+const $$createType30 = SyncRemoteVersion.createFrom;
+const $$createType31 = SyncConfig.createFrom;
+const $$createType32 = SyncVersion.createFrom;
+const $$createType33 = $Create.Nullable($$createType32);
+const $$createType34 = $Create.Nullable($$createType30);
+const $$createType35 = SyncConflict.createFrom;
+const $$createType36 = $Create.Nullable($$createType35);
+const $$createType37 = $Create.Array($$createType32);
+const $$createType38 = SyncEvent.createFrom;
+const $$createType39 = $Create.Array($$createType38);
+const $$createType40 = NetworkInterface.createFrom;
+const $$createType41 = $Create.Array($$createType40);
+const $$createType42 = TerminalGlobalStyleInput.createFrom;
+const $$createType43 = ThemeProfileInput.createFrom;
+const $$createType44 = $Create.Array($$createType43);
+const $$createType45 = ThemeAssignmentsInput.createFrom;
+const $$createType46 = ThemeImportResult.createFrom;
+const $$createType47 = $Create.Array($$createType46);
+const $$createType48 = ThemeDefinition.createFrom;
+const $$createType49 = $Create.Nullable($$createType48);

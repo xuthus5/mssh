@@ -2,9 +2,29 @@ package model
 
 type SessionCSVConflictPolicy string
 
+type SessionCSVColumn string
+
 const (
 	SessionCSVConflictSkip      SessionCSVConflictPolicy = "skip"
 	SessionCSVConflictOverwrite SessionCSVConflictPolicy = "overwrite"
+)
+
+const (
+	SessionCSVColumnName         SessionCSVColumn = "name"
+	SessionCSVColumnHost         SessionCSVColumn = "host"
+	SessionCSVColumnPort         SessionCSVColumn = "port"
+	SessionCSVColumnUsername     SessionCSVColumn = "username"
+	SessionCSVColumnAuthMethod   SessionCSVColumn = "auth_method"
+	SessionCSVColumnPassword     SessionCSVColumn = "password"
+	SessionCSVColumnKeyName      SessionCSVColumn = "key_name"
+	SessionCSVColumnKeyPublicKey SessionCSVColumn = "key_public_key"
+	SessionCSVColumnFolderPath   SessionCSVColumn = "folder_path"
+	SessionCSVColumnEnvironment  SessionCSVColumn = "environment"
+	SessionCSVColumnProject      SessionCSVColumn = "project"
+	SessionCSVColumnTags         SessionCSVColumn = "tags"
+	SessionCSVColumnNotes        SessionCSVColumn = "notes"
+	SessionCSVColumnKeepAlive    SessionCSVColumn = "keep_alive"
+	SessionCSVColumnTermType     SessionCSVColumn = "term_type"
 )
 
 type SessionCSVExportOptions struct {
@@ -20,9 +40,9 @@ type SessionCSVExportResult struct {
 }
 
 type SessionCSVImportOptions struct {
-	ConflictPolicy SessionCSVConflictPolicy `json:"conflict_policy"`
-	HeaderMapping  map[string]string        `json:"header_mapping,omitempty"`
-	DefaultValues  map[string]string        `json:"default_values,omitempty"`
+	ConflictPolicy SessionCSVConflictPolicy    `json:"conflict_policy"`
+	HeaderMapping  map[SessionCSVColumn]string `json:"header_mapping,omitempty"`
+	DefaultValues  map[SessionCSVColumn]string `json:"default_values,omitempty"`
 }
 
 type SessionCSVPreview struct {

@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useSessionCSVTransfer } from '@/hooks/useSessionCSVTransfer'
 import { __clearHandlers, __registerHandler } from '@/test/__mocks__/wails-runtime'
 import { SessionCSVConflictPolicy } from '../../bindings/github.com/xuthus5/mssh/internal/model/models'
+import type { SessionCSVValues } from '@/lib/sessionCSVMapping'
 
 const service = 'github.com/xuthus5/mssh/internal/service.SessionService.'
 
@@ -47,6 +48,33 @@ describe('useSessionCSVTransfer', () => {
     await vi.waitFor(() => {
       expect(refreshFolders).toHaveBeenCalledWith({ silent: true })
       expect(refreshAssets).toHaveBeenCalledWith({ silent: true })
+    })
+  })
+
+  it('only sends backend-supported CSV target columns', async () => {
+    const summary = { total: 1, imported: 1, updated: 0, skipped: 0, failed: 0, results: [] }
+    const handler = vi.fn(async () => summary)
+    __registerHandler(service + 'ImportCSV', handler)
+    const { result } = renderHook(() => useSessionCSVTransfer({
+      refreshFolders: vi.fn(async () => {}),
+      refreshAssets: vi.fn(async () => {}),
+    }))
+
+    const staleMapping = { name: 'Name' } as SessionCSVValues & Record<string, string>
+    const staleDefaults = { port: '22' } as SessionCSVValues & Record<string, string>
+    staleMapping.format_version = 'Format'
+    staleDefaults.format_version = '1'
+    await act(async () => {
+      await result.current.importSessionsCSV({
+        path: '/tmp/sessions.csv',
+        conflictPolicy: SessionCSVConflictPolicy.SessionCSVConflictSkip,
+        headerMapping: staleMapping,
+        defaultValues: staleDefaults,
+      })
+    })
+
+    expect(handler).toHaveBeenCalledWith('/tmp/sessions.csv', {
+      conflict_policy: 'skip', header_mapping: { name: 'Name' }, default_values: { port: '22' },
     })
   })
 

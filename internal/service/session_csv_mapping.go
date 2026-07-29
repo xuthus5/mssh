@@ -15,6 +15,14 @@ import (
 
 const maxSessionCSVPreviewRows = 20
 
+func stringSessionCSVValues(values map[model.SessionCSVColumn]string) map[string]string {
+	result := make(map[string]string, len(values))
+	for column, value := range values {
+		result[string(column)] = value
+	}
+	return result
+}
+
 func (s *SessionService) PreviewCSV(path string) (model.SessionCSVPreview, error) {
 	finish, err := s.beginOperation()
 	if err != nil {
