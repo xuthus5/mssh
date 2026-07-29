@@ -37,7 +37,7 @@ func TestJournalLoadRepairsPermissionsWithoutMutatingHardLinkSource(t *testing.T
 	root := t.TempDir()
 	journal := newTransferFinalizationJournalStore(filepath.Join(root, "data"))
 	require.NoError(t, os.MkdirAll(journal.directory, 0o700))
-	content := []byte(`{"version":1,"entries":[]}`)
+	content := []byte(`{"entries":[]}`)
 	source := filepath.Join(root, "source-journal.json")
 	require.NoError(t, os.WriteFile(source, content, 0o644))
 	require.NoError(t, os.Chmod(source, 0o644))

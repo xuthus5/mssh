@@ -2,31 +2,22 @@ package service
 
 import (
 	"database/sql"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"time"
 
-	backupcrypto "github.com/xuthus5/mssh/internal/crypto"
 	"github.com/xuthus5/mssh/internal/fsutil"
 )
 
 func encodeEncryptedSnapshot(data ExportData, masterKey string) ([]byte, error) {
-	plaintext, err := json.Marshal(data)
+	fingerprint, err := snapshotFingerprint(data)
 	if err != nil {
-		return nil, fmt.Errorf("encode data: %w", err)
+		return nil, err
 	}
-	envelope, err := backupcrypto.EncryptBackup(plaintext, []byte(masterKey))
-	if err != nil {
-		return nil, fmt.Errorf("encrypt: %w", err)
-	}
-	content, err := backupcrypto.EncodeBackup(envelope)
-	if err != nil {
-		return nil, fmt.Errorf("encode envelope: %w", err)
-	}
-	return content, nil
+	metadata := syncArtifactMetadata{SnapshotFingerprint: fingerprint, CreatedAt: time.Now().UTC()}
+	return encodeSyncArtifact(data, masterKey, metadata, nil)
 }
 
 // writePrivateFileAtomic writes content with mode 0600 via temp+rename.
