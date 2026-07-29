@@ -81,11 +81,8 @@ func validateSetting(setting model.Setting) error {
 	if err := ValidateSettingNamespace(setting.Namespace); err != nil {
 		return err
 	}
-	if setting.Namespace == "legacy" || !strings.HasPrefix(setting.Key, setting.Namespace+".") {
+	if !strings.HasPrefix(setting.Key, setting.Namespace+".") {
 		return fmt.Errorf("invalid setting key or namespace")
-	}
-	if setting.Version != 1 {
-		return fmt.Errorf("invalid setting version")
 	}
 	if err := validateDeclaredSettingValueType(setting.ValueType); err != nil {
 		return err

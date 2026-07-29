@@ -99,13 +99,9 @@ func applySettingUpdate(tx *sql.Tx, setting model.Setting) error {
 }
 
 func reencryptSessionPassword(oldCrypto, newCrypto KeyCrypto, stored string) (string, error) {
-	plain := stored
-	if strings.HasPrefix(stored, sessionPasswordPrefix) {
-		opened, err := openSessionPassword(oldCrypto, stored)
-		if err != nil {
-			return "", fmt.Errorf("decrypt: %w", err)
-		}
-		plain = opened
+	plain, err := openSessionPassword(oldCrypto, stored)
+	if err != nil {
+		return "", fmt.Errorf("decrypt: %w", err)
 	}
 	sealed, err := sealSessionPassword(newCrypto, plain)
 	if err != nil {
@@ -119,9 +115,8 @@ func decryptProxyPasswordValue(crypto KeyCrypto, raw string) (string, error) {
 	if raw == "" {
 		return "", nil
 	}
-	// Legacy plaintext passwords remain usable until the next save/rotate.
 	if !strings.HasPrefix(raw, proxyPasswordEncPrefix) {
-		return raw, nil
+		return "", fmt.Errorf("proxy password has an invalid encryption format")
 	}
 	if crypto == nil {
 		return "", fmt.Errorf("proxy password decryption is unavailable")

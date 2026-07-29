@@ -184,10 +184,9 @@ func TestEncryptDecryptProxyPasswordValueEdges(t *testing.T) {
 	_, err = decryptProxyPasswordValue(nil, proxyPasswordEncPrefix+"x")
 	require.Error(t, err)
 
-	plain, err := decryptProxyPasswordValue(nil, "legacy-plain")
-	require.NoError(t, err)
-	assert.Equal(t, "legacy-plain", plain)
-	plain, err = decryptProxyPasswordValue(nil, "  ")
+	_, err = decryptProxyPasswordValue(nil, "invalid")
+	require.Error(t, err)
+	plain, err := decryptProxyPasswordValue(nil, "  ")
 	require.NoError(t, err)
 	assert.Equal(t, "", plain)
 

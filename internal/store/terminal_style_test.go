@@ -45,7 +45,6 @@ func TestLoadTerminalGlobalStyleRejectsInvalidSettingContract(t *testing.T) {
 		args        []any
 	}{
 		{name: "namespace", query: "UPDATE settings SET namespace = 'terminal.style' WHERE key = ?", args: []any{terminalFontFamilyKey}},
-		{name: "version", query: "UPDATE settings SET version = 2 WHERE key = ?", args: []any{terminalFontFamilyKey}},
 		{name: "updated at", query: "UPDATE settings SET updated_at = 'invalid' WHERE key = ?", args: []any{terminalFontFamilyKey}},
 		{name: "invalid json", query: "UPDATE settings SET value = '{' WHERE key = ?", args: []any{terminalFontFamilyKey}},
 		{name: "actual type", query: "UPDATE settings SET value = 'true' WHERE key = ?", args: []any{terminalFontFamilyKey}},

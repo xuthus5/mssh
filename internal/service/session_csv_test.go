@@ -178,7 +178,7 @@ func writeSessionCSVFixture(t *testing.T, rows []map[string]string) string {
 
 func csvFixtureRow(overrides map[string]string) map[string]string {
 	row := map[string]string{
-		"format_version": "1", "name": "会话", "host": "10.0.0.1", "port": "22", "username": "root",
+		"name": "会话", "host": "10.0.0.1", "port": "22", "username": "root",
 		"auth_method": "password", "folder_path": `[]`, "tags": `[]`, "keep_alive": "30", "term_type": "xterm-256color",
 	}
 	for key, value := range overrides {

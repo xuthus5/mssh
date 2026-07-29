@@ -163,12 +163,10 @@ func parseSessionCSVRecord(row int, columns map[string]int, values []string) (se
 	record.Notes = value("notes")
 	record.TermType = strings.TrimSpace(value("term_type"))
 	var err error
-	if value("format_version") != sessionCSVVersion {
-		err = fmt.Errorf("row %d format_version must be %s", row, sessionCSVVersion)
-	} else if record.Port, err = parseSessionCSVInteger("port", value("port"), 1, 65535); err == nil {
-		record.KeepAlive, err = parseSessionCSVInteger("keep_alive", value("keep_alive"), 0, 86400)
+	if record.Port, err = parseSessionCSVInteger("port", value("port"), 1, 65535); err != nil {
+		return record, fmt.Errorf("row %d: %w", row, err)
 	}
-	if err != nil {
+	if record.KeepAlive, err = parseSessionCSVInteger("keep_alive", value("keep_alive"), 0, 86400); err != nil {
 		return record, fmt.Errorf("row %d: %w", row, err)
 	}
 	if record.FolderPath, err = parseSessionCSVList(value("folder_path"), "/\\"); err != nil {

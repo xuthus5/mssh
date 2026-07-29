@@ -127,7 +127,7 @@ func TestSyncAdoptVaultAndImportWithPassword(t *testing.T) {
 		tables[table] = nil
 	}
 	tables["session_folders"] = []map[string]any{snapshotFolderRow(1, nil, true, "root")}
-	data := ExportData{FormatVersion: syncFormatVersion, Tables: tables}
+	data := ExportData{Tables: tables}
 	content, err := encodeSyncArtifact(data, secret,
 		syncArtifactMetadata{SnapshotFingerprint: mustFingerprint(t, data), CreatedAt: time.Now().UTC()},
 		&vault,
@@ -138,11 +138,6 @@ func TestSyncAdoptVaultAndImportWithPassword(t *testing.T) {
 
 	noInstaller := NewSyncService(db, testutil.NewTestLogger(), WithSyncDataDir(dir))
 	assert.Error(t, noInstaller.AdoptVaultFromContent("initial-pass-12", content))
-
-	// missing vault path
-	legacy, err := encodeEncryptedSnapshot(data, secret)
-	require.NoError(t, err)
-	assert.ErrorIs(t, svc.AdoptVaultFromContent("initial-pass-12", legacy), errSyncVaultMissing)
 
 	path := filepath.Join(dir, "import.msshbackup")
 	require.NoError(t, os.WriteFile(path, content, 0o600))
@@ -173,20 +168,15 @@ func TestReencryptSessionPasswordPlainAndSealed(t *testing.T) {
 	oldCrypto := &staticCrypto{key: oldKey}
 	newCrypto := &staticCrypto{key: newKey}
 
-	sealed, err := reencryptSessionPassword(oldCrypto, newCrypto, "plain-password")
-	require.NoError(t, err)
-	assert.True(t, len(sealed) > 0)
-	assert.Contains(t, sealed, sessionPasswordPrefix)
-	opened, err := openSessionPassword(newCrypto, sealed)
-	require.NoError(t, err)
-	assert.Equal(t, "plain-password", opened)
+	_, err := reencryptSessionPassword(oldCrypto, newCrypto, "plain-password")
+	require.Error(t, err)
 
 	// already sealed under old key
 	first, err := sealSessionPassword(oldCrypto, "again")
 	require.NoError(t, err)
 	rotated, err := reencryptSessionPassword(oldCrypto, newCrypto, first)
 	require.NoError(t, err)
-	opened, err = openSessionPassword(newCrypto, rotated)
+	opened, err := openSessionPassword(newCrypto, rotated)
 	require.NoError(t, err)
 	assert.Equal(t, "again", opened)
 

@@ -34,7 +34,7 @@ func TestSyncService_DestructiveOperationsRejectConcurrentSync(t *testing.T) {
 		{name: "delete version", call: func() error { return service.DeleteVersion(1) }},
 		{name: "cloud upload", call: func() error { return service.SyncToCloud("https://sync.example.test/backup", "", "") }},
 		{name: "cloud download", call: func() error { return service.SyncFromCloud("https://sync.example.test/backup", "", "") }},
-		{name: "legacy connection test", call: func() error { return service.TestCloudConnection("https://sync.example.test/backup", "", "") }},
+		{name: "cloud connection test", call: func() error { return service.TestCloudConnection("https://sync.example.test/backup", "", "") }},
 		{name: "test provider", call: func() error { return service.TestProvider(syncTestConfigInput()) }},
 	}
 	for _, test := range tests {

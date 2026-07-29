@@ -15,13 +15,12 @@ import (
 )
 
 const (
-	sessionCSVVersion  = "1"
 	maxSessionCSVBytes = 10 << 20
 	maxSessionCSVRows  = 10_000
 )
 
 var sessionCSVHeader = []string{
-	"format_version", "name", "host", "port", "username", "auth_method", "password",
+	"name", "host", "port", "username", "auth_method", "password",
 	"key_name", "key_public_key", "folder_path", "environment", "project", "tags", "notes",
 	"keep_alive", "term_type",
 }
@@ -188,7 +187,7 @@ func sessionCSVExportRecord(session model.Session, folderPaths map[int64][]strin
 		password = session.Password
 	}
 	return []string{
-		sessionCSVVersion, protectCSVCell(session.Name), protectCSVCell(session.Host), strconv.Itoa(session.Port),
+		protectCSVCell(session.Name), protectCSVCell(session.Host), strconv.Itoa(session.Port),
 		protectCSVCell(session.Username), string(session.AuthMethod), protectCSVCell(password), protectCSVCell(key.Name),
 		protectCSVCell(key.PublicKey), string(folderJSON), assetName(session.Environment), assetProjectName(session.Project),
 		string(tagsJSON), protectCSVCell(session.Notes), strconv.Itoa(session.KeepAlive), protectCSVCell(session.TermType),

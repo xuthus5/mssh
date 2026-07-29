@@ -28,7 +28,7 @@ func encodeTransferFinalizationJournal(finalizations []transferFinalization) ([]
 		entries = append(entries, entry)
 	}
 	sort.Slice(entries, func(left, right int) bool { return entries[left].TaskID < entries[right].TaskID })
-	document := transferFinalizationJournalDocument{Version: transferFinalizationJournalVersion, Entries: entries}
+	document := transferFinalizationJournalDocument{Entries: entries}
 	data, err := json.Marshal(document)
 	if err != nil {
 		return nil, fmt.Errorf("encode journal: %w", err)

@@ -16,7 +16,6 @@ import (
 )
 
 const (
-	transferFinalizationJournalVersion      = 1
 	transferFinalizationJournalMaxBytes     = 1 << 20
 	transferFinalizationJournalMaxEntries   = 4096
 	transferFinalizationJournalMaxTaskID    = 256
@@ -32,7 +31,6 @@ type transferFinalizationJournalStore struct {
 }
 
 type transferFinalizationJournalDocument struct {
-	Version int                                `json:"version"`
 	Entries []transferFinalizationJournalEntry `json:"entries"`
 }
 
@@ -156,9 +154,6 @@ func decodeTransferFinalizationJournal(data []byte) ([]transferFinalization, err
 	}
 	if err := requireJournalEOF(decoder); err != nil {
 		return nil, err
-	}
-	if document.Version != transferFinalizationJournalVersion {
-		return nil, fmt.Errorf("unsupported journal version %d", document.Version)
 	}
 	if document.Entries == nil || len(document.Entries) > transferFinalizationJournalMaxEntries {
 		return nil, fmt.Errorf("invalid journal entry count %d", len(document.Entries))

@@ -14,11 +14,9 @@ import (
 
 const (
 	securityRotationPendingSetting = "security.rotation_pending"
-	securityRotationMarkerVersion  = 1
 )
 
 type securityRotationMarker struct {
-	Version  int              `json:"version"`
 	OldVault crypto.VaultFile `json:"old_vault"`
 	NewVault crypto.VaultFile `json:"new_vault"`
 }
@@ -113,10 +111,7 @@ func decodeRotationMarker(raw string) (securityRotationMarker, error) {
 	if err := json.Unmarshal([]byte(raw), &marker); err != nil {
 		return securityRotationMarker{}, fmt.Errorf("decode pending password rotation: %w", err)
 	}
-	if marker.Version != securityRotationMarkerVersion {
-		return securityRotationMarker{}, fmt.Errorf("unsupported password rotation marker version %d", marker.Version)
-	}
-	if marker.OldVault.FormatVersion == 0 || marker.NewVault.FormatVersion == 0 {
+	if marker.OldVault.WrappedDEK == "" || marker.NewVault.WrappedDEK == "" {
 		return securityRotationMarker{}, errors.New("pending password rotation marker is incomplete")
 	}
 	return marker, nil
