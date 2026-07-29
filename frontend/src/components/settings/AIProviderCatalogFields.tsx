@@ -25,7 +25,7 @@ export function AIProviderCatalogFields(props: Props) {
   const provider = selectedCatalogProvider(props.catalog, props.draft)
   const models = provider?.models ?? []
   return <div className="grid gap-3 rounded-lg border border-border bg-muted/20 p-3 sm:grid-cols-2">
-    <CatalogField label={t('models.dev 提供商')}>
+    <CatalogField label={t('models.dev 提供商')} action={<Button size="icon-xs" variant="ghost" aria-label={t('刷新 models.dev 提供商')} disabled={props.loading} onClick={() => { void props.refresh() }}><RefreshCw className={props.loading ? 'animate-spin' : undefined} /></Button>}>
       <Combobox items={providers} value={provider ?? null} itemToStringLabel={(item) => item.name} itemToStringValue={(item) => item.id} isItemEqualToValue={(item, value) => item.id === value.id} filter={providerFilter} onValueChange={(selected) => {
         if (selected) props.update((draft) => applyProviderPreset(draft, selected))
       }}>
@@ -43,7 +43,6 @@ export function AIProviderCatalogFields(props: Props) {
     </CatalogField>
     {(props.error || props.loading) ? <div className="flex items-center gap-2 text-xs text-muted-foreground sm:col-span-2" role="status">
       {props.loading ? <LoaderCircle className="size-3.5 animate-spin" /> : <span className="min-w-0 flex-1 truncate">{t('models.dev 加载失败: ${}', props.error ?? '')}</span>}
-      {!props.loading && props.error ? <Button size="icon-xs" variant="ghost" aria-label={t('重新加载 models.dev')} onClick={() => { void props.refresh() }}><RefreshCw /></Button> : null}
     </div> : null}
   </div>
 }
@@ -57,6 +56,6 @@ function providerFilter(item: ModelsDevProvider, query: string): boolean { retur
 
 function modelFilter(item: ModelsDevModel, query: string): boolean { return catalogFilter(item, query) }
 
-function CatalogField({ label, children }: { label: string; children: React.ReactNode }) {
-  return <div className="grid min-w-0 gap-1.5"><Label className="text-xs text-muted-foreground">{label}</Label>{children}</div>
+function CatalogField({ label, children, action }: { label: string; children: React.ReactNode; action?: React.ReactNode }) {
+  return <div className="grid min-w-0 gap-1.5"><div className="flex h-6 items-center justify-between"><Label className="text-xs text-muted-foreground">{label}</Label>{action}</div>{children}</div>
 }

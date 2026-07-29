@@ -13,7 +13,6 @@ import (
 
 	"github.com/xuthus5/mssh/internal/crypto"
 	"github.com/xuthus5/mssh/internal/model"
-	"github.com/xuthus5/mssh/internal/netproxy"
 	"github.com/xuthus5/mssh/internal/store"
 )
 
@@ -29,24 +28,34 @@ type aiTerminalWriter interface {
 }
 
 type AIService struct {
-	db             *sql.DB
-	terminals      aiTerminalWriter
-	secrets        *aiSecretStore
-	httpClient     *http.Client
-	logger         *slog.Logger
-	lifecycle      aiServiceLifecycle
-	configMu       sync.RWMutex
-	modelsDevMu    sync.Mutex
-	modelsDevURL   string
-	modelsDevCache model.ModelsDevCatalog
+	db                 *sql.DB
+	terminals          aiTerminalWriter
+	secrets            *aiSecretStore
+	httpClient         *http.Client
+	logger             *slog.Logger
+	lifecycle          aiServiceLifecycle
+	configMu           sync.RWMutex
+	modelsDevMu        sync.Mutex
+	modelsDevURL       string
+	modelsDevCachePath string
+	modelsDevCache     model.ModelsDevCatalog
 }
 
-func NewAIService(db *sql.DB, terminals *TerminalService, keychain crypto.KeychainAdapter, logger *slog.Logger, proxy ...*netproxy.Manager) *AIService {
+func NewAIService(db *sql.DB, terminals *TerminalService, keychain crypto.KeychainAdapter, logger *slog.Logger, options ...AIServiceOption) *AIService {
 	var terminalController aiTerminalWriter
 	if terminals != nil {
 		terminalController = terminals
 	}
-	return &AIService{db: db, terminals: terminalController, secrets: newAISecretStore(keychain), httpClient: sharedHTTPClient(45*time.Second, firstProxy(proxy...)), logger: logger, modelsDevURL: modelsDevAPIURL}
+	service := &AIService{db: db, terminals: terminalController, secrets: newAISecretStore(keychain), logger: logger, modelsDevURL: modelsDevAPIURL}
+	for _, option := range options {
+		if option != nil {
+			option(service)
+		}
+	}
+	if service.httpClient == nil {
+		service.httpClient = sharedHTTPClient(45*time.Second, nil)
+	}
+	return service
 }
 
 func (s *AIService) Dashboard() (model.AISettingsDashboard, error) {
