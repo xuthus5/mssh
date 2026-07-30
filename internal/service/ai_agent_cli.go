@@ -16,7 +16,6 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/xuthus5/mssh/internal/model"
@@ -105,8 +104,16 @@ type aiAgentCLIProcess struct {
 	maxOutputBytes int
 }
 
-func runAIAgentCLIProcess(ctx context.Context, process aiAgentCLIProcess) error {
-	command := commandWithContext(ctx, process.command)
+func runAIAgentCLIProcess(ctx context.Context, process aiAgentCLIProcess) (resultErr error) {
+	command, lifecycle, err := commandWithContext(ctx, process.command)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if closeErr := lifecycle.Close(); closeErr != nil {
+			resultErr = errors.Join(resultErr, fmt.Errorf("close AI agent CLI process lifecycle: %w", closeErr))
+		}
+	}()
 	stdout, err := command.StdoutPipe()
 	if err != nil {
 		return fmt.Errorf("open AI agent CLI stdout: %w", err)
@@ -115,6 +122,9 @@ func runAIAgentCLIProcess(ctx context.Context, process aiAgentCLIProcess) error 
 	command.Stderr = stderr
 	if err = command.Start(); err != nil {
 		return fmt.Errorf("start AI agent CLI: %w", err)
+	}
+	if err = lifecycle.Started(command); err != nil {
+		return stopAIAgentCLIProcessAfterStartFailure(command, err)
 	}
 	scanErr := scanAIAgentCLIEvents(stdout, process.adapter, process.maxOutputBytes)
 	waitErr := command.Wait()
@@ -127,24 +137,33 @@ func runAIAgentCLIProcess(ctx context.Context, process aiAgentCLIProcess) error 
 	return nil
 }
 
-func commandWithContext(ctx context.Context, command *exec.Cmd) *exec.Cmd {
+func commandWithContext(ctx context.Context, command *exec.Cmd) (*exec.Cmd, aiAgentProcessLifecycle, error) {
 	contextCommand := exec.CommandContext(ctx, command.Path, command.Args[1:]...) // #nosec G204 -- adapter paths are fixed allowlisted executables.
 	contextCommand.Dir, contextCommand.Env = command.Dir, command.Env
-	contextCommand.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	contextCommand.Cancel = func() error { return killAIAgentProcessGroup(contextCommand) }
+	lifecycle, err := newAIAgentProcessLifecycle(contextCommand)
+	if err != nil {
+		return nil, nil, fmt.Errorf("prepare AI agent CLI process lifecycle: %w", err)
+	}
+	contextCommand.Cancel = func() error { return lifecycle.Cancel(contextCommand) }
 	contextCommand.WaitDelay = 2 * time.Second
-	return contextCommand
+	return contextCommand, lifecycle, nil
 }
 
-func killAIAgentProcessGroup(command *exec.Cmd) error {
-	if command.Process == nil {
-		return os.ErrProcessDone
+func stopAIAgentCLIProcessAfterStartFailure(command *exec.Cmd, startErr error) error {
+	killErr := command.Process.Kill()
+	if errors.Is(killErr, os.ErrProcessDone) {
+		killErr = nil
 	}
-	err := syscall.Kill(-command.Process.Pid, syscall.SIGKILL)
-	if errors.Is(err, syscall.ESRCH) {
-		return os.ErrProcessDone
+	waitErr := command.Wait()
+	var exitErr *exec.ExitError
+	if errors.As(waitErr, &exitErr) {
+		waitErr = nil
 	}
-	return err
+	return errors.Join(
+		fmt.Errorf("bind AI agent CLI process lifecycle: %w", startErr),
+		killErr,
+		waitErr,
+	)
 }
 
 func newAIAgentCLIAdapter(cli model.AIAgentCLI) (aiAgentCLIAdapter, error) {

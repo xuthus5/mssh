@@ -1,10 +1,9 @@
 package service
 
 import (
+	"fmt"
 	"os"
-	"path/filepath"
-	"runtime"
-	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -13,9 +12,9 @@ import (
 
 func TestDetectAICLI(t *testing.T) {
 	directory := t.TempDir()
-	path := filepath.Join(directory, "agent-test")
-	require.NoError(t, os.WriteFile(path, []byte("#!/bin/sh\necho agent-test 1.2.3\n"), 0o700))
-	t.Setenv("PATH", directory)
+	path := installAIAgentTestLauncher(t, directory, "agent-test", "TestAIAgentVersionHelperProcess")
+	t.Setenv("MSSH_AGENT_VERSION_HELPER", "success")
+	setAIAgentTestPath(t, directory)
 	status := detectAICLI("Agent Test", "agent-test")
 	assert.True(t, status.Installed)
 	assert.Equal(t, path, status.Path)
@@ -35,29 +34,42 @@ func TestDetectAgentCLIsReturnsConfiguredCommands(t *testing.T) {
 
 func TestDetectAICLIReportsVersionFailure(t *testing.T) {
 	directory := t.TempDir()
-	path := filepath.Join(directory, "agent-fail")
-	require.NoError(t, os.WriteFile(path, []byte("#!/bin/sh\nexit 1\n"), 0o700))
-	t.Setenv("PATH", directory)
+	installAIAgentTestLauncher(t, directory, "agent-fail", "TestAIAgentVersionHelperProcess")
+	t.Setenv("MSSH_AGENT_VERSION_HELPER", "failure")
+	setAIAgentTestPath(t, directory)
 	status := detectAICLI("Agent Fail", "agent-fail")
 	assert.True(t, status.Installed)
 	assert.Contains(t, status.Error, "读取版本失败")
 }
 
 func TestDetectAICLIRejectsOversizedVersionOutput(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("shell fixture is Unix-specific")
-	}
 	directory := t.TempDir()
-	path := filepath.Join(directory, "agent-large")
-	script := "#!/bin/sh\nprintf '%0" + strconv.Itoa(maxAIAgentVersionOutputBytes+1) + "d' 0\n"
-	require.NoError(t, os.WriteFile(path, []byte(script), 0o700))
-	t.Setenv("PATH", directory)
+	installAIAgentTestLauncher(t, directory, "agent-large", "TestAIAgentVersionHelperProcess")
+	t.Setenv("MSSH_AGENT_VERSION_HELPER", "oversized")
+	setAIAgentTestPath(t, directory)
 
 	status := detectAICLI("Agent Large", "agent-large")
 
 	assert.True(t, status.Installed)
 	assert.Contains(t, status.Error, "输出过大")
 	assert.Empty(t, status.Version)
+}
+
+func TestAIAgentVersionHelperProcess(t *testing.T) {
+	switch os.Getenv("MSSH_AGENT_VERSION_HELPER") {
+	case "":
+		return
+	case "success":
+		_, _ = fmt.Println("agent-test 1.2.3")
+		os.Exit(0)
+	case "failure":
+		os.Exit(1)
+	case "oversized":
+		_, _ = fmt.Print(strings.Repeat("0", maxAIAgentVersionOutputBytes+1))
+		os.Exit(0)
+	default:
+		os.Exit(2)
+	}
 }
 
 func TestBoundedAIVersionOutputKeepsOnlyConfiguredBytes(t *testing.T) {

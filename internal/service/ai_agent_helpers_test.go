@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -124,21 +125,25 @@ func TestAIAgentCLIEventScanning(t *testing.T) {
 func TestRunAIAgentCLIProcess(t *testing.T) {
 	tests := []struct {
 		name      string
-		script    string
+		mode      string
 		wantError string
 	}{
-		{name: "success", script: `printf '{"type":"assistant"}\n'`},
-		{name: "invalid event", script: `printf 'bad\n'`, wantError: "decode Claude Code event"},
-		{name: "exit error", script: `printf '{"type":"assistant"}\n'; printf 'failed' >&2; exit 7`, wantError: "failed"},
+		{name: "success", mode: "success"},
+		{name: "invalid event", mode: "invalid", wantError: "decode Claude Code event"},
+		{name: "exit error", mode: "exit", wantError: "failed"},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			testBinary, err := os.Executable()
+			require.NoError(t, err)
+			command := exec.Command(testBinary, "-test.run=^TestAIAgentCLIProcessHelper$")
+			command.Env = append(os.Environ(), "MSSH_AGENT_CLI_PROCESS_MODE="+test.mode)
 			process := aiAgentCLIProcess{
-				command:        exec.Command("/bin/sh", "-c", test.script),
+				command:        command,
 				adapter:        claudeAIAgentAdapter{},
 				maxOutputBytes: 256,
 			}
-			err := runAIAgentCLIProcess(context.Background(), process)
+			err = runAIAgentCLIProcess(context.Background(), process)
 			if test.wantError == "" {
 				require.NoError(t, err)
 				return
@@ -148,11 +153,29 @@ func TestRunAIAgentCLIProcess(t *testing.T) {
 	}
 }
 
+func TestAIAgentCLIProcessHelper(t *testing.T) {
+	switch os.Getenv("MSSH_AGENT_CLI_PROCESS_MODE") {
+	case "":
+		return
+	case "success":
+		_, _ = fmt.Println(`{"type":"assistant"}`)
+		os.Exit(0)
+	case "invalid":
+		_, _ = fmt.Println("bad")
+		os.Exit(0)
+	case "exit":
+		_, _ = fmt.Println(`{"type":"assistant"}`)
+		_, _ = fmt.Fprint(os.Stderr, "failed")
+		os.Exit(7)
+	default:
+		os.Exit(2)
+	}
+}
+
 func TestAIAgentCLICommandConfiguration(t *testing.T) {
 	binDir := t.TempDir()
-	executable := filepath.Join(binDir, "opencode")
-	require.NoError(t, os.WriteFile(executable, []byte("#!/bin/sh\n"), 0o700))
-	t.Setenv("PATH", binDir)
+	installAIAgentTestLauncher(t, binDir, "opencode", "TestAIAgentCLIProcessHelper")
+	setAIAgentTestPath(t, binDir)
 	workDir := t.TempDir()
 	command, err := (openCodeAIAgentAdapter{}).Command(workDir, "http://127.0.0.1/mcp", "secret", "prompt")
 	require.NoError(t, err)
@@ -167,13 +190,14 @@ func TestAIAgentCLICommandConfiguration(t *testing.T) {
 	assert.Equal(t, os.FileMode(0o600), info.Mode().Perm())
 	assert.Contains(t, command.Env, "OPENCODE_CONFIG="+configPath)
 
-	wrapped := commandWithContext(context.Background(), command)
+	wrapped, lifecycle, err := commandWithContext(context.Background(), command)
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, lifecycle.Close()) })
 	assert.Equal(t, command.Dir, wrapped.Dir)
 	assert.Equal(t, command.Env, wrapped.Env)
 	require.NotNil(t, wrapped.SysProcAttr)
-	assert.True(t, wrapped.SysProcAttr.Setpgid)
 	assert.NotNil(t, wrapped.Cancel)
-	assert.ErrorIs(t, killAIAgentProcessGroup(&exec.Cmd{}), os.ErrProcessDone)
+	assert.ErrorIs(t, lifecycle.Cancel(&exec.Cmd{}), os.ErrProcessDone)
 
 	t.Setenv("PATH", t.TempDir())
 	_, err = (claudeAIAgentAdapter{}).Command(workDir, "url", "token", "prompt")

@@ -172,6 +172,22 @@ tasks:
       - go test -race -tags=e2e ./e2e -run 'TestCommercialSSHWorkflow|TestConcurrentResourcesReturnToBaseline' -count=1 -timeout=2m
       - go test -race -tags=e2e ./internal/serial -run '^TestSerialPTYIntegration$' -count=1 -timeout=30s
 
+  test:windows:
+    summary: Verify Windows backend compatibility
+    cmds:
+      - cmd: |
+          set -euo pipefail
+          windows_test_dir="$(mktemp -d)"
+          trap 'rm -rf -- "$windows_test_dir"' EXIT
+          GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go test -c \
+            -o "$windows_test_dir/mssh-service.test.exe" ./internal/service
+          GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build ./internal/app
+        platforms: [linux, darwin]
+      - cmd: go test ./internal/service -run 'Test(AIAgentWindowsProcessLifecycleKillsDescendants|RunAIAgentCLIProcess)' -count=1
+        platforms: [windows]
+      - cmd: go build ./internal/app
+        platforms: [windows]
+
   benchmark:
     summary: Run commercial performance benchmarks
     cmds:
@@ -196,12 +212,13 @@ tasks:
   ci:
     summary: Full local gate aligned with .github/workflows/ci.yml
     desc: |
-      Mirrors CI: golangci-lint, backend race+coverage, frontend checks, production build.
+      Mirrors CI: golangci-lint, backend race+coverage, Windows compatibility, frontend checks, production build.
       Run before every commit/push. Fails fast on the first failing stage.
     cmds:
       - task: toolchain:check
       - task: lint
       - task: test
+      - task: test:windows
       - node scripts/check-go-source-limits.mjs
       - task: test:frontend
       - task: build

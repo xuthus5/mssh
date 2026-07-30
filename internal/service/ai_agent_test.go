@@ -128,9 +128,8 @@ func TestAIAgentCLIEventsRejectLocalTools(t *testing.T) {
 
 func TestClaudeAIAgentTokenUsesPrivateConfigFile(t *testing.T) {
 	binDir := t.TempDir()
-	executable := filepath.Join(binDir, "claude")
-	require.NoError(t, os.WriteFile(executable, []byte("#!/bin/sh\n"), 0o700))
-	t.Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	installAIAgentTestLauncher(t, binDir, "claude", "TestAIAgentCLIProcessHelper")
+	setAIAgentTestPath(t, binDir)
 	workDir := t.TempDir()
 	command, err := (claudeAIAgentAdapter{}).Command(workDir, "http://127.0.0.1/mcp", "private-token", "prompt")
 	require.NoError(t, err)

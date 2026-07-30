@@ -34,6 +34,23 @@ jobs:
         # Single source of truth with local `wails3 task ci`
         run: wails3 task ci
 
+  windows-compatibility:
+    name: Windows compatibility
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: .go-version
+      - name: Run Agent CLI process tests
+        shell: bash
+        run: >-
+          go test ./internal/service
+          -run 'Test(AIAgentWindowsProcessLifecycleKillsDescendants|RunAIAgentCLIProcess)'
+          -count=1
+      - name: Build Windows backend
+        run: go build ./internal/app
+
   performance:
     name: Commercial performance benchmarks
     runs-on: ubuntu-24.04
