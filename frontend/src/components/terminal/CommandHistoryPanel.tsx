@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type UIEvent } from 'react'
-import { Clipboard, History, Trash2, X } from 'lucide-react'
+import { History, Trash2, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from '@/components/ui/toast'
+import { CommandHistoryRow } from '@/components/terminal/CommandHistoryRow'
+import { SaveHistoryMacroDialog } from '@/components/terminal/SaveHistoryMacroDialog'
 import { getClipboard } from '@/lib/clipboard'
 import { clearCommandHistory, readCommandHistory, type CommandHistoryEntry } from '@/lib/commandHistory'
 import { requestConfirm } from '@/lib/confirmDialog'
@@ -17,19 +19,22 @@ import {
   runCommandHistoryMutation,
   useCommandHistoryMutationState,
 } from '@/lib/commandHistoryMutationCoordinator'
+import { useMacroMutationState } from '@/lib/macroMutationCoordinator'
 
-
-const ROW_HEIGHT = 72
+const ROW_HEIGHT = 40
 
 export function CommandHistoryPanel({
   sessionID,
   onClose,
+  onExecute,
   onFill,
 }: {
   sessionID: number
   onClose: () => void
+  onExecute: (command: string) => Promise<void>
   onFill: (command: string) => void
 }) {
+  const [macroCommand, setMacroCommand] = useState<string | null>(null)
   const panel = useToolPanelResize('history')
   const runtime = useHistoryRuntime()
   const source = useRef(Symbol('command-history-panel')).current
@@ -42,7 +47,15 @@ export function CommandHistoryPanel({
     <HistoryPanelHeader disabled={clear.clearing} onClose={onClose} />
     <HistoryPanelToolbar virtual={virtual} clear={clear} entryCount={history.entries.length} />
     {feedback.actionError ? <div className="border-b border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive" role="alert">{feedback.actionError}</div> : null}
-    <HistoryPanelList virtual={virtual} loadError={history.loadError} onCopy={feedback.copy} onFill={onFill} />
+    <HistoryPanelList
+      virtual={virtual}
+      loadError={history.loadError}
+      onCopy={feedback.copy}
+      onExecute={(command) => feedback.execute(command, onExecute)}
+      onFill={onFill}
+      onSaveMacro={setMacroCommand}
+    />
+    <SaveHistoryMacroDialog command={macroCommand} onClose={() => setMacroCommand(null)} />
   </aside>
 }
 
@@ -154,7 +167,15 @@ function useHistoryFeedback(runtime: HistoryRuntime, sessionID: number) {
       if (isCurrent()) setActionError(t('复制失败: ${}', error instanceof Error ? error.message : String(error)))
     }
   }
-  return { actionError, setActionError, copy }
+  const execute = async (command: string, action: (value: string) => Promise<void>) => {
+    try {
+      await action(command)
+      setActionError('')
+    } catch (error: unknown) {
+      setActionError(t('执行失败: ${}', error instanceof Error ? error.message : String(error)))
+    }
+  }
+  return { actionError, setActionError, copy, execute }
 }
 
 type HistoryFeedback = ReturnType<typeof useHistoryFeedback>
@@ -235,34 +256,31 @@ function HistoryPanelToolbar({ virtual, clear, entryCount }: {
   </div>
 }
 
-function HistoryRow({ entry, item, onCopy, onFill }: {
-  entry: CommandHistoryEntry
-  item: VirtualHistory['windowed']['items'][number]
-  onCopy: (command: string) => Promise<void>
-  onFill: (command: string) => void
-}) {
-  return <div className="group absolute left-0 right-0 rounded-md p-2 hover:bg-muted/60 focus-within:bg-muted/60"
-    style={{ top: item.start, height: item.size - 4 }}>
-    <code className="block whitespace-pre-wrap break-all text-xs">{entry.command}</code>
-    <div className="mt-1 flex justify-end gap-1 opacity-100 focus-within:opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
-      <Button size="xs" variant="ghost" onClick={() => { void onCopy(entry.command) }}><Clipboard />{t('复制')}</Button>
-      <Button size="xs" variant="ghost" onClick={() => onFill(entry.command)}>{t('填入终端')}</Button>
-    </div>
-  </div>
-}
-
-function HistoryPanelList({ virtual, loadError, onCopy, onFill }: {
+function HistoryPanelList({ virtual, loadError, onCopy, onExecute, onFill, onSaveMacro }: {
   virtual: VirtualHistory
   loadError: string
   onCopy: (command: string) => Promise<void>
+  onExecute: (command: string) => Promise<void>
   onFill: (command: string) => void
+  onSaveMacro: (command: string) => void
 }) {
+  const macroBusy = useMacroMutationState((state) => state.busy)
   let content = <p className="p-3 text-xs text-muted-foreground">{t('暂无命令历史')}</p>
   if (loadError) content = <p className="p-3 text-xs text-destructive" role="alert">{t('加载命令历史失败: ${}', loadError)}</p>
   else if (virtual.filtered.length > 0) content = <div style={{ height: virtual.windowed.totalSize, position: 'relative' }}>
     {virtual.windowed.items.map((item) => {
       const entry = virtual.filtered[item.index]
-      return <HistoryRow key={entry.id} entry={entry} item={item} onCopy={onCopy} onFill={onFill} />
+      return <CommandHistoryRow
+        key={entry.id}
+        entry={entry}
+        start={item.start}
+        height={item.size - 2}
+        macroBusy={macroBusy}
+        onCopy={onCopy}
+        onExecute={onExecute}
+        onFill={onFill}
+        onSaveMacro={onSaveMacro}
+      />
     })}
   </div>
   return <div className="min-h-0 flex-1 overflow-y-auto p-2" onScroll={virtual.onScroll}>{content}</div>
