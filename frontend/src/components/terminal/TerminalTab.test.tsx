@@ -5,12 +5,18 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const logService = vi.hoisted(() => ({
   start: vi.fn(async () => {}),
   stop: vi.fn(async () => {}),
+  write: vi.fn(async () => {}),
 }))
 vi.mock('@/lib/wails', () => ({
   LogService: {
     StartTerminalRecording: logService.start,
     StopTerminalRecording: logService.stop,
   },
+  TerminalService: { Write: logService.write },
+}))
+vi.mock('@/components/terminal/CommandHistoryPanel', () => ({
+  CommandHistoryPanel: ({ onExecute }: { onExecute: (command: string) => Promise<void> }) =>
+    <button type="button" onClick={() => { void onExecute('git status') }}>执行历史命令</button>,
 }))
 const splitAction = vi.hoisted(() => vi.fn())
 vi.mock('@/components/terminal/TerminalSplit', () => ({
@@ -35,13 +41,14 @@ vi.mock('@/components/terminal/AITerminalPanel', () => ({
   },
 }))
 vi.mock('@/components/terminal/TerminalToolbar', () => ({
-  TerminalToolbar: ({ isRecording, recordingBusy, onToggleRecording, onSplit, onToggleSearch, onToggleCompose, onOpenAI, recordingError }: {
+  TerminalToolbar: ({ isRecording, recordingBusy, onToggleRecording, onSplit, onToggleSearch, onToggleCompose, onOpenHistory, onOpenAI, recordingError }: {
     isRecording: boolean
     recordingBusy?: boolean
     onToggleRecording: () => void
     onSplit: (direction: 'horizontal') => void
     onToggleSearch: () => void
     onToggleCompose: () => void
+    onOpenHistory: () => void
     onOpenAI: () => void
     recordingError?: string
   }) => <div>
@@ -49,6 +56,7 @@ vi.mock('@/components/terminal/TerminalToolbar', () => ({
     <button type="button" onClick={() => onSplit('horizontal')}>向右分屏</button>
     <button type="button" onClick={onToggleSearch}>搜索终端</button>
     <button type="button" onClick={onToggleCompose}>撰写终端</button>
+    <button type="button" onClick={onOpenHistory}>命令历史</button>
     <button type="button" onClick={onOpenAI}>AI 面板</button>
     {recordingError ? <p role="alert">{recordingError}</p> : null}
   </div>,
@@ -100,6 +108,21 @@ describe('TerminalTab', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '关闭撰写' }))
     expect(screen.queryByTestId('compose-split-1')).not.toBeInTheDocument()
+  })
+
+  it('executes history commands in the active split terminal', async () => {
+    const focus = vi.fn()
+    useAppStore.setState({
+      activePaneId: 'split-1',
+      terminalPool: new Map([['split-1', { terminal: { cols: 90, rows: 30, focus } as never, lastUsed: 1 }]]),
+    })
+    render(<TerminalTab terminalID="term-1" sessionId={7} active focusRequest={focusRequest} onOpenFiles={vi.fn()} />)
+
+    fireEvent.click(screen.getByRole('button', { name: '命令历史' }))
+    fireEvent.click(screen.getByRole('button', { name: '执行历史命令' }))
+
+    await waitFor(() => expect(logService.write).toHaveBeenCalledWith('split-1', 'git status\r'))
+    expect(focus).toHaveBeenCalledOnce()
   })
 
   it('keeps the visited AI panel mounted while hidden', () => {

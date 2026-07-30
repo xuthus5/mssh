@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { TerminalSplit, type TerminalSplitHandle } from '@/components/terminal/TerminalSplit'
 import { TerminalToolbar } from '@/components/terminal/TerminalToolbar'
 import { useAppStore, type TerminalTab as TerminalTabState } from '@/store/appStore'
-import { LogService } from '@/lib/wails'
+import { LogService, TerminalService } from '@/lib/wails'
 import { logger } from '@/lib/logger'
 import type { TerminalFocusRequest } from '@/hooks/useTerminal'
 import { CommandHistoryPanel } from '@/components/terminal/CommandHistoryPanel'
@@ -153,10 +153,15 @@ function TerminalToolPanels({ controller }: { controller: TerminalTabController 
     terminal?.paste(command)
     terminal?.focus()
   }
+  const executeCommand = async (command: string) => {
+    const input = /[\r\n]$/.test(command) ? command : `${command}\r`
+    await TerminalService.Write(activeTerminalID, input)
+    useAppStore.getState().terminalPool.get(activeTerminalID)?.terminal?.focus()
+  }
   return <>
     <TerminalSearchBar terminalID={activeTerminalID} open={searchOpen} onOpenChange={setSearchOpen} />
     {toolPanel === 'history' && historySessionId !== 0
-      ? <CommandHistoryPanel sessionID={historySessionId} onClose={closePanel} onFill={fillCommand} />
+      ? <CommandHistoryPanel sessionID={historySessionId} onClose={closePanel} onExecute={executeCommand} onFill={fillCommand} />
       : null}
     {toolPanel === 'system' && remoteFeatures
       ? <SystemPanel terminalID={activeTerminalID} onClose={closePanel} />
