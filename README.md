@@ -69,6 +69,7 @@ wails3 task ci
 # Individual stages
 wails3 task lint
 wails3 task test            # backend race + coverage >= 90%
+wails3 task test:windows    # Windows backend compile/process checks
 wails3 task test:frontend   # source limits + bundle budget + vitest
 wails3 task build           # production build
 
