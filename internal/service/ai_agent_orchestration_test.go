@@ -8,7 +8,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -52,15 +51,10 @@ func TestRunLocalCLIAgentThroughScopedMCP(t *testing.T) {
 
 func installFakeOpenCode(t *testing.T) {
 	t.Helper()
-	testBinary, err := os.Executable()
-	require.NoError(t, err)
 	binDir := t.TempDir()
-	scriptPath := filepath.Join(binDir, "opencode")
-	script := "#!/bin/sh\nexec \"$MSSH_TEST_BINARY\" -test.run=TestAIAgentFakeOpenCodeProcess -- \"$@\"\n"
-	require.NoError(t, os.WriteFile(scriptPath, []byte(script), 0o700))
-	t.Setenv("MSSH_TEST_BINARY", testBinary)
+	installAIAgentTestLauncher(t, binDir, "opencode", "TestAIAgentFakeOpenCodeProcess")
 	t.Setenv("MSSH_AGENT_HELPER_PROCESS", "1")
-	t.Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	setAIAgentTestPath(t, binDir)
 }
 
 func TestAIAgentFakeOpenCodeProcess(t *testing.T) {
