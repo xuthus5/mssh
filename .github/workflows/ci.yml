@@ -60,10 +60,14 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: .go-version
-      - name: Install Wails CLI
-        run: go install github.com/wailsapp/wails/v3/cmd/wails3@$(tr -d '\r\n' < .wails-version)
       - name: Capture benchmark samples
-        run: wails3 task benchmark:ci
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir -p performance
+          go test -run '^$' -bench 'BenchmarkCommercial|BenchmarkWailsEventBus' -benchmem -count=3 \
+            ./internal/store ./internal/service ./pkg/event | tee performance/commercial-benchmarks.txt
+          test -s performance/commercial-benchmarks.txt
       - name: Upload benchmark samples
         uses: actions/upload-artifact@v4
         with:

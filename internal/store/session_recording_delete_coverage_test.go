@@ -45,7 +45,6 @@ func TestValidateStagedSessionRecordingRejectsMissingAndChangedFiles(t *testing.
 	assert.ErrorContains(t, err, "inspect staged recording")
 
 	staged := filepath.Join(directory, "changed.msshlog")
-	require.NoError(t, os.Remove(original))
 	require.NoError(t, os.WriteFile(staged, []byte("changed"), 0o600))
 	_, err = validateStagedSessionRecording(stagedSessionRecording{
 		originalPath: original,
