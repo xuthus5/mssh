@@ -56,7 +56,7 @@ MSSH is not a fleet orchestrator. It focuses on saved SSH sessions and terminal-
 
 - SFTP file browser with list/tree views
 - Hidden-file filtering and native file dialogs
-- OSC 7 directory following
+- OSC 7 directory following, with optional Bash/Zsh startup-script integration
 - Transfer center with progress, ETA, retry, history, and cancellation
 
 ### Automation

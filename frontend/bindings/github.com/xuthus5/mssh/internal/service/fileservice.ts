@@ -35,18 +35,24 @@ export function Download(sessionID: number, remotePath: string, localPath: strin
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.FileService.Download", sessionID, remotePath, localPath);
 }
 
+export function InstallTerminalDirectoryIntegration(sessionID: number): $CancellablePromise<string[]> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.FileService.InstallTerminalDirectoryIntegration", sessionID).then(($result: any) => {
+        return $$createType0($result);
+    });
+}
+
 /**
  * ListDir lists remote directory entries via SFTP.
  */
 export function ListDir(sessionID: number, path: string): $CancellablePromise<ssh$0.FileEntry[]> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.FileService.ListDir", sessionID, path).then(($result: any) => {
-        return $$createType1($result);
+        return $$createType2($result);
     });
 }
 
 export function ListTransfers(): $CancellablePromise<model$0.TransferJob[]> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.FileService.ListTransfers").then(($result: any) => {
-        return $$createType3($result);
+        return $$createType4($result);
     });
 }
 
@@ -69,7 +75,8 @@ export function Upload(sessionID: number, localPath: string, remotePath: string)
 }
 
 // Private type creation functions
-const $$createType0 = ssh$0.FileEntry.createFrom;
-const $$createType1 = $Create.Array($$createType0);
-const $$createType2 = model$0.TransferJob.createFrom;
-const $$createType3 = $Create.Array($$createType2);
+const $$createType0 = $Create.Array($Create.Any);
+const $$createType1 = ssh$0.FileEntry.createFrom;
+const $$createType2 = $Create.Array($$createType1);
+const $$createType3 = model$0.TransferJob.createFrom;
+const $$createType4 = $Create.Array($$createType3);

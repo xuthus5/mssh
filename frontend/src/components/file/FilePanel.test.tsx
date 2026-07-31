@@ -8,6 +8,7 @@ const handlers = {
   onRename: vi.fn(), onMakeDir: vi.fn(), onUpload: vi.fn(), onDownload: vi.fn(),
   onLoadDirectory: vi.fn(async () => []),
   transferActionPending: null, onSyncCurrentDirectory: vi.fn(), syncingCurrentDirectory: false,
+  onInstallDirectoryIntegration: vi.fn(), installingDirectoryIntegration: false,
 }
 
 describe('FilePanel SFTP views', () => {
@@ -22,6 +23,8 @@ describe('FilePanel SFTP views', () => {
     expect(screen.getByRole('table')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: '同步当前目录' }))
     expect(handlers.onSyncCurrentDirectory).toHaveBeenCalledOnce()
+    await user.click(screen.getByRole('button', { name: '安装自动跟随脚本' }))
+    expect(handlers.onInstallDirectoryIntegration).toHaveBeenCalledOnce()
     await user.click(screen.getByRole('button', { name: '树状视图' }))
     expect(screen.getByRole('tree', { name: '远程文件树' })).toBeInTheDocument()
     expect(screen.queryByText('.env')).not.toBeInTheDocument()
