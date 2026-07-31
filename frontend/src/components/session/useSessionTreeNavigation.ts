@@ -7,13 +7,20 @@ interface Options {
   folders: Folder[]
   sessions: Session[]
   revealAll: boolean
+  expandedFolderIDs?: string[]
+  onExpandedFolderIDsChange?: (ids: string[]) => void
   onConnect: (sessionId: string) => void
   onSelectFolder?: (folderId: string) => void
 }
 
 export function useSessionTreeNavigation(options: Options) {
-  const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  const [localExpanded, setLocalExpanded] = useState<Set<string>>(new Set())
   const [activeIndex, setActiveIndex] = useState(0)
+  const controlled = options.expandedFolderIDs !== undefined
+  const expanded = useMemo(
+    () => controlled ? new Set(options.expandedFolderIDs) : localExpanded,
+    [controlled, localExpanded, options.expandedFolderIDs],
+  )
   const nodes = useMemo(
     () => buildVisibleSessionTreeNodes(options.folders, options.sessions, expanded, options.revealAll),
     [expanded, options.folders, options.revealAll, options.sessions],
@@ -22,8 +29,17 @@ export function useSessionTreeNavigation(options: Options) {
   const activeId = nodes[resolvedActiveIndex]?.id
   useActiveTreeNodeScroll(activeId)
   const toggleFolder = useCallback((id: string) => {
-    setExpanded((current) => toggleExpandedFolder(current, id))
-  }, [])
+    if (controlled) {
+      const next = toggleExpandedFolder(new Set(options.expandedFolderIDs), id)
+      options.onExpandedFolderIDsChange?.([...next])
+      return
+    }
+    setLocalExpanded((current) => {
+      const next = toggleExpandedFolder(current, id)
+      options.onExpandedFolderIDsChange?.([...next])
+      return next
+    })
+  }, [controlled, options])
   const handleNodeKey = useCallback((event: KeyboardEvent, index: number, node: SessionTreeNode) => {
     handleTreeNodeKey({ event, index, node, nodes, setActiveIndex, toggleFolder, ...options })
   }, [nodes, options, toggleFolder])

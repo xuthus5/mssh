@@ -175,6 +175,17 @@ function isHostKeyRejected(error: unknown) {
   return message.toLowerCase().includes(hostKeyRejectedMarker)
 }
 
+function shouldOpenReconnectDialog(context: {
+  source: 'manual' | 'auto'
+  tabID: string
+  connectionKind?: 'ssh' | 'serial' | 'local'
+}) {
+  if ((context.connectionKind ?? 'ssh') !== 'ssh') return false
+  if (context.source === 'manual') return true
+  const activeSurface = useAppStore.getState().activeSurface
+  return activeSurface?.type === 'terminal' && activeSurface.id === context.tabID
+}
+
 async function runReconnectAttempts(context: ReconnectContext) {
   for (let attempt = 0; attempt < 3; attempt++) {
     if (context.run.controller.signal.aborted) return
@@ -206,7 +217,7 @@ export async function performReconnectSessionTab(
     tabID,
     terminalID: target.terminalID,
     controller: new AbortController(),
-    ownsDialog: (target.tab.connectionKind ?? 'ssh') === 'ssh',
+    ownsDialog: shouldOpenReconnectDialog({ source, tabID, connectionKind: target.tab.connectionKind }),
     dialogID: 0,
   }
   if (run.ownsDialog) {

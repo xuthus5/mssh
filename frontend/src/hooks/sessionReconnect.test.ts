@@ -226,7 +226,32 @@ describe('maybeAutoReconnectTerminal', () => {
     maybeAutoReconnectTerminal('term-old', sessions)
     await Promise.resolve()
     expect(useAppStore.getState().connectionStatus['term-old']).toBe('reconnecting')
+    expect(useConnectDialog.getState().open).toBe(true)
     open.resolve('term-new')
+  })
+
+  it('auto-reconnects inactive SSH tabs without opening the connection dialog', async () => {
+    useTerminalBehaviorStore.setState({ autoReconnect: true, renderer: 'dom', historyPredict: false })
+    useAppStore.setState({
+      tabs: [
+        { id: 'tab-active', title: 'Active', type: 'terminal', terminalId: 'term-active', sessionId: 6 },
+        { id: 'tab-1', title: 'Server', type: 'terminal', terminalId: 'term-old', sessionId: 5 },
+      ],
+      activeSurface: { type: 'terminal', id: 'tab-active' },
+      connectionStatus: { 'term-active': 'connected', 'term-old': 'disconnected' },
+    })
+    const open = deferred<string>()
+    __registerHandler(service + 'Open', async () => open.promise)
+
+    maybeAutoReconnectTerminal('term-old', sessions)
+    await Promise.resolve()
+
+    expect(useConnectDialog.getState().open).toBe(false)
+    open.resolve('term-new')
+    await new Promise((resolve) => setTimeout(resolve, 30))
+    const backgroundTab = useAppStore.getState().tabs.find((item) => item.id === 'tab-1')
+    expect(backgroundTab).toMatchObject({ terminalId: 'term-new' })
+    expect(useAppStore.getState().connectionStatus['term-new']).toBe('connected')
   })
 
   it('skips auto reconnect for intentional disconnects', async () => {

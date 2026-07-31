@@ -32,6 +32,8 @@ vi.mock('@/lib/wails', () => ({ MacroService: macroService }))
 vi.mock('@/components/session/SessionTree', () => ({
   default: (props: any) => <div>
     <span data-testid="tree-state">folders:{props.folders.map((item: any) => item.name).join(',')}|sessions:{props.sessions.map((item: any) => item.name).join(',')}|reveal:{String(props.revealAll)}</span>
+    <span data-testid="tree-expanded">expanded:{(props.expandedFolderIDs ?? []).join(',')}</span>
+    <button type="button" onClick={() => props.onExpandedFolderIDsChange?.(['parent'])}>tree-remember</button>
     <button type="button" onClick={() => props.onEditSession?.(props.sessions[0])}>tree-edit</button>
     <button type="button" onClick={() => props.onSelectFolder?.('child')}>tree-select</button>
   </div>,
@@ -78,7 +80,7 @@ describe('Sidebar behavior', () => {
     macroService.Delete.mockReset().mockResolvedValue(undefined)
     logger.debug.mockClear()
     logger.error.mockClear()
-    useAppStore.setState({ tabs: [], activeSurface: { type: 'workspace', id: 'sessions' }, activePaneId: null, workspaceTab: 'sessions', overviewSection: 'sessions', overviewReturnSurface: null })
+    useAppStore.setState({ tabs: [], activeSurface: { type: 'workspace', id: 'sessions' }, activePaneId: null, workspaceTab: 'sessions', overviewSection: 'sessions', overviewReturnSurface: null, sessionTreeExpandedFolderIDs: [] })
   })
 
   it('filters sessions with folder ancestry and retries failed loads', async () => {
@@ -104,6 +106,21 @@ describe('Sidebar behavior', () => {
     await user.click(screen.getByRole('button', { name: '重试' }))
     expect(workspace.listFolders).toHaveBeenCalled()
     expect(workspace.listSessions).toHaveBeenCalled()
+  })
+
+  it('remembers session tree expanded folders across sidebar tab switches', async () => {
+    const user = userEvent.setup()
+    render(<Sidebar />)
+
+    expect(screen.getByTestId('tree-expanded')).toHaveTextContent('expanded:')
+    await user.click(screen.getByRole('button', { name: 'tree-remember' }))
+    expect(screen.getByTestId('tree-expanded')).toHaveTextContent('expanded:parent')
+
+    act(() => useAppStore.getState().activateWorkspace('macros'))
+    expect(screen.queryByTestId('tree-expanded')).not.toBeInTheDocument()
+    act(() => useAppStore.getState().activateWorkspace('sessions'))
+
+    expect(screen.getByTestId('tree-expanded')).toHaveTextContent('expanded:parent')
   })
 
   it('coordinates folder and session dialogs', async () => {

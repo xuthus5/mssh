@@ -119,6 +119,7 @@ export interface AppState {
   overviewReturnSurface: ActiveSurface | null
   navigationCollapsed: boolean
   sidebarWidth: number
+  sessionTreeExpandedFolderIDs: string[]
   focusRequest: { id: string; terminalId?: string | null; sequence: number }
   terminalPool: Map<string, PooledTerminal>
   pendingTerminalOpens?: number
@@ -163,6 +164,7 @@ export interface AppState {
   requestTerminalFocus: (tabID: string, terminalID: string) => void
   toggleNavigation: () => void
   setSidebarWidth: (width: number) => void
+  setSessionTreeExpandedFolderIDs: (ids: string[]) => void
   registerTerminal: (id: string, terminal: Terminal) => void
   unregisterTerminal: (id: string) => void
   forgetTerminal: (id: string) => void
@@ -186,6 +188,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   overviewSection: 'sessions',
   overviewReturnSurface: null,
   ...initialNavigation,
+  sessionTreeExpandedFolderIDs: [],
   focusRequest: { id: '', terminalId: null, sequence: 0 },
   terminalPool: new Map(),
   pendingTerminalOpens: 0,
@@ -209,6 +212,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   ...createTransferActions(set),
   ...createTabActions(set, get),
   ...createNavigationActions(set, get),
+  setSessionTreeExpandedFolderIDs: (ids) => set({ sessionTreeExpandedFolderIDs: [...new Set(ids)] }),
   ...createPoolActions(set, get),
   ...createStatusActions(set),
 }))
