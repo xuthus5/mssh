@@ -76,7 +76,7 @@ fi
 
 install_stack() {
   local gnome_ver="$1" fd_ver="$2"
-  echo "Installing org.gnome.Platform//${gnome_ver} + Sdk + golang/node20 //${fd_ver}"
+  echo "Installing org.gnome.Platform//${gnome_ver} + Sdk + golang/node24 //${fd_ver}"
   if ! flatpak config --user --set languages "en" >/dev/null 2>&1; then
     echo "unable to limit Flatpak runtime languages" >&2
     return 1
@@ -85,7 +85,7 @@ install_stack() {
     "org.gnome.Platform//${gnome_ver}" \
     "org.gnome.Sdk//${gnome_ver}" \
     "org.freedesktop.Sdk.Extension.golang//${fd_ver}" \
-    "org.freedesktop.Sdk.Extension.node20//${fd_ver}"
+    "org.freedesktop.Sdk.Extension.node24//${fd_ver}"
 }
 
 if ! install_stack "${GNOME_VERSION}" "${FD_VERSION}"; then

@@ -164,7 +164,7 @@ mssh-setup-*.exe
 ### 前置要求
 
 - Go 1.26+
-- Node.js 20+
+- Node.js 24+
 - [Wails v3 CLI](https://github.com/wailsapp/wails) (`go install github.com/wailsapp/wails/v3/cmd/wails3@latest`)
 - **Linux**：需要 GTK4 及 WebKitGTK 6.0 开发包
 
