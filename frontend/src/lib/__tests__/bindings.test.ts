@@ -37,6 +37,7 @@ describe('Generated Bindings Barrel', () => {
     expect(FileService).toBeDefined()
     expect(typeof FileService.ListDir).toBe('function')
     expect(typeof FileService.Upload).toBe('function')
+    expect(typeof FileService.InstallTerminalDirectoryIntegration).toBe('function')
   })
 
   it('exports KeyService', () => {
