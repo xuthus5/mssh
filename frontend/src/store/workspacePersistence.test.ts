@@ -18,6 +18,9 @@ describe('workspace persistence', () => {
         sessionId: 7,
         terminalInstance: 2,
         toolPanel: 'system',
+        connectionHost: '10.0.0.1',
+        connectionPort: 22,
+        connectionUsername: 'deploy',
       }],
       activeSurface: { type: 'terminal', id: 'terminal-dead' },
       workspaceTab: 'sessions',
@@ -27,7 +30,14 @@ describe('workspace persistence', () => {
     expect(JSON.stringify(snapshot)).not.toContain('dead')
     expect(snapshot).toMatchObject({
       active: { type: 'tab', index: 0 },
-      tabs: [{ type: 'terminal', sessionId: 7, toolPanel: 'system' }],
+      tabs: [{
+        type: 'terminal',
+        sessionId: 7,
+        toolPanel: 'system',
+        connectionHost: '10.0.0.1',
+        connectionPort: 22,
+        connectionUsername: 'deploy',
+      }],
     })
   })
 
@@ -85,7 +95,16 @@ describe('workspace persistence', () => {
     const snapshot: WorkspaceSnapshot = {
       version: 3,
       tabs: [
-        { type: 'terminal', title: 'prod', sessionId: 7, terminalInstance: 1, toolPanel: 'files' },
+        {
+          type: 'terminal',
+          title: 'prod',
+          sessionId: 7,
+          terminalInstance: 1,
+          toolPanel: 'files',
+          connectionHost: '10.0.0.1',
+          connectionPort: 22,
+          connectionUsername: 'deploy',
+        },
         { type: 'terminal', title: 'missing', sessionId: 8, toolPanel: null },
         { type: 'playback', title: 'recording', recordingPath: '/tmp/a.msshlog' },
       ],
@@ -102,7 +121,13 @@ describe('workspace persistence', () => {
       sessionId: 7,
     }))
     expect(restored.tabs).toHaveLength(2)
-    expect(restored.tabs[0]).toMatchObject({ terminalId: 'fresh-7', toolPanel: 'files' })
+    expect(restored.tabs[0]).toMatchObject({
+      terminalId: 'fresh-7',
+      toolPanel: 'files',
+      connectionHost: '10.0.0.1',
+      connectionPort: 22,
+      connectionUsername: 'deploy',
+    })
     expect(restored.activeSurface).toEqual({ type: 'terminal', id: 'terminal-fresh-7' })
     expect(restored.activePaneId).toBe('fresh-7')
     expect(restored.connectionStatus).toEqual({ 'fresh-7': 'connected' })

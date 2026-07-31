@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createTerminalTab } from '@/lib/terminalTabs'
+import { createTerminalTab, terminalConnectionLabel } from '@/lib/terminalTabs'
 import type { Tab } from '@/store/appStore'
 
 function terminalTab(sessionId: number, terminalInstance: number): Tab {
@@ -84,5 +84,26 @@ describe('createTerminalTab', () => {
       title: '本地终端',
       terminalInstance: 1,
     })
+  })
+
+  it('stores ssh connection details for toolbar labels', () => {
+    const tab = createTerminalTab({
+      sessionID: 7,
+      sessionName: '生产服务器',
+      terminalID: 'term-ssh',
+      tabs: [],
+      connectionInfo: {
+        host: '10.0.0.1',
+        port: 22,
+        username: 'deploy',
+      },
+    })
+
+    expect(tab).toMatchObject({
+      connectionHost: '10.0.0.1',
+      connectionPort: 22,
+      connectionUsername: 'deploy',
+    })
+    expect(terminalConnectionLabel(tab)).toBe('deploy@10.0.0.1:22')
   })
 })

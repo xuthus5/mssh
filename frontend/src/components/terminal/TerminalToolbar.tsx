@@ -25,7 +25,7 @@ interface TerminalToolbarProps {
   recordingLogId: number | null
   recordingError?: string
   onToggleRecording: () => void
-  hostname?: string
+  connectionLabel?: string
   onOpenFiles?: () => void
   filesSupported?: boolean
   serialControls?: boolean
@@ -261,9 +261,10 @@ export function TerminalToolbar(props: TerminalToolbarProps) {
     setShowSessionLog(open)
   }, [sessionLogBlocked])
   const bannerError = props.recordingError || clipboardError
+  const toolbarLabel = props.connectionLabel ?? 'Terminal'
   return <div className="relative flex flex-shrink-0 flex-col bg-muted/30">
     <div className="flex h-8 items-center gap-1 px-2">
-      <span className="mr-2 truncate text-xs text-muted-foreground">{props.hostname ?? 'Terminal'}</span>
+      <span className="mr-2 truncate text-xs text-muted-foreground" title={toolbarLabel}>{toolbarLabel}</span>
       <ToolbarActions {...props} onOpenSystem={props.onOpenSystem ?? (() => {})} onOpenHistory={props.onOpenHistory ?? (() => {})} onOpenAI={props.onOpenAI ?? (() => {})} onOpenTunnels={() => { setTunnelOpen(true); void tunnels.load() }} clipboard={clipboard} logOpen={showSessionLog} setLogOpen={setShowSessionLog}
         setLogBlocked={setSessionLogBlocked} onLogOpenChange={handleSessionLogOpenChange} />
     </div>

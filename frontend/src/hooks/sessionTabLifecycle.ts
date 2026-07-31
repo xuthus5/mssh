@@ -18,7 +18,17 @@ export async function openSessionTab(session: Session, signal?: AbortSignal): Pr
     throw connectionCancelledError(signal)
   }
   const store = useAppStore.getState()
-  const tab = createTerminalTab({ sessionID: Number(session.id), sessionName: session.name, terminalID: terminalId, tabs: store.tabs })
+  const tab = createTerminalTab({
+    sessionID: Number(session.id),
+    sessionName: session.name,
+    terminalID: terminalId,
+    tabs: store.tabs,
+    connectionInfo: {
+      host: session.host,
+      port: session.port,
+      username: session.username,
+    },
+  })
   store.setConnectionStatus(terminalId, 'connected')
   store.openTab(tab)
   return terminalId

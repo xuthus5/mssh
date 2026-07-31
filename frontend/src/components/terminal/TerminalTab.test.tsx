@@ -41,7 +41,8 @@ vi.mock('@/components/terminal/AITerminalPanel', () => ({
   },
 }))
 vi.mock('@/components/terminal/TerminalToolbar', () => ({
-  TerminalToolbar: ({ isRecording, recordingBusy, onToggleRecording, onSplit, onToggleSearch, onToggleCompose, onOpenHistory, onOpenAI, recordingError }: {
+  TerminalToolbar: ({ connectionLabel, isRecording, recordingBusy, onToggleRecording, onSplit, onToggleSearch, onToggleCompose, onOpenHistory, onOpenAI, recordingError }: {
+    connectionLabel?: string
     isRecording: boolean
     recordingBusy?: boolean
     onToggleRecording: () => void
@@ -52,6 +53,7 @@ vi.mock('@/components/terminal/TerminalToolbar', () => ({
     onOpenAI: () => void
     recordingError?: string
   }) => <div>
+    <span data-testid="toolbar-connection-label">{connectionLabel}</span>
     <button type="button" disabled={recordingBusy} onClick={onToggleRecording}>{isRecording ? '停止录制' : '开始录制'}</button>
     <button type="button" onClick={() => onSplit('horizontal')}>向右分屏</button>
     <button type="button" onClick={onToggleSearch}>搜索终端</button>
@@ -81,6 +83,25 @@ describe('TerminalTab', () => {
       activePaneId: null,
       connectionStatus: { 'term-1': 'connected' },
     })
+  })
+
+  it('shows ssh connection info in the toolbar instead of the session title', () => {
+    useAppStore.setState({
+      tabs: [{
+        id: 'tab-1',
+        title: 'production',
+        type: 'terminal',
+        terminalId: 'term-1',
+        sessionId: 7,
+        connectionHost: '10.0.0.1',
+        connectionPort: 22022,
+        connectionUsername: 'deploy',
+      }],
+    })
+
+    render(<TerminalTab terminalID="term-1" sessionId={7} active focusRequest={focusRequest} onOpenFiles={vi.fn()} />)
+
+    expect(screen.getByTestId('toolbar-connection-label')).toHaveTextContent('deploy@10.0.0.1:22022')
   })
 
   it('routes repeated split actions to the persistent split workspace', () => {
