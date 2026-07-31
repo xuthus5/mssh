@@ -164,7 +164,7 @@ All shortcuts are customizable with conflict detection.
 ### Prerequisites
 
 - Go 1.26+
-- Node.js 20+
+- Node.js 24+
 - [Wails v3 CLI](https://github.com/wailsapp/wails) (`go install github.com/wailsapp/wails/v3/cmd/wails3@latest`)
 - **Linux**: GTK4 and WebKitGTK 6.0 development packages
 

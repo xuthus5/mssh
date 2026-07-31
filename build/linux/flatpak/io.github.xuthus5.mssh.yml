@@ -9,7 +9,7 @@ runtime-version: '49'
 sdk: org.gnome.Sdk
 sdk-extensions:
   - org.freedesktop.Sdk.Extension.golang
-  - org.freedesktop.Sdk.Extension.node20
+  - org.freedesktop.Sdk.Extension.node24
 command: mssh
 finish-args:
   - --share=ipc
@@ -22,7 +22,7 @@ finish-args:
   - --filesystem=home
   - --filesystem=xdg-run/gnupg:ro
 build-options:
-  append-path: /usr/lib/sdk/golang/bin:/usr/lib/sdk/node20/bin
+  append-path: /usr/lib/sdk/golang/bin:/usr/lib/sdk/node24/bin
   build-args:
     - --share=network
   env:
@@ -42,8 +42,8 @@ modules:
       - |
         set -euo pipefail
         . /usr/lib/sdk/golang/enable.sh
-        . /usr/lib/sdk/node20/enable.sh
-        export PATH="/usr/lib/sdk/golang/bin:/usr/lib/sdk/node20/bin:${PATH}"
+        . /usr/lib/sdk/node24/enable.sh
+        export PATH="/usr/lib/sdk/golang/bin:/usr/lib/sdk/node24/bin:${PATH}"
         export GOROOT=/usr/lib/sdk/golang
         export GOPATH=/run/build/mssh/go-path
         export GOCACHE=/run/build/mssh/gocache
