@@ -1,161 +1,169 @@
 # MSSH — Secure Shell 客户端与会话管理器
 
-> [English](README.md)
-
-基于 [Go](https://go.dev) + [Wails v3](https://wails.io) + [React](https://react.dev) + [xterm.js](https://xtermjs.org) 构建的新一代跨平台 SSH 客户端。
-
 [![CI](https://github.com/xuthus5/mssh/actions/workflows/ci.yml/badge.svg)](https://github.com/xuthus5/mssh/actions/workflows/ci.yml)
 [![Release](https://github.com/xuthus5/mssh/actions/workflows/release.yml/badge.svg)](https://github.com/xuthus5/mssh/actions/workflows/release.yml)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
+MSSH 是面向多主机、多终端、多重复操作场景的跨平台 SSH 工作台。它把会话管理、终端操作、文件传输、自动化、录制回放和 AI 辅助任务放在同一个桌面应用中，技术栈为 Go + Wails v3 + React。
+
+> [English](README.md)
+
 ---
 
-## 安装
+## 产品定位
 
-### Linux
+MSSH 的设计前提是：一次 SSH 连接不只是一个 Shell。真正可用的 SSH 客户端还需要管理会话资产、保留终端上下文、处理断线恢复，并让重复操作更安全。
 
-**Debian / Ubuntu (deb)**
+它覆盖完整工作链路：
 
-```bash
-# 从 Releases 页面下载最新 .deb 包
-sudo dpkg -i mssh_*.deb
-sudo apt-get install -f   # 自动安装依赖
+1. 管理主机、分组、标签、环境、项目、隧道、密钥和宏
+2. 打开 SSH、本地 Shell 或串口终端
+3. 分屏、搜索、复制、重连和录制终端操作
+4. 使用 SFTP 传输文件并跟踪传输进度
+5. 通过宏和批量操作执行重复任务
+6. 在需要远程操作代理时，使用原生 AI 任务或本地 CLI 桥接
+
+### 适用场景
+
+MSSH 适合需要在本地桌面集中管理远程机器的工作流：
+
+- 开发者需要频繁切换项目主机、本地 Shell、隧道和文件传输
+- SRE / 运维人员需要可搜索的会话、宏、审计记录和断线恢复
+- 团队希望敏感数据本地加密保存，并在自动化或 AI 辅助修改前显式审批
+
+MSSH 不是集群编排平台。它聚焦已保存 SSH 会话和终端中心化操作，每个任务绑定到具体会话，并拥有独立连接生命周期。
+
+---
+
+## 核心能力
+
+### 终端工作台
+
+- 持久化顶层终端标签页
+- 递归分屏，分屏窗格可独立重连
+- 终端输出搜索，支持文本与正则模式
+- 会话录制回放
+- 本地 Shell 终端，覆盖本机操作流程
+
+### 会话与资产管理
+
+- 集中的会话目录，支持分组、环境、项目和标签
+- 会话搜索、快速连接、资产详情面板
+- CSV 导入/导出，支持 MSSH、PuTTY、SecureCRT、MobaXterm 格式
+- 对选中会话执行批量更新、删除和宏操作
+
+### 文件传输
+
+- SFTP 文件浏览器，支持列表/树形视图
+- 隐藏文件过滤和系统原生文件选择器
+- OSC 7 目录跟随
+- 传输中心展示进度、预计剩余时间、重试、历史和取消
+
+### 自动化
+
+- 宏命令模板，用于重复命令序列
+- SSH 密钥生成与管理
+- 本地、远程和动态端口转发
+- 会话录制与回放
+
+### 云同步与备份
+
+- 加密 `.msshbackup` 导出与导入
+- GitHub Gist、WebDAV、AWS S3 同步提供商
+- 支持 MinIO、Ceph 等 S3 兼容服务的 path-style 访问
+- 本地版本历史与同步操作记录
+
+### AI 任务
+
+- 使用已配置 OpenAI 兼容提供商运行原生 Agent 任务
+- 通过 MSSH MCP 桥接本地 Claude Code 或 OpenCode
+- 对修改操作进行逐步审批，高危命令硬阻断
+- 持久化任务状态，应用重启后可手动恢复
+
+### 串口与桌面集成
+
+- 串口终端支持 300 到 4,000,000 波特率
+- 支持数据位、校验位、停止位、XON-XOFF、RTS-CTS、DSR-DTR 流程控制
+- 支持 DTR、RTS、Break、本地回显和设备独占锁
+- 系统托盘、关闭按钮行为配置和按日写入的本地日志
+
+### 外观与快捷键
+
+- 离线终端主题，包括 GitHub、Dracula、Nord、TokyoNight、Catppuccin 等配色
+- `.itermcolors` 导入
+- 深色、浅色和固定主题分配
+- 可自定义快捷键，并提供冲突检测
+
+### 安全与运维控制
+
+- 使用主密钥加密本地敏感数据
+- 主机密钥校验与变更检测
+- 集成 Linux、Windows、macOS 系统钥匙串
+- 可选审计日志，记录连接、同步、密钥访问和批量操作
+
+---
+
+## 典型工作流
+
+```text
+1. 新建或导入会话。
+2. 打开会话并进入终端标签页。
+3. 按需分屏连接其它主机或窗格。
+4. 使用 SFTP 传输文件，或运行宏完成重复任务。
+5. 按需开启自动重连，或在任务中断后手动恢复。
 ```
 
-**Fedora / RHEL (rpm)**
+---
+
+## 平台支持
+
+| 平台 | 交付格式 |
+| --- | --- |
+| Linux | binary、deb、rpm、AppImage、Flatpak |
+| Windows | exe + NSIS 安装器 |
+| macOS | universal `.app` zip |
+
+发布产物包含 SHA-256 校验和、CycloneDX SBOM、来源证明和 Sigstore 签名。
+
+---
+
+## 快速开始
+
+### 安装
+
+从 [Releases](https://github.com/xuthus5/mssh/releases) 下载适合平台的产物，或使用对应的软件包格式安装。
 
 ```bash
-# 从 Releases 页面下载最新 .rpm 包
-sudo rpm -ivh mssh-*.rpm
-```
-
-**Arch Linux (AUR)**
-
-```bash
-yay -S mssh
-# 或从 Releases 页面下载 PKGBUILD
-```
-
-**Flatpak**
-
-[![Flathub](https://img.shields.io/badge/Flathub-io.github.xuthus5.mssh-blue?logo=flathub)](https://flathub.org/apps/io.github.xuthus5.mssh)
-
-```bash
+# Linux Flatpak
 flatpak install flathub io.github.xuthus5.mssh
-```
 
-**AppImage**
-
-```bash
-# 从 Releases 页面下载 .AppImage
+# Linux AppImage
 chmod +x mssh-*.AppImage
 ./mssh-*.AppImage
-```
 
-### macOS
-
-```bash
-# 从 Releases 页面下载 universal .app zip
+# macOS
 unzip mssh-macos-*.zip
 open mssh.app
-```
 
-### Windows
-
-```bash
-# 从 Releases 页面下载 NSIS 安装器
+# Windows
 mssh-setup-*.exe
 ```
 
-> 所有发布产物均包含 SHA-256 校验和、CycloneDX SBOM、来源证明及 Sigstore 签名。
+### 从源码运行
 
----
+```bash
+# 安装前端依赖
+cd frontend && npm ci && cd ..
 
-## 功能概览
+# 以开发模式启动桌面应用
+wails3 task dev
+```
 
-### 终端与 SSH
+### 第一次连接
 
-- 持久化的顶层标签页，支持多实例连接、标签页复制与断线恢复
-- 递归终端分屏——最多 8 个独立可重连的窗格，支持可拖拽分割线
-- 终端内容搜索：纯文本或正则表达式，高亮匹配项，支持上/下导航
-- 总览工作区：集中的会话、密钥、隧道、宏与串口管理
-
-### 文件传输（SFTP）
-
-- 原生文件对话框，支持隐藏文件过滤、列表/树形视图
-- OSC 7 目录跟随——SFTP 面板自动同步远程工作目录
-- 全局传输中心，显示进度、预计剩余时间、重试、历史与取消
-
-### 安全与保险库
-
-- 应用主密钥加密（Argon2id + AES-256-GCM，最短 12 字符）
-- 加密 `.msshbackup` 备份格式，支持加密导出/导入
-- 系统钥匙串集成（Linux secret-service、Windows 凭据管理器、macOS Keychain）
-- 主机密钥验证，需显式指纹信任，支持变更检测
-- 可选的审计日志：记录连接、同步、密钥访问与批量操作
-
-### 云同步
-
-| 提供商       | 功能                   |
-|-------------|------------------------|
-| GitHub Gist | 加密会话备份同步          |
-| WebDAV      | HTTPS 目录同步           |
-| AWS S3      | Path-style 访问，支持 MinIO/Ceph |
-
-### AI 运维代理
-
-- 基于配置的 OpenAI 兼容提供商的本地 AI 任务
-- 通过 MSSH MCP 桥接使用本地 CLI（Claude Code / OpenCode）
-- 变动操作需逐条审批，高危命令硬阻断
-- 任务状态持久化——应用重启后可手动恢复
-- 对话历史与搜索上下文
-
-### 主题与外观
-
-- 24 套离线终端主题（GitHub Dark/Light、Dracula、Nord、TokyoNight、Catppuccin 等）
-- 支持导入 `.itermcolors` 配色文件
-- Dark/Light/Fixed 模式分配
-- 系统字体与字号配置
-
-### 串口终端
-
-- 完整的串口终端：支持 300–4,000,000 波特率、数据位/校验位/停止位、流程控制（XON-XOFF、RTS-CTS、DSR-DTR）
-- DTR/RTS/Break 信号控制、本地回显、设备独占锁
-
-### 本地 Shell
-
-- 可配置的 Shell 路径、启动参数、工作目录与登录模式
-- 支持会话录制
-
-### 会话资产与自动化
-
-- 环境目录（开发/测试/生产）、项目指派、多标签分类
-- CSV 导入导出：支持与 MSSH、PuTTY、SecureCRT、MobaXterm 格式互操作
-- 批量操作：批量更新、删除、多会话宏执行
-- 宏模板，执行结果按节点返回
-- 端口转发（本地/远程/动态）
-- SSH 密钥生成与管理
-- 会话录制与回放
-
-### 键盘快捷键
-
-| 快捷键             | 功能            |
-|-------------------|-----------------|
-| `Ctrl+N`          | 新建 SSH 会话      |
-| `Ctrl+Shift+N`    | 新建本地终端        |
-| `Ctrl+W`          | 关闭当前标签页      |
-| `Ctrl+F`          | 快速搜索会话       |
-| `Ctrl+Shift+C`    | 复制选中文本       |
-| `Ctrl+Shift+V`    | 粘贴剪贴板内容      |
-| `Ctrl+Shift+L`    | 清屏             |
-
-所有快捷键均支持自定义，并有冲突检测。
-
-### 系统集成
-
-- 系统托盘（显示/隐藏/退出）
-- 可配置的关闭按钮行为（最小化到托盘 或 退出）
-- 按日写入的日志文件（`~/.mssh/logs`），日志保留天数可配置
+1. 创建或导入会话。
+2. 从侧边栏或会话资产中心打开会话。
+3. 在同一工作区中使用终端、文件面板、隧道面板或宏操作。
 
 ---
 
@@ -165,67 +173,85 @@ mssh-setup-*.exe
 
 - Go 1.26+
 - Node.js 24+
-- [Wails v3 CLI](https://github.com/wailsapp/wails) (`go install github.com/wailsapp/wails/v3/cmd/wails3@latest`)
-- **Linux**：需要 GTK4 及 WebKitGTK 6.0 开发包
+- [Wails v3 CLI](https://github.com/wailsapp/wails)（`go install github.com/wailsapp/wails/v3/cmd/wails3@latest`）
+- Linux 仅开发环境需要 GTK4 与 WebKitGTK 6.0 开发包
 
-### 快速开始
-
-```bash
-# 安装前端依赖
-cd frontend && npm ci && cd ..
-
-# 开发模式运行
-wails3 task dev
-
-# 生产构建
-wails3 task build
-```
-
-### CI 门禁（提交/推送前必须通过）
+### 质量门禁
 
 ```bash
 wails3 task ci
 ```
 
-该命令依次执行：lint → 后端测试（含竞态检测，覆盖率 ≥90%） → 前端测试 + 产物体积检查 → 生产构建。
+该命令会执行：
 
-### 独立任务
+1. `golangci-lint run --timeout 5m ./...`
+2. `go test -race -coverprofile=coverage.out -covermode=atomic -coverpkg=./internal/...,./pkg/... ./internal/... ./pkg/...`
+3. `npm run check:source-limits`、`npm run check:bundle-budget`、`npm test`
+4. `wails3 task build`
+
+### 常用任务
 
 ```bash
-wails3 task lint               # golangci-lint（v2.12.2）
-wails3 task fmt                # goimports-reviser 格式化
-wails3 task test               # 后端竞态测试 + 覆盖率
-wails3 task test:frontend      # vitest + 源文件限制 + 打包体积预算
-wails3 task test:e2e           # SSH/tmux/SFTP/串口集成测试
-wails3 task benchmark          # 性能基准
-wails3 task package            # 当前平台打包
-wails3 task package:linux:amd64 # Linux: deb + rpm + AppImage + Flatpak
+wails3 task lint
+wails3 task fmt
+wails3 task test
+wails3 task test:frontend
+wails3 task test:e2e
+wails3 task benchmark
+wails3 task package
 ```
-
-### 发布
-
-匹配 `v*` 格式的 Git 标签会触发发布流水线，产出如下：
-
-| 平台     | 架构            | 产物                         |
-|----------|-----------------|------------------------------|
-| Linux    | amd64、arm64    | 二进制、deb、rpm、AppImage、Flatpak |
-| Windows  | amd64、arm64    | exe + NSIS 安装器                   |
-| macOS    | universal       | `.app` zip 包                       |
 
 ---
 
-## 技术规格
+## 打包与发布
 
-| 层次       | 技术                                          |
-|------------|-----------------------------------------------|
-| 前端       | React 19、TypeScript、Vite 6、Tailwind CSS 4、xterm.js |
-| 后端       | Go 1.26、Wails v3（GTK4 + WebKitGTK 6.0）    |
-| 数据库     | SQLite（基于 modernc.org/sqlite）              |
-| SSH        | golang.org/x/crypto、pkg/sftp                    |
-| 加密       | Argon2id、AES-256-GCM                          |
-| 钥匙串     | go-keyring（Linux / Windows / macOS）           |
-| 串口       | go.bug.st/serial                               |
-| 云 SDK     | AWS SDK v2                                     |
+匹配 `v*` 的 Git 标签会触发发布流水线，产出各平台安装包和归档文件。
+
+| 平台 | 产物 |
+| --- | --- |
+| Linux | binary、deb、rpm、AppImage、Flatpak |
+| Windows | exe + NSIS 安装器 |
+| macOS | universal `.app` zip |
+
+打包细节见 [docs/packaging.md](docs/packaging.md)。
+
+---
+
+## 文档索引
+
+- [docs/packaging.md](docs/packaging.md)
+- [docs/performance-budgets.md](docs/performance-budgets.md)
+- [docs/frontend-performance-notes.md](docs/frontend-performance-notes.md)
+- [docs/design/](docs/design)
+- [docs/ears-backend-review.md](docs/ears-backend-review.md)
+- [docs/ears-frontend-review.md](docs/ears-frontend-review.md)
+
+---
+
+## 技术栈
+
+| 层次 | 技术 |
+| --- | --- |
+| 前端 | React 19、TypeScript、Vite 6、Tailwind CSS 4、xterm.js |
+| 后端 | Go 1.26、Wails v3（GTK4 + WebKitGTK 6.0） |
+| 数据库 | SQLite（modernc.org/sqlite） |
+| SSH | golang.org/x/crypto、pkg/sftp |
+| 加密 | Argon2id、AES-256-GCM |
+| 钥匙串 | go-keyring |
+| 串口 | go.bug.st/serial |
+| 云 SDK | AWS SDK v2 |
+
+---
+
+## 参与贡献
+
+提交或推送前必须运行本地门禁：
+
+```bash
+wails3 task ci
+```
+
+编码、测试和交付规则见仓库根目录的 `AGENTS.md`。
 
 ---
 
