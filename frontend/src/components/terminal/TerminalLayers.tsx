@@ -30,7 +30,7 @@ function useLayerFocusRequest(...args: [Tab, boolean, AppState['focusRequest'], 
   return resolvedRequestRef.current
 }
 
-function FilePanelView({ transfer, actionError, transferActionPending, onClose, onUpload, onDownload, dropTargetID, showHiddenFiles, defaultView, onLoadDirectory, onSyncCurrentDirectory, syncingCurrentDirectory }: {
+function FilePanelView({ transfer, actionError, transferActionPending, onClose, onUpload, onDownload, dropTargetID, showHiddenFiles, defaultView, onLoadDirectory, onSyncCurrentDirectory, syncingCurrentDirectory, onInstallDirectoryIntegration, installingDirectoryIntegration }: {
   transfer: FileTransfer
   actionError: string
   transferActionPending: 'upload' | 'download' | null
@@ -43,6 +43,8 @@ function FilePanelView({ transfer, actionError, transferActionPending, onClose, 
   onLoadDirectory: (path: string) => Promise<import('@/hooks/useFileTransfer').FileInfo[]>
   onSyncCurrentDirectory: () => void
   syncingCurrentDirectory: boolean
+  onInstallDirectoryIntegration: () => void
+  installingDirectoryIntegration: boolean
 }) {
   return (
     <Suspense fallback={<div className="grid w-[340px] place-items-center border-l"><Spinner /></div>}>
@@ -52,7 +54,8 @@ function FilePanelView({ transfer, actionError, transferActionPending, onClose, 
         onMakeDir={transfer.makeDir} onUpload={onUpload} onDownload={onDownload} dropTargetId={dropTargetID}
         showHiddenFiles={showHiddenFiles} defaultView={defaultView} onLoadDirectory={onLoadDirectory}
         transferActionPending={transferActionPending} onSyncCurrentDirectory={onSyncCurrentDirectory}
-        syncingCurrentDirectory={syncingCurrentDirectory} catalogRevision={transfer.catalogRevision}
+        syncingCurrentDirectory={syncingCurrentDirectory} onInstallDirectoryIntegration={onInstallDirectoryIntegration}
+        installingDirectoryIntegration={installingDirectoryIntegration} catalogRevision={transfer.catalogRevision}
         externalCatalogRevision={transfer.externalCatalogRevision} directoryMutationBusy={transfer.directoryMutationBusy}
         isMutationBusy={(file) => transfer.isMutationBusy(file.path, file.isDir)} />
     </Suspense>
@@ -65,7 +68,9 @@ function FilePanelContainer({ sessionID, terminalID, onClose }: { sessionID: num
     onClose={onClose} onUpload={() => { void runtime.handleUpload() }}
     onDownload={(path) => { void runtime.handleDownload(path) }} dropTargetID={runtime.dropTargetID} showHiddenFiles={runtime.showHiddenFiles}
     defaultView={runtime.defaultView} onLoadDirectory={runtime.transfer.loadDirectory} onSyncCurrentDirectory={() => { void runtime.syncCurrentDirectory() }}
-    syncingCurrentDirectory={runtime.syncingCurrentDirectory} />
+    syncingCurrentDirectory={runtime.syncingCurrentDirectory}
+    onInstallDirectoryIntegration={() => { void runtime.installTerminalDirectoryIntegration() }}
+    installingDirectoryIntegration={runtime.installingDirectoryIntegration} />
 }
 
 function DynamicLayer({ tab, active, activePaneID, fileTargetID, lastActiveTerminalTabID, filePanelOpen, onToggleFiles, onPaneClosed, onPaneReplaced, onCloseFiles, focusRequest, onClose }: {
