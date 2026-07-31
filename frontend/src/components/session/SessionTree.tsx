@@ -21,6 +21,8 @@ interface Props {
   onDeleteFolder?: (folderId: string) => void
   onMoveToFolder?: (sessionId: string, folderId: string | null) => void | Promise<void>
   onSelectFolder?: (folderId: string) => void
+  expandedFolderIDs?: string[]
+  onExpandedFolderIDsChange?: (ids: string[]) => void
   navigationOnly?: boolean
   revealAll?: boolean
 }
