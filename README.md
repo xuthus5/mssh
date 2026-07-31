@@ -1,161 +1,169 @@
 # MSSH — Secure Shell Client & Session Manager
 
-A modern, cross-platform SSH client built with [Go](https://go.dev) + [Wails v3](https://wails.io) + [React](https://react.dev) + [xterm.js](https://xtermjs.org).
-
 [![CI](https://github.com/xuthus5/mssh/actions/workflows/ci.yml/badge.svg)](https://github.com/xuthus5/mssh/actions/workflows/ci.yml)
 [![Release](https://github.com/xuthus5/mssh/actions/workflows/release.yml/badge.svg)](https://github.com/xuthus5/mssh/actions/workflows/release.yml)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
+A cross-platform SSH workstation for people who manage many hosts, many terminals, and many repeatable operations. MSSH combines session management, terminal workflows, file transfer, automation, recording, and AI-assisted tasks in one desktop app built with Go + Wails v3 + React.
 
 > [中文](README_zh-CN.md)
 
 ---
 
-## Install
+## Product overview
 
-### Linux
+MSSH is designed around a simple idea: a connection is more than a shell. A useful SSH client must also manage sessions, keep related assets close to the terminal, preserve context across reconnects, and make repetitive work safer.
 
-**Debian / Ubuntu (deb)**
+It covers the full loop:
 
-```bash
-# Download the latest .deb from releases
-sudo dpkg -i mssh_*.deb
-sudo apt-get install -f   # install dependencies
-```
+1. organize hosts, folders, tags, environments, projects, tunnels, keys, and macros
+2. open SSH, local shell, or serial terminals
+3. split, search, duplicate, reconnect, and record terminal work
+4. move files with SFTP and track transfer progress
+5. automate routine actions with macros and batch operations
+6. use native AI tasks or a local CLI bridge when you want an agent to operate on a remote session
 
-**Fedora / RHEL (rpm)**
+### Intended use
 
-```bash
-# Download the latest .rpm from releases
-sudo rpm -ivh mssh-*.rpm
-```
+MSSH fits desktop workflows where operators need a reliable local control plane for remote machines:
 
-**Arch Linux (AUR)**
+- developers who switch between project hosts, local shells, tunnels, and file transfer
+- SRE / operations users who need searchable sessions, macros, audit records, and reconnect behavior
+- teams that prefer local encrypted storage and explicit approval before automated or AI-assisted mutation
 
-```bash
-yay -S mssh
-# or via PKGBUILD from releases
-```
-
-**Flatpak**
-
-[![Flathub](https://img.shields.io/badge/Flathub-io.github.xuthus5.mssh-blue?logo=flathub)](https://flathub.org/apps/io.github.xuthus5.mssh)
-
-```bash
-flatpak install flathub io.github.xuthus5.mssh
-```
-
-**AppImage**
-
-```bash
-# Download the .AppImage from releases
-chmod +x mssh-*.AppImage
-./mssh-*.AppImage
-```
-
-### macOS
-
-```bash
-# Download the universal .app zip from releases
-unzip mssh-macos-*.zip
-open mssh.app
-```
-
-### Windows
-
-```bash
-# Download the NSIS installer from releases
-mssh-setup-*.exe
-```
-
-> All release artifacts include SHA-256 checksums, CycloneDX SBOM, provenance attestations, and Sigstore signatures.
+MSSH is not a fleet orchestrator. It focuses on saved SSH sessions and terminal-centered operations, with each task bound to a specific session and its own connection lifecycle.
 
 ---
 
-## Features
+## What you get
 
-### Terminal & SSH
+### Terminal workspace
 
-- Persistent top-level tabs with multi-instance connections, tab duplication, and restart recovery
-- Recursive terminal splitting — up to 8 independently reconnectable panes with draggable dividers
-- Active terminal search with plain text or regex, highlighted matches, and prev/next navigation
-- Overview workspace for sessions, SSH keys, tunnels, macros, and serial ports
+- Persistent top-level terminal tabs
+- Recursive split panes with independent reconnect support
+- Active search inside terminal output with text or regex mode
+- Playback for recorded sessions
+- Local shell terminals for machine-local workflows
 
-### File Transfer (SFTP)
+### Session and asset management
 
-- Native file dialogs with hidden-file filtering, list/tree views
-- OSC 7 directory following — auto-syncs SFTP panel to remote working directory
-- Global transfer center with progress, ETA, retry, history, and cancellation
+- Central session catalog with folders, environments, projects, and tags
+- Session search, quick connect, and asset detail panels
+- Import/export for MSSH, PuTTY, SecureCRT, and MobaXterm CSV formats
+- Batch update, delete, and macro execution across selected sessions
 
-### Security & Vault
+### File transfer
 
-- Application master key encryption (Argon2id + AES-256-GCM, min 12 chars)
-- Encrypted `.msshbackup` backups with encrypted export/import
-- System keychain integration (Linux secret-service, Windows Credential Manager, macOS Keychain)
-- Host key verification with explicit fingerprint trust and change detection
-- Optional audit logging for connections, sync, key access, and batch operations
+- SFTP file browser with list/tree views
+- Hidden-file filtering and native file dialogs
+- OSC 7 directory following
+- Transfer center with progress, ETA, retry, history, and cancellation
 
-### Cloud Sync
+### Automation
 
-| Provider     | Features                     |
-|-------------|------------------------------|
-| GitHub Gist | Encrypted session backup sync |
-| WebDAV      | HTTPS directory sync          |
-| AWS S3      | Path-style access, MinIO/Ceph |
-
-### AI Agent
-
-- Native AI tasks using configured OpenAI-compatible providers
-- Local CLI tasks via MSSH MCP bridge (Claude Code / OpenCode)
-- Per-step approval for mutations, hard-blocked destructive commands
-- Persistent task state — manual resume after application restart
-- Conversation history with search context
-
-### Theming & Appearance
-
-- 24 curated offline terminal themes (GitHub Dark/Light, Dracula, Nord, TokyoNight, Catppuccin, etc.)
-- Import `.itermcolors` files
-- Dark/Light/Fixed mode assignments
-- System font and size configuration
-
-### Serial Port
-
-- Full serial terminal: 300–4,000,000 baud, data/parity/stop bits flow control (XON-XOFF, RTS-CTS, DSR-DTR)
-- DTR/RTS/Break control, local echo, exclusive device lock
-
-### Local Shell
-
-- Configurable shell path, arguments, working directory, login mode
-- Session recording support
-
-### Session Assets & Automation
-
-- Environments (dev/staging/production), projects, multi-tag assignment
-- CSV import/export supporting MSSH, PuTTY, SecureCRT, and MobaXterm formats
-- Batch operations: bulk updates, deletion, multi-session macro execution
-- Macro templates with per-node results
-- Port forwarding (local/remote/dynamic)
-- SSH key generation and management
+- Macros for repeatable command sequences
+- SSH key generation and key management
+- Port forwarding for local, remote, and dynamic tunnels
 - Session recording and playback
 
-### Keyboard Shortcuts
+### Cloud sync and backup
 
-| Shortcut           | Action                |
-|--------------------|-----------------------|
-| `Ctrl+N`           | New SSH session       |
-| `Ctrl+Shift+N`     | New local terminal    |
-| `Ctrl+W`           | Close current tab     |
-| `Ctrl+F`           | Quick search sessions |
-| `Ctrl+Shift+C`     | Copy selection        |
-| `Ctrl+Shift+V`     | Paste clipboard       |
-| `Ctrl+Shift+L`     | Clear terminal        |
+- Encrypted `.msshbackup` export and import
+- GitHub Gist, WebDAV, and AWS S3 sync providers
+- S3-compatible path-style access for MinIO and Ceph deployments
+- Local version history and sync operation records
 
-All shortcuts are customizable with conflict detection.
+### AI tasks
 
-### System Integration
+- Native agent tasks driven by configured OpenAI-compatible providers
+- Local CLI tasks through the MSSH MCP bridge for Claude Code or OpenCode
+- Step-level mutation approval and hard-blocked destructive commands
+- Persistent task state with manual resume after restart
 
-- System tray (show/hide/exit)
-- Configurable close-button behavior (minimize to tray or exit)
-- Daily application logs in `~/.mssh/logs` with configurable retention
+### Serial and desktop integration
+
+- Serial terminal support for baud rates from 300 to 4,000,000
+- Data bits, parity, stop bits, XON-XOFF, RTS-CTS, and DSR-DTR flow control
+- DTR, RTS, Break, local echo, and exclusive device lock controls
+- System tray, configurable close-button behavior, and daily local logs
+
+### Appearance and shortcuts
+
+- Offline terminal themes, including GitHub, Dracula, Nord, TokyoNight, and Catppuccin variants
+- `.itermcolors` import
+- Dark, light, and fixed theme assignments
+- Customizable keyboard shortcuts with conflict detection
+
+### Security and operational controls
+
+- Master-key encryption for sensitive local data
+- Host key verification with change detection
+- System keychain integration on Linux, Windows, and macOS
+- Optional audit logging for connections, sync, key access, and batch operations
+
+---
+
+## Demo workflow
+
+```text
+1. Add a session.
+2. Connect and open a terminal tab.
+3. Split the tab for a second host or pane.
+4. Transfer files with SFTP or run a macro.
+5. Enable auto-reconnect or resume tasks when a connection drops.
+```
+
+---
+
+## Platform support
+
+| Platform | Packages |
+| --- | --- |
+| Linux | binary, deb, rpm, AppImage, Flatpak |
+| Windows | exe + NSIS installer |
+| macOS | universal `.app` zip |
+
+Release artifacts include SHA-256 checksums, CycloneDX SBOM, provenance attestations, and Sigstore signatures.
+
+---
+
+## Getting started
+
+### Install
+
+Download an artifact from [Releases](https://github.com/xuthus5/mssh/releases), or use the package manager / distribution format that fits your environment.
+
+```bash
+# Linux Flatpak
+flatpak install flathub io.github.xuthus5.mssh
+
+# Linux AppImage
+chmod +x mssh-*.AppImage
+./mssh-*.AppImage
+
+# macOS
+unzip mssh-macos-*.zip
+open mssh.app
+
+# Windows
+mssh-setup-*.exe
+```
+
+### Run from source
+
+```bash
+# Install frontend dependencies
+cd frontend && npm ci && cd ..
+
+# Start the desktop app in development mode
+wails3 task dev
+```
+
+### First connection
+
+1. Create or import a session.
+2. Open the session from the sidebar or the session catalog.
+3. Use the terminal, file panel, tunnel panel, or macro actions from the same workspace.
 
 ---
 
@@ -166,66 +174,84 @@ All shortcuts are customizable with conflict detection.
 - Go 1.26+
 - Node.js 24+
 - [Wails v3 CLI](https://github.com/wailsapp/wails) (`go install github.com/wailsapp/wails/v3/cmd/wails3@latest`)
-- **Linux**: GTK4 and WebKitGTK 6.0 development packages
+- Linux only: GTK4 and WebKitGTK 6.0 development packages
 
-### Quick Start
-
-```bash
-# Install frontend dependencies
-cd frontend && npm ci && cd ..
-
-# Run in development mode
-wails3 task dev
-
-# Build for production
-wails3 task build
-```
-
-### CI Gate (required before commit/push)
+### Quality gate
 
 ```bash
 wails3 task ci
 ```
 
-This runs: lint → backend tests (race + ≥90% coverage) → frontend tests + bundle check → production build.
+This runs:
 
-### Individual Tasks
+1. `golangci-lint run --timeout 5m ./...`
+2. `go test -race -coverprofile=coverage.out -covermode=atomic -coverpkg=./internal/...,./pkg/... ./internal/... ./pkg/...`
+3. `npm run check:source-limits`, `npm run check:bundle-budget`, `npm test`
+4. `wails3 task build`
+
+### Useful tasks
 
 ```bash
-wails3 task lint               # golangci-lint (v2.12.2)
-wails3 task fmt                # goimports-reviser format
-wails3 task test               # backend race + coverage
-wails3 task test:frontend      # vitest + source limits + bundle budget
-wails3 task test:e2e           # SSH/tmux/SFTP/serial integration
-wails3 task benchmark          # performance budgets
-wails3 task package            # current OS packages
-wails3 task package:linux:amd64 # Linux: deb + rpm + AppImage + Flatpak
+wails3 task lint
+wails3 task fmt
+wails3 task test
+wails3 task test:frontend
+wails3 task test:e2e
+wails3 task benchmark
+wails3 task package
 ```
-
-### Packaging
-
-Git tags matching `v*` trigger the release pipeline, producing:
-
-| Platform  | Architectures | Artifacts                          |
-|-----------|---------------|------------------------------------|
-| Linux     | amd64, arm64  | binary, deb, rpm, AppImage, Flatpak |
-| Windows   | amd64, arm64  | exe + NSIS installer                |
-| macOS     | universal     | `.app` zip                          |
 
 ---
 
-## Tech Stack
+## Packaging
 
-| Layer      | Technology                                      |
-|------------|-------------------------------------------------|
-| Frontend   | React 19, TypeScript, Vite 6, Tailwind CSS 4, xterm.js |
-| Backend    | Go 1.26, Wails v3 (GTK4 + WebKitGTK 6.0)       |
-| Database   | SQLite (via modernc.org/sqlite)                 |
-| SSH        | golang.org/x/crypto, pkg/sftp                   |
-| Crypto     | Argon2id, AES-256-GCM                           |
-| keychain   | go-keyring (Linux/Windows/macOS)                |
-| Serial     | go.bug.st/serial                                |
-| Cloud SDK  | AWS SDK v2                                      |
+Tagged releases (`v*`) trigger the release pipeline and produce platform-specific installers and archives.
+
+| Platform | Output |
+| --- | --- |
+| Linux | binary, deb, rpm, AppImage, Flatpak |
+| Windows | exe + NSIS installer |
+| macOS | universal `.app` zip |
+
+For packaging details, see [docs/packaging.md](docs/packaging.md).
+
+---
+
+## Documentation
+
+- [docs/packaging.md](docs/packaging.md)
+- [docs/performance-budgets.md](docs/performance-budgets.md)
+- [docs/frontend-performance-notes.md](docs/frontend-performance-notes.md)
+- [docs/design/](docs/design)
+- [docs/ears-backend-review.md](docs/ears-backend-review.md)
+- [docs/ears-frontend-review.md](docs/ears-frontend-review.md)
+
+---
+
+## Tech stack
+
+| Layer | Technology |
+| --- | --- |
+| Frontend | React 19, TypeScript, Vite 6, Tailwind CSS 4, xterm.js |
+| Backend | Go 1.26, Wails v3 (GTK4 + WebKitGTK 6.0) |
+| Database | SQLite (modernc.org/sqlite) |
+| SSH | golang.org/x/crypto, pkg/sftp |
+| Crypto | Argon2id, AES-256-GCM |
+| Keychain | go-keyring |
+| Serial | go.bug.st/serial |
+| Cloud SDK | AWS SDK v2 |
+
+---
+
+## Contributing
+
+Before committing or pushing, run the local gate:
+
+```bash
+wails3 task ci
+```
+
+See the repository guidelines in `AGENTS.md` for coding, testing, and delivery rules.
 
 ---
 
