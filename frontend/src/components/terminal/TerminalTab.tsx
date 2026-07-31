@@ -11,6 +11,7 @@ import { TerminalSearchBar } from '@/components/terminal/TerminalSearchBar'
 import { TerminalComposePanel } from '@/components/terminal/TerminalComposePanel'
 import { AITerminalPanel } from '@/components/terminal/AITerminalPanel'
 import { localHistoryBucket } from '@/hooks/terminalInputRuntime'
+import { terminalConnectionLabel } from '@/lib/terminalTabs'
 import { t } from '@/i18n'
 import { TERMINAL_SEARCH_TOGGLE_EVENT } from '@/lib/terminalSearchEvents'
 
@@ -197,6 +198,7 @@ function TerminalTabView({ controller }: { controller: TerminalTabController }) 
   const { props, currentTab, toolPanel, connectionKind, remoteFeatures, splitRef, splitState,
     setSplitState, searchOpen, setSearchOpen, composeOpen, setComposeOpen, activeTerminalID,
     updateWorkspace, recording } = controller
+  const toolbarLabel = terminalConnectionLabel(currentTab) ?? currentTab?.title
   return (
     <div className="flex h-full min-h-0 flex-col">
       <TerminalToolbar
@@ -207,7 +209,7 @@ function TerminalTabView({ controller }: { controller: TerminalTabController }) 
         recordingLogId={null}
         recordingError={recording.actionError}
         onToggleRecording={recording.toggle}
-        hostname={currentTab?.title}
+        connectionLabel={toolbarLabel}
         filesSupported={remoteFeatures}
         serialControls={connectionKind === 'serial'}
         onOpenFiles={remoteFeatures ? () => props.onOpenFiles(activeTerminalID) : undefined}
