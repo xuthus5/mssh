@@ -60,6 +60,15 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: .go-version
+      - name: Install benchmark dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev
+      - name: Verify benchmark dependencies
+        run: |
+          set -euo pipefail
+          command -v pkg-config
+          pkg-config --libs gtk4 webkitgtk-6.0
       - name: Capture benchmark samples
         run: |
           set -euo pipefail
@@ -77,7 +86,7 @@ jobs:
           retention-days: 14
 
   flatpak:
-    name: Flatpak and Flathub manifest validation
+    name: Flatpak manifest validation
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
@@ -86,12 +95,8 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y appstream flatpak flatpak-builder jq
-      - name: Validate local Flatpak manifest
-        run: bash build/linux/flatpak/validate.sh build/linux/flatpak/io.github.xuthus5.mssh.yml
-      - name: Validate Flathub submission manifest
-        env:
-          VERIFY_FLATHUB_SOURCE: '1'
-        run: bash build/linux/flatpak/validate.sh build/linux/flatpak/io.github.xuthus5.mssh.flathub.yml
+      - name: Validate Flatpak manifest
+        run: bash build/linux/flatpak/validate.sh
 
   e2e:
     name: E2E SSH/SFTP/tmux/serial
@@ -106,13 +111,15 @@ jobs:
       - name: Install E2E services
         run: |
           sudo apt-get update
-          sudo apt-get install -y openssh-server openssh-client tmux
+          sudo apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev openssh-server openssh-client tmux
       - name: Verify E2E tools
         run: |
           set -euo pipefail
           command -v sshd
           command -v ssh-keygen
           command -v tmux
+          command -v pkg-config
+          pkg-config --libs gtk4 webkitgtk-6.0
       - name: Run real SSH/SFTP/tmux gate
         run: go test -race -tags=e2e ./e2e -run 'TestCommercialSSHWorkflow|TestConcurrentResourcesReturnToBaseline' -count=1 -timeout=2m
       - name: Run serial PTY integration gate

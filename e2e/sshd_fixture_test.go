@@ -7,7 +7,9 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"os/user"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -18,6 +20,7 @@ type sshdFixture struct {
 	address       string
 	privateKey    string
 	hostPublicKey []byte
+	username      string
 }
 
 func startSSHD(t *testing.T) sshdFixture {
@@ -37,7 +40,6 @@ func startSSHD(t *testing.T) sshdFixture {
 	config := filepath.Join(directory, "sshd_config")
 	content := fmt.Sprintf("Port %d\nListenAddress 127.0.0.1\nHostKey %s\nPidFile %s\nAuthorizedKeysFile %s\nStrictModes no\nPermitRootLogin yes\nPubkeyAuthentication yes\nPasswordAuthentication no\nKbdInteractiveAuthentication no\nUsePAM no\nPrintMotd no\nLogLevel ERROR\nSubsystem sftp internal-sftp\n", port, hostKey, filepath.Join(directory, "sshd.pid"), authorizedKeys)
 	require.NoError(t, os.WriteFile(config, []byte(content), 0o600))
-	require.NoError(t, os.MkdirAll("/run/sshd", 0o755))
 	command := exec.Command(sshdPath, "-D", "-e", "-f", config)
 	command.Stdout, command.Stderr = os.Stdout, os.Stderr
 	require.NoError(t, command.Start())
@@ -46,7 +48,19 @@ func startSSHD(t *testing.T) sshdFixture {
 	waitForPort(t, address)
 	hostPublicKey, err := os.ReadFile(hostKey + ".pub")
 	require.NoError(t, err)
-	return sshdFixture{address: address, privateKey: clientKey, hostPublicKey: hostPublicKey}
+	return sshdFixture{address: address, privateKey: clientKey, hostPublicKey: hostPublicKey, username: currentUsername(t)}
+}
+
+func currentUsername(t *testing.T) string {
+	t.Helper()
+	current, err := user.Current()
+	require.NoError(t, err)
+	username := current.Username
+	if index := strings.LastIndexAny(username, `\`); index >= 0 {
+		username = username[index+1:]
+	}
+	require.NotEmpty(t, username)
+	return username
 }
 
 func requireCommand(t *testing.T, name string) string {
