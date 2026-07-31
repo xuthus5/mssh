@@ -129,7 +129,7 @@ func newFixtureSession(t *testing.T, fixture sshdFixture) (*app.App, *model.Sess
 	var port int
 	_, err = fmt.Sscan(portText, &port)
 	require.NoError(t, err)
-	session, err := appInstance.Session.CreateSession(model.SessionInput{Name: "commercial-e2e", Host: host, Port: port, Username: "root", AuthMethod: model.AuthKey, KeyID: &key.ID, KeepAlive: 30, TermType: "xterm-256color"})
+	session, err := appInstance.Session.CreateSession(model.SessionInput{Name: "commercial-e2e", Host: host, Port: port, Username: fixture.username, AuthMethod: model.AuthKey, KeyID: &key.ID, KeepAlive: 30, TermType: "xterm-256color"})
 	require.NoError(t, err)
 	return appInstance, session
 }
