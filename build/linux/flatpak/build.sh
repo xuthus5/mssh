@@ -5,9 +5,6 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 APP_ID="io.github.xuthus5.mssh"
 MANIFEST_SRC="${ROOT_DIR}/build/linux/flatpak/${APP_ID}.yml"
-STATE_DIR="${ROOT_DIR}/build/linux/flatpak/.flatpak-builder"
-BUILD_DIR="${ROOT_DIR}/build/linux/flatpak/build-dir"
-REPO_DIR="${ROOT_DIR}/build/linux/flatpak/repo"
 EXPORT_DIR="${ROOT_DIR}/bin"
 VERSION="${APP_VERSION:-0.1.0}"
 VERSION="${VERSION#v}"
@@ -53,6 +50,26 @@ fi
 command -v flatpak >/dev/null 2>&1 || die "flatpak is required"
 command -v flatpak-builder >/dev/null 2>&1 || die "flatpak-builder is required"
 
+work_root_base="${FLATPAK_WORK_ROOT:-${RUNNER_TEMP:-${ROOT_DIR}/.tmp}}"
+if [ ! -d "${work_root_base}" ]; then
+  install -d -m 0700 "${work_root_base}"
+fi
+WORK_ROOT="$(mktemp -d "${work_root_base%/}/mssh-flatpak.XXXXXX")"
+WORKDIR="${WORK_ROOT}/work"
+STATE_DIR="${WORK_ROOT}/state"
+BUILD_DIR="${WORK_ROOT}/build"
+REPO_DIR="${WORK_ROOT}/repo"
+TMPDIR="${WORK_ROOT}/tmp"
+install -d -m 0700 "${WORKDIR}" "${STATE_DIR}" "${BUILD_DIR}" "${REPO_DIR}" "${TMPDIR}"
+export TMPDIR
+
+log_disk_usage() {
+  echo "Flatpak work root: ${WORK_ROOT}"
+  df -h "${work_root_base}" "${TMPDIR}" "${ROOT_DIR}" || true
+}
+
+log_disk_usage
+
 if ! flatpak remotes --user 2>/dev/null | awk '{print $1}' | grep -qx flathub; then
   flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
 fi
@@ -78,8 +95,9 @@ if ! install_stack "${GNOME_VERSION}" "${FD_VERSION}"; then
   install_stack "${GNOME_VERSION}" "${FD_VERSION}"
 fi
 
-WORKDIR="$(mktemp -d "${TMPDIR:-/tmp}/mssh-flatpak.XXXXXX")"
-cleanup() { rm -rf "${WORKDIR}"; }
+cleanup() {
+  rm -rf "${WORK_ROOT}" 2>/dev/null || sudo rm -rf "${WORK_ROOT}" 2>/dev/null || true
+}
 trap cleanup EXIT
 
 MANIFEST="${WORKDIR}/${APP_ID}.yml"
@@ -138,18 +156,21 @@ if command -v appstreamcli >/dev/null 2>&1; then
     "${ROOT_DIR}/build/linux/flatpak/${APP_ID}.metainfo.xml"
 fi
 
-mkdir -p "${EXPORT_DIR}" "${STATE_DIR}"
-rm -rf "${BUILD_DIR}" "${REPO_DIR}"
+mkdir -p "${EXPORT_DIR}"
+rm -rf "${STATE_DIR}" "${BUILD_DIR}" "${REPO_DIR}"
+mkdir -p "${STATE_DIR}"
 
 flatpak-builder \
   --user \
-  --force-clean \
   --disable-rofiles-fuse \
+  --keep-build-dirs \
   --state-dir "${STATE_DIR}" \
   --repo "${REPO_DIR}" \
   --default-branch "${VERSION}" \
   "${BUILD_DIR}" \
   "${MANIFEST}"
+
+log_disk_usage
 
 flatpak build-bundle \
   --arch "${FLATPAK_ARCH}" \

@@ -85,6 +85,7 @@ modules:
           - .task
           - .worktrees
           - .superpowers
+          - .tmp
           - bin
           - coverage.out
           - coverage.func.txt
@@ -92,7 +93,3 @@ modules:
           - frontend/node_modules
           - frontend/dist
           - build/linux/appimage
-          - build/linux/flatpak/.flatpak-builder
-          - build/linux/flatpak/build-dir
-          - build/linux/flatpak/repo
-          - build/bin

@@ -4,6 +4,7 @@ package serial
 
 import (
 	"bytes"
+	"errors"
 	"os"
 	"sync"
 	"testing"
@@ -27,7 +28,7 @@ func TestSerialPTYIntegration(t *testing.T) {
 	originalOpen := openSerialPort
 	t.Cleanup(func() { openSerialPort = originalOpen })
 	openSerialPort = func(_ string, _ *goserial.Mode) (goserial.Port, error) {
-		return &ptyPort{file: tty, handle: int(tty.Fd())}, nil
+		return &ptyPort{file: tty, peer: master, handle: int(tty.Fd())}, nil
 	}
 
 	session, err := OpenPort(model.SerialPort{
@@ -68,7 +69,10 @@ func configurePTY(file *os.File) error {
 	termios.Cflag |= unix.CREAD | unix.CLOCAL
 	termios.Cc[unix.VMIN] = 1
 	termios.Cc[unix.VTIME] = 0
-	return unix.IoctlSetTermios(int(file.Fd()), unix.TCSETS, termios)
+	if err := unix.IoctlSetTermios(int(file.Fd()), unix.TCSETS, termios); err != nil {
+		return err
+	}
+	return nil
 }
 
 func readPTYUntil(t *testing.T, file *os.File, marker []byte) []byte {
@@ -104,8 +108,8 @@ func receiveUntil(t *testing.T, dataCh <-chan []byte, marker []byte) []byte {
 }
 
 type ptyPort struct {
-	mu        sync.Mutex
 	file      *os.File
+	peer      *os.File
 	handle    int
 	closeOnce sync.Once
 	closeErr  error
@@ -134,9 +138,11 @@ func (p *ptyPort) GetModemStatusBits() (*goserial.ModemStatusBits, error) {
 func (p *ptyPort) SetReadTimeout(time.Duration) error { return nil }
 
 func (p *ptyPort) Close() error {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	p.closeOnce.Do(func() { p.closeErr = p.file.Close() })
+	p.closeOnce.Do(func() {
+		peerErr := p.peer.Close()
+		fileErr := p.file.Close()
+		p.closeErr = errors.Join(peerErr, fileErr)
+	})
 	return p.closeErr
 }
 

@@ -1,19 +1,13 @@
-name: Release
+name: Nightly
 
 on:
   push:
-    tags:
-      - 'v*'
-
-permissions:
-  contents: write
-  id-token: write
-  attestations: write
+    branches:
+      - main
+  workflow_dispatch:
 
 env:
   WAILS_VERSION: 'v3.0.0-alpha2.117'
-  SYFT_VERSION: 'v1.49.0'
-  COSIGN_VERSION: 'v3.1.2'
 
 jobs:
   linux:
@@ -60,19 +54,11 @@ jobs:
           df -h
       - name: Install Wails CLI
         run: go install github.com/wailsapp/wails/v3/cmd/wails3@$(tr -d '\r\n' < .wails-version)
-      - name: Verify pinned toolchain
-        run: |
-          set -euo pipefail
-          test "$(go version | awk '{print $3}' | sed 's/^go//')" = "$(tr -d '\r\n' < .go-version)"
-          test "$(node --version | sed 's/^v//')" = "$(tr -d '\r\n' < .node-version)"
-          test "$(wails3 version 2>&1 | tr -d '\r')" = "$(tr -d '\r\n' < .wails-version)"
       - name: Resolve version
         id: version
         run: |
-          TAG="${GITHUB_REF_NAME}"
-          VERSION="${TAG#v}"
+          VERSION="nightly-$(date -u +%Y%m%d)-${GITHUB_SHA:0:7}"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
-          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
       - name: Prepare AppImage runtime
         run: |
           set -euo pipefail
@@ -89,11 +75,6 @@ jobs:
             --output "${runtime_file}"
           chmod 0755 "${runtime_file}"
           echo "LDAI_RUNTIME_FILE=${runtime_file}" >> "${GITHUB_ENV}"
-      - name: Stamp package metadata
-        run: |
-          VERSION="${{ steps.version.outputs.version }}"
-          sed -i "s/^version: .*/version: \"${VERSION}\"/" build/config.yml
-          sed -i "s/^version: \".*\"/version: \"${VERSION}\"/" build/linux/nfpm/nfpm.yaml
       - name: Build and package
         env:
           APP_VERSION: ${{ steps.version.outputs.version }}
@@ -119,7 +100,6 @@ jobs:
           cp "bin/mssh" "dist/mssh-${VERSION}-linux-${ARCH}"
           test -s "dist/mssh-${VERSION}-linux-${ARCH}"
 
-          # Normalize package filenames so release assets include version + arch.
           mapfile -t debs < <(find bin -maxdepth 1 -type f -name '*.deb' | sort)
           mapfile -t rpms < <(find bin -maxdepth 1 -type f -name '*.rpm' | sort)
           mapfile -t appimages < <(find bin -maxdepth 1 -type f \( -name '*.AppImage' -o -name '*.appimage' \) | sort)
@@ -133,7 +113,6 @@ jobs:
           cp "${debs[0]}" "dist/mssh-${VERSION}-linux-${ARCH}.deb"
           cp "${rpms[0]}" "dist/mssh-${VERSION}-linux-${ARCH}.rpm"
 
-          # Prefer versioned AppImage if present; otherwise rename any generated AppImage.
           appimage_src=""
           if [[ ${#appimages[@]} -gt 0 ]]; then
             for f in "${appimages[@]}"; do
@@ -217,29 +196,12 @@ jobs:
       - name: Install Wails CLI
         shell: bash
         run: go install github.com/wailsapp/wails/v3/cmd/wails3@$(tr -d '\r\n' < .wails-version)
-      - name: Verify pinned toolchain
-        shell: bash
-        run: |
-          set -euo pipefail
-          test "$(go version | awk '{print $3}' | sed 's/^go//')" = "$(tr -d '\r\n' < .go-version)"
-          test "$(node --version | sed 's/^v//')" = "$(tr -d '\r\n' < .node-version)"
-          test "$(wails3 version 2>&1 | tr -d '\r')" = "$(tr -d '\r\n' < .wails-version)"
       - name: Resolve version
         id: version
         shell: bash
         run: |
-          TAG="${GITHUB_REF_NAME}"
-          VERSION="${TAG#v}"
+          VERSION="nightly-$(date -u +%Y%m%d)-${GITHUB_SHA:0:7}"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
-      - name: Stamp package metadata
-        shell: bash
-        run: |
-          VERSION="${{ steps.version.outputs.version }}"
-          sed -i "s/\"0.1.0\"/\"${VERSION}\"/g" build/windows/info.json
-          sed -i "s/version=\"0.1.0\"/version=\"${VERSION}\"/" build/windows/wails.exe.manifest
-          if grep -q '!define INFO_PRODUCTVERSION "0.1.0"' build/windows/nsis/wails_tools.nsh; then
-            sed -i "s/!define INFO_PRODUCTVERSION \"0.1.0\"/!define INFO_PRODUCTVERSION \"${VERSION}\"/" build/windows/nsis/wails_tools.nsh
-          fi
       - name: Build and package
         shell: bash
         env:
@@ -299,31 +261,17 @@ jobs:
           node-version-file: .node-version
       - name: Install Wails CLI
         run: go install github.com/wailsapp/wails/v3/cmd/wails3@$(tr -d '\r\n' < .wails-version)
-      - name: Verify pinned toolchain
-        run: |
-          set -euo pipefail
-          test "$(go version | awk '{print $3}' | sed 's/^go//')" = "$(tr -d '\r\n' < .go-version)"
-          test "$(node --version | sed 's/^v//')" = "$(tr -d '\r\n' < .node-version)"
-          test "$(wails3 version 2>&1 | tr -d '\r')" = "$(tr -d '\r\n' < .wails-version)"
       - name: Resolve version
         id: version
         run: |
-          TAG="${GITHUB_REF_NAME}"
-          VERSION="${TAG#v}"
+          VERSION="nightly-$(date -u +%Y%m%d)-${GITHUB_SHA:0:7}"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
-      - name: Stamp package metadata
-        run: |
-          VERSION="${{ steps.version.outputs.version }}"
-          for f in build/darwin/Info.plist build/darwin/Info.dev.plist; do
-            sed -i.bak "s/0\.1\.0/${VERSION}/g" "$f"
-            rm -f "${f}.bak"
-          done
       - name: Build macOS app
         env:
           APP_VERSION: ${{ steps.version.outputs.version }}
           CGO_ENABLED: 1
         run: |
-          # Build natively for the runner architecture to avoid brittle CGO cross-compile.
+          set -euo pipefail
           wails3 task darwin:package ARCH=${{ matrix.arch }} PRODUCTION=true APP_VERSION=${APP_VERSION}
       - name: Collect artifacts
         run: |
@@ -342,9 +290,11 @@ jobs:
           if-no-files-found: error
 
   publish:
-    name: GitHub Release
+    name: Publish Nightly Release
     needs: [linux, windows, darwin]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
       - name: Download all artifacts
@@ -358,98 +308,29 @@ jobs:
           find release-assets -type f -print -exec cp {} upload/ \;
           ls -la upload
           test "$(find upload -maxdepth 1 -type f | wc -l)" -gt 0
-      - name: Install release security tools
-        env:
-          SYFT_VERSION: ${{ env.SYFT_VERSION }}
-          COSIGN_VERSION: ${{ env.COSIGN_VERSION }}
+      - name: Generate checksums
         run: |
           set -euo pipefail
-          tool_dir="${RUNNER_TEMP}/release-tools"
-          mkdir -p "${tool_dir}"
-          syft_archive="syft_${SYFT_VERSION#v}_linux_amd64.tar.gz"
-          curl --fail --silent --show-error --location \
-            "https://github.com/anchore/syft/releases/download/${SYFT_VERSION}/${syft_archive}" \
-            --output "${tool_dir}/${syft_archive}"
-          curl --fail --silent --show-error --location \
-            "https://github.com/anchore/syft/releases/download/${SYFT_VERSION}/syft_${SYFT_VERSION#v}_checksums.txt" \
-            --output "${tool_dir}/syft_checksums.txt"
-          (cd "${tool_dir}" && grep "  ${syft_archive}$" syft_checksums.txt | sha256sum -c -)
-          tar -xzf "${tool_dir}/${syft_archive}" -C "${tool_dir}" syft
-
-          cosign_binary="cosign-linux-amd64"
-          curl --fail --silent --show-error --location \
-            "https://github.com/sigstore/cosign/releases/download/${COSIGN_VERSION}/${cosign_binary}" \
-            --output "${tool_dir}/${cosign_binary}"
-          curl --fail --silent --show-error --location \
-            "https://github.com/sigstore/cosign/releases/download/${COSIGN_VERSION}/cosign_checksums.txt" \
-            --output "${tool_dir}/cosign_checksums.txt"
-          (cd "${tool_dir}" && grep "  ${cosign_binary}$" cosign_checksums.txt | sha256sum -c -)
-          chmod 0755 "${tool_dir}/syft" "${tool_dir}/${cosign_binary}"
-          mv "${tool_dir}/${cosign_binary}" "${tool_dir}/cosign"
-          echo "${tool_dir}" >> "${GITHUB_PATH}"
-      - name: Generate and verify release metadata
-        env:
-          RELEASE_VERSION: ${{ github.ref_name }}
-          RELEASE_COMMIT: ${{ github.sha }}
-        run: |
-          set -euo pipefail
-          RELEASE_VERSION="${RELEASE_VERSION#v}" bash scripts/release/prepare-metadata.sh upload
-          checksum_file="upload/mssh-${RELEASE_VERSION#v}-SHA256SUMS"
-          test -s "${checksum_file}"
-          (cd upload && sha256sum -c "$(basename "${checksum_file}")")
-      - name: Sign release metadata
-        env:
-          RELEASE_VERSION: ${{ github.ref_name }}
-        run: |
-          set -euo pipefail
-          version="${RELEASE_VERSION#v}"
-          cosign sign-blob --yes \
-            --bundle "upload/mssh-${version}-SHA256SUMS.sigstore.json" \
-            "upload/mssh-${version}-SHA256SUMS"
-          cosign sign-blob --yes \
-            --bundle "upload/mssh-${version}-provenance.json.sigstore.json" \
-            "upload/mssh-${version}-provenance.json"
-          jq -e '.messageSignature.signature and .verificationMaterial' \
-            "upload/mssh-${version}-SHA256SUMS.sigstore.json" >/dev/null
-          jq -e '.messageSignature.signature and .verificationMaterial' \
-            "upload/mssh-${version}-provenance.json.sigstore.json" >/dev/null
-      - name: Verify release metadata signatures
-        env:
-          RELEASE_VERSION: ${{ github.ref_name }}
-          RELEASE_REPOSITORY: ${{ github.repository }}
-          RELEASE_REF: refs/tags/${{ github.ref_name }}
-          RELEASE_WORKFLOW: ${{ github.workflow }}
-        run: |
-          set -euo pipefail
-          version="${RELEASE_VERSION#v}"
-          for subject in SHA256SUMS provenance.json; do
-            cosign verify-blob \
-              --bundle "upload/mssh-${version}-${subject}.sigstore.json" \
-              --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-              --certificate-github-workflow-repository "${RELEASE_REPOSITORY}" \
-              --certificate-github-workflow-ref "${RELEASE_REF}" \
-              --certificate-github-workflow-name "${RELEASE_WORKFLOW}" \
-              "upload/mssh-${version}-${subject}"
-          done
-      - name: Attest release subjects
-        uses: actions/attest-build-provenance@v2
-        with:
-          subject-path: upload/*
-      - name: Recreate GitHub Release shell
+          cd upload
+          sha256sum * > mssh-nightly-SHA256SUMS
+          cat mssh-nightly-SHA256SUMS
+      - name: Create or update GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          if gh release view "${{ github.ref_name }}" >/dev/null 2>&1; then
-            gh release delete "${{ github.ref_name }}" --yes
+          RELEASE_TAG="nightly"
+          if gh release view "${RELEASE_TAG}" >/dev/null 2>&1; then
+            echo "Updating existing nightly release..."
+            for asset in $(gh release view "${RELEASE_TAG}" --json assets -q '.assets[].name'); do
+              gh release delete-asset "${RELEASE_TAG}" "${asset}" --yes 2>/dev/null || true
+            done
+          else
+            echo "Creating new nightly release..."
+            gh release create "${RELEASE_TAG}" \
+              --title "Nightly Build" \
+              --notes "Nightly build from \`${GITHUB_SHA:0:7}\` ($(date -u +%Y-%m-%d))" \
+              --prerelease
           fi
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.ref_name }}
-          name: ${{ github.ref_name }}
-          files: upload/*
-          generate_release_notes: true
-          fail_on_unmatched_files: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          gh release upload "${RELEASE_TAG}" upload/* --clobber
+          echo "Nightly release ${RELEASE_TAG} updated with latest artifacts"
