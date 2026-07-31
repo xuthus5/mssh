@@ -1,11 +1,18 @@
 import type { Tab, TerminalTab } from '@/store/appStore'
 
+export interface TerminalConnectionInfo {
+  host: string
+  port: number
+  username: string
+}
+
 interface CreateTerminalTabOptions {
   sessionID: number
   sessionName: string
   terminalID: string
   tabs: Tab[]
   connectionKind?: 'ssh' | 'serial' | 'local'
+  connectionInfo?: TerminalConnectionInfo
   serialPortId?: number
 }
 
@@ -33,6 +40,7 @@ export function createTerminalTab({
   terminalID,
   tabs,
   connectionKind = 'ssh',
+  connectionInfo,
   serialPortId,
 }: CreateTerminalTabOptions): TerminalTab {
   const sessionKey = connectionKind === 'local'
@@ -57,5 +65,22 @@ export function createTerminalTab({
   if (connectionKind === 'local') {
     tab.connectionKind = 'local'
   }
+  if (connectionKind === 'ssh' && connectionInfo) {
+    tab.connectionHost = connectionInfo.host
+    tab.connectionPort = connectionInfo.port
+    tab.connectionUsername = connectionInfo.username
+  }
   return tab
+}
+
+export function terminalConnectionLabel(tab: TerminalTab | undefined): string | undefined {
+  const connection = terminalConnectionInfo(tab)
+  return connection ? `${connection.username}@${connection.host}:${connection.port}` : undefined
+}
+
+export function terminalConnectionInfo(tab: TerminalTab | undefined): TerminalConnectionInfo | undefined {
+  if (!tab || (tab.connectionKind ?? 'ssh') !== 'ssh') return undefined
+  const { connectionHost: host, connectionPort: port, connectionUsername: username } = tab
+  if (!host || !username || typeof port !== 'number' || !Number.isSafeInteger(port) || port <= 0) return undefined
+  return { host, port, username }
 }

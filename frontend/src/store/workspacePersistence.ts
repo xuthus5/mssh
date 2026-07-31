@@ -2,6 +2,7 @@ import type { AppState, ConnectionStatus, Tab, TerminalTab } from '@/store/appSt
 import type { ActiveSurface, OverviewSection, WorkspaceID } from '@/store/tabNavigation'
 import { isSplitLayoutSnapshot, type SplitLayoutSnapshot } from '@/components/terminal/splitLayout'
 import { releaseAppTerminalOpenReservation } from '@/lib/openTerminal'
+import { terminalConnectionInfo } from '@/lib/terminalTabs'
 
 export const WORKSPACE_LAYOUT_SETTING = 'workspace.layout'
 
@@ -26,6 +27,9 @@ type TerminalIntent = {
   terminalInstance?: number
   toolPanel?: TerminalTab['toolPanel']
   connectionKind?: TerminalConnectionKind
+  connectionHost?: string
+  connectionPort?: number
+  connectionUsername?: string
   serialPortId?: number
   splitLayout?: SplitLayoutSnapshot | null
 }
@@ -89,6 +93,12 @@ function tabIntent(tab: Tab): TabIntent {
   if (tab.connectionKind === 'local' || tab.connectionKind === 'serial') {
     intent.connectionKind = tab.connectionKind
   }
+  const connection = terminalConnectionInfo(tab)
+  if (connection) {
+    intent.connectionHost = connection.host
+    intent.connectionPort = connection.port
+    intent.connectionUsername = connection.username
+  }
   if (tab.connectionKind === 'serial' && tab.serialPortId) {
     intent.serialPortId = tab.serialPortId
   }
@@ -148,6 +158,7 @@ function isTabIntent(value: unknown): value is TabIntent {
   if (value.splitLayout !== undefined && value.splitLayout !== null && !isSplitLayoutSnapshot(value.splitLayout)) {
     return false
   }
+  if (!isConnectionInfoFields(value)) return false
   const kind = value.connectionKind
   if (kind === undefined || kind === 'ssh') return Number(value.sessionId) > 0
   if (kind === 'local') return Number(value.sessionId) === 0
@@ -159,6 +170,17 @@ function isTabIntent(value: unknown): value is TabIntent {
       && Number(value.serialPortId) > 0
   }
   return false
+}
+
+function isConnectionInfoFields(value: Record<string, unknown>): boolean {
+  const hasAny = value.connectionHost !== undefined || value.connectionPort !== undefined || value.connectionUsername !== undefined
+  if (!hasAny) return true
+  return typeof value.connectionHost === 'string'
+    && value.connectionHost.length > 0
+    && Number.isSafeInteger(value.connectionPort)
+    && Number(value.connectionPort) > 0
+    && typeof value.connectionUsername === 'string'
+    && value.connectionUsername.length > 0
 }
 
 function isActive(value: unknown, tabCount: number): value is WorkspaceSnapshot['active'] {
@@ -250,6 +272,11 @@ async function restoreTabIntent(...args: [
       sessionId: intent.sessionId,
       terminalInstance: intent.terminalInstance,
       toolPanel: sanitizeToolPanelForConnection(kind, intent.toolPanel) ?? null,
+    }
+    if (kind === 'ssh' && isConnectionInfoFields(intent)) {
+      tab.connectionHost = intent.connectionHost
+      tab.connectionPort = intent.connectionPort
+      tab.connectionUsername = intent.connectionUsername
     }
     if (kind === 'local') tab.connectionKind = 'local'
     if (kind === 'serial') {

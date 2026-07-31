@@ -8,6 +8,9 @@ import { resolveOpenTerminalSize } from '@/lib/terminalOpenSize'
 interface BatchSession {
   id: string
   name: string
+  host?: string
+  port?: number
+  username?: string
 }
 
 export interface BatchSessionResult {
@@ -16,6 +19,12 @@ export interface BatchSessionResult {
   success: boolean
   terminalId?: string
   error?: string
+}
+
+function connectionInfo(session: BatchSession) {
+  const { host, port, username } = session
+  if (!host || !username || typeof port !== 'number' || !Number.isSafeInteger(port) || port <= 0) return undefined
+  return { host, port, username }
 }
 
 async function openSessionTab(session: BatchSession, command?: string): Promise<string> {
@@ -29,7 +38,13 @@ async function openSessionTab(session: BatchSession, command?: string): Promise<
     throw error
   }
   const store = useAppStore.getState()
-  const tab = createTerminalTab({ sessionID: Number(session.id), sessionName: session.name, terminalID: terminalId, tabs: store.tabs })
+  const tab = createTerminalTab({
+    sessionID: Number(session.id),
+    sessionName: session.name,
+    terminalID: terminalId,
+    tabs: store.tabs,
+    connectionInfo: connectionInfo(session),
+  })
   store.setConnectionStatus(terminalId, 'connected')
   store.openTab(tab)
   return terminalId

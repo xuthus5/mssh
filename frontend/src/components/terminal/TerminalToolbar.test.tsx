@@ -80,7 +80,7 @@ describe('TerminalToolbar', () => {
       ]),
     })
     render(<TerminalToolbar terminalID="primary-1" sessionId={1} isRecording={false} recordingLogId={null}
-      onToggleRecording={vi.fn()} hostname="server" onOpenFiles={vi.fn()} onSplit={vi.fn()} splitDisabled={false} paneCount={2} searchOpen={false} onToggleSearch={vi.fn()} />)
+      onToggleRecording={vi.fn()} connectionLabel="deploy@10.0.0.1:22" onOpenFiles={vi.fn()} onSplit={vi.fn()} splitDisabled={false} paneCount={2} searchOpen={false} onToggleSearch={vi.fn()} />)
 
     await userEvent.click(screen.getByTitle('复制 (Ctrl+Shift+C)'))
     await userEvent.click(screen.getByTitle('粘贴 (Ctrl+Shift+V)'))
@@ -91,13 +91,14 @@ describe('TerminalToolbar', () => {
     expect(split.clear).toHaveBeenCalledOnce()
     expect(split.focus).toHaveBeenCalledTimes(3)
     expect(primary.focus).not.toHaveBeenCalled()
-    expect(screen.getByText('server')).toBeInTheDocument()
-    expect(screen.getByText('server').parentElement).not.toHaveClass('border-b')
+    expect(screen.getByText('deploy@10.0.0.1:22')).toBeInTheDocument()
+    expect(screen.getByText('deploy@10.0.0.1:22')).toHaveAttribute('title', 'deploy@10.0.0.1:22')
+    expect(screen.getByText('deploy@10.0.0.1:22').parentElement).not.toHaveClass('border-b')
   })
 
   it('places serial controls on a dedicated row below the main toolbar', () => {
     render(<TerminalToolbar terminalID="serial-1" sessionId={0} isRecording={false} recordingLogId={null}
-      onToggleRecording={vi.fn()} hostname="serial" serialControls onSplit={vi.fn()} splitDisabled
+      onToggleRecording={vi.fn()} connectionLabel="serial" serialControls onSplit={vi.fn()} splitDisabled
       paneCount={1} searchOpen={false} onToggleSearch={vi.fn()} />)
 
     const mainToolbar = screen.getByText('serial').parentElement
@@ -110,7 +111,7 @@ describe('TerminalToolbar', () => {
 
   it('opens tunnel management beside the file action', async () => {
     render(<TerminalToolbar terminalID="primary-1" sessionId={7} isRecording={false} recordingLogId={null}
-      onToggleRecording={vi.fn()} hostname="server" onOpenFiles={vi.fn()} onSplit={vi.fn()} splitDisabled={false} paneCount={1} searchOpen={false} onToggleSearch={vi.fn()} />)
+      onToggleRecording={vi.fn()} connectionLabel="server" onOpenFiles={vi.fn()} onSplit={vi.fn()} splitDisabled={false} paneCount={1} searchOpen={false} onToggleSearch={vi.fn()} />)
 
     expect(screen.getByTitle('隧道管理')).toBeInTheDocument()
     await userEvent.click(screen.getByTitle('隧道管理'))
@@ -123,7 +124,7 @@ describe('TerminalToolbar', () => {
   it('places compose directly after files and toggles its active state', async () => {
     const onToggleCompose = vi.fn()
     const view = render(<TerminalToolbar terminalID="primary-1" sessionId={7} isRecording={false} recordingLogId={null}
-      onToggleRecording={vi.fn()} hostname="server" onOpenFiles={vi.fn()} onSplit={vi.fn()} splitDisabled={false}
+      onToggleRecording={vi.fn()} connectionLabel="server" onOpenFiles={vi.fn()} onSplit={vi.fn()} splitDisabled={false}
       paneCount={1} searchOpen={false} onToggleSearch={vi.fn()} composeOpen={false} onToggleCompose={onToggleCompose} />)
 
     const titles = screen.getAllByRole('button').map((button) => button.getAttribute('title'))
@@ -132,7 +133,7 @@ describe('TerminalToolbar', () => {
     expect(onToggleCompose).toHaveBeenCalledOnce()
 
     view.rerender(<TerminalToolbar terminalID="primary-1" sessionId={7} isRecording={false} recordingLogId={null}
-      onToggleRecording={vi.fn()} hostname="server" onOpenFiles={vi.fn()} onSplit={vi.fn()} splitDisabled={false}
+      onToggleRecording={vi.fn()} connectionLabel="server" onOpenFiles={vi.fn()} onSplit={vi.fn()} splitDisabled={false}
       paneCount={1} searchOpen={false} onToggleSearch={vi.fn()} composeOpen onToggleCompose={onToggleCompose} />)
     expect(screen.getByTitle('关闭撰写面板')).toHaveClass('text-primary')
   })
@@ -256,7 +257,7 @@ describe('TerminalToolbar', () => {
     const { useToastStore } = await import('@/components/ui/toast')
     useToastStore.setState({ toasts: [] })
     render(<TerminalToolbar terminalID="primary-1" sessionId={1} isRecording={false} recordingLogId={null}
-      onToggleRecording={vi.fn()} hostname="server" onOpenFiles={vi.fn()} onSplit={vi.fn()} splitDisabled={false} paneCount={1} searchOpen={false} onToggleSearch={vi.fn()} />)
+      onToggleRecording={vi.fn()} connectionLabel="server" onOpenFiles={vi.fn()} onSplit={vi.fn()} splitDisabled={false} paneCount={1} searchOpen={false} onToggleSearch={vi.fn()} />)
 
     await userEvent.click(screen.getByTitle('复制 (Ctrl+Shift+C)'))
     expect(await screen.findByRole('alert')).toHaveTextContent('复制失败: clipboard denied')
@@ -274,7 +275,7 @@ describe('TerminalToolbar', () => {
       terminalPool: new Map([['primary-1', { terminal: terminal('selected') as never, lastUsed: 0 }]]),
     })
     render(<TerminalToolbar terminalID="primary-1" sessionId={1} isRecording={false} recordingLogId={null}
-      onToggleRecording={vi.fn()} hostname="server" onOpenFiles={vi.fn()} onSplit={vi.fn()} splitDisabled={false} paneCount={1} searchOpen={false} onToggleSearch={vi.fn()} />)
+      onToggleRecording={vi.fn()} connectionLabel="server" onOpenFiles={vi.fn()} onSplit={vi.fn()} splitDisabled={false} paneCount={1} searchOpen={false} onToggleSearch={vi.fn()} />)
     window.dispatchEvent(new CustomEvent('mssh:terminal-clipboard-error', {
       detail: { terminalID: 'primary-1', message: '复制失败: write denied' },
     }))
