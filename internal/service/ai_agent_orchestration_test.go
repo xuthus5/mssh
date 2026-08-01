@@ -49,10 +49,39 @@ func TestRunLocalCLIAgentThroughScopedMCP(t *testing.T) {
 	assert.ErrorContains(t, err, "without calling task.finish")
 }
 
+func TestRunLocalCLIAgentThroughScopedMCPWithCodex(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	session, err := store.CreateSession(db, model.Session{
+		Name: "agent", Host: "127.0.0.1", Port: 22, Username: "root",
+		AuthMethod: model.AuthPassword, KeepAlive: 30,
+	})
+	require.NoError(t, err)
+	task, err := store.CreateAIAgentTask(db, model.AIAgentTaskInput{SessionID: session.ID, Prompt: "finish"}, model.AIAgentEngineLocalCLI, model.AIAgentCLICodex)
+	require.NoError(t, err)
+	service := NewAIService(db, nil, nil, testutil.NewTestLogger())
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	execution := &aiAgentExecution{cancel: cancel, done: ctx.Done(), approvals: make(map[int64]chan bool)}
+	installFakeCodex(t)
+	settings := defaultAISettings()
+	settings.Interaction.Agent.AllowCodex = true
+	result, err := service.runLocalCLIAgent(ctx, *task, execution, &aiAgentSSH{}, settings)
+	require.NoError(t, err)
+	assert.Equal(t, "helper complete", result)
+}
+
 func installFakeOpenCode(t *testing.T) {
 	t.Helper()
 	binDir := t.TempDir()
 	installAIAgentTestLauncher(t, binDir, "opencode", "TestAIAgentFakeOpenCodeProcess")
+	t.Setenv("MSSH_AGENT_HELPER_PROCESS", "1")
+	setAIAgentTestPath(t, binDir)
+}
+
+func installFakeCodex(t *testing.T) {
+	t.Helper()
+	binDir := t.TempDir()
+	installAIAgentTestLauncher(t, binDir, "codex", "TestAIAgentFakeCodexProcess")
 	t.Setenv("MSSH_AGENT_HELPER_PROCESS", "1")
 	setAIAgentTestPath(t, binDir)
 }
@@ -85,6 +114,49 @@ func callFakeOpenCodeMCP(t *testing.T) {
 	request, err := http.NewRequestWithContext(context.Background(), http.MethodPost, mcp.URL, bytes.NewReader(body))
 	require.NoError(t, err)
 	request.Header.Set("Authorization", mcp.Headers["Authorization"])
+	response, err := http.DefaultClient.Do(request)
+	require.NoError(t, err)
+	defer func() { require.NoError(t, response.Body.Close()) }()
+	result, err := io.ReadAll(response.Body)
+	require.NoError(t, err)
+	assert.Contains(t, string(result), "helper complete")
+}
+
+func TestAIAgentFakeCodexProcess(t *testing.T) {
+	if os.Getenv("MSSH_AGENT_HELPER_PROCESS") != "1" {
+		return
+	}
+	callFakeCodexMCP(t)
+	_, err := fmt.Println(`{"type":"item.completed","item":{"id":"item_0","type":"mcp_tool_call","server":"mssh","tool":"task.finish","status":"completed"}}`)
+	require.NoError(t, err)
+	os.Exit(0)
+}
+
+func callFakeCodexMCP(t *testing.T) {
+	t.Helper()
+	mcpURL := ""
+	for index, arg := range os.Args {
+		if strings.HasPrefix(arg, "mcp_servers.mssh.url=") {
+			candidate := strings.Trim(strings.TrimPrefix(arg, "mcp_servers.mssh.url="), `"`)
+			if strings.HasPrefix(candidate, "http") {
+				mcpURL = candidate
+			} else if index+1 < len(os.Args) && strings.HasPrefix(strings.Trim(os.Args[index+1], `"`), "http") {
+				mcpURL = strings.Trim(os.Args[index+1], `"`)
+			}
+		}
+	}
+	require.NotEmpty(t, mcpURL)
+	token := ""
+	for _, entry := range os.Environ() {
+		if strings.HasPrefix(entry, "MSSH_AGENT_TOKEN=") {
+			token = strings.TrimPrefix(entry, "MSSH_AGENT_TOKEN=")
+		}
+	}
+	require.NotEmpty(t, token)
+	body := []byte(`{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"task.finish","arguments":{"result":"helper complete"}}}`)
+	request, err := http.NewRequestWithContext(context.Background(), http.MethodPost, mcpURL, bytes.NewReader(body))
+	require.NoError(t, err)
+	request.Header.Set("Authorization", "Bearer "+token)
 	response, err := http.DefaultClient.Do(request)
 	require.NoError(t, err)
 	defer func() { require.NoError(t, response.Body.Close()) }()
