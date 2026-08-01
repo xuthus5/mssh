@@ -346,6 +346,21 @@ describe('persistent content layers', () => {
     expect(toggleSearch).toHaveBeenCalledTimes(1)
     window.removeEventListener('mssh:toggle-terminal-search', toggleSearch)
   })
+  it('handles shortcuts before xterm swallows ctrl keys in capture phase', () => {
+    const openSearch = vi.fn()
+    window.addEventListener('mssh:open-session-search', openSearch)
+    render(<App />)
+    const textarea = document.createElement('textarea')
+    textarea.className = 'xterm-helper-textarea'
+    document.body.append(textarea)
+    // xterm registers a target-phase keydown that stops propagation for the
+    // Ctrl+letter keys it encodes (^F, ^S, ...).
+    textarea.addEventListener('keydown', (event) => { event.stopPropagation() }, true)
+    expect(fireEvent.keyDown(textarea, { key: 's', ctrlKey: true })).toBe(false)
+    expect(openSearch).toHaveBeenCalledTimes(1)
+    textarea.remove()
+    window.removeEventListener('mssh:open-session-search', openSearch)
+  })
   it('blocks Ctrl+W for a connected active terminal', async () => {
     const closeTab = vi.fn(async () => {})
     useAppStore.setState({

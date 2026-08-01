@@ -147,6 +147,10 @@ function handleShortcut(event: KeyboardEvent) {
   if (!actionId) return
   if (!runShortcutAction(actionId)) return
   event.preventDefault()
+  // xterm stops propagation of Ctrl+letter keys it handles, so the shortcut
+  // listener must run in the capture phase; stop immediate propagation also
+  // keeps the control character (e.g. ^F / ^S) from reaching the remote shell.
+  event.stopImmediatePropagation()
 }
 
 function AppShell() {
@@ -155,8 +159,8 @@ function AppShell() {
   useShortcutRuntimeHydration()
 
   useEffect(() => {
-    document.addEventListener('keydown', handleShortcut)
-    return () => document.removeEventListener('keydown', handleShortcut)
+    document.addEventListener('keydown', handleShortcut, true)
+    return () => document.removeEventListener('keydown', handleShortcut, true)
   }, [])
 
   useEffect(() => onAppEvent(APP_NEW_LOCAL_TERMINAL_EVENT, () => {
