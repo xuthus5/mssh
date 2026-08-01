@@ -46,7 +46,7 @@ vi.mock('@/components/terminal/TerminalTab', () => ({
 }))
 vi.mock('@/components/terminal/PlaybackTab', () => ({ PlaybackTab: () => null }))
 vi.mock('@/components/file/FilePanel', () => ({
-  default: ({ dropTargetId, showHiddenFiles, defaultView, actionError, transferActionPending, onSyncCurrentDirectory, onUpload, onDownload }: {
+  default: ({ dropTargetId, showHiddenFiles, defaultView, actionError, transferActionPending, onSyncCurrentDirectory, onUpload, onDownload, followsTerminalDirectory }: {
     dropTargetId: string
     showHiddenFiles: boolean
     defaultView: string
@@ -55,10 +55,11 @@ vi.mock('@/components/file/FilePanel', () => ({
     onSyncCurrentDirectory: () => void
     onUpload: () => void
     onDownload: (path: string) => void
+    followsTerminalDirectory: boolean
   }) => (
-    <div data-testid="file-panel" data-drop-target-id={dropTargetId} data-show-hidden={String(showHiddenFiles)} data-default-view={defaultView}>
+    <div data-testid="file-panel" data-drop-target-id={dropTargetId} data-show-hidden={String(showHiddenFiles)} data-default-view={defaultView} data-follows-terminal-directory={String(followsTerminalDirectory)}>
       {actionError ? <div role="alert">{actionError}</div> : null}
-      <button type="button" onClick={onSyncCurrentDirectory}>同步当前目录</button>
+      {!followsTerminalDirectory ? <button type="button" onClick={onSyncCurrentDirectory}>同步当前目录</button> : null}
       <button type="button" disabled={transferActionPending !== null && transferActionPending !== undefined} onClick={onUpload}>upload</button>
       <button type="button" disabled={transferActionPending !== null && transferActionPending !== undefined} onClick={() => onDownload('/remote/app.log')}>download</button>
     </div>
@@ -129,6 +130,17 @@ describe('TerminalLayers SFTP isolation', () => {
 
     await waitFor(() => expect(terminalService.write).toHaveBeenCalledWith('term-a', MANUAL_TERMINAL_DIRECTORY_REPORT))
     await waitFor(() => expect(transfer.listFiles).toHaveBeenCalledWith('/manual-sync'))
+  })
+
+  it('hides the manual sync button while OSC 7 drives the file panel', async () => {
+    useSFTPSettingsStore.setState({ showHiddenFiles: false, followTerminalDirectory: true, defaultView: 'list' })
+    useTerminalDirectoryStore.setState({ directories: { 'term-a': '/srv/app' }, revisions: { 'term-a': 2 } })
+    render(<TerminalLayers />)
+    const terminalA = (await screen.findByTestId('terminal-term-a')).closest('[data-layer-id="terminal-a"]') as HTMLElement
+    fireEvent.click(within(terminalA).getByRole('button', { name: 'files' }))
+
+    await waitFor(() => expect(within(terminalA).getByTestId('file-panel')).toHaveAttribute('data-follows-terminal-directory', 'true'))
+    expect(within(terminalA).queryByRole('button', { name: '同步当前目录' })).not.toBeInTheDocument()
   })
 
   it('does not expose manual OSC 7 shell integration installation', async () => {

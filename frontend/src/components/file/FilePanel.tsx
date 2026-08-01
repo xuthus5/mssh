@@ -36,6 +36,7 @@ interface Props {
   onLoadDirectory: (path: string) => Promise<FileInfo[]>
   onSyncCurrentDirectory: () => void
   syncingCurrentDirectory: boolean
+  followsTerminalDirectory?: boolean
   catalogRevision?: number
   externalCatalogRevision?: number
   directoryMutationBusy?: boolean
@@ -47,7 +48,7 @@ function errorText(error: unknown): string {
 }
 
 export default function FilePanel(props: Props) {
-  const { open, onClose, files, currentPath, loading, onNavigateTo, onNavigateUp, onDelete, onRename, onMakeDir, onUpload, onDownload, transferActionPending, dropTargetId, error, actionError = '', showHiddenFiles, defaultView, onLoadDirectory, onSyncCurrentDirectory, syncingCurrentDirectory, catalogRevision = 0, externalCatalogRevision = 0, directoryMutationBusy = false, isMutationBusy = () => false } = props
+  const { open, onClose, files, currentPath, loading, onNavigateTo, onNavigateUp, onDelete, onRename, onMakeDir, onUpload, onDownload, transferActionPending, dropTargetId, error, actionError = '', showHiddenFiles, defaultView, onLoadDirectory, onSyncCurrentDirectory, syncingCurrentDirectory, followsTerminalDirectory = false, catalogRevision = 0, externalCatalogRevision = 0, directoryMutationBusy = false, isMutationBusy = () => false } = props
   const state = useFilePanelState({ defaultView, currentPath, panelOpen: open, externalCatalogRevision })
   const selectedMutationBusy = state.selected ? isMutationBusy(state.selected) : false
   const panel = useToolPanelResize('files')
@@ -60,7 +61,7 @@ export default function FilePanel(props: Props) {
     {open ? <aside id={dropTargetId} data-file-drop-target style={panel.panelStyle} className="group/drop relative flex-shrink-0 flex flex-col border-l border-border bg-card file-drop-target-active:ring-2 file-drop-target-active:ring-inset file-drop-target-active:ring-primary">
       <ToolPanelResizeHandle {...panel.resizeHandleProps} />
       <div className="pointer-events-none absolute inset-3 z-40 hidden place-items-center rounded-xl border-2 border-dashed border-primary bg-background/90 text-sm font-medium text-primary shadow-sm group-[.file-drop-target-active]/drop:grid">{t('释放文件以上传到当前目录')}</div>
-      <PanelHeader onClose={onClose} onSyncCurrentDirectory={onSyncCurrentDirectory} syncingCurrentDirectory={syncingCurrentDirectory} />
+      <PanelHeader onClose={onClose} onSyncCurrentDirectory={onSyncCurrentDirectory} syncingCurrentDirectory={syncingCurrentDirectory} followsTerminalDirectory={followsTerminalDirectory} />
       <PathBar currentPath={currentPath} onNavigateUp={onNavigateUp} onNavigateTo={onNavigateTo} />
       <FileActions selected={state.selected} currentPath={currentPath} view={state.view} showMkdir={state.showMkdir}
         onUpload={onUpload} onDownload={onDownload} onNavigateTo={onNavigateTo} onSetView={state.setView}
@@ -178,8 +179,8 @@ function FileContent({ view, files, loading, currentPath, showHiddenFiles, selec
   return <div className="min-h-0 flex-1 overflow-y-auto">{view === 'list' ? <FileListView {...shared} /> : <FileTreeView {...shared} currentPath={currentPath} showHiddenFiles={showHiddenFiles} onLoadDirectory={onLoadDirectory} catalogRevision={catalogRevision} />}</div>
 }
 
-function PanelHeader({ onClose, onSyncCurrentDirectory, syncingCurrentDirectory }: { onClose: () => void; onSyncCurrentDirectory: () => void; syncingCurrentDirectory: boolean }) {
-  return <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2"><span className="text-sm font-medium">{t('文件管理')}</span><div className="flex shrink-0 items-center gap-1"><Button size="xs" variant="outline" title={t('同步当前终端的 Shell 工作目录（需要处于 Shell 提示符）')} disabled={syncingCurrentDirectory} onClick={onSyncCurrentDirectory}><RefreshCw className={syncingCurrentDirectory ? 'animate-spin' : undefined} data-icon="inline-start" />{syncingCurrentDirectory ? t('同步中') : t('同步当前目录')}</Button><Button size="xs" variant="ghost" onClick={onClose}>{t('关闭')}</Button></div></div>
+function PanelHeader({ onClose, onSyncCurrentDirectory, syncingCurrentDirectory, followsTerminalDirectory }: { onClose: () => void; onSyncCurrentDirectory: () => void; syncingCurrentDirectory: boolean; followsTerminalDirectory: boolean }) {
+  return <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2"><span className="text-sm font-medium">{t('文件管理')}</span><div className="flex shrink-0 items-center gap-1">{!followsTerminalDirectory ? <Button size="xs" variant="outline" title={t('同步当前终端的 Shell 工作目录（需要处于 Shell 提示符）')} disabled={syncingCurrentDirectory} onClick={onSyncCurrentDirectory}><RefreshCw className={syncingCurrentDirectory ? 'animate-spin' : undefined} data-icon="inline-start" />{syncingCurrentDirectory ? t('同步中') : t('同步当前目录')}</Button> : null}<Button size="xs" variant="ghost" onClick={onClose}>{t('关闭')}</Button></div></div>
 }
 
 function PathBar({ currentPath, onNavigateUp, onNavigateTo }: { currentPath: string; onNavigateUp: () => void; onNavigateTo: (path: string) => void }) {
