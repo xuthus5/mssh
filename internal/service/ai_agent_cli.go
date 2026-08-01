@@ -186,12 +186,26 @@ func newAIAgentCLIAdapter(cli model.AIAgentCLI, allowCodex bool) (aiAgentCLIAdap
 
 const codexAIAgentTokenEnv = "MSSH_AGENT_TOKEN"
 
-type codexAIAgentAdapter struct{}
+type codexAIAgentAdapter struct {
+	codexHome string
+}
 
-func (codexAIAgentAdapter) Command(workDir, mcpURL, token, prompt string) (*exec.Cmd, error) {
+func (adapter codexAIAgentAdapter) Command(workDir, mcpURL, token, prompt string) (*exec.Cmd, error) {
 	path, err := exec.LookPath("codex")
 	if err != nil {
 		return nil, fmt.Errorf("find Codex CLI: %w", err)
+	}
+	codexHome := adapter.codexHome
+	if codexHome == "" {
+		if envHome := os.Getenv("CODEX_HOME"); envHome != "" {
+			codexHome = envHome
+		} else if home, homeErr := os.UserHomeDir(); homeErr == nil {
+			codexHome = filepath.Join(home, ".codex")
+		}
+	}
+	catalogPath, err := prepareCodexModelCatalogForMCP(workDir, codexHome)
+	if err != nil {
+		return nil, err
 	}
 	sandboxMode := "read-only"
 	if runtime.GOOS == "windows" {
@@ -215,13 +229,102 @@ func (codexAIAgentAdapter) Command(workDir, mcpURL, token, prompt string) (*exec
 		"-c", fmt.Sprintf(`mcp_servers.mssh.url=%q`, mcpURL),
 		"-c", fmt.Sprintf(`mcp_servers.mssh.bearer_token_env_var=%q`, codexAIAgentTokenEnv),
 		"-c", `mcp_servers.mssh.enabled_tools=['ssh.exec','ssh.list_dir','ssh.stat','ssh.read_file','ssh.write_file','task.finish']`,
-		"-",
 	}
+	if catalogPath != "" {
+		args = append(args, "-c", fmt.Sprintf(`model_catalog_json=%q`, filepath.ToSlash(catalogPath)))
+	}
+	args = append(args, "-")
 	command := exec.Command(path, args...) // #nosec G204 -- path is resolved from fixed command name.
 	command.Dir = workDir
 	command.Env = append(os.Environ(), codexAIAgentTokenEnv+"="+token)
 	command.Stdin = strings.NewReader(prompt)
 	return command, nil
+}
+
+// codexModelCatalogFileName is the conventional Codex model catalog location.
+const codexModelCatalogFileName = "models.json"
+
+// prepareCodexModelCatalogForMCP writes a copy of the user's Codex model
+// catalog with supports_search_tool disabled into the private agent work
+// directory and returns its path, or an empty string when no override is
+// needed. Models that advertise supports_search_tool=true make Codex defer
+// every MCP tool behind tool search; when tool search is unavailable the mssh
+// MCP tools stay invisible and the agent falls back to local tools, which the
+// bridge rejects. Disabling the flag exposes MCP tools directly (see
+// openai/codex#36382).
+func prepareCodexModelCatalogForMCP(workDir, codexHome string) (string, error) {
+	source := filepath.Join(codexHome, codexModelCatalogFileName)
+	if configured := codexModelCatalogPathFromConfig(codexHome); configured != "" {
+		source = configured
+	}
+	data, err := os.ReadFile(source)
+	if err != nil {
+		// A missing or unreadable catalog keeps the default exposure.
+		return "", nil
+	}
+	var catalog map[string]any
+	if err = json.Unmarshal(data, &catalog); err != nil {
+		return "", nil
+	}
+	models, ok := catalog["models"].([]any)
+	if !ok {
+		return "", nil
+	}
+	changed := false
+	for _, entry := range models {
+		model, ok := entry.(map[string]any)
+		if !ok {
+			continue
+		}
+		if enabled, ok := model["supports_search_tool"].(bool); ok && enabled {
+			model["supports_search_tool"] = false
+			changed = true
+		}
+	}
+	if !changed {
+		return "", nil
+	}
+	overridden, err := json.Marshal(catalog)
+	if err != nil {
+		return "", nil
+	}
+	catalogPath := filepath.Join(workDir, "codex-models.json")
+	if err = os.WriteFile(catalogPath, overridden, 0o600); err != nil {
+		return "", fmt.Errorf("write Codex model catalog override: %w", err)
+	}
+	return catalogPath, nil
+}
+
+// codexModelCatalogPathFromConfig extracts the model_catalog_json path from
+// the Codex config.toml with a minimal line scan. The key is a top-level
+// string assignment in the conventional configuration, so a full TOML parser
+// is not worth a dependency here.
+func codexModelCatalogPathFromConfig(codexHome string) string {
+	data, err := os.ReadFile(filepath.Join(codexHome, "config.toml"))
+	if err != nil {
+		return ""
+	}
+	for _, rawLine := range strings.Split(string(data), "\n") {
+		line := strings.TrimSpace(rawLine)
+		if !strings.HasPrefix(line, "model_catalog_json") {
+			continue
+		}
+		rest := strings.TrimSpace(strings.TrimPrefix(line, "model_catalog_json"))
+		rest = strings.TrimSpace(strings.TrimPrefix(rest, "="))
+		value := strings.TrimSpace(rest)
+		if len(value) < 2 {
+			return ""
+		}
+		quote := value[0]
+		if quote != '"' && quote != '\'' {
+			return ""
+		}
+		if end := strings.IndexByte(value[1:], quote); end >= 0 {
+			return value[1 : 1+end]
+		}
+		return ""
+	}
+	return ""
 }
 
 func (codexAIAgentAdapter) ValidateEvent(line []byte) error {
