@@ -152,7 +152,7 @@ func modelsDevProviderRoute(key string, entry modelsDevProviderPayload) (model.A
 	}
 	api := strings.TrimRight(strings.TrimSpace(entry.API), "/")
 	compatible := entry.NPM == "@ai-sdk/openai-compatible" || entry.NPM == "@openrouter/ai-sdk-provider"
-	return model.AIProviderOpenAICompatible, api, compatible && api != ""
+	return model.AIProviderOpenAICompatible, api, compatible && isValidModelsDevBaseURL(api)
 }
 
 func buildModelsDevModel(key string, entry modelsDevModelPayload) (model.ModelsDevModel, bool) {
