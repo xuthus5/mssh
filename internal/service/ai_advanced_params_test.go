@@ -2,12 +2,14 @@ package service
 
 import (
 	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/xuthus5/mssh/internal/model"
+	"github.com/xuthus5/mssh/internal/netproxy"
 	"github.com/xuthus5/mssh/internal/service/testutil"
 )
 
@@ -74,4 +76,21 @@ func TestProviderHTTPClientSkipTLSVerify(t *testing.T) {
 	assert.True(t, transport.TLSClientConfig.InsecureSkipVerify)
 	same := providerHTTPClient(base, false)
 	assert.Same(t, base, same)
+}
+
+func TestProviderHTTPClientSkipTLSVerifyPreservesProxyManager(t *testing.T) {
+	manager := netproxy.New()
+	require.NoError(t, manager.Configure(netproxy.Config{Mode: netproxy.ModeManual, URL: "http://127.0.0.1:8080"}))
+	base := sharedHTTPClient(5_000_000_000, manager)
+
+	skip := providerHTTPClient(base, true)
+
+	transport, ok := skip.Transport.(*http.Transport)
+	require.True(t, ok)
+	require.True(t, transport.TLSClientConfig.InsecureSkipVerify)
+	require.NotNil(t, transport.Proxy)
+	request := httptest.NewRequest(http.MethodGet, "http://example.com/", nil)
+	proxyURL, err := transport.Proxy(request)
+	require.NoError(t, err)
+	require.Equal(t, "http://127.0.0.1:8080", proxyURL.String())
 }

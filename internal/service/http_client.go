@@ -172,15 +172,15 @@ func providerHTTPClient(base *http.Client, skipTLS bool) *http.Client {
 	if transport == nil {
 		transport = http.DefaultTransport
 	}
-	if tr, ok := transport.(*http.Transport); ok {
-		clone := tr.Clone()
-		clone.TLSClientConfig = clone.TLSClientConfig.Clone()
-		if clone.TLSClientConfig == nil {
-			clone.TLSClientConfig = &tls.Config{}
-		}
-		clone.TLSClientConfig.InsecureSkipVerify = true
-		transport = clone
-	} else {
+	switch typed := transport.(type) {
+	case *http.Transport:
+		transport = cloneWithInsecureTLS(typed)
+	case *netproxy.Manager:
+		// The proxy manager is not a *http.Transport; derive a transport from
+		// its current config so the configured proxy and secure dialer survive
+		// the TLS verification override.
+		transport = cloneWithInsecureTLS(typed.Transport())
+	default:
 		transport = &http.Transport{
 			TLSClientConfig:   &tls.Config{InsecureSkipVerify: true},
 			ForceAttemptHTTP2: true,
@@ -188,6 +188,16 @@ func providerHTTPClient(base *http.Client, skipTLS bool) *http.Client {
 	}
 	cloned.Transport = transport
 	return &cloned
+}
+
+func cloneWithInsecureTLS(transport *http.Transport) *http.Transport {
+	cloned := transport.Clone()
+	cloned.TLSClientConfig = cloned.TLSClientConfig.Clone()
+	if cloned.TLSClientConfig == nil {
+		cloned.TLSClientConfig = &tls.Config{}
+	}
+	cloned.TLSClientConfig.InsecureSkipVerify = true
+	return cloned
 }
 
 // validateOutboundHTTPURL enforces scheme/host policy for outbound application HTTP.
