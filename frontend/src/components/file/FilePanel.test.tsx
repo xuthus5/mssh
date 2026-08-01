@@ -28,6 +28,13 @@ describe('FilePanel SFTP views', () => {
     expect(screen.queryByText('.env')).not.toBeInTheDocument()
   })
 
+  it('hides the sync-current-directory button while OSC 7 follows the terminal', () => {
+    render(<FilePanel open files={[]} currentPath="/" loading={false} dropTargetId="drop-zone" showHiddenFiles={false}
+      defaultView="list" {...handlers} followsTerminalDirectory />)
+    expect(screen.queryByRole('button', { name: '同步当前目录' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '关闭' })).toBeInTheDocument()
+  })
+
   it('uses the configured tree view and shows hidden files', () => {
     render(<FilePanel open files={[
       { name: '.ssh', path: '/.ssh', size: 0, modified: '', isDir: true },

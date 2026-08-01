@@ -248,6 +248,7 @@ export function useFilePanelRuntime(sessionID: number, terminalID: string) {
   return {
     transfer, showHiddenFiles, defaultView, dropTargetID, actionError,
     transferActionPending: dialog.pending, syncingCurrentDirectory, syncCurrentDirectory,
+    followsTerminalDirectory: Boolean(followTerminalDirectory && terminalDirectory),
     handleUpload, handleDownload,
   }
 }
