@@ -28,9 +28,14 @@ function workspaceTabForSurface(activeSurface: ActiveSurface | null, workspaceTa
 }
 
 function openTabState(state: AppState, tab: Tab): Partial<AppState> {
+  // 新打开的终端 tab 立即成为活动表面，需要同步下发焦点请求，
+  // 否则 useTerminal 的 sequence 保持 0，xterm 不会自动聚焦。
+  const focusRequest = tab.type === 'terminal'
+    ? { id: tab.id, terminalId: tab.terminalId, sequence: state.focusRequest.sequence + 1 }
+    : state.focusRequest
   const existing = state.tabs.find((item) => item.id === tab.id)
-  if (existing) return { activeSurface: surfaceForTab(existing) }
-  return { tabs: [...state.tabs, tab], activeSurface: surfaceForTab(tab) }
+  if (existing) return { activeSurface: surfaceForTab(existing), focusRequest }
+  return { tabs: [...state.tabs, tab], activeSurface: surfaceForTab(tab), focusRequest }
 }
 
 async function closeTerminalPane(terminalID: string) {
