@@ -234,11 +234,14 @@ describe('persistent content layers', () => {
     useAppStore.setState({ terminalPool: new Map([['term-1', { terminal: { focus: primaryFocus } as never, lastUsed: 0 }]]) })
     render(<App />)
     await screen.findByTestId('terminal-term-1')
-    act(() => useAppStore.getState().activateTab('terminal-1', true))
+    // 新打开的终端 tab 在挂载时自动聚焦一次。
     expect(primaryFocus).toHaveBeenCalledOnce()
 
+    // 无新 sequence 的普通重渲染不应重复聚焦。
     act(() => useAppStore.setState((state) => ({ terminalPool: new Map(state.terminalPool) })))
     act(() => useAppStore.setState((state) => ({ tabs: [...state.tabs] })))
+    expect(primaryFocus).toHaveBeenCalledOnce()
+
     act(() => useAppStore.setState({
       activePaneId: 'split-1',
       terminalPool: new Map([
@@ -246,7 +249,6 @@ describe('persistent content layers', () => {
         ['split-1', { terminal: { focus: splitFocus } as never, lastUsed: 0 }],
       ]),
     }))
-    expect(primaryFocus).toHaveBeenCalledOnce()
     expect(splitFocus).not.toHaveBeenCalled()
     act(() => useAppStore.getState().activateTab('terminal-1', true))
     expect(primaryFocus).toHaveBeenCalledOnce()
