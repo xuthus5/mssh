@@ -1209,6 +1209,8 @@
   "红色": "Red",
   "组织多行命令，执行或仅粘贴到当前终端": "Compose multi-line commands, then run or paste into the current terminal",
   "终端": "Terminal",
+  "终端搜索": "Terminal Search",
+  "打开当前终端的搜索框。": "Open the active terminal's search box.",
   "终端上下文行数": "Terminal context lines",
   "终端主题": "Terminal Theme",
   "终端主题应用策略": "Terminal Theme Apply Policy",
