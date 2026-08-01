@@ -46,7 +46,7 @@ func (s *AIService) StartAgentTask(input model.AIAgentTaskInput) (*model.AIAgent
 		return nil, err
 	}
 	if engine == model.AIAgentEngineLocalCLI {
-		if err = validateInstalledAIAgentCLI(cli); err != nil {
+		if err = validateInstalledAIAgentCLI(cli, settings.Interaction.Agent.AllowCodex); err != nil {
 			return nil, err
 		}
 	}
@@ -281,8 +281,8 @@ func resolveAIAgentSelection(input model.AIAgentTaskInput, defaults model.AIAgen
 	return engine, cli, nil
 }
 
-func validateInstalledAIAgentCLI(cli model.AIAgentCLI) error {
-	if _, err := newAIAgentCLIAdapter(cli); err != nil {
+func validateInstalledAIAgentCLI(cli model.AIAgentCLI, allowCodex bool) error {
+	if _, err := newAIAgentCLIAdapter(cli, allowCodex); err != nil {
 		return err
 	}
 	status := detectAICLI(string(cli), string(cli))
@@ -296,7 +296,7 @@ func validateAIAgentDefaultAvailability(settings model.AIAgentSettings) error {
 	if settings.DefaultEngine == model.AIAgentEngineNative {
 		return nil
 	}
-	return validateInstalledAIAgentCLI(settings.DefaultCLI)
+	return validateInstalledAIAgentCLI(settings.DefaultCLI, settings.AllowCodex)
 }
 
 func normalizeAIAgentTaskCreateError(err error) error {

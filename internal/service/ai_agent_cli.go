@@ -14,6 +14,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -44,7 +45,7 @@ type aiAgentMCPBridge struct {
 }
 
 func (s *AIService) runLocalCLIAgent(ctx context.Context, task model.AIAgentTask, execution *aiAgentExecution, connection *aiAgentSSH, settings model.AISettings) (string, error) {
-	adapter, err := newAIAgentCLIAdapter(task.CLI)
+	adapter, err := newAIAgentCLIAdapter(task.CLI, settings.Interaction.Agent.AllowCodex)
 	if err != nil {
 		return "", err
 	}
@@ -140,6 +141,7 @@ func runAIAgentCLIProcess(ctx context.Context, process aiAgentCLIProcess) (resul
 func commandWithContext(ctx context.Context, command *exec.Cmd) (*exec.Cmd, aiAgentProcessLifecycle, error) {
 	contextCommand := exec.CommandContext(ctx, command.Path, command.Args[1:]...) // #nosec G204 -- adapter paths are fixed allowlisted executables.
 	contextCommand.Dir, contextCommand.Env = command.Dir, command.Env
+	contextCommand.Stdin = command.Stdin
 	lifecycle, err := newAIAgentProcessLifecycle(contextCommand)
 	if err != nil {
 		return nil, nil, fmt.Errorf("prepare AI agent CLI process lifecycle: %w", err)
@@ -166,17 +168,64 @@ func stopAIAgentCLIProcessAfterStartFailure(command *exec.Cmd, startErr error) e
 	)
 }
 
-func newAIAgentCLIAdapter(cli model.AIAgentCLI) (aiAgentCLIAdapter, error) {
+func newAIAgentCLIAdapter(cli model.AIAgentCLI, allowCodex bool) (aiAgentCLIAdapter, error) {
 	switch cli {
 	case model.AIAgentCLIClaude:
 		return claudeAIAgentAdapter{}, nil
 	case model.AIAgentCLIOpenCode:
 		return openCodeAIAgentAdapter{}, nil
 	case model.AIAgentCLICodex:
-		return nil, fmt.Errorf("codex CLI cannot prove local shell isolation in this installed version")
+		if !allowCodex {
+			return nil, fmt.Errorf("codex CLI cannot prove local shell isolation in this installed version; enable the Codex weak isolation option in AI settings to run it anyway")
+		}
+		return codexAIAgentAdapter{}, nil
 	default:
 		return nil, fmt.Errorf("unsupported AI agent CLI %s", cli)
 	}
+}
+
+const codexAIAgentTokenEnv = "MSSH_AGENT_TOKEN"
+
+type codexAIAgentAdapter struct{}
+
+func (codexAIAgentAdapter) Command(workDir, mcpURL, token, prompt string) (*exec.Cmd, error) {
+	path, err := exec.LookPath("codex")
+	if err != nil {
+		return nil, fmt.Errorf("find Codex CLI: %w", err)
+	}
+	sandboxMode := "read-only"
+	if runtime.GOOS == "windows" {
+		// The Windows sandbox is experimental and read-only / workspace-write
+		// modes have failed to spawn in released versions. Use the only mode
+		// that runs reliably; local tool calls are still rejected by event
+		// validation, which is the weak isolation contract of this option.
+		sandboxMode = "danger-full-access"
+	}
+	args := []string{
+		"exec",
+		"--json",
+		"--ephemeral",
+		"--skip-git-repo-check",
+		"--ignore-rules",
+		"-C", workDir,
+		"-c", fmt.Sprintf(`sandbox_mode=%q`, sandboxMode),
+		"-c", `approval_policy="never"`,
+		"-c", "features.plugins=false",
+		"-c", "features.hooks=false",
+		"-c", fmt.Sprintf(`mcp_servers.mssh.url=%q`, mcpURL),
+		"-c", fmt.Sprintf(`mcp_servers.mssh.bearer_token_env_var=%q`, codexAIAgentTokenEnv),
+		"-c", `mcp_servers.mssh.enabled_tools=['ssh.exec','ssh.list_dir','ssh.stat','ssh.read_file','ssh.write_file','task.finish']`,
+		"-",
+	}
+	command := exec.Command(path, args...) // #nosec G204 -- path is resolved from fixed command name.
+	command.Dir = workDir
+	command.Env = append(os.Environ(), codexAIAgentTokenEnv+"="+token)
+	command.Stdin = strings.NewReader(prompt)
+	return command, nil
+}
+
+func (codexAIAgentAdapter) ValidateEvent(line []byte) error {
+	return validateCodexAIAgentEvent(line)
 }
 
 type claudeAIAgentAdapter struct{}

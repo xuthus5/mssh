@@ -23,6 +23,55 @@ func validateAIAgentCLIEvent(line []byte, cliName string) error {
 	return nil
 }
 
+func validateCodexAIAgentEvent(line []byte) error {
+	var event map[string]any
+	if err := json.Unmarshal(line, &event); err != nil {
+		return fmt.Errorf("decode Codex event: %w", err)
+	}
+	if len(event) == 0 {
+		return fmt.Errorf("codex emitted an empty event")
+	}
+	eventType, ok := event["type"].(string)
+	if !ok {
+		return fmt.Errorf("codex event has no type")
+	}
+	if item, ok := event["item"].(map[string]any); ok {
+		if err := validateCodexAIAgentItem(item); err != nil {
+			return err
+		}
+	}
+	if strings.Contains(strings.ToLower(eventType), "approval") {
+		return fmt.Errorf("codex requested approval for a local action")
+	}
+	if tool := findUnscopedAIAgentTool(event); tool != "" {
+		return fmt.Errorf("codex attempted unavailable local tool %q", tool)
+	}
+	return nil
+}
+
+func validateCodexAIAgentItem(item map[string]any) error {
+	itemType, _ := item["type"].(string)
+	if itemType == "" {
+		itemType, _ = item["item_type"].(string)
+	}
+	switch itemType {
+	case "command_execution", "file_change", "web_search", "image_view", "browser":
+		return fmt.Errorf("codex attempted unavailable local tool %q", itemType)
+	case "mcp_tool_call":
+		server, _ := item["server"].(string)
+		tool, _ := item["tool"].(string)
+		if tool == "" {
+			tool, _ = item["tool_name"].(string)
+		}
+		if server != "mssh" || !isMSSHAIAgentTool(tool) {
+			return fmt.Errorf("codex attempted unavailable tool %q on server %q", tool, server)
+		}
+	case "approval", "command_approval", "file_change_approval":
+		return fmt.Errorf("codex requested approval for a local action")
+	}
+	return nil
+}
+
 func findUnscopedAIAgentTool(value any) string {
 	switch typed := value.(type) {
 	case map[string]any:

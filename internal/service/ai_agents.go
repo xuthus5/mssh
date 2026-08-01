@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/xuthus5/mssh/internal/model"
+	"github.com/xuthus5/mssh/internal/store"
 )
 
 var aiCLIs = []struct {
@@ -29,22 +30,28 @@ func (s *AIService) DetectAgentCLIs() []model.AIAgentCLIStatus {
 		return []model.AIAgentCLIStatus{}
 	}
 	defer finish()
+	allowCodex := false
+	if s.db != nil {
+		if settings, loadErr := store.LoadAISettings(s.db, defaultAISettings()); loadErr == nil {
+			allowCodex = settings.Interaction.Agent.AllowCodex
+		}
+	}
 	result := make([]model.AIAgentCLIStatus, 0, len(aiCLIs))
 	for _, cli := range aiCLIs {
 		if operationContext.Err() != nil {
 			break
 		}
 		status := detectAICLIContext(operationContext, cli.name, cli.command)
-		result = append(result, applyAIAgentCLIIsolationStatus(status))
+		result = append(result, applyAIAgentCLIIsolationStatus(status, allowCodex))
 	}
 	return result
 }
 
-func applyAIAgentCLIIsolationStatus(status model.AIAgentCLIStatus) model.AIAgentCLIStatus {
+func applyAIAgentCLIIsolationStatus(status model.AIAgentCLIStatus, allowCodex bool) model.AIAgentCLIStatus {
 	if status.Command != string(model.AIAgentCLICodex) || !status.Installed {
 		return status
 	}
-	if _, err := newAIAgentCLIAdapter(model.AIAgentCLICodex); err != nil {
+	if _, err := newAIAgentCLIAdapter(model.AIAgentCLICodex, allowCodex); err != nil {
 		status.Installed = false
 		status.Error = fmt.Sprintf("%s: %v", status.Version, err)
 		status.Version = ""
