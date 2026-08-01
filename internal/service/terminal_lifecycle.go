@@ -46,6 +46,9 @@ func (t *TerminalService) closeAll(permanent bool) error {
 	t.stopTerminalExitCallbacks()
 	closeErr := closeTerminalIDsIfPresent(t, t.snapshotTerminalIDs())
 	t.operationWG.Wait()
+	if permanent {
+		t.terminalDirectoryIntegrationWG.Wait()
+	}
 	t.stopPendingOutputExpiries()
 	closeErr = errors.Join(closeErr, closeTerminalIDsIfPresent(t, t.snapshotTerminalIDs()))
 	closeErr = errors.Join(closeErr, t.retryPendingSerialCleanups())

@@ -8,9 +8,6 @@ const transfer = vi.hoisted(() => ({
   download: vi.fn(async () => {}),
 }))
 const terminalService = vi.hoisted(() => ({ write: vi.fn(async (_terminalID: string, _data: string) => 0) }))
-const fileService = vi.hoisted(() => ({
-  installTerminalDirectoryIntegration: vi.fn(async (_sessionID: number) => ['/home/test/.bashrc', '/home/test/.zshrc']),
-}))
 type DropHandler = (event: { data?: { files?: string[]; details?: { id?: string } } }) => void
 const runtime = vi.hoisted(() => ({
   openFile: vi.fn(async (..._args: unknown[]) => ''),
@@ -49,21 +46,19 @@ vi.mock('@/components/terminal/TerminalTab', () => ({
 }))
 vi.mock('@/components/terminal/PlaybackTab', () => ({ PlaybackTab: () => null }))
 vi.mock('@/components/file/FilePanel', () => ({
-  default: ({ dropTargetId, showHiddenFiles, defaultView, actionError, transferActionPending, onSyncCurrentDirectory, onInstallDirectoryIntegration, onUpload, onDownload }: {
+  default: ({ dropTargetId, showHiddenFiles, defaultView, actionError, transferActionPending, onSyncCurrentDirectory, onUpload, onDownload }: {
     dropTargetId: string
     showHiddenFiles: boolean
     defaultView: string
     actionError?: string
     transferActionPending?: 'upload' | 'download' | null
     onSyncCurrentDirectory: () => void
-    onInstallDirectoryIntegration: () => void
     onUpload: () => void
     onDownload: (path: string) => void
   }) => (
     <div data-testid="file-panel" data-drop-target-id={dropTargetId} data-show-hidden={String(showHiddenFiles)} data-default-view={defaultView}>
       {actionError ? <div role="alert">{actionError}</div> : null}
       <button type="button" onClick={onSyncCurrentDirectory}>同步当前目录</button>
-      <button type="button" onClick={onInstallDirectoryIntegration}>安装自动跟随脚本</button>
       <button type="button" disabled={transferActionPending !== null && transferActionPending !== undefined} onClick={onUpload}>upload</button>
       <button type="button" disabled={transferActionPending !== null && transferActionPending !== undefined} onClick={() => onDownload('/remote/app.log')}>download</button>
     </div>
@@ -75,7 +70,6 @@ vi.mock('@/hooks/useFileTransfer', () => ({
 vi.mock('@/hooks/useSFTPSettings', () => ({ useSFTPSettings: vi.fn() }))
 vi.mock('@/hooks/SessionWorkspaceContext', () => ({ useSessionWorkspace: () => ({ reconnect: vi.fn(async () => {}) }) }))
 vi.mock('@/lib/wails', () => ({
-  FileService: { InstallTerminalDirectoryIntegration: fileService.installTerminalDirectoryIntegration },
   TerminalService: { Write: terminalService.write },
 }))
 
@@ -93,8 +87,6 @@ describe('TerminalLayers SFTP isolation', () => {
     runtime.saveFile.mockReset()
     runtime.onFilesDropped.mockReset()
     runtime.onFilesDropped.mockImplementation(() => vi.fn())
-    fileService.installTerminalDirectoryIntegration.mockReset()
-    fileService.installTerminalDirectoryIntegration.mockResolvedValue(['/home/test/.bashrc', '/home/test/.zshrc'])
     useSFTPSettingsStore.setState({ showHiddenFiles: false, followTerminalDirectory: false, defaultView: 'list' })
     useTerminalDirectoryStore.setState({ directories: {}, revisions: {} })
     terminalService.write.mockImplementation(async (terminalID: string, _data: string) => {
@@ -139,27 +131,13 @@ describe('TerminalLayers SFTP isolation', () => {
     await waitFor(() => expect(transfer.listFiles).toHaveBeenCalledWith('/manual-sync'))
   })
 
-  it('installs OSC 7 shell integration for the selected session', async () => {
+  it('does not expose manual OSC 7 shell integration installation', async () => {
     render(<TerminalLayers />)
     const terminalA = (await screen.findByTestId('terminal-term-a')).closest('[data-layer-id="terminal-a"]') as HTMLElement
     fireEvent.click(within(terminalA).getByRole('button', { name: 'files' }))
 
-    fireEvent.click(await within(terminalA).findByRole('button', { name: '安装自动跟随脚本' }))
-
-    await waitFor(() => expect(fileService.installTerminalDirectoryIntegration).toHaveBeenCalledWith(1))
-    expect(notify).toHaveBeenCalledWith('已安装自动跟随脚本: /home/test/.bashrc, /home/test/.zshrc', 'success')
-  })
-
-  it('surfaces OSC 7 shell integration installation failures on the file panel', async () => {
-    fileService.installTerminalDirectoryIntegration.mockRejectedValueOnce(new Error('permission denied'))
-    render(<TerminalLayers />)
-    const terminalA = (await screen.findByTestId('terminal-term-a')).closest('[data-layer-id="terminal-a"]') as HTMLElement
-    fireEvent.click(within(terminalA).getByRole('button', { name: 'files' }))
-
-    fireEvent.click(await within(terminalA).findByRole('button', { name: '安装自动跟随脚本' }))
-
-    expect(await within(terminalA).findByRole('alert')).toHaveTextContent('安装自动跟随脚本失败: permission denied')
-    expect(notify).not.toHaveBeenCalledWith(expect.stringContaining('安装自动跟随脚本失败'), 'error')
+    expect(await within(terminalA).findByTestId('file-panel')).toBeInTheDocument()
+    expect(within(terminalA).queryByRole('button', { name: '安装自动跟随脚本' })).not.toBeInTheDocument()
   })
 
   it('retains independent panels and drop targets for terminals from the same session', async () => {
