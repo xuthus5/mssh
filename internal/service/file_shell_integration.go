@@ -7,6 +7,7 @@ import (
 	"os"
 	"path"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/pkg/sftp"
@@ -114,6 +115,10 @@ func installTerminalDirectoryIntegrationForWrapper(
 	if err != nil {
 		return "", false, fmt.Errorf("install terminal directory integration: %w", err)
 	}
+	// The wrapper passed here is a dedicated integration connection, but clear
+	// the deadline defensively so a shared connection can never be left with a
+	// lingering transport timeout.
+	defer func() { _ = wrapper.SetDeadline(time.Time{}) }()
 	client, err := ssh.OpenSFTP(wrapper)
 	if err != nil {
 		return "", false, sftpMetadataError("install terminal directory integration", deadline, err)
