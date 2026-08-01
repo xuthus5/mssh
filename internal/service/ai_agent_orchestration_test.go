@@ -207,6 +207,58 @@ func TestStartAndResumeAIAgentTaskPersistConnectionFailure(t *testing.T) {
 	service.removeAIAgentExecution(started.ID)
 }
 
+func TestRetryAgentTaskClonesFailedTaskParameters(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	session, err := store.CreateSession(db, model.Session{
+		Name: "unreachable", Host: "127.0.0.1", Port: 1, Username: "root",
+		AuthMethod: model.AuthPassword, KeepAlive: 1,
+	})
+	require.NoError(t, err)
+	bus := &threadSafeAIAgentBus{}
+	sessions := NewSessionService(db, bus, 1, t.TempDir(), nil, testutil.NewTestLogger())
+	service := NewAIService(db, nil, nil, testutil.NewTestLogger(), WithAIAgentRuntime(sessions, bus))
+	t.Cleanup(service.Shutdown)
+
+	started, err := service.StartAgentTask(model.AIAgentTaskInput{SessionID: session.ID, Prompt: "inspect disk"})
+	require.NoError(t, err)
+	waitForAIAgentStatus(t, service, started.ID, model.AIAgentTaskFailed)
+	require.Eventually(t, func() bool { return service.agentExecution(started.ID) == nil }, 3*time.Second, 10*time.Millisecond)
+
+	retried, err := service.RetryAgentTask(started.ID)
+	require.NoError(t, err)
+	assert.NotEqual(t, started.ID, retried.ID)
+	assert.Equal(t, session.ID, retried.SessionID)
+	assert.Equal(t, "inspect disk", retried.Prompt)
+	assert.Equal(t, model.AIAgentEngineNative, retried.Engine)
+	assert.Equal(t, model.AIAgentTaskRunning, retried.Status)
+	waitForAIAgentStatus(t, service, retried.ID, model.AIAgentTaskFailed)
+}
+
+func TestRetryAgentTaskRejectsNonFailedOrMissingTasks(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	session, err := store.CreateSession(db, model.Session{
+		Name: "unreachable", Host: "127.0.0.1", Port: 1, Username: "root",
+		AuthMethod: model.AuthPassword, KeepAlive: 1,
+	})
+	require.NoError(t, err)
+	bus := &threadSafeAIAgentBus{}
+	sessions := NewSessionService(db, bus, 1, t.TempDir(), nil, testutil.NewTestLogger())
+	service := NewAIService(db, nil, nil, testutil.NewTestLogger(), WithAIAgentRuntime(sessions, bus))
+	t.Cleanup(service.Shutdown)
+
+	completed, err := store.CreateAIAgentTask(db, model.AIAgentTaskInput{SessionID: session.ID, Prompt: "done"}, model.AIAgentEngineNative, "")
+	require.NoError(t, err)
+	require.NoError(t, store.UpdateAIAgentTaskStatus(db, completed.ID, model.AIAgentTaskCompleted, "ok", ""))
+	_, err = service.RetryAgentTask(completed.ID)
+	assert.ErrorContains(t, err, "cannot be retried")
+
+	_, err = service.RetryAgentTask(completed.ID + 1000)
+	assert.ErrorContains(t, err, "not found")
+
+	_, err = service.RetryAgentTask(0)
+	assert.ErrorContains(t, err, "invalid AI agent task id")
+}
+
 func waitForAIAgentStatus(t *testing.T, service *AIService, taskID int64, status model.AIAgentTaskStatus) {
 	t.Helper()
 	require.Eventually(t, func() bool {

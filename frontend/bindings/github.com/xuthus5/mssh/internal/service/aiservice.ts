@@ -94,6 +94,16 @@ export function ResumeAgentTask(taskID: number): $CancellablePromise<model$0.AIA
     });
 }
 
+/**
+ * RetryAgentTask creates and starts a new task from a failed task's original
+ * execution parameters (session, prompt, engine and CLI).
+ */
+export function RetryAgentTask(taskID: number): $CancellablePromise<model$0.AIAgentTask | null> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.AIService.RetryAgentTask", taskID).then(($result: any) => {
+        return $$createType5($result);
+    });
+}
+
 export function SaveProvider(input: model$0.AIProviderProfileInput): $CancellablePromise<model$0.AIProviderProfile | null> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.AIService.SaveProvider", input).then(($result: any) => {
         return $$createType13($result);
