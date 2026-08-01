@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"strings"
 
 	"github.com/xuthus5/mssh/internal/fsutil"
 	"github.com/xuthus5/mssh/internal/model"
@@ -90,8 +91,7 @@ func validateModelsDevCachedProvider(provider model.ModelsDevProvider) error {
 	if provider.Provider != model.AIProviderOpenAICompatible && provider.Provider != model.AIProviderAnthropic && provider.Provider != model.AIProviderGemini {
 		return fmt.Errorf("catalog provider %s uses an unsupported protocol", provider.ID)
 	}
-	endpoint, err := url.Parse(provider.BaseURL)
-	if err != nil || endpoint.Scheme != "https" || endpoint.Host == "" {
+	if !isValidModelsDevBaseURL(provider.BaseURL) {
 		return fmt.Errorf("catalog provider %s has an invalid base URL", provider.ID)
 	}
 	for _, catalogModel := range provider.Models {
@@ -100,4 +100,17 @@ func validateModelsDevCachedProvider(provider model.ModelsDevProvider) error {
 		}
 	}
 	return nil
+}
+
+// isValidModelsDevBaseURL mirrors the app's provider URL policy
+// (validateProviderURL): HTTP and HTTPS are both accepted, credentials are
+// rejected, and a host is required. Local providers such as Atomic Chat and
+// Ollama legitimately use http://127.0.0.1 endpoints.
+func isValidModelsDevBaseURL(raw string) bool {
+	endpoint, err := url.Parse(raw)
+	if err != nil || endpoint.User != nil {
+		return false
+	}
+	scheme := strings.ToLower(endpoint.Scheme)
+	return (scheme == "http" || scheme == "https") && endpoint.Host != ""
 }
