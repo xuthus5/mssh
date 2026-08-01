@@ -186,14 +186,17 @@ func TestBuildModelsDevCatalogFallbacksAndValidation(t *testing.T) {
 		},
 		"missing-name": {NPM: "@ai-sdk/openai-compatible", API: "https://example.com/v1"},
 		"empty":        {ID: "empty", Name: "Empty", NPM: "@ai-sdk/openai-compatible", API: "https://empty.example/v1"},
+		"invalid-url":  {ID: "invalid-url", Name: "Invalid URL", NPM: "@ai-sdk/openai-compatible", API: "http://", Models: map[string]modelsDevModelPayload{"model": modelsDevTextModel("", "Model")}},
+		"local":        {ID: "local", Name: "Local", NPM: "@ai-sdk/openai-compatible", API: "http://127.0.0.1:1337/v1/", Models: map[string]modelsDevModelPayload{"model": modelsDevTextModel("", "Model")}},
 	}
 	catalog := buildModelsDevCatalog(payload, time.Unix(1, 0))
-	require.Len(t, catalog.Providers, 1)
-	provider := catalog.Providers[0]
-	assert.Equal(t, "compatible", provider.ID)
-	assert.Equal(t, "https://example.com/v1", provider.BaseURL)
-	require.Len(t, provider.Models, 2)
-	assert.Equal(t, []string{"a-model", "z-model"}, []string{provider.Models[0].ID, provider.Models[1].ID})
+	require.Equal(t, []string{"compatible", "local"}, catalogProviderIDs(catalog))
+	compatible := catalogProvider(t, catalog, "compatible")
+	assert.Equal(t, "https://example.com/v1", compatible.BaseURL)
+	require.Len(t, compatible.Models, 2)
+	assert.Equal(t, []string{"a-model", "z-model"}, []string{compatible.Models[0].ID, compatible.Models[1].ID})
+	local := catalogProvider(t, catalog, "local")
+	assert.Equal(t, "http://127.0.0.1:1337/v1", local.BaseURL)
 }
 
 func TestBuildModelsDevModelValidation(t *testing.T) {

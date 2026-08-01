@@ -46,7 +46,9 @@ func TestValidateModelsDevCatalogCacheErrors(t *testing.T) {
 		{name: "metadata", mutate: func(catalog *model.ModelsDevCatalog) { catalog.CachedAt = time.Time{} }, match: "metadata"},
 		{name: "provider incomplete", mutate: func(catalog *model.ModelsDevCatalog) { catalog.Providers[0].Name = "" }, match: "incomplete"},
 		{name: "protocol", mutate: func(catalog *model.ModelsDevCatalog) { catalog.Providers[0].Provider = model.AIProviderOllama }, match: "unsupported protocol"},
-		{name: "base URL", mutate: func(catalog *model.ModelsDevCatalog) { catalog.Providers[0].BaseURL = "http://example.com" }, match: "invalid base URL"},
+		{name: "base URL scheme", mutate: func(catalog *model.ModelsDevCatalog) { catalog.Providers[0].BaseURL = "ftp://example.com" }, match: "invalid base URL"},
+		{name: "base URL host", mutate: func(catalog *model.ModelsDevCatalog) { catalog.Providers[0].BaseURL = "http://" }, match: "invalid base URL"},
+		{name: "base URL credentials", mutate: func(catalog *model.ModelsDevCatalog) { catalog.Providers[0].BaseURL = "https://user:pass@example.com" }, match: "invalid base URL"},
 		{name: "model", mutate: func(catalog *model.ModelsDevCatalog) { catalog.Providers[0].Models[0].ID = "" }, match: "invalid model"},
 		{name: "model count", mutate: addExcessModels, match: "too many models"},
 	}
@@ -57,6 +59,15 @@ func TestValidateModelsDevCatalogCacheErrors(t *testing.T) {
 			assert.ErrorContains(t, validateModelsDevCatalogCache(catalog), test.match)
 		})
 	}
+}
+
+func TestValidateModelsDevCatalogCacheAcceptsLocalHTTPProvider(t *testing.T) {
+	catalog := validModelsDevCacheCatalog()
+	catalog.Providers[0] = model.ModelsDevProvider{
+		ID: "atomic-chat", Name: "Atomic Chat", Provider: model.AIProviderOpenAICompatible,
+		BaseURL: "http://127.0.0.1:1337/v1", Models: []model.ModelsDevModel{{ID: "model", Name: "Model"}},
+	}
+	require.NoError(t, validateModelsDevCatalogCache(catalog))
 }
 
 func validModelsDevCacheCatalog() model.ModelsDevCatalog {
