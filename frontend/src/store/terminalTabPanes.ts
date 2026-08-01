@@ -17,20 +17,22 @@ export function rewriteSplitPaneIDs(
 
 /** Drop pool/status/recording entries for closed terminal IDs. */
 export function scrubTerminalRuntime(
-  state: Pick<AppState, 'terminalPool' | 'connectionStatus' | 'recordingState' | 'activePaneId' | 'terminalOpenReservations'>,
+  state: Pick<AppState, 'terminalPool' | 'connectionStatus' | 'connectionErrors' | 'recordingState' | 'activePaneId' | 'terminalOpenReservations'>,
   terminalIDs: string[],
-): Pick<AppState, 'terminalPool' | 'connectionStatus' | 'recordingState' | 'activePaneId' | 'terminalOpenReservations'> {
+): Pick<AppState, 'terminalPool' | 'connectionStatus' | 'connectionErrors' | 'recordingState' | 'activePaneId' | 'terminalOpenReservations'> {
   const terminalPool = new Map(state.terminalPool)
   const connectionStatus = { ...state.connectionStatus }
+  const connectionErrors = { ...state.connectionErrors }
   const recordingState = { ...state.recordingState }
   const terminalOpenReservations = new Set(state.terminalOpenReservations ?? [])
   let activePaneId = state.activePaneId
   for (const terminalID of terminalIDs) {
     terminalPool.delete(terminalID)
     delete connectionStatus[terminalID]
+    delete connectionErrors[terminalID]
     delete recordingState[terminalID]
     terminalOpenReservations.delete(terminalID)
     if (activePaneId === terminalID) activePaneId = null
   }
-  return { terminalPool, connectionStatus, recordingState, activePaneId, terminalOpenReservations }
+  return { terminalPool, connectionStatus, connectionErrors, recordingState, activePaneId, terminalOpenReservations }
 }

@@ -111,6 +111,7 @@ describe('useTerminal backend failures', () => {
     const wrapper = ({ children }: { children: ReactNode }) => <>{boundary({ children })}<ToastContainer /></>
     renderHook(() => useTerminal('term-attach', containerRef, { active: false, focusRequest: { sequence: 0 } }), { wrapper })
     await waitFor(() => expect(useAppStore.getState().connectionStatus['term-attach']).toBe('error'))
+    expect(useAppStore.getState().connectionErrors['term-attach']).toBe('attach failed')
     expect(useToastStore.getState().toasts).toHaveLength(0)
     expect(screen.queryByText(/终端挂载失败/)).not.toBeInTheDocument()
   })
