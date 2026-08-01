@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { RotateCcw, SquareTerminal } from 'lucide-react'
-import { AutoSaveStatusIndicator } from '@/components/settings/AutoSaveStatus'
 import { useAutoSave } from '@/hooks/useAutoSave'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
@@ -61,6 +60,7 @@ export function ThemeEditor({ profiles, assignments, globalStyle, colorMode, onS
     enabled: valid && !state.resetting,
     isReady: ready,
     delayMs: 500,
+    notify: true,
   })
   if (!activeProfile || !activeTheme) return <p className="text-sm text-muted-foreground">{t('终端主题配置不可用，请重新加载设置。')}</p>
   const actions = themeEditorActions(state, activeProfileID, colorMode)
@@ -71,7 +71,7 @@ export function ThemeEditor({ profiles, assignments, globalStyle, colorMode, onS
   const sharedLabels = !state.draftAssignments.follow_interface_mode ? fixedProfileSharing(state.draftAssignments) : []
 
   return <div className="flex flex-col gap-5 pb-2 pt-2">
-    <div className="flex items-start justify-between gap-4"><div><h2 className="text-lg font-semibold text-foreground">{t('终端主题')}</h2><p className="text-sm text-muted-foreground">{t('选择终端是否跟随应用模式，或固定使用一个独立主题。')}</p></div><div className="flex items-center gap-3"><AutoSaveStatusIndicator status={valid ? autoSave.status : 'idle'} error={autoSave.error} /><BuiltinThemeResetControl canReset={canReset} dirty={state.dirty} saving={autoSave.status === 'saving'} resetting={state.resetting} includesFixed={!assignments.follow_interface_mode} targetKey={themeResetTargetKey(assignments)} onResettingChange={state.setResetting} onReset={onResetBuiltins} /></div></div>
+    <div className="flex items-start justify-between gap-4"><div><h2 className="text-lg font-semibold text-foreground">{t('终端主题')}</h2><p className="text-sm text-muted-foreground">{t('选择终端是否跟随应用模式，或固定使用一个独立主题。')}</p></div><div className="flex items-center gap-3"><BuiltinThemeResetControl canReset={canReset} dirty={state.dirty} saving={autoSave.status === 'saving'} resetting={state.resetting} includesFixed={!assignments.follow_interface_mode} targetKey={themeResetTargetKey(assignments)} onResettingChange={state.setResetting} onReset={onResetBuiltins} /></div></div>
     {!valid && state.dirty && <Alert variant="destructive"><AlertDescription>{t('当前主题配置无效，自动保存已暂停，请修正颜色或字体后继续。')}</AlertDescription></Alert>}
     <ThemeStrategyCard assignments={state.draftAssignments} busy={busy} onFollowChange={actions.setFollowInterfaceMode} />
     <TerminalGlobalStyleEditor style={state.draftGlobalStyle} disabled={busy} onChange={actions.updateGlobalStyle} />
