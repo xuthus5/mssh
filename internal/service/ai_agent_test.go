@@ -120,8 +120,10 @@ func TestCodexAIAgentCommandUsesScopedOverridesAndTokenEnv(t *testing.T) {
 	binDir := t.TempDir()
 	installAIAgentTestLauncher(t, binDir, "codex", "TestAIAgentCLIProcessHelper")
 	setAIAgentTestPath(t, binDir)
+	codexHome := t.TempDir()
+	writeTestCodexModelCatalog(t, codexHome, true)
 	workDir := t.TempDir()
-	command, err := (codexAIAgentAdapter{}).Command(workDir, "http://127.0.0.1:9/mcp", "private-token", "prompt")
+	command, err := (codexAIAgentAdapter{codexHome: codexHome}).Command(workDir, "http://127.0.0.1:9/mcp", "private-token", "prompt")
 	require.NoError(t, err)
 	assert.Equal(t, workDir, command.Dir)
 	assert.NotContains(t, strings.Join(command.Args, "\x00"), "private-token")
@@ -131,6 +133,7 @@ func TestCodexAIAgentCommandUsesScopedOverridesAndTokenEnv(t *testing.T) {
 	assert.Contains(t, joined, `approval_policy="never"`)
 	assert.Contains(t, joined, "features.plugins=false")
 	assert.Contains(t, joined, "enabled_tools=")
+	assert.Contains(t, joined, "model_catalog_json=")
 	assert.Equal(t, "-", command.Args[len(command.Args)-1])
 	expectedSandbox := "read-only"
 	if runtime.GOOS == "windows" {
@@ -141,6 +144,146 @@ func TestCodexAIAgentCommandUsesScopedOverridesAndTokenEnv(t *testing.T) {
 	data, err := io.ReadAll(command.Stdin)
 	require.NoError(t, err)
 	assert.Equal(t, "prompt", string(data))
+}
+
+func TestCodexAIAgentCommandSkipsModelCatalogOverrideWhenAbsent(t *testing.T) {
+	binDir := t.TempDir()
+	installAIAgentTestLauncher(t, binDir, "codex", "TestAIAgentCLIProcessHelper")
+	setAIAgentTestPath(t, binDir)
+	command, err := (codexAIAgentAdapter{codexHome: t.TempDir()}).Command(t.TempDir(), "http://127.0.0.1:9/mcp", "private-token", "prompt")
+	require.NoError(t, err)
+	assert.NotContains(t, strings.Join(command.Args, "\x00"), "model_catalog_json=")
+}
+
+func TestCodexAIAgentCommandUsesCODEXHomeEnv(t *testing.T) {
+	binDir := t.TempDir()
+	installAIAgentTestLauncher(t, binDir, "codex", "TestAIAgentCLIProcessHelper")
+	setAIAgentTestPath(t, binDir)
+	codexHome := t.TempDir()
+	writeTestCodexModelCatalog(t, codexHome, true)
+	t.Setenv("CODEX_HOME", codexHome)
+	command, err := (codexAIAgentAdapter{}).Command(t.TempDir(), "http://127.0.0.1:9/mcp", "private-token", "prompt")
+	require.NoError(t, err)
+	assert.Contains(t, strings.Join(command.Args, "\x00"), "model_catalog_json=")
+}
+
+func TestPrepareCodexModelCatalogForMCPDisablesSearchTool(t *testing.T) {
+	codexHome := t.TempDir()
+	writeTestCodexModelCatalog(t, codexHome, true)
+	path, err := prepareCodexModelCatalogForMCP(t.TempDir(), codexHome)
+	require.NoError(t, err)
+	require.NotEmpty(t, path)
+	info, err := os.Stat(path)
+	require.NoError(t, err)
+	assert.Equal(t, os.FileMode(0o600), info.Mode().Perm())
+	data, err := os.ReadFile(path)
+	require.NoError(t, err)
+	var catalog map[string]any
+	require.NoError(t, json.Unmarshal(data, &catalog))
+	models, ok := catalog["models"].([]any)
+	require.True(t, ok)
+	require.Len(t, models, 3)
+	first, ok := models[0].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, false, first["supports_search_tool"])
+	assert.Equal(t, float64(1048576), first["context_window"])
+	second, ok := models[1].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, false, second["supports_search_tool"])
+}
+
+func TestPrepareCodexModelCatalogForMCPHonorsConfigPath(t *testing.T) {
+	codexHome := t.TempDir()
+	custom := filepath.Join(t.TempDir(), "custom-catalog.json")
+	writeTestCodexModelCatalogAt(t, custom, true)
+	config := "model = \"deepseek-v4-flash\"\nmodel_catalog_json = \"" + custom + "\"\n"
+	require.NoError(t, os.WriteFile(filepath.Join(codexHome, "config.toml"), []byte(config), 0o600))
+	path, err := prepareCodexModelCatalogForMCP(t.TempDir(), codexHome)
+	require.NoError(t, err)
+	assert.NotEmpty(t, path)
+	data, err := os.ReadFile(path)
+	require.NoError(t, err)
+	assert.Contains(t, string(data), "supports_search_tool")
+}
+
+func TestPrepareCodexModelCatalogForMCPIgnoresMissingCatalog(t *testing.T) {
+	path, err := prepareCodexModelCatalogForMCP(t.TempDir(), t.TempDir())
+	require.NoError(t, err)
+	assert.Empty(t, path)
+}
+
+func TestPrepareCodexModelCatalogForMCPIgnoresInvalidJSON(t *testing.T) {
+	codexHome := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(codexHome, "models.json"), []byte("not-json"), 0o600))
+	path, err := prepareCodexModelCatalogForMCP(t.TempDir(), codexHome)
+	require.NoError(t, err)
+	assert.Empty(t, path)
+}
+
+func TestPrepareCodexModelCatalogForMCPIgnoresMalformedModels(t *testing.T) {
+	codexHome := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(codexHome, "models.json"), []byte(`{"models":{"slug":"x"}}`), 0o600))
+	path, err := prepareCodexModelCatalogForMCP(t.TempDir(), codexHome)
+	require.NoError(t, err)
+	assert.Empty(t, path)
+}
+
+func TestPrepareCodexModelCatalogForMCPSkipsWhenSearchToolDisabled(t *testing.T) {
+	codexHome := t.TempDir()
+	writeTestCodexModelCatalog(t, codexHome, false)
+	path, err := prepareCodexModelCatalogForMCP(t.TempDir(), codexHome)
+	require.NoError(t, err)
+	assert.Empty(t, path)
+}
+
+func TestCodexModelCatalogPathFromConfig(t *testing.T) {
+	codexHome := t.TempDir()
+	assert.Empty(t, codexModelCatalogPathFromConfig(codexHome))
+	tests := []struct {
+		name   string
+		config string
+		want   string
+	}{
+		{name: "double quoted", config: "model_catalog_json = \"C:/x/models.json\"\n", want: "C:/x/models.json"},
+		{name: "single quoted", config: "model_catalog_json = 'C:/x/models.json'\n", want: "C:/x/models.json"},
+		{name: "not a string", config: "model_catalog_json = 123\n", want: ""},
+		{name: "empty value", config: "model_catalog_json =\n", want: ""},
+		{name: "unterminated string", config: "model_catalog_json = \"C:/x\n", want: ""},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			home := t.TempDir()
+			require.NoError(t, os.WriteFile(filepath.Join(home, "config.toml"), []byte(test.config), 0o600))
+			assert.Equal(t, test.want, codexModelCatalogPathFromConfig(home))
+		})
+	}
+}
+
+func writeTestCodexModelCatalog(t *testing.T, codexHome string, searchEnabled bool) {
+	t.Helper()
+	writeTestCodexModelCatalogAt(t, filepath.Join(codexHome, "models.json"), searchEnabled)
+}
+
+func writeTestCodexModelCatalogAt(t *testing.T, path string, searchEnabled bool) {
+	t.Helper()
+	catalog := map[string]any{
+		"models": []any{
+			map[string]any{
+				"slug":                 "deepseek-v4-flash",
+				"supports_search_tool": searchEnabled,
+				"context_window":       1048576,
+				"base_instructions":    "test",
+			},
+			map[string]any{
+				"slug":                 "plain-model",
+				"supports_search_tool": false,
+			},
+			"not-a-model",
+		},
+	}
+	data, err := json.Marshal(catalog)
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(path, data, 0o600))
 }
 
 func TestCodexAIAgentEventsRejectLocalTools(t *testing.T) {
