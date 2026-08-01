@@ -311,23 +311,40 @@ describe('persistent content layers', () => {
     expect(originalTerminal.paste).not.toHaveBeenCalled()
     expect(replacementTerminal.paste).not.toHaveBeenCalled()
   })
-  it('opens session search globally while preserving ordinary form input', () => {
+  it('opens session search with Mod+S globally while preserving ordinary form input', () => {
     const openSearch = vi.fn()
     window.addEventListener('mssh:open-session-search', openSearch)
     render(<App />)
-    expect(fireEvent.keyDown(document.body, { key: 'f', ctrlKey: true })).toBe(false)
+    expect(fireEvent.keyDown(document.body, { key: 's', ctrlKey: true })).toBe(false)
     const terminalInput = document.createElement('textarea')
     terminalInput.className = 'xterm-helper-textarea'
     document.body.append(terminalInput)
-    expect(fireEvent.keyDown(terminalInput, { key: 'f', ctrlKey: true })).toBe(false)
+    expect(fireEvent.keyDown(terminalInput, { key: 's', ctrlKey: true })).toBe(false)
     const ordinaryInput = document.createElement('input')
     document.body.append(ordinaryInput)
-    expect(fireEvent.keyDown(ordinaryInput, { key: 'f', ctrlKey: true })).toBe(true)
-    expect(fireEvent.keyDown(document.body, { key: 'f', metaKey: true })).toBe(false)
+    expect(fireEvent.keyDown(ordinaryInput, { key: 's', ctrlKey: true })).toBe(true)
+    expect(fireEvent.keyDown(document.body, { key: 's', metaKey: true })).toBe(false)
     expect(openSearch).toHaveBeenCalledTimes(3)
     terminalInput.remove()
     ordinaryInput.remove()
     window.removeEventListener('mssh:open-session-search', openSearch)
+  })
+  it('routes Mod+F to terminal search only when a terminal tab is active', () => {
+    const toggleSearch = vi.fn()
+    window.addEventListener('mssh:toggle-terminal-search', toggleSearch)
+    useAppStore.setState({
+      tabs: [{ id: 'terminal-1', title: 'Terminal', type: 'terminal', terminalId: 'term-1', sessionId: 1 }],
+      activeSurface: { type: 'terminal', id: 'terminal-1' },
+      terminalPool: new Map([['term-1', { terminal: { getSelection: vi.fn(), paste: vi.fn(), clear: vi.fn(), focus: vi.fn() } as never, lastUsed: 0 }]]),
+    })
+    render(<App />)
+    expect(fireEvent.keyDown(document.body, { key: 'f', ctrlKey: true })).toBe(false)
+    expect(toggleSearch).toHaveBeenCalledTimes(1)
+
+    useAppStore.setState({ activeSurface: { type: 'workspace', id: 'sessions' } })
+    expect(fireEvent.keyDown(document.body, { key: 'f', ctrlKey: true })).toBe(true)
+    expect(toggleSearch).toHaveBeenCalledTimes(1)
+    window.removeEventListener('mssh:toggle-terminal-search', toggleSearch)
   })
   it('blocks Ctrl+W for a connected active terminal', async () => {
     const closeTab = vi.fn(async () => {})

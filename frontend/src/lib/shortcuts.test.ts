@@ -40,6 +40,26 @@ describe('shortcuts', () => {
     expect(bindings['new-session']).toEqual({ ctrl: true, meta: false, alt: false, shift: true, key: 's' })
     expect(bindings['close-tab']).toBeNull()
     expect(bindings['copy-selection']).toEqual(defaultShortcutBindings()['copy-selection'])
+    expect(bindings['terminal-search']).toEqual({ ctrl: true, meta: false, alt: false, shift: false, key: 'f' })
+  })
+
+  it('migrates legacy quick-search Ctrl+F bindings to the split shortcuts', () => {
+    const bindings = normalizeShortcutBindings({
+      'quick-search': 'Mod+F',
+      'new-session': 'Mod+N',
+    })
+    expect(bindings['quick-search']).toEqual({ ctrl: true, meta: false, alt: false, shift: false, key: 's' })
+    expect(bindings['terminal-search']).toEqual({ ctrl: true, meta: false, alt: false, shift: false, key: 'f' })
+    expect(bindings['new-session']).toEqual({ ctrl: true, meta: false, alt: false, shift: false, key: 'n' })
+  })
+
+  it('keeps an explicit Ctrl+F quick-search binding once terminal-search is persisted', () => {
+    const bindings = normalizeShortcutBindings({
+      'quick-search': 'Mod+F',
+      'terminal-search': 'Mod+Shift+F',
+    })
+    expect(bindings['quick-search']).toEqual({ ctrl: true, meta: false, alt: false, shift: false, key: 'f' })
+    expect(bindings['terminal-search']).toEqual({ ctrl: true, meta: false, alt: false, shift: true, key: 'f' })
   })
 
   it('detects conflicts between two actions', () => {
@@ -51,7 +71,8 @@ describe('shortcuts', () => {
 
   it('matches action ids from events', () => {
     const bindings = defaultShortcutBindings()
-    expect(matchShortcutAction({ key: 'f', ctrlKey: true, metaKey: false, altKey: false, shiftKey: false }, bindings)).toBe('quick-search')
+    expect(matchShortcutAction({ key: 's', ctrlKey: true, metaKey: false, altKey: false, shiftKey: false }, bindings)).toBe('quick-search')
+    expect(matchShortcutAction({ key: 'f', ctrlKey: true, metaKey: false, altKey: false, shiftKey: false }, bindings)).toBe('terminal-search')
     expect(matchShortcutAction({ key: 'c', ctrlKey: true, metaKey: false, altKey: false, shiftKey: true }, bindings)).toBe('copy-selection')
   })
 
@@ -65,6 +86,8 @@ describe('shortcuts', () => {
   it('serializes bindings for persistence', () => {
     const payload = serializeShortcutBindings(defaultShortcutBindings())
     expect(payload['new-session']).toBe('Mod+N')
+    expect(payload['quick-search']).toBe('Mod+S')
+    expect(payload['terminal-search']).toBe('Mod+F')
     expect(payload['copy-selection']).toBe('Mod+Shift+C')
   })
 

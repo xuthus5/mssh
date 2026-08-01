@@ -4,6 +4,7 @@ export type ShortcutActionId =
   | 'new-local-terminal'
   | 'close-tab'
   | 'quick-search'
+  | 'terminal-search'
   | 'copy-selection'
   | 'paste-clipboard'
   | 'clear-terminal'
@@ -57,6 +58,13 @@ export const SHORTCUT_DEFINITIONS: readonly ShortcutDefinition[] = [
     id: 'quick-search',
     label: '快速搜索会话',
     description: '打开会话快速搜索面板。',
+    allowInEditable: false,
+    defaultChord: { ctrl: true, meta: false, alt: false, shift: false, key: 's' },
+  },
+  {
+    id: 'terminal-search',
+    label: '终端搜索',
+    description: '打开当前终端的搜索框。',
     allowInEditable: false,
     defaultChord: { ctrl: true, meta: false, alt: false, shift: false, key: 'f' },
   },
@@ -214,10 +222,18 @@ export function detectShortcutPlatform(): 'mac' | 'other' {
   return 'other'
 }
 
+const legacyQuickSearchChord: ShortcutChord = { ctrl: true, meta: false, alt: false, shift: false, key: 'f' }
+
 export function normalizeShortcutBindings(value: unknown): ShortcutBindings {
   const defaults = defaultShortcutBindings()
   if (!value || typeof value !== 'object') return defaults
   const record = value as Record<string, unknown>
+  // One-time migration: before terminal search existed, quick-search used
+  // Ctrl+F. Terminal search now owns Ctrl+F, so move the legacy binding to
+  // Ctrl+S when the new action is not persisted yet.
+  if (!('terminal-search' in record) && chordsEqual(parseChord(record['quick-search']), legacyQuickSearchChord)) {
+    record['quick-search'] = serializeChord({ ctrl: true, meta: false, alt: false, shift: false, key: 's' })
+  }
   const next = { ...defaults }
   for (const definition of SHORTCUT_DEFINITIONS) {
     if (!(definition.id in record)) continue
