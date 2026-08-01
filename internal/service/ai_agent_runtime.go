@@ -6,15 +6,18 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/xuthus5/mssh/internal/model"
 	"github.com/xuthus5/mssh/internal/store"
+	"github.com/xuthus5/mssh/pkg/event"
 )
 
 const (
 	defaultAIAgentTaskLimit = 100
 	maxAIAgentTaskLimit     = 500
 	maxAIAgentPromptBytes   = 32 * 1024
+	agentTaskDeleteGrace    = 3 * time.Second
 )
 
 type aiAgentRuntime struct {
@@ -118,6 +121,36 @@ func (s *AIService) CancelAgentTask(taskID int64) error {
 	}
 	execution.cancel()
 	return nil
+}
+
+// DeleteAgentTask cancels an active execution (when present) and removes the
+// task together with its steps.
+func (s *AIService) DeleteAgentTask(taskID int64) error {
+	if taskID <= 0 {
+		return fmt.Errorf("invalid AI agent task id")
+	}
+	if execution := s.agentExecution(taskID); execution != nil {
+		execution.cancel()
+		s.waitForAIAgentExecutionRelease(taskID)
+	}
+	if err := store.DeleteAIAgentTask(s.db, taskID); err != nil {
+		return err
+	}
+	if s.eventBus != nil {
+		s.eventBus.Emit(event.AIAgentTaskChanged, nil)
+	}
+	return nil
+}
+
+func (s *AIService) waitForAIAgentExecutionRelease(taskID int64) {
+	deadline := time.Now().Add(agentTaskDeleteGrace)
+	for time.Now().Before(deadline) {
+		if s.agentExecution(taskID) == nil {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	s.logger.Warn("AI agent task delete wait timed out", "taskID", taskID)
 }
 
 func (s *AIService) ResumeAgentTask(taskID int64) (*model.AIAgentTask, error) {
