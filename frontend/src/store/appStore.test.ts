@@ -129,7 +129,7 @@ describe('appStore', () => {
 
     expect(useAppStore.getState()).toMatchObject({
       activeSurface: { type: 'terminal', id: 'terminal-1' },
-      focusRequest: { id: 'terminal-1', sequence: 1 },
+      focusRequest: { id: 'terminal-1', terminalId: 'term-1', sequence: 2 },
     })
   })
 
@@ -142,7 +142,7 @@ describe('appStore', () => {
     expect(useAppStore.getState()).toMatchObject({
       activeSurface: { type: 'terminal', id: 'terminal-1' },
       activePaneId: 'split-1',
-      focusRequest: { id: 'terminal-1', terminalId: 'split-1', sequence: 1 },
+      focusRequest: { id: 'terminal-1', terminalId: 'split-1', sequence: 2 },
     })
   })
 
@@ -157,7 +157,27 @@ describe('appStore', () => {
     expect(useAppStore.getState()).toMatchObject({
       activeSurface: { type: 'terminal', id: 'terminal-1' },
       activePaneId: 'split-1',
-      focusRequest: { id: 'terminal-1', terminalId: 'split-1', sequence: 2 },
+      focusRequest: { id: 'terminal-1', terminalId: 'split-1', sequence: 3 },
+    })
+  })
+
+  it('requests focus when opening a terminal tab', () => {
+    const store = useAppStore.getState()
+    store.openTab({ id: 'terminal-1', title: 'one', type: 'terminal', terminalId: 'term-1', sessionId: 1 })
+
+    expect(useAppStore.getState()).toMatchObject({
+      activeSurface: { type: 'terminal', id: 'terminal-1' },
+      focusRequest: { id: 'terminal-1', terminalId: 'term-1', sequence: 1 },
+    })
+  })
+
+  it('keeps focus unchanged when opening a playback tab', () => {
+    const store = useAppStore.getState()
+    store.openTab({ id: 'playback-1', title: 'Playback', type: 'playback', recordingPath: '/tmp/a.msshlog' })
+
+    expect(useAppStore.getState()).toMatchObject({
+      activeSurface: { type: 'playback', id: 'playback-1' },
+      focusRequest: { id: '', sequence: 0 },
     })
   })
 
