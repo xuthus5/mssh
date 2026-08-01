@@ -341,46 +341,28 @@ func TestWriteRemoteIntegrationFilePropagatesReplaceError(t *testing.T) {
 	requireNoFileHasSuffix(t, client.files, ".tmp")
 }
 
-func TestWriteRemoteIntegrationFilePropagatesFallbackRemoveAndRenameErrors(t *testing.T) {
-	tests := []struct {
-		name              string
-		prepare           func(*fakeIntegrationClient)
-		want              string
-		wantTempRemaining bool
-	}{
-		{
-			name: "remove",
-			prepare: func(client *fakeIntegrationClient) {
-				client.files["/home/deploy/.bashrc"] = fakeRemoteEntry{content: "old", mode: 0o600}
-				client.removeErr = errors.New("remove denied")
-			},
-			want:              "remove denied",
-			wantTempRemaining: true,
-		},
-		{
-			name: "rename",
-			prepare: func(client *fakeIntegrationClient) {
-				client.renameErr = errors.New("rename denied")
-			},
-			want: "rename denied",
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			client := newFakeIntegrationClient("/home/deploy")
-			client.posixRenameErr = sftp.ErrSSHFxOpUnsupported
-			tt.prepare(client)
+func TestWriteRemoteIntegrationFileFallbackRenameFailurePreservesOriginal(t *testing.T) {
+	client := newFakeIntegrationClient("/home/deploy")
+	client.posixRenameErr = sftp.ErrSSHFxOpUnsupported
+	client.renameErr = errors.New("rename denied")
+	client.files["/home/deploy/.bashrc"] = fakeRemoteEntry{content: "original", mode: 0o644}
 
-			err := writeRemoteIntegrationFile(client, "/home/deploy/.bashrc", "content", 0o600)
+	err := writeRemoteIntegrationFile(client, "/home/deploy/.bashrc", "replacement", 0o644)
 
-			require.ErrorContains(t, err, tt.want)
-			if tt.wantTempRemaining {
-				requireFileHasSuffix(t, client.files, ".tmp")
-			} else {
-				requireNoFileHasSuffix(t, client.files, ".tmp")
-			}
-		})
-	}
+	require.ErrorContains(t, err, "rename denied")
+	require.Equal(t, fakeRemoteEntry{content: "original", mode: 0o644}, client.files["/home/deploy/.bashrc"])
+	requireNoFileHasSuffix(t, client.files, ".tmp")
+}
+
+func TestWriteRemoteIntegrationFilePropagatesTempChmodError(t *testing.T) {
+	client := newFakeIntegrationClient("/home/deploy")
+	client.tempChmodErr = errors.New("temp chmod denied")
+
+	err := writeRemoteIntegrationFile(client, "/home/deploy/.bashrc", "content", 0o600)
+
+	require.ErrorContains(t, err, "temp chmod denied")
+	require.NotContains(t, client.files, "/home/deploy/.bashrc")
+	requireNoFileHasSuffix(t, client.files, ".tmp")
 }
 
 func TestWriteRemoteIntegrationFilePropagatesChmodError(t *testing.T) {
@@ -438,6 +420,7 @@ type fakeIntegrationClient struct {
 	renameErr      error
 	removeErr      error
 	tempOpenErr    error
+	tempChmodErr   error
 	readOpenErr    error
 	readErr        error
 	writeErr       error
@@ -487,6 +470,7 @@ func (c *fakeIntegrationClient) OpenFile(remotePath string, flags int) (terminal
 	if c.tempOpenErr != nil && strings.HasSuffix(remotePath, ".tmp") {
 		return nil, c.tempOpenErr
 	}
+	c.files[remotePath] = fakeRemoteEntry{mode: 0o666}
 	return &fakeIntegrationFile{
 		writeErr: c.writeErr,
 		closeErr: c.closeErr,
@@ -511,7 +495,11 @@ func (c *fakeIntegrationClient) Rename(oldPath, newPath string) error {
 }
 
 func (c *fakeIntegrationClient) Chmod(remotePath string, mode os.FileMode) error {
-	if c.chmodErr != nil {
+	if strings.HasSuffix(remotePath, ".tmp") {
+		if c.tempChmodErr != nil {
+			return c.tempChmodErr
+		}
+	} else if c.chmodErr != nil {
 		return c.chmodErr
 	}
 	entry, ok := c.files[remotePath]
@@ -607,14 +595,4 @@ func requireNoFileHasSuffix(t *testing.T, files map[string]fakeRemoteEntry, suff
 	for name := range files {
 		require.False(t, strings.HasSuffix(name, suffix), "temporary file %s was not removed", name)
 	}
-}
-
-func requireFileHasSuffix(t *testing.T, files map[string]fakeRemoteEntry, suffix string) {
-	t.Helper()
-	for name := range files {
-		if strings.HasSuffix(name, suffix) {
-			return
-		}
-	}
-	t.Fatalf("expected a file with suffix %s", suffix)
 }
