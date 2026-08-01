@@ -346,7 +346,13 @@ func (claudeAIAgentAdapter) Command(workDir, mcpURL, token, prompt string) (*exe
 	if err = os.WriteFile(configPath, config, 0o600); err != nil {
 		return nil, fmt.Errorf("write Claude MCP config: %w", err)
 	}
-	args := []string{"-p", "--output-format", "stream-json", "--verbose", "--safe-mode", "--no-chrome", "--setting-sources", "", "--tools", "", "--allowedTools", "mcp__mssh__*", "--disallowedTools", "Bash,Edit,Write,Read,Glob,Grep,WebFetch,WebSearch,Task,NotebookEdit", "--mcp-config", configPath, "--strict-mcp-config", "--permission-mode", "dontAsk", "--no-session-persistence", "--disable-slash-commands", prompt}
+	// Claude's argument parser drops empty-string values: --setting-sources ""
+	// then consumes the next flag and exits with status 1, and --tools ""
+	// disables every tool including MCP servers. --safe-mode also skips the
+	// --mcp-config servers entirely. Load only the user settings explicitly
+	// (the private agent work directory carries no project or local settings)
+	// and restrict tools through allow/deny lists plus dontAsk mode.
+	args := []string{"-p", "--output-format", "stream-json", "--verbose", "--no-chrome", "--setting-sources", "user", "--allowedTools", "mcp__mssh__*", "--disallowedTools", "Bash,Edit,Write,Read,Glob,Grep,WebFetch,WebSearch,Task,NotebookEdit", "--mcp-config", configPath, "--strict-mcp-config", "--permission-mode", "dontAsk", "--no-session-persistence", "--disable-slash-commands", prompt}
 	command := exec.Command(path, args...) // #nosec G204 -- path is resolved from fixed command name.
 	command.Dir = workDir
 	command.Env = append(os.Environ(), "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1")
