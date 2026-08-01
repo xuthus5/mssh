@@ -189,6 +189,11 @@ func TestAIAgentCLICommandConfiguration(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, os.FileMode(0o600), info.Mode().Perm())
 	assert.Contains(t, command.Env, "OPENCODE_CONFIG="+configPath)
+	assert.NotContains(t, strings.Join(command.Args, "\x00"), "prompt")
+	require.NotNil(t, command.Stdin)
+	stdin, err := io.ReadAll(command.Stdin)
+	require.NoError(t, err)
+	assert.Equal(t, "prompt", string(stdin))
 
 	wrapped, lifecycle, err := commandWithContext(context.Background(), command)
 	require.NoError(t, err)
