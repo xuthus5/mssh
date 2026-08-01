@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -97,9 +99,11 @@ func TestAIAgentMCPRequiresTokenAndListsScopedTools(t *testing.T) {
 }
 
 func TestAIAgentCLIAdaptersFailClosed(t *testing.T) {
-	_, err := newAIAgentCLIAdapter(model.AIAgentCLICodex)
+	_, err := newAIAgentCLIAdapter(model.AIAgentCLICodex, false)
 	assert.ErrorContains(t, err, "cannot prove local shell isolation")
-	_, err = newAIAgentCLIAdapter("unknown")
+	_, err = newAIAgentCLIAdapter(model.AIAgentCLICodex, true)
+	assert.NoError(t, err)
+	_, err = newAIAgentCLIAdapter("unknown", false)
 	assert.Error(t, err)
 }
 
@@ -107,6 +111,64 @@ func TestAIAgentDefaultAvailabilityFailsClosed(t *testing.T) {
 	assert.NoError(t, validateAIAgentDefaultAvailability(model.AIAgentSettings{DefaultEngine: model.AIAgentEngineNative, DefaultCLI: model.AIAgentCLICodex}))
 	err := validateAIAgentDefaultAvailability(model.AIAgentSettings{DefaultEngine: model.AIAgentEngineLocalCLI, DefaultCLI: model.AIAgentCLICodex})
 	assert.ErrorContains(t, err, "cannot prove local shell isolation")
+	t.Setenv("PATH", t.TempDir())
+	err = validateAIAgentDefaultAvailability(model.AIAgentSettings{DefaultEngine: model.AIAgentEngineLocalCLI, DefaultCLI: model.AIAgentCLICodex, AllowCodex: true})
+	assert.ErrorContains(t, err, "AI agent CLI codex is unavailable")
+}
+
+func TestCodexAIAgentCommandUsesScopedOverridesAndTokenEnv(t *testing.T) {
+	binDir := t.TempDir()
+	installAIAgentTestLauncher(t, binDir, "codex", "TestAIAgentCLIProcessHelper")
+	setAIAgentTestPath(t, binDir)
+	workDir := t.TempDir()
+	command, err := (codexAIAgentAdapter{}).Command(workDir, "http://127.0.0.1:9/mcp", "private-token", "prompt")
+	require.NoError(t, err)
+	assert.Equal(t, workDir, command.Dir)
+	assert.NotContains(t, strings.Join(command.Args, "\x00"), "private-token")
+	assert.Contains(t, command.Env, "MSSH_AGENT_TOKEN=private-token")
+	joined := strings.Join(command.Args, "\x00")
+	assert.Contains(t, joined, "mcp_servers.mssh.url=")
+	assert.Contains(t, joined, `approval_policy="never"`)
+	assert.Contains(t, joined, "features.plugins=false")
+	assert.Contains(t, joined, "enabled_tools=")
+	assert.Equal(t, "-", command.Args[len(command.Args)-1])
+	expectedSandbox := "read-only"
+	if runtime.GOOS == "windows" {
+		expectedSandbox = "danger-full-access"
+	}
+	assert.Contains(t, joined, `sandbox_mode="`+expectedSandbox+`"`)
+	require.NotNil(t, command.Stdin)
+	data, err := io.ReadAll(command.Stdin)
+	require.NoError(t, err)
+	assert.Equal(t, "prompt", string(data))
+}
+
+func TestCodexAIAgentEventsRejectLocalTools(t *testing.T) {
+	adapter := codexAIAgentAdapter{}
+	assert.NoError(t, adapter.ValidateEvent([]byte(`{"type":"thread.started","thread_id":"1"}`)))
+	assert.NoError(t, adapter.ValidateEvent([]byte(`{"type":"item.completed","item":{"id":"i","type":"agent_message","text":"ok"}}`)))
+	assert.NoError(t, adapter.ValidateEvent([]byte(`{"type":"item.completed","item":{"id":"i","type":"mcp_tool_call","server":"mssh","tool":"ssh.exec","status":"completed"}}`)))
+	assert.NoError(t, adapter.ValidateEvent([]byte(`{"type":"item.completed","item":{"id":"i","item_type":"mcp_tool_call","server":"mssh","tool":"task.finish"}}`)))
+	assert.ErrorContains(t, adapter.ValidateEvent([]byte(`{"type":"item.completed","item":{"id":"i","type":"command_execution","command":"bash -lc pwd"}}`)), "unavailable local tool")
+	assert.ErrorContains(t, adapter.ValidateEvent([]byte(`{"type":"item.completed","item":{"id":"i","type":"file_change"}}`)), "unavailable local tool")
+	assert.ErrorContains(t, adapter.ValidateEvent([]byte(`{"type":"item.completed","item":{"id":"i","type":"web_search"}}`)), "unavailable local tool")
+	assert.ErrorContains(t, adapter.ValidateEvent([]byte(`{"type":"item.completed","item":{"id":"i","type":"mcp_tool_call","server":"github","tool":"create_issue"}}`)), "unavailable tool")
+	assert.ErrorContains(t, adapter.ValidateEvent([]byte(`{"type":"item.completed","item":{"id":"i","type":"mcp_tool_call","server":"mssh","tool":"read"}}`)), "unavailable tool")
+	assert.ErrorContains(t, adapter.ValidateEvent([]byte(`{"type":"approval.requested","item":{"id":"i","type":"command_approval"}}`)), "approval")
+	assert.ErrorContains(t, adapter.ValidateEvent([]byte(`not-json`)), "decode Codex event")
+}
+
+func TestApplyAIAgentCLIIsolationStatusHonorsCodexOptIn(t *testing.T) {
+	status := model.AIAgentCLIStatus{Name: "Codex", Command: "codex", Installed: true, Version: "1.2.3"}
+	blocked := applyAIAgentCLIIsolationStatus(status, false)
+	assert.False(t, blocked.Installed)
+	assert.Contains(t, blocked.Error, "cannot prove local shell isolation")
+	assert.Empty(t, blocked.Version)
+	allowed := applyAIAgentCLIIsolationStatus(status, true)
+	assert.True(t, allowed.Installed)
+	assert.Empty(t, allowed.Error)
+	claude := model.AIAgentCLIStatus{Name: "Claude Code", Command: "claude", Installed: true}
+	assert.True(t, applyAIAgentCLIIsolationStatus(claude, false).Installed)
 }
 
 func TestLimitAIAgentDirectoryEntriesPreservesJSONEnvelope(t *testing.T) {

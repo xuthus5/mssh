@@ -1557,6 +1557,8 @@
   "默认 CLI": "Default CLI",
   "默认 Agent CLI": "Default Agent CLI",
   "仅允许通过任务绑定的 MSSH MCP 工具操作远程主机。": "Only the task-bound MSSH MCP tools may operate on the remote host.",
+  "允许 Codex 弱隔离运行": "Allow Codex weak isolation",
+  "Codex 无官方 MCP-only 模式，无法证明本地 Shell 隔离；开启后任务仅靠工具白名单与事件校验兜底，存在安全风险。": "Codex has no official MCP-only mode and cannot prove local shell isolation; when enabled, tasks rely only on tool allowlisting and event validation as a backstop. This carries a security risk.",
   "当前 SSH 会话": "Current SSH session",
   "对话": "Chat",
   "Agent 任务": "Agent tasks"

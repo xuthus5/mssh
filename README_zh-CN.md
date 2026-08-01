@@ -76,7 +76,7 @@ MSSH 不是集群编排平台。它聚焦已保存 SSH 会话和终端中心化�
 ### AI 任务
 
 - 使用已配置 OpenAI 兼容提供商运行原生 Agent 任务
-- 通过 MSSH MCP 桥接本地 Claude Code 或 OpenCode
+- 通过 MSSH MCP 桥接本地 Claude Code、OpenCode 或 Codex（Codex 需显式开启弱隔离选项）
 - 对修改操作进行逐步审批，高危命令硬阻断
 - 持久化任务状态，应用重启后可手动恢复
 

@@ -58,4 +58,18 @@ describe('AIAgentPanel', () => {
     view.rerender(<AIAgentPanel controller={controller} draft={{ ...draft, interaction: { ...draft.interaction, agent: { ...draft.interaction.agent, default_engine: AIAgentEngine.AIAgentEngineLocalCLI } } } as never} update={update} />)
     expect(screen.getByRole('combobox', { name: '默认 Agent CLI' })).toHaveTextContent('OpenCode · 1.0')
   })
+
+  it('toggles the Codex weak isolation switch', async () => {
+    const detectAgents = vi.fn(async () => {})
+    const update = vi.fn()
+    const controller = { agents: [{ name: 'Codex', command: 'codex', installed: true, path: '/bin/codex', version: '1.0', error: '', detected_at: '' }], pending: null, detectAgents } as never
+    const draft = { interaction: { panel_width: 420, context_lines: 80, include_session_metadata: true, include_system_summary: true, stream_responses: true, auto_scroll: true, render_markdown: true, history_retention_days: 30, max_conversations: 100, agent: { default_engine: AIAgentEngine.AIAgentEngineLocalCLI, default_cli: AIAgentCLI.AIAgentCLICodex, allow_codex: false } } }
+    render(<AIAgentPanel controller={controller} draft={draft as never} update={update} />)
+    await userEvent.click(screen.getByRole('switch', { name: '允许 Codex 弱隔离运行' }))
+    expect(update).toHaveBeenCalledWith(expect.objectContaining({
+      interaction: expect.objectContaining({
+        agent: expect.objectContaining({ allow_codex: true }),
+      }),
+    }))
+  })
 })

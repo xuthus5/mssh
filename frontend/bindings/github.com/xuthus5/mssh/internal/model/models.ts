@@ -87,6 +87,13 @@ export class AIAgentSettings {
     "default_engine": AIAgentEngine;
     "default_cli": AIAgentCLI;
 
+    /**
+     * AllowCodex opts in to running the Codex CLI in weak isolation mode.
+     * Codex cannot prove local shell isolation (no MCP-only mode), so local
+     * tool calls are only blocked after the fact by event validation.
+     */
+    "allow_codex": boolean;
+
     /** Creates a new AIAgentSettings instance. */
     constructor($$source: Partial<AIAgentSettings> = {}) {
         if (!("default_engine" in $$source)) {
@@ -94,6 +101,9 @@ export class AIAgentSettings {
         }
         if (!("default_cli" in $$source)) {
             this["default_cli"] = AIAgentCLI.$zero;
+        }
+        if (!("allow_codex" in $$source)) {
+            this["allow_codex"] = false;
         }
 
         Object.assign(this, $$source);

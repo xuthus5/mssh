@@ -76,7 +76,7 @@ MSSH is not a fleet orchestrator. It focuses on saved SSH sessions and terminal-
 ### AI tasks
 
 - Native agent tasks driven by configured OpenAI-compatible providers
-- Local CLI tasks through the MSSH MCP bridge for Claude Code or OpenCode
+- Local CLI tasks through the MSSH MCP bridge for Claude Code, OpenCode, or Codex (Codex requires an explicit weak-isolation opt-in)
 - Step-level mutation approval and hard-blocked destructive commands
 - Persistent task state with manual resume after restart
 

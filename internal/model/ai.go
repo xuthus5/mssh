@@ -81,6 +81,10 @@ const (
 type AIAgentSettings struct {
 	DefaultEngine AIAgentEngine `json:"default_engine"`
 	DefaultCLI    AIAgentCLI    `json:"default_cli"`
+	// AllowCodex opts in to running the Codex CLI in weak isolation mode.
+	// Codex cannot prove local shell isolation (no MCP-only mode), so local
+	// tool calls are only blocked after the fact by event validation.
+	AllowCodex bool `json:"allow_codex"`
 }
 
 type AIAgentTaskStatus string
