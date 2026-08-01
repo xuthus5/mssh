@@ -15,7 +15,10 @@ import (
 )
 
 func openPlatformContext(ctx context.Context, cfg resolvedConfig) (*Session, error) {
-	cmd := exec.CommandContext(ctx, cfg.Shell, cfg.Args...)
+	// 本地 shell 的生命周期长于绑定调用本身：Wails 会在方法返回后立即取消调用
+	// context，若直接绑定该 context，进程会被 exec.CommandContext 立刻 SIGKILL。
+	// WithoutCancel 保留启动期 ctx.Err() 的取消语义，但不再跟随调用结束而杀进程。
+	cmd := exec.CommandContext(context.WithoutCancel(ctx), cfg.Shell, cfg.Args...)
 	cmd.Dir = cfg.CWD
 	cmd.Env = cfg.Env
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
