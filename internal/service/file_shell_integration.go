@@ -226,6 +226,10 @@ func writeRemoteIntegrationFile(client terminalDirectoryIntegrationClient, remot
 			_ = client.Remove(tempPath)
 		}
 	}()
+	if err = client.Chmod(tempPath, 0o600); err != nil {
+		_ = tempFile.Close()
+		return fmt.Errorf("set temporary file permissions %s: %w", tempPath, err)
+	}
 	if _, err = io.WriteString(tempFile, content); err != nil {
 		_ = tempFile.Close()
 		return fmt.Errorf("write temporary file %s: %w", tempPath, err)
@@ -236,9 +240,6 @@ func writeRemoteIntegrationFile(client terminalDirectoryIntegrationClient, remot
 	if err = client.PosixRename(tempPath, remotePath); err != nil {
 		if !errors.Is(err, sftp.ErrSSHFxOpUnsupported) {
 			return fmt.Errorf("replace remote file %s: %w", remotePath, err)
-		}
-		if removeErr := client.Remove(remotePath); removeErr != nil && !isRemoteNotExist(removeErr) {
-			return fmt.Errorf("remove remote file %s: %w", remotePath, removeErr)
 		}
 		if renameErr := client.Rename(tempPath, remotePath); renameErr != nil {
 			return fmt.Errorf("rename temporary file %s: %w", remotePath, renameErr)
