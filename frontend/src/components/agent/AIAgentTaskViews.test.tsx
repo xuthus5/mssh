@@ -77,6 +77,18 @@ describe('AIAgentSessionPanel', () => {
     await userEvent.click(screen.getByRole('button', { name: '恢复' }))
     expect(resume).toHaveBeenCalledWith(1)
   })
+
+  it('shows prominent approve and reject actions for a task awaiting approval', async () => {
+    const approve = vi.fn(async () => undefined)
+    const tasks = [createTask({ status: AIAgentTaskStatus.AIAgentTaskWaitingApproval, steps: [{ id: 4, task_id: 1, sequence: 1, kind: 'tool', model_output: 'write config', tool_name: 'ssh.write_file', tool_input: '{"path":"/tmp/a"}', tool_output: '', risk: AICommandRisk.AICommandRiskModify, approval_status: AIAgentApprovalStatus.AIAgentApprovalPending, error: '', created_at: '', updated_at: '' }] })]
+    __registerHandler(listCall, async () => tasks)
+    __registerHandler(approveCall, approve)
+    render(<AIAgentSessionPanel sessionID={9} sessionName="prod" />)
+    await userEvent.click(await screen.findByRole('button', { name: '批准任务' }))
+    expect(approve).toHaveBeenCalledWith(1, 4, true)
+    await userEvent.click(screen.getByRole('button', { name: '拒绝任务' }))
+    expect(approve).toHaveBeenCalledWith(1, 4, false)
+  })
 })
 
 function createTask(changes: Partial<AIAgentTask> = {}) {
