@@ -178,6 +178,29 @@ func (s *AIService) ResumeAgentTask(taskID int64) (*model.AIAgentTask, error) {
 	return s.GetAgentTask(taskID)
 }
 
+// RetryAgentTask creates and starts a new task from a failed task's original
+// execution parameters (session, prompt, engine and CLI).
+func (s *AIService) RetryAgentTask(taskID int64) (*model.AIAgentTask, error) {
+	if taskID <= 0 {
+		return nil, fmt.Errorf("invalid AI agent task id")
+	}
+	task, err := s.GetAgentTask(taskID)
+	if err != nil {
+		return nil, err
+	}
+	if task.Status != model.AIAgentTaskFailed {
+		return nil, fmt.Errorf("AI agent task %d cannot be retried in %s status", taskID, task.Status)
+	}
+	engine := task.Engine
+	cli := task.CLI
+	return s.StartAgentTask(model.AIAgentTaskInput{
+		SessionID: task.SessionID,
+		Prompt:    task.Prompt,
+		Engine:    &engine,
+		CLI:       &cli,
+	})
+}
+
 func (s *AIService) launchAIAgentTask(taskID int64) error {
 	ctx, finish, err := s.beginOperation()
 	if err != nil {
