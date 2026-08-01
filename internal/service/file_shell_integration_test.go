@@ -14,7 +14,6 @@ import (
 	"github.com/pkg/sftp"
 	"github.com/stretchr/testify/require"
 
-	"github.com/xuthus5/mssh/internal/service/testutil"
 	msshssh "github.com/xuthus5/mssh/internal/ssh"
 )
 
@@ -52,53 +51,118 @@ func TestMergeTerminalDirectoryIntegrationReplacesExistingManagedBlock(t *testin
 	require.Equal(t, 1, strings.Count(merged, terminalDirectoryIntegrationEndMarker))
 }
 
-func TestTerminalDirectoryIntegrationTargetsUseLoginDirectory(t *testing.T) {
-	targets, err := terminalDirectoryIntegrationTargets("/home/deploy")
+func TestParseShellIntegrationDetectsSupportedShells(t *testing.T) {
+	tests := []struct {
+		name  string
+		value string
+		want  shellIntegration
+		ok    bool
+	}{
+		{name: "bash path", value: "/bin/bash", want: shellIntegrationBash, ok: true},
+		{name: "zsh path", value: "/usr/local/bin/zsh", want: shellIntegrationZsh, ok: true},
+		{name: "unsupported shell", value: "/bin/fish", ok: false},
+		{name: "empty shell", value: "", ok: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, ok := parseShellIntegration(tt.value)
+			require.Equal(t, tt.ok, ok)
+			require.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestDetectTerminalShellIntegrationParsesProbeOutput(t *testing.T) {
+	previous := _runSystemInfoCommand
+	_runSystemInfoCommand = func(_ *msshssh.ClientWrapper, command string) ([]byte, error) {
+		require.Contains(t, command, "SHELL")
+		return []byte("/usr/bin/zsh\n"), nil
+	}
+	defer func() { _runSystemInfoCommand = previous }()
+
+	shell, ok, err := detectTerminalShellIntegration(&msshssh.ClientWrapper{})
+
 	require.NoError(t, err)
-	require.Equal(t, []shellIntegrationTarget{
-		{shell: shellIntegrationBash, path: "/home/deploy/.bashrc", createIfMissing: true},
-		{shell: shellIntegrationBash, path: "/home/deploy/.bash_profile"},
-		{shell: shellIntegrationZsh, path: "/home/deploy/.zshrc", createIfMissing: true},
-	}, targets)
+	require.True(t, ok)
+	require.Equal(t, shellIntegrationZsh, shell)
 }
 
-func TestTerminalDirectoryIntegrationTargetsRejectUnsafeLoginDirectory(t *testing.T) {
-	_, err := terminalDirectoryIntegrationTargets("/")
-	require.ErrorContains(t, err, "login directory")
+func TestTerminalDirectoryIntegrationTargetUsesDetectedShell(t *testing.T) {
+	bashTarget, err := terminalDirectoryIntegrationTarget("/home/deploy", shellIntegrationBash)
+	require.NoError(t, err)
+	require.Equal(t, shellIntegrationTarget{
+		shell:           shellIntegrationBash,
+		path:            "/home/deploy/.bashrc",
+		createIfMissing: true,
+	}, bashTarget)
 
-	_, err = terminalDirectoryIntegrationTargets("relative")
-	require.ErrorContains(t, err, "login directory")
+	zshTarget, err := terminalDirectoryIntegrationTarget("/home/deploy", shellIntegrationZsh)
+	require.NoError(t, err)
+	require.Equal(t, shellIntegrationTarget{
+		shell:           shellIntegrationZsh,
+		path:            "/home/deploy/.zshrc",
+		createIfMissing: true,
+	}, zshTarget)
 }
 
-func TestInstallTerminalDirectoryIntegrationWritesStartupFiles(t *testing.T) {
+func TestTerminalDirectoryIntegrationTargetRejectsUnsafeLoginDirectory(t *testing.T) {
+	_, err := terminalDirectoryIntegrationTarget("/", shellIntegrationBash)
+	require.ErrorContains(t, err, "login directory")
+
+	_, err = terminalDirectoryIntegrationTarget("relative", shellIntegrationZsh)
+	require.ErrorContains(t, err, "login directory")
+
+	_, err = terminalDirectoryIntegrationTarget("/home/deploy", shellIntegration("fish"))
+	require.ErrorContains(t, err, "unsupported shell integration")
+}
+
+func TestInstallTerminalDirectoryIntegrationForShellPropagatesLoginDirectoryError(t *testing.T) {
+	client := newFakeIntegrationClient("/home/deploy")
+	client.cwdErr = errors.New("pwd denied")
+
+	_, managed, err := installTerminalDirectoryIntegrationForShell(client, shellIntegrationBash)
+
+	require.False(t, managed)
+	require.ErrorContains(t, err, "resolve login directory")
+}
+
+func TestInstallTerminalDirectoryIntegrationForShellWritesOnlyDetectedStartupFile(t *testing.T) {
 	client := newFakeIntegrationClient("/home/deploy")
 	client.files["/home/deploy/.bashrc"] = fakeRemoteEntry{
 		content: "# existing bashrc\n",
 		mode:    0o644,
 	}
 
-	paths, err := installTerminalDirectoryIntegration(client)
+	path, managed, err := installTerminalDirectoryIntegrationForShell(client, shellIntegrationBash)
 
 	require.NoError(t, err)
-	require.Equal(t, []string{"/home/deploy/.bashrc", "/home/deploy/.zshrc"}, paths)
+	require.True(t, managed)
+	require.Equal(t, "/home/deploy/.bashrc", path)
 	require.Contains(t, client.files["/home/deploy/.bashrc"].content, "__mssh_emit_osc7_bash")
-	require.Contains(t, client.files["/home/deploy/.zshrc"].content, "__mssh_emit_osc7_zsh")
 	require.Equal(t, os.FileMode(0o644), client.files["/home/deploy/.bashrc"].mode)
-	require.Equal(t, os.FileMode(0o600), client.files["/home/deploy/.zshrc"].mode)
+	require.NotContains(t, client.files, "/home/deploy/.zshrc")
 	require.NotContains(t, client.files, "/home/deploy/.bash_profile")
 	requireNoFileHasSuffix(t, client.files, ".tmp")
 }
 
-func TestInstallTerminalDirectoryIntegrationUpdatesExistingBashProfile(t *testing.T) {
+func TestInstallTerminalDirectoryIntegrationForShellWritesZshrc(t *testing.T) {
 	client := newFakeIntegrationClient("/home/deploy")
-	client.files["/home/deploy/.bash_profile"] = fakeRemoteEntry{content: "# login\n", mode: 0o640}
 
-	paths, err := installTerminalDirectoryIntegration(client)
+	path, managed, err := installTerminalDirectoryIntegrationForShell(client, shellIntegrationZsh)
 
 	require.NoError(t, err)
-	require.Contains(t, paths, "/home/deploy/.bash_profile")
-	require.Contains(t, client.files["/home/deploy/.bash_profile"].content, "__mssh_emit_osc7_bash")
-	require.Equal(t, os.FileMode(0o640), client.files["/home/deploy/.bash_profile"].mode)
+	require.True(t, managed)
+	require.Equal(t, "/home/deploy/.zshrc", path)
+	require.Contains(t, client.files["/home/deploy/.zshrc"].content, "__mssh_emit_osc7_zsh")
+	require.Equal(t, os.FileMode(0o600), client.files["/home/deploy/.zshrc"].mode)
+	require.NotContains(t, client.files, "/home/deploy/.bashrc")
+}
+
+func TestInstallTerminalDirectoryIntegrationForWrapperNormalizesSFTPErrors(t *testing.T) {
+	_, managed, err := installTerminalDirectoryIntegrationForWrapper(&msshssh.ClientWrapper{}, shellIntegrationBash)
+
+	require.False(t, managed)
+	require.ErrorContains(t, err, "install terminal directory integration")
 }
 
 func TestInstallShellIntegrationFileRejectsSymbolicLinks(t *testing.T) {
@@ -170,6 +234,60 @@ func TestInstallShellIntegrationFileRejectsDirectories(t *testing.T) {
 	require.ErrorContains(t, err, "directory")
 }
 
+func TestInstallShellIntegrationFileSkipsMissingTargetWhenCreationDisabled(t *testing.T) {
+	client := newFakeIntegrationClient("/home/deploy")
+
+	managed, err := installShellIntegrationFile(client, shellIntegrationTarget{
+		shell:           shellIntegrationBash,
+		path:            "/home/deploy/.profile",
+		createIfMissing: false,
+	})
+
+	require.NoError(t, err)
+	require.False(t, managed)
+}
+
+func TestReadRemoteIntegrationFilePropagatesOpenReadAndCloseErrors(t *testing.T) {
+	tests := []struct {
+		name    string
+		prepare func(*fakeIntegrationClient)
+		want    string
+	}{
+		{
+			name: "open",
+			prepare: func(client *fakeIntegrationClient) {
+				client.readOpenErr = errors.New("open denied")
+			},
+			want: "open denied",
+		},
+		{
+			name: "read",
+			prepare: func(client *fakeIntegrationClient) {
+				client.readErr = errors.New("read failed")
+			},
+			want: "read failed",
+		},
+		{
+			name: "close",
+			prepare: func(client *fakeIntegrationClient) {
+				client.closeErr = errors.New("close failed")
+			},
+			want: "close failed",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client := newFakeIntegrationClient("/home/deploy")
+			client.files["/home/deploy/.bashrc"] = fakeRemoteEntry{content: "# existing\n", mode: 0o600}
+			tt.prepare(client)
+
+			_, _, err := readRemoteIntegrationFile(client, "/home/deploy/.bashrc", true)
+
+			require.ErrorContains(t, err, tt.want)
+		})
+	}
+}
+
 func TestWriteRemoteIntegrationFilePropagatesTempCreateError(t *testing.T) {
 	client := newFakeIntegrationClient("/home/deploy")
 	client.tempOpenErr = errors.New("temp denied")
@@ -177,6 +295,40 @@ func TestWriteRemoteIntegrationFilePropagatesTempCreateError(t *testing.T) {
 	err := writeRemoteIntegrationFile(client, "/home/deploy/.bashrc", "content", 0o600)
 
 	require.ErrorContains(t, err, "temp denied")
+}
+
+func TestWriteRemoteIntegrationFilePropagatesWriteAndCloseErrors(t *testing.T) {
+	tests := []struct {
+		name    string
+		prepare func(*fakeIntegrationClient)
+		want    string
+	}{
+		{
+			name: "write",
+			prepare: func(client *fakeIntegrationClient) {
+				client.writeErr = errors.New("disk full")
+			},
+			want: "disk full",
+		},
+		{
+			name: "close",
+			prepare: func(client *fakeIntegrationClient) {
+				client.closeErr = errors.New("flush failed")
+			},
+			want: "flush failed",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client := newFakeIntegrationClient("/home/deploy")
+			tt.prepare(client)
+
+			err := writeRemoteIntegrationFile(client, "/home/deploy/.bashrc", "content", 0o600)
+
+			require.ErrorContains(t, err, tt.want)
+			requireNoFileHasSuffix(t, client.files, ".tmp")
+		})
+	}
 }
 
 func TestWriteRemoteIntegrationFilePropagatesReplaceError(t *testing.T) {
@@ -189,6 +341,48 @@ func TestWriteRemoteIntegrationFilePropagatesReplaceError(t *testing.T) {
 	requireNoFileHasSuffix(t, client.files, ".tmp")
 }
 
+func TestWriteRemoteIntegrationFilePropagatesFallbackRemoveAndRenameErrors(t *testing.T) {
+	tests := []struct {
+		name              string
+		prepare           func(*fakeIntegrationClient)
+		want              string
+		wantTempRemaining bool
+	}{
+		{
+			name: "remove",
+			prepare: func(client *fakeIntegrationClient) {
+				client.files["/home/deploy/.bashrc"] = fakeRemoteEntry{content: "old", mode: 0o600}
+				client.removeErr = errors.New("remove denied")
+			},
+			want:              "remove denied",
+			wantTempRemaining: true,
+		},
+		{
+			name: "rename",
+			prepare: func(client *fakeIntegrationClient) {
+				client.renameErr = errors.New("rename denied")
+			},
+			want: "rename denied",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client := newFakeIntegrationClient("/home/deploy")
+			client.posixRenameErr = sftp.ErrSSHFxOpUnsupported
+			tt.prepare(client)
+
+			err := writeRemoteIntegrationFile(client, "/home/deploy/.bashrc", "content", 0o600)
+
+			require.ErrorContains(t, err, tt.want)
+			if tt.wantTempRemaining {
+				requireFileHasSuffix(t, client.files, ".tmp")
+			} else {
+				requireNoFileHasSuffix(t, client.files, ".tmp")
+			}
+		})
+	}
+}
+
 func TestWriteRemoteIntegrationFilePropagatesChmodError(t *testing.T) {
 	client := newFakeIntegrationClient("/home/deploy")
 	client.chmodErr = errors.New("chmod denied")
@@ -197,28 +391,6 @@ func TestWriteRemoteIntegrationFilePropagatesChmodError(t *testing.T) {
 
 	require.ErrorContains(t, err, "chmod denied")
 	require.Contains(t, client.files, "/home/deploy/.bashrc")
-}
-
-func TestFileServiceInstallTerminalDirectoryIntegrationRejectsMissingSession(t *testing.T) {
-	db := testutil.NewTestDB(t)
-	sessionService := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
-	fileService := NewFileService(sessionService, newMockEventBus(), testutil.NewTestLogger())
-
-	paths, err := fileService.InstallTerminalDirectoryIntegration(999)
-
-	require.Nil(t, paths)
-	require.ErrorContains(t, err, "install terminal directory integration")
-}
-
-func TestFileServiceInstallTerminalDirectoryIntegrationRejectsUnsafeSFTPLoginDirectory(t *testing.T) {
-	sftpContext := startSFTPTestServer(t)
-	defer sftpContext.cancel()
-	fileService, session := createSFTPFileService(t, sftpContext)
-
-	paths, err := fileService.InstallTerminalDirectoryIntegration(session.ID)
-
-	require.Nil(t, paths)
-	require.ErrorContains(t, err, "login directory")
 }
 
 func TestSFTPTerminalDirectoryIntegrationClientDelegates(t *testing.T) {
@@ -261,8 +433,15 @@ type fakeRemoteEntry struct {
 type fakeIntegrationClient struct {
 	cwd            string
 	files          map[string]fakeRemoteEntry
+	cwdErr         error
 	posixRenameErr error
+	renameErr      error
+	removeErr      error
 	tempOpenErr    error
+	readOpenErr    error
+	readErr        error
+	writeErr       error
+	closeErr       error
 	chmodErr       error
 }
 
@@ -271,6 +450,9 @@ func newFakeIntegrationClient(cwd string) *fakeIntegrationClient {
 }
 
 func (c *fakeIntegrationClient) Getwd() (string, error) {
+	if c.cwdErr != nil {
+		return "", c.cwdErr
+	}
 	return c.cwd, nil
 }
 
@@ -284,11 +466,18 @@ func (c *fakeIntegrationClient) Lstat(remotePath string) (os.FileInfo, error) {
 
 func (c *fakeIntegrationClient) OpenFile(remotePath string, flags int) (terminalDirectoryIntegrationFile, error) {
 	if flags&os.O_WRONLY == 0 && flags&os.O_RDWR == 0 {
+		if c.readOpenErr != nil {
+			return nil, c.readOpenErr
+		}
 		entry, ok := c.files[remotePath]
 		if !ok {
 			return nil, os.ErrNotExist
 		}
-		return &fakeIntegrationFile{reader: strings.NewReader(entry.content)}, nil
+		return &fakeIntegrationFile{
+			reader:   strings.NewReader(entry.content),
+			readErr:  c.readErr,
+			closeErr: c.closeErr,
+		}, nil
 	}
 	if flags&os.O_EXCL != 0 {
 		if _, exists := c.files[remotePath]; exists {
@@ -298,9 +487,13 @@ func (c *fakeIntegrationClient) OpenFile(remotePath string, flags int) (terminal
 	if c.tempOpenErr != nil && strings.HasSuffix(remotePath, ".tmp") {
 		return nil, c.tempOpenErr
 	}
-	return &fakeIntegrationFile{onClose: func(content string) {
-		c.files[remotePath] = fakeRemoteEntry{content: content, mode: 0o600}
-	}}, nil
+	return &fakeIntegrationFile{
+		writeErr: c.writeErr,
+		closeErr: c.closeErr,
+		onClose: func(content string) {
+			c.files[remotePath] = fakeRemoteEntry{content: content, mode: 0o600}
+		},
+	}, nil
 }
 
 func (c *fakeIntegrationClient) PosixRename(oldPath, newPath string) error {
@@ -311,6 +504,9 @@ func (c *fakeIntegrationClient) PosixRename(oldPath, newPath string) error {
 }
 
 func (c *fakeIntegrationClient) Rename(oldPath, newPath string) error {
+	if c.renameErr != nil {
+		return c.renameErr
+	}
 	return c.rename(oldPath, newPath)
 }
 
@@ -328,6 +524,9 @@ func (c *fakeIntegrationClient) Chmod(remotePath string, mode os.FileMode) error
 }
 
 func (c *fakeIntegrationClient) Remove(remotePath string) error {
+	if c.removeErr != nil {
+		return c.removeErr
+	}
 	if _, ok := c.files[remotePath]; !ok {
 		return os.ErrNotExist
 	}
@@ -346,13 +545,19 @@ func (c *fakeIntegrationClient) rename(oldPath, newPath string) error {
 }
 
 type fakeIntegrationFile struct {
-	reader  *strings.Reader
-	buffer  bytes.Buffer
-	onClose func(string)
-	closed  bool
+	reader   *strings.Reader
+	buffer   bytes.Buffer
+	onClose  func(string)
+	closed   bool
+	readErr  error
+	writeErr error
+	closeErr error
 }
 
 func (f *fakeIntegrationFile) Read(p []byte) (int, error) {
+	if f.readErr != nil {
+		return 0, f.readErr
+	}
 	if f.reader == nil {
 		return 0, io.EOF
 	}
@@ -360,6 +565,9 @@ func (f *fakeIntegrationFile) Read(p []byte) (int, error) {
 }
 
 func (f *fakeIntegrationFile) Write(p []byte) (int, error) {
+	if f.writeErr != nil {
+		return 0, f.writeErr
+	}
 	return f.buffer.Write(p)
 }
 
@@ -368,6 +576,9 @@ func (f *fakeIntegrationFile) Close() error {
 		return nil
 	}
 	f.closed = true
+	if f.closeErr != nil {
+		return f.closeErr
+	}
 	if f.onClose != nil {
 		f.onClose(f.buffer.String())
 	}
@@ -396,4 +607,14 @@ func requireNoFileHasSuffix(t *testing.T, files map[string]fakeRemoteEntry, suff
 	for name := range files {
 		require.False(t, strings.HasSuffix(name, suffix), "temporary file %s was not removed", name)
 	}
+}
+
+func requireFileHasSuffix(t *testing.T, files map[string]fakeRemoteEntry, suffix string) {
+	t.Helper()
+	for name := range files {
+		if strings.HasSuffix(name, suffix) {
+			return
+		}
+	}
+	t.Fatalf("expected a file with suffix %s", suffix)
 }

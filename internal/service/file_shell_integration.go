@@ -1,7 +1,6 @@
 package service
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -49,6 +48,11 @@ type terminalDirectoryIntegrationFile interface {
 
 var errShellIntegrationTargetMissing = errors.New("shell integration target missing")
 
+var (
+	_detectTerminalShellIntegration                = detectTerminalShellIntegration
+	_installTerminalDirectoryIntegrationForWrapper = installTerminalDirectoryIntegrationForWrapper
+)
+
 type sftpTerminalDirectoryIntegrationClient struct {
 	client *sftp.Client
 }
@@ -81,65 +85,82 @@ func (c sftpTerminalDirectoryIntegrationClient) Remove(remotePath string) error 
 	return c.client.Remove(remotePath)
 }
 
-func (f *FileService) InstallTerminalDirectoryIntegration(sessionID int64) ([]string, error) {
-	finish, err := f.beginOperation()
-	if err != nil {
-		return nil, err
+func parseShellIntegration(value string) (shellIntegration, bool) {
+	name := strings.TrimPrefix(path.Base(strings.TrimSpace(value)), "-")
+	switch name {
+	case string(shellIntegrationBash):
+		return shellIntegrationBash, true
+	case string(shellIntegrationZsh):
+		return shellIntegrationZsh, true
+	default:
+		return "", false
 	}
-	defer finish()
-	wrapper, connID, err := f.connect(context.Background(), sessionID)
+}
+
+func detectTerminalShellIntegration(wrapper *ssh.ClientWrapper) (shellIntegration, bool, error) {
+	output, err := _runSystemInfoCommand(wrapper, `printf '%s\n' "${SHELL:-}"`)
 	if err != nil {
-		return nil, fmt.Errorf("install terminal directory integration: %w", err)
+		return "", false, fmt.Errorf("detect shell: %w", err)
 	}
-	defer f.disconnect(connID)
+	shell, ok := parseShellIntegration(string(output))
+	return shell, ok, nil
+}
+
+func installTerminalDirectoryIntegrationForWrapper(
+	wrapper *ssh.ClientWrapper,
+	shell shellIntegration,
+) (string, bool, error) {
 	deadline, err := setSFTPMetadataDeadline(wrapper)
 	if err != nil {
-		return nil, fmt.Errorf("install terminal directory integration: %w", err)
+		return "", false, fmt.Errorf("install terminal directory integration: %w", err)
 	}
 	client, err := ssh.OpenSFTP(wrapper)
 	if err != nil {
-		return nil, sftpMetadataError("install terminal directory integration", deadline, err)
+		return "", false, sftpMetadataError("install terminal directory integration", deadline, err)
 	}
 	defer func() { _ = client.Close() }()
-	paths, err := installTerminalDirectoryIntegration(sftpTerminalDirectoryIntegrationClient{client: client})
+	remotePath, managed, err := installTerminalDirectoryIntegrationForShell(
+		sftpTerminalDirectoryIntegrationClient{client: client},
+		shell,
+	)
 	if err != nil {
-		return nil, sftpMetadataError("install terminal directory integration", deadline, err)
+		return "", false, sftpMetadataError("install terminal directory integration", deadline, err)
 	}
-	return paths, nil
+	return remotePath, managed, nil
 }
 
-func installTerminalDirectoryIntegration(client terminalDirectoryIntegrationClient) ([]string, error) {
+func installTerminalDirectoryIntegrationForShell(
+	client terminalDirectoryIntegrationClient,
+	shell shellIntegration,
+) (string, bool, error) {
 	loginDir, err := client.Getwd()
 	if err != nil {
-		return nil, fmt.Errorf("resolve login directory: %w", err)
+		return "", false, fmt.Errorf("resolve login directory: %w", err)
 	}
-	targets, err := terminalDirectoryIntegrationTargets(loginDir)
+	target, err := terminalDirectoryIntegrationTarget(loginDir, shell)
 	if err != nil {
-		return nil, err
+		return "", false, err
 	}
-	installed := make([]string, 0, len(targets))
-	for _, target := range targets {
-		managed, err := installShellIntegrationFile(client, target)
-		if err != nil {
-			return nil, err
-		}
-		if managed {
-			installed = append(installed, target.path)
-		}
-	}
-	return installed, nil
+	managed, err := installShellIntegrationFile(client, target)
+	return target.path, managed, err
 }
 
-func terminalDirectoryIntegrationTargets(loginDir string) ([]shellIntegrationTarget, error) {
+func terminalDirectoryIntegrationTarget(
+	loginDir string,
+	shell shellIntegration,
+) (shellIntegrationTarget, error) {
 	cleaned := path.Clean(strings.TrimSpace(loginDir))
 	if cleaned == "" || cleaned == "." || cleaned == "/" || !path.IsAbs(cleaned) {
-		return nil, fmt.Errorf("login directory is not usable: %q", loginDir)
+		return shellIntegrationTarget{}, fmt.Errorf("login directory is not usable: %q", loginDir)
 	}
-	return []shellIntegrationTarget{
-		{shell: shellIntegrationBash, path: path.Join(cleaned, ".bashrc"), createIfMissing: true},
-		{shell: shellIntegrationBash, path: path.Join(cleaned, ".bash_profile")},
-		{shell: shellIntegrationZsh, path: path.Join(cleaned, ".zshrc"), createIfMissing: true},
-	}, nil
+	switch shell {
+	case shellIntegrationBash:
+		return shellIntegrationTarget{shell: shell, path: path.Join(cleaned, ".bashrc"), createIfMissing: true}, nil
+	case shellIntegrationZsh:
+		return shellIntegrationTarget{shell: shell, path: path.Join(cleaned, ".zshrc"), createIfMissing: true}, nil
+	default:
+		return shellIntegrationTarget{}, fmt.Errorf("unsupported shell integration: %s", shell)
+	}
 }
 
 func installShellIntegrationFile(client terminalDirectoryIntegrationClient, target shellIntegrationTarget) (bool, error) {

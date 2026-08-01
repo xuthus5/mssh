@@ -4,7 +4,7 @@ import { toast } from '@/components/ui/toast'
 import { MANUAL_TERMINAL_DIRECTORY_REPORT, waitForTerminalWorkingDirectory } from '@/hooks/terminalDirectoryRuntime'
 import { useFileTransfer } from '@/hooks/useFileTransfer'
 import { t } from '@/i18n'
-import { FileService, TerminalService } from '@/lib/wails'
+import { TerminalService } from '@/lib/wails'
 import { useSFTPSettingsStore } from '@/store/sftpSettingsStore'
 import { useTerminalDirectoryStore } from '@/store/terminalDirectoryStore'
 
@@ -120,37 +120,6 @@ function useCurrentDirectorySync(options: {
     options.syncingRef, options.syncRequestID, options.terminalID, options.transfer.currentPath, options.transfer.listFiles])
 }
 
-function useShellIntegrationInstall(options: {
-  sessionID: number
-  captureLifecycle: () => () => boolean
-  installingRef: MutableRefObject<boolean>
-  installRequestID: MutableRefObject<number>
-  setInstalling: Dispatch<SetStateAction<boolean>>
-  setActionError: SetError
-}) {
-  return useCallback(async () => {
-    const { captureLifecycle, installingRef, installRequestID, setActionError, setInstalling, sessionID } = options
-    const isActive = captureLifecycle()
-    if (!isActive() || installingRef.current) return
-    const request = ++installRequestID.current
-    installingRef.current = true
-    setInstalling(true)
-    setActionError('')
-    try {
-      const paths = await FileService.InstallTerminalDirectoryIntegration(sessionID)
-      if (!isActive()) return
-      const summary = paths.length > 0 ? paths.join(', ') : t('脚本已安装')
-      toast(t('已安装自动跟随脚本: ${}', summary), 'success')
-    } catch (error) {
-      if (isActive()) setActionError(t('安装自动跟随脚本失败: ${}', error instanceof Error ? error.message : String(error)))
-    } finally {
-      if (installRequestID.current !== request) return
-      installingRef.current = false
-      if (isActive()) setInstalling(false)
-    }
-  }, [options.captureLifecycle, options.installRequestID, options.installingRef, options.sessionID, options.setActionError, options.setInstalling])
-}
-
 function useDroppedFileUpload(options: {
   dropTargetID: string
   transfer: FileTransfer
@@ -255,9 +224,6 @@ export function useFilePanelRuntime(sessionID: number, terminalID: string) {
   const syncingRef = useRef(false)
   const syncRequestID = useRef(0)
   const [syncingCurrentDirectory, setSyncingCurrentDirectory] = useState(false)
-  const installingRef = useRef(false)
-  const installRequestID = useRef(0)
-  const [installingDirectoryIntegration, setInstallingDirectoryIntegration] = useState(false)
   const [actionError, setActionError] = useState('')
   const identity = `${sessionID}:${terminalID}`
   const captureLifecycle = usePanelLifecycle(identity)
@@ -267,9 +233,6 @@ export function useFilePanelRuntime(sessionID: number, terminalID: string) {
     syncRequestID.current++
     syncingRef.current = false
     setSyncingCurrentDirectory(false)
-    installRequestID.current++
-    installingRef.current = false
-    setInstallingDirectoryIntegration(false)
     setActionError('')
   }, [sessionID, terminalID])
   useInitialFileListing({ transfer, followTerminalDirectory, terminalDirectory, loadedInitialPath })
@@ -278,9 +241,6 @@ export function useFilePanelRuntime(sessionID: number, terminalID: string) {
     ...shared, terminalID, followTerminalDirectory, syncingRef, syncRequestID,
     setSyncing: setSyncingCurrentDirectory,
   })
-  const installTerminalDirectoryIntegration = useShellIntegrationInstall({
-    ...shared, sessionID, installingRef, installRequestID, setInstalling: setInstallingDirectoryIntegration,
-  })
   const dropTargetID = `sftp-drop-zone-${terminalID}`
   useDroppedFileUpload({ ...shared, dropTargetID })
   const handleUpload = useUploadDialog(shared)
@@ -288,6 +248,6 @@ export function useFilePanelRuntime(sessionID: number, terminalID: string) {
   return {
     transfer, showHiddenFiles, defaultView, dropTargetID, actionError,
     transferActionPending: dialog.pending, syncingCurrentDirectory, syncCurrentDirectory,
-    installingDirectoryIntegration, installTerminalDirectoryIntegration, handleUpload, handleDownload,
+    handleUpload, handleDownload,
   }
 }

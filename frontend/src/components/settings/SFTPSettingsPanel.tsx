@@ -58,7 +58,7 @@ function DisplayCard({ draft, update }: SettingsCardProps) {
 }
 
 function DirectoryCard({ draft, update }: SettingsCardProps) {
-  return <Card><CardHeader><CardTitle className="text-sm">{t('目录联动')}</CardTitle><p className="mt-1 text-sm text-muted-foreground">{t('让文件面板跟随当前终端所在的远程目录。')}</p></CardHeader><CardContent><SettingSwitch id="sftp-follow-terminal" label={t('追随终端目录')} description={t('终端发送 OSC 7 工作目录信息时，文件面板自动切换到该目录。')} checked={draft.followTerminalDirectory} onCheckedChange={(checked) => update({ followTerminalDirectory: checked })} /><Alert className="mt-4"><AlertDescription>{t('如果远端 Shell 未发送工作目录信息，可在对应会话的文件面板安装自动跟随脚本，或点击“同步当前目录”手动请求一次。')}</AlertDescription></Alert></CardContent></Card>
+  return <Card><CardHeader><CardTitle className="text-sm">{t('目录联动')}</CardTitle><p className="mt-1 text-sm text-muted-foreground">{t('让文件面板跟随当前终端所在的远程目录。')}</p></CardHeader><CardContent><SettingSwitch id="sftp-follow-terminal" label={t('追随终端目录')} description={t('终端发送 OSC 7 工作目录信息时，文件面板自动切换到该目录。')} checked={draft.followTerminalDirectory} onCheckedChange={(checked) => update({ followTerminalDirectory: checked })} /><Alert className="mt-4"><AlertDescription>{t('开启后，SSH 终端登录时会在后台检测当前 Shell，并向 .bashrc、.zshrc 等配置文件自动注入 OSC 7 工作目录指令；如果已存在 MSSH 管理块，则不会重复写入。')}</AlertDescription></Alert></CardContent></Card>
 }
 
 function DefaultViewCard({ draft, update }: SettingsCardProps) {
