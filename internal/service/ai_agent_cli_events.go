@@ -35,16 +35,17 @@ func validateCodexAIAgentEvent(line []byte) error {
 	if !ok {
 		return fmt.Errorf("codex event has no type")
 	}
+	if strings.Contains(strings.ToLower(eventType), "approval") {
+		return fmt.Errorf("codex requested approval for a local action")
+	}
 	if item, ok := event["item"].(map[string]any); ok {
 		if err := validateCodexAIAgentItem(item); err != nil {
 			return err
 		}
-	}
-	if strings.Contains(strings.ToLower(eventType), "approval") {
-		return fmt.Errorf("codex requested approval for a local action")
-	}
-	if tool := findUnscopedAIAgentTool(event); tool != "" {
-		return fmt.Errorf("codex attempted unavailable local tool %q", tool)
+	} else {
+		if tool := findUnscopedAIAgentTool(event); tool != "" {
+			return fmt.Errorf("codex attempted unavailable local tool %q", tool)
+		}
 	}
 	return nil
 }
@@ -63,6 +64,13 @@ func validateCodexAIAgentItem(item map[string]any) error {
 		if tool == "" {
 			tool, _ = item["tool_name"].(string)
 		}
+		if server == "codex" && isCodexAIAgentManagementTool(tool) {
+			// Codex's own MCP server exposes read-only resource discovery and
+			// read tools (list_mcp_resources, list_mcp_resource_templates,
+			// read_mcp_resource). They never run local commands or write files,
+			// so they are allowed; every other tool on that server fails closed.
+			return nil
+		}
 		if server != "mssh" || !isMSSHAIAgentTool(tool) {
 			return fmt.Errorf("codex attempted unavailable tool %q on server %q", tool, server)
 		}
@@ -70,6 +78,15 @@ func validateCodexAIAgentItem(item map[string]any) error {
 		return fmt.Errorf("codex requested approval for a local action")
 	}
 	return nil
+}
+
+func isCodexAIAgentManagementTool(tool string) bool {
+	switch tool {
+	case "list_mcp_resources", "list_mcp_resource_templates", "read_mcp_resource":
+		return true
+	default:
+		return false
+	}
 }
 
 func findUnscopedAIAgentTool(value any) string {
