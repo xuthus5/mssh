@@ -161,7 +161,7 @@ func (t *TerminalService) openTerminalSession(ctx context.Context, sessionID int
 	if err := t.registerSessionTerminal(registration); err != nil {
 		return "", errors.Join(err, t.cleanupTerminalResources(connID, pty))
 	}
-	t.startTerminalDirectoryIntegration(sessionID, wrapper)
+	t.startTerminalDirectoryIntegration(sessionID)
 	return terminalID, nil
 }
 

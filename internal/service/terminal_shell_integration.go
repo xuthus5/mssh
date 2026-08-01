@@ -1,8 +1,11 @@
 package service
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"log/slog"
+	"sync"
 
 	msshssh "github.com/xuthus5/mssh/internal/ssh"
 	"github.com/xuthus5/mssh/internal/store"
@@ -10,17 +13,14 @@ import (
 
 const sftpFollowTerminalDirectorySettingKey = "sftp.follow_terminal_directory"
 
-func (t *TerminalService) startTerminalDirectoryIntegration(
-	sessionID int64,
-	wrapper *msshssh.ClientWrapper,
-) bool {
-	if !t.terminalDirectoryIntegrationEnabled() || wrapper == nil {
+func (t *TerminalService) startTerminalDirectoryIntegration(sessionID int64) bool {
+	if !t.terminalDirectoryIntegrationEnabled() {
 		return false
 	}
 	t.terminalDirectoryIntegrationWG.Add(1)
 	go func() {
 		defer t.terminalDirectoryIntegrationWG.Done()
-		t.runTerminalDirectoryIntegration(sessionID, wrapper)
+		t.runTerminalDirectoryIntegration(sessionID)
 	}()
 	return true
 }
@@ -46,7 +46,22 @@ func (t *TerminalService) terminalDirectoryIntegrationEnabled() bool {
 	return enabled
 }
 
-func (t *TerminalService) runTerminalDirectoryIntegration(
+// runTerminalDirectoryIntegration performs shell detection and OSC 7 injection
+// on a dedicated SSH connection, so deadlines or failures of the integration
+// never affect the terminal's live connection.
+func (t *TerminalService) runTerminalDirectoryIntegration(sessionID int64) {
+	logger := terminalServiceLogger(t)
+	wrapper, disconnect, err := t.openTerminalDirectoryIntegrationConnection(context.Background(), sessionID)
+	if err != nil {
+		logger.Warn("terminal directory integration connection failed",
+			"sessionID", sessionID, "error", err)
+		return
+	}
+	defer disconnect()
+	t.runTerminalDirectoryIntegrationWithWrapper(sessionID, wrapper)
+}
+
+func (t *TerminalService) runTerminalDirectoryIntegrationWithWrapper(
 	sessionID int64,
 	wrapper *msshssh.ClientWrapper,
 ) {
@@ -72,6 +87,30 @@ func (t *TerminalService) runTerminalDirectoryIntegration(
 		logger.Info("terminal directory integration installed",
 			"sessionID", sessionID, "shell", shell, "path", remotePath)
 	}
+}
+
+// openTerminalDirectoryIntegrationConnection establishes a temporary SSH
+// connection used only for shell integration work. The returned disconnect
+// closes the temporary connection exactly once.
+func (t *TerminalService) openTerminalDirectoryIntegrationConnection(
+	ctx context.Context,
+	sessionID int64,
+) (*msshssh.ClientWrapper, func(), error) {
+	if t == nil || t.sessionSvc == nil {
+		return nil, nil, errors.New("session service unavailable")
+	}
+	connID, err := t.sessionSvc.connect(ctx, sessionID, false)
+	if err != nil {
+		return nil, nil, err
+	}
+	wrapper, err := t.sessionSvc.GetClientWrapper(connID)
+	if err != nil {
+		_ = t.sessionSvc.disconnect(connID, false)
+		return nil, nil, err
+	}
+	var once sync.Once
+	disconnect := func() { once.Do(func() { _ = t.sessionSvc.disconnect(connID, false) }) }
+	return wrapper, disconnect, nil
 }
 
 func terminalServiceLogger(service *TerminalService) *slog.Logger {
