@@ -22,7 +22,5 @@ export function resolveShortcutAction(
   const definition = shortcutDefinition(actionId)
   const target = event.target as HTMLElement | null
   if (!definition.allowInEditable && isOrdinaryEditableTarget(target)) return null
-  // quick-search uses a slightly broader rule: allow unless ordinary editable
-  if (actionId === 'quick-search' && isOrdinaryEditableTarget(target)) return null
   return actionId
 }
