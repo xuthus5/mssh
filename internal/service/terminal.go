@@ -16,41 +16,42 @@ import (
 )
 
 type TerminalService struct {
-	mu                     sync.RWMutex
-	closeMu                sync.Mutex
-	resourceMu             sync.Mutex
-	outputMu               sync.Mutex
-	ptys                   map[string]terminalIO
-	closingPTYs            map[string]terminalIO
-	pendingSerialCleanups  map[string]unregisteredSerialResource
-	connIDs                map[string]string
-	sessionIDs             map[string]int64
-	pendingSessionIDs      map[string]int64
-	blockedSessions        map[int64]int
-	sessionOpenGenerations map[int64]uint64
-	attached               map[string]bool
-	pendingOutput          map[string][]byte
-	pendingExpiries        map[string]*pendingOutputExpiry
-	outputSequences        map[string]uint64
-	outputDispatchers      map[string]*sync.Mutex
-	outputFlows            map[string]*terminalOutputFlow
-	eventBus               EventBus
-	maxSize                int
-	lastUsed               map[string]time.Time
-	sessionSvc             *SessionService
-	serialSvc              *SerialService
-	outputHandler          func(terminalID string, data []byte)
-	closeHandler           func(terminalID string)
-	systemMu               sync.Mutex
-	systemSamples          map[string]systemSample
-	operationWG            sync.WaitGroup
-	exitMu                 sync.Mutex
-	exitWG                 sync.WaitGroup
-	exitGeneration         uint64
-	exitStopping           bool
-	closing                bool
-	shuttingDown           bool
-	logger                 *slog.Logger
+	mu                             sync.RWMutex
+	closeMu                        sync.Mutex
+	resourceMu                     sync.Mutex
+	outputMu                       sync.Mutex
+	ptys                           map[string]terminalIO
+	closingPTYs                    map[string]terminalIO
+	pendingSerialCleanups          map[string]unregisteredSerialResource
+	connIDs                        map[string]string
+	sessionIDs                     map[string]int64
+	pendingSessionIDs              map[string]int64
+	blockedSessions                map[int64]int
+	sessionOpenGenerations         map[int64]uint64
+	attached                       map[string]bool
+	pendingOutput                  map[string][]byte
+	pendingExpiries                map[string]*pendingOutputExpiry
+	outputSequences                map[string]uint64
+	outputDispatchers              map[string]*sync.Mutex
+	outputFlows                    map[string]*terminalOutputFlow
+	eventBus                       EventBus
+	maxSize                        int
+	lastUsed                       map[string]time.Time
+	sessionSvc                     *SessionService
+	serialSvc                      *SerialService
+	outputHandler                  func(terminalID string, data []byte)
+	closeHandler                   func(terminalID string)
+	systemMu                       sync.Mutex
+	systemSamples                  map[string]systemSample
+	operationWG                    sync.WaitGroup
+	terminalDirectoryIntegrationWG sync.WaitGroup
+	exitMu                         sync.Mutex
+	exitWG                         sync.WaitGroup
+	exitGeneration                 uint64
+	exitStopping                   bool
+	closing                        bool
+	shuttingDown                   bool
+	logger                         *slog.Logger
 }
 
 var _openPTY = ssh.PreparePTY
@@ -160,6 +161,7 @@ func (t *TerminalService) openTerminalSession(ctx context.Context, sessionID int
 	if err := t.registerSessionTerminal(registration); err != nil {
 		return "", errors.Join(err, t.cleanupTerminalResources(connID, pty))
 	}
+	t.startTerminalDirectoryIntegration(sessionID, wrapper)
 	return terminalID, nil
 }
 

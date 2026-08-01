@@ -115,7 +115,7 @@ describe('SettingsView', () => {
     render(<SettingsView {...props} />)
 
     await user.click(screen.getByRole('tab', { name: 'SFTP' }))
-    expect(screen.getByText(/安装自动跟随脚本/)).toBeInTheDocument()
+    expect(screen.getByText(/开启后.*\.bashrc.*\.zshrc/)).toBeInTheDocument()
     await user.click(screen.getByRole('switch', { name: '显示隐藏文件' }))
     await user.click(screen.getByRole('switch', { name: '追随终端目录' }))
     await user.click(screen.getByRole('button', { name: '树状视图' }))
