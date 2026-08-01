@@ -4,7 +4,6 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Switch } from '@/components/ui/switch'
-import { AutoSaveStatusIndicator } from '@/components/settings/AutoSaveStatus'
 import { useAutoSave } from '@/hooks/useAutoSave'
 import { useDraftSync } from '@/hooks/useDraftSync'
 import type { SFTPSettings } from '@/lib/sftpSettings'
@@ -29,12 +28,12 @@ export function SFTPSettingsPanel({ settings, onSave, settingsReady = true, load
     await onSave(next)
     acknowledgeSaved(next)
   }, [acknowledgeSaved, onSave])
-  const autoSave = useAutoSave({ value: draft, onSave: persist, isReady: settingsReady, delayMs: 350, baselineRevision })
+  const autoSave = useAutoSave({ value: draft, onSave: persist, isReady: settingsReady, delayMs: 350, baselineRevision, notify: true })
 
   return (
     <div className="flex flex-col gap-4 pt-2">
       <LoadError error={loadError} onReload={onReload} />
-      <PanelHeader status={autoSave.status} error={autoSave.error} />
+      <PanelHeader />
       <DisplayCard draft={draft} update={update} />
       <DirectoryCard draft={draft} update={update} />
       <DefaultViewCard draft={draft} update={update} />
@@ -47,8 +46,8 @@ function LoadError({ error, onReload }: { error: string; onReload?: () => void }
   return <div className="rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">{t('加载 SFTP 设置失败: ${}', error)}{onReload ? <Button type="button" size="xs" variant="outline" className="ml-2" onClick={onReload}>{t('重试')}</Button> : null}</div>
 }
 
-function PanelHeader({ status, error }: Pick<ReturnType<typeof useAutoSave<SFTPSettings>>, 'status' | 'error'>) {
-  return <div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="text-lg font-semibold">{t('SFTP 文件管理')}</h2><p className="mt-1 text-sm text-muted-foreground">{t('控制远程文件面板的显示方式和目录联动行为。')}</p></div><AutoSaveStatusIndicator status={status} error={error} /></div>
+function PanelHeader() {
+  return <div><h2 className="text-lg font-semibold">{t('SFTP 文件管理')}</h2><p className="mt-1 text-sm text-muted-foreground">{t('控制远程文件面板的显示方式和目录联动行为。')}</p></div>
 }
 
 type SettingsCardProps = { draft: SFTPSettings; update: (updates: Partial<SFTPSettings>) => void }

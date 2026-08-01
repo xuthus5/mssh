@@ -241,7 +241,7 @@ describe('ThemeEditor dual mode profiles', () => {
     expect(screen.getByLabelText('背景色 HEX')).toHaveValue('#123456')
     await waitFor(() => {
       expect(onSave).toHaveBeenCalled()
-      expect(screen.getByText(/自动保存失败/)).toBeInTheDocument()
+      expect(useToastStore.getState().toasts.some((item) => item.type === 'error' && item.message.includes('自动保存失败'))).toBe(true)
     })
   })
 

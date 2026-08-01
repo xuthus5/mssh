@@ -6,8 +6,7 @@ import { SearchableSelect } from '@/components/ui/searchable-select'
 import { ApplicationBehaviorSettingsSection } from '@/components/settings/ApplicationBehaviorSettings'
 import { ApplicationLogSettingsSection } from '@/components/settings/ApplicationLogSettings'
 import { ApplicationNetworkProxySettingsSection } from '@/components/settings/ApplicationNetworkProxySettings'
-import { AutoSaveStatusIndicator } from '@/components/settings/AutoSaveStatus'
-import { useAutoSave, type UseAutoSaveResult } from '@/hooks/useAutoSave'
+import { useAutoSave } from '@/hooks/useAutoSave'
 import { useDraftSync } from '@/hooks/useDraftSync'
 import { useSettingsWindowHide } from '@/hooks/useSettingsWindowHide'
 import type { GeneralSettings, GeneralSettingsSaveOptions } from '@/hooks/useSettings'
@@ -152,10 +151,9 @@ function UIFontSettings(props: UIFontProps) {
   </section>
 }
 
-function GeneralSettingsHeader({ loadError, onReload, autoSave }: {
+function GeneralSettingsHeader({ loadError, onReload }: {
   loadError: string
   onReload?: () => void
-  autoSave: UseAutoSaveResult<GeneralDraft>
 }) {
   return <>
     {loadError ? (
@@ -166,7 +164,6 @@ function GeneralSettingsHeader({ loadError, onReload, autoSave }: {
     ) : null}
     <div className="flex items-center justify-between gap-3">
       <p className="text-xs text-muted-foreground">{t('通用设置包含界面外观与应用级偏好。')}</p>
-      <AutoSaveStatusIndicator status={autoSave.status} error={autoSave.error} />
     </div>
   </>
 }
@@ -213,7 +210,7 @@ function useGeneralSettingsDraft({ general, onSave, onPreviewUIFont, settingsRea
     },
     [acknowledgeSaved, general, onSave],
   )
-  const autoSave = useAutoSave({ value: draft, onSave: persist, isReady: settingsReady, delayMs: 450, baselineRevision })
+  const autoSave = useAutoSave({ value: draft, onSave: persist, isReady: settingsReady, delayMs: 450, baselineRevision, notify: true })
   useSettingsWindowHide(useCallback(() => {
     if (!draft.proxyPassword && !draft.clearProxyPassword) return
     const redacted = redactedDraft(draft)
@@ -265,9 +262,9 @@ function GeneralSettingsSections({ draft, setDraft, systemFonts, previewDraft }:
 }
 
 export function GeneralSettingsPanel(props: Props) {
-  const { draft, setDraft, previewDraft, autoSave } = useGeneralSettingsDraft(props)
+  const { draft, setDraft, previewDraft } = useGeneralSettingsDraft(props)
   return <div className="flex flex-col gap-3 pt-2">
-    <GeneralSettingsHeader loadError={props.loadError ?? ''} onReload={props.onReload} autoSave={autoSave} />
+    <GeneralSettingsHeader loadError={props.loadError ?? ''} onReload={props.onReload} />
     <GeneralSettingsSections draft={draft} setDraft={setDraft} systemFonts={props.systemFonts} previewDraft={previewDraft} />
   </div>
 }
