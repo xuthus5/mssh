@@ -3,13 +3,17 @@ import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { __clearHandlers, __emitEvent, __registerHandler } from '@/test/__mocks__/wails-runtime'
 import { AIAgentSessionPanel } from '@/components/agent/AIAgentTaskViews'
+import { requestConfirm } from '@/lib/confirmDialog'
 import { AIAgentApprovalStatus, AIAgentCLI, AIAgentEngine, AIAgentTask, AIAgentTaskStatus, AICommandRisk } from '../../../bindings/github.com/xuthus5/mssh/internal/model/models'
+
+vi.mock('@/lib/confirmDialog', () => ({ requestConfirm: vi.fn(async () => true) }))
 
 const listCall = 'github.com/xuthus5/mssh/internal/service.AIService.ListAgentTasks'
 const startCall = 'github.com/xuthus5/mssh/internal/service.AIService.StartAgentTask'
 const approveCall = 'github.com/xuthus5/mssh/internal/service.AIService.ApproveAgentStep'
 const cancelCall = 'github.com/xuthus5/mssh/internal/service.AIService.CancelAgentTask'
 const resumeCall = 'github.com/xuthus5/mssh/internal/service.AIService.ResumeAgentTask'
+const deleteCall = 'github.com/xuthus5/mssh/internal/service.AIService.DeleteAgentTask'
 
 describe('AIAgentSessionPanel', () => {
   beforeEach(() => __clearHandlers())
@@ -88,6 +92,29 @@ describe('AIAgentSessionPanel', () => {
     expect(approve).toHaveBeenCalledWith(1, 4, true)
     await userEvent.click(screen.getByRole('button', { name: '拒绝任务' }))
     expect(approve).toHaveBeenCalledWith(1, 4, false)
+  })
+
+  it('deletes a task after confirmation', async () => {
+    const remove = vi.fn(async () => undefined)
+    __registerHandler(listCall, async () => [createTask({ status: AIAgentTaskStatus.AIAgentTaskCompleted })])
+    __registerHandler(deleteCall, remove)
+    render(<AIAgentSessionPanel sessionID={9} sessionName="prod" />)
+    await userEvent.click(await screen.findByRole('button', { name: '删除任务' }))
+    await waitFor(() => expect(requestConfirm).toHaveBeenCalled())
+    expect(remove).toHaveBeenCalledWith(1)
+  })
+
+  it('renders the task result with duration', async () => {
+    __registerHandler(listCall, async () => [createTask({
+      status: AIAgentTaskStatus.AIAgentTaskCompleted,
+      result: 'disk usage collected',
+      started_at: '2026-01-01T00:00:00Z',
+      finished_at: '2026-01-01T00:00:05Z',
+    })])
+    render(<AIAgentSessionPanel sessionID={9} sessionName="prod" />)
+    expect(await screen.findByText('任务结果')).toBeInTheDocument()
+    expect(screen.getByText('disk usage collected')).toBeInTheDocument()
+    expect(screen.getByText('耗时 5s')).toBeInTheDocument()
   })
 })
 

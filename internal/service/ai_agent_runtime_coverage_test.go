@@ -64,6 +64,64 @@ func TestAIAgentTaskQueryAndValidationAPI(t *testing.T) {
 	assert.ErrorContains(t, service.validateAIAgentTaskInput(&input), "unavailable")
 }
 
+func TestDeleteAgentTaskRemovesTaskAndSteps(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	session, err := store.CreateSession(db, model.Session{
+		Name: "agent", Host: "127.0.0.1", Port: 22, Username: "root",
+		AuthMethod: model.AuthPassword, KeepAlive: 30,
+	})
+	require.NoError(t, err)
+	sessions := NewSessionService(db, nil, 30, t.TempDir(), nil, testutil.NewTestLogger())
+	bus := newMockEventBus()
+	service := NewAIService(db, nil, nil, testutil.NewTestLogger(), WithAIAgentRuntime(sessions, bus))
+	task, err := store.CreateAIAgentTask(db, model.AIAgentTaskInput{SessionID: session.ID, Prompt: "inspect"}, model.AIAgentEngineNative, "")
+	require.NoError(t, err)
+	step, err := store.CreateAIAgentStep(db, model.AIAgentStep{TaskID: task.ID, Sequence: 1, Kind: "tool", ToolName: "ssh.exec", Risk: model.AICommandRiskReadOnly, ApprovalStatus: model.AIAgentApprovalNotRequired})
+	require.NoError(t, err)
+
+	require.NoError(t, service.DeleteAgentTask(task.ID))
+
+	loaded, err := service.GetAgentTask(task.ID)
+	assert.Nil(t, loaded)
+	assert.ErrorContains(t, err, "not found")
+	loadedStep, err := store.GetAIAgentStep(db, step.ID)
+	require.NoError(t, err)
+	require.Nil(t, loadedStep)
+	assert.True(t, bus.hasEvent(event.AIAgentTaskChanged))
+	missing, err := store.GetAIAgentTask(db, task.ID)
+	require.NoError(t, err)
+	require.Nil(t, missing)
+	assert.ErrorContains(t, service.DeleteAgentTask(task.ID), "not found")
+	assert.ErrorContains(t, service.DeleteAgentTask(0), "invalid")
+}
+
+func TestDeleteAgentTaskCancelsActiveExecution(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	session, err := store.CreateSession(db, model.Session{
+		Name: "agent", Host: "127.0.0.1", Port: 22, Username: "root",
+		AuthMethod: model.AuthPassword, KeepAlive: 30,
+	})
+	require.NoError(t, err)
+	sessions := NewSessionService(db, nil, 30, t.TempDir(), nil, testutil.NewTestLogger())
+	service := NewAIService(db, nil, nil, testutil.NewTestLogger(), WithAIAgentRuntime(sessions, nil))
+	task, err := store.CreateAIAgentTask(db, model.AIAgentTaskInput{SessionID: session.ID, Prompt: "inspect"}, model.AIAgentEngineNative, "")
+	require.NoError(t, err)
+	ctx, cancel := context.WithCancel(context.Background())
+	service.agent.tasks = make(map[int64]*aiAgentExecution)
+	service.agent.tasks[task.ID] = &aiAgentExecution{cancel: cancel, done: ctx.Done(), approvals: make(map[int64]chan bool)}
+	go func() {
+		<-ctx.Done()
+		service.removeAIAgentExecution(task.ID)
+	}()
+
+	require.NoError(t, service.DeleteAgentTask(task.ID))
+
+	require.Nil(t, service.agentExecution(task.ID))
+	loaded, err := service.GetAgentTask(task.ID)
+	assert.Nil(t, loaded)
+	assert.ErrorContains(t, err, "not found")
+}
+
 func TestAIAgentRuntimeStateAndResumeGuards(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	session, err := store.CreateSession(db, model.Session{

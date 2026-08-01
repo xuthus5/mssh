@@ -60,6 +60,7 @@ function useAIAgentTaskActions({ reload, setSelectedID, setPending, setError }: 
     approve: (taskID: number, stepID: number, approved: boolean) => action('approval', () => AIService.ApproveAgentStep(taskID, stepID, approved)),
     cancel: (taskID: number) => action('cancel', () => AIService.CancelAgentTask(taskID)),
     resume: (taskID: number) => action('resume', () => AIService.ResumeAgentTask(taskID)),
+    remove: (taskID: number) => action('remove', () => AIService.DeleteAgentTask(taskID)),
   }
 }
 

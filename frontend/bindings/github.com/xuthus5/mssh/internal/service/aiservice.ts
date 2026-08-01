@@ -29,6 +29,14 @@ export function Dashboard(): $CancellablePromise<model$0.AISettingsDashboard> {
     });
 }
 
+/**
+ * DeleteAgentTask cancels an active execution (when present) and removes the
+ * task together with its steps.
+ */
+export function DeleteAgentTask(taskID: number): $CancellablePromise<void> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.AIService.DeleteAgentTask", taskID);
+}
+
 export function DeleteConversation(id: number): $CancellablePromise<void> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.AIService.DeleteConversation", id);
 }

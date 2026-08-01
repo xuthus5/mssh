@@ -90,6 +90,26 @@ func UpdateAIAgentTaskStatus(db *sql.DB, id int64, status model.AIAgentTaskStatu
 	return requireAffected(resultValue, "AI agent task")
 }
 
+// DeleteAIAgentTask removes a task together with its steps.
+func DeleteAIAgentTask(db *sql.DB, id int64) error {
+	tx, err := db.Begin()
+	if err != nil {
+		return fmt.Errorf("begin AI agent task delete: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	if _, err = tx.Exec(`DELETE FROM ai_agent_steps WHERE task_id=?`, id); err != nil {
+		return fmt.Errorf("delete AI agent steps: %w", err)
+	}
+	result, err := tx.Exec(`DELETE FROM ai_agent_tasks WHERE id=?`, id)
+	if err != nil {
+		return fmt.Errorf("delete AI agent task: %w", err)
+	}
+	if err = requireAffected(result, "AI agent task"); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
 func ResumeAIAgentTask(db *sql.DB, id int64) error {
 	tx, err := db.Begin()
 	if err != nil {
