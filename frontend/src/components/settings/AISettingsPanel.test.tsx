@@ -82,6 +82,20 @@ describe('AISettingsPanel', () => {
     expect(screen.getByText('AI 配置加载失败')).toBeInTheDocument()
   })
 
+  it('hides the idle saved hint but keeps autosave failure feedback', async () => {
+    const controller = aiController()
+    const user = userEvent.setup()
+    render(<AISettingsPanel controller={controller as never} />)
+    expect(screen.queryByText('已自动保存')).not.toBeInTheDocument()
+
+    controller.saveSettings = vi.fn().mockRejectedValue(new Error('disk full'))
+    await user.click(screen.getByRole('tab', { name: '交互配置' }))
+    await changeNumber(user, '面板宽度', '500')
+    await vi.advanceTimersByTimeAsync(600)
+
+    expect(await screen.findByText('自动保存失败: disk full')).toBeInTheDocument()
+  })
+
   it('keeps edits made while an earlier settings save resolves', async () => {
     const controller = aiController()
     const firstSave = deferredSave()
