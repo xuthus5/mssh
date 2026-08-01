@@ -3,7 +3,7 @@ import type { AppState } from '@/store/appStore'
 import { canTransitionConnection } from '@/store/connectionStatus'
 
 type StoreSet = StoreApi<AppState>['setState']
-type StatusActions = Pick<AppState, 'setConnectionStatus' | 'setActivePane' | 'setRecordingState' | 'setTunnelState' | 'setAppStatus' | 'setTerminalTheme' | 'setMaxPoolSize' | 'setWorkspaceRestoreError' | 'setWorkspaceRestoreNotice' | 'setWorkspaceSaveError' | 'setShellActionError' | 'retryWorkspaceRestore'>
+type StatusActions = Pick<AppState, 'setConnectionStatus' | 'setConnectionError' | 'setActivePane' | 'setRecordingState' | 'setTunnelState' | 'setAppStatus' | 'setTerminalTheme' | 'setMaxPoolSize' | 'setWorkspaceRestoreError' | 'setWorkspaceRestoreNotice' | 'setWorkspaceSaveError' | 'setShellActionError' | 'retryWorkspaceRestore'>
 
 export function createStatusActions(set: StoreSet): StatusActions {
   return {
@@ -16,6 +16,7 @@ export function createStatusActions(set: StoreSet): StatusActions {
       terminalOpenReservations.delete(id)
       return { connectionStatus: { ...state.connectionStatus, [id]: status }, terminalOpenReservations }
     }),
+    setConnectionError: (id, message) => set((state) => ({ connectionErrors: { ...state.connectionErrors, [id]: message } })),
     setActivePane: (activePaneId) => set({ activePaneId }),
     setRecordingState: (id, recording) => set((state) => ({ recordingState: { ...state.recordingState, [id]: recording } })),
     setTunnelState: (id, tunnel) => set((state) => ({ tunnelState: { ...state.tunnelState, [id]: tunnel } })),

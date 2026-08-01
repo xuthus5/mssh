@@ -326,6 +326,11 @@ describe('appStore', () => {
     expect(useAppStore.getState().connectionStatus['term-1']).toBe('connected')
   })
 
+  it('records terminal attach errors', () => {
+    useAppStore.getState().setConnectionError('term-1', 'terminal term-1 not found')
+    expect(useAppStore.getState().connectionErrors['term-1']).toBe('terminal term-1 not found')
+  })
+
   it('keeps an open reservation until the terminal mounts or closes', () => {
     useAppStore.setState({ terminalOpenReservations: new Set(['term-1']) })
     useAppStore.getState().setConnectionStatus('term-1', 'connected')

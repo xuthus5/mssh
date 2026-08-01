@@ -23,6 +23,7 @@ export interface SplitTreeViewProps {
 
 function ConnectionOverlay({ terminalID, onReconnect, onClose }: { terminalID: string; onReconnect: () => void; onClose: () => void }) {
   const status = useAppStore((state) => state.connectionStatus[terminalID])
+  const errorDetail = useAppStore((state) => state.connectionErrors[terminalID])
   if (status === undefined || status === 'connected') return null
   const connecting = status === 'connecting' || status === 'reconnecting'
   const title = connecting ? t('正在重新连接') : status === 'error' ? t('连接异常') : t('连接已断开')
@@ -36,6 +37,9 @@ function ConnectionOverlay({ terminalID, onReconnect, onClose }: { terminalID: s
       {connecting ? <RefreshCw aria-hidden="true" className="mb-3 size-8 animate-spin text-primary" /> : <WifiOff aria-hidden="true" className="mb-3 size-8 text-destructive" />}
       <h3 className="text-sm font-semibold text-foreground">{title}</h3>
       <p className="mt-1 text-xs leading-5 text-muted-foreground">{description}</p>
+      {status === 'error' && errorDetail
+        ? <p className="mt-1 break-all text-[10px] leading-4 text-muted-foreground/80">{errorDetail}</p>
+        : null}
       <div className="mt-4 flex items-center gap-2">
         <Button type="button" size="sm" variant="outline" disabled={connecting} onClick={onClose}><X />{t('关闭终端')}</Button>
         <Button type="button" size="sm" disabled={connecting} onClick={onReconnect}><RefreshCw />{connecting ? t('正在重连') : t('重新连接')}</Button>

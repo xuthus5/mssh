@@ -126,6 +126,7 @@ export interface AppState {
   terminalOpenReservations?: Set<string>
   maxPoolSize: number
   connectionStatus: Record<string, ConnectionStatus>
+  connectionErrors: Record<string, string>
   appStatus: string
   terminalTheme: TerminalTheme
   transfers: TransferJob[]
@@ -171,6 +172,7 @@ export interface AppState {
   updateLastUsed: (id: string) => void
   evictLRU: () => void
   setConnectionStatus: (id: string, status: ConnectionStatus) => void
+  setConnectionError: (id: string, message: string) => void
   setActivePane: (id: string | null) => void
   setRecordingState: (id: string, state: AppState['recordingState'][string]) => void
   setTunnelState: (id: string, state: AppState['tunnelState'][string]) => void
@@ -195,6 +197,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   terminalOpenReservations: new Set(),
   maxPoolSize: DEFAULT_MAX_POOL_SIZE,
   connectionStatus: {},
+  connectionErrors: {},
   appStatus: t('就绪'),
   terminalTheme: DEFAULT_THEME,
   transfers: [],

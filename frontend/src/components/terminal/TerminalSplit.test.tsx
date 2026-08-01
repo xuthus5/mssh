@@ -523,8 +523,10 @@ it('preserves the primary pane host when splitting', async () => {
     useToastStore.setState({ toasts: [] })
     render(<Harness />)
     act(() => useAppStore.getState().setConnectionStatus('primary-1', 'error'))
+    act(() => useAppStore.getState().setConnectionError('primary-1', 'terminal primary-1 not found'))
     expect(await screen.findByText('连接异常')).toBeInTheDocument()
     expect(screen.getByText('终端通道不可用（挂载或通信失败），可在当前终端中重新连接。')).toBeInTheDocument()
+    expect(screen.getByText('terminal primary-1 not found')).toBeInTheDocument()
     expect(useToastStore.getState().toasts).toHaveLength(0)
   })
 

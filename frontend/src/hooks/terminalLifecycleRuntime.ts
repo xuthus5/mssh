@@ -87,6 +87,7 @@ export function useTerminalAttachment(terminalID: string) {
     const markFailed = (error: unknown) => {
       logger.error('terminal attach error', error)
       // Pane ConnectionOverlay owns recovery UX; avoid toast + overlay double reporting.
+      useAppStore.getState().setConnectionError(terminalID, error instanceof Error ? error.message : String(error))
       useAppStore.getState().setConnectionStatus(terminalID, 'error')
     }
     try {

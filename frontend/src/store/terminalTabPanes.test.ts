@@ -38,6 +38,7 @@ describe('terminalTabPanes', () => {
           ['split-a', { terminal, lastUsed: 2 }],
         ]),
         connectionStatus: { primary: 'connected', 'split-a': 'connected' },
+        connectionErrors: { primary: 'attach boom', 'split-a': 'attach boom' },
         recordingState: { primary: 'recording' },
         activePaneId: 'split-a',
         terminalOpenReservations: new Set(['primary', 'split-a']),
@@ -46,6 +47,7 @@ describe('terminalTabPanes', () => {
     )
     expect(result.terminalPool.size).toBe(0)
     expect(result.connectionStatus).toEqual({})
+    expect(result.connectionErrors).toEqual({})
     expect(result.recordingState).toEqual({})
     expect(result.activePaneId).toBeNull()
     expect(result.terminalOpenReservations).toEqual(new Set())
