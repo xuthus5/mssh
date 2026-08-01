@@ -44,7 +44,19 @@ func ListAIAgentTasks(db *sql.DB, sessionID int64, limit int) ([]model.AIAgentTa
 		}
 		tasks = append(tasks, task)
 	}
-	return tasks, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	// Load steps only after the task rows are fully drained: the database pool
+	// is limited to one connection, so nested queries would deadlock.
+	for index := range tasks {
+		steps, stepErr := ListAIAgentSteps(db, tasks[index].ID)
+		if stepErr != nil {
+			return nil, stepErr
+		}
+		tasks[index].Steps = steps
+	}
+	return tasks, nil
 }
 
 func GetAIAgentTask(db *sql.DB, id int64) (*model.AIAgentTask, error) {
