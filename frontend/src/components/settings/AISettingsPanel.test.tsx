@@ -3,6 +3,7 @@ import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Events } from '@wailsio/runtime'
 import { AISettingsPanel } from '@/components/settings/AISettingsPanel'
+import { useToastStore } from '@/components/ui/toast'
 import type { AISettingsController } from '@/hooks/useAISettings'
 import { SETTINGS_PREVIEW_CANCELLED_EVENT } from '@/lib/settingsWindowEvents'
 import {
@@ -18,7 +19,7 @@ import {
 vi.mock('@/lib/confirmDialog', () => ({ requestConfirm: vi.fn(async () => true) }))
 
 describe('AISettingsPanel', () => {
-  beforeEach(() => { vi.useFakeTimers({ shouldAdvanceTime: true }) })
+  beforeEach(() => { vi.useFakeTimers({ shouldAdvanceTime: true }); useToastStore.setState({ toasts: [] }) })
   afterEach(() => { vi.runOnlyPendingTimers(); vi.useRealTimers() })
 
   it('uses horizontal tabs and saves interaction changes', async () => {
@@ -82,18 +83,18 @@ describe('AISettingsPanel', () => {
     expect(screen.getByText('AI 配置加载失败')).toBeInTheDocument()
   })
 
-  it('hides the idle saved hint but keeps autosave failure feedback', async () => {
+  it('reports autosave outcomes through toasts instead of a persistent hint', async () => {
     const controller = aiController()
     const user = userEvent.setup()
     render(<AISettingsPanel controller={controller as never} />)
-    expect(screen.queryByText('已自动保存')).not.toBeInTheDocument()
+    expect(useToastStore.getState().toasts.some((item) => item.message === '已自动保存')).toBe(false)
 
     controller.saveSettings = vi.fn().mockRejectedValue(new Error('disk full'))
     await user.click(screen.getByRole('tab', { name: '交互配置' }))
     await changeNumber(user, '面板宽度', '500')
     await vi.advanceTimersByTimeAsync(600)
 
-    expect(await screen.findByText('自动保存失败: disk full')).toBeInTheDocument()
+    expect(useToastStore.getState().toasts.some((item) => item.type === 'error' && item.message.includes('自动保存失败: disk full'))).toBe(true)
   })
 
   it('keeps edits made while an earlier settings save resolves', async () => {

@@ -1,6 +1,5 @@
 import { useCallback } from 'react'
 import { Button } from '@/components/ui/button'
-import { AutoSaveStatusIndicator } from '@/components/settings/AutoSaveStatus'
 import { TerminalBehaviorSettingsSection } from '@/components/settings/TerminalBehaviorSettings'
 import { TerminalRendererSettingsSection } from '@/components/settings/TerminalRendererSettings'
 import { TerminalLocalShellSettingsSection } from '@/components/settings/TerminalLocalShellSettings'
@@ -109,9 +108,9 @@ function useTerminalDraft({ general, onSaveGeneral, settingsReady = true }: Pick
     },
     [acknowledgeSaved, general, onSaveGeneral],
   )
-  const autoSave = useAutoSave({ value: draft, onSave: persist, isReady: settingsReady, delayMs: 450, baselineRevision })
+  useAutoSave({ value: draft, onSave: persist, isReady: settingsReady, delayMs: 450, baselineRevision, notify: true })
   const update = <Key extends keyof TerminalDraft>(key: Key, value: TerminalDraft[Key]) => setDraft({ ...draft, [key]: value })
-  return { autoSave, draft, update }
+  return { draft, update }
 }
 
 export function TerminalSettingsPanel(props: Props) {
@@ -133,7 +132,7 @@ function SettingsErrors({ loadError = '', onReloadSettings, themeLoadError = '',
 
 function TerminalPreferenceSections({ model }: { model: TerminalModel }) {
   const { draft, update } = model
-  return <div className="flex flex-col gap-3"><div className="flex items-center justify-between gap-3"><p className="text-xs text-muted-foreground">{t('终端连接与交互偏好会自动保存。')}</p><AutoSaveStatusIndicator status={model.autoSave.status} error={model.autoSave.error} /></div><TerminalConnectionDefaultsSettingsSection maxPoolSize={draft.maxPoolSize} defaultKeepAlive={draft.defaultKeepAlive} defaultTermType={draft.defaultTermType} onMaxPoolSizeChange={(value) => update('maxPoolSize', value)} onDefaultKeepAliveChange={(value) => update('defaultKeepAlive', value)} onDefaultTermTypeChange={(value) => update('defaultTermType', value)} /><TerminalBehaviorSettingsSection rightClickAction={draft.rightClickAction} copyOnSelect={draft.copyOnSelect} scrollbackLines={draft.scrollbackLines} autoReconnect={draft.autoReconnect} restoreTabsOnStartup={draft.restoreTabsOnStartup} historyPredict={draft.historyPredict} onRightClickActionChange={(value) => update('rightClickAction', value)} onCopyOnSelectChange={(value) => update('copyOnSelect', value)} onScrollbackLinesChange={(value) => update('scrollbackLines', value > 0 ? String(value) : '')} onAutoReconnectChange={(value) => update('autoReconnect', value)} onRestoreTabsOnStartupChange={(value) => update('restoreTabsOnStartup', value)} onHistoryPredictChange={(value) => update('historyPredict', value)} /><TerminalLocalShellSettingsSection shell={draft.localShell} args={draft.localShellArgs} cwd={draft.localShellCwd} login={draft.localShellLogin} onShellChange={(value) => update('localShell', value)} onArgsChange={(value) => update('localShellArgs', value)} onCwdChange={(value) => update('localShellCwd', value)} onLoginChange={(value) => update('localShellLogin', value)} /><TerminalRendererSettingsSection renderer={draft.renderer} onRendererChange={(value) => update('renderer', value)} /></div>
+  return <div className="flex flex-col gap-3"><div className="flex items-center justify-between gap-3"><p className="text-xs text-muted-foreground">{t('终端连接与交互偏好会自动保存。')}</p></div><TerminalConnectionDefaultsSettingsSection maxPoolSize={draft.maxPoolSize} defaultKeepAlive={draft.defaultKeepAlive} defaultTermType={draft.defaultTermType} onMaxPoolSizeChange={(value) => update('maxPoolSize', value)} onDefaultKeepAliveChange={(value) => update('defaultKeepAlive', value)} onDefaultTermTypeChange={(value) => update('defaultTermType', value)} /><TerminalBehaviorSettingsSection rightClickAction={draft.rightClickAction} copyOnSelect={draft.copyOnSelect} scrollbackLines={draft.scrollbackLines} autoReconnect={draft.autoReconnect} restoreTabsOnStartup={draft.restoreTabsOnStartup} historyPredict={draft.historyPredict} onRightClickActionChange={(value) => update('rightClickAction', value)} onCopyOnSelectChange={(value) => update('copyOnSelect', value)} onScrollbackLinesChange={(value) => update('scrollbackLines', value > 0 ? String(value) : '')} onAutoReconnectChange={(value) => update('autoReconnect', value)} onRestoreTabsOnStartupChange={(value) => update('restoreTabsOnStartup', value)} onHistoryPredictChange={(value) => update('historyPredict', value)} /><TerminalLocalShellSettingsSection shell={draft.localShell} args={draft.localShellArgs} cwd={draft.localShellCwd} login={draft.localShellLogin} onShellChange={(value) => update('localShell', value)} onArgsChange={(value) => update('localShellArgs', value)} onCwdChange={(value) => update('localShellCwd', value)} onLoginChange={(value) => update('localShellLogin', value)} /><TerminalRendererSettingsSection renderer={draft.renderer} onRendererChange={(value) => update('renderer', value)} /></div>
 }
 
 function ThemeSections(props: Pick<Props, 'themeProfiles' | 'themeAssignments' | 'terminalGlobalStyle' | 'colorMode' | 'onSaveThemeConfiguration' | 'onResetBuiltinThemes' | 'onImportThemes' | 'onCreateThemeProfile' | 'onUpdateThemeProfile' | 'onDeleteThemeProfile' | 'onDeleteThemeDefinition'>) {

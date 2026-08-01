@@ -2,9 +2,8 @@ import { useCallback } from 'react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { AIProviderPanel } from '@/components/settings/AIProviderPanel'
 import { AIAgentPanel } from '@/components/settings/AIAgentPanel'
-import { AutoSaveStatusIndicator } from '@/components/settings/AutoSaveStatus'
 import { AIInteractionSettingsSection, AISearchSettingsSection, AISecuritySettingsSection } from '@/components/settings/AISettingsSections'
-import { useAutoSave, type UseAutoSaveResult } from '@/hooks/useAutoSave'
+import { useAutoSave } from '@/hooks/useAutoSave'
 import { useDraftSync } from '@/hooks/useDraftSync'
 import { useSettingsWindowHide } from '@/hooks/useSettingsWindowHide'
 import type { AISettingsController } from '@/hooks/useAISettings'
@@ -93,6 +92,7 @@ function useAISettingsPanelState(controller: AISettingsController) {
     isReady: dashboard !== null,
     delayMs: 450,
     baselineRevision,
+    notify: true,
   })
   useSettingsWindowHide(useCallback(() => {
     if (!draft.search.api_key) return
@@ -128,11 +128,10 @@ function AISettingsFailure({ error }: { error: string | null }) {
   </div>
 }
 
-function AISettingsTabs({ controller, dashboard, draft, autoSave, update, removeProvider }: {
+function AISettingsTabs({ controller, dashboard, draft, update, removeProvider }: {
   controller: AISettingsController
   dashboard: AISettingsDashboard
   draft: AISettingsInput
-  autoSave: UseAutoSaveResult<AISettingsInput>
   update: (changes: Partial<AISettingsInput>) => void
   removeProvider: (providerID: number) => void
 }) {
@@ -145,7 +144,6 @@ function AISettingsTabs({ controller, dashboard, draft, autoSave, update, remove
           <TabsTrigger value="search">{t('网络搜索')}</TabsTrigger>
           <TabsTrigger value="security">{t('安全配置')}</TabsTrigger>
         </TabsList>
-        {autoSave.status !== 'idle' && autoSave.status !== 'saved' ? <AutoSaveStatusIndicator status={autoSave.status} error={autoSave.error} /> : null}
       </div>
       <TabsContent value="providers" className="min-h-0 overflow-y-auto">
         <AIProviderPanel controller={controller} priorities={draft} onPriorityChange={update} onProviderDeleted={removeProvider} />

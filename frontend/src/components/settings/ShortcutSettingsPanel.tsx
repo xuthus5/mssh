@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Keyboard, RotateCcw, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { AutoSaveStatusIndicator } from '@/components/settings/AutoSaveStatus'
 import { useAutoSave } from '@/hooks/useAutoSave'
 import { useDraftSync } from '@/hooks/useDraftSync'
 import { useShortcutSettings } from '@/hooks/useShortcutSettings'
@@ -88,7 +87,7 @@ export function ShortcutSettingsPanel() {
   const model = useShortcutSettingsModel()
   return (
     <div className="flex flex-col gap-5 pt-2">
-      <ShortcutHeader autoSave={model.autoSave} onReset={model.resetAll} />
+      <ShortcutHeader onReset={model.resetAll} />
       <ShortcutAlerts error={model.error} conflicts={model.conflicts.length} onReload={model.reload} />
       <ShortcutList model={model} />
     </div>
@@ -113,6 +112,7 @@ function useShortcutSettingsModel() {
     isReady: !loading,
     delayMs: 450,
     baselineRevision,
+    notify: true,
   })
   const updateBinding = (id: ShortcutActionId, chord: ShortcutChord | null) => {
     if (chord && isReservedShortcutChord(chord)) {
@@ -143,8 +143,8 @@ function buildConflictMap(conflicts: ReturnType<typeof findShortcutConflicts>) {
   return map
 }
 
-function ShortcutHeader({ autoSave, onReset }: Pick<ShortcutModel, 'autoSave'> & { onReset: () => void }) {
-  return <div className="flex items-start justify-between gap-3"><div><h2 className="flex items-center gap-2 text-sm font-semibold text-foreground"><Keyboard className="size-4" />{t('快捷键')}</h2><p className="mt-1 text-xs text-muted-foreground">{t('自定义全局快捷键。修改后自动保存；冲突项会以警告标出。macOS 使用 ⌘，Windows/Linux 使用 Ctrl。')}</p></div><div className="flex items-center gap-2"><AutoSaveStatusIndicator status={autoSave.status} error={autoSave.error} /><Button type="button" size="sm" variant="outline" onClick={onReset}><RotateCcw className="size-3.5" />{t('恢复默认')}</Button></div></div>
+function ShortcutHeader({ onReset }: { onReset: () => void }) {
+  return <div className="flex items-start justify-between gap-3"><div><h2 className="flex items-center gap-2 text-sm font-semibold text-foreground"><Keyboard className="size-4" />{t('快捷键')}</h2><p className="mt-1 text-xs text-muted-foreground">{t('自定义全局快捷键。修改后自动保存；冲突项会以警告标出。macOS 使用 ⌘，Windows/Linux 使用 Ctrl。')}</p></div><Button type="button" size="sm" variant="outline" onClick={onReset}><RotateCcw className="size-3.5" />{t('恢复默认')}</Button></div>
 }
 
 function ShortcutAlerts({ error, conflicts, onReload }: { error: string; conflicts: number; onReload: () => Promise<void> }) {

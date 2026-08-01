@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Events } from '@wailsio/runtime'
 import { SettingsView } from '@/components/settings/SettingsView'
+import { useToastStore } from '@/components/ui/toast'
 import type { GeneralSettings } from '@/hooks/useSettings'
 import { SETTINGS_PREVIEW_CANCELLED_EVENT } from '@/lib/settingsWindowEvents'
 import { CursorStyle } from '../../../bindings/github.com/xuthus5/mssh/internal/model/models'
@@ -83,6 +84,7 @@ function themeProfile(id: number, mode: 'dark' | 'light', background: string): a
 describe('SettingsView', () => {
   beforeEach(() => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
+    useToastStore.setState({ toasts: [] })
   })
   afterEach(() => {
     vi.clearAllTimers()
@@ -279,7 +281,7 @@ describe('SettingsView', () => {
 
     expect(props.onSaveGeneral).toHaveBeenCalledWith(expect.objectContaining({ logRetentionDays: 45 }), { scope: 'general' })
     expect(screen.getByLabelText('日志保留天数')).toHaveValue(45)
-    expect(screen.getByRole('status')).toHaveTextContent('自动保存失败: disk full')
+    expect(useToastStore.getState().toasts.some((item) => item.type === 'error' && item.message.includes('自动保存失败: disk full'))).toBe(true)
   })
 
   it('keeps a newer general draft when an earlier save response arrives', async () => {

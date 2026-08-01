@@ -8,7 +8,9 @@ import {
   type SetStateAction,
 } from 'react'
 import { AutoSaveCoordinator, type AutoSaveRequest } from '@/hooks/autoSaveCoordinator'
+import { toast } from '@/components/ui/toast'
 import { useSettingsWindowHide } from '@/hooks/useSettingsWindowHide'
+import { t } from '@/i18n'
 
 export type AutoSaveStatus = 'idle' | 'pending' | 'saving' | 'saved' | 'error'
 
@@ -20,6 +22,7 @@ export interface UseAutoSaveOptions<T> {
   delayMs?: number
   serialize?: (value: T) => string
   baselineRevision?: number
+  notify?: boolean
 }
 
 export interface UseAutoSaveResult<T> {
@@ -57,9 +60,21 @@ export function useAutoSave<T>(options: UseAutoSaveOptions<T>): UseAutoSaveResul
 }
 
 function normalizeOptions<T>(options: UseAutoSaveOptions<T>): NormalizedOptions<T> {
+  const notify = options.notify ?? false
+  const onSave = notify
+    ? async (value: T) => {
+        try {
+          await options.onSave(value)
+          toast(t('已自动保存'), 'success')
+        } catch (saveError) {
+          toast(t('自动保存失败: ${}', saveError instanceof Error ? saveError.message : String(saveError)), 'error')
+          throw saveError
+        }
+      }
+    : options.onSave
   return {
     value: options.value,
-    onSave: options.onSave,
+    onSave,
     enabled: options.enabled ?? true,
     isReady: options.isReady ?? true,
     delayMs: options.delayMs ?? 450,

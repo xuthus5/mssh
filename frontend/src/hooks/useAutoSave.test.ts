@@ -2,11 +2,13 @@ import { act, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Events } from '@wailsio/runtime'
 import { useAutoSave } from '@/hooks/useAutoSave'
+import { useToastStore } from '@/components/ui/toast'
 import { SETTINGS_PREVIEW_CANCELLED_EVENT } from '@/lib/settingsWindowEvents'
 
 describe('useAutoSave', () => {
   beforeEach(() => {
     vi.useFakeTimers()
+    useToastStore.setState({ toasts: [] })
   })
   afterEach(() => {
     vi.useRealTimers()
@@ -35,6 +37,48 @@ describe('useAutoSave', () => {
     })
     expect(onSave).toHaveBeenCalledWith({ name: 'b' })
     expect(result.current.status).toBe('saved')
+  })
+
+  it('fires a success toast after a real autosave when notify is enabled', async () => {
+    const onSave = vi.fn(async () => {})
+    const { rerender } = renderHook(
+      ({ value }) => useAutoSave({ value, onSave, delayMs: 300, notify: true }),
+      { initialProps: { value: { name: 'a' } } },
+    )
+    rerender({ value: { name: 'b' } })
+    await act(async () => {
+      vi.advanceTimersByTime(301)
+      await Promise.resolve()
+    })
+    expect(useToastStore.getState().toasts.some((item) => item.type === 'success' && item.message === '已自动保存')).toBe(true)
+  })
+
+  it('fires an error toast when a notified autosave fails', async () => {
+    const onSave = vi.fn(async () => { throw new Error('disk full') })
+    const { rerender } = renderHook(
+      ({ value }) => useAutoSave({ value, onSave, delayMs: 300, notify: true }),
+      { initialProps: { value: { name: 'a' } } },
+    )
+    rerender({ value: { name: 'b' } })
+    await act(async () => {
+      vi.advanceTimersByTime(301)
+      await Promise.resolve()
+    })
+    expect(useToastStore.getState().toasts.some((item) => item.type === 'error' && item.message.includes('自动保存失败: disk full'))).toBe(true)
+  })
+
+  it('keeps autosave silent when notify is disabled', async () => {
+    const onSave = vi.fn(async () => {})
+    const { rerender } = renderHook(
+      ({ value }) => useAutoSave({ value, onSave, delayMs: 300 }),
+      { initialProps: { value: { name: 'a' } } },
+    )
+    rerender({ value: { name: 'b' } })
+    await act(async () => {
+      vi.advanceTimersByTime(301)
+      await Promise.resolve()
+    })
+    expect(useToastStore.getState().toasts).toHaveLength(0)
   })
 
   it('coalesces rapid edits into a single save of the latest value', async () => {

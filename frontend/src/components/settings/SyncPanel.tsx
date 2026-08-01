@@ -7,7 +7,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { AutoSaveStatusIndicator } from '@/components/settings/AutoSaveStatus'
 import { SyncProviderTab } from '@/components/settings/SyncProviderTab'
 import { SyncStatusTab } from '@/components/settings/SyncStatusTab'
 import { useAutoSave } from '@/hooks/useAutoSave'
@@ -83,6 +82,7 @@ export function SyncPanel({ controller, onExport, onImport }: Props) {
     isReady: Boolean(controller.dashboard),
     delayMs: 500,
     baselineRevision,
+    notify: true,
   })
   useSettingsWindowHide(useCallback(() => {
     if (!hasTransientSyncSecrets(input)) return
@@ -143,7 +143,6 @@ function SyncPanelHeader(props: SyncPanelViewProps) {
         </div>
       </div>
       <div className="flex flex-wrap items-center justify-end gap-3">
-        <AutoSaveStatusIndicator status={props.autoSave.status} error={props.autoSave.error} />
         {!props.input.enabled && <SyncTransferButtons {...props} runTransfer={runTransfer} />}
         <label className="flex items-center gap-2 text-sm">
           <Switch checked={props.input.enabled} onCheckedChange={(enabled) => props.setInput({ ...props.input, enabled })} />
