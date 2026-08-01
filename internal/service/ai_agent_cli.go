@@ -373,9 +373,13 @@ func (openCodeAIAgentAdapter) Command(workDir, mcpURL, token, prompt string) (*e
 	if err = os.WriteFile(configPath, data, 0o600); err != nil {
 		return nil, fmt.Errorf("write OpenCode config: %w", err)
 	}
-	command := exec.Command(path, "run", "--pure", "--format", "json", "--agent", "mssh", "--dir", workDir, prompt) // #nosec G204 -- path is resolved from fixed command name.
+	// The prompt is passed through stdin instead of as a positional argument:
+	// OpenCode's CLI parser truncates message arguments at embedded double
+	// quotes, and the agent prompt contains a JSON template with quotes.
+	command := exec.Command(path, "run", "--pure", "--format", "json", "--agent", "mssh", "--dir", workDir) // #nosec G204 -- path is resolved from fixed command name.
 	command.Dir = workDir
 	command.Env = append(os.Environ(), "OPENCODE_CONFIG="+configPath)
+	command.Stdin = strings.NewReader(prompt)
 	return command, nil
 }
 
