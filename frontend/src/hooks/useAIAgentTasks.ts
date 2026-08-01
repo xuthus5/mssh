@@ -60,6 +60,11 @@ function useAIAgentTaskActions({ reload, setSelectedID, setPending, setError }: 
     approve: (taskID: number, stepID: number, approved: boolean) => action('approval', () => AIService.ApproveAgentStep(taskID, stepID, approved)),
     cancel: (taskID: number) => action('cancel', () => AIService.CancelAgentTask(taskID)),
     resume: (taskID: number) => action('resume', () => AIService.ResumeAgentTask(taskID)),
+    retry: async (taskID: number) => {
+      const task = await action('retry', () => AIService.RetryAgentTask(taskID))
+      if (task) setSelectedID(task.id)
+      return task
+    },
     remove: (taskID: number) => action('remove', () => AIService.DeleteAgentTask(taskID)),
   }
 }

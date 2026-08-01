@@ -13,6 +13,7 @@ const startCall = 'github.com/xuthus5/mssh/internal/service.AIService.StartAgent
 const approveCall = 'github.com/xuthus5/mssh/internal/service.AIService.ApproveAgentStep'
 const cancelCall = 'github.com/xuthus5/mssh/internal/service.AIService.CancelAgentTask'
 const resumeCall = 'github.com/xuthus5/mssh/internal/service.AIService.ResumeAgentTask'
+const retryCall = 'github.com/xuthus5/mssh/internal/service.AIService.RetryAgentTask'
 const deleteCall = 'github.com/xuthus5/mssh/internal/service.AIService.DeleteAgentTask'
 
 describe('AIAgentSessionPanel', () => {
@@ -102,6 +103,18 @@ describe('AIAgentSessionPanel', () => {
     await userEvent.click(await screen.findByRole('button', { name: '删除任务' }))
     await waitFor(() => expect(requestConfirm).toHaveBeenCalled())
     expect(remove).toHaveBeenCalledWith(1)
+  })
+
+  it('retries a failed task with its original parameters', async () => {
+    const retry = vi.fn(async () => {
+      const next = createTask({ id: 2, status: AIAgentTaskStatus.AIAgentTaskRunning, prompt: 'retried task' })
+      return next
+    })
+    __registerHandler(listCall, async () => [createTask({ status: AIAgentTaskStatus.AIAgentTaskFailed, error: 'boom' })])
+    __registerHandler(retryCall, retry)
+    render(<AIAgentSessionPanel sessionID={9} sessionName="prod" />)
+    await userEvent.click(await screen.findByRole('button', { name: '重试' }))
+    expect(retry).toHaveBeenCalledWith(1)
   })
 
   it('renders the task result with duration', async () => {
