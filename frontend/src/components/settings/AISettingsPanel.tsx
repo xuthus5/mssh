@@ -145,7 +145,7 @@ function AISettingsTabs({ controller, dashboard, draft, autoSave, update, remove
           <TabsTrigger value="search">{t('网络搜索')}</TabsTrigger>
           <TabsTrigger value="security">{t('安全配置')}</TabsTrigger>
         </TabsList>
-        <AutoSaveStatusIndicator status={autoSave.status} error={autoSave.error} />
+        {autoSave.status !== 'idle' && autoSave.status !== 'saved' ? <AutoSaveStatusIndicator status={autoSave.status} error={autoSave.error} /> : null}
       </div>
       <TabsContent value="providers" className="min-h-0 overflow-y-auto">
         <AIProviderPanel controller={controller} priorities={draft} onPriorityChange={update} onProviderDeleted={removeProvider} />
