@@ -22,6 +22,7 @@ const initialSettings: GeneralSettings = {
   localShellCwd: '',
   localShellLogin: true,
   closeButtonAction: 'tray',
+  debug: false,
   logDir: '/old/logs',
   logRetentionDays: 30,
   proxyMode: 'manual',
