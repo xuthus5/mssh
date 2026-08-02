@@ -54,9 +54,14 @@ func (importer *ITermColorsImporter) Import(filename string, content []byte) ([]
 	return []model.ThemeDefinition{definition}, nil
 }
 
+// containsXMLExternalReference reports whether the plist declares an internal
+// entity subset that Go's encoding/xml decoder would not expand. The standard
+// plist header `<!DOCTYPE plist PUBLIC "..." "...">` carries no internal subset
+// and is safe to accept: Go never fetches external DTDs, so the only real XXE
+// vector is an `<!ENTITY` declaration inside a `<!DOCTYPE ... [ ... ]>` block.
 func containsXMLExternalReference(content []byte) bool {
 	upper := bytes.ToUpper(content)
-	return bytes.Contains(upper, []byte("<!DOCTYPE")) || bytes.Contains(upper, []byte("<!ENTITY"))
+	return bytes.Contains(upper, []byte("<!ENTITY"))
 }
 
 func parseITermColors(content []byte) (map[string]map[string]string, error) {
