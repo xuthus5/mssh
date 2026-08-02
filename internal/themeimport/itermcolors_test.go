@@ -37,6 +37,25 @@ func TestITermColorsImporterValidatesInput(t *testing.T) {
 	assert.ErrorContains(t, err, "entities")
 }
 
+func TestITermColorsImporterAcceptsStandardPlistHeader(t *testing.T) {
+	importer := NewITermColorsImporter()
+	content := `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+` + itermFixture(0.1)
+	definitions, err := importer.Import("Cobalt.itermcolors", []byte(content))
+	require.NoError(t, err)
+	require.Len(t, definitions, 1)
+	assert.Equal(t, model.ThemeModeDark, definitions[0].Mode)
+	assert.Equal(t, "Cobalt", definitions[0].Name)
+}
+
+func TestContainsXMLExternalReferenceOnlyRejectsEntityDeclarations(t *testing.T) {
+	assert.False(t, containsXMLExternalReference([]byte(`<?xml version="1.0"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist/>`)), "standard plist DOCTYPE header must be accepted")
+	assert.True(t, containsXMLExternalReference([]byte(`<!DOCTYPE plist [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>`)), "entity declaration must be rejected")
+	assert.True(t, containsXMLExternalReference([]byte(`<!ENTITY xxe SYSTEM "file:///etc/passwd">`)), "bare entity declaration must be rejected")
+	assert.False(t, containsXMLExternalReference([]byte(`<plist><dict></dict></plist>`)), "plain plist must be accepted")
+}
+
 func TestITermColorsFingerprintIsStable(t *testing.T) {
 	importer := NewITermColorsImporter()
 	first, err := importer.Import("one.itermcolors", []byte(itermFixture(0.2)))
