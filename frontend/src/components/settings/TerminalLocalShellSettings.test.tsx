@@ -75,4 +75,14 @@ describe('TerminalLocalShellSettingsSection', () => {
     await user.click(await screen.findByText('系统默认'))
     expect(onShellChange).toHaveBeenCalledWith('')
   })
+
+  it('keeps the working directory hint as the input placeholder for row alignment', () => {
+    render(<TerminalLocalShellSettingsSection shell="" args="" cwd="" login={false} candidates={CANDIDATES} onShellChange={vi.fn()} onArgsChange={vi.fn()} onCwdChange={vi.fn()} onLoginChange={vi.fn()} />)
+    const args = screen.getByLabelText('启动参数')
+    const cwd = screen.getByLabelText('工作目录')
+    expect(cwd).toHaveAttribute('placeholder', '留空则使用用户家目录。')
+    expect(screen.queryByText('留空则使用用户家目录。')).toBeNull()
+    expect(args.parentElement).toHaveClass('group/field flex w-full gap-2')
+    expect(cwd.parentElement).toHaveClass('group/field flex w-full gap-2')
+  })
 })
