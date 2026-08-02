@@ -52,3 +52,12 @@ func TestLocalShellOptionsReadsSettings(t *testing.T) {
 	require.Equal(t, 100, opts.Cols)
 	require.Equal(t, 40, opts.Rows)
 }
+
+func TestListLocalShellCandidatesNoError(t *testing.T) {
+	term := NewTerminalService(nil, discardEventBus{}, 4, slog.Default())
+	candidates := term.ListLocalShellCandidates()
+	require.NotNil(t, candidates)
+	for _, candidate := range candidates {
+		require.NotEmpty(t, candidate)
+	}
+}
