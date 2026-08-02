@@ -17,6 +17,7 @@ interface GeneralDraft {
   uiFontFallbackFamily: string
   uiFontSize: string
   closeButtonAction: GeneralSettings['closeButtonAction']
+  debug: boolean
   logDir: string
   logRetentionDays: string
   proxyMode: GeneralSettings['proxyMode']
@@ -45,6 +46,7 @@ function createDraft(general: GeneralSettings): GeneralDraft {
     uiFontFallbackFamily: general.uiFontFallbackFamily,
     uiFontSize: String(general.uiFontSize),
     closeButtonAction: general.closeButtonAction,
+    debug: general.debug,
     logDir: general.logDir,
     logRetentionDays: String(general.logRetentionDays),
     proxyMode: general.proxyMode,
@@ -65,6 +67,7 @@ function buildSavePayload(general: GeneralSettings, draft: GeneralDraft): Genera
     uiFontFallbackFamily: draft.uiFontFallbackFamily,
     uiFontSize: parseInt(draft.uiFontSize, 10) || 14,
     closeButtonAction: draft.closeButtonAction,
+    debug: draft.debug,
     logDir: draft.logDir.trim(),
     logRetentionDays: parseInt(draft.logRetentionDays, 10) || 30,
     proxyMode: draft.proxyMode,
@@ -231,6 +234,8 @@ function GeneralSettingsSections({ draft, setDraft, systemFonts, previewDraft }:
       <UIFontSettings draft={draft} systemFonts={systemFonts} onChange={previewDraft} />
       <ApplicationBehaviorSettingsSection
         closeButtonAction={draft.closeButtonAction}
+        debug={draft.debug}
+        onDebugChange={(value) => setDraft({ ...draft, debug: value })}
         onCloseButtonActionChange={(value) => setDraft({ ...draft, closeButtonAction: value })}
       />
       <ApplicationLogSettingsSection

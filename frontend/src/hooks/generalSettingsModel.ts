@@ -25,6 +25,7 @@ export const generalSettingKeys = [
   'terminal.right_click_action', 'terminal.copy_on_select', 'terminal.scrollback_lines', 'terminal.auto_reconnect', 'terminal.restore_tabs_on_startup', 'terminal.renderer', 'terminal.history_predict', 'terminal.local_shell', 'terminal.local_shell_args', 'terminal.local_shell_cwd', 'terminal.local_shell_login', 'appearance.ui_font_family',
   'appearance.ui_font_fallback_family', 'appearance.ui_font_size',
   'application.close_button_action', 'application.log_dir', 'application.log_retention_days',
+  'application.debug',
   'application.proxy_mode', 'application.proxy_url', 'application.proxy_no_proxy',
   'application.proxy_username', 'application.proxy_password', 'application.proxy_password_saved',
   LANGUAGE_SETTING_KEY,
@@ -54,6 +55,7 @@ export interface GeneralSettings {
   localShellCwd: string
   localShellLogin: boolean
   closeButtonAction: CloseButtonAction
+  debug: boolean
   logDir: string
   logRetentionDays: number
   proxyMode: NetworkProxyMode
@@ -80,6 +82,7 @@ export const defaultGeneralSettings: GeneralSettings = {
   uiFontSize: DEFAULT_UI_FONT_SIZE,
   rightClickAction: 'menu', copyOnSelect: false, scrollbackLines: DEFAULT_TERMINAL_SCROLLBACK_LINES, autoReconnect: false, restoreTabsOnStartup: true, renderer: DEFAULT_TERMINAL_RENDERER, historyPredict: false, localShell: '', localShellArgs: '', localShellCwd: '', localShellLogin: true,
   closeButtonAction: 'tray',
+  debug: false,
   logDir: '',
   logRetentionDays: 30,
   proxyMode: 'system',
@@ -94,6 +97,10 @@ export const defaultGeneralSettings: GeneralSettings = {
 
 export function normalizeCloseButtonAction(value: unknown): CloseButtonAction {
   return value === 'exit' ? 'exit' : 'tray'
+}
+
+export function normalizeDebug(value: unknown): boolean {
+  return value === true
 }
 
 export function normalizeLogDir(value: unknown): string {
@@ -153,6 +160,7 @@ export function normalizeGeneral(settings: GeneralSettings): GeneralSettings {
     localShellCwd: String(settings.localShellCwd ?? ''),
     localShellLogin: settings.localShellLogin !== false,
     closeButtonAction: normalizeCloseButtonAction(settings.closeButtonAction),
+    debug: normalizeDebug(settings.debug),
     logDir: normalizeLogDir(settings.logDir),
     logRetentionDays: normalizeLogRetentionDays(settings.logRetentionDays),
     proxyMode: normalizeProxyMode(settings.proxyMode),
@@ -186,6 +194,7 @@ export function parseGeneral(settings: { [_ in string]?: Setting }): GeneralSett
     uiFontFamily, uiFontFallbackFamily: settingValue(settings, 'appearance.ui_font_fallback_family', DEFAULT_UI_FONT_FALLBACK_FAMILY),
     uiFontSize: settingValue(settings, 'appearance.ui_font_size', DEFAULT_UI_FONT_SIZE),
     closeButtonAction: settingValue(settings, 'application.close_button_action', 'tray'),
+    debug: settingValue(settings, 'application.debug', false),
     logDir: settingValue(settings, 'application.log_dir', ''),
     logRetentionDays: settingValue(settings, 'application.log_retention_days', 30),
     proxyMode: settingValue(settings, 'application.proxy_mode', 'system'),
@@ -228,6 +237,7 @@ export async function persistGeneral(settings: GeneralSettings) {
     settingEntry('terminal.copy_on_select', normalized.copyOnSelect), settingEntry('terminal.scrollback_lines', normalized.scrollbackLines), settingEntry('terminal.auto_reconnect', normalized.autoReconnect), settingEntry('terminal.restore_tabs_on_startup', normalized.restoreTabsOnStartup), settingEntry('terminal.renderer', normalized.renderer), settingEntry('terminal.history_predict', normalized.historyPredict), settingEntry('terminal.local_shell', normalized.localShell), settingEntry('terminal.local_shell_args', normalized.localShellArgs), settingEntry('terminal.local_shell_cwd', normalized.localShellCwd), settingEntry('terminal.local_shell_login', normalized.localShellLogin), settingEntry('appearance.ui_font_family', normalized.uiFontFamily),
     settingEntry('appearance.ui_font_fallback_family', normalized.uiFontFallbackFamily), settingEntry('appearance.ui_font_size', normalized.uiFontSize),
     settingEntry('application.close_button_action', normalized.closeButtonAction),
+    settingEntry('application.debug', normalized.debug),
     settingEntry('application.log_dir', normalized.logDir),
     settingEntry('application.log_retention_days', normalized.logRetentionDays),
     settingEntry('application.proxy_mode', normalized.proxyMode),
