@@ -17,6 +17,17 @@ export function Close(terminalID: string): $CancellablePromise<void> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.TerminalService.Close", terminalID);
 }
 
+/**
+ * ListLocalShellCandidates returns the shell paths that actually exist on the
+ * local machine, deduplicated and ordered deterministically. Used by the
+ * settings UI to offer preset options for the local terminal shell.
+ */
+export function ListLocalShellCandidates(): $CancellablePromise<string[]> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.TerminalService.ListLocalShellCandidates").then(($result: any) => {
+        return $$createType0($result);
+    });
+}
+
 export function Open(sessionID: number, cols: number, rows: number): $CancellablePromise<string> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.TerminalService.Open", sessionID, cols, rows);
 }
@@ -37,7 +48,7 @@ export function OpenSerial(serialPortID: number, cols: number, rows: number): $C
 
 export function ProcessInfo(terminalID: string): $CancellablePromise<model$0.ProcessInfo[]> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.TerminalService.ProcessInfo", terminalID).then(($result: any) => {
-        return $$createType1($result);
+        return $$createType2($result);
     });
 }
 
@@ -64,7 +75,7 @@ export function SerialSetSignals(terminalID: string, dtr: boolean, rts: boolean)
  */
 export function SerialSignals(terminalID: string): $CancellablePromise<model$0.SerialSignals> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.TerminalService.SerialSignals", terminalID).then(($result: any) => {
-        return $$createType2($result);
+        return $$createType3($result);
     });
 }
 
@@ -83,7 +94,7 @@ export function SetOutputPaused(terminalID: string, paused: boolean): $Cancellab
 
 export function SystemInfo(terminalID: string): $CancellablePromise<model$0.SystemInfo | null> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.TerminalService.SystemInfo", terminalID).then(($result: any) => {
-        return $$createType4($result);
+        return $$createType5($result);
     });
 }
 
@@ -92,8 +103,9 @@ export function Write(terminalID: string, data: string): $CancellablePromise<num
 }
 
 // Private type creation functions
-const $$createType0 = model$0.ProcessInfo.createFrom;
-const $$createType1 = $Create.Array($$createType0);
-const $$createType2 = model$0.SerialSignals.createFrom;
-const $$createType3 = model$0.SystemInfo.createFrom;
-const $$createType4 = $Create.Nullable($$createType3);
+const $$createType0 = $Create.Array($Create.Any);
+const $$createType1 = model$0.ProcessInfo.createFrom;
+const $$createType2 = $Create.Array($$createType1);
+const $$createType3 = model$0.SerialSignals.createFrom;
+const $$createType4 = model$0.SystemInfo.createFrom;
+const $$createType5 = $Create.Nullable($$createType4);
