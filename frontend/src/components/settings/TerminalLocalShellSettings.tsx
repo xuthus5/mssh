@@ -79,12 +79,9 @@ function ShellArgumentFields({ args, cwd, onArgsChange, onCwdChange }: Pick<Prop
         placeholder="-l" onChange={(event) => onArgsChange(event.target.value)} />
     </Field>
     <Field>
-      <FieldContent>
-        <FieldLabel htmlFor="terminal-local-shell-cwd">{t('工作目录')}</FieldLabel>
-        <FieldDescription>{t('留空则使用用户家目录。')}</FieldDescription>
-      </FieldContent>
+      <FieldLabel htmlFor="terminal-local-shell-cwd">{t('工作目录')}</FieldLabel>
       <Input id="terminal-local-shell-cwd" aria-label={t('工作目录')} value={cwd}
-        placeholder="~" onChange={(event) => onCwdChange(event.target.value)} />
+        placeholder={t('留空则使用用户家目录。')} onChange={(event) => onCwdChange(event.target.value)} />
     </Field>
   </>
 }
