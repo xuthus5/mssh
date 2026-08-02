@@ -39,6 +39,9 @@ export const generalSettingKeys = [
 
 export const DEFAULT_TERMINAL_POOL_SIZE = 10
 
+export const DEFAULT_PROXY_NO_PROXY =
+  'localhost,127.0.*,10.0.*,172.16.*,172.17.*,172.18.*,172.19.*,172.20.*,172.21.*,172.22.*,172.23.*,172.24.*,172.25.*,172.26.*,172.27.*,172.28.*,172.29.*,172.30.*,172.31.*,192.168.*,.internal'
+
 export type CloseButtonAction = 'tray' | 'exit'
 export type NetworkProxyMode = 'system' | 'direct' | 'manual'
 
@@ -99,7 +102,7 @@ export const defaultGeneralSettings: GeneralSettings = {
   logRetentionDays: 30,
   proxyMode: 'system',
   proxyURL: '',
-  proxyNoProxy: '',
+  proxyNoProxy: DEFAULT_PROXY_NO_PROXY,
   proxyUsername: '',
   proxyPassword: '',
   proxyPasswordSaved: false,
@@ -223,7 +226,7 @@ export function parseGeneral(settings: { [_ in string]?: Setting }): GeneralSett
     logRetentionDays: settingValue(settings, 'application.log_retention_days', 30),
     proxyMode: settingValue(settings, 'application.proxy_mode', 'system'),
     proxyURL: settingValue(settings, 'application.proxy_url', ''),
-    proxyNoProxy: settingValue(settings, 'application.proxy_no_proxy', ''),
+    proxyNoProxy: settingValue(settings, 'application.proxy_no_proxy', DEFAULT_PROXY_NO_PROXY),
     proxyUsername: settingValue(settings, 'application.proxy_username', ''),
     proxyPassword: '',
     proxyPasswordSaved: Boolean(settingValue(settings, 'application.proxy_password_saved', false)),
