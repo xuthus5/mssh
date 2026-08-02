@@ -36,6 +36,7 @@ export interface GeneralSettingsSaveOptions {
 export {
   DEFAULT_TERMINAL_POOL_SIZE,
   normalizeCloseButtonAction,
+  normalizeDebug,
   normalizeLogDir,
   normalizeLogRetentionDays,
   normalizeMaxPoolSize,
@@ -52,6 +53,7 @@ function mergeGeneralScope(current: GeneralSettings, next: GeneralSettings): Gen
     uiFontFallbackFamily: next.uiFontFallbackFamily,
     uiFontSize: next.uiFontSize,
     closeButtonAction: next.closeButtonAction,
+    debug: next.debug,
     logDir: next.logDir,
     logRetentionDays: next.logRetentionDays,
     proxyMode: next.proxyMode,

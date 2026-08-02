@@ -30,7 +30,7 @@ tasks:
     vars:
       APP_VERSION: '{{.APP_VERSION | default "0.1.0"}}'
       VERSION_LDFLAGS: '-X github.com/xuthus5/mssh/internal/service.Version={{.APP_VERSION}}'
-      BUILD_FLAGS: '{{if eq .PRODUCTION "true"}}-tags production -trimpath -buildvcs=false -ldflags="-w -s -H windowsgui {{.VERSION_LDFLAGS}}"{{else}}-buildvcs=false -gcflags=all="-l" -ldflags="{{.VERSION_LDFLAGS}}"{{end}}'
+      BUILD_FLAGS: '{{if eq .PRODUCTION "true"}}-tags "production devtools" -trimpath -buildvcs=false -ldflags="-w -s -H windowsgui {{.VERSION_LDFLAGS}}"{{else}}-buildvcs=false -gcflags=all="-l" -ldflags="{{.VERSION_LDFLAGS}}"{{end}}'
     env:
       GOOS: windows
       CGO_ENABLED: 0

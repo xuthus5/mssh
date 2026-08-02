@@ -27,6 +27,7 @@ const general: GeneralSettings = {
   localShellCwd: '',
   localShellLogin: true,
   closeButtonAction: 'tray' as const,
+  debug: false,
   logDir: '',
   logRetentionDays: 30,
   proxyMode: 'system' as const,

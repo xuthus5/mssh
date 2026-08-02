@@ -18,6 +18,7 @@ const savedGeneral = {
   historyPredict: false,
   localShell: '', localShellArgs: '', localShellCwd: '', localShellLogin: true,
   closeButtonAction: 'exit' as const,
+  debug: false,
   logDir: '/tmp/mssh-logs',
   logRetentionDays: 14,
   proxyMode: 'system' as const,
@@ -205,6 +206,25 @@ describe('useGeneralSettings cross-window sync', () => {
   it('defaults the close button action to the system tray', async () => {
     const { result } = renderHook(() => useGeneralSettings())
     await waitFor(() => expect(result.current.general.closeButtonAction).toBe('tray'))
+  })
+
+  it('loads and persists the application debug setting', async () => {
+    let savedEntries: Array<{ key: string; value: string }> = []
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.GetMany', async () => ({
+      'application.debug': setting('application.debug', true),
+    }))
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.SetMany', async (entries) => { savedEntries = entries })
+    const { result } = renderHook(() => useGeneralSettings())
+    await waitFor(() => expect(result.current.general.debug).toBe(true))
+
+    await act(async () => {
+      await result.current.saveGeneral({ ...savedGeneral, debug: false })
+    })
+
+    expect(savedEntries).toContainEqual(expect.objectContaining({
+      key: 'application.debug', value: 'false',
+    }))
+    expect(result.current.general.debug).toBe(false)
   })
 
   it('loads and persists the close button action using the final setting contract', async () => {

@@ -11,6 +11,8 @@ describe('ApplicationBehaviorSettingsSection', () => {
     render(
       <ApplicationBehaviorSettingsSection
         closeButtonAction="tray"
+        debug={false}
+        onDebugChange={() => undefined}
         onCloseButtonActionChange={onCloseButtonActionChange}
       />,
     )
@@ -20,5 +22,25 @@ describe('ApplicationBehaviorSettingsSection', () => {
     await user.click(select)
     await user.click(await screen.findByRole('option', { name: '关闭应用' }))
     expect(onCloseButtonActionChange).toHaveBeenCalledWith('exit')
+  })
+
+  it('shows the debug switch with a restart hint and emits changes', async () => {
+    const onDebugChange = vi.fn()
+    const user = userEvent.setup()
+
+    render(
+      <ApplicationBehaviorSettingsSection
+        closeButtonAction="tray"
+        debug={false}
+        onDebugChange={onDebugChange}
+        onCloseButtonActionChange={() => undefined}
+      />,
+    )
+
+    const toggle = screen.getByRole('switch', { name: '应用调试' })
+    expect(toggle).not.toBeChecked()
+    expect(screen.getByText('启用开发者工具（Web 检查器）。更改后需重启应用才能生效，默认关闭。')).toBeInTheDocument()
+    await user.click(toggle)
+    expect(onDebugChange).toHaveBeenCalledWith(true)
   })
 })

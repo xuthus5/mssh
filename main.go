@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
@@ -48,8 +49,18 @@ func main() {
 		os.Exit(1)
 	}
 
+	debugEnabled := false
+	if enabled, readErr := appInstance.Setting.ApplicationDebugEnabled(); readErr != nil {
+		logger.Warn("read application debug setting failed", "error", readErr)
+	} else {
+		debugEnabled = enabled
+	}
 	wailsApp := newWailsApplication(appInstance, logger)
-	configureWindows(wailsApp, windowConfiguration{Settings: appInstance.Setting, Logger: logger})
+	configureWindows(wailsApp, windowConfiguration{
+		Settings:     appInstance.Setting,
+		Logger:       logger,
+		DebugEnabled: debugEnabled,
+	})
 	wailsApp.OnShutdown(func() {
 		shutdownRuntime(appInstance, logManager, os.Stderr)
 	})
@@ -172,12 +183,16 @@ func (h *wailsSystemLogHandler) WithGroup(name string) slog.Handler {
 }
 
 type windowConfiguration struct {
-	Settings windowing.CloseActionReader
-	Logger   *slog.Logger
+	Settings     windowing.CloseActionReader
+	Logger       *slog.Logger
+	DebugEnabled bool
 }
 
 func configureWindows(wailsApp *application.App, configuration windowConfiguration) {
 	mainWindow := wailsApp.Window.NewWithOptions(mainWindowOptions())
+	if configuration.DebugEnabled {
+		openMainWindowDevToolsOnFirstShow(mainWindow)
+	}
 	settingsController := windowing.NewSettingsWindowController(wailsApp.Window, mainWindow, wailsApp.Event.Emit)
 	settingsController.Preload()
 	lifecycleController := windowing.NewApplicationLifecycleController(windowing.ApplicationLifecycleOptions{
@@ -200,6 +215,15 @@ func configureWindows(wailsApp *application.App, configuration windowConfigurati
 		})
 	})
 	configureSystemTray(wailsApp, lifecycleController)
+}
+
+// openMainWindowDevToolsOnFirstShow opens the WebView inspector once after the
+// main window becomes visible, when the application debug setting is enabled.
+func openMainWindowDevToolsOnFirstShow(window *application.WebviewWindow) {
+	var once sync.Once
+	_ = window.OnWindowEvent(events.Common.WindowShow, func(*application.WindowEvent) {
+		once.Do(func() { window.OpenDevTools() })
+	})
 }
 
 func configureSystemTray(wailsApp *application.App, controller *windowing.ApplicationLifecycleController) (*application.SystemTray, *application.Menu) {

@@ -13,7 +13,7 @@ const general: GeneralSettings = {
   rightClickAction: 'menu', copyOnSelect: false, scrollbackLines: 10000, autoReconnect: false,
   restoreTabsOnStartup: true, renderer: 'dom', historyPredict: false,
   localShell: '', localShellArgs: '', localShellCwd: '', localShellLogin: true,
-  closeButtonAction: 'tray', logDir: '', logRetentionDays: 30,
+  closeButtonAction: 'tray', debug: false, logDir: '', logRetentionDays: 30,
   proxyMode: 'system', proxyURL: '', proxyNoProxy: '', proxyUsername: '',
   proxyPassword: '', proxyPasswordSaved: false, clearProxyPassword: false, language: 'zh-CN',
 }
