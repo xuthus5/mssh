@@ -5,7 +5,7 @@ import { Unicode11Addon } from '@xterm/addon-unicode11'
 import type { Terminal } from '@xterm/xterm'
 import type { TerminalRuntimeErrorReporter } from '@/components/terminal/TerminalErrorBoundary'
 import { installTerminalCopyOnSelect } from '@/components/terminal/terminalBehaviorRuntime'
-import { installHistoryCommandPredict } from '@/components/terminal/terminalHistoryPredictRuntime'
+import { installCommandTokenPredict } from '@/components/terminal/terminalHistoryPredictRuntime'
 import { runTerminalRuntime } from '@/components/terminal/terminalRuntime'
 import { subscribeToRenderer, subscribeToScrollback } from '@/hooks/terminalBehaviorSubscriptions'
 import { subscribeToTerminalWorkingDirectory } from '@/hooks/terminalDirectoryRuntime'
@@ -83,12 +83,12 @@ function createInputSubscriptions(options: MountOptions, resources: BaseResource
   const { refs, reportRuntimeError } = options
   const { term } = resources
   const commandCapture = new TerminalCommandCapture()
-  const historyPredict = installHistoryCommandPredict(term, {
+  const historyPredict = installCommandTokenPredict(term, {
     getSessionId: () => resolveSessionId(refs),
     getBuffer: () => commandCapture.current(),
-    applyCompletion: (suffix) => {
-      options.writeTerminalInput(suffix, refs)
-      commandCapture.feed(suffix)
+    applyCompletion: (data) => {
+      options.writeTerminalInput(data, refs)
+      commandCapture.feed(data)
     },
   })
   const focusHandler = () => runTerminalRuntime(reportRuntimeError, 'terminal pane activation', () => {
@@ -97,7 +97,8 @@ function createInputSubscriptions(options: MountOptions, resources: BaseResource
   resources.container?.addEventListener('focusin', focusHandler)
   resources.container?.addEventListener('pointerdown', focusHandler)
   const dataDispose = subscribeToTerminalData(term, refs, commandCapture, (data) => options.writeTerminalInput(data, refs))
-  return { historyPredict, focusHandler, dataDispose }
+  const predictObserve = term.onData(() => historyPredict.update())
+  return { historyPredict, predictObserve, focusHandler, dataDispose }
 }
 
 function createRuntimeSubscriptions(options: MountOptions, resources: BaseResources) {
@@ -172,6 +173,7 @@ function disposeMount(context: {
   resources.container?.removeEventListener('pointerdown', input.focusHandler)
   safelyDisposeTerminalResource('history predict', input.historyPredict.dispose)
   safelyDisposeTerminalResource('data subscription', () => input.dataDispose.dispose())
+  safelyDisposeTerminalResource('predict observe', () => input.predictObserve.dispose())
   safelyDisposeTerminalResource('synchronized output query', () => subscriptions.synchronizedOutputQueryDispose.dispose())
   safelyDisposeTerminalResource('terminal version query', () => subscriptions.terminalVersionQueryDispose.dispose())
   safelyDisposeTerminalResource('terminal working directory', () => subscriptions.terminalDirectoryDispose.dispose())

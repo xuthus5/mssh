@@ -1041,7 +1041,7 @@
   "样例": "Sample",
   "核心": "Core",
   "核心分组": "Core folder",
-  "根据本会话历史命令预测当前输入，按 Tab 补全剩余内容。开启后会拦截 Tab 完成补全；默认关闭。": "Predict the current input from this session's command history and complete the rest with Tab. When enabled, Tab is intercepted for completion. Off by default.",
+  "根据本会话历史命令，输入时在光标处显示灰色预测，按 Tab 采纳当前 token 并展开候选列表，方向键选择、Enter 确认、Esc 关闭。开启后会拦截 Tab 完成补全；默认关闭。": "Predict from this session's command history: a grey hint appears at the cursor while typing, Tab accepts the current token and expands the candidate list, arrow keys select, Enter confirms, Esc closes. Tab is intercepted when enabled. Off by default.",
   "根目录": "Root directory",
   "格式版本": "Format version",
   "检查中…": "Checking…",

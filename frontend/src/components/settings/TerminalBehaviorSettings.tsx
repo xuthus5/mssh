@@ -54,7 +54,7 @@ export function TerminalBehaviorSettingsSection({
         <ScrollbackField value={scrollbackLines} onChange={onScrollbackLinesChange} />
         <BehaviorSwitch id="terminal-auto-reconnect" label="SSH 断线自动重连" description="意外断开后自动尝试重新连接；手动断开或关闭标签不会触发。默认关闭。" checked={autoReconnect} onChange={onAutoReconnectChange} />
         <BehaviorSwitch id="terminal-restore-tabs" label="启动时恢复终端标签" description="重启应用后自动恢复上次未关闭的终端标签。默认开启。" checked={restoreTabsOnStartup} onChange={onRestoreTabsOnStartupChange} />
-        <BehaviorSwitch id="terminal-history-predict" label="历史命令预测补全" description="根据本会话历史命令预测当前输入，按 Tab 补全剩余内容。开启后会拦截 Tab 完成补全；默认关闭。" checked={historyPredict} onChange={onHistoryPredictChange} />
+        <BehaviorSwitch id="terminal-history-predict" label="历史命令预测补全" description="根据本会话历史命令，输入时在光标处显示灰色预测，按 Tab 采纳当前 token 并展开候选列表，方向键选择、Enter 确认、Esc 关闭。开启后会拦截 Tab 完成补全；默认关闭。" checked={historyPredict} onChange={onHistoryPredictChange} />
       </div>
     </section>
   )

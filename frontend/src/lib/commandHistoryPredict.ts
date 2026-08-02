@@ -1,22 +1,96 @@
 import { readCommandHistory } from '@/lib/commandHistory'
 
-/** Return the remainder to append so prefix becomes a historical command. */
-export function findHistoryCompletion(prefix: string, history: string[]): string | null {
-  const current = prefix
-  if (!current.trim()) return null
-  const seen = new Set<string>()
-  for (const command of history) {
-    if (!command || seen.has(command)) continue
-    seen.add(command)
-    if (command.startsWith(current) && command.length > current.length) {
-      return command.slice(current.length)
-    }
-  }
-  return null
+export const MAX_PREDICTION_TOKENS = 8
+
+export interface TokenPrediction {
+  tokens: string[]
+  mode: 'prefix' | 'next'
 }
 
-export function suggestHistoryCompletion(prefix: string, sessionID: number): string | null {
-  if (!Number.isFinite(sessionID)) return null
-  const history = readCommandHistory(sessionID).map((entry) => entry.command)
-  return findHistoryCompletion(prefix, history)
+export function splitCommandTokens(line: string): string[] {
+  return line.trim().split(/\s+/).filter((token) => token.length > 0)
+}
+
+function hasTrailingSpace(buffer: string): boolean {
+  return /\s$/.test(buffer)
+}
+
+function matchesContext(tokens: string[], start: number, context: string[]): boolean {
+  for (let index = 0; index < context.length; index++) {
+    if (tokens[start + index] !== context[index]) return false
+  }
+  return true
+}
+
+interface CandidateFilter {
+  partial: string
+  includeExact: boolean
+}
+
+function collectCandidates(history: string[], context: string[], filter: CandidateFilter): string[] {
+  const { partial, includeExact } = filter
+  const counts = new Map<string, number>()
+  const firstIndex = new Map<string, number>()
+  const record = (token: string, index: number) => {
+    if (partial && !token.startsWith(partial)) return
+    if (partial && !includeExact && token === partial) return
+    if (!partial && token === (context[context.length - 1] ?? '')) return
+    counts.set(token, (counts.get(token) ?? 0) + 1)
+    if (!firstIndex.has(token)) firstIndex.set(token, index)
+  }
+  history.forEach((command, index) => {
+    const tokens = splitCommandTokens(command)
+    if (tokens.length === 0) return
+    if (context.length === 0) {
+      record(tokens[0], index)
+      return
+    }
+    const limit = tokens.length - context.length - 1
+    for (let start = 0; start <= limit; start++) {
+      if (!matchesContext(tokens, start, context)) continue
+      record(tokens[start + context.length], index)
+    }
+  })
+  return [...counts.entries()]
+    .map(([token, count]) => ({ token, count, index: firstIndex.get(token) ?? 0 }))
+    .sort((a, b) => b.count - a.count || a.index - b.index)
+    .slice(0, MAX_PREDICTION_TOKENS)
+    .map(({ token }) => token)
+}
+
+function isKnownCompleteToken(history: string[], context: string[], partial: string): boolean {
+  if (!partial) return false
+  return history.some((command) => {
+    const tokens = splitCommandTokens(command)
+    if (context.length === 0) return tokens[0] === partial
+    if (tokens.length < context.length + 1) return false
+    const limit = tokens.length - context.length - 1
+    for (let start = 0; start <= limit; start++) {
+      if (matchesContext(tokens, start, context) && tokens[start + context.length] === partial) return true
+    }
+    return false
+  })
+}
+
+/** Predict next-token candidates for the current line from session history. */
+export function predictCommandTokens(buffer: string, history: string[]): TokenPrediction {
+  if (buffer.trim() === '') return { tokens: [], mode: 'next' }
+  const trailing = hasTrailingSpace(buffer)
+  const allTokens = splitCommandTokens(buffer)
+  const context = trailing ? allTokens : allTokens.slice(0, -1)
+  const partial = trailing ? '' : (allTokens[allTokens.length - 1] ?? '')
+
+  if (partial) {
+    if (isKnownCompleteToken(history, context, partial)) {
+      const next = collectCandidates(history, [...context, partial], { partial: '', includeExact: false })
+      if (next.length > 0) return { tokens: next, mode: 'next' }
+    }
+    return { tokens: collectCandidates(history, context, { partial, includeExact: false }), mode: 'prefix' }
+  }
+  return { tokens: collectCandidates(history, context, { partial: '', includeExact: false }), mode: 'next' }
+}
+
+export function readSessionCommands(sessionID: number): string[] {
+  if (!Number.isFinite(sessionID)) return []
+  return readCommandHistory(sessionID).map((entry) => entry.command)
 }
