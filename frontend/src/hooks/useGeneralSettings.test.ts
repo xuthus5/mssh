@@ -209,6 +209,13 @@ describe('useGeneralSettings cross-window sync', () => {
     await waitFor(() => expect(result.current.general.closeButtonAction).toBe('tray'))
   })
 
+  it('defaults the no-proxy list to common private network hosts', async () => {
+    const { result } = renderHook(() => useGeneralSettings())
+    await waitFor(() => expect(result.current.general.proxyNoProxy).toContain('172.16.*'))
+    expect(result.current.general.proxyNoProxy).toContain('localhost')
+    expect(result.current.general.proxyNoProxy).toContain('.internal')
+  })
+
   it('loads and persists the application debug setting', async () => {
     let savedEntries: Array<{ key: string; value: string }> = []
     __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.GetMany', async () => ({
