@@ -2,12 +2,14 @@ import { useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { TerminalBehaviorSettingsSection } from '@/components/settings/TerminalBehaviorSettings'
 import { TerminalRendererSettingsSection } from '@/components/settings/TerminalRendererSettings'
+import { TerminalKeywordHighlightSettingsSection } from '@/components/settings/TerminalKeywordHighlightSettings'
 import { TerminalLocalShellSettingsSection } from '@/components/settings/TerminalLocalShellSettings'
 import { TerminalConnectionDefaultsSettingsSection } from '@/components/settings/TerminalConnectionDefaultsSettings'
 import { ThemeEditor } from '@/components/settings/ThemeEditor'
 import { ThemeManager } from '@/components/settings/ThemeManager'
 import { useAutoSave } from '@/hooks/useAutoSave'
 import { useDraftSync } from '@/hooks/useDraftSync'
+import { DEFAULT_KEYWORD_HIGHLIGHT_SETTINGS } from '@/store/terminalKeywordHighlightStore'
 import { DEFAULT_TERMINAL_POOL_SIZE } from '@/hooks/generalSettingsModel'
 import type { GeneralSettings, GeneralSettingsSaveOptions } from '@/hooks/useSettings'
 import type { ColorMode } from '@/lib/effectiveTerminalTheme'
@@ -33,6 +35,9 @@ interface TerminalDraft {
   restoreTabsOnStartup: boolean
   historyPredict: boolean
   renderer: GeneralSettings['renderer']
+  keywordHighlightEnabled: boolean
+  keywordHighlightCaseInsensitive: boolean
+  keywordHighlightRules: GeneralSettings['keywordHighlightRules']
   localShell: string
   localShellArgs: string
   localShellCwd: string
@@ -72,6 +77,9 @@ function createDraft(general: GeneralSettings): TerminalDraft {
     restoreTabsOnStartup: general.restoreTabsOnStartup,
     historyPredict: general.historyPredict,
     renderer: general.renderer,
+    keywordHighlightEnabled: general.keywordHighlightEnabled,
+    keywordHighlightCaseInsensitive: general.keywordHighlightCaseInsensitive,
+    keywordHighlightRules: general.keywordHighlightRules,
     localShell: general.localShell,
     localShellArgs: general.localShellArgs,
     localShellCwd: general.localShellCwd,
@@ -92,6 +100,9 @@ function buildSavePayload(general: GeneralSettings, draft: TerminalDraft): Gener
     restoreTabsOnStartup: draft.restoreTabsOnStartup,
     historyPredict: draft.historyPredict,
     renderer: draft.renderer,
+    keywordHighlightEnabled: draft.keywordHighlightEnabled,
+    keywordHighlightCaseInsensitive: draft.keywordHighlightCaseInsensitive,
+    keywordHighlightRules: draft.keywordHighlightRules,
     localShell: draft.localShell,
     localShellArgs: draft.localShellArgs,
     localShellCwd: draft.localShellCwd,
@@ -132,7 +143,7 @@ function SettingsErrors({ loadError = '', onReloadSettings, themeLoadError = '',
 
 function TerminalPreferenceSections({ model }: { model: TerminalModel }) {
   const { draft, update } = model
-  return <div className="flex flex-col gap-3"><div className="flex items-center justify-between gap-3"><p className="text-xs text-muted-foreground">{t('终端连接与交互偏好会自动保存。')}</p></div><TerminalConnectionDefaultsSettingsSection maxPoolSize={draft.maxPoolSize} defaultKeepAlive={draft.defaultKeepAlive} defaultTermType={draft.defaultTermType} onMaxPoolSizeChange={(value) => update('maxPoolSize', value)} onDefaultKeepAliveChange={(value) => update('defaultKeepAlive', value)} onDefaultTermTypeChange={(value) => update('defaultTermType', value)} /><TerminalBehaviorSettingsSection rightClickAction={draft.rightClickAction} copyOnSelect={draft.copyOnSelect} scrollbackLines={draft.scrollbackLines} autoReconnect={draft.autoReconnect} restoreTabsOnStartup={draft.restoreTabsOnStartup} historyPredict={draft.historyPredict} onRightClickActionChange={(value) => update('rightClickAction', value)} onCopyOnSelectChange={(value) => update('copyOnSelect', value)} onScrollbackLinesChange={(value) => update('scrollbackLines', value > 0 ? String(value) : '')} onAutoReconnectChange={(value) => update('autoReconnect', value)} onRestoreTabsOnStartupChange={(value) => update('restoreTabsOnStartup', value)} onHistoryPredictChange={(value) => update('historyPredict', value)} /><TerminalLocalShellSettingsSection shell={draft.localShell} args={draft.localShellArgs} cwd={draft.localShellCwd} login={draft.localShellLogin} onShellChange={(value) => update('localShell', value)} onArgsChange={(value) => update('localShellArgs', value)} onCwdChange={(value) => update('localShellCwd', value)} onLoginChange={(value) => update('localShellLogin', value)} /><TerminalRendererSettingsSection renderer={draft.renderer} onRendererChange={(value) => update('renderer', value)} /></div>
+  return <div className="flex flex-col gap-3"><div className="flex items-center justify-between gap-3"><p className="text-xs text-muted-foreground">{t('终端连接与交互偏好会自动保存。')}</p></div><TerminalConnectionDefaultsSettingsSection maxPoolSize={draft.maxPoolSize} defaultKeepAlive={draft.defaultKeepAlive} defaultTermType={draft.defaultTermType} onMaxPoolSizeChange={(value) => update('maxPoolSize', value)} onDefaultKeepAliveChange={(value) => update('defaultKeepAlive', value)} onDefaultTermTypeChange={(value) => update('defaultTermType', value)} /><TerminalBehaviorSettingsSection rightClickAction={draft.rightClickAction} copyOnSelect={draft.copyOnSelect} scrollbackLines={draft.scrollbackLines} autoReconnect={draft.autoReconnect} restoreTabsOnStartup={draft.restoreTabsOnStartup} historyPredict={draft.historyPredict} onRightClickActionChange={(value) => update('rightClickAction', value)} onCopyOnSelectChange={(value) => update('copyOnSelect', value)} onScrollbackLinesChange={(value) => update('scrollbackLines', value > 0 ? String(value) : '')} onAutoReconnectChange={(value) => update('autoReconnect', value)} onRestoreTabsOnStartupChange={(value) => update('restoreTabsOnStartup', value)} onHistoryPredictChange={(value) => update('historyPredict', value)} /><TerminalLocalShellSettingsSection shell={draft.localShell} args={draft.localShellArgs} cwd={draft.localShellCwd} login={draft.localShellLogin} onShellChange={(value) => update('localShell', value)} onArgsChange={(value) => update('localShellArgs', value)} onCwdChange={(value) => update('localShellCwd', value)} onLoginChange={(value) => update('localShellLogin', value)} /><TerminalKeywordHighlightSettingsSection enabled={draft.keywordHighlightEnabled} caseInsensitive={draft.keywordHighlightCaseInsensitive} rules={draft.keywordHighlightRules} onEnabledChange={(value) => update('keywordHighlightEnabled', value)} onCaseInsensitiveChange={(value) => update('keywordHighlightCaseInsensitive', value)} onRulesChange={(value) => update('keywordHighlightRules', value)} onReset={() => update('keywordHighlightRules', DEFAULT_KEYWORD_HIGHLIGHT_SETTINGS.rules)} /><TerminalRendererSettingsSection renderer={draft.renderer} onRendererChange={(value) => update('renderer', value)} /></div>
 }
 
 function ThemeSections(props: Pick<Props, 'themeProfiles' | 'themeAssignments' | 'terminalGlobalStyle' | 'colorMode' | 'onSaveThemeConfiguration' | 'onResetBuiltinThemes' | 'onImportThemes' | 'onCreateThemeProfile' | 'onUpdateThemeProfile' | 'onDeleteThemeProfile' | 'onDeleteThemeDefinition'>) {
