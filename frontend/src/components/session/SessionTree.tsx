@@ -33,7 +33,7 @@ const VIRTUALIZE_AFTER = 80
 export default function SessionTree(props: Props) {
   const { folders, sessions, onConnect, onSelectFolder, navigationOnly = false, revealAll = false } = props
   const treeRef = useRef<HTMLDivElement>(null)
-  const navigation = useSessionTreeNavigation({ folders, sessions, revealAll, onConnect, onSelectFolder })
+  const navigation = useSessionTreeNavigation({ folders, sessions, revealAll, expandedFolderIDs: props.expandedFolderIDs, onExpandedFolderIDsChange: props.onExpandedFolderIDsChange, onConnect, onSelectFolder })
   const renderNode = (node: SessionTreeNode, index: number) => (
     <TreeRow
       {...props}

@@ -57,6 +57,53 @@ describe('SessionTree', () => {
     expect(screen.getByText('db-master')).toBeInTheDocument()
   })
 
+  it('reports folder expansion to the controlled handler', async () => {
+    const user = userEvent.setup()
+    const onExpandedFolderIDsChange = vi.fn()
+    const view = render(<SessionTree
+      folders={FOLDERS}
+      sessions={SESSIONS}
+      expandedFolderIDs={[]}
+      onExpandedFolderIDsChange={onExpandedFolderIDsChange}
+      onConnect={vi.fn()}
+      onEditSession={vi.fn()}
+      onDeleteSession={vi.fn()}
+      onEditFolder={vi.fn()}
+      onDeleteFolder={vi.fn()}
+    />)
+
+    await user.click(screen.getByText('生产环境'))
+    expect(onExpandedFolderIDsChange).toHaveBeenCalledWith(['f1'])
+
+    view.rerender(<SessionTree
+      folders={FOLDERS}
+      sessions={SESSIONS}
+      expandedFolderIDs={['f1']}
+      onExpandedFolderIDsChange={onExpandedFolderIDsChange}
+      onConnect={vi.fn()}
+      onEditSession={vi.fn()}
+      onDeleteSession={vi.fn()}
+      onEditFolder={vi.fn()}
+      onDeleteFolder={vi.fn()}
+    />)
+    await user.click(screen.getByText('生产环境'))
+    expect(onExpandedFolderIDsChange).toHaveBeenCalledWith([])
+  })
+
+  it('renders sessions inside folders expanded via controlled state', () => {
+    render(<SessionTree
+      folders={FOLDERS}
+      sessions={SESSIONS}
+      expandedFolderIDs={['f1']}
+      onExpandedFolderIDsChange={vi.fn()}
+      onConnect={vi.fn()}
+      navigationOnly
+    />)
+
+    expect(screen.getByText('db-master')).toBeInTheDocument()
+    expect(screen.queryByText('test-web')).not.toBeInTheDocument()
+  })
+
   it('connects once without allowing browser text selection on double click', async () => {
     const user = userEvent.setup()
     const onConnect = vi.fn()
