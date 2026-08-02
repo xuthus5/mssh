@@ -33,13 +33,13 @@ func platformShellCandidates() []string {
 	}
 }
 
-// probeShell validates that path exists as a non-directory, executable shell.
+// probeShell validates that path exists as a non-directory. The executable bit
+// is intentionally not checked here: candidates only feed the settings preset
+// list, while the executable bit and allowlist are enforced at launch time by
+// resolveShell.
 func probeShell(path string) (string, bool) {
 	info, err := os.Stat(path)
 	if err != nil || info.IsDir() {
-		return "", false
-	}
-	if runtime.GOOS != "windows" && info.Mode().Perm()&0o111 == 0 {
 		return "", false
 	}
 	return filepath.Clean(path), true
