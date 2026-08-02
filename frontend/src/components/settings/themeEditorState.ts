@@ -53,7 +53,16 @@ export function buildThemeConfiguration(
     if (!draft) throw new Error(`terminal theme draft ${id} is unavailable`)
     return themeToProfileInput(profile, draft)
   })
-  return { global_style: terminalGlobalStyleInput(globalStyle), profiles: inputs, assignments }
+  return { global_style: terminalGlobalStyleInput(globalStyle), profiles: inputs, assignments: normalizedAssignments(assignments) }
+}
+
+function normalizedAssignments(assignments: ThemeAssignments): ThemeAssignments {
+  return {
+    dark_profile_id: assignments.dark_profile_id,
+    light_profile_id: assignments.light_profile_id,
+    follow_interface_mode: assignments.follow_interface_mode,
+    fixed_profile_id: assignments.fixed_profile_id,
+  }
 }
 
 export function effectiveDraftTheme(draft: ThemeDraft, globalStyle: TerminalGlobalStyle): TerminalTheme {
