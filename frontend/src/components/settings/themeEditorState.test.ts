@@ -91,7 +91,27 @@ describe('theme editor state', () => {
     expect(validTerminalFontSize(7)).toBe(false)
     expect(validTerminalFontSize(Number.NaN)).toBe(false)
   })
+
+  it('normalizes assignments key order so serialized configuration stays stable', () => {
+    const drafts = createThemeDrafts(profiles as never)
+    const canonical: ThemeAssignmentsLike = { dark_profile_id: 1, light_profile_id: 2, follow_interface_mode: true, fixed_profile_id: 0 }
+    // 模拟用户操作（如切换跟随模式）后 draftAssignments 被重建，字段插入顺序变化
+    const reordered = { dark_profile_id: 1, fixed_profile_id: 0, follow_interface_mode: true, light_profile_id: 2 }
+
+    const configA = buildThemeConfiguration({ profiles: profiles as never, drafts, assignments: reordered as never, globalStyle: globalStyle as never })
+    const configB = buildThemeConfiguration({ profiles: profiles as never, drafts, assignments: canonical as never, globalStyle: globalStyle as never })
+
+    expect(Object.keys(configA.assignments)).toEqual(['dark_profile_id', 'light_profile_id', 'follow_interface_mode', 'fixed_profile_id'])
+    expect(JSON.stringify(configA)).toBe(JSON.stringify(configB))
+  })
 })
+
+interface ThemeAssignmentsLike {
+  dark_profile_id: number
+  light_profile_id: number
+  follow_interface_mode: boolean
+  fixed_profile_id: number
+}
 
 function profile(id: number, background: string) {
   return {
