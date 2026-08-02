@@ -37,7 +37,7 @@ interface Props {
 }
 
 export function ThemeEditor({ profiles, assignments, globalStyle, colorMode, onSave, onResetBuiltins }: Props) {
-  const state = useThemeEditorDraftState(profiles, assignments, globalStyle)
+  const state = useThemeEditorDraftState({ profiles, assignments, globalStyle, colorMode })
   const setDirty = state.setDirty
   const activeProfileID = profileIDForSlot(state.editorSlot, state.draftAssignments)
   const activeProfile = findProfile(profiles, activeProfileID)
@@ -81,8 +81,8 @@ export function ThemeEditor({ profiles, assignments, globalStyle, colorMode, onS
   </div>
 }
 
-function useThemeEditorDraftState(profiles: ThemeProfile[], assignments: ThemeAssignments, globalStyle: TerminalGlobalStyle) {
-  const [editorSlot, setEditorSlot] = useState<ThemeEditorSlot>(assignments.follow_interface_mode ? 'dark' : 'fixed')
+function useThemeEditorDraftState({ profiles, assignments, globalStyle, colorMode }: { profiles: ThemeProfile[]; assignments: ThemeAssignments; globalStyle: TerminalGlobalStyle; colorMode: ColorMode }) {
+  const [editorSlot, setEditorSlot] = useState<ThemeEditorSlot>(assignments.follow_interface_mode ? colorMode : 'fixed')
   const [draftAssignments, setDraftAssignments] = useState(assignments)
   const [drafts, setDrafts] = useState(() => createThemeDrafts(profiles))
   const [draftGlobalStyle, setDraftGlobalStyle] = useState(globalStyle)
@@ -92,9 +92,9 @@ function useThemeEditorDraftState(profiles: ThemeProfile[], assignments: ThemeAs
     setDraftAssignments(assignments)
     setDrafts(createThemeDrafts(profiles))
     setDraftGlobalStyle(globalStyle)
-    setEditorSlot(assignments.follow_interface_mode ? 'dark' : 'fixed')
+    setEditorSlot(assignments.follow_interface_mode ? colorMode : 'fixed')
     setDirty(false)
-  }, [profiles, assignments, globalStyle])
+  }, [profiles, assignments, globalStyle, colorMode])
 
   return { editorSlot, setEditorSlot, draftAssignments, setDraftAssignments, drafts, setDrafts, draftGlobalStyle, setDraftGlobalStyle, resetting, setResetting, dirty, setDirty }
 }

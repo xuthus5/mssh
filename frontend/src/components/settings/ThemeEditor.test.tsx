@@ -43,6 +43,20 @@ describe('ThemeEditor dual mode profiles', () => {
     expect(screen.getByRole('tab', { name: 'Light Mode' })).toBeInTheDocument()
   })
 
+  it.each(['dark', 'light'] as const)('defaults the preview tab to the interface mode when following (%s)', (colorMode) => {
+    renderEditor({ colorMode })
+    const preferred = colorMode === 'dark' ? screen.getByRole('tab', { name: 'Dark Mode' }) : screen.getByRole('tab', { name: 'Light Mode' })
+    const other = colorMode === 'dark' ? screen.getByRole('tab', { name: 'Light Mode' }) : screen.getByRole('tab', { name: 'Dark Mode' })
+    expect(preferred).toHaveAttribute('data-active')
+    expect(other).not.toHaveAttribute('data-active')
+  })
+
+  it('uses the fixed tab when not following the interface mode', () => {
+    renderEditor({ assignments: { dark_profile_id: 1, light_profile_id: 2, follow_interface_mode: false, fixed_profile_id: 3 } })
+    expect(screen.queryByRole('tab', { name: 'Dark Mode' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('tablist', { name: '预览模式' })).not.toBeInTheDocument()
+  })
+
   it('previews and saves global terminal style atomically', async () => {
     const onSave = vi.fn(async () => {})
     renderEditor({ onSave })
