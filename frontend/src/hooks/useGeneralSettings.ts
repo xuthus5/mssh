@@ -84,6 +84,9 @@ function mergeTerminalScope(current: GeneralSettings, next: GeneralSettings): Ge
     localShellArgs: next.localShellArgs,
     localShellCwd: next.localShellCwd,
     localShellLogin: next.localShellLogin,
+    keywordHighlightEnabled: next.keywordHighlightEnabled,
+    keywordHighlightCaseInsensitive: next.keywordHighlightCaseInsensitive,
+    keywordHighlightRules: next.keywordHighlightRules,
   }
 }
 
