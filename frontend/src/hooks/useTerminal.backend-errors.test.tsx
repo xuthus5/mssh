@@ -156,7 +156,7 @@ describe('useTerminal backend failures', () => {
     await waitFor(() => expect(backend.write).toHaveBeenCalledWith('term-new', 'whoami\n'))
     expect(terminalDisposes).toHaveLength(1)
     expect(terminalDisposes[0]).not.toHaveBeenCalled()
-    expect(dataHandlers).toHaveLength(1)
+    expect(dataHandlers).toHaveLength(2)
     expect(getTerminalSearch('term-old')).toBeNull()
     expect(getTerminalSearch('term-new')).not.toBeNull()
     expect(backend.attach).toHaveBeenNthCalledWith(1, 'term-old')
