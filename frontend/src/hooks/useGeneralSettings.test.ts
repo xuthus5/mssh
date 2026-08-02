@@ -17,6 +17,7 @@ const savedGeneral = {
   rightClickAction: 'paste' as const, copyOnSelect: true, scrollbackLines: 10000, autoReconnect: false, restoreTabsOnStartup: true, renderer: 'dom' as const,
   historyPredict: false,
   localShell: '', localShellArgs: '', localShellCwd: '', localShellLogin: true,
+  keywordHighlightEnabled: true, keywordHighlightCaseInsensitive: true, keywordHighlightRules: [{ keyword: 'Error', color: '#ff5555' }],
   closeButtonAction: 'exit' as const,
   debug: false,
   logDir: '/tmp/mssh-logs',

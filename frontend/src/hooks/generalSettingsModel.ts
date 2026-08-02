@@ -15,6 +15,12 @@ import {
   type TerminalRightClickAction,
 } from '@/store/terminalBehaviorStore'
 import { useAppStore } from '@/store/appStore'
+import {
+  DEFAULT_KEYWORD_HIGHLIGHT_SETTINGS,
+  normalizeKeywordHighlightSettings,
+  useTerminalKeywordHighlightStore,
+  type KeywordHighlightSettings,
+} from '@/store/terminalKeywordHighlightStore'
 import { SettingService, TerminalService } from '@/lib/wails'
 import { LANGUAGE_SETTING_KEY, type AppLanguage, useLanguageStore } from '@/i18n'
 import { logger } from '@/lib/logger'
@@ -22,7 +28,7 @@ import { Events } from '@wailsio/runtime'
 
 export const generalSettingKeys = [
   'terminal.max_pool_size', 'terminal.default_keep_alive', 'terminal.default_term_type',
-  'terminal.right_click_action', 'terminal.copy_on_select', 'terminal.scrollback_lines', 'terminal.auto_reconnect', 'terminal.restore_tabs_on_startup', 'terminal.renderer', 'terminal.history_predict', 'terminal.local_shell', 'terminal.local_shell_args', 'terminal.local_shell_cwd', 'terminal.local_shell_login', 'appearance.ui_font_family',
+  'terminal.right_click_action', 'terminal.copy_on_select', 'terminal.scrollback_lines', 'terminal.auto_reconnect', 'terminal.restore_tabs_on_startup', 'terminal.renderer', 'terminal.history_predict', 'terminal.local_shell', 'terminal.local_shell_args', 'terminal.local_shell_cwd', 'terminal.local_shell_login', 'terminal.keyword_highlight', 'appearance.ui_font_family',
   'appearance.ui_font_fallback_family', 'appearance.ui_font_size',
   'application.close_button_action', 'application.log_dir', 'application.log_retention_days',
   'application.debug',
@@ -54,6 +60,9 @@ export interface GeneralSettings {
   localShellArgs: string
   localShellCwd: string
   localShellLogin: boolean
+  keywordHighlightEnabled: boolean
+  keywordHighlightCaseInsensitive: boolean
+  keywordHighlightRules: KeywordHighlightSettings['rules']
   closeButtonAction: CloseButtonAction
   debug: boolean
   logDir: string
@@ -81,6 +90,9 @@ export const defaultGeneralSettings: GeneralSettings = {
   uiFontFamily: DEFAULT_UI_FONT_FAMILY, uiFontFallbackFamily: DEFAULT_UI_FONT_FALLBACK_FAMILY,
   uiFontSize: DEFAULT_UI_FONT_SIZE,
   rightClickAction: 'menu', copyOnSelect: false, scrollbackLines: DEFAULT_TERMINAL_SCROLLBACK_LINES, autoReconnect: false, restoreTabsOnStartup: true, renderer: DEFAULT_TERMINAL_RENDERER, historyPredict: false, localShell: '', localShellArgs: '', localShellCwd: '', localShellLogin: true,
+  keywordHighlightEnabled: DEFAULT_KEYWORD_HIGHLIGHT_SETTINGS.enabled,
+  keywordHighlightCaseInsensitive: DEFAULT_KEYWORD_HIGHLIGHT_SETTINGS.caseInsensitive,
+  keywordHighlightRules: DEFAULT_KEYWORD_HIGHLIGHT_SETTINGS.rules,
   closeButtonAction: 'tray',
   debug: false,
   logDir: '',
@@ -140,6 +152,11 @@ export function settingValue<T>(settings: { [_ in string]?: Setting }, key: stri
   return JSON.parse(setting.value) as T
 }
 
+function parseKeywordHighlight(settings: { [_ in string]?: Setting }): Pick<GeneralSettings, 'keywordHighlightEnabled' | 'keywordHighlightCaseInsensitive' | 'keywordHighlightRules'> {
+  const keyword = normalizeKeywordHighlightSettings(settingValue(settings, 'terminal.keyword_highlight', DEFAULT_KEYWORD_HIGHLIGHT_SETTINGS))
+  return { keywordHighlightEnabled: keyword.enabled, keywordHighlightCaseInsensitive: keyword.caseInsensitive, keywordHighlightRules: keyword.rules }
+}
+
 export function normalizeGeneral(settings: GeneralSettings): GeneralSettings {
   const uiFontFamily = normalizeUIFontFamily(settings.uiFontFamily)
   return {
@@ -159,6 +176,12 @@ export function normalizeGeneral(settings: GeneralSettings): GeneralSettings {
     localShellArgs: String(settings.localShellArgs ?? ''),
     localShellCwd: String(settings.localShellCwd ?? ''),
     localShellLogin: settings.localShellLogin !== false,
+    keywordHighlightEnabled: settings.keywordHighlightEnabled === true,
+    keywordHighlightCaseInsensitive: settings.keywordHighlightCaseInsensitive !== false,
+    keywordHighlightRules: normalizeKeywordHighlightSettings({
+      enabled: settings.keywordHighlightEnabled,
+      rules: settings.keywordHighlightRules,
+    }).rules,
     closeButtonAction: normalizeCloseButtonAction(settings.closeButtonAction),
     debug: normalizeDebug(settings.debug),
     logDir: normalizeLogDir(settings.logDir),
@@ -191,6 +214,7 @@ export function parseGeneral(settings: { [_ in string]?: Setting }): GeneralSett
     localShellArgs: settingValue(settings, 'terminal.local_shell_args', ''),
     localShellCwd: settingValue(settings, 'terminal.local_shell_cwd', ''),
     localShellLogin: settingValue(settings, 'terminal.local_shell_login', true),
+    ...parseKeywordHighlight(settings),
     uiFontFamily, uiFontFallbackFamily: settingValue(settings, 'appearance.ui_font_fallback_family', DEFAULT_UI_FONT_FALLBACK_FAMILY),
     uiFontSize: settingValue(settings, 'appearance.ui_font_size', DEFAULT_UI_FONT_SIZE),
     closeButtonAction: settingValue(settings, 'application.close_button_action', 'tray'),
@@ -212,6 +236,11 @@ export function applyGeneral(settings: GeneralSettings) {
   applyUIFont({ family: settings.uiFontFamily, fallbackFamily: settings.uiFontFallbackFamily, size: settings.uiFontSize })
   useTerminalBehaviorStore.getState().setSettings({ rightClickAction: settings.rightClickAction, copyOnSelect: settings.copyOnSelect, scrollbackLines: settings.scrollbackLines, autoReconnect: settings.autoReconnect, restoreTabsOnStartup: settings.restoreTabsOnStartup, renderer: settings.renderer, historyPredict: settings.historyPredict })
   useAppStore.getState().setMaxPoolSize(settings.maxPoolSize)
+  useTerminalKeywordHighlightStore.getState().setSettings({
+    enabled: settings.keywordHighlightEnabled,
+    caseInsensitive: settings.keywordHighlightCaseInsensitive,
+    rules: settings.keywordHighlightRules,
+  })
   useLanguageStore.getState().hydrateLanguage(settings.language)
 }
 
@@ -234,7 +263,7 @@ export async function persistGeneral(settings: GeneralSettings) {
   await SettingService.SetMany([
     settingEntry('terminal.max_pool_size', normalized.maxPoolSize), settingEntry('terminal.default_keep_alive', normalized.defaultKeepAlive),
     settingEntry('terminal.default_term_type', normalized.defaultTermType), settingEntry('terminal.right_click_action', normalized.rightClickAction),
-    settingEntry('terminal.copy_on_select', normalized.copyOnSelect), settingEntry('terminal.scrollback_lines', normalized.scrollbackLines), settingEntry('terminal.auto_reconnect', normalized.autoReconnect), settingEntry('terminal.restore_tabs_on_startup', normalized.restoreTabsOnStartup), settingEntry('terminal.renderer', normalized.renderer), settingEntry('terminal.history_predict', normalized.historyPredict), settingEntry('terminal.local_shell', normalized.localShell), settingEntry('terminal.local_shell_args', normalized.localShellArgs), settingEntry('terminal.local_shell_cwd', normalized.localShellCwd), settingEntry('terminal.local_shell_login', normalized.localShellLogin), settingEntry('appearance.ui_font_family', normalized.uiFontFamily),
+    settingEntry('terminal.copy_on_select', normalized.copyOnSelect), settingEntry('terminal.scrollback_lines', normalized.scrollbackLines), settingEntry('terminal.auto_reconnect', normalized.autoReconnect), settingEntry('terminal.restore_tabs_on_startup', normalized.restoreTabsOnStartup), settingEntry('terminal.renderer', normalized.renderer), settingEntry('terminal.history_predict', normalized.historyPredict), settingEntry('terminal.local_shell', normalized.localShell), settingEntry('terminal.local_shell_args', normalized.localShellArgs), settingEntry('terminal.local_shell_cwd', normalized.localShellCwd), settingEntry('terminal.local_shell_login', normalized.localShellLogin), settingEntry('terminal.keyword_highlight', { enabled: normalized.keywordHighlightEnabled, caseInsensitive: normalized.keywordHighlightCaseInsensitive, rules: normalized.keywordHighlightRules }), settingEntry('appearance.ui_font_family', normalized.uiFontFamily),
     settingEntry('appearance.ui_font_fallback_family', normalized.uiFontFallbackFamily), settingEntry('appearance.ui_font_size', normalized.uiFontSize),
     settingEntry('application.close_button_action', normalized.closeButtonAction),
     settingEntry('application.debug', normalized.debug),

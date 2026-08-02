@@ -16,6 +16,7 @@ import { subscribeToSynchronizedOutputQuery, subscribeToTerminalOutput, subscrib
 import type { TerminalLifecycleRefs } from '@/hooks/terminalMountRuntime'
 import { TerminalCommandCapture } from '@/lib/terminalCommandCapture'
 import { registerTerminalSearch, unregisterTerminalSearch } from '@/lib/terminalSearchRegistry'
+import { createTerminalKeywordHighlightController } from '@/hooks/useTerminalKeywordHighlight'
 import { TerminalService } from '@/lib/wails'
 import { useTerminalBehaviorStore } from '@/store/terminalBehaviorStore'
 
@@ -102,12 +103,15 @@ function createInputSubscriptions(options: MountOptions, resources: BaseResource
 function createRuntimeSubscriptions(options: MountOptions, resources: BaseResources) {
   const { refs, reportRuntimeError, containerRef } = options
   const { term, fitAddon } = resources
+  const keywordHighlight = createTerminalKeywordHighlightController({ reportRuntimeError })
   const outputSubscription = subscribeToTerminalOutput({
     term, terminalIDRef: refs.terminalIDRef, reportRuntimeError,
     shouldCoalesce: () => !refs.activeRef.current,
     setOutputPaused: typeof TerminalService.SetOutputPaused === 'function'
       ? async (terminalID, paused) => { await TerminalService.SetOutputPaused(terminalID, paused) }
       : undefined,
+    outputTransform: keywordHighlight.transform,
+    outputFlush: keywordHighlight.flush,
   })
   refs.outputFlushRef.current = () => outputSubscription.flush()
   const unsubscribeTheme = options.subscribeToTheme({ term, fitAddon, containerRef, refs, reportRuntimeError })
@@ -118,6 +122,7 @@ function createRuntimeSubscriptions(options: MountOptions, resources: BaseResour
     terminalVersionQueryDispose: subscribeToTerminalVersionQuery(term),
     terminalDirectoryDispose: subscribeToTerminalWorkingDirectory(term, refs.terminalIDRef),
     outputSubscription,
+    keywordHighlightDispose: keywordHighlight.dispose,
     unsubscribeTheme,
     unsubscribeScrollback: subscribeToScrollback(term, reportRuntimeError),
     unsubscribeRenderer: subscribeToRenderer((mode) => resources.rendererController.apply(mode), reportRuntimeError),
@@ -171,6 +176,7 @@ function disposeMount(context: {
   safelyDisposeTerminalResource('terminal version query', () => subscriptions.terminalVersionQueryDispose.dispose())
   safelyDisposeTerminalResource('terminal working directory', () => subscriptions.terminalDirectoryDispose.dispose())
   safelyDisposeTerminalResource('output subscription', subscriptions.outputSubscription.dispose)
+  safelyDisposeTerminalResource('keyword highlight', () => subscriptions.keywordHighlightDispose())
   safelyDisposeTerminalResource('theme subscription', subscriptions.unsubscribeTheme)
   safelyDisposeTerminalResource('scrollback subscription', subscriptions.unsubscribeScrollback)
   safelyDisposeTerminalResource('renderer subscription', subscriptions.unsubscribeRenderer)
