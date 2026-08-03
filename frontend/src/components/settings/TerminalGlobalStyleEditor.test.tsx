@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { TerminalGlobalStyleEditor } from '@/components/settings/TerminalGlobalStyleEditor'
+import { DEFAULT_TERMINAL_BEHAVIOR, useTerminalBehaviorStore } from '@/store/terminalBehaviorStore'
 
 describe('TerminalGlobalStyleEditor', () => {
   it('edits the global terminal font, size, cursor style, and selection background', async () => {
@@ -75,6 +76,18 @@ describe('TerminalGlobalStyleEditor', () => {
   it('disables the ligatures switch while saving', () => {
     render(<TerminalGlobalStyleEditor style={globalStyle() as never} disabled onChange={vi.fn()} />)
     expect(screen.getByRole('switch', { name: '字体连字' })).toHaveAttribute('aria-disabled', 'true')
+  })
+
+  it('warns when ligatures are enabled under a non-DOM renderer', () => {
+    useTerminalBehaviorStore.setState({ ...DEFAULT_TERMINAL_BEHAVIOR, renderer: 'canvas' })
+    render(<TerminalGlobalStyleEditor style={{ ...globalStyle(), ligatures_enabled: true } as never} onChange={vi.fn()} />)
+    expect(screen.getByText(/当前渲染器为 Canvas/)).toBeInTheDocument()
+  })
+
+  it('does not warn for a DOM renderer with ligatures enabled', () => {
+    useTerminalBehaviorStore.setState({ ...DEFAULT_TERMINAL_BEHAVIOR, renderer: 'dom' })
+    render(<TerminalGlobalStyleEditor style={{ ...globalStyle(), ligatures_enabled: true } as never} onChange={vi.fn()} />)
+    expect(screen.queryByText(/当前渲染器为/)).not.toBeInTheDocument()
   })
 })
 

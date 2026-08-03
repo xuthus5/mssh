@@ -1,5 +1,7 @@
+import { ShieldAlert } from 'lucide-react'
 import { Field, FieldContent, FieldDescription, FieldLabel } from '@/components/ui/field'
 import { LabeledSelect } from '@/components/ui/labeled-select'
+import { useThemeCatalogStore } from '@/hooks/useThemeCatalog'
 import {
   normalizeTerminalRenderer,
   type TerminalRenderer,
@@ -20,6 +22,7 @@ interface Props {
 }
 
 export function TerminalRendererSettingsSection({ renderer, onRendererChange }: Props) {
+  const ligaturesEnabled = useThemeCatalogStore((state) => state.globalStyle.ligatures_enabled)
   return (
     <section className="rounded-xl border border-border bg-card p-3 shadow-sm">
       <div className="mb-3">
@@ -43,6 +46,12 @@ export function TerminalRendererSettingsSection({ renderer, onRendererChange }: 
           className="w-40"
         />
       </Field>
+      {renderer !== 'dom' && ligaturesEnabled ? (
+        <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-500/60 bg-amber-500/10 px-3 py-2 text-xs text-foreground">
+          <ShieldAlert className="mt-0.5 size-4 shrink-0 text-amber-500" />
+          <span>{t('已开启字体连字，但 ${} 渲染器下连字可能无法生效，建议切换为 DOM 渲染器。', renderer === 'canvas' ? 'Canvas' : 'WebGL')}</span>
+        </div>
+      ) : null}
     </section>
   )
 }
