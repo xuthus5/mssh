@@ -187,25 +187,41 @@ jobs:
           $root = Join-Path $env:RUNNER_TEMP 'nsis'
           $zip = Join-Path $env:RUNNER_TEMP "nsis-$version.zip"
           $makensis = Join-Path $root "nsis-$version\makensis.exe"
+          function Install-NsisChocolatey {
+            Write-Host "Installing NSIS via Chocolatey"
+            choco install nsis -y --no-progress --attempts=3
+          }
+          function Test-ZipFile {
+            param([string]$Path)
+            if (-not (Test-Path $Path)) { return $false }
+            if ((Get-Item $Path).Length -le 1MB) { return $false }
+            $bytes = [System.IO.File]::ReadAllBytes($Path)
+            return $bytes.Length -ge 2 -and $bytes[0] -eq 0x50 -and $bytes[1] -eq 0x4B
+          }
           if (-not (Test-Path $makensis)) {
             if (-not (Test-Path $zip)) {
               $url = "https://downloads.sourceforge.net/project/nsis/NSIS%203/$version/nsis-$version.zip"
               $downloaded = $false
               for ($attempt = 1; $attempt -le 3; $attempt++) {
-                try {
-                  Invoke-WebRequest -Uri $url -OutFile $zip -UseBasicParsing -ErrorAction Stop
+                Remove-Item $zip -Force -ErrorAction SilentlyContinue
+                curl.exe -L --fail --silent --show-error -o $zip $url
+                if ($LASTEXITCODE -eq 0 -and (Test-ZipFile $zip)) {
                   $downloaded = $true
                   break
-                } catch {
-                  if ($attempt -lt 3) { Start-Sleep -Seconds 5 }
                 }
+                Write-Host "NSIS download attempt $attempt failed or produced an invalid archive; retrying"
+                if ($attempt -lt 3) { Start-Sleep -Seconds 5 }
               }
-              if (-not $downloaded) {
-                Write-Host "SourceForge NSIS download failed; falling back to Chocolatey"
-                choco install nsis -y --no-progress --attempts=3
+              if (-not $downloaded) { Install-NsisChocolatey }
+            }
+            if (Test-Path $zip) {
+              try {
+                Expand-Archive -Path $zip -DestinationPath $root -Force
+              } catch {
+                Write-Host "Expand-Archive failed; falling back to Chocolatey: $_"
+                Install-NsisChocolatey
               }
             }
-            if (Test-Path $zip) { Expand-Archive -Path $zip -DestinationPath $root -Force }
             if (-not (Test-Path $makensis)) {
               $candidates = @(
                 "C:\Program Files (x86)\NSIS\makensis.exe",
