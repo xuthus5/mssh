@@ -3974,6 +3974,7 @@ export class TerminalGlobalStyle {
     "font_size": number;
     "cursor_style": CursorStyle;
     "selection_background": string;
+    "ligatures_enabled": boolean;
 
     /** Creates a new TerminalGlobalStyle instance. */
     constructor($$source: Partial<TerminalGlobalStyle> = {}) {
@@ -3988,6 +3989,9 @@ export class TerminalGlobalStyle {
         }
         if (!("selection_background" in $$source)) {
             this["selection_background"] = "";
+        }
+        if (!("ligatures_enabled" in $$source)) {
+            this["ligatures_enabled"] = false;
         }
 
         Object.assign(this, $$source);
@@ -4007,6 +4011,7 @@ export class TerminalGlobalStyleInput {
     "font_size": number;
     "cursor_style": CursorStyle;
     "selection_background": string;
+    "ligatures_enabled": boolean;
 
     /** Creates a new TerminalGlobalStyleInput instance. */
     constructor($$source: Partial<TerminalGlobalStyleInput> = {}) {
@@ -4021,6 +4026,9 @@ export class TerminalGlobalStyleInput {
         }
         if (!("selection_background" in $$source)) {
             this["selection_background"] = "";
+        }
+        if (!("ligatures_enabled" in $$source)) {
+            this["ligatures_enabled"] = false;
         }
 
         Object.assign(this, $$source);

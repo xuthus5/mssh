@@ -20,13 +20,29 @@ func TestLoadTerminalGlobalStyleReportsAbsentStateAndRoundTrip(t *testing.T) {
 
 	expected := model.TerminalGlobalStyle{
 		FontFamily: "Iosevka", FontSize: 17, CursorStyle: model.CursorStyleUnderline,
-		SelectionBackground: "#123456",
+		SelectionBackground: "#123456", LigaturesEnabled: true,
 	}
 	require.NoError(t, SaveTerminalGlobalStyleDB(db, expected))
 	loaded, exists, err := LoadTerminalGlobalStyle(db)
 	require.NoError(t, err)
 	assert.True(t, exists)
 	assert.Equal(t, expected, loaded)
+}
+
+func TestLoadTerminalGlobalStyleDefaultsMissingLigaturesForOldDatabases(t *testing.T) {
+	db := setupTestDB(t)
+	require.NoError(t, SaveTerminalGlobalStyleDB(db, model.TerminalGlobalStyle{
+		FontFamily: "Iosevka", FontSize: 17, CursorStyle: model.CursorStyleUnderline,
+		SelectionBackground: "#123456", LigaturesEnabled: true,
+	}))
+	_, err := db.Exec("DELETE FROM settings WHERE key = ?", terminalLigaturesKey)
+	require.NoError(t, err)
+
+	style, exists, err := LoadTerminalGlobalStyle(db)
+	require.NoError(t, err)
+	assert.True(t, exists)
+	assert.False(t, style.LigaturesEnabled)
+	assert.Equal(t, "Iosevka", style.FontFamily)
 }
 
 func TestLoadTerminalGlobalStyleRejectsIncompleteState(t *testing.T) {

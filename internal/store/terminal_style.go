@@ -15,15 +15,21 @@ const (
 	terminalFontSizeKey    = "terminal.style.font_size"
 	terminalCursorStyleKey = "terminal.style.cursor_style"
 	terminalSelectionKey   = "terminal.style.selection_background"
+	terminalLigaturesKey   = "terminal.style.ligatures_enabled"
 )
 
+// Required keys existed in every release; optional keys are back-filled with
+// defaults when older databases have not persisted them yet (migration).
 var terminalGlobalStyleKeys = []string{terminalFontFamilyKey, terminalFontSizeKey, terminalCursorStyleKey, terminalSelectionKey}
+
+var terminalGlobalStyleOptionalKeys = []string{terminalLigaturesKey}
 
 var terminalGlobalStyleValueTypes = map[string]string{
 	terminalFontFamilyKey:  "string",
 	terminalFontSizeKey:    "number",
 	terminalCursorStyleKey: "string",
 	terminalSelectionKey:   "string",
+	terminalLigaturesKey:   "boolean",
 }
 
 func LoadTerminalGlobalStyle(db themeDB) (model.TerminalGlobalStyle, bool, error) {
@@ -68,6 +74,17 @@ func loadTerminalGlobalStyleValues(db themeDB) (map[string]string, bool, error) 
 	if len(values) != len(terminalGlobalStyleKeys) {
 		return nil, true, fmt.Errorf("terminal global style is incomplete")
 	}
+	for _, key := range terminalGlobalStyleOptionalKeys {
+		setting, settingExists, err := loadTerminalGlobalStyleSetting(db, key)
+		if err != nil {
+			return nil, true, err
+		}
+		if settingExists {
+			values[key] = setting.Value
+		} else {
+			values[key] = "false"
+		}
+	}
 	return values, true, nil
 }
 
@@ -106,8 +123,10 @@ func parseTerminalGlobalStyle(values map[string]string) (model.TerminalGlobalSty
 		terminalFontSizeKey:    &style.FontSize,
 		terminalCursorStyleKey: &style.CursorStyle,
 		terminalSelectionKey:   &style.SelectionBackground,
+		terminalLigaturesKey:   &style.LigaturesEnabled,
 	}
-	for _, key := range terminalGlobalStyleKeys {
+	allKeys := append(append([]string{}, terminalGlobalStyleKeys...), terminalGlobalStyleOptionalKeys...)
+	for _, key := range allKeys {
 		if err := json.Unmarshal([]byte(values[key]), targets[key]); err != nil {
 			return model.TerminalGlobalStyle{}, fmt.Errorf("parse terminal global style %s: %w", key, err)
 		}
@@ -125,6 +144,7 @@ func SaveTerminalGlobalStyleDB(db themeDB, style model.TerminalGlobalStyle) erro
 		{key: terminalFontSizeKey, value: style.FontSize, valueType: "number"},
 		{key: terminalCursorStyleKey, value: style.CursorStyle, valueType: "string"},
 		{key: terminalSelectionKey, value: style.SelectionBackground, valueType: "string"},
+		{key: terminalLigaturesKey, value: style.LigaturesEnabled, valueType: "boolean"},
 	}
 	for _, setting := range settings {
 		value, err := json.Marshal(setting.value)

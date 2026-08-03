@@ -83,6 +83,7 @@ export function terminalGlobalStyleInput(style: TerminalGlobalStyle): TerminalGl
     font_size: style.font_size,
     cursor_style: style.cursor_style,
     selection_background: style.selection_background,
+    ligatures_enabled: style.ligatures_enabled,
   }
 }
 

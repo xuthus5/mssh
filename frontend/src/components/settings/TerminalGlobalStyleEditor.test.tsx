@@ -61,6 +61,21 @@ describe('TerminalGlobalStyleEditor', () => {
     expect(screen.getByLabelText('全局选区背景色 HEX')).toHaveAttribute('aria-invalid', 'true')
     expect(screen.getByRole('alert')).toHaveTextContent('请输入 #RRGGBB 格式')
   })
+
+  it('toggles the ligatures switch', async () => {
+    const onChange = vi.fn()
+    const { rerender } = render(<TerminalGlobalStyleEditor style={globalStyle() as never} onChange={onChange} />)
+    await userEvent.click(screen.getByRole('switch', { name: '字体连字' }))
+    expect(onChange).toHaveBeenCalledWith('ligatures_enabled', true)
+
+    rerender(<TerminalGlobalStyleEditor style={{ ...globalStyle(), ligatures_enabled: true } as never} onChange={onChange} />)
+    expect(screen.getByRole('switch', { name: '字体连字' })).toHaveAttribute('aria-checked', 'true')
+  })
+
+  it('disables the ligatures switch while saving', () => {
+    render(<TerminalGlobalStyleEditor style={globalStyle() as never} disabled onChange={vi.fn()} />)
+    expect(screen.getByRole('switch', { name: '字体连字' })).toHaveAttribute('aria-disabled', 'true')
+  })
 })
 
 function GlobalStyleHarness() {
@@ -69,5 +84,5 @@ function GlobalStyleHarness() {
 }
 
 function globalStyle() {
-  return { font_family: 'Global Font', font_size: 16, cursor_style: 'bar' as const, selection_background: '#264f78' }
+  return { font_family: 'Global Font', font_size: 16, cursor_style: 'bar' as const, selection_background: '#264f78', ligatures_enabled: false }
 }

@@ -68,16 +68,18 @@ function writeTerminalInput(data: string, refs: TerminalLifecycleRefs) {
   }
 }
 
-function subscribeToTheme({ term, fitAddon, containerRef, refs, reportRuntimeError }: {
+function subscribeToTheme({ term, fitAddon, containerRef, refs, reportRuntimeError, ligaturesController }: {
   term: Terminal
   fitAddon: FitAddon
   containerRef: RefObject<HTMLDivElement | null>
   refs: TerminalLifecycleRefs
   reportRuntimeError: TerminalRuntimeErrorReporter
+  ligaturesController: import('@/hooks/terminalInstanceRuntime').TerminalLigaturesController
 }) {
   return useAppStore.subscribe((state, previous) => {
     if (state.terminalTheme !== previous.terminalTheme) {
       runTerminalRuntime(reportRuntimeError, 'terminal theme update', () => {
+        ligaturesController.apply(state.terminalTheme.ligatures)
         applyTerminalTheme(term.options, state.terminalTheme)
         // Inactive split panes still need a visual refresh after theme changes.
         if (!fitAndRefresh(term, fitAddon, containerRef.current)) {

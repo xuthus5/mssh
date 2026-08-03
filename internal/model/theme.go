@@ -35,6 +35,7 @@ type TerminalGlobalStyle struct {
 	FontSize            int         `json:"font_size"`
 	CursorStyle         CursorStyle `json:"cursor_style"`
 	SelectionBackground string      `json:"selection_background"`
+	LigaturesEnabled    bool        `json:"ligatures_enabled"`
 }
 
 type TerminalColorPayload struct {
