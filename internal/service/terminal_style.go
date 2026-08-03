@@ -17,6 +17,7 @@ func defaultTerminalGlobalStyle() model.TerminalGlobalStyle {
 		FontSize:            model.DefaultTerminalFontSize,
 		CursorStyle:         model.CursorStyleBar,
 		SelectionBackground: model.DefaultTerminalSelectionBackground,
+		LigaturesEnabled:    false,
 	}
 }
 

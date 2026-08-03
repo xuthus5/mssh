@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { TerminalProfileStyleEditor } from '@/components/settings/TerminalProfileStyleEditor'
 import type { ThemeDraft } from '@/components/settings/themeEditorState'
 
-const globalStyle = { font_family: 'Global Font', font_size: 16, cursor_style: 'underline' as const, selection_background: '#123456' }
+const globalStyle = { font_family: 'Global Font', font_size: 16, cursor_style: 'underline' as const, selection_background: '#123456', ligatures_enabled: false }
 
 describe('TerminalProfileStyleEditor', () => {
   it('shows effective global values while following and disables fallback fields', () => {

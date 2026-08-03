@@ -7,6 +7,7 @@ import {
 } from '@/store/terminalBehaviorStore'
 import {
   applyTerminalScrollback,
+  createLigaturesController,
   createTerminalInstance,
   createTerminalRendererController,
 } from '@/hooks/terminalInstanceRuntime'
@@ -34,6 +35,13 @@ vi.mock('@xterm/addon-canvas', () => ({
 vi.mock('@xterm/addon-webgl', () => ({
   WebglAddon: class {
     dispose = vi.fn()
+  },
+}))
+
+const disposedLigatures = vi.fn()
+vi.mock('@xterm/addon-ligatures', () => ({
+  LigaturesAddon: class {
+    dispose = disposedLigatures
   },
 }))
 
@@ -79,5 +87,35 @@ describe('terminalInstanceRuntime renderer', () => {
     expect(controller.apply('webgl')).toBe('webgl')
     expect(loadAddon).toHaveBeenCalledTimes(2)
     expect(controller.apply('dom')).toBe('dom')
+  })
+})
+
+describe('terminalInstanceRuntime ligatures', () => {
+  beforeEach(() => {
+    loadAddon.mockClear()
+    disposedLigatures.mockClear()
+    useTerminalBehaviorStore.setState(DEFAULT_TERMINAL_BEHAVIOR)
+  })
+
+  it('loads the ligatures addon when enabled and unloads when disabled', () => {
+    const term = createTerminalInstance()
+    const controller = createLigaturesController(term as never)
+    controller.apply(true)
+    expect(loadAddon).toHaveBeenCalledTimes(1)
+    controller.apply(true)
+    expect(loadAddon).toHaveBeenCalledTimes(1)
+    controller.apply(false)
+    expect(disposedLigatures).toHaveBeenCalledTimes(1)
+    controller.apply(false)
+    expect(disposedLigatures).toHaveBeenCalledTimes(1)
+    controller.dispose()
+  })
+
+  it('disposes an active addon on cleanup', () => {
+    const term = createTerminalInstance()
+    const controller = createLigaturesController(term as never)
+    controller.apply(true)
+    controller.dispose()
+    expect(disposedLigatures).toHaveBeenCalledTimes(1)
   })
 })

@@ -32,6 +32,7 @@ export function profileToTerminalTheme(profile: ThemeProfile, globalStyle: Termi
     cursorStyle: cursorStyle as TerminalTheme['cursorStyle'],
     fontFamily,
     fontSize,
+    ligatures: globalStyle.ligatures_enabled,
     ansiBlack: ansi[0] ?? FALLBACK_ANSI[0], ansiRed: ansi[1] ?? FALLBACK_ANSI[1], ansiGreen: ansi[2] ?? FALLBACK_ANSI[2], ansiYellow: ansi[3] ?? FALLBACK_ANSI[3],
     ansiBlue: ansi[4] ?? FALLBACK_ANSI[4], ansiMagenta: ansi[5] ?? FALLBACK_ANSI[5], ansiCyan: ansi[6] ?? FALLBACK_ANSI[6], ansiWhite: ansi[7] ?? FALLBACK_ANSI[7],
     ansiBrightBlack: ansi[8] ?? FALLBACK_ANSI[8], ansiBrightRed: ansi[9] ?? FALLBACK_ANSI[9], ansiBrightGreen: ansi[10] ?? FALLBACK_ANSI[10], ansiBrightYellow: ansi[11] ?? FALLBACK_ANSI[11],

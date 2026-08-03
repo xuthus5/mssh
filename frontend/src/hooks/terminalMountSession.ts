@@ -12,12 +12,14 @@ import { subscribeToTerminalWorkingDirectory } from '@/hooks/terminalDirectoryRu
 import { fitAndRefresh } from '@/hooks/terminalFitRuntime'
 import { resolveSessionId, subscribeToTerminalData } from '@/hooks/terminalInputRuntime'
 import { createTerminalInstance, createTerminalRendererController, safelyDisposeTerminalResource } from '@/hooks/terminalInstanceRuntime'
+import { createLigaturesController, type TerminalLigaturesController } from '@/hooks/terminalInstanceRuntime'
 import { subscribeToSynchronizedOutputQuery, subscribeToTerminalOutput, subscribeToTerminalVersionQuery } from '@/hooks/terminalOutputRuntime'
 import type { TerminalLifecycleRefs } from '@/hooks/terminalMountRuntime'
 import { TerminalCommandCapture } from '@/lib/terminalCommandCapture'
 import { registerTerminalSearch, unregisterTerminalSearch } from '@/lib/terminalSearchRegistry'
 import { createTerminalKeywordHighlightController } from '@/hooks/useTerminalKeywordHighlight'
 import { TerminalService } from '@/lib/wails'
+import { useAppStore } from '@/store/appStore'
 import { useTerminalBehaviorStore } from '@/store/terminalBehaviorStore'
 
 type MountOptions = {
@@ -37,6 +39,7 @@ type ThemeSubscriptionOptions = {
   containerRef: RefObject<HTMLDivElement | null>
   refs: TerminalLifecycleRefs
   reportRuntimeError: TerminalRuntimeErrorReporter
+  ligaturesController: TerminalLigaturesController
 }
 
 type BaseResources = {
@@ -46,6 +49,7 @@ type BaseResources = {
   unicodeAddon: Unicode11Addon
   searchAddon: SearchAddon
   rendererController: ReturnType<typeof createTerminalRendererController>
+  ligaturesController: TerminalLigaturesController
   cleanupCopyOnSelect?: () => void
   owned: { fit: boolean; unicode: boolean; search: boolean }
 }
@@ -58,6 +62,7 @@ function createBaseResources(options: MountOptions): BaseResources {
   const unicodeAddon = new Unicode11Addon()
   const searchAddon = new SearchAddon({ highlightLimit: 1000 })
   const rendererController = createTerminalRendererController(term)
+  const ligaturesController = createLigaturesController(term)
   const owned = { fit: false, unicode: false, search: false }
   let cleanupCopyOnSelect: (() => void) | undefined
   refs.termRef.current = term
@@ -65,6 +70,7 @@ function createBaseResources(options: MountOptions): BaseResources {
   if (container) {
     term.open(container)
     rendererController.apply(useTerminalBehaviorStore.getState().renderer)
+    ligaturesController.apply(useAppStore.getState().terminalTheme.ligatures)
     term.loadAddon(unicodeAddon)
     owned.unicode = true
     if (term.unicode) term.unicode.activeVersion = '11'
@@ -76,7 +82,7 @@ function createBaseResources(options: MountOptions): BaseResources {
     owned.fit = true
     refs.storeRef.current.registerTerminal(refs.terminalIDRef.current, term)
   }
-  return { container, term, fitAddon, unicodeAddon, searchAddon, rendererController, cleanupCopyOnSelect, owned }
+  return { container, term, fitAddon, unicodeAddon, searchAddon, rendererController, ligaturesController, cleanupCopyOnSelect, owned }
 }
 
 function createInputSubscriptions(options: MountOptions, resources: BaseResources) {
@@ -115,8 +121,8 @@ function createRuntimeSubscriptions(options: MountOptions, resources: BaseResour
     outputFlush: keywordHighlight.flush,
   })
   refs.outputFlushRef.current = () => outputSubscription.flush()
-  const unsubscribeTheme = options.subscribeToTheme({ term, fitAddon, containerRef, refs, reportRuntimeError })
-  const resizeObserver = options.observeResize({ term, fitAddon, containerRef, refs, reportRuntimeError })
+  const unsubscribeTheme = options.subscribeToTheme({ term, fitAddon, containerRef, refs, reportRuntimeError, ligaturesController: resources.ligaturesController })
+  const resizeObserver = options.observeResize({ term, fitAddon, containerRef, refs, reportRuntimeError, ligaturesController: resources.ligaturesController })
   if (resources.container) resizeObserver.observe(resources.container)
   return {
     synchronizedOutputQueryDispose: subscribeToSynchronizedOutputQuery(term),
@@ -183,6 +189,7 @@ function disposeMount(context: {
   safelyDisposeTerminalResource('scrollback subscription', subscriptions.unsubscribeScrollback)
   safelyDisposeTerminalResource('renderer subscription', subscriptions.unsubscribeRenderer)
   safelyDisposeTerminalResource('renderer addon', () => resources.rendererController.dispose())
+  safelyDisposeTerminalResource('ligatures addon', () => resources.ligaturesController.dispose())
   safelyDisposeTerminalResource('resize observer', () => subscriptions.resizeObserver.disconnect())
   if (resources.cleanupCopyOnSelect) safelyDisposeTerminalResource('copy-on-select subscription', resources.cleanupCopyOnSelect)
   unregisterTerminalSearch(refs.registeredTerminalIDRef.current)

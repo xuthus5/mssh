@@ -1,5 +1,6 @@
 import { CanvasAddon } from '@xterm/addon-canvas'
 import { WebglAddon } from '@xterm/addon-webgl'
+import { LigaturesAddon } from '@xterm/addon-ligatures'
 import { Terminal } from '@xterm/xterm'
 import { logger } from '@/lib/logger'
 import { xtermTheme } from '@/lib/terminalTheme'
@@ -105,6 +106,49 @@ export function createTerminalRendererController(term: Terminal): TerminalRender
 /** @deprecated Prefer createTerminalRendererController for selectable renderers. */
 export function loadCanvasRenderer(term: Terminal) {
   createTerminalRendererController(term).apply('canvas')
+}
+
+export interface TerminalLigaturesController {
+  apply: (enabled: boolean) => void
+  dispose: () => void
+}
+
+/** Load or unload the ligatures addon based on the global font setting. */
+export function createLigaturesController(term: Terminal): TerminalLigaturesController {
+  let addon: { dispose: () => void } | null = null
+
+  return {
+    apply: (enabled) => {
+      if (enabled && !addon) {
+        try {
+          const next = new LigaturesAddon()
+          term.loadAddon(next)
+          addon = next
+        } catch (error: unknown) {
+          logger.warn('terminal ligatures addon unavailable', error)
+        }
+        return
+      }
+      if (!enabled && addon) {
+        try {
+          addon.dispose()
+        } catch (error: unknown) {
+          logger.warn('terminal ligatures dispose failed', error)
+        }
+        addon = null
+      }
+    },
+    dispose: () => {
+      if (addon) {
+        try {
+          addon.dispose()
+        } catch (error: unknown) {
+          logger.warn('terminal ligatures cleanup failed', error)
+        }
+        addon = null
+      }
+    },
+  }
 }
 
 export function safelyDisposeTerminalResource(label: string, dispose: () => void) {
