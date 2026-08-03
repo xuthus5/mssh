@@ -119,17 +119,23 @@ tasks:
   generate:deb:
     summary: Creates a deb package
     cmds:
-      - wails3 tool package -name {{.APP_NAME}} -format deb -config ./build/linux/nfpm/nfpm.yaml -out {{.ROOT_DIR}}/bin
+      - |
+        pkg_version="$(printf '%s' '{{.APP_VERSION | default "0.1.0"}}' | tr -d '\r' | sed 's/^v//' | sed 's/-/./g')"
+        NFPM_VERSION="${pkg_version}" wails3 tool package -name {{.APP_NAME}} -format deb -config ./build/linux/nfpm/nfpm.yaml -out {{.ROOT_DIR}}/bin
 
   generate:rpm:
     summary: Creates a rpm package
     cmds:
-      - wails3 tool package -name {{.APP_NAME}} -format rpm -config ./build/linux/nfpm/nfpm.yaml -out {{.ROOT_DIR}}/bin
+      - |
+        pkg_version="$(printf '%s' '{{.APP_VERSION | default "0.1.0"}}' | tr -d '\r' | sed 's/^v//' | sed 's/-/./g')"
+        NFPM_VERSION="${pkg_version}" wails3 tool package -name {{.APP_NAME}} -format rpm -config ./build/linux/nfpm/nfpm.yaml -out {{.ROOT_DIR}}/bin
 
   generate:aur:
     summary: Creates a arch linux packager package
     cmds:
-      - wails3 tool package -name {{.APP_NAME}} -format archlinux -config ./build/linux/nfpm/nfpm.yaml -out {{.ROOT_DIR}}/bin
+      - |
+        pkg_version="$(printf '%s' '{{.APP_VERSION | default "0.1.0"}}' | tr -d '\r' | sed 's/^v//' | sed 's/-/./g')"
+        NFPM_VERSION="${pkg_version}" wails3 tool package -name {{.APP_NAME}} -format archlinux -config ./build/linux/nfpm/nfpm.yaml -out {{.ROOT_DIR}}/bin
 
   generate:dotdesktop:
     summary: Generates a `.desktop` file

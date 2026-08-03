@@ -57,7 +57,7 @@ jobs:
       - name: Resolve version
         id: version
         run: |
-          VERSION="nightly-$(date -u +%Y%m%d)-${GITHUB_SHA:0:7}"
+          VERSION="nightly-$(date -u +%Y%m%d-%H%M%S)-${GITHUB_SHA:0:7}"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
       - name: Prepare AppImage runtime
         run: |
@@ -240,7 +240,7 @@ jobs:
         id: version
         shell: bash
         run: |
-          VERSION="nightly-$(date -u +%Y%m%d)-${GITHUB_SHA:0:7}"
+          VERSION="nightly-$(date -u +%Y%m%d-%H%M%S)-${GITHUB_SHA:0:7}"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
       - name: Build and package
         shell: bash
@@ -304,7 +304,7 @@ jobs:
       - name: Resolve version
         id: version
         run: |
-          VERSION="nightly-$(date -u +%Y%m%d)-${GITHUB_SHA:0:7}"
+          VERSION="nightly-$(date -u +%Y%m%d-%H%M%S)-${GITHUB_SHA:0:7}"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
       - name: Build macOS app
         env:
