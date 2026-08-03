@@ -211,7 +211,7 @@ describe('useTerminal', () => {
 
     const { unmount } = renderHook(() => useTerminal('term-1', containerRef, { active: true, focusRequest: { sequence: 0 } }))
 
-    expect(calls).toEqual(['open', 'load:unicode11', 'load:search', 'load:fit'])
+    expect(calls).toEqual(['open', 'load:undefined', 'load:unicode11', 'load:search', 'load:fit'])
     expect(terminalOptions[0]).toEqual(expect.objectContaining({ allowProposedApi: true, cursorInactiveStyle: 'none' }))
     expect(getTerminalSearch('term-1')).not.toBeNull()
     expect(selectionDisposes).toHaveLength(1)
@@ -256,7 +256,7 @@ describe('useTerminal', () => {
 
     const { unmount } = renderHook(() => useTerminal('term-canvas-fallback', containerRef, { active: false, focusRequest: { sequence: 0 } }))
 
-    expect(calls).toEqual(['open', 'load:canvas', 'load:unicode11', 'load:search', 'load:fit', 'blur'])
+    expect(calls).toEqual(['open', 'load:canvas', 'load:undefined', 'load:unicode11', 'load:search', 'load:fit', 'blur'])
     expect(warn).toHaveBeenCalledWith('terminal canvas renderer unavailable', expect.objectContaining({ message: 'canvas unavailable' }))
     act(() => unmount())
     expect(canvasDisposes[0]).toHaveBeenCalledOnce()
