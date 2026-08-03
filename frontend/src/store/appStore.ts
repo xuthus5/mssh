@@ -66,6 +66,7 @@ export interface TerminalTheme {
   cursorStyle: 'block' | 'underline' | 'bar'
   fontFamily: string
   fontSize: number
+  ligatures: boolean
   ansiBlack: string
   ansiRed: string
   ansiGreen: string
@@ -94,6 +95,7 @@ const DEFAULT_THEME: TerminalTheme = {
   cursorStyle: 'bar',
   fontFamily: '"JetBrains Mono", "Cascadia Code", monospace',
   fontSize: 14,
+  ligatures: false,
   ansiBlack: '#000000',
   ansiRed: '#cd0000',
   ansiGreen: '#00cd00',

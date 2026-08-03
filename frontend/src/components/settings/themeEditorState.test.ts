@@ -9,7 +9,7 @@ import {
 } from '@/components/settings/themeEditorState'
 
 const profiles = [profile(1, '#111111'), profile(2, '#eeeeee'), profile(3, '#333333')]
-const globalStyle = { font_family: 'Global Font', font_size: 16, cursor_style: 'underline' as const, selection_background: '#123456' }
+const globalStyle = { font_family: 'Global Font', font_size: 16, cursor_style: 'underline' as const, selection_background: '#123456', ligatures_enabled: false }
 
 describe('theme editor state', () => {
   it('creates editable drafts keyed by Profile ID', () => {

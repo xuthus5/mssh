@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import { TextCursorInput } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
+import { Field, FieldContent, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { LabeledSelect } from '@/components/ui/labeled-select'
+import { Switch } from '@/components/ui/switch'
 import { TerminalSelectionBackgroundField } from '@/components/settings/TerminalSelectionBackgroundField'
 import { validTerminalFontFamily, validTerminalFontSize } from '@/components/settings/themeEditorState'
 import type { TerminalGlobalStyle } from '../../../bindings/github.com/xuthus5/mssh/internal/model/models'
@@ -60,6 +61,13 @@ export function TerminalGlobalStyleEditor({ style, disabled = false, onChange }:
           </Field>
         </div>
         <TerminalSelectionBackgroundField id="terminal-global-selection-background" ariaPrefix={t('全局')} value={style.selection_background} disabled={disabled} onChange={(value) => onChange('selection_background', value)} />
+        <Field orientation="horizontal" data-disabled={disabled || undefined}>
+          <FieldContent>
+            <FieldLabel htmlFor="terminal-global-ligatures">{t('字体连字')}</FieldLabel>
+            <FieldDescription>{t('配合支持连字的字体（如 Fira Code、JetBrains Mono）将运算符等渲染为连字字形；建议搭配 DOM 渲染器使用。默认关闭。')}</FieldDescription>
+          </FieldContent>
+          <Switch id="terminal-global-ligatures" checked={style.ligatures_enabled} disabled={disabled} onCheckedChange={(value) => onChange('ligatures_enabled', value)} aria-label={t('字体连字')} />
+        </Field>
       </FieldGroup>
     </CardContent>
   </Card>

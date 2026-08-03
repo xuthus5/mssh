@@ -8,6 +8,9 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
+      // @xterm/addon-ligatures@0.10.0 publishes only the ESM build but
+      // declares main as the missing CJS file; route it to the real entry.
+      '@xterm/addon-ligatures': path.resolve(__dirname, 'node_modules/@xterm/addon-ligatures/lib/addon-ligatures.mjs'),
     },
   },
   server: {

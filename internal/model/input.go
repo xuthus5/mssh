@@ -131,6 +131,7 @@ type TerminalGlobalStyleInput struct {
 	FontSize            int         `json:"font_size"`
 	CursorStyle         CursorStyle `json:"cursor_style"`
 	SelectionBackground string      `json:"selection_background"`
+	LigaturesEnabled    bool        `json:"ligatures_enabled"`
 }
 
 func (input TerminalGlobalStyleInput) TerminalGlobalStyle() TerminalGlobalStyle {

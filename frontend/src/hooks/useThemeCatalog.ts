@@ -31,7 +31,7 @@ const initialState: ThemeCatalogState = {
   definitions: [],
   profiles: [],
   assignments: { dark_profile_id: 0, light_profile_id: 0, follow_interface_mode: true, fixed_profile_id: 0 } as ThemeAssignments,
-  globalStyle: { font_family: '"JetBrains Mono", "Cascadia Code", monospace', font_size: 14, cursor_style: 'bar', selection_background: '#264f78' } as TerminalGlobalStyle,
+  globalStyle: { font_family: '"JetBrains Mono", "Cascadia Code", monospace', font_size: 14, cursor_style: 'bar', selection_background: '#264f78', ligatures_enabled: false } as TerminalGlobalStyle,
   colorMode: readStorageItem('mssh:color-mode') === 'light' ? 'light' : 'dark',
   loaded: false,
   loading: false,

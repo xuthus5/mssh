@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { profileToTerminalTheme } from '@/lib/terminalThemeCatalog'
 
-const globalStyle = { font_family: 'Global Font', font_size: 15, cursor_style: 'bar', selection_background: '#4f46e5' }
+const globalStyle = { font_family: 'Global Font', font_size: 15, cursor_style: 'bar', selection_background: '#4f46e5', ligatures_enabled: false }
 const profile = {
   id: 1,
   name: 'Dark',
@@ -43,5 +43,13 @@ describe('profileToTerminalTheme', () => {
     const result = profileToTerminalTheme({ ...profile, follow_global_style: true } as never, globalStyle as never)
 
     expect(result).toMatchObject({ cursor: '#abcdef', selectionBackground: '#4f46e5', fontFamily: 'Global Font', fontSize: 15, cursorStyle: 'bar' })
+  })
+
+  it('carries the global ligatures flag into the terminal theme', () => {
+    const result = profileToTerminalTheme(profile as never, { ...globalStyle, ligatures_enabled: true } as never)
+    expect(result.ligatures).toBe(true)
+
+    const disabled = profileToTerminalTheme(profile as never, { ...globalStyle, ligatures_enabled: false } as never)
+    expect(disabled.ligatures).toBe(false)
   })
 })
