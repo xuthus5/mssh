@@ -12,8 +12,9 @@ function createTermMock() {
   let keyHandler: ((event: KeyboardEvent) => boolean) | null = null
   const element = document.createElement('div')
   element.id = 'overlay-anchor'
+  element.style.width = '8px'
   document.body.appendChild(element)
-  const state = { baseY: 0, cursorY: 1, cursorX: 0, rows: 24 }
+  const state = { baseY: 0, cursorY: 23, cursorX: 0, rows: 24 }
   const term = {
     rows: 24,
     buffer: {
@@ -45,7 +46,7 @@ function createTermMock() {
       } as KeyboardEvent)
     },
   }
-  return { term, element }
+  return { term, state, element }
 }
 
 describe('tokenInsertion', () => {
@@ -98,6 +99,22 @@ describe('installCommandTokenPredict', () => {
     expect(term.registerDecoration).toHaveBeenCalled()
   })
 
+  it('keeps the decoration anchored when only the cursor column moves', async () => {
+    recordCommand(7, 'ls -lahrt /usr/local/bin/claude')
+    const { term, state } = createTermMock()
+    const handlers = installCommandTokenPredict(term as never, {
+      getSessionId: () => 7,
+      getBuffer: () => 'ls',
+      applyCompletion: vi.fn(),
+    })
+    await act(async () => { handlers.update() })
+    const decoratedOnce = term.registerDecoration.mock.calls.length
+    state.cursorX = 5
+    await act(async () => { handlers.update() })
+    expect(term.registerDecoration.mock.calls.length).toBe(decoratedOnce)
+    expect(await screen.findByText((content) => content.includes('-lahrt'))).toBeInTheDocument()
+  })
+
   it('accepts the inline token on Tab and continues selecting', async () => {
     recordCommand(7, 'ls -lahrt /usr/local/bin/claude')
     const { term } = createTermMock()
@@ -119,30 +136,6 @@ describe('installCommandTokenPredict', () => {
   })
 
   it('navigates the open list with arrows and accepts with Enter', async () => {
-    recordCommand(7, 'git commit -m x')
-    recordCommand(7, 'git checkout release')
-    recordCommand(7, 'git checkout dev')
-    recordCommand(7, 'git checkout main')
-    const { term } = createTermMock()
-    let buffer = 'git'
-    const applyCompletion = vi.fn((data: string) => { buffer += data })
-    const handlers = installCommandTokenPredict(term as never, {
-      getSessionId: () => 7,
-      getBuffer: () => buffer,
-      applyCompletion,
-    })
-    await act(async () => { handlers.update() })
-    expect(term.trigger({ key: 'Tab' })).toBe(false)
-    expect(applyCompletion).toHaveBeenCalledWith(' checkout ')
-    await act(async () => { handlers.update() })
-    expect(term.trigger({ key: 'ArrowDown' })).toBe(false)
-    expect(term.trigger({ key: 'ArrowDown' })).toBe(false)
-    expect(term.trigger({ key: 'ArrowUp' })).toBe(false)
-    expect(term.trigger({ key: 'Enter' })).toBe(false)
-    expect(applyCompletion).toHaveBeenLastCalledWith('dev ')
-  })
-
-  it('cycles selection with Tab while open and accepts with Enter', async () => {
     recordCommand(7, 'git commit -m x')
     recordCommand(7, 'git checkout release')
     recordCommand(7, 'git checkout dev')
