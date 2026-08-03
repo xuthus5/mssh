@@ -33,9 +33,12 @@ function openTabState(state: AppState, tab: Tab): Partial<AppState> {
   const focusRequest = tab.type === 'terminal'
     ? { id: tab.id, terminalId: tab.terminalId, sequence: state.focusRequest.sequence + 1 }
     : state.focusRequest
+  // 同时把 activePaneId 指向新终端的主 pane，否则残留的旧 pane id 会让
+  // SplitTerminalPortals 的 selected 判定为 false，导致新终端 active=false 而不聚焦。
+  const activePaneId = tab.type === 'terminal' ? tab.terminalId : state.activePaneId
   const existing = state.tabs.find((item) => item.id === tab.id)
-  if (existing) return { activeSurface: surfaceForTab(existing), focusRequest }
-  return { tabs: [...state.tabs, tab], activeSurface: surfaceForTab(tab), focusRequest }
+  if (existing) return { activeSurface: surfaceForTab(existing), focusRequest, activePaneId }
+  return { tabs: [...state.tabs, tab], activeSurface: surfaceForTab(tab), focusRequest, activePaneId }
 }
 
 async function closeTerminalPane(terminalID: string) {
