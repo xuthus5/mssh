@@ -30,11 +30,11 @@ jobs:
             goarch: arm64
             runner: ubuntu-24.04-arm
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
         with:
           go-version-file: .go-version
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version-file: .node-version
       - name: Install Linux package tooling
@@ -175,7 +175,7 @@ jobs:
           test -s "dist/mssh-${VERSION}-linux-${ARCH}.flatpak"
 
           ls -la bin dist
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: linux-${{ matrix.arch }}
           path: dist/*
@@ -193,11 +193,11 @@ jobs:
           - arch: arm64
             goarch: arm64
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
         with:
           go-version-file: .go-version
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version-file: .node-version
       - name: Install NSIS
@@ -312,7 +312,7 @@ jobs:
           cp "${installers[0]}" "dist/mssh-${VERSION}-windows-${ARCH}-installer.exe"
           test -s "dist/mssh-${VERSION}-windows-${ARCH}-installer.exe"
           ls -la bin dist
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: windows-${{ matrix.arch }}
           path: dist/*
@@ -330,11 +330,11 @@ jobs:
           - arch: amd64
             runner: macos-15
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
         with:
           go-version-file: .go-version
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version-file: .node-version
       - name: Install Wails CLI
@@ -375,7 +375,7 @@ jobs:
           ditto -c -k --sequesterRsrc --keepParent "bin/mssh.app" "dist/mssh-${VERSION}-darwin-${ARCH}.app.zip"
           test -s "dist/mssh-${VERSION}-darwin-${ARCH}.app.zip"
           ls -la bin dist
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: darwin-${{ matrix.arch }}
           path: dist/*
@@ -386,9 +386,9 @@ jobs:
     needs: [linux, windows, darwin]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           path: release-assets
       - name: Flatten artifacts
