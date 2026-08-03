@@ -167,7 +167,23 @@ describe('appStore', () => {
 
     expect(useAppStore.getState()).toMatchObject({
       activeSurface: { type: 'terminal', id: 'terminal-1' },
+      activePaneId: 'term-1',
       focusRequest: { id: 'terminal-1', terminalId: 'term-1', sequence: 1 },
+    })
+  })
+
+  it('repins the active pane when a new terminal tab replaces a stale one', () => {
+    const store = useAppStore.getState()
+    store.openTab({ id: 'terminal-1', title: 'one', type: 'terminal', terminalId: 'term-old', sessionId: 1 })
+    store.requestTerminalFocus('terminal-1', 'term-old')
+
+    store.openTab({ id: 'terminal-2', title: 'two', type: 'terminal', terminalId: 'term-new', sessionId: 2 })
+
+    const state = useAppStore.getState()
+    expect(state).toMatchObject({
+      activeSurface: { type: 'terminal', id: 'terminal-2' },
+      activePaneId: 'term-new',
+      focusRequest: { id: 'terminal-2', terminalId: 'term-new', sequence: 3 },
     })
   })
 
