@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { TextCursorInput } from 'lucide-react'
+import { ShieldAlert, TextCursorInput } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Field, FieldContent, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
@@ -7,6 +7,7 @@ import { LabeledSelect } from '@/components/ui/labeled-select'
 import { Switch } from '@/components/ui/switch'
 import { TerminalSelectionBackgroundField } from '@/components/settings/TerminalSelectionBackgroundField'
 import { validTerminalFontFamily, validTerminalFontSize } from '@/components/settings/themeEditorState'
+import { useTerminalBehaviorStore } from '@/store/terminalBehaviorStore'
 import type { TerminalGlobalStyle } from '../../../bindings/github.com/xuthus5/mssh/internal/model/models'
 import { t } from '@/i18n'
 
@@ -17,10 +18,31 @@ const CURSOR_STYLE_OPTIONS = [
   { value: 'bar', label: '竖线' },
 ] as const
 
+const RENDERER_LABELS: Record<string, string> = { dom: 'DOM', canvas: 'Canvas', webgl: 'WebGL' }
+
 interface Props {
   style: TerminalGlobalStyle
   disabled?: boolean
   onChange: <Key extends keyof TerminalGlobalStyle>(key: Key, value: TerminalGlobalStyle[Key]) => void
+}
+
+function LigaturesField({ style, disabled, onChange }: Pick<Props, 'style' | 'disabled' | 'onChange'>) {
+  const renderer = useTerminalBehaviorStore((state) => state.renderer)
+  return <>
+    <Field orientation="horizontal" data-disabled={disabled || undefined}>
+      <FieldContent>
+        <FieldLabel htmlFor="terminal-global-ligatures">{t('字体连字')}</FieldLabel>
+        <FieldDescription>{t('配合支持连字的字体（如 Fira Code、JetBrains Mono）将运算符等渲染为连字字形；建议搭配 DOM 渲染器使用。默认关闭。')}</FieldDescription>
+      </FieldContent>
+      <Switch id="terminal-global-ligatures" checked={style.ligatures_enabled} disabled={disabled} onCheckedChange={(value) => onChange('ligatures_enabled', value)} aria-label={t('字体连字')} />
+    </Field>
+    {style.ligatures_enabled && renderer !== 'dom' ? (
+      <div className="flex items-start gap-2 rounded-lg border border-amber-500/60 bg-amber-500/10 px-3 py-2 text-xs text-foreground">
+        <ShieldAlert className="mt-0.5 size-4 shrink-0 text-amber-500" />
+        <span>{t('当前渲染器为 ${}，连字可能无法生效，建议切换为 DOM 渲染器。', RENDERER_LABELS[renderer] ?? renderer)}</span>
+      </div>
+    ) : null}
+  </>
 }
 
 export function TerminalGlobalStyleEditor({ style, disabled = false, onChange }: Props) {
@@ -61,13 +83,7 @@ export function TerminalGlobalStyleEditor({ style, disabled = false, onChange }:
           </Field>
         </div>
         <TerminalSelectionBackgroundField id="terminal-global-selection-background" ariaPrefix={t('全局')} value={style.selection_background} disabled={disabled} onChange={(value) => onChange('selection_background', value)} />
-        <Field orientation="horizontal" data-disabled={disabled || undefined}>
-          <FieldContent>
-            <FieldLabel htmlFor="terminal-global-ligatures">{t('字体连字')}</FieldLabel>
-            <FieldDescription>{t('配合支持连字的字体（如 Fira Code、JetBrains Mono）将运算符等渲染为连字字形；建议搭配 DOM 渲染器使用。默认关闭。')}</FieldDescription>
-          </FieldContent>
-          <Switch id="terminal-global-ligatures" checked={style.ligatures_enabled} disabled={disabled} onCheckedChange={(value) => onChange('ligatures_enabled', value)} aria-label={t('字体连字')} />
-        </Field>
+        <LigaturesField style={style} disabled={disabled} onChange={onChange} />
       </FieldGroup>
     </CardContent>
   </Card>
