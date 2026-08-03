@@ -1,4 +1,5 @@
 import type { RefObject } from 'react'
+import { WebLinksAddon } from '@xterm/addon-web-links'
 import { FitAddon } from '@xterm/addon-fit'
 import { SearchAddon } from '@xterm/addon-search'
 import { Unicode11Addon } from '@xterm/addon-unicode11'
@@ -18,6 +19,7 @@ import type { TerminalLifecycleRefs } from '@/hooks/terminalMountRuntime'
 import { TerminalCommandCapture } from '@/lib/terminalCommandCapture'
 import { registerTerminalSearch, unregisterTerminalSearch } from '@/lib/terminalSearchRegistry'
 import { createTerminalKeywordHighlightController } from '@/hooks/useTerminalKeywordHighlight'
+import { openTerminalWebLink } from '@/lib/terminalWebLinks'
 import { TerminalService } from '@/lib/wails'
 import { useAppStore } from '@/store/appStore'
 import { useTerminalBehaviorStore } from '@/store/terminalBehaviorStore'
@@ -48,10 +50,11 @@ type BaseResources = {
   fitAddon: FitAddon
   unicodeAddon: Unicode11Addon
   searchAddon: SearchAddon
+  webLinksAddon: WebLinksAddon
   rendererController: ReturnType<typeof createTerminalRendererController>
   ligaturesController: TerminalLigaturesController
   cleanupCopyOnSelect?: () => void
-  owned: { fit: boolean; unicode: boolean; search: boolean }
+  owned: { fit: boolean; unicode: boolean; search: boolean; webLinks: boolean }
 }
 
 function createBaseResources(options: MountOptions): BaseResources {
@@ -63,7 +66,8 @@ function createBaseResources(options: MountOptions): BaseResources {
   const searchAddon = new SearchAddon({ highlightLimit: 1000 })
   const rendererController = createTerminalRendererController(term)
   const ligaturesController = createLigaturesController(term)
-  const owned = { fit: false, unicode: false, search: false }
+  const webLinksAddon = new WebLinksAddon(openTerminalWebLink)
+  const owned = { fit: false, unicode: false, search: false, webLinks: false }
   let cleanupCopyOnSelect: (() => void) | undefined
   refs.termRef.current = term
   refs.fitAddonRef.current = fitAddon
@@ -71,6 +75,8 @@ function createBaseResources(options: MountOptions): BaseResources {
     term.open(container)
     rendererController.apply(useTerminalBehaviorStore.getState().renderer)
     ligaturesController.apply(useAppStore.getState().terminalTheme.ligatures)
+    term.loadAddon(webLinksAddon)
+    owned.webLinks = true
     term.loadAddon(unicodeAddon)
     owned.unicode = true
     if (term.unicode) term.unicode.activeVersion = '11'
@@ -82,7 +88,7 @@ function createBaseResources(options: MountOptions): BaseResources {
     owned.fit = true
     refs.storeRef.current.registerTerminal(refs.terminalIDRef.current, term)
   }
-  return { container, term, fitAddon, unicodeAddon, searchAddon, rendererController, ligaturesController, cleanupCopyOnSelect, owned }
+  return { container, term, fitAddon, unicodeAddon, searchAddon, webLinksAddon, rendererController, ligaturesController, cleanupCopyOnSelect, owned }
 }
 
 function createInputSubscriptions(options: MountOptions, resources: BaseResources) {
@@ -196,6 +202,7 @@ function disposeMount(context: {
   if (!resources.owned.fit) safelyDisposeTerminalResource('fit addon', () => resources.fitAddon.dispose())
   if (!resources.owned.unicode) safelyDisposeTerminalResource('unicode addon', () => resources.unicodeAddon.dispose())
   if (!resources.owned.search) safelyDisposeTerminalResource('search addon', () => resources.searchAddon.dispose())
+  if (!resources.owned.webLinks) safelyDisposeTerminalResource('web links addon', () => resources.webLinksAddon.dispose())
   refs.storeRef.current.unregisterTerminal(refs.terminalIDRef.current)
   safelyDisposeTerminalResource('instance', () => resources.term.dispose())
   refs.fitAddonRef.current = null
