@@ -182,15 +182,39 @@ jobs:
       - name: Install NSIS
         shell: powershell
         run: |
-          choco install nsis -y --no-progress
-          $candidates = @(
-            "C:\Program Files (x86)\NSIS\makensis.exe",
-            "C:\Program Files\NSIS\makensis.exe"
-          )
-          $makensis = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
-          if (-not $makensis) {
-            throw "makensis.exe not found after Chocolatey NSIS install"
+          $ErrorActionPreference = 'Stop'
+          $version = '3.12'
+          $root = Join-Path $env:RUNNER_TEMP 'nsis'
+          $zip = Join-Path $env:RUNNER_TEMP "nsis-$version.zip"
+          $makensis = Join-Path $root "nsis-$version\makensis.exe"
+          if (-not (Test-Path $makensis)) {
+            if (-not (Test-Path $zip)) {
+              $url = "https://downloads.sourceforge.net/project/nsis/NSIS%203/$version/nsis-$version.zip"
+              $downloaded = $false
+              for ($attempt = 1; $attempt -le 3; $attempt++) {
+                try {
+                  Invoke-WebRequest -Uri $url -OutFile $zip -UseBasicParsing -ErrorAction Stop
+                  $downloaded = $true
+                  break
+                } catch {
+                  if ($attempt -lt 3) { Start-Sleep -Seconds 5 }
+                }
+              }
+              if (-not $downloaded) {
+                Write-Host "SourceForge NSIS download failed; falling back to Chocolatey"
+                choco install nsis -y --no-progress --attempts=3
+              }
+            }
+            if (Test-Path $zip) { Expand-Archive -Path $zip -DestinationPath $root -Force }
+            if (-not (Test-Path $makensis)) {
+              $candidates = @(
+                "C:\Program Files (x86)\NSIS\makensis.exe",
+                "C:\Program Files\NSIS\makensis.exe"
+              )
+              $makensis = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+            }
           }
+          if (-not $makensis) { throw "makensis.exe not found (SourceForge download or Chocolatey fallback)" }
           & $makensis /VERSION
           "MAKENSIS_NATIVE=$makensis" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
       - name: Install Wails CLI
