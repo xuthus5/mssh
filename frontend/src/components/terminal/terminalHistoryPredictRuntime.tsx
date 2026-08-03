@@ -24,6 +24,8 @@ interface PredictState {
   pendingReopen: boolean
 }
 
+type SyncStatus = 'same' | 'pending' | 'hidden'
+
 const MAX_LIST_ROWS = 8
 
 function isPlainKey(event: KeyboardEvent): boolean {
@@ -51,43 +53,53 @@ export function inlineSuggestionText(buffer: string, token: string, replaceParti
 }
 
 interface OverlayAnchor {
-  sync: () => boolean
+  sync: (lineKey: string) => SyncStatus
+  cellWidth: () => number
+  element: () => HTMLElement | undefined
   dispose: () => void
 }
 
-/** Keeps a xterm decoration anchored to the current cursor cell. */
-function createOverlayAnchor(term: Terminal, onRendered: (element: HTMLElement) => void): OverlayAnchor {
+/** Anchors a xterm decoration to the cursor line and tracks the cell width. */
+function createOverlayAnchor(term: Terminal, onRendered: () => void): OverlayAnchor {
   let decoration: IDecoration | undefined
+  let element: HTMLElement | undefined
   let anchorKey = ''
+  let measuredWidth = 0
 
   const show = () => {
-    const active = term.buffer.active
     const marker = term.registerMarker(0)
     if (!marker) return false
-    const next = term.registerDecoration({ marker, x: active.cursorX, width: 1, height: 1 })
+    const next = term.registerDecoration({ marker, x: 0, width: 1, height: 1 })
     if (!next) {
       marker.dispose()
       return false
     }
     decoration = next
-    next.onRender(onRendered)
+    next.onRender((rendered) => {
+      element = rendered
+      measuredWidth = rendered.getBoundingClientRect().width
+      onRendered()
+    })
     return true
   }
 
   return {
-    sync: () => {
-      const active = term.buffer.active
-      const key = `${active.baseY}:${active.cursorY}:${active.cursorX}`
-      if (key === anchorKey) return true
-      anchorKey = key
+    sync: (lineKey) => {
+      if (lineKey === anchorKey && decoration) return 'same'
+      anchorKey = lineKey
       decoration?.dispose()
       decoration = undefined
-      return show()
+      element = undefined
+      return show() ? 'pending' : 'hidden'
     },
+    cellWidth: () => measuredWidth,
+    element: () => element,
     dispose: () => {
       decoration?.dispose()
       decoration = undefined
+      element = undefined
       anchorKey = ''
+      measuredWidth = 0
     },
   }
 }
@@ -95,15 +107,11 @@ function createOverlayAnchor(term: Terminal, onRendered: (element: HTMLElement) 
 /** Token-level history prediction: inline ghost + Tab-expandable candidate list. */
 class TokenPredictController {
   private state: PredictState = { candidates: [], selected: 0, open: false, replacePartial: false, pendingReopen: false }
-  private root: Root | null = null
-  private element: HTMLElement | null = null
+  private rootEntry: { element: HTMLElement; root: Root } | null = null
   private overlay: OverlayAnchor
 
   constructor(private term: Terminal, private options: TokenPredictOptions) {
-    this.overlay = createOverlayAnchor(term, (rendered) => {
-      this.element = rendered
-      this.renderOverlay()
-    })
+    this.overlay = createOverlayAnchor(term, () => this.renderOverlay())
     term.attachCustomKeyEventHandler((event) => this.handleKeydown(event))
   }
 
@@ -119,6 +127,11 @@ class TokenPredictController {
   private enabled(): boolean {
     if (this.options.isEnabled) return this.options.isEnabled()
     return useTerminalBehaviorStore.getState().historyPredict
+  }
+
+  private lineKey(): string {
+    const active = this.term.buffer.active
+    return String(active.baseY + active.cursorY)
   }
 
   private refresh() {
@@ -144,17 +157,26 @@ class TokenPredictController {
   }
 
   private renderOverlay() {
-    if (!this.overlay.sync()) return
-    if (!this.element) return
-    if (!this.root) this.root = createRoot(this.element)
+    if (this.overlay.sync(this.lineKey()) === 'hidden') {
+      this.hideOverlay()
+      return
+    }
+    const element = this.overlay.element()
+    if (!element) return
+    if (!this.rootEntry || this.rootEntry.element !== element) {
+      if (this.rootEntry) this.rootEntry.root.unmount()
+      this.rootEntry = { element, root: createRoot(element) }
+    }
     const buffer = this.options.getBuffer()
     const token = this.state.candidates[0] ?? ''
-    this.root.render(
+    const active = this.term.buffer.active
+    this.rootEntry.root.render(
       <TerminalSuggestionOverlay
         inline={this.state.open ? '' : inlineSuggestionText(buffer, token, this.state.replacePartial)}
         candidates={this.state.open ? this.state.candidates : []}
         selectedIndex={this.state.selected}
-        showAbove={this.term.buffer.active.cursorY >= this.term.rows - MAX_LIST_ROWS}
+        leftOffset={active.cursorX * this.overlay.cellWidth()}
+        showAbove={active.cursorY >= this.term.rows - MAX_LIST_ROWS}
         onSelect={(index) => this.acceptToken(index)}
       />,
     )
@@ -162,10 +184,9 @@ class TokenPredictController {
 
   private hideOverlay() {
     this.overlay.dispose()
-    this.element = null
-    if (this.root) {
-      this.root.unmount()
-      this.root = null
+    if (this.rootEntry) {
+      this.rootEntry.root.unmount()
+      this.rootEntry = null
     }
   }
 

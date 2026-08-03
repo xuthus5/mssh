@@ -7,6 +7,7 @@ function renderOverlay(props: Partial<Parameters<typeof TerminalSuggestionOverla
     inline: '',
     candidates: [] as string[],
     selectedIndex: 0,
+    leftOffset: 0,
     showAbove: false,
     onSelect: vi.fn(),
   }
