@@ -2916,7 +2916,7 @@
 |---|---|---|
 | SERIAL-ARCH-705 | 当应用配置 XON/XOFF、RTS/CTS 或 DSR/DTR 串口流控时，生产实现必须只依赖公开、稳定、可测试的串口 API，不得通过 reflection 与 `unsafe` 读取第三方私有 `handle`。当前固定版本 `go.bug.st/serial v1.6.4` 及已核对的最新 `v1.8.0` 均未公开流控或 native handle API；推荐维护受控 fork，在驱动内部公开 `FlowControl` 配置并固定提交版本，而不是继续扩大私有字段耦合。 | decision required |
 | SSH-ARCH-706 | 当 Windows 用户选择 SSH Agent 认证时，应用必须兼容系统 OpenSSH 默认 `\\.\pipe\openssh-ssh-agent` named pipe，并在 UI 中仅暴露实际可用能力。当前实现与 Go 标准库只覆盖 `SSH_AUTH_SOCK` 指向的 Unix socket，前端却跨平台无条件显示 `SSH Agent`；推荐引入经过审计的 named-pipe transport，并增加平台能力探测与端到端测试。 | decision required |
-| DEP-ARCH-707 | 当 Wails 工具链、Go runtime 与前端 runtime 参与同一构建时，三者必须使用同一精确版本并由单一版本源校验。当前 CLI 与 Go 模块为 `v3.0.0-alpha2.117`，`@wailsio/runtime` 仍声明并锁定 `3.0.0-alpha.97`，`npm outdated` 已确认 wanted/latest 为 `3.0.0-alpha2.117`。推荐精确升级并锁定前端 runtime，重新生成 bindings 后执行全量交互与打包回归。 | decision required |
+| DEP-ARCH-707 | 当 Wails 工具链、Go runtime 与前端 runtime 参与同一构建时，三者必须使用同一精确版本并由单一版本源校验。已将 CLI 与 Go 模块升级锁定为 `v3.0.0-beta.2`（`.wails-version` 单一版本源），`@wailsio/runtime` 同步升级并锁定 `3.0.0-beta.1`；`go build ./...`、`wails3 task ci` 与前端全量测试均通过，无 API 破坏。 | done |
 
 串口替代方案会改变核心依赖，Windows Agent 需要新增 named-pipe transport，Wails runtime 对齐会修改前端依赖与锁文件；三项均属于依赖或跨平台行为变更，必须获得明确授权后实施。本轮只完成审计、证据固化与不依赖新依赖的 SSH Agent 安全收口，不擅自升级或降级现有能力。
 
