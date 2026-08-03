@@ -6,7 +6,9 @@
 name: "mssh"
 arch: ${GOARCH}
 platform: "linux"
-version: "0.1.0"
+# Injected by build/linux/Taskfile.yml generate:* tasks (sanitized APP_VERSION);
+# makes each nightly build a distinct, higher version so package managers upgrade.
+version: "${NFPM_VERSION}"
 section: "default"
 priority: "extra"
 maintainer: ${GIT_COMMITTER_NAME} <${GIT_COMMITTER_EMAIL}>
