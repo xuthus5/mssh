@@ -79,6 +79,21 @@ describe('executeMacroOnActiveTerminal', () => {
     expect(useToastStore.getState().toasts.some((item) => item.message.includes('宏已发送') && item.type === 'success')).toBe(true)
   })
 
+  it('returns focus to the target terminal after a successful execute', async () => {
+    const execute = vi.fn(async () => {})
+    __registerHandler(executePath, execute)
+    __registerHandler(addHistory, async () => {})
+    const focus = vi.fn()
+    useAppStore.setState({
+      tabs: [{ id: 'tab-1', title: 'host', type: 'terminal', terminalId: 'term-1', sessionId: 9 }],
+      connectionStatus: { 'term-1': 'connected' },
+      activeSurface: { type: 'terminal', id: 'tab-1' },
+      terminalPool: new Map([['term-1', { terminal: { focus } as never, lastUsed: Date.now() }]]),
+    })
+    await executeMacroOnActiveTerminal('uptime')
+    expect(focus).toHaveBeenCalledTimes(1)
+  })
+
   it('rethrows execute failures without error toast', async () => {
     __registerHandler(executePath, async () => { throw new Error('boom') })
     useAppStore.setState({
