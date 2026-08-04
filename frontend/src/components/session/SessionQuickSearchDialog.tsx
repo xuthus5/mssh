@@ -13,6 +13,8 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import type { Folder, Session } from '@/hooks/useSession'
 import { SESSION_QUICK_SEARCH_EVENT } from '@/lib/sessionQuickSearch'
 import { sessionAssetSearchText } from '@/lib/sessionAssetSearch'
+import { formatChordDisplay } from '@/lib/shortcuts'
+import { useShortcutStore } from '@/store/shortcutStore'
 import { Badge } from '@/components/ui/badge'
 import { t } from '@/i18n'
 
@@ -102,12 +104,16 @@ interface SearchFieldProps {
 }
 
 function SearchHeader() {
+  const quickSearchChord = useShortcutStore((state) => state.bindings['quick-search'])
+  const hint = quickSearchChord ? formatChordDisplay(quickSearchChord) : null
   return <DialogHeader className="border-b border-border px-4 pb-3 pt-4">
     <div className="flex items-center justify-between gap-4 pr-8">
       <DialogTitle>{t('快速连接会话')}</DialogTitle>
-      <span className="rounded-md border border-border bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
-        Ctrl F
-      </span>
+      {hint ? (
+        <span className="rounded-md border border-border bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+          {hint}
+        </span>
+      ) : null}
     </div>
     <DialogDescription>{t('搜索名称、主机、用户、分组、环境、项目或标签')}</DialogDescription>
   </DialogHeader>

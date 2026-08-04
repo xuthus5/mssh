@@ -2,6 +2,8 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { SessionQuickSearchDialog } from '@/components/session/SessionQuickSearchDialog'
+import { defaultShortcutBindings, parseChord } from '@/lib/shortcuts'
+import { useShortcutStore } from '@/store/shortcutStore'
 import type { Folder, Session } from '@/hooks/useSession'
 
 const folders: Folder[] = [
@@ -33,6 +35,22 @@ function renderDialog(customSessions = sessions) {
 }
 
 describe('SessionQuickSearchDialog', () => {
+  it('shows the configured quick search shortcut in the header', () => {
+    renderDialog()
+    expect(screen.getByText('Ctrl+Shift+S')).toBeInTheDocument()
+  })
+
+  it('reflects a custom quick search shortcut from the settings store', () => {
+    useShortcutStore.setState({ bindings: { ...defaultShortcutBindings(), 'quick-search': parseChord('Mod+Alt+K') } })
+    renderDialog()
+    expect(screen.getByText('Ctrl+Alt+K')).toBeInTheDocument()
+  })
+
+  it('hides the shortcut hint when quick search is unbound', () => {
+    useShortcutStore.setState({ bindings: { ...defaultShortcutBindings(), 'quick-search': null } })
+    renderDialog()
+    expect(screen.queryByText(/Ctrl|⌘/)).not.toBeInTheDocument()
+  })
   it.each([
     ['production', 'Production API'],
     ['10.0.0.20', 'Development'],
