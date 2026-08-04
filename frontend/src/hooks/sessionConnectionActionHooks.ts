@@ -12,6 +12,24 @@ import { t } from '@/i18n'
 
 type SetSessions = Dispatch<SetStateAction<Session[]>>
 
+function nextAnimationFrame(): Promise<void> {
+  return new Promise((resolve) => requestAnimationFrame(() => resolve()))
+}
+
+/** Keep keyboard focus on the freshly opened terminal once it mounts. */
+export async function focusOpenedTerminal(terminalId: string) {
+  for (let attempt = 0; attempt < 40; attempt++) {
+    const term = useAppStore.getState().terminalPool.get(terminalId)?.terminal
+    if (!term) {
+      await nextAnimationFrame()
+      continue
+    }
+    term.focus()
+    await nextAnimationFrame()
+    if (document.activeElement === term.textarea) return
+  }
+}
+
 export interface SessionConnectionOptions {
   sessions: Session[]
   setSessions: SetSessions
@@ -34,6 +52,9 @@ export function useConnectSession(options: SessionConnectionOptions) {
       const terminalId = await openSessionTab(session, controller.signal)
       dialog.completeDialog(dialogId)
       logger.info('connected', { terminalId, host: session.host })
+      // The connect dialog's focus-return can steal focus back to the session
+      // tree after the terminal mounts; re-focus the terminal until it sticks.
+      void focusOpenedTerminal(terminalId)
       refreshSessionLists(options)
     } catch (error) {
       if (controller.signal.aborted) return
