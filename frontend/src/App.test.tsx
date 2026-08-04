@@ -277,7 +277,7 @@ describe('persistent content layers', () => {
     fireEvent.keyDown(document.body, { key: 'c', ctrlKey: true, shiftKey: true })
     fireEvent.keyDown(document.body, { key: 'v', ctrlKey: true, shiftKey: true })
     fireEvent.keyDown(document.body, { key: 'l', ctrlKey: true, shiftKey: true })
-    fireEvent.keyDown(document.body, { key: 'n', ctrlKey: true })
+    fireEvent.keyDown(document.body, { key: 't', ctrlKey: true, shiftKey: true })
     await waitFor(() => expect(writeText).toHaveBeenCalledWith('selected text'))
     await waitFor(() => expect(terminal.paste).toHaveBeenCalledWith('clipboard text'))
     expect(terminal.clear).toHaveBeenCalledOnce()
@@ -315,15 +315,15 @@ describe('persistent content layers', () => {
     const openSearch = vi.fn()
     window.addEventListener('mssh:open-session-search', openSearch)
     render(<App />)
-    expect(fireEvent.keyDown(document.body, { key: 's', ctrlKey: true })).toBe(false)
+    expect(fireEvent.keyDown(document.body, { key: 's', ctrlKey: true, shiftKey: true })).toBe(false)
     const terminalInput = document.createElement('textarea')
     terminalInput.className = 'xterm-helper-textarea'
     document.body.append(terminalInput)
-    expect(fireEvent.keyDown(terminalInput, { key: 's', ctrlKey: true })).toBe(false)
+    expect(fireEvent.keyDown(terminalInput, { key: 's', ctrlKey: true, shiftKey: true })).toBe(false)
     const ordinaryInput = document.createElement('input')
     document.body.append(ordinaryInput)
-    expect(fireEvent.keyDown(ordinaryInput, { key: 's', ctrlKey: true })).toBe(true)
-    expect(fireEvent.keyDown(document.body, { key: 's', metaKey: true })).toBe(false)
+    expect(fireEvent.keyDown(ordinaryInput, { key: 's', ctrlKey: true, shiftKey: true })).toBe(true)
+    expect(fireEvent.keyDown(document.body, { key: 's', metaKey: true, shiftKey: true })).toBe(false)
     expect(openSearch).toHaveBeenCalledTimes(3)
     terminalInput.remove()
     ordinaryInput.remove()
@@ -338,11 +338,11 @@ describe('persistent content layers', () => {
       terminalPool: new Map([['term-1', { terminal: { getSelection: vi.fn(), paste: vi.fn(), clear: vi.fn(), focus: vi.fn() } as never, lastUsed: 0 }]]),
     })
     render(<App />)
-    expect(fireEvent.keyDown(document.body, { key: 'f', ctrlKey: true })).toBe(false)
+    expect(fireEvent.keyDown(document.body, { key: 'f', ctrlKey: true, shiftKey: true })).toBe(false)
     expect(toggleSearch).toHaveBeenCalledTimes(1)
 
     useAppStore.setState({ activeSurface: { type: 'workspace', id: 'sessions' } })
-    expect(fireEvent.keyDown(document.body, { key: 'f', ctrlKey: true })).toBe(true)
+    expect(fireEvent.keyDown(document.body, { key: 'f', ctrlKey: true, shiftKey: true })).toBe(true)
     expect(toggleSearch).toHaveBeenCalledTimes(1)
     window.removeEventListener('mssh:toggle-terminal-search', toggleSearch)
   })
@@ -356,12 +356,12 @@ describe('persistent content layers', () => {
     // xterm registers a target-phase keydown that stops propagation for the
     // Ctrl+letter keys it encodes (^F, ^S, ...).
     textarea.addEventListener('keydown', (event) => { event.stopPropagation() }, true)
-    expect(fireEvent.keyDown(textarea, { key: 's', ctrlKey: true })).toBe(false)
+    expect(fireEvent.keyDown(textarea, { key: 's', ctrlKey: true, shiftKey: true })).toBe(false)
     expect(openSearch).toHaveBeenCalledTimes(1)
     textarea.remove()
     window.removeEventListener('mssh:open-session-search', openSearch)
   })
-  it('blocks Ctrl+W for a connected active terminal', async () => {
+  it('blocks Ctrl+Shift+W for a connected active terminal', async () => {
     const closeTab = vi.fn(async () => {})
     useAppStore.setState({
       tabs: [{ id: 'terminal-1', title: 'Terminal', type: 'terminal', terminalId: 'term-1', sessionId: 1 }],
@@ -370,7 +370,7 @@ describe('persistent content layers', () => {
       closeTab,
     })
     render(<App />)
-    fireEvent.keyDown(document.body, { key: 'w', ctrlKey: true })
+    fireEvent.keyDown(document.body, { key: 'w', ctrlKey: true, shiftKey: true })
     expect(closeTab).not.toHaveBeenCalled()
     expect(await screen.findByRole('status')).toHaveTextContent('请使用标签关闭按钮确认终止活动连接')
   })
@@ -423,7 +423,7 @@ describe('persistent content layers', () => {
     expect(await screen.findByText('打开本地终端失败: shell missing')).toBeInTheDocument()
   })
 
-  it('consumes a rejected Ctrl+W close on the app shell banner without toast', async () => {
+  it('consumes a rejected Ctrl+Shift+W close on the app shell banner without toast', async () => {
     const closeTab = vi.fn(async () => { throw new Error('connection lost') })
     const logError = vi.spyOn(logger, 'error').mockImplementation(() => {})
     const unhandledRejection = vi.fn((event: PromiseRejectionEvent) => event.preventDefault())
@@ -438,7 +438,7 @@ describe('persistent content layers', () => {
     })
     useToastStore.setState({ toasts: [] })
     render(<App />)
-    fireEvent.keyDown(document.body, { key: 'w', ctrlKey: true })
+    fireEvent.keyDown(document.body, { key: 'w', ctrlKey: true, shiftKey: true })
     await waitFor(() => expect(closeTab).toHaveBeenCalledWith('playback-1'))
     await waitFor(() => expect(useAppStore.getState().shellActionError).toBe('关闭标签失败: connection lost'))
     expect(await screen.findByText('关闭标签失败: connection lost')).toBeInTheDocument()
