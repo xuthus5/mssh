@@ -14,7 +14,7 @@ describe('shortcutRuntime', () => {
   it('allows shortcuts in xterm helper textarea', () => {
     const area = document.createElement('textarea')
     area.className = 'xterm-helper-textarea'
-    const event = new KeyboardEvent('keydown', { key: 'n', ctrlKey: true })
+    const event = new KeyboardEvent('keydown', { key: 't', ctrlKey: true, shiftKey: true })
     Object.defineProperty(event, 'target', { value: area })
     expect(resolveShortcutAction(event, defaultShortcutBindings())).toBe('new-session')
   })

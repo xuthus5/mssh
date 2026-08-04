@@ -40,7 +40,7 @@ export const SHORTCUT_DEFINITIONS: readonly ShortcutDefinition[] = [
     id: 'new-session',
     label: '新建会话',
     description: '打开新建 SSH 会话流程。',
-    defaultChord: { ctrl: true, meta: false, alt: false, shift: false, key: 'n' },
+    defaultChord: { ctrl: true, meta: false, alt: false, shift: true, key: 't' },
   },
   {
     id: 'new-local-terminal',
@@ -52,21 +52,21 @@ export const SHORTCUT_DEFINITIONS: readonly ShortcutDefinition[] = [
     id: 'close-tab',
     label: '关闭标签页',
     description: '关闭当前活动标签（活动连接需手动确认）。',
-    defaultChord: { ctrl: true, meta: false, alt: false, shift: false, key: 'w' },
+    defaultChord: { ctrl: true, meta: false, alt: false, shift: true, key: 'w' },
   },
   {
     id: 'quick-search',
     label: '快速搜索会话',
     description: '打开会话快速搜索面板。',
     allowInEditable: false,
-    defaultChord: { ctrl: true, meta: false, alt: false, shift: false, key: 's' },
+    defaultChord: { ctrl: true, meta: false, alt: false, shift: true, key: 's' },
   },
   {
     id: 'terminal-search',
     label: '终端搜索',
     description: '打开当前终端的搜索框。',
     allowInEditable: false,
-    defaultChord: { ctrl: true, meta: false, alt: false, shift: false, key: 'f' },
+    defaultChord: { ctrl: true, meta: false, alt: false, shift: true, key: 'f' },
   },
   {
     id: 'copy-selection',
@@ -224,44 +224,44 @@ export function detectShortcutPlatform(): 'mac' | 'other' {
 
 const legacyQuickSearchChord: ShortcutChord = { ctrl: true, meta: false, alt: false, shift: false, key: 'f' }
 
+/** Plain Ctrl+letter defaults that used to steal terminal keys; moved to Ctrl+Shift variants. */
+const TERMINAL_CONFLICT_MIGRATIONS: Array<{ id: ShortcutActionId; from: ShortcutChord; to: ShortcutChord }> = [
+  { id: 'new-session', from: { ctrl: true, meta: false, alt: false, shift: false, key: 'n' }, to: { ctrl: true, meta: false, alt: false, shift: true, key: 't' } },
+  { id: 'close-tab', from: { ctrl: true, meta: false, alt: false, shift: false, key: 'w' }, to: { ctrl: true, meta: false, alt: false, shift: true, key: 'w' } },
+  { id: 'quick-search', from: { ctrl: true, meta: false, alt: false, shift: false, key: 's' }, to: { ctrl: true, meta: false, alt: false, shift: true, key: 's' } },
+  { id: 'terminal-search', from: { ctrl: true, meta: false, alt: false, shift: false, key: 'f' }, to: { ctrl: true, meta: false, alt: false, shift: true, key: 'f' } },
+]
+
+function rawChord(value: unknown): ShortcutChord | null {
+  if (value === null || value === undefined || value === '') return null
+  if (typeof value === 'string') return parseChord(value)
+  if (typeof value !== 'object' || value === null) return null
+  const object = value as Partial<ShortcutChord>
+  const chord: ShortcutChord = { ctrl: Boolean(object.ctrl || object.meta), meta: false, alt: Boolean(object.alt), shift: Boolean(object.shift), key: normalizeKey(String(object.key ?? '')) }
+  return chord.key ? chord : null
+}
+
+function migrateLegacyShortcutBindings(record: Record<string, unknown>) {
+  if (!('terminal-search' in record) && chordsEqual(parseChord(record['quick-search']), legacyQuickSearchChord)) {
+    record['quick-search'] = serializeChord({ ctrl: true, meta: false, alt: false, shift: false, key: 's' })
+  }
+  for (const { id, from, to } of TERMINAL_CONFLICT_MIGRATIONS) {
+    if (!(id in record)) continue
+    const current = rawChord(record[id])
+    if (current && chordsEqual(current, from)) record[id] = serializeChord(to)
+  }
+}
+
 export function normalizeShortcutBindings(value: unknown): ShortcutBindings {
   const defaults = defaultShortcutBindings()
   if (!value || typeof value !== 'object') return defaults
   const record = value as Record<string, unknown>
-  // One-time migration: before terminal search existed, quick-search used
-  // Ctrl+F. Terminal search now owns Ctrl+F, so move the legacy binding to
-  // Ctrl+S when the new action is not persisted yet.
-  if (!('terminal-search' in record) && chordsEqual(parseChord(record['quick-search']), legacyQuickSearchChord)) {
-    record['quick-search'] = serializeChord({ ctrl: true, meta: false, alt: false, shift: false, key: 's' })
-  }
+  migrateLegacyShortcutBindings(record)
   const next = { ...defaults }
   for (const definition of SHORTCUT_DEFINITIONS) {
     if (!(definition.id in record)) continue
-    const raw = record[definition.id]
-    if (raw === null) {
-      next[definition.id] = null
-      continue
-    }
-    if (typeof raw === 'string') {
-      const parsed = parseChord(raw)
-      next[definition.id] = isReservedShortcutChord(parsed) ? null : parsed
-      continue
-    }
-    if (raw && typeof raw === 'object') {
-      const object = raw as Partial<ShortcutChord>
-      const chord: ShortcutChord = {
-        ctrl: Boolean(object.ctrl || object.meta),
-        meta: false,
-        alt: Boolean(object.alt),
-        shift: Boolean(object.shift),
-        key: normalizeKey(String(object.key ?? '')),
-      }
-      if (!chord.key || isReservedShortcutChord(chord)) {
-        next[definition.id] = null
-      } else {
-        next[definition.id] = chord
-      }
-    }
+    const chord = rawChord(record[definition.id])
+    next[definition.id] = !chord || isReservedShortcutChord(chord) ? null : chord
   }
   return next
 }
