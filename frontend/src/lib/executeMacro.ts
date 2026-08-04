@@ -53,6 +53,9 @@ export async function executeMacroOnActiveTerminal(
   try {
     await MacroService.Execute(terminalID, command)
     recordCommand(tab.sessionId, command)
+    // Return keyboard focus to the terminal so a following Enter does not
+    // re-trigger the sidebar/workspace macro item that was just clicked.
+    useAppStore.getState().terminalPool.get(terminalID)?.terminal?.focus()
     toast(t('宏已发送到活动终端'), 'success')
   } catch (error: unknown) {
     // Callers with fixed surfaces own execute failures.
