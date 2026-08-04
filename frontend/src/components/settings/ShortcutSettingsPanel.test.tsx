@@ -39,11 +39,11 @@ describe('ShortcutSettingsPanel', () => {
     // mutate then restore to force persistence of defaults
     const recorders = screen.getAllByLabelText('录制快捷键')
     await user.click(recorders[0])
-    await user.keyboard('{Control>}{Shift>}s{/Shift}{/Control}')
-    await waitFor(() => expect(saved).toEqual(expect.objectContaining({ 'new-session': 'Mod+Shift+S' })))
+    await user.keyboard('{Control>}{Shift>}x{/Shift}{/Control}')
+    await waitFor(() => expect(saved).toEqual(expect.objectContaining({ 'new-session': 'Mod+Shift+X' })))
     saved = null
     await user.click(screen.getByRole('button', { name: '恢复默认' }))
-    await waitFor(() => expect(saved).toEqual(expect.objectContaining({ 'new-session': 'Mod+N' })))
+    await waitFor(() => expect(saved).toEqual(expect.objectContaining({ 'new-session': 'Mod+Shift+T' })))
   })
 
   it('records a new shortcut combination', async () => {
@@ -53,8 +53,8 @@ describe('ShortcutSettingsPanel', () => {
     const recorders = screen.getAllByLabelText('录制快捷键')
     await user.click(recorders[0])
     expect(screen.getByText('按下组合键…（Esc 取消）')).toBeInTheDocument()
-    await user.keyboard('{Control>}{Shift>}s{/Shift}{/Control}')
-    await waitFor(() => expect(saved).toEqual(expect.objectContaining({ 'new-session': 'Mod+Shift+S' })))
+    await user.keyboard('{Control>}{Shift>}x{/Shift}{/Control}')
+    await waitFor(() => expect(saved).toEqual(expect.objectContaining({ 'new-session': 'Mod+Shift+X' })))
   })
 
   it('cancels shortcut recording when the native settings window hides', async () => {
@@ -69,9 +69,9 @@ describe('ShortcutSettingsPanel', () => {
     await act(async () => { await Events.Emit(SETTINGS_PREVIEW_CANCELLED_EVENT, { data: null }) })
 
     expect(screen.queryByText('按下组合键…（Esc 取消）')).not.toBeInTheDocument()
-    expect(recorder).toHaveTextContent('Ctrl+N')
+    expect(recorder).toHaveTextContent('Ctrl+Shift+T')
     saved = null
-    await user.keyboard('{Control>}{Shift>}s{/Shift}{/Control}')
+    await user.keyboard('{Control>}{Shift>}x{/Shift}{/Control}')
     expect(saved).toBeNull()
   })
 
@@ -86,7 +86,7 @@ describe('ShortcutSettingsPanel', () => {
     await waitFor(() => expect(screen.getByText('新建会话')).toBeInTheDocument())
 
     await user.click(screen.getAllByLabelText('录制快捷键')[0])
-    await user.keyboard('{Control>}{Shift>}s{/Shift}{/Control}')
+    await user.keyboard('{Control>}{Shift>}x{/Shift}{/Control}')
     await act(async () => { await vi.advanceTimersByTimeAsync(500) })
     expect(writes).toHaveLength(1)
     writes.length = 0
@@ -95,6 +95,6 @@ describe('ShortcutSettingsPanel', () => {
     await act(async () => { await vi.advanceTimersByTimeAsync(500) })
 
     expect(writes).toHaveLength(1)
-    expect(writes[0]).toEqual(expect.objectContaining({ 'new-session': 'Mod+N' }))
+    expect(writes[0]).toEqual(expect.objectContaining({ 'new-session': 'Mod+Shift+T' }))
   })
 })
