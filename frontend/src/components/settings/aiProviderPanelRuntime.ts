@@ -26,6 +26,7 @@ function useProviderLifecycle() {
 function useProviderTarget(controller: AISettingsController) {
   const dashboard = controller.dashboard
   const [selectedID, setSelectedID] = useState(0)
+  const [creating, setCreating] = useState(false)
   const [draft, setDraft] = useState<AIProviderProfileInput>(emptyProvider)
   const lifecycle = useProviderLifecycle()
   const targetGeneration = useRef(0)
@@ -41,37 +42,29 @@ function useProviderTarget(controller: AISettingsController) {
     setDraft(next)
   }, [])
   useEffect(() => {
-    if (selected) {
-      if (syncedProviderID.current !== selected.id || !draftDirty.current) syncDraft(selected.id, providerInput(selected))
-    } else if (selectedID === 0) {
-      if (syncedProviderID.current !== 0 || !draftDirty.current) syncDraft(0, emptyProvider())
-    } else if (dashboard) {
-      targetGeneration.current++
-      setSelectedID(0)
-      syncDraft(0, emptyProvider())
-    }
+    if (selected && (syncedProviderID.current !== selected.id || !draftDirty.current)) syncDraft(selected.id, providerInput(selected))
+    else if (selectedID === 0 && (syncedProviderID.current !== 0 || !draftDirty.current)) syncDraft(0, emptyProvider())
+    else if (!selected && selectedID !== 0 && dashboard) { targetGeneration.current++; setSelectedID(0); syncDraft(0, emptyProvider()) }
   }, [dashboard, selected, selectedID, syncDraft])
   const updateDraft = (update: (current: AIProviderProfileInput) => AIProviderProfileInput) => {
     draftDirty.current = true
     draftRevision.current++
     setDraft(update)
   }
-  const selectProvider = (profile: AIProviderProfile) => { targetGeneration.current++; syncDraft(profile.id, providerInput(profile)); setSelectedID(profile.id) }
-  const selectNewProvider = () => { targetGeneration.current++; syncDraft(0, emptyProvider()); setSelectedID(0) }
+  const selectProvider = (profile: AIProviderProfile) => { targetGeneration.current++; syncDraft(profile.id, providerInput(profile)); setSelectedID(profile.id); setCreating(false) }
+  const selectNewProvider = () => { targetGeneration.current++; syncDraft(0, emptyProvider()); setSelectedID(0); setCreating(true) }
   const resetTransientTarget = useCallback(() => {
     targetGeneration.current++
     const saved = dashboard?.providers.find((profile) => profile.id === selectedID)
-    if (saved) {
-      syncDraft(saved.id, providerInput(saved))
-      return
-    }
+    if (saved) { syncDraft(saved.id, providerInput(saved)); setCreating(false); return }
+    setCreating(false)
     setSelectedID(0)
     syncDraft(0, emptyProvider())
   }, [dashboard, selectedID, syncDraft])
   useSettingsWindowHide(resetTransientTarget)
   const captureTarget = () => ({ lifecycleToken: lifecycle.current, targetToken: targetGeneration.current })
   const isCurrentTarget = (target: ReturnType<typeof captureTarget>) => lifecycle.current === target.lifecycleToken && targetGeneration.current === target.targetToken
-  return { dashboard, selectedID, setSelectedID, draft, selected, draftRevision, targetGeneration, operationActive, syncDraft, updateDraft, selectProvider, selectNewProvider, captureTarget, isCurrentTarget }
+  return { dashboard, selectedID, setSelectedID, creating, setCreating, draft, selected, draftRevision, targetGeneration, operationActive, syncDraft, updateDraft, selectProvider, selectNewProvider, captureTarget, isCurrentTarget }
 }
 
 type ProviderTarget = ReturnType<typeof useProviderTarget>
@@ -90,6 +83,7 @@ function useSaveProvider(controller: AISettingsController, target: ProviderTarge
         target.targetGeneration.current++
         target.syncDraft(saved.id, providerInput(saved))
         target.setSelectedID(saved.id)
+        target.setCreating(false)
       }
     } finally {
       target.operationActive.current = false
@@ -101,28 +95,32 @@ function useSaveProvider(controller: AISettingsController, target: ProviderTarge
 
 function useDeleteProvider(controller: AISettingsController, target: ProviderTarget, onProviderDeleted: (providerID: number) => void) {
   const [deleting, setDeleting] = useState(false)
-  const deleteSelected = async () => {
-    if (!target.draft.id || target.operationActive.current) return
+  const deleteProvider = async (profile: AIProviderProfile) => {
+    if (!profile?.id || target.operationActive.current) return
     target.operationActive.current = true
     setDeleting(true)
     const captured = target.captureTarget()
-    const targetID = target.draft.id
     try {
-      const confirmed = await requestConfirm({ title: t('删除提供商'), description: t('确认删除提供商「${}」？此操作不可撤销。', target.draft.name || t('未命名提供商')), confirmLabel: t('删除'), cancelLabel: t('取消'), destructive: true })
+      const confirmed = await requestConfirm({ title: t('删除提供商'), description: t('确认删除提供商「${}」？此操作不可撤销。', profile.name || t('未命名提供商')), confirmLabel: t('删除'), cancelLabel: t('取消'), destructive: true })
       if (!confirmed || !target.isCurrentTarget(captured)) return
-      await controller.deleteProvider(targetID)
-      onProviderDeleted(targetID)
-      if (target.isCurrentTarget(captured)) {
+      await controller.deleteProvider(profile.id)
+      onProviderDeleted(profile.id)
+      if (target.isCurrentTarget(captured) && profile.id === target.selectedID) {
         target.targetGeneration.current++
         target.syncDraft(0, emptyProvider())
         target.setSelectedID(0)
+        target.setCreating(false)
       }
     } finally {
       target.operationActive.current = false
       setDeleting(false)
     }
   }
-  return { deleting, deleteSelected }
+  const deleteSelected = () => {
+    if (!target.selected) return Promise.resolve()
+    return deleteProvider(target.selected)
+  }
+  return { deleting, deleteSelected, deleteProvider }
 }
 
 function useTestProvider(controller: AISettingsController, target: ProviderTarget) {
