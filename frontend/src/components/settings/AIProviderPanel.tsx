@@ -32,19 +32,32 @@ interface Props {
 export function AIProviderPanel({ controller, priorities, onPriorityChange, onProviderDeleted }: Props) {
   const model = useAIProviderPanelRuntime(controller, onProviderDeleted)
   const catalog = useModelsDevCatalog()
-  return <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(220px,0.8fr)_minmax(360px,1.5fr)]">
-    <ProviderListCard model={model} priorities={priorities} onPriorityChange={onPriorityChange} />
-    <ProviderEditorCard controller={controller} model={model} catalog={catalog} />
+  return <div className="grid min-w-0 gap-4">
+    {controller.error ? <div className="rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive" role="alert">{controller.error}</div> : null}
+    <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(220px,0.8fr)_minmax(360px,1.5fr)]">
+      <ProviderListCard model={model} priorities={priorities} onPriorityChange={onPriorityChange} />
+      <ProviderEditorCard controller={controller} model={model} catalog={catalog} />
+    </div>
   </div>
 }
 
 function ProviderListCard({ model, priorities, onPriorityChange }: Pick<Props, 'priorities' | 'onPriorityChange'> & { model: AIProviderPanelRuntime }) {
   const providers = model.dashboard?.providers ?? []
-  return <Card className="min-w-0 shadow-sm"><CardHeader className="flex-row items-center justify-between"><CardTitle className="text-sm">{t('提供商')}</CardTitle><Button size="icon-xs" variant="outline" aria-label={t('新增提供商')} onClick={model.selectNewProvider}><Plus /></Button></CardHeader><CardContent className="space-y-2">{providers.map((profile) => <ProviderButton key={profile.id} profile={profile} selected={model.selectedID === profile.id} isDefault={profile.id === priorities.default_provider_id} onSelect={model.selectProvider} />)}{providers.length === 0 ? <p className="py-8 text-center text-xs text-muted-foreground">{t('尚未配置提供商')}</p> : null}{model.dashboard ? <ProviderPrioritySettings priorities={priorities} providers={providers} keychainAvailable={model.dashboard.keychain_available} onChange={onPriorityChange} /> : null}</CardContent></Card>
+  return <Card className="min-w-0 shadow-sm"><CardHeader className="flex-row items-center justify-between"><CardTitle className="text-sm">{t('提供商')}</CardTitle><Button size="sm" variant="outline" onClick={model.selectNewProvider}><Plus data-icon="inline-start" />{t('新增提供商')}</Button></CardHeader><CardContent className="space-y-2">{providers.map((profile) => <ProviderRow key={profile.id} profile={profile} selected={model.selectedID === profile.id} isDefault={profile.id === priorities.default_provider_id} deleting={model.deleting} onSelect={model.selectProvider} onDelete={() => { void model.deleteProvider(profile).catch(() => undefined) }} />)}{providers.length === 0 ? <p className="py-8 text-center text-xs text-muted-foreground">{t('尚未配置提供商')}</p> : null}{model.dashboard ? <ProviderPrioritySettings priorities={priorities} providers={providers} keychainAvailable={model.dashboard.keychain_available} onChange={onPriorityChange} /> : null}</CardContent></Card>
 }
 
-function ProviderButton({ profile, selected, isDefault, onSelect }: { profile: AIProviderProfile; selected: boolean; isDefault: boolean; onSelect: (profile: AIProviderProfile) => void }) {
-  return <button type="button" onClick={() => onSelect(profile)} className={`flex w-full items-center justify-between rounded-lg border p-3 text-left transition-colors ${selected ? 'border-primary bg-primary/5' : 'border-border hover:bg-muted/50'}`}><span className="min-w-0"><span className="block truncate text-sm font-medium">{profile.name}</span><span className="block truncate text-xs text-muted-foreground">{t(providerLabels[profile.provider as ProviderKind] ?? profile.provider)} · {profile.default_model}</span></span><span className="flex shrink-0 items-center gap-1">{profile.credential_saved ? <Check className="size-3.5 text-emerald-600" /> : null}{isDefault ? <Badge variant="secondary">{t('默认')}</Badge> : null}</span></button>
+function ProviderRow({ profile, selected, isDefault, deleting, onSelect, onDelete }: { profile: AIProviderProfile; selected: boolean; isDefault: boolean; deleting: boolean; onSelect: (profile: AIProviderProfile) => void; onDelete: () => void }) {
+  return <div className={`flex items-center justify-between gap-2 rounded-lg border p-3 transition-colors ${selected ? 'border-primary bg-primary/5' : 'border-border hover:bg-muted/50'}`}>
+    <button type="button" className="min-w-0 flex-1 text-left" onClick={() => onSelect(profile)} aria-label={profile.name}>
+      <span className="block truncate text-sm font-medium">{profile.name}</span>
+      <span className="block truncate text-xs text-muted-foreground">{t(providerLabels[profile.provider as ProviderKind] ?? profile.provider)} · {profile.default_model || t('未设置模型')}</span>
+    </button>
+    <span className="flex shrink-0 items-center gap-1">
+      {profile.credential_saved ? <Check className="size-3.5 text-emerald-600" aria-label={t('凭据已保存')} /> : null}
+      {isDefault ? <Badge variant="secondary">{t('默认')}</Badge> : null}
+      <Button size="icon-xs" variant="ghost" aria-label={t('删除提供商')} disabled={deleting} onClick={onDelete}><Trash2 /></Button>
+    </span>
+  </div>
 }
 
 function ProviderPrioritySettings({ priorities, providers, keychainAvailable, onChange }: {
@@ -62,7 +75,17 @@ function ProviderSelect({ ariaLabel, placeholder, emptyLabel, value, providers, 
 }
 
 function ProviderEditorCard({ controller, model, catalog }: { controller: AISettingsController; model: AIProviderPanelRuntime; catalog: ReturnType<typeof useModelsDevCatalog> }) {
-  return <Card className="min-w-0 shadow-sm"><CardHeader><CardTitle className="text-sm">{model.draft.id ? t('编辑提供商') : t('新增提供商')}</CardTitle></CardHeader><CardContent className="grid gap-4">{controller.error ? <div className="rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive" role="alert">{controller.error}</div> : null}<ProviderFields model={model} catalog={catalog} /><ProviderActions controller={controller} model={model} /></CardContent></Card>
+  const editing = model.draft.id !== 0
+  if (!editing && !model.creating) {
+    return <Card className="min-w-0 shadow-sm"><CardHeader><CardTitle className="text-sm">{t('提供商详情')}</CardTitle></CardHeader><CardContent><ProviderEmptyState /></CardContent></Card>
+  }
+  return <Card className="min-w-0 shadow-sm"><CardHeader><CardTitle className="text-sm">{editing ? t('编辑提供商') : t('新增提供商')}</CardTitle></CardHeader><CardContent className="grid gap-4"><ProviderFields model={model} catalog={catalog} /><ProviderActions controller={controller} model={model} /></CardContent></Card>
+}
+
+function ProviderEmptyState() {
+  return <div className="flex flex-col items-center justify-center gap-3 py-12 text-center">
+    <p className="text-sm text-muted-foreground">{t('从左侧选择一个提供商进行查看或编辑，或点击「新增提供商」创建新的提供商。')}</p>
+  </div>
 }
 
 function ProviderFields({ model, catalog }: { model: AIProviderPanelRuntime; catalog: ReturnType<typeof useModelsDevCatalog> }) {
