@@ -89,6 +89,7 @@ describe('AIProviderPanel', () => {
     renderProviderPanel(controller)
     await user.click(screen.getByRole('button', { name: /main/ }))
     await selectOption(user, '类型', 'Ollama')
+    expect(screen.getByRole('combobox', { name: '类型' }).textContent).toContain('Ollama')
     expect(screen.getByLabelText('Base URL')).toHaveValue('http://127.0.0.1:11434')
     fireEvent.change(screen.getByLabelText('名称'), { target: { value: 'local' } })
     fireEvent.change(screen.getByLabelText('默认模型'), { target: { value: 'qwen' } })

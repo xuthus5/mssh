@@ -3,6 +3,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { SyncStrategy, type SyncConfigInput } from '../../../bindings/github.com/xuthus5/mssh/internal/model/models'
 import { t } from '@/i18n'
 
+function strategyLabel(strategy: string): string {
+  return ({ [SyncStrategy.SyncStrategySmart]: t('智能同步'), [SyncStrategy.SyncStrategyCloudFirst]: t('云端优先'), [SyncStrategy.SyncStrategyLocalFirst]: t('本地优先') })[strategy] ?? strategy
+}
+
+function intervalLabel(minutes: number): string {
+  return ({ 0: t('仅手动'), 5: t('每 5 分钟'), 15: t('每 15 分钟'), 30: t('每 30 分钟'), 60: t('每 60 分钟') })[minutes] ?? String(minutes)
+}
+
 interface Props {
   input: SyncConfigInput
   pending: string | null
@@ -21,7 +29,7 @@ export function SyncPolicySettings(props: Props) {
         <label className="flex flex-col gap-1.5">
           <span className="text-xs font-medium text-muted-foreground">{t('同步策略')}</span>
           <Select value={props.input.strategy} onValueChange={(strategy) => update({ strategy: strategy as SyncStrategy })}>
-            <SelectTrigger aria-label={t('同步策略')} className="w-full"><SelectValue /></SelectTrigger>
+            <SelectTrigger aria-label={t('同步策略')} className="w-full"><SelectValue><span>{strategyLabel(props.input.strategy)}</span></SelectValue></SelectTrigger>
             <SelectContent>
               <SelectItem value={SyncStrategy.SyncStrategySmart}>{t('智能同步')}</SelectItem>
               <SelectItem value={SyncStrategy.SyncStrategyCloudFirst}>{t('云端优先')}</SelectItem>
@@ -32,7 +40,7 @@ export function SyncPolicySettings(props: Props) {
         <label className="flex flex-col gap-1.5">
           <span className="text-xs font-medium text-muted-foreground">{t('自动同步')}</span>
           <Select value={String(props.input.interval_minutes)} onValueChange={(value) => update({ interval_minutes: Number(value) })}>
-            <SelectTrigger aria-label={t('自动同步间隔')} className="w-full"><SelectValue /></SelectTrigger>
+            <SelectTrigger aria-label={t('自动同步间隔')} className="w-full"><SelectValue><span>{intervalLabel(props.input.interval_minutes)}</span></SelectValue></SelectTrigger>
             <SelectContent>
               <SelectItem value="0">{t('仅手动')}</SelectItem>
               <SelectItem value="5">{t('每 5 分钟')}</SelectItem>
