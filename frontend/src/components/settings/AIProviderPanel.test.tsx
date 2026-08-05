@@ -18,11 +18,48 @@ describe('AIProviderPanel', () => {
     catalogHook.mockReturnValue({ catalog: modelsDevCatalog(), loading: false, error: null, refresh: refreshCatalog })
   })
 
+  it('hides the editor until a provider is selected or created', async () => {
+    const controller = providerController()
+    renderProviderPanel(controller)
+    expect(screen.getByText(/从左侧选择一个提供商/)).toBeInTheDocument()
+    expect(screen.queryByLabelText('名称')).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: '新增提供商' }))
+    expect(screen.queryByText(/从左侧选择一个提供商/)).not.toBeInTheDocument()
+    expect(screen.getByLabelText('名称')).toBeInTheDocument()
+  })
+
+  it('deletes a provider from the list row', async () => {
+    const controller = providerController()
+    controller.dashboard.providers.push(providerProfile(2, 'backup'))
+    const { onProviderDeleted } = renderProviderPanel(controller)
+    const deleteButtons = screen.getAllByRole('button', { name: '删除提供商' })
+    fireEvent.click(deleteButtons[0])
+
+    await waitFor(() => expect(controller.deleteProvider).toHaveBeenCalledWith(1))
+    expect(onProviderDeleted).toHaveBeenCalledWith(1)
+  })
+
+  it('keeps the editor visible while deleting an unselected provider from the list', async () => {
+    const controller = providerController()
+    controller.dashboard.providers.push(providerProfile(2, 'backup'))
+    renderProviderPanel(controller)
+    await userEvent.click(screen.getByRole('button', { name: /main/ }))
+    expect(screen.getByLabelText('名称')).toHaveValue('main')
+
+    const deleteButtons = screen.getAllByRole('button', { name: '删除提供商' })
+    fireEvent.click(deleteButtons[1])
+    await waitFor(() => expect(controller.deleteProvider).toHaveBeenCalledWith(2))
+
+    expect(screen.getByLabelText('名称')).toHaveValue('main')
+  })
+
   it('refreshes the models.dev catalog only from the provider refresh button', async () => {
     const controller = providerController()
     renderProviderPanel(controller)
     expect(refreshCatalog).not.toHaveBeenCalled()
 
+    await userEvent.click(screen.getByRole('button', { name: /main/ }))
     await userEvent.click(screen.getByRole('button', { name: '刷新 models.dev 提供商' }))
 
     expect(refreshCatalog).toHaveBeenCalledOnce()
