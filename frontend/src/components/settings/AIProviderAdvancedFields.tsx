@@ -67,7 +67,7 @@ function NumericPresetField(props: NumericPresetProps) {
         const option = options.find((item) => item.key === key)
         if (option) props.onChange(option.value)
       }}>
-        <SelectTrigger aria-label={t('${} 快速选择', props.label)} className="w-full"><SelectValue /></SelectTrigger>
+        <SelectTrigger aria-label={t('${} 快速选择', props.label)} className="w-full"><SelectValue><span>{options.find((option) => option.key === selected)?.label ?? selected}</span></SelectValue></SelectTrigger>
         <SelectContent>{options.map((option) => <SelectItem key={option.key} value={option.key}>{option.label}</SelectItem>)}<SelectItem value="custom" disabled>{t('自定义')}</SelectItem></SelectContent>
       </Select>
     </div>

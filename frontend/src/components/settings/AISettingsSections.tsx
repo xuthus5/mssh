@@ -9,6 +9,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import type { AISettingsInput } from '../../../bindings/github.com/xuthus5/mssh/internal/model/models'
 import { t } from '@/i18n'
 
+function searchModeLabel(mode: string): string {
+  return ({ auto: t('自动'), independent: t('独立搜索'), disabled: t('禁用') })[mode] ?? mode
+}
+
+function searchProviderLabel(provider: string): string {
+  return ({ brave: 'Brave', tavily: 'Tavily', serper: 'Serper' })[provider] ?? provider
+}
+
 export function AIInteractionSettingsSection({
   draft,
   update,
@@ -68,7 +76,7 @@ function AISearchProviderFields({ search, setSearch }: {
         <Field label={t('搜索模式')}>
           <Select value={search.mode} onValueChange={(value) => setSearch({ mode: value as typeof search.mode })}>
             <SelectTrigger aria-label={t('搜索模式')} className="w-full">
-              <SelectValue />
+              <SelectValue><span>{searchModeLabel(search.mode)}</span></SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="auto">{t('自动')}</SelectItem>
@@ -80,7 +88,7 @@ function AISearchProviderFields({ search, setSearch }: {
         <Field label={t('搜索提供商')}>
           <Select value={search.provider} onValueChange={(value) => setSearch({ provider: value as typeof search.provider })}>
             <SelectTrigger aria-label={t('搜索提供商')} className="w-full">
-              <SelectValue />
+              <SelectValue><span>{searchProviderLabel(search.provider)}</span></SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="brave">Brave</SelectItem>
