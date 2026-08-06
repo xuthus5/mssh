@@ -368,7 +368,7 @@ jobs:
       - name: Generate release notes
         env:
           NIGHTLY_VERSION: ${{ steps.version.outputs.version }}
-          RELEASE_TAG: ${{ steps.version.outputs.version }}
+          RELEASE_TAG: nightly
           GITHUB_REPOSITORY: ${{ github.repository }}
           GITHUB_SHA: ${{ github.sha }}
           GITHUB_RUN_ID: ${{ github.run_id }}
@@ -382,32 +382,23 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          VERSION="${{ steps.version.outputs.version }}"
-          if gh release view "${VERSION}" >/dev/null 2>&1; then
-            echo "Release ${VERSION} already exists; replacing assets"
-            for asset in $(gh release view "${VERSION}" --json assets -q '.assets[].name'); do
-              gh release delete-asset "${VERSION}" "${asset}" --yes 2>/dev/null || true
-            done
-          else
-            gh release create "${VERSION}" \
-              --title "Nightly Build ${VERSION}" \
-              --notes-file release-body.md \
-              --prerelease
+          if gh release view nightly >/dev/null 2>&1; then
+            echo "Removing previous nightly release..."
+            gh release delete nightly --yes --cleanup-tag
           fi
-          gh release upload "${VERSION}" upload/* --clobber
-          echo "Nightly release ${VERSION} published"
-      - name: Clean up old nightly releases
+          gh release create nightly \
+            --title "Nightly Build" \
+            --notes-file release-body.md \
+            --prerelease
+          gh release upload nightly upload/* --clobber
+          echo "Nightly release recreated and published"
+      - name: Clean up legacy per-build nightly releases
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          keep="${NIGHTLY_RETENTION:-14}"
-          count=0
           while IFS=$'\t' read -r _created tag; do
-            count=$((count + 1))
-            if (( count > keep )); then
-              echo "Deleting old nightly release ${tag}"
-              gh release delete "${tag}" --yes --cleanup-tag 2>/dev/null || true
-            fi
+            echo "Deleting legacy nightly release ${tag}"
+            gh release delete "${tag}" --yes --cleanup-tag 2>/dev/null || true
           done < <(gh release list --limit 100 --json tagName,isPrerelease,createdAt \
-            -q '.[] | select(.isPrerelease == true and (.tagName | startswith("nightly-"))) | [.createdAt, .tagName] | @tsv' | sort -r)
+            -q '.[] | select(.isPrerelease == true and (.tagName | startswith("nightly-")) and (.tagName != "nightly")) | [.createdAt, .tagName] | @tsv')
