@@ -11,7 +11,7 @@ import { syncDataChangedEvent } from '@/lib/syncDataReload'
 const darkProfile = profile(1, 'dark', '#000000')
 const lightProfile = profile(2, 'light', '#ffffff')
 const fixedProfile = profile(3, 'dark', '#123456')
-const globalStyle = { font_family: 'Global Font', font_size: 15, cursor_style: CursorStyle.CursorStyleUnderline, selection_background: '#4f46e5', ligatures_enabled: false }
+const globalStyle = { font_family: 'Global Font', font_size: 15, cursor_style: CursorStyle.CursorStyleUnderline, cursor_color: '#0969da', selection_background: '#4f46e5', ligatures_enabled: false }
 
 describe('useThemeCatalog', () => {
   beforeEach(() => {
@@ -28,7 +28,7 @@ describe('useThemeCatalog', () => {
     expect(useThemeCatalogStore.getState().colorMode).toBe('light')
     expect(document.documentElement).toHaveClass('light')
     expect(useAppStore.getState().terminalTheme.background).toBe('#ffffff')
-    expect(useAppStore.getState().terminalTheme).toMatchObject({ fontFamily: 'Global Font', fontSize: 15, cursorStyle: 'underline', cursor: '#888888' })
+    expect(useAppStore.getState().terminalTheme).toMatchObject({ fontFamily: 'Global Font', fontSize: 15, cursorStyle: 'underline', cursor: '#0969da' })
   })
 
   it('uses the Profile typography when global following is disabled', async () => {
@@ -182,7 +182,7 @@ describe('useThemeCatalog', () => {
     __registerHandler('github.com/xuthus5/mssh/internal/service.ThemeService.SaveConfiguration', async () => {})
     const { result } = renderHook(() => useThemeCatalog())
     await waitFor(() => expect(result.current.loaded).toBe(true))
-    const savedGlobalStyle = { font_family: 'Saved Global Font', font_size: 18, cursor_style: CursorStyle.CursorStyleBar, selection_background: '#123456', ligatures_enabled: false }
+    const savedGlobalStyle = { font_family: 'Saved Global Font', font_size: 18, cursor_style: CursorStyle.CursorStyleBar, cursor_color: '#abcdef', selection_background: '#123456', ligatures_enabled: false }
     __registerHandler('github.com/xuthus5/mssh/internal/service.ThemeService.GetGlobalStyle', async () => savedGlobalStyle)
 
     await act(async () => {
@@ -194,7 +194,7 @@ describe('useThemeCatalog', () => {
     })
 
     expect(useThemeCatalogStore.getState().globalStyle).toEqual(savedGlobalStyle)
-    expect(useAppStore.getState().terminalTheme).toMatchObject({ fontFamily: 'Saved Global Font', fontSize: 18, cursorStyle: 'bar', cursor: '#888888', selectionBackground: '#123456' })
+    expect(useAppStore.getState().terminalTheme).toMatchObject({ fontFamily: 'Saved Global Font', fontSize: 18, cursorStyle: 'bar', cursor: '#abcdef', selectionBackground: '#123456' })
   })
 
   it('keeps the catalog and active terminal theme unchanged when configuration save fails', async () => {
@@ -205,7 +205,7 @@ describe('useThemeCatalog', () => {
     __registerHandler('github.com/xuthus5/mssh/internal/service.ThemeService.SaveConfiguration', async () => { throw new Error('db failed') })
 
     await expect(result.current.saveConfiguration({
-      global_style: { font_family: 'Rejected Font', font_size: 20, cursor_style: CursorStyle.CursorStyleBlock, selection_background: '#123456', ligatures_enabled: false },
+      global_style: { font_family: 'Rejected Font', font_size: 20, cursor_style: CursorStyle.CursorStyleBlock, cursor_color: '#123456', selection_background: '#123456', ligatures_enabled: false },
       profiles: [],
       assignments: catalogBefore.assignments,
     } as never)).rejects.toThrow('db failed')

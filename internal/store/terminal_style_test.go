@@ -20,13 +20,29 @@ func TestLoadTerminalGlobalStyleReportsAbsentStateAndRoundTrip(t *testing.T) {
 
 	expected := model.TerminalGlobalStyle{
 		FontFamily: "Iosevka", FontSize: 17, CursorStyle: model.CursorStyleUnderline,
-		SelectionBackground: "#123456", LigaturesEnabled: true,
+		CursorColor: "#abcdef", SelectionBackground: "#123456", LigaturesEnabled: true,
 	}
 	require.NoError(t, SaveTerminalGlobalStyleDB(db, expected))
 	loaded, exists, err := LoadTerminalGlobalStyle(db)
 	require.NoError(t, err)
 	assert.True(t, exists)
 	assert.Equal(t, expected, loaded)
+}
+
+func TestLoadTerminalGlobalStyleDefaultsMissingCursorColorForOldDatabases(t *testing.T) {
+	db := setupTestDB(t)
+	require.NoError(t, SaveTerminalGlobalStyleDB(db, model.TerminalGlobalStyle{
+		FontFamily: "Iosevka", FontSize: 17, CursorStyle: model.CursorStyleUnderline,
+		CursorColor: "#abcdef", SelectionBackground: "#123456", LigaturesEnabled: true,
+	}))
+	_, err := db.Exec("DELETE FROM settings WHERE key = ?", terminalCursorColorKey)
+	require.NoError(t, err)
+
+	style, exists, err := LoadTerminalGlobalStyle(db)
+	require.NoError(t, err)
+	assert.True(t, exists)
+	assert.Equal(t, model.DefaultTerminalCursorColor, style.CursorColor)
+	assert.Equal(t, "Iosevka", style.FontFamily)
 }
 
 func TestLoadTerminalGlobalStyleDefaultsMissingLigaturesForOldDatabases(t *testing.T) {
@@ -68,6 +84,8 @@ func TestLoadTerminalGlobalStyleRejectsInvalidSettingContract(t *testing.T) {
 		{name: "font family", query: "UPDATE settings SET value = '1', value_type = 'number' WHERE key = ?", args: []any{terminalFontFamilyKey}},
 		{name: "font size", query: "UPDATE settings SET value = '\"large\"', value_type = 'string' WHERE key = ?", args: []any{terminalFontSizeKey}},
 		{name: "cursor style", query: "UPDATE settings SET value = '1', value_type = 'number' WHERE key = ?", args: []any{terminalCursorStyleKey}},
+		{name: "cursor color", query: "UPDATE settings SET value = '1', value_type = 'number' WHERE key = ?", args: []any{terminalCursorColorKey}},
+		{name: "cursor color json", query: "UPDATE settings SET value = '{' WHERE key = ?", args: []any{terminalCursorColorKey}},
 		{name: "selection background", query: "UPDATE settings SET value = '1', value_type = 'number' WHERE key = ?", args: []any{terminalSelectionKey}},
 	}
 	for _, test := range tests {

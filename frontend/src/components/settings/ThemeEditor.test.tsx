@@ -12,7 +12,7 @@ const profiles = [
   profile({ id: 2, name: 'GitHub Light', mode: 'light', background: '#ffffff' }),
   profile({ id: 3, name: 'Dracula', mode: 'dark', background: '#282a36' }),
 ]
-const globalStyle = { font_family: 'Global Font', font_size: 16, cursor_style: 'underline' as const, selection_background: '#123456', ligatures_enabled: false }
+const globalStyle = { font_family: 'Global Font', font_size: 16, cursor_style: 'underline' as const, cursor_color: '#0969da', selection_background: '#123456', ligatures_enabled: false }
 type ThemeEditorProps = ComponentProps<typeof ThemeEditor>
 
 describe('ThemeEditor dual mode profiles', () => {
@@ -72,7 +72,7 @@ describe('ThemeEditor dual mode profiles', () => {
     await vi.advanceTimersByTimeAsync(700)
 
     expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
-      global_style: { font_family: 'Cascadia Code', font_size: 16, cursor_style: 'underline', selection_background: '#4f46e5', ligatures_enabled: false },
+      global_style: { font_family: 'Cascadia Code', font_size: 16, cursor_style: 'underline', cursor_color: '#0969da', selection_background: '#4f46e5', ligatures_enabled: false },
       profiles: expect.arrayContaining([expect.objectContaining({ id: 1, follow_global_style: true, font_family: 'monospace' })]),
     }))
   })
@@ -120,6 +120,11 @@ describe('ThemeEditor dual mode profiles', () => {
 
     await userEvent.type(screen.getByLabelText('全局终端字号'), '16')
     await userEvent.clear(screen.getByLabelText('全局选区背景色 HEX'))
+    await vi.advanceTimersByTimeAsync(700)
+    expect(onSave).not.toHaveBeenCalled()
+
+    await userEvent.type(screen.getByLabelText('全局选区背景色 HEX'), '#123456')
+    await userEvent.clear(screen.getByLabelText('全局光标颜色 HEX'))
     await vi.advanceTimersByTimeAsync(700)
     expect(onSave).not.toHaveBeenCalled()
   })

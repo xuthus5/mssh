@@ -247,5 +247,5 @@ function hasValidTerminalStyle(theme: ThemeDraft): boolean {
 }
 
 function hasValidGlobalStyle(style: TerminalGlobalStyle): boolean {
-  return validTerminalFontFamily(style.font_family) && validTerminalFontSize(style.font_size) && isHexColor(style.selection_background)
+  return validTerminalFontFamily(style.font_family) && validTerminalFontSize(style.font_size) && isHexColor(style.cursor_color) && isHexColor(style.selection_background)
 }

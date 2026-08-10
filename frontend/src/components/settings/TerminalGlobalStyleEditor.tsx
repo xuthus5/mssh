@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input'
 import { LabeledSelect } from '@/components/ui/labeled-select'
 import { Switch } from '@/components/ui/switch'
 import { TerminalSelectionBackgroundField } from '@/components/settings/TerminalSelectionBackgroundField'
+import { TerminalCursorColorField } from '@/components/settings/TerminalCursorColorField'
 import { validTerminalFontFamily, validTerminalFontSize } from '@/components/settings/themeEditorState'
 import { useTerminalBehaviorStore } from '@/store/terminalBehaviorStore'
 import type { TerminalGlobalStyle } from '../../../bindings/github.com/xuthus5/mssh/internal/model/models'
@@ -61,7 +62,7 @@ export function TerminalGlobalStyleEditor({ style, disabled = false, onChange }:
   return <Card>
     <CardHeader>
       <CardTitle className="flex items-center gap-2 text-sm"><TextCursorInput className="size-4" />{t('全局字体与光标')}</CardTitle>
-      <p className="mt-1 text-sm text-muted-foreground">{t('作为所有终端主题的默认字体、光标样式和选区高亮配置。')}</p>
+      <p className="mt-1 text-sm text-muted-foreground">{t('作为所有终端主题的默认字体、光标样式、光标颜色和选区高亮配置。')}</p>
     </CardHeader>
     <CardContent>
       <FieldGroup>
@@ -82,7 +83,10 @@ export function TerminalGlobalStyleEditor({ style, disabled = false, onChange }:
             <LabeledSelect ariaLabel={t('全局光标样式')} value={style.cursor_style} options={CURSOR_STYLE_OPTIONS.map((item) => ({ ...item, label: t(item.label) }))} disabled={disabled} onValueChange={(value) => onChange('cursor_style', value as TerminalGlobalStyle['cursor_style'])} />
           </Field>
         </div>
-        <TerminalSelectionBackgroundField id="terminal-global-selection-background" ariaPrefix={t('全局')} value={style.selection_background} disabled={disabled} onChange={(value) => onChange('selection_background', value)} />
+        <div className="grid gap-4 sm:grid-cols-2">
+          <TerminalSelectionBackgroundField id="terminal-global-selection-background" ariaPrefix={t('全局')} value={style.selection_background} disabled={disabled} onChange={(value) => onChange('selection_background', value)} />
+          <TerminalCursorColorField id="terminal-global-cursor-color" ariaPrefix={t('全局')} value={style.cursor_color} disabled={disabled} onChange={(value) => onChange('cursor_color', value)} />
+        </div>
         <LigaturesField style={style} disabled={disabled} onChange={onChange} />
       </FieldGroup>
     </CardContent>

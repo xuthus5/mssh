@@ -73,6 +73,7 @@ export function effectiveDraftTheme(draft: ThemeDraft, globalStyle: TerminalGlob
     fontFamily: globalStyle.font_family,
     fontSize: globalStyle.font_size,
     cursorStyle: globalStyle.cursor_style as TerminalTheme['cursorStyle'],
+    cursorColor: globalStyle.cursor_color,
     selectionBackground: globalStyle.selection_background,
   }
 }
@@ -82,6 +83,7 @@ export function terminalGlobalStyleInput(style: TerminalGlobalStyle): TerminalGl
     font_family: style.font_family,
     font_size: style.font_size,
     cursor_style: style.cursor_style,
+    cursor_color: style.cursor_color,
     selection_background: style.selection_background,
     ligatures_enabled: style.ligatures_enabled,
   }

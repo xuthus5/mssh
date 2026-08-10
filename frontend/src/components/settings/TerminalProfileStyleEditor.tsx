@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input'
 import { LabeledSelect } from '@/components/ui/labeled-select'
 import { Switch } from '@/components/ui/switch'
 import { TerminalSelectionBackgroundField } from '@/components/settings/TerminalSelectionBackgroundField'
+import { TerminalCursorColorField } from '@/components/settings/TerminalCursorColorField'
 import { effectiveDraftTheme, validTerminalFontFamily, validTerminalFontSize, type ThemeDraft } from '@/components/settings/themeEditorState'
 import type { TerminalGlobalStyle } from '../../../bindings/github.com/xuthus5/mssh/internal/model/models'
 import { t } from '@/i18n'
@@ -42,7 +43,7 @@ export function TerminalProfileStyleEditor({ draft, globalStyle, disabled = fals
   return <Card>
     <CardHeader>
       <CardTitle className="flex items-center gap-2 text-sm"><Blend className="size-4" />{t('当前主题字体与光标')}</CardTitle>
-      <p className="mt-1 text-sm text-muted-foreground">{t('字体、光标样式和选区背景色默认继承全局配置。')}</p>
+      <p className="mt-1 text-sm text-muted-foreground">{t('字体、光标样式、光标颜色和选区背景色默认继承全局配置。')}</p>
     </CardHeader>
     <CardContent>
       <TerminalProfileFields draft={draft} effective={effective} disabled={disabled} fieldsDisabled={fieldsDisabled}
@@ -67,7 +68,7 @@ function TerminalProfileFields({ draft, effective, disabled, fieldsDisabled, fon
     <Field orientation="horizontal" data-disabled={disabled || undefined}>
           <FieldContent>
             <FieldLabel htmlFor="terminal-profile-follow-global">{t('跟随全局字体与光标')}</FieldLabel>
-            <FieldDescription>{t('关闭后可为当前主题单独设置字体、光标样式和选区背景色；光标颜色始终属于主题。')}</FieldDescription>
+            <FieldDescription>{t('关闭后可为当前主题单独设置字体、光标样式、光标颜色和选区背景色。')}</FieldDescription>
           </FieldContent>
           <Switch id="terminal-profile-follow-global" checked={draft.followGlobalStyle} disabled={disabled} onCheckedChange={(checked) => update('followGlobalStyle', checked)} />
     </Field>
@@ -87,6 +88,9 @@ function TerminalProfileFields({ draft, effective, disabled, fieldsDisabled, fon
             <LabeledSelect ariaLabel={t('主题光标样式')} value={effective.cursorStyle} options={CURSOR_STYLE_OPTIONS.map((item) => ({ ...item, label: t(item.label) }))} disabled={fieldsDisabled} onValueChange={(value) => update('cursorStyle', value as ThemeDraft['cursorStyle'])} />
       </Field>
     </div>
-    <TerminalSelectionBackgroundField id="terminal-profile-selection-background" ariaPrefix={t('主题')} value={effective.selectionBackground} disabled={fieldsDisabled} onChange={(value) => update('selectionBackground', value)} />
+    <div className="grid gap-4 sm:grid-cols-2">
+      <TerminalSelectionBackgroundField id="terminal-profile-selection-background" ariaPrefix={t('主题')} value={effective.selectionBackground} disabled={fieldsDisabled} onChange={(value) => update('selectionBackground', value)} />
+      <TerminalCursorColorField id="terminal-profile-cursor-color" ariaPrefix={t('主题')} value={effective.cursorColor} disabled={fieldsDisabled} onChange={(value) => update('cursorColor', value)} />
+    </div>
   </FieldGroup>
 }

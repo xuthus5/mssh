@@ -16,6 +16,7 @@ func defaultTerminalGlobalStyle() model.TerminalGlobalStyle {
 		FontFamily:          model.DefaultTerminalFontFamily,
 		FontSize:            model.DefaultTerminalFontSize,
 		CursorStyle:         model.CursorStyleBar,
+		CursorColor:         model.DefaultTerminalCursorColor,
 		SelectionBackground: model.DefaultTerminalSelectionBackground,
 		LigaturesEnabled:    false,
 	}
@@ -23,6 +24,7 @@ func defaultTerminalGlobalStyle() model.TerminalGlobalStyle {
 
 func normalizeTerminalGlobalStyle(style model.TerminalGlobalStyle) model.TerminalGlobalStyle {
 	style.FontFamily = normalizeTerminalFontFamily(style.FontFamily)
+	style.CursorColor = strings.ToLower(strings.TrimSpace(style.CursorColor))
 	style.SelectionBackground = strings.ToLower(strings.TrimSpace(style.SelectionBackground))
 	return style
 }
@@ -58,6 +60,9 @@ func validateTerminalStyle(fontFamily string, fontSize int, cursorStyle model.Cu
 func validateTerminalGlobalStyle(style model.TerminalGlobalStyle) error {
 	if err := validateTerminalStyle(style.FontFamily, style.FontSize, style.CursorStyle); err != nil {
 		return err
+	}
+	if !validTerminalHexColor(style.CursorColor) {
+		return fmt.Errorf("terminal cursor color must use #RRGGBB format")
 	}
 	if !validTerminalHexColor(style.SelectionBackground) {
 		return fmt.Errorf("terminal selection background must use #RRGGBB format")

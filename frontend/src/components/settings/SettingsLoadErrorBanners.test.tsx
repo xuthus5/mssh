@@ -79,7 +79,7 @@ describe('settings load error banners', () => {
         general={general}
         themeProfiles={[profile as never]}
         themeAssignments={{ dark_profile_id: 1, light_profile_id: 1, follow_interface_mode: true, fixed_profile_id: 0 }}
-        terminalGlobalStyle={{ font_family: 'mono', font_size: 14, cursor_style: CursorStyle.CursorStyleBar, selection_background: '#264f78', ligatures_enabled: false }}
+        terminalGlobalStyle={{ font_family: 'mono', font_size: 14, cursor_style: CursorStyle.CursorStyleBar, cursor_color: '#0969da', selection_background: '#264f78', ligatures_enabled: false }}
         colorMode="dark"
         onSaveGeneral={async () => undefined}
         onSaveThemeConfiguration={async () => undefined}

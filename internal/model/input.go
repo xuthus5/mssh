@@ -130,6 +130,7 @@ type TerminalGlobalStyleInput struct {
 	FontFamily          string      `json:"font_family"`
 	FontSize            int         `json:"font_size"`
 	CursorStyle         CursorStyle `json:"cursor_style"`
+	CursorColor         string      `json:"cursor_color"`
 	SelectionBackground string      `json:"selection_background"`
 	LigaturesEnabled    bool        `json:"ligatures_enabled"`
 }

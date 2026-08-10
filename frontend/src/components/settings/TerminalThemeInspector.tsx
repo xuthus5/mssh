@@ -37,7 +37,6 @@ export function TerminalThemeInspector({ theme, onThemeChange }: Props) {
     <CardContent><FieldGroup>
       <ColorField id="terminal-background" label={t('背景色')} value={theme.background} onChange={(value) => onThemeChange('background', value)} />
       <ColorField id="terminal-foreground" label={t('前景色')} value={theme.foreground} onChange={(value) => onThemeChange('foreground', value)} />
-      <ColorField id="terminal-cursor" label={t('光标颜色')} value={theme.cursorColor} onChange={(value) => onThemeChange('cursorColor', value)} />
     </FieldGroup></CardContent>
   </Card>
 }

@@ -9,7 +9,7 @@ import {
 } from '@/components/settings/themeEditorState'
 
 const profiles = [profile(1, '#111111'), profile(2, '#eeeeee'), profile(3, '#333333')]
-const globalStyle = { font_family: 'Global Font', font_size: 16, cursor_style: 'underline' as const, selection_background: '#123456', ligatures_enabled: false }
+const globalStyle = { font_family: 'Global Font', font_size: 16, cursor_style: 'underline' as const, cursor_color: '#abcdef', selection_background: '#123456', ligatures_enabled: false }
 
 describe('theme editor state', () => {
   it('creates editable drafts keyed by Profile ID', () => {
@@ -51,8 +51,8 @@ describe('theme editor state', () => {
 
     const effective = effectiveDraftTheme(draft, globalStyle as never)
 
-    expect(effective).toMatchObject({ fontFamily: 'Global Font', fontSize: 16, cursorStyle: 'underline', selectionBackground: '#123456' })
-    expect(draft).toMatchObject({ fontFamily: 'Profile Font 1', fontSize: 13, cursorStyle: 'bar', selectionBackground: '#264f78', followGlobalStyle: true })
+    expect(effective).toMatchObject({ fontFamily: 'Global Font', fontSize: 16, cursorStyle: 'underline', cursorColor: '#abcdef', selectionBackground: '#123456' })
+    expect(draft).toMatchObject({ fontFamily: 'Profile Font 1', fontSize: 13, cursorStyle: 'bar', cursorColor: '#ffffff', selectionBackground: '#264f78', followGlobalStyle: true })
   })
 
   it('restores the Profile fallback values when global following is disabled', () => {
