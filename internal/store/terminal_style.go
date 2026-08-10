@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/xuthus5/mssh/internal/model"
@@ -14,6 +15,7 @@ const (
 	terminalFontFamilyKey  = "terminal.style.font_family"
 	terminalFontSizeKey    = "terminal.style.font_size"
 	terminalCursorStyleKey = "terminal.style.cursor_style"
+	terminalCursorColorKey = "terminal.style.cursor_color"
 	terminalSelectionKey   = "terminal.style.selection_background"
 	terminalLigaturesKey   = "terminal.style.ligatures_enabled"
 )
@@ -22,12 +24,18 @@ const (
 // defaults when older databases have not persisted them yet (migration).
 var terminalGlobalStyleKeys = []string{terminalFontFamilyKey, terminalFontSizeKey, terminalCursorStyleKey, terminalSelectionKey}
 
-var terminalGlobalStyleOptionalKeys = []string{terminalLigaturesKey}
+var terminalGlobalStyleOptionalKeys = []string{terminalLigaturesKey, terminalCursorColorKey}
+
+var terminalGlobalStyleOptionalDefaults = map[string]string{
+	terminalLigaturesKey:   "false",
+	terminalCursorColorKey: strconv.Quote(model.DefaultTerminalCursorColor),
+}
 
 var terminalGlobalStyleValueTypes = map[string]string{
 	terminalFontFamilyKey:  "string",
 	terminalFontSizeKey:    "number",
 	terminalCursorStyleKey: "string",
+	terminalCursorColorKey: "string",
 	terminalSelectionKey:   "string",
 	terminalLigaturesKey:   "boolean",
 }
@@ -82,7 +90,7 @@ func loadTerminalGlobalStyleValues(db themeDB) (map[string]string, bool, error) 
 		if settingExists {
 			values[key] = setting.Value
 		} else {
-			values[key] = "false"
+			values[key] = terminalGlobalStyleOptionalDefaults[key]
 		}
 	}
 	return values, true, nil
@@ -122,6 +130,7 @@ func parseTerminalGlobalStyle(values map[string]string) (model.TerminalGlobalSty
 		terminalFontFamilyKey:  &style.FontFamily,
 		terminalFontSizeKey:    &style.FontSize,
 		terminalCursorStyleKey: &style.CursorStyle,
+		terminalCursorColorKey: &style.CursorColor,
 		terminalSelectionKey:   &style.SelectionBackground,
 		terminalLigaturesKey:   &style.LigaturesEnabled,
 	}
@@ -143,6 +152,7 @@ func SaveTerminalGlobalStyleDB(db themeDB, style model.TerminalGlobalStyle) erro
 		{key: terminalFontFamilyKey, value: style.FontFamily, valueType: "string"},
 		{key: terminalFontSizeKey, value: style.FontSize, valueType: "number"},
 		{key: terminalCursorStyleKey, value: style.CursorStyle, valueType: "string"},
+		{key: terminalCursorColorKey, value: style.CursorColor, valueType: "string"},
 		{key: terminalSelectionKey, value: style.SelectionBackground, valueType: "string"},
 		{key: terminalLigaturesKey, value: style.LigaturesEnabled, valueType: "boolean"},
 	}

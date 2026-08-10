@@ -21,11 +21,12 @@ describe('TerminalThemeInspector', () => {
 
     await userEvent.clear(screen.getByLabelText('背景色 HEX'))
     await userEvent.type(screen.getByLabelText('背景色 HEX'), '#123456')
-    await userEvent.clear(screen.getByLabelText('光标颜色 HEX'))
-    await userEvent.type(screen.getByLabelText('光标颜色 HEX'), '#abcdef')
+    await userEvent.clear(screen.getByLabelText('前景色 HEX'))
+    await userEvent.type(screen.getByLabelText('前景色 HEX'), '#abcdef')
 
     expect(onThemeChange).toHaveBeenCalledWith('background', expect.any(String))
-    expect(onThemeChange).toHaveBeenCalledWith('cursorColor', expect.any(String))
+    expect(onThemeChange).toHaveBeenCalledWith('foreground', expect.any(String))
+    expect(screen.queryByLabelText('光标颜色 HEX')).not.toBeInTheDocument()
   })
 
   it('reports invalid HEX colors', async () => {
