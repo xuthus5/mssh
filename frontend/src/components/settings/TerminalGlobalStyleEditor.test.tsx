@@ -18,12 +18,16 @@ describe('TerminalGlobalStyleEditor', () => {
     await userEvent.click(await screen.findByRole('option', { name: '下划线' }))
     fireEvent.change(screen.getByLabelText('全局选区背景色 HEX'), { target: { value: '#4f46e5' } })
     fireEvent.change(screen.getByLabelText('全局选区背景色选择器'), { target: { value: '#abcdef' } })
+    fireEvent.change(screen.getByLabelText('全局光标颜色 HEX'), { target: { value: '#111111' } })
+    fireEvent.change(screen.getByLabelText('全局光标颜色选择器'), { target: { value: '#222222' } })
 
     expect(onChange).toHaveBeenCalledWith('font_family', expect.any(String))
     expect(onChange).toHaveBeenCalledWith('font_size', 18)
     expect(onChange).toHaveBeenCalledWith('cursor_style', 'underline')
     expect(onChange).toHaveBeenCalledWith('selection_background', '#4f46e5')
     expect(onChange).toHaveBeenCalledWith('selection_background', '#abcdef')
+    expect(onChange).toHaveBeenCalledWith('cursor_color', '#111111')
+    expect(onChange).toHaveBeenCalledWith('cursor_color', '#222222')
   })
 
   it('disables every field while saving', () => {
@@ -34,6 +38,8 @@ describe('TerminalGlobalStyleEditor', () => {
     expect(screen.getByRole('combobox', { name: '全局光标样式' })).toBeDisabled()
     expect(screen.getByLabelText('全局选区背景色选择器')).toBeDisabled()
     expect(screen.getByLabelText('全局选区背景色 HEX')).toBeDisabled()
+    expect(screen.getByLabelText('全局光标颜色选择器')).toBeDisabled()
+    expect(screen.getByLabelText('全局光标颜色 HEX')).toBeDisabled()
   })
 
   it('supports controlled updates', async () => {
@@ -60,6 +66,15 @@ describe('TerminalGlobalStyleEditor', () => {
     await userEvent.type(screen.getByLabelText('全局选区背景色 HEX'), 'blue')
 
     expect(screen.getByLabelText('全局选区背景色 HEX')).toHaveAttribute('aria-invalid', 'true')
+    expect(screen.getByRole('alert')).toHaveTextContent('请输入 #RRGGBB 格式')
+  })
+
+  it('reports invalid global cursor colors', async () => {
+    render(<GlobalStyleHarness />)
+    await userEvent.clear(screen.getByLabelText('全局光标颜色 HEX'))
+    await userEvent.type(screen.getByLabelText('全局光标颜色 HEX'), 'red')
+
+    expect(screen.getByLabelText('全局光标颜色 HEX')).toHaveAttribute('aria-invalid', 'true')
     expect(screen.getByRole('alert')).toHaveTextContent('请输入 #RRGGBB 格式')
   })
 
@@ -97,5 +112,5 @@ function GlobalStyleHarness() {
 }
 
 function globalStyle() {
-  return { font_family: 'Global Font', font_size: 16, cursor_style: 'bar' as const, selection_background: '#264f78', ligatures_enabled: false }
+  return { font_family: 'Global Font', font_size: 16, cursor_style: 'bar' as const, cursor_color: '#0969da', selection_background: '#264f78', ligatures_enabled: false }
 }

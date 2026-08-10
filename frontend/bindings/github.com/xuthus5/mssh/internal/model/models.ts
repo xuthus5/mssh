@@ -3973,6 +3973,7 @@ export class TerminalGlobalStyle {
     "font_family": string;
     "font_size": number;
     "cursor_style": CursorStyle;
+    "cursor_color": string;
     "selection_background": string;
     "ligatures_enabled": boolean;
 
@@ -3986,6 +3987,9 @@ export class TerminalGlobalStyle {
         }
         if (!("cursor_style" in $$source)) {
             this["cursor_style"] = CursorStyle.$zero;
+        }
+        if (!("cursor_color" in $$source)) {
+            this["cursor_color"] = "";
         }
         if (!("selection_background" in $$source)) {
             this["selection_background"] = "";
@@ -4010,6 +4014,7 @@ export class TerminalGlobalStyleInput {
     "font_family": string;
     "font_size": number;
     "cursor_style": CursorStyle;
+    "cursor_color": string;
     "selection_background": string;
     "ligatures_enabled": boolean;
 
@@ -4023,6 +4028,9 @@ export class TerminalGlobalStyleInput {
         }
         if (!("cursor_style" in $$source)) {
             this["cursor_style"] = CursorStyle.$zero;
+        }
+        if (!("cursor_color" in $$source)) {
+            this["cursor_color"] = "";
         }
         if (!("selection_background" in $$source)) {
             this["selection_background"] = "";
