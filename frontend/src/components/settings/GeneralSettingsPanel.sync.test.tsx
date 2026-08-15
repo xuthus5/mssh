@@ -16,7 +16,7 @@ const initialSettings: GeneralSettings = {
   autoReconnect: false,
   restoreTabsOnStartup: true,
   renderer: 'dom',
-  historyPredict: false,
+  historyPredict: false, autoCloseTerminalOnExit: false,
   localShell: '',
   localShellArgs: '',
   localShellCwd: '',

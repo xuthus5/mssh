@@ -220,7 +220,7 @@ describe('maybeAutoReconnectTerminal', () => {
   })
 
   it('starts reconnect when auto reconnect is enabled', async () => {
-    useTerminalBehaviorStore.setState({ autoReconnect: true, renderer: 'dom', historyPredict: false })
+    useTerminalBehaviorStore.setState({ autoReconnect: true, renderer: 'dom', historyPredict: false, autoCloseTerminalOnExit: false })
     const open = deferred<string>()
     __registerHandler(service + 'Open', async () => open.promise)
     maybeAutoReconnectTerminal('term-old', sessions)
@@ -231,7 +231,7 @@ describe('maybeAutoReconnectTerminal', () => {
   })
 
   it('auto-reconnects inactive SSH tabs without opening the connection dialog', async () => {
-    useTerminalBehaviorStore.setState({ autoReconnect: true, renderer: 'dom', historyPredict: false })
+    useTerminalBehaviorStore.setState({ autoReconnect: true, renderer: 'dom', historyPredict: false, autoCloseTerminalOnExit: false })
     useAppStore.setState({
       tabs: [
         { id: 'tab-active', title: 'Active', type: 'terminal', terminalId: 'term-active', sessionId: 6 },
@@ -255,7 +255,7 @@ describe('maybeAutoReconnectTerminal', () => {
   })
 
   it('skips auto reconnect for intentional disconnects', async () => {
-    useTerminalBehaviorStore.setState({ autoReconnect: true, renderer: 'dom', historyPredict: false })
+    useTerminalBehaviorStore.setState({ autoReconnect: true, renderer: 'dom', historyPredict: false, autoCloseTerminalOnExit: false })
     const open = vi.fn(async () => 'term-new')
     __registerHandler(service + 'Open', open)
     markIntentionalDisconnect('term-old')
@@ -265,7 +265,7 @@ describe('maybeAutoReconnectTerminal', () => {
   })
 
   it('does not auto-reconnect serial terminals', async () => {
-    useTerminalBehaviorStore.setState({ autoReconnect: true, renderer: 'dom', historyPredict: false })
+    useTerminalBehaviorStore.setState({ autoReconnect: true, renderer: 'dom', historyPredict: false, autoCloseTerminalOnExit: false })
     useAppStore.setState({
       tabs: [{ id: 'tab-serial', title: 'UART', type: 'terminal', terminalId: 'term-serial', sessionId: 0, connectionKind: 'serial', serialPortId: 9 }],
       connectionStatus: { 'term-serial': 'disconnected' },
@@ -277,7 +277,7 @@ describe('maybeAutoReconnectTerminal', () => {
     expect(openSerial).not.toHaveBeenCalled()
   })
   it('dispatches split-pane reconnect for secondary panes without reopening primary', async () => {
-    useTerminalBehaviorStore.setState({ autoReconnect: true, renderer: 'dom', historyPredict: false })
+    useTerminalBehaviorStore.setState({ autoReconnect: true, renderer: 'dom', historyPredict: false, autoCloseTerminalOnExit: false })
     useAppStore.setState({
       tabs: [{
         id: 'tab-1',

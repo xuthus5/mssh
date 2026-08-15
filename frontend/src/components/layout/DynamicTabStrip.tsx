@@ -108,7 +108,7 @@ function scrollTabsWithWheel(event: WheelEvent<HTMLDivElement>) {
 	event.preventDefault()
 }
 
-function DynamicTab({ tab, active, connectionStatus, navigation, onActivate, onClose, onDuplicate }: {
+function DynamicTab({ tab, active, connectionStatus, navigation, onActivate, onClose, onDuplicate, onCloseAll }: {
   tab: Tab
   active: boolean
   connectionStatus: AppState['connectionStatus']
@@ -116,6 +116,7 @@ function DynamicTab({ tab, active, connectionStatus, navigation, onActivate, onC
   onActivate: (tabID: string) => void
   onClose: (tabID: string) => void
   onDuplicate: (sessionID: number) => void
+  onCloseAll: () => void
 }) {
   const statusLabel = tabStatusLabel(tab, connectionStatus)
   const content = (
@@ -142,6 +143,15 @@ function DynamicTab({ tab, active, connectionStatus, navigation, onActivate, onC
           <ContextMenuItem onClick={() => onDuplicate(tab.sessionId)}>
             <Copy aria-hidden="true" />
             {t('复制终端')}
+          </ContextMenuItem>
+        </ContextMenuGroup>
+        <ContextMenuGroup>
+          <ContextMenuItem onClick={() => onClose(tab.id)}>
+            <X aria-hidden="true" />
+            {t('关闭')}
+          </ContextMenuItem>
+          <ContextMenuItem onClick={onCloseAll}>
+            {t('关闭所有标签')}
           </ContextMenuItem>
         </ContextMenuGroup>
       </ContextMenuContent>
@@ -237,7 +247,7 @@ export function DynamicTabStrip({ onOverflowChange }: { onOverflowChange?: (over
       <div className={`relative min-w-0 ${scroll.overflow ? 'flex-1' : ''} ${scroll.canScrollLeft ? 'shadow-[inset_12px_0_8px_-12px_rgba(0,0,0,0.45)]' : ''} ${scroll.canScrollRight ? 'shadow-[inset_-12px_0_8px_-12px_rgba(0,0,0,0.45)]' : ''}`}>
         <div ref={scroll.tabListRef} role="tablist" aria-label={t('动态标签')} className="mssh-tab-strip-scroll flex h-9 min-w-0 items-end gap-1 overflow-x-auto overflow-y-hidden" onWheel={scrollTabsWithWheel} onScroll={scroll.syncScrollAffordances}>
           {tabs.map((tab, index) => <Fragment key={tab.id}>
-            <DynamicTab tab={tab} active={activeSurface?.id === tab.id} connectionStatus={connectionStatus} navigation={navigation} onActivate={activateWithFocus} onClose={closeCoordinator.requestClose} onDuplicate={duplicateTerminal} />
+            <DynamicTab tab={tab} active={activeSurface?.id === tab.id} connectionStatus={connectionStatus} navigation={navigation} onActivate={activateWithFocus} onClose={closeCoordinator.requestClose} onDuplicate={duplicateTerminal} onCloseAll={closeCoordinator.requestCloseAll} />
             {index === quickConnectAfter && <QuickConnectButton />}
           </Fragment>)}
         </div>
