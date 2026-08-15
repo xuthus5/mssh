@@ -1,9 +1,8 @@
 import { FolderOpen } from 'lucide-react'
 import { Dialogs } from '@wailsio/runtime'
 import { Button } from '@/components/ui/button'
-import { Field, FieldContent, FieldDescription, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
-import { SettingsCard, SettingsSectionHeader } from '@/components/settings/settings-ui'
+import { SettingsCard, SettingsRow, SettingsSectionHeader } from '@/components/settings/settings-ui'
 import { useRef, useState } from 'react'
 import { useSettingsWindowHide } from '@/hooks/useSettingsWindowHide'
 import { logger } from '@/lib/logger'
@@ -62,11 +61,7 @@ function LogDirectoryField({ logDir, onChange, onPick, picking }: {
   picking: boolean
 }) {
   return (
-    <Field>
-      <FieldContent>
-        <FieldLabel htmlFor="app-log-dir">{t('日志目录')}</FieldLabel>
-        <FieldDescription>{t('默认为用户家目录下的 .mssh/logs，文件名形如 2026-07-15.log。')}</FieldDescription>
-      </FieldContent>
+    <SettingsRow label={t('日志目录')} description={t('默认为用户家目录下的 .mssh/logs，文件名形如 2026-07-15.log。')}>
       <div className="flex items-center gap-2">
         <Input id="app-log-dir" aria-label={t('日志目录')} value={logDir} disabled={picking}
           placeholder={DEFAULT_APP_LOG_DIR_PLACEHOLDER} onChange={(event) => onChange(event.target.value)} />
@@ -74,19 +69,15 @@ function LogDirectoryField({ logDir, onChange, onPick, picking }: {
           <FolderOpen data-icon="inline-start" />{picking ? t('选择中...') : t('浏览')}
         </Button>
       </div>
-    </Field>
+    </SettingsRow>
   )
 }
 
 function LogRetentionField({ value, onChange }: { value: string; onChange: Props['onLogRetentionDaysChange'] }) {
-  return <Field orientation="horizontal">
-    <FieldContent>
-      <FieldLabel htmlFor="app-log-retention">{t('日志保留天数')}</FieldLabel>
-      <FieldDescription>{t('超过保留天数的按日日志文件会被自动删除，默认 30 天。')}</FieldDescription>
-    </FieldContent>
+  return <SettingsRow label={t('日志保留天数')} description={t('超过保留天数的按日日志文件会被自动删除，默认 30 天。')}>
     <Input id="app-log-retention" aria-label={t('日志保留天数')} className="w-28" type="number"
       min={1} max={3650} value={value} onChange={(event) => onChange(event.target.value)} />
-  </Field>
+  </SettingsRow>
 }
 
 export function ApplicationLogSettingsSection(props: Props) {
