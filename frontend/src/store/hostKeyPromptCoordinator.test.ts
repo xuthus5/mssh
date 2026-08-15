@@ -12,6 +12,8 @@ function prompt(attemptId: string): HostKeyPrompt {
     hostname: `${attemptId}.internal:22`,
     fingerprint: `SHA256:${attemptId}`,
     algorithm: 'ssh-ed25519',
+    changed: false,
+    expected: [],
   }
 }
 

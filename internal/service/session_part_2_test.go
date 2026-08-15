@@ -8,7 +8,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/xuthus5/mssh/internal/model"
 	"github.com/xuthus5/mssh/internal/service/testutil"
+	"github.com/xuthus5/mssh/internal/ssh"
+	"github.com/xuthus5/mssh/internal/store"
 	"github.com/xuthus5/mssh/pkg/event"
 )
 
@@ -24,7 +27,7 @@ func TestSessionServiceHostKeyDecisionAccept(t *testing.T) {
 
 	result := make(chan bool, 1)
 	go func() {
-		result <- svc.awaitHostKeyDecision(ctx, attemptID, "example.com", "ssh-ed25519", "SHA256:test")
+		result <- svc.awaitHostKeyDecision(ctx, attemptID, "example.com", "ssh-ed25519", "SHA256:test", false, nil)
 	}()
 
 	require.Eventually(t, func() bool {
@@ -45,11 +48,56 @@ func TestSessionServiceHostKeyDecisionReject(t *testing.T) {
 
 	result := make(chan bool, 1)
 	go func() {
-		result <- svc.awaitHostKeyDecision(ctx, attemptID, "example.com", "ssh-ed25519", "SHA256:test")
+		result <- svc.awaitHostKeyDecision(ctx, attemptID, "example.com", "ssh-ed25519", "SHA256:test", false, nil)
 	}()
 
 	require.NoError(t, svc.DecideHostKey(attemptID, false))
 	assert.False(t, <-result)
+}
+
+func TestSessionServiceHostKeyChangeDecisionCarriesExpected(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	bus := newManualHostKeyEventBus()
+	svc := NewSessionService(db, bus, 30, t.TempDir(), nil, testutil.NewTestLogger())
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	attemptID := svc.registerConnectAttempt(1, cancel)
+	defer svc.finishConnectAttempt(attemptID)
+
+	result := make(chan bool, 1)
+	go func() {
+		result <- svc.awaitHostKeyDecision(ctx, attemptID, "example.com", "ssh-ed25519", "SHA256:new", true, []string{"SHA256:old"})
+	}()
+
+	require.Eventually(t, func() bool { return bus.hasEvent(event.HostKeyFingerprint) }, time.Second, 10*time.Millisecond)
+	payload := bus.lastHostKeyPayload()
+	require.NotNil(t, payload)
+	assert.True(t, payload.Changed)
+	assert.Equal(t, []string{"SHA256:old"}, payload.Expected)
+	require.NoError(t, svc.DecideHostKey(attemptID, true))
+	assert.True(t, <-result)
+}
+
+func TestSessionServiceHostKeyChangePolicyDefaultsToBlock(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	svc := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
+
+	assert.Equal(t, ssh.HostKeyPolicyBlock, svc.hostKeyChangePolicy())
+}
+
+func TestSessionServiceHostKeyChangePolicyResolvesValues(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	svc := NewSessionService(db, newMockEventBus(), 30, t.TempDir(), nil, testutil.NewTestLogger())
+
+	require.NoError(t, store.SetSettings(db, []model.Setting{{Key: hostKeyChangePolicySettingKey, Namespace: "security", Value: `"warn"`, ValueType: "string", Version: 1}}))
+	assert.Equal(t, ssh.HostKeyPolicyWarn, svc.hostKeyChangePolicy())
+
+	require.NoError(t, store.SetSettings(db, []model.Setting{{Key: hostKeyChangePolicySettingKey, Namespace: "security", Value: `"trust"`, ValueType: "string", Version: 1}}))
+	assert.Equal(t, ssh.HostKeyPolicyTrust, svc.hostKeyChangePolicy())
+
+	require.NoError(t, store.SetSettings(db, []model.Setting{{Key: hostKeyChangePolicySettingKey, Namespace: "security", Value: `"invalid"`, ValueType: "string", Version: 1}}))
+	assert.Equal(t, ssh.HostKeyPolicyBlock, svc.hostKeyChangePolicy())
 }
 
 func TestSessionServiceCancelConnect(t *testing.T) {
@@ -92,7 +140,7 @@ func TestSessionServiceHostKeyDecisionHonorsContextCancellation(t *testing.T) {
 	t.Cleanup(func() { cancel(); svc.finishConnectAttempt(attemptID) })
 	result := make(chan bool, 1)
 	go func() {
-		result <- svc.awaitHostKeyDecision(ctx, attemptID, "one:22", "ssh-ed25519", "SHA256:one")
+		result <- svc.awaitHostKeyDecision(ctx, attemptID, "one:22", "ssh-ed25519", "SHA256:one", false, nil)
 	}()
 	require.Eventually(t, func() bool { return hostKeyEventCount(bus) == 1 }, time.Second, 5*time.Millisecond)
 	cancel()

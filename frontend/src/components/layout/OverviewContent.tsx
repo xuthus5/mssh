@@ -14,6 +14,7 @@ import { useTunnelManager } from '@/hooks/useTunnelManager'
 import { SessionAssetCenter } from '@/components/session/SessionAssetCenter'
 import { useAppStore } from '@/store/appStore'
 import { AuditPanel } from '@/components/layout/AuditPanel'
+import { TrustedHostsPanel } from '@/components/layout/TrustedHostsPanel'
 import { SerialPortCenter } from '@/components/serial/SerialPortCenter'
 import { t } from '@/i18n'
 import type { OverviewSection } from '@/store/tabNavigation'
@@ -36,6 +37,7 @@ function overviewSections(): Array<{ id: OverviewSection; content: ReactNode }> 
     { id: 'keys', content: <OverviewKeys /> },
     { id: 'tunnels', content: <OverviewTunnels /> },
     { id: 'serial', content: <SerialPortCenter /> },
+    { id: 'trusted', content: <TrustedHostsPanel /> },
     { id: 'audit', content: <AuditPanel /> },
   ]
 }

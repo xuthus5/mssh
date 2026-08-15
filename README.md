@@ -98,7 +98,8 @@ MSSH is not a fleet orchestrator. It focuses on saved SSH sessions and terminal-
 ### Security and operational controls
 
 - Master-key encryption for sensitive local data
-- Host key verification with change detection
+- Host key verification with change detection: block, warn, or trust new fingerprints
+- Manage trusted host fingerprints from the Overview
 - System keychain integration on Linux, Windows, and macOS
 - Optional audit logging for connections, sync, key access, and batch operations
 

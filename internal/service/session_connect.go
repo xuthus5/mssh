@@ -16,8 +16,9 @@ import (
 )
 
 const (
-	defaultKeepAliveSettingKey = "terminal.default_keep_alive"
-	hostKeyDecisionTimeout     = 5 * time.Minute
+	defaultKeepAliveSettingKey    = "terminal.default_keep_alive"
+	hostKeyChangePolicySettingKey = "security.host_key_change_policy"
+	hostKeyDecisionTimeout        = 5 * time.Minute
 )
 
 func (s *SessionService) connect(ctx context.Context, sessionID int64, emitState bool) (string, error) {
@@ -51,10 +52,18 @@ func (s *SessionService) connect(ctx context.Context, sessionID int64, emitState
 		return "", fmt.Errorf("connect: application data directory is required for host key verification")
 	}
 	knownHostsPath := filepath.Join(s.dataDir, "known_hosts")
+	policy := s.hostKeyChangePolicy()
 	onNewHostKey := func(hostname, algorithm, fingerprint string) bool {
-		return s.awaitHostKeyDecision(connectCtx, attemptID, hostname, algorithm, fingerprint)
+		return s.awaitHostKeyDecision(connectCtx, attemptID, hostname, algorithm, fingerprint, false, nil)
 	}
-	wrapper, err := ssh.ConnectWithVerifier(connectCtx, *sess, authMethods, knownHostsPath, onNewHostKey, s.logger)
+	onHostKeyChange := func(hostname, algorithm, fingerprint string, expected []string) bool {
+		return s.awaitHostKeyDecision(connectCtx, attemptID, hostname, algorithm, fingerprint, true, expected)
+	}
+	wrapper, err := ssh.ConnectWithHostKeyOptions(connectCtx, *sess, authMethods, knownHostsPath, ssh.HostKeyOptions{
+		Policy:          policy,
+		OnNewHostKey:    onNewHostKey,
+		OnHostKeyChange: onHostKeyChange,
+	}, s.logger)
 	if err != nil {
 		if cleanup != nil {
 			cleanup()
@@ -128,7 +137,7 @@ func (s *SessionService) finishConnectAttempt(attemptID string) {
 	s.mu.Unlock()
 }
 
-func (s *SessionService) awaitHostKeyDecision(ctx context.Context, attemptID, hostname, algorithm, fingerprint string) bool {
+func (s *SessionService) awaitHostKeyDecision(ctx context.Context, attemptID, hostname, algorithm, fingerprint string, changed bool, expected []string) bool {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -141,7 +150,7 @@ func (s *SessionService) awaitHostKeyDecision(ctx context.Context, attemptID, ho
 	if !ok {
 		return false
 	}
-	payload := event.HostKeyPayload{AttemptID: attemptID, Hostname: hostname, Fingerprint: fingerprint, Algorithm: algorithm}
+	payload := event.HostKeyPayload{AttemptID: attemptID, Hostname: hostname, Fingerprint: fingerprint, Algorithm: algorithm, Changed: changed, Expected: expected}
 	s.eventBus.Emit(event.HostKeyFingerprint, payload)
 	if accepter, ok := s.eventBus.(hostKeyAutoAccepter); ok && accepter.AutoAcceptHostKeys() {
 		return true
@@ -156,6 +165,27 @@ func (s *SessionService) awaitHostKeyDecision(ctx context.Context, attemptID, ho
 			s.logger.Warn("host key decision ended", "attemptID", attemptID, "hostname", hostname, "error", decisionCtx.Err())
 		}
 		return false
+	}
+}
+
+// hostKeyChangePolicy resolves the configured behavior for changed or unknown
+// host fingerprints. Unset or invalid values fall back to blocking changes.
+func (s *SessionService) hostKeyChangePolicy() ssh.HostKeyPolicy {
+	entry, err := store.GetSettingEntry(s.db, hostKeyChangePolicySettingKey)
+	if err != nil || entry == nil {
+		return ssh.HostKeyPolicyBlock
+	}
+	var value string
+	if err := json.Unmarshal([]byte(entry.Value), &value); err != nil {
+		return ssh.HostKeyPolicyBlock
+	}
+	switch value {
+	case "warn":
+		return ssh.HostKeyPolicyWarn
+	case "trust":
+		return ssh.HostKeyPolicyTrust
+	default:
+		return ssh.HostKeyPolicyBlock
 	}
 }
 
