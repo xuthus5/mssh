@@ -11,6 +11,7 @@ describe('TerminalBehaviorSettingsSection', () => {
     const onAutoReconnectChange = vi.fn()
     const onRestoreTabsOnStartupChange = vi.fn()
     const onHistoryPredictChange = vi.fn()
+    const onAutoCloseTerminalOnExitChange = vi.fn()
     const user = userEvent.setup()
 
     render(
@@ -21,12 +22,14 @@ describe('TerminalBehaviorSettingsSection', () => {
         autoReconnect={false}
         restoreTabsOnStartup={true}
         historyPredict={false}
+        autoCloseTerminalOnExit={false}
         onRightClickActionChange={onRightClickActionChange}
         onCopyOnSelectChange={onCopyOnSelectChange}
         onScrollbackLinesChange={onScrollbackLinesChange}
         onAutoReconnectChange={onAutoReconnectChange}
         onRestoreTabsOnStartupChange={onRestoreTabsOnStartupChange}
         onHistoryPredictChange={onHistoryPredictChange}
+        onAutoCloseTerminalOnExitChange={onAutoCloseTerminalOnExitChange}
       />,
     )
 
@@ -39,6 +42,7 @@ describe('TerminalBehaviorSettingsSection', () => {
     expect(scrollback).toHaveValue(10000)
     fireEvent.change(scrollback, { target: { value: '5000' } })
     await user.click(screen.getByRole('switch', { name: 'SSH 断线自动重连' }))
+    await user.click(screen.getByRole('switch', { name: '退出后自动关闭终端' }))
     await user.click(screen.getByRole('switch', { name: '启动时恢复终端标签' }))
     await user.click(screen.getByRole('switch', { name: '历史命令预测补全' }))
 
@@ -46,6 +50,7 @@ describe('TerminalBehaviorSettingsSection', () => {
     expect(onCopyOnSelectChange).toHaveBeenCalledWith(true)
     expect(onScrollbackLinesChange).toHaveBeenCalledWith(5000)
     expect(onAutoReconnectChange).toHaveBeenCalledWith(true)
+    expect(onAutoCloseTerminalOnExitChange).toHaveBeenCalledWith(true)
     expect(onRestoreTabsOnStartupChange).toHaveBeenCalledWith(false)
     expect(onHistoryPredictChange).toHaveBeenCalledWith(true)
   })

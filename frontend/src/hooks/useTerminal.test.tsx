@@ -181,7 +181,7 @@ describe('useTerminal', () => {
     proposedDimensions = []
     canvasLoadFailure = false
     Object.defineProperty(document, 'fonts', { configurable: true, value: undefined })
-    useTerminalBehaviorStore.setState({ rightClickAction: 'menu', copyOnSelect: false, autoReconnect: false, restoreTabsOnStartup: true, scrollbackLines: 10000, renderer: 'dom', historyPredict: false })
+    useTerminalBehaviorStore.setState({ rightClickAction: 'menu', copyOnSelect: false, autoReconnect: false, restoreTabsOnStartup: true, scrollbackLines: 10000, renderer: 'dom', historyPredict: false, autoCloseTerminalOnExit: false })
     vi.stubGlobal('ResizeObserver', class {
       observe() {}
       disconnect = vi.fn()

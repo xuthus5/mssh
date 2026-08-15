@@ -81,6 +81,49 @@ describe('DynamicTabStrip', () => {
     expect(connect).toHaveBeenCalledWith('7')
   })
 
+  it('closes a terminal from its context menu after confirmation', async () => {
+    const closeTab = vi.fn(async () => {})
+    seedTabs()
+    useAppStore.setState({ closeTab })
+    render(<DynamicTabStrip />)
+
+    fireEvent.contextMenu(screen.getByRole('tab', { name: /生产服务器/ }))
+    await userEvent.click(await screen.findByRole('menuitem', { name: '关闭' }))
+
+    expect(screen.getByRole('dialog')).toHaveTextContent('关闭活动连接？')
+    await userEvent.click(screen.getByRole('button', { name: '关闭连接' }))
+    await waitFor(() => expect(closeTab).toHaveBeenCalledWith('terminal-1'))
+  })
+
+  it('closes all terminal tabs from a context menu with a single confirmation', async () => {
+    const closeTab = vi.fn(async () => {})
+    seedTabs()
+    useAppStore.setState({ closeTab })
+    render(<DynamicTabStrip />)
+
+    fireEvent.contextMenu(screen.getByRole('tab', { name: /生产服务器/ }))
+    await userEvent.click(await screen.findByRole('menuitem', { name: '关闭所有标签' }))
+
+    expect(screen.getByRole('dialog')).toHaveTextContent('关闭所有活动连接？')
+    await userEvent.click(screen.getByRole('button', { name: '全部关闭' }))
+    await waitFor(() => expect(closeTab).toHaveBeenCalledWith('terminal-1'))
+  })
+
+  it('skips close confirmation when the exit auto-close preference is enabled', async () => {
+    const closeTab = vi.fn(async () => {})
+    const { useTerminalBehaviorStore } = await import('@/store/terminalBehaviorStore')
+    useTerminalBehaviorStore.setState({ autoCloseTerminalOnExit: true })
+    seedTabs()
+    useAppStore.setState({ closeTab })
+    render(<DynamicTabStrip />)
+
+    await userEvent.click(screen.getByRole('button', { name: '关闭 生产服务器' }))
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    await waitFor(() => expect(closeTab).toHaveBeenCalledWith('terminal-1'))
+    useTerminalBehaviorStore.setState({ autoCloseTerminalOnExit: false })
+  })
+
   it('opens quick session search from the button after the last terminal tab', async () => {
     const openSearch = vi.fn()
     window.addEventListener('mssh:open-session-search', openSearch)
