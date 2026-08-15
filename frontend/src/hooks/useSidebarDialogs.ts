@@ -3,6 +3,10 @@ import { APP_NEW_SESSION_EVENT, onAppEvent } from '@/lib/appEvents'
 import type { Folder, Session } from '@/hooks/useSession'
 import { useSessionWorkspace } from '@/hooks/SessionWorkspaceContext'
 import { logger } from '@/lib/logger'
+import { SessionService } from '@/lib/wails'
+import { getClipboard } from '@/lib/clipboard'
+import { requestConfirm } from '@/lib/confirmDialog'
+import { toast } from '@/components/ui/toast'
 import { t } from '@/i18n'
 
 type Workspace = ReturnType<typeof useSessionWorkspace>
@@ -38,6 +42,9 @@ function useDialogState() {
   const [folderError, setFolderError] = useState('')
   const [editingFolder, setEditingFolderState] = useState<Folder | null>(null)
   const [editingSession, setEditingSessionState] = useState<Session | null>(null)
+  const [renameSession, setRenameSessionState] = useState<Session | null>(null)
+  const [renameName, setRenameNameState] = useState('')
+  const [renameError, setRenameErrorState] = useState('')
   const lifecycle = useRef(0)
   const sessionGeneration = useRef(0)
   const folderGeneration = useRef(0)
@@ -52,7 +59,9 @@ function useDialogState() {
   const setFolderName = useCallback((name: string) => { folderGeneration.current++; setFolderNameState(name) }, [])
   const setEditingFolder = useCallback((folder: Folder | null) => { folderGeneration.current++; setEditingFolderState(folder) }, [])
   const setEditingSession = useCallback((session: Session | null) => { sessionGeneration.current++; setEditingSessionState(session) }, [])
-  return { sessionDialogOpen, setSessionDialogOpen, setSessionDialogOpenState, folderDialogOpen, setFolderDialogOpen, setFolderDialogOpenState, folderName, setFolderName, setFolderNameState, folderError, setFolderError, editingFolder, setEditingFolder, setEditingFolderState, editingSession, setEditingSession, setEditingSessionState, lifecycle, sessionGeneration, folderGeneration, folderSaveRequest, folderSaveGeneration }
+  const setRenameSession = useCallback((session: Session | null) => { setRenameSessionState(session); setRenameNameState(session?.name ?? ''); setRenameErrorState('') }, [])
+  const setRenameName = useCallback((name: string) => { setRenameNameState(name); setRenameErrorState('') }, [])
+  return { sessionDialogOpen, setSessionDialogOpen, setSessionDialogOpenState, folderDialogOpen, setFolderDialogOpen, setFolderDialogOpenState, folderName, setFolderName, setFolderNameState, folderError, setFolderError, editingFolder, setEditingFolder, setEditingFolderState, editingSession, setEditingSession, setEditingSessionState, renameSession, setRenameSession, renameName, setRenameName, renameError, setRenameErrorState, lifecycle, sessionGeneration, folderGeneration, folderSaveRequest, folderSaveGeneration }
 }
 
 type DialogState = ReturnType<typeof useDialogState>
@@ -119,17 +128,116 @@ function editSession(state: DialogState, session: Session) {
   }, 0)
 }
 
+function duplicateSessionName(session: Session, existing: string[]) {
+  const base = `${session.name} ${t('副本')}`
+  const names = new Set(existing.map((name) => name.trim()))
+  if (!names.has(base)) return base
+  let index = 2
+  while (names.has(`${base} ${index}`)) index++
+  return `${base} ${index}`
+}
+
+async function duplicateSession(workspace: Workspace, session: Session) {
+  try {
+    const credentials = await SessionService.GetSessionCredentials(Number(session.id))
+    const name = duplicateSessionName(session, workspace.sessions.map((item) => item.name))
+    const input: Omit<Session, 'id'> = {
+      name, host: session.host, port: session.port, username: session.username, notes: session.notes ?? '',
+      tags: session.tags, environmentId: session.environmentId, projectId: session.projectId,
+      authMethod: session.authMethod, password: credentials?.password ?? undefined,
+      keyId: session.keyId, keepAlive: session.keepAlive, termType: session.termType, folderId: session.folderId,
+    }
+    await workspace.createSession(input)
+    toast(t('已复制会话「${}」', name), 'success')
+  } catch (error) {
+    logger.error('Sidebar: duplicate session error', error)
+    toast(t('复制会话失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
+    throw error
+  }
+}
+
+async function copySessionCredentials(workspace: Workspace, session: Session) {
+  try {
+    const credentials = await SessionService.GetSessionCredentials(Number(session.id))
+    if (!credentials) throw new Error(t('未找到会话凭据'))
+    const text = credentials.password ? `${credentials.username}:${credentials.password}` : credentials.username
+    await getClipboard().writeText(text)
+    toast(t('账号密码已复制'), 'success')
+  } catch (error) {
+    logger.error('Sidebar: copy session credentials error', error)
+    toast(t('复制账号密码失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
+  }
+}
+
+async function deleteSession(workspace: Workspace, session: Session) {
+  const confirmed = await requestConfirm({
+    title: t('删除会话'),
+    description: t('确认删除会话「${}」？此操作不可撤销。', session.name),
+    confirmLabel: t('删除'),
+    cancelLabel: t('取消'),
+    destructive: true,
+  })
+  if (!confirmed) return
+  try {
+    await workspace.deleteSession(session.id)
+  } catch (error) {
+    logger.error('Sidebar: delete session error', error)
+    toast(t('删除会话失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
+    throw error
+  }
+}
+
+async function deleteFolder(workspace: Workspace, folder: Folder) {
+  const confirmed = await requestConfirm({
+    title: t('删除分组'),
+    description: t('确认删除分组「${}」？其下会话将移动到根目录。', folder.name),
+    confirmLabel: t('删除'),
+    cancelLabel: t('取消'),
+    destructive: true,
+  })
+  if (!confirmed) return
+  try {
+    await workspace.deleteFolder(folder.id)
+  } catch (error) {
+    logger.error('Sidebar: delete folder error', error)
+    toast(t('删除分组失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
+    throw error
+  }
+}
+
 export function useSidebarDialogs(workspace: Workspace) {
   const state = useDialogState()
   const events = useDialogOpeners(state)
   useSidebarDialogEvents(events)
   const saveSession = useSaveSession(workspace, state)
+  const quickRenameSession = useCallback((session: Session) => { state.setRenameSession(session) }, [state.setRenameSession])
+  const saveRename = useCallback(async () => {
+    const target = state.renameSession
+    if (!target) return
+    const name = state.renameName.trim()
+    if (!name) { state.setRenameErrorState(t('请输入会话名称')); return }
+    try {
+      await workspace.updateSession({ ...target, name })
+      state.setRenameSession(null)
+    } catch (error) {
+      logger.error('Sidebar: rename session error', error)
+      state.setRenameErrorState(t('重命名失败: ${}', error instanceof Error ? error.message : String(error)))
+    }
+  }, [state, workspace])
   return {
     sessionDialogOpen: state.sessionDialogOpen, setSessionDialogOpen: state.setSessionDialogOpen,
     folderDialogOpen: state.folderDialogOpen, setFolderDialogOpen: state.setFolderDialogOpen,
     folderName: state.folderName, setFolderName: state.setFolderName, folderError: state.folderError, setFolderError: state.setFolderError,
     editingFolder: state.editingFolder, setEditingFolder: state.setEditingFolder,
     editingSession: state.editingSession, setEditingSession: state.setEditingSession,
+    renameSession: state.renameSession, setRenameSession: state.setRenameSession,
+    renameName: state.renameName, setRenameName: state.setRenameName, renameError: state.renameError,
+    quickRenameSession, saveRename,
+    duplicateSession: (session: Session) => duplicateSession(workspace, session),
+    copyCredentials: (session: Session) => copySessionCredentials(workspace, session),
+    deleteSession: (session: Session) => deleteSession(workspace, session),
+    editFolder: events.editFolder,
+    deleteFolder: (folder: Folder) => deleteFolder(workspace, folder),
     saveSession, saveFolder: () => saveFolder(workspace, state), editSession: (session: Session) => editSession(state, session),
   }
 }
