@@ -2,9 +2,11 @@ import { readCommandHistory } from '@/lib/commandHistory'
 
 export const MAX_PREDICTION_TOKENS = 8
 
+export type PredictionMode = 'prefix' | 'next' | 'command'
+
 export interface TokenPrediction {
   tokens: string[]
-  mode: 'prefix' | 'next'
+  mode: PredictionMode
 }
 
 export function splitCommandTokens(line: string): string[] {
@@ -20,6 +22,28 @@ function matchesContext(tokens: string[], start: number, context: string[]): boo
     if (tokens[start + index] !== context[index]) return false
   }
   return true
+}
+
+/**
+ * Collect full-command suffix candidates for a partial input line, newest first.
+ * The history array is time-descending, so the first match wins per suffix.
+ */
+function collectCommandSuffixes(history: string[], buffer: string): string[] {
+  const input = buffer.trim()
+  if (!input) return []
+  const seen = new Set<string>()
+  const result: string[] = []
+  for (const command of history) {
+    const trimmed = command.trim()
+    if (!trimmed.startsWith(input)) continue
+    if (trimmed === input) continue
+    const suffix = trimmed.slice(input.length).trim()
+    if (!suffix || seen.has(suffix)) continue
+    seen.add(suffix)
+    result.push(suffix)
+    if (result.length >= MAX_PREDICTION_TOKENS) break
+  }
+  return result
 }
 
 interface CandidateFilter {
@@ -80,6 +104,10 @@ export function predictCommandTokens(buffer: string, history: string[]): TokenPr
   const context = trailing ? allTokens : allTokens.slice(0, -1)
   const partial = trailing ? '' : (allTokens[allTokens.length - 1] ?? '')
 
+  if (!trailing && partial && context.length === 0 && !isKnownCompleteToken(history, [], partial)) {
+    const commandSuffixes = collectCommandSuffixes(history, buffer)
+    if (commandSuffixes.length > 0) return { tokens: commandSuffixes, mode: 'command' }
+  }
   if (partial) {
     if (isKnownCompleteToken(history, context, partial)) {
       const next = collectCandidates(history, [...context, partial], { partial: '', includeExact: false })

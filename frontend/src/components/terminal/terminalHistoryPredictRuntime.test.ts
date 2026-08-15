@@ -51,28 +51,37 @@ function createTermMock() {
 
 describe('tokenInsertion', () => {
   it('completes a partial token in place', () => {
-    expect(tokenInsertion('ls -la', '-lahrt', true)).toBe('hrt ')
+    expect(tokenInsertion('ls -la', '-lahrt', 'prefix')).toBe('hrt ')
   })
 
   it('inserts a next token with a leading space', () => {
-    expect(tokenInsertion('ls', '-lahrt', false)).toBe(' -lahrt ')
+    expect(tokenInsertion('ls', '-lahrt', 'next')).toBe(' -lahrt ')
   })
 
   it('does not duplicate a trailing space', () => {
-    expect(tokenInsertion('ls ', '-lahrt', false)).toBe('-lahrt ')
-    expect(tokenInsertion('', 'ls', false)).toBe('ls ')
+    expect(tokenInsertion('ls ', '-lahrt', 'next')).toBe('-lahrt ')
+    expect(tokenInsertion('', 'ls', 'next')).toBe('ls ')
+  })
+
+  it('replaces a partial command with its full suffix', () => {
+    expect(tokenInsertion('l', 's -lahrt', 'command')).toBe('s -lahrt ')
+    expect(tokenInsertion('ls -', 'lahrt', 'command')).toBe('lahrt ')
   })
 })
 
 describe('inlineSuggestionText', () => {
   it('shows only the missing suffix for a partial token', () => {
-    expect(inlineSuggestionText('ls -la', '-lahrt', true)).toBe('hrt')
+    expect(inlineSuggestionText('ls -la', '-lahrt', 'prefix')).toBe('hrt')
   })
 
   it('prepends a space for the next token', () => {
-    expect(inlineSuggestionText('ls', '-lahrt', false)).toBe(' -lahrt')
-    expect(inlineSuggestionText('ls ', '-lahrt', false)).toBe('-lahrt')
-    expect(inlineSuggestionText('', 'ls', false)).toBe('ls')
+    expect(inlineSuggestionText('ls', '-lahrt', 'next')).toBe(' -lahrt')
+    expect(inlineSuggestionText('ls ', '-lahrt', 'next')).toBe('-lahrt')
+    expect(inlineSuggestionText('', 'ls', 'next')).toBe('ls')
+  })
+
+  it('shows the full command suffix after the partial', () => {
+    expect(inlineSuggestionText('l', 's -lahrt', 'command')).toBe('s -lahrt')
   })
 })
 

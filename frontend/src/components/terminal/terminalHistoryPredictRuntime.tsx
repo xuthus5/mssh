@@ -1,7 +1,7 @@
 import type { IDecoration, Terminal } from '@xterm/xterm'
 import { createRoot, type Root } from 'react-dom/client'
 import { TerminalSuggestionOverlay } from '@/components/terminal/TerminalSuggestionOverlay'
-import { predictCommandTokens, readSessionCommands, splitCommandTokens } from '@/lib/commandHistoryPredict'
+import { predictCommandTokens, readSessionCommands, splitCommandTokens, type PredictionMode } from '@/lib/commandHistoryPredict'
 import { useTerminalBehaviorStore } from '@/store/terminalBehaviorStore'
 
 export interface HistoryPredictHandlers {
@@ -20,7 +20,7 @@ interface PredictState {
   candidates: string[]
   selected: number
   open: boolean
-  replacePartial: boolean
+  mode: PredictionMode
   pendingReopen: boolean
 }
 
@@ -33,20 +33,21 @@ function isPlainKey(event: KeyboardEvent): boolean {
 }
 
 /** Data to write into the terminal so `token` is inserted at the cursor. */
-export function tokenInsertion(buffer: string, token: string, replacePartial: boolean): string {
-  if (replacePartial) {
+export function tokenInsertion(buffer: string, token: string, mode: PredictionMode): string {
+  if (mode === 'prefix' || mode === 'command') {
     const partial = splitCommandTokens(buffer).at(-1) ?? ''
-    return `${token.slice(partial.length)} `
+    const suffix = token.startsWith(partial) ? token.slice(partial.length) : token
+    return `${suffix} `
   }
   if (buffer.length === 0 || /\s$/.test(buffer)) return `${token} `
   return ` ${token} `
 }
 
 /** Ghost text to render after the cursor for the given suggestion. */
-export function inlineSuggestionText(buffer: string, token: string, replacePartial: boolean): string {
-  if (replacePartial) {
+export function inlineSuggestionText(buffer: string, token: string, mode: PredictionMode): string {
+  if (mode === 'prefix' || mode === 'command') {
     const partial = splitCommandTokens(buffer).at(-1) ?? ''
-    return token.slice(partial.length)
+    return token.startsWith(partial) ? token.slice(partial.length) : token
   }
   if (buffer.length === 0 || /\s$/.test(buffer)) return token
   return ` ${token}`
@@ -106,7 +107,7 @@ function createOverlayAnchor(term: Terminal, onRendered: () => void): OverlayAnc
 
 /** Token-level history prediction: inline ghost + Tab-expandable candidate list. */
 class TokenPredictController {
-  private state: PredictState = { candidates: [], selected: 0, open: false, replacePartial: false, pendingReopen: false }
+  private state: PredictState = { candidates: [], selected: 0, open: false, mode: 'next', pendingReopen: false }
   private rootEntry: { element: HTMLElement; root: Root } | null = null
   private overlay: OverlayAnchor
 
@@ -142,7 +143,7 @@ class TokenPredictController {
     const sessionID = this.options.getSessionId() as number
     const prediction = predictCommandTokens(this.options.getBuffer(), readSessionCommands(sessionID))
     this.state.candidates = prediction.tokens
-    this.state.replacePartial = prediction.mode === 'prefix'
+    this.state.mode = prediction.mode
     if (this.state.candidates.length === 0) {
       this.state.open = false
       this.hideOverlay()
@@ -172,7 +173,7 @@ class TokenPredictController {
     const active = this.term.buffer.active
     this.rootEntry.root.render(
       <TerminalSuggestionOverlay
-        inline={this.state.open ? '' : inlineSuggestionText(buffer, token, this.state.replacePartial)}
+        inline={this.state.open ? '' : inlineSuggestionText(buffer, token, this.state.mode)}
         candidates={this.state.open ? this.state.candidates : []}
         selectedIndex={this.state.selected}
         leftOffset={active.cursorX * this.overlay.cellWidth()}
@@ -193,7 +194,7 @@ class TokenPredictController {
   private acceptToken(index: number) {
     const token = this.state.candidates[index]
     if (!token) return
-    this.options.applyCompletion(tokenInsertion(this.options.getBuffer(), token, this.state.replacePartial))
+    this.options.applyCompletion(tokenInsertion(this.options.getBuffer(), token, this.state.mode))
     this.state.selected = 0
     this.state.pendingReopen = true
     this.refresh()
