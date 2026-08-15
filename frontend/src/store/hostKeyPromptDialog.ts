@@ -6,6 +6,8 @@ export interface HostKeyPrompt {
   hostname: string
   fingerprint: string
   algorithm: string
+  changed: boolean
+  expected: string[]
 }
 
 export interface HostKeyEndpoint {

@@ -47,6 +47,33 @@ describe('HostKeyPromptDialog', () => {
     expect(useHostKeyPromptDialog.getState().active).toBeNull()
   })
 
+  it('shows changed-fingerprint details and trusts the new key', async () => {
+    const decide = vi.fn(async () => {})
+    useHostKeyPromptDialog.getState().present({
+      coordinatorId: 1,
+      prompt: {
+        attemptId: 'attempt-1',
+        hostname: 'host.internal:2222',
+        fingerprint: 'SHA256:new',
+        algorithm: 'ssh-ed25519',
+        changed: true,
+        expected: ['SHA256:old'],
+      },
+      endpoint: { host: 'host.internal', port: 2222 },
+      decide,
+      dismiss: async () => {},
+    })
+    render(<HostKeyPromptDialog />)
+
+    expect(screen.getByText('主机指纹已变化')).toBeInTheDocument()
+    expect(screen.getByText('SHA256:old')).toBeInTheDocument()
+    expect(screen.getByText('SHA256:new')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: '信任新指纹并连接' }))
+
+    expect(decide).toHaveBeenCalledWith(true)
+    expect(useHostKeyPromptDialog.getState().active).toBeNull()
+  })
+
   it('keeps the prompt actionable when fail-closed dismissal also fails', async () => {
     presentPrompt({
       decide: async () => { throw new Error('decision boom') },
@@ -73,6 +100,8 @@ function presentPrompt(overrides: Partial<Pick<HostKeyPromptRequest, 'decide' | 
       hostname: 'host.internal:2222',
       fingerprint: 'SHA256:test',
       algorithm: 'ssh-ed25519',
+      changed: false,
+      expected: [],
     },
     endpoint: { host: 'host.internal', port: 2222 },
     decide: overrides.decide ?? (async () => {}),

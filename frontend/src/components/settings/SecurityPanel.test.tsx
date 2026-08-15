@@ -20,8 +20,12 @@ const session = vi.hoisted(() => ({
   ListHostKeys: vi.fn(),
   DeleteHostKey: vi.fn(),
 }))
+const settings = vi.hoisted(() => ({
+  Get: vi.fn(),
+  Set: vi.fn(),
+}))
 
-vi.mock('@/lib/wails', () => ({ SecurityService: security, SessionService: session }))
+vi.mock('@/lib/wails', () => ({ SecurityService: security, SessionService: session, SettingService: settings }))
 
 describe('SecurityPanel', () => {
   beforeEach(() => {
@@ -35,6 +39,8 @@ describe('SecurityPanel', () => {
     security.Setup.mockResolvedValue({
       configured: true, unlocked: true, require_password_on_launch: false, remember_unlock: true, updated_at: '2026-07-21T00:00:00Z',
     })
+    settings.Get.mockResolvedValue(null)
+    settings.Set.mockResolvedValue(undefined)
   })
 
   it('shows application password card first and sets up a password', async () => {
@@ -50,22 +56,36 @@ describe('SecurityPanel', () => {
     })))
   })
 
-  it('lists and deletes trusted host fingerprints', async () => {
+  it('shows the fingerprint change policy config and defaults to block', async () => {
+    settings.Get.mockResolvedValue(null)
     render(<SecurityPanel />)
-    expect(await screen.findByText('example.com')).toBeInTheDocument()
-    await userEvent.click(screen.getByRole('button', { name: '删除 example.com 的主机指纹' }))
-    expect(await screen.findByRole('alertdialog')).toBeInTheDocument()
-    await userEvent.click(screen.getByRole('button', { name: '确认' }))
-    await waitFor(() => expect(session.DeleteHostKey).toHaveBeenCalledWith(1))
+    expect(await screen.findByText('指纹变化时')).toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: '指纹变化时' })).toHaveTextContent('阻止')
+    expect(settings.Get).toHaveBeenCalledWith('security.host_key_change_policy')
   })
 
-  it('shows load failures instead of empty host keys without toast', async () => {
-    useToastStore.setState({ toasts: [] })
-    security.Status.mockRejectedValueOnce(new Error('status boom'))
+  it('loads the saved fingerprint change policy', async () => {
+    settings.Get.mockResolvedValue({ key: 'security.host_key_change_policy', namespace: 'security', value: '"warn"', value_type: 'string', version: 1 })
     render(<SecurityPanel />)
-    expect(await screen.findByRole('alert')).toHaveTextContent('status boom')
-    expect(screen.queryByText('尚未信任任何 SSH 主机。')).not.toBeInTheDocument()
-    expect(screen.getByText(/主机指纹暂不可用/)).toBeInTheDocument()
+    expect(await screen.findByRole('combobox', { name: '指纹变化时' })).toHaveTextContent('提醒')
+  })
+
+  it('saves the fingerprint change policy on selection', async () => {
+    settings.Get.mockResolvedValue(null)
+    const user = userEvent.setup()
+    render(<SecurityPanel />)
+    await user.click(await screen.findByRole('combobox', { name: '指纹变化时' }))
+    await user.click(await screen.findByRole('option', { name: '默认信任' }))
+    await waitFor(() => expect(settings.Set).toHaveBeenCalledWith(expect.objectContaining({
+      key: 'security.host_key_change_policy', value: '"trust"',
+    })))
+  })
+
+  it('shows fingerprint policy load failures inline without toast', async () => {
+    useToastStore.setState({ toasts: [] })
+    settings.Get.mockRejectedValueOnce(new Error('policy boom'))
+    render(<SecurityPanel />)
+    expect(await screen.findByRole('alert')).toHaveTextContent('policy boom')
     expect(useToastStore.getState().toasts).toHaveLength(0)
   })
 
@@ -183,37 +203,16 @@ describe('SecurityPanel', () => {
     expect(security.Status).toHaveBeenCalledTimes(2)
   })
 
-  it('surfaces host fingerprint delete failures inline without toast', async () => {
+  it('surfaces fingerprint policy save failures inline without toast', async () => {
     useToastStore.setState({ toasts: [] })
-    session.DeleteHostKey.mockRejectedValueOnce(new Error('delete boom'))
+    settings.Get.mockResolvedValue(null)
+    settings.Set.mockRejectedValueOnce(new Error('save boom'))
+    const user = userEvent.setup()
     render(<SecurityPanel />)
-    expect(await screen.findByText('example.com')).toBeInTheDocument()
-    await userEvent.click(screen.getByRole('button', { name: '删除 example.com 的主机指纹' }))
-    expect(await screen.findByRole('alertdialog')).toBeInTheDocument()
-    await userEvent.click(screen.getByRole('button', { name: '确认' }))
-    await waitFor(() => expect(session.DeleteHostKey).toHaveBeenCalledWith(1))
-    expect(await screen.findByText('删除主机指纹失败: delete boom')).toBeInTheDocument()
-    expect(screen.getByRole('alertdialog')).toBeInTheDocument()
+    await user.click(await screen.findByRole('combobox', { name: '指纹变化时' }))
+    await user.click(await screen.findByRole('option', { name: '提醒' }))
+    expect(await screen.findByText('保存指纹策略失败: save boom')).toBeInTheDocument()
     expect(useToastStore.getState().toasts.filter((item) => item.type === 'error')).toHaveLength(0)
-  })
-
-  it('keeps the newest security load when refreshes resolve out of order', async () => {
-    const first = deferred<SecurityStatus>()
-    const second = deferred<SecurityStatus>()
-    let calls = 0
-    security.Status.mockImplementation(() => {
-      calls++
-      return calls === 1 ? first.promise : second.promise
-    })
-    session.ListHostKeys.mockResolvedValue([])
-    render(<SecurityPanel />)
-    await waitFor(() => expect(security.Status).toHaveBeenCalledTimes(1))
-    await userEvent.click(screen.getByRole('button', { name: '刷新主机指纹' }))
-    await waitFor(() => expect(security.Status).toHaveBeenCalledTimes(2))
-    await act(async () => { second.resolve({ ...emptyStatus(), configured: true, unlocked: true }); await Promise.resolve() })
-    expect(screen.getByText(/状态：已配置 · 已解锁/)).toBeInTheDocument()
-    await act(async () => { first.resolve(emptyStatus()); await Promise.resolve() })
-    expect(screen.getByText(/状态：已配置 · 已解锁/)).toBeInTheDocument()
   })
 
   it('reloads security status when another window changes the vault', async () => {

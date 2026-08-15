@@ -26,13 +26,15 @@ var (
 )
 
 type hostKeyCheck struct {
-	callback       gossh.HostKeyCallback
-	hostname       string
-	remote         net.Addr
-	key            gossh.PublicKey
-	knownHostsPath string
-	onNewHostKey   HostKeyVerifyFunc
-	logger         *slog.Logger
+	callback        gossh.HostKeyCallback
+	hostname        string
+	remote          net.Addr
+	key             gossh.PublicKey
+	knownHostsPath  string
+	onNewHostKey    HostKeyVerifyFunc
+	onHostKeyChange HostKeyChangedVerifyFunc
+	policy          HostKeyPolicy
+	logger          *slog.Logger
 }
 
 // WithKnownHostsLock runs fn while holding the process-wide known_hosts write lock.
@@ -43,7 +45,7 @@ func WithKnownHostsLock(fn func() error) error {
 	return fn()
 }
 
-func createHostKeyCallback(knownHostsPath string, onNewHostKey HostKeyVerifyFunc, logger *slog.Logger) (gossh.HostKeyCallback, error) {
+func createHostKeyCallback(knownHostsPath string, options HostKeyOptions, logger *slog.Logger) (gossh.HostKeyCallback, error) {
 	if strings.TrimSpace(knownHostsPath) == "" {
 		return nil, ErrEmptyKnownHostsPath
 	}
@@ -56,13 +58,15 @@ func createHostKeyCallback(knownHostsPath string, onNewHostKey HostKeyVerifyFunc
 	}
 	return func(hostname string, remote net.Addr, key gossh.PublicKey) error {
 		return verifyHostKey(hostKeyCheck{
-			callback:       baseCallback,
-			hostname:       hostname,
-			remote:         remote,
-			key:            key,
-			knownHostsPath: knownHostsPath,
-			onNewHostKey:   onNewHostKey,
-			logger:         logger,
+			callback:        baseCallback,
+			hostname:        hostname,
+			remote:          remote,
+			key:             key,
+			knownHostsPath:  knownHostsPath,
+			onNewHostKey:    options.OnNewHostKey,
+			onHostKeyChange: options.OnHostKeyChange,
+			policy:          options.Policy,
+			logger:          logger,
 		})
 	}, nil
 }
@@ -101,30 +105,9 @@ func verifyHostKey(check hostKeyCheck) error {
 		return err
 	}
 	if len(keyErr.Want) != 0 {
-		return hostKeyChangedError(check.hostname, check.key, keyErr)
+		return handleChangedHostKey(check, keyErr)
 	}
 	return handleNewHostKey(check)
-}
-
-func hostKeyChangedError(hostname string, presented gossh.PublicKey, keyErr *knownhosts.KeyError) error {
-	presentedFingerprint := gossh.FingerprintSHA256(presented)
-	expected := expectedHostKeyFingerprints(keyErr)
-	if len(expected) == 0 {
-		return fmt.Errorf("host key for %s changed (presented %s %s); connection blocked. remove the old fingerprint in Security settings if the change is expected",
-			hostname, presented.Type(), presentedFingerprint)
-	}
-	return fmt.Errorf("host key for %s changed (possible MITM). expected [%s]; presented %s %s. connection blocked. remove the old fingerprint in Security settings if the change is expected",
-		hostname, strings.Join(expected, ", "), presented.Type(), presentedFingerprint)
-}
-
-func expectedHostKeyFingerprints(keyErr *knownhosts.KeyError) []string {
-	expected := make([]string, 0, len(keyErr.Want))
-	for _, known := range keyErr.Want {
-		if known.Key != nil {
-			expected = append(expected, known.Key.Type()+" "+gossh.FingerprintSHA256(known.Key))
-		}
-	}
-	return expected
 }
 
 func handleNewHostKey(check hostKeyCheck) error {
@@ -142,7 +125,7 @@ func handleNewHostKey(check hostKeyCheck) error {
 	if check.logger != nil {
 		check.logger.Info("first-seen host key observed", "hostname", check.hostname, "algorithm", algorithm, "fingerprint", fingerprint)
 	}
-	if check.onNewHostKey != nil && !check.onNewHostKey(check.hostname, algorithm, fingerprint) {
+	if check.policy != HostKeyPolicyTrust && check.onNewHostKey != nil && !check.onNewHostKey(check.hostname, algorithm, fingerprint) {
 		return fmt.Errorf("host key rejected by user: %s", check.hostname)
 	}
 	return appendKnownHostIfUnknown(check)
