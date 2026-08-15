@@ -166,7 +166,7 @@ export function SettingsView(props: SettingsViewProps) {
       orientation="vertical"
       className="min-h-0 flex-1 gap-6 overflow-hidden p-6"
     >
-      <TabsList className="w-44 shrink-0 justify-start overflow-visible rounded-xl border border-border bg-muted/40 p-1.5">
+      <TabsList className="w-44 shrink-0 justify-start overflow-visible rounded-xl border border-border bg-card p-1.5 shadow-sm">
         <TabsTrigger value="general">{t('通用')}</TabsTrigger>
         <TabsTrigger value="terminal">{t('终端')}</TabsTrigger>
         <TabsTrigger value="ai">AI</TabsTrigger>

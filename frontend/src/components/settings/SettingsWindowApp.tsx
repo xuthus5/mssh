@@ -62,7 +62,7 @@ function SettingsWindowContent() {
     [catalog.saveConfiguration],
   )
   return (
-    <div className="flex h-screen w-screen flex-col overflow-hidden bg-background text-foreground">
+    <div className="flex h-screen w-screen flex-col overflow-hidden bg-muted text-foreground">
       <SettingsWindowTitleBar />
       <SettingsView {...settingsViewProps({ settings, catalog, cloudSync, ai, saveGeneralQuiet, saveSFTPQuiet, saveThemeQuiet })} />
       <ToastContainer />
