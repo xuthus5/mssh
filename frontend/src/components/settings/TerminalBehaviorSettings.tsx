@@ -1,7 +1,7 @@
-import { Field, FieldContent, FieldDescription, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { LabeledSelect } from '@/components/ui/labeled-select'
 import { Switch } from '@/components/ui/switch'
+import { SettingsCard, SettingsRow, SettingsSectionHeader } from '@/components/settings/settings-ui'
 import {
   MAX_TERMINAL_SCROLLBACK_LINES,
   MIN_TERMINAL_SCROLLBACK_LINES,
@@ -45,33 +45,23 @@ export function TerminalBehaviorSettingsSection({
   onRestoreTabsOnStartupChange,
   onHistoryPredictChange,
 }: Props) {
-  return (
-    <section className="rounded-xl border border-border bg-card p-3 shadow-sm">
-      <BehaviorHeader />
-      <div className="flex flex-col gap-3">
-        <RightClickField value={rightClickAction} onChange={onRightClickActionChange} />
-        <BehaviorSwitch id="terminal-copy-on-select" label="选择即复制" description="选中文本后自动写入系统剪贴板。" checked={copyOnSelect} onChange={onCopyOnSelectChange} />
-        <ScrollbackField value={scrollbackLines} onChange={onScrollbackLinesChange} />
-        <BehaviorSwitch id="terminal-auto-reconnect" label="SSH 断线自动重连" description="意外断开后自动尝试重新连接；手动断开或关闭标签不会触发。默认关闭。" checked={autoReconnect} onChange={onAutoReconnectChange} />
-        <BehaviorSwitch id="terminal-restore-tabs" label="启动时恢复终端标签" description="重启应用后自动恢复上次未关闭的终端标签。默认开启。" checked={restoreTabsOnStartup} onChange={onRestoreTabsOnStartupChange} />
-        <BehaviorSwitch id="terminal-history-predict" label="历史命令预测补全" description="根据本会话历史命令，输入时在光标处显示灰色预测，按 Tab 采纳当前 token 并展开候选列表，方向键选择、Enter 确认、Esc 关闭。开启后会拦截 Tab 完成补全；默认关闭。" checked={historyPredict} onChange={onHistoryPredictChange} />
-      </div>
-    </section>
-  )
-}
-
-function BehaviorHeader() {
-  return <div className="mb-3">
-    <h3 className="text-sm font-medium text-foreground">{t('行为')}</h3>
-    <p className="mt-1 text-xs text-muted-foreground">{t('控制终端中的鼠标、剪贴板、历史缓冲与连接恢复策略。')}</p>
+  return <div>
+    <SettingsSectionHeader title={t('行为')} description={t('控制终端中的鼠标、剪贴板、历史缓冲与连接恢复策略。')} />
+    <SettingsCard divided>
+      <RightClickField value={rightClickAction} onChange={onRightClickActionChange} />
+      <BehaviorSwitch id="terminal-copy-on-select" label="选择即复制" description="选中文本后自动写入系统剪贴板。" checked={copyOnSelect} onChange={onCopyOnSelectChange} />
+      <ScrollbackField value={scrollbackLines} onChange={onScrollbackLinesChange} />
+      <BehaviorSwitch id="terminal-auto-reconnect" label="SSH 断线自动重连" description="意外断开后自动尝试重新连接；手动断开或关闭标签不会触发。默认关闭。" checked={autoReconnect} onChange={onAutoReconnectChange} />
+      <BehaviorSwitch id="terminal-restore-tabs" label="启动时恢复终端标签" description="重启应用后自动恢复上次未关闭的终端标签。默认开启。" checked={restoreTabsOnStartup} onChange={onRestoreTabsOnStartupChange} />
+      <BehaviorSwitch id="terminal-history-predict" label="历史命令预测补全" description="根据本会话历史命令，输入时在光标处显示灰色预测，按 Tab 采纳当前 token 并展开候选列表，方向键选择、Enter 确认、Esc 关闭。开启后会拦截 Tab 完成补全；默认关闭。" checked={historyPredict} onChange={onHistoryPredictChange} />
+    </SettingsCard>
   </div>
 }
 
 function RightClickField({ value, onChange }: { value: Props['rightClickAction']; onChange: Props['onRightClickActionChange'] }) {
-  return <Field orientation="horizontal">
-    <FieldContent><FieldLabel>{t('鼠标右键行为')}</FieldLabel><FieldDescription>{t('选择显示操作菜单或直接粘贴剪贴板内容。')}</FieldDescription></FieldContent>
+  return <SettingsRow label={t('鼠标右键行为')} description={t('选择显示操作菜单或直接粘贴剪贴板内容。')}>
     <LabeledSelect ariaLabel={t('鼠标右键行为')} value={value} options={RIGHT_CLICK_OPTIONS.map((item) => ({ ...item, label: t(item.label) }))} onValueChange={(next) => onChange(normalizeTerminalRightClickAction(next))} className="w-40" />
-  </Field>
+  </SettingsRow>
 }
 
 function ScrollbackField({ value, onChange }: { value: Props['scrollbackLines']; onChange: Props['onScrollbackLinesChange'] }) {
@@ -80,15 +70,13 @@ function ScrollbackField({ value, onChange }: { value: Props['scrollbackLines'];
     const parsed = Number.parseInt(raw, 10)
     if (Number.isFinite(parsed)) onChange(parsed)
   }
-  return <Field orientation="horizontal">
-    <FieldContent><FieldLabel htmlFor="terminal-scrollback-lines">{t('滚动历史行数')}</FieldLabel><FieldDescription>{t('限制每个终端保留的输出历史行数，超出后丢弃最旧内容（${}-${}）。', MIN_TERMINAL_SCROLLBACK_LINES, MAX_TERMINAL_SCROLLBACK_LINES)}</FieldDescription></FieldContent>
+  return <SettingsRow label={t('滚动历史行数')} description={t('限制每个终端保留的输出历史行数，超出后丢弃最旧内容（${}-${}）。', MIN_TERMINAL_SCROLLBACK_LINES, MAX_TERMINAL_SCROLLBACK_LINES)}>
     <Input id="terminal-scrollback-lines" type="number" min={MIN_TERMINAL_SCROLLBACK_LINES} max={MAX_TERMINAL_SCROLLBACK_LINES} step={1000} className="w-32" value={value === 0 || value === '0' ? '' : value} onChange={(event) => handleChange(event.target.value)} aria-label={t('滚动历史行数')} />
-  </Field>
+  </SettingsRow>
 }
 
 function BehaviorSwitch({ id, label, description, checked, onChange }: { id: string; label: string; description: string; checked: boolean; onChange: (value: boolean) => void }) {
-  return <Field orientation="horizontal">
-    <FieldContent><FieldLabel htmlFor={id}>{t(label)}</FieldLabel><FieldDescription>{t(description)}</FieldDescription></FieldContent>
-    <Switch id={id} checked={checked} onCheckedChange={(value) => onChange(value)} />
-  </Field>
+  return <SettingsRow label={t(label)} description={t(description)}>
+    <Switch id={id} aria-label={t(label)} checked={checked} onCheckedChange={(value) => onChange(value)} />
+  </SettingsRow>
 }

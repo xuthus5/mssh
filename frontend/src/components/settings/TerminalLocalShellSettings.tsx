@@ -3,6 +3,7 @@ import { Field, FieldContent, FieldDescription, FieldLabel } from '@/components/
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { SettingsCard, SettingsSectionHeader } from '@/components/settings/settings-ui'
 import { t } from '@/i18n'
 
 export const SHELL_PRESET_DEFAULT = '__default__'
@@ -98,15 +99,14 @@ function ShellLoginField({ checked, onChange }: { checked: boolean; onChange: Pr
 }
 
 export function TerminalLocalShellSettingsSection(props: Props) {
-  return <section className="rounded-xl border border-border bg-card p-3 shadow-sm">
-    <div className="mb-3">
-      <h3 className="text-sm font-medium text-foreground">{t('本地终端')}</h3>
-      <p className="mt-1 text-xs text-muted-foreground">{t('配置本机交互 Shell 的默认路径、参数、工作目录与登录行为。')}</p>
-    </div>
-    <div className="grid gap-3 md:grid-cols-2">
-      <ShellPathField shell={props.shell} candidates={props.candidates} onChange={props.onShellChange} />
-      <ShellArgumentFields args={props.args} cwd={props.cwd} onArgsChange={props.onArgsChange} onCwdChange={props.onCwdChange} />
-      <ShellLoginField checked={props.login} onChange={props.onLoginChange} />
-    </div>
-  </section>
+  return <div>
+    <SettingsSectionHeader title={t('本地终端')} description={t('配置本机交互 Shell 的默认路径、参数、工作目录与登录行为。')} />
+    <SettingsCard>
+      <div className="grid gap-3 md:grid-cols-2">
+        <ShellPathField shell={props.shell} candidates={props.candidates} onChange={props.onShellChange} />
+        <ShellArgumentFields args={props.args} cwd={props.cwd} onArgsChange={props.onArgsChange} onCwdChange={props.onCwdChange} />
+        <ShellLoginField checked={props.login} onChange={props.onLoginChange} />
+      </div>
+    </SettingsCard>
+  </div>
 }

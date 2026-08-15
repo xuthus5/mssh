@@ -3,6 +3,7 @@ import { Dialogs } from '@wailsio/runtime'
 import { Button } from '@/components/ui/button'
 import { Field, FieldContent, FieldDescription, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
+import { SettingsCard, SettingsSectionHeader } from '@/components/settings/settings-ui'
 import { useRef, useState } from 'react'
 import { useSettingsWindowHide } from '@/hooks/useSettingsWindowHide'
 import { logger } from '@/lib/logger'
@@ -90,15 +91,12 @@ function LogRetentionField({ value, onChange }: { value: string; onChange: Props
 
 export function ApplicationLogSettingsSection(props: Props) {
   const { pickerError, pickDirectory, picking } = useLogDirectoryPicker(props.onLogDirChange)
-  return <section className="rounded-xl border border-border bg-card p-3 shadow-sm">
-    <div className="mb-3">
-      <h3 className="text-sm font-medium text-foreground">{t('应用日志')}</h3>
-      <p className="mt-1 text-xs text-muted-foreground">{t('按日期写入日志文件，并自动清理超出保留天数的旧日志。')}</p>
-    </div>
-    {pickerError ? <div className="mb-3 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">{pickerError}</div> : null}
-    <div className="flex flex-col gap-3">
+  return <div className="flex flex-col">
+    <SettingsSectionHeader title={t('应用日志')} description={t('按日期写入日志文件，并自动清理超出保留天数的旧日志。')} />
+    {pickerError ? <div className="mb-2.5 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">{pickerError}</div> : null}
+    <SettingsCard divided>
       <LogDirectoryField logDir={props.logDir} onChange={props.onLogDirChange} onPick={() => { void pickDirectory() }} picking={picking} />
       <LogRetentionField value={props.logRetentionDays} onChange={props.onLogRetentionDaysChange} />
-    </div>
-  </section>
+    </SettingsCard>
+  </div>
 }

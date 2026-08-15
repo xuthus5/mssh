@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { LabeledSelect } from '@/components/ui/labeled-select'
 import { SearchableSelect } from '@/components/ui/searchable-select'
+import { SettingsCard, SettingsRow } from '@/components/settings/settings-ui'
 import { ApplicationBehaviorSettingsSection } from '@/components/settings/ApplicationBehaviorSettings'
 import { ApplicationLogSettingsSection } from '@/components/settings/ApplicationLogSettings'
 import { ApplicationNetworkProxySettingsSection } from '@/components/settings/ApplicationNetworkProxySettings'
@@ -134,7 +135,7 @@ function UIFontFamilyFields({ draft, systemFonts, onChange }: UIFontProps) {
 }
 
 function UIFontPreview({ draft }: { draft: GeneralDraft }) {
-  return <div className="mt-3 rounded-lg border border-border bg-background px-3 py-2" style={{
+  return <div className="mt-3 rounded-lg border border-border bg-muted/30 px-3 py-2" style={{
     fontFamily: `${JSON.stringify(draft.uiFontFamily)}, ${JSON.stringify(draft.uiFontFallbackFamily)}, sans-serif`,
     fontSize: `${parseInt(draft.uiFontSize, 10) || 14}px`,
   }}>
@@ -144,14 +145,16 @@ function UIFontPreview({ draft }: { draft: GeneralDraft }) {
 }
 
 function UIFontSettings(props: UIFontProps) {
-  return <section className="rounded-xl border border-border bg-card p-3 shadow-sm">
-    <div className="mb-3">
-      <h3 className="text-sm font-medium text-foreground">{t('界面字体')}</h3>
+  return <div>
+    <div className="mb-2.5">
+      <h3 className="text-sm font-semibold text-foreground">{t('界面字体')}</h3>
       <p className="mt-1 text-xs text-muted-foreground">{t('仅调整应用界面。终端排版请在“终端”分类中配置。')}</p>
     </div>
-    <UIFontFamilyFields {...props} />
-    <UIFontPreview draft={props.draft} />
-  </section>
+    <SettingsCard>
+      <UIFontFamilyFields {...props} />
+      <UIFontPreview draft={props.draft} />
+    </SettingsCard>
+  </div>
 }
 
 function GeneralSettingsHeader({ loadError, onReload }: {
@@ -165,8 +168,9 @@ function GeneralSettingsHeader({ loadError, onReload }: {
         {onReload ? <Button type="button" size="xs" variant="outline" className="ml-2" onClick={onReload}>{t('重试')}</Button> : null}
       </div>
     ) : null}
-    <div className="flex items-center justify-between gap-3">
-      <p className="text-xs text-muted-foreground">{t('通用设置包含界面外观与应用级偏好。')}</p>
+    <div className="mb-4">
+      <h2 className="text-lg font-semibold text-foreground">{t('通用设置')}</h2>
+      <p className="mt-1 text-sm text-muted-foreground">{t('通用设置包含界面外观与应用级偏好。')}</p>
     </div>
   </>
 }
@@ -179,24 +183,26 @@ function LanguageSettings({
   setDraft: (draft: GeneralDraft) => void
 }) {
   return (
-    <section className="rounded-xl border border-border bg-card p-3 shadow-sm">
-      <div className="mb-3">
-        <h3 className="text-sm font-medium text-foreground">{t('界面语言')}</h3>
+    <div>
+      <div className="mb-2.5">
+        <h3 className="text-sm font-semibold text-foreground">{t('界面语言')}</h3>
         <p className="mt-1 text-xs text-muted-foreground">{t('选择应用界面显示语言。')}</p>
       </div>
-      <div className="flex flex-col gap-1.5">
-        <label className="text-xs font-medium text-muted-foreground">{t('语言')}</label>
-        <LabeledSelect
-          ariaLabel={t('界面语言')}
-          value={draft.language}
-          options={[
-            { value: 'zh-CN', label: t('中文（简体）') },
-            { value: 'en', label: 'English' },
-          ]}
-          onValueChange={(value) => setDraft({ ...draft, language: value === 'en' ? 'en' : 'zh-CN' })}
-        />
-      </div>
-    </section>
+      <SettingsCard divided>
+        <SettingsRow label={t('语言')}>
+          <LabeledSelect
+            ariaLabel={t('界面语言')}
+            value={draft.language}
+            options={[
+              { value: 'zh-CN', label: t('中文（简体）') },
+              { value: 'en', label: 'English' },
+            ]}
+            onValueChange={(value) => setDraft({ ...draft, language: value === 'en' ? 'en' : 'zh-CN' })}
+            className="w-44"
+          />
+        </SettingsRow>
+      </SettingsCard>
+    </div>
   )
 }
 
@@ -229,7 +235,7 @@ function GeneralSettingsSections({ draft, setDraft, systemFonts, previewDraft }:
   systemFonts: string[]
   previewDraft: (next: GeneralDraft) => void
 }) {
-  return <>
+  return <div className="space-y-6">
       <LanguageSettings draft={draft} setDraft={setDraft} />
       <UIFontSettings draft={draft} systemFonts={systemFonts} onChange={previewDraft} />
       <ApplicationBehaviorSettingsSection
@@ -263,12 +269,12 @@ function GeneralSettingsSections({ draft, setDraft, systemFonts, previewDraft }:
           proxyPassword: value ? '' : draft.proxyPassword,
         })}
       />
-  </>
+  </div>
 }
 
 export function GeneralSettingsPanel(props: Props) {
   const { draft, setDraft, previewDraft } = useGeneralSettingsDraft(props)
-  return <div className="flex flex-col gap-3 pt-2">
+  return <div className="flex flex-col">
     <GeneralSettingsHeader loadError={props.loadError ?? ''} onReload={props.onReload} />
     <GeneralSettingsSections draft={draft} setDraft={setDraft} systemFonts={props.systemFonts} previewDraft={previewDraft} />
   </div>
