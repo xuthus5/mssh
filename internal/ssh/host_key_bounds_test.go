@@ -1,12 +1,14 @@
 package ssh
 
 import (
+	"encoding/base64"
 	"errors"
 	"log/slog"
 	"net"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -47,7 +49,7 @@ func TestCreateHostKeyCallbackRejectsKnownHostsSymbolicLink(t *testing.T) {
 		t.Skipf("symbolic links unavailable: %v", err)
 	}
 
-	_, err := createHostKeyCallback(path, nil, slog.Default())
+	_, err := createHostKeyCallback(path, HostKeyOptions{}, slog.Default())
 
 	assert.ErrorContains(t, err, "regular file")
 }
@@ -57,7 +59,7 @@ func TestCreateHostKeyCallbackRejectsOversizedKnownHosts(t *testing.T) {
 	require.NoError(t, os.WriteFile(path, nil, 0o600))
 	require.NoError(t, os.Truncate(path, testKnownHostsLimit+1))
 
-	_, err := createHostKeyCallback(path, nil, slog.Default())
+	_, err := createHostKeyCallback(path, HostKeyOptions{}, slog.Default())
 
 	assert.ErrorContains(t, err, "known_hosts exceeds")
 }
@@ -79,7 +81,7 @@ func TestCreateHostKeyCallbackRejectsMalformedKnownHosts(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "known_hosts")
 	require.NoError(t, os.WriteFile(path, []byte("example.com ssh-ed25519 invalid\n"), 0o600))
 
-	callback, err := createHostKeyCallback(path, nil, slog.Default())
+	callback, err := createHostKeyCallback(path, HostKeyOptions{}, slog.Default())
 
 	assert.Nil(t, callback)
 	assert.ErrorContains(t, err, "parse known_hosts")
@@ -101,6 +103,131 @@ func TestHostKeyChangedErrorHandlesMissingExpectedKey(t *testing.T) {
 	err := hostKeyChangedError("example.com", newTestPublicKey(t), &knownhosts.KeyError{})
 
 	assert.ErrorContains(t, err, "presented")
+}
+
+func TestHandleChangedHostKeyBlockRejects(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "known_hosts")
+	oldKey := newTestPublicKey(t)
+	require.NoError(t, appendKnownHost(path, "example.com:22", oldKey))
+	check := hostKeyCheck{
+		hostname: "example.com:22", remote: &net.TCPAddr{Port: 22}, key: newTestPublicKey(t),
+		knownHostsPath: path, policy: HostKeyPolicyBlock,
+	}
+	callback, err := loadKnownHostsCallback(path)
+	require.NoError(t, err)
+	check.callback = callback
+
+	err = verifyHostKey(check)
+
+	assert.ErrorContains(t, err, "changed")
+}
+
+func TestHandleChangedHostKeyTrustReplaces(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "known_hosts")
+	oldKey := newTestPublicKey(t)
+	require.NoError(t, appendKnownHost(path, "example.com:22", oldKey))
+	newKey := newTestPublicKey(t)
+	check := hostKeyCheck{
+		hostname: "example.com:22", remote: &net.TCPAddr{Port: 22}, key: newKey,
+		knownHostsPath: path, policy: HostKeyPolicyTrust,
+	}
+	callback, err := loadKnownHostsCallback(path)
+	require.NoError(t, err)
+	check.callback = callback
+
+	err = verifyHostKey(check)
+
+	require.NoError(t, err)
+	content, readErr := os.ReadFile(path)
+	require.NoError(t, readErr)
+	assert.Contains(t, string(content), keyMaterial(newKey))
+	assert.NotContains(t, string(content), keyMaterial(oldKey))
+}
+
+func TestHandleChangedHostKeyWarnAccepts(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "known_hosts")
+	oldKey := newTestPublicKey(t)
+	require.NoError(t, appendKnownHost(path, "example.com:22", oldKey))
+	newKey := newTestPublicKey(t)
+	var captured []string
+	changed := func(_ string, _ string, _ string, expected []string) bool {
+		captured = expected
+		return true
+	}
+	check := hostKeyCheck{
+		hostname: "example.com:22", remote: &net.TCPAddr{Port: 22}, key: newKey,
+		knownHostsPath: path, policy: HostKeyPolicyWarn, onHostKeyChange: changed,
+	}
+	callback, err := loadKnownHostsCallback(path)
+	require.NoError(t, err)
+	check.callback = callback
+
+	err = verifyHostKey(check)
+
+	require.NoError(t, err)
+	require.Len(t, captured, 1)
+	assert.Contains(t, captured[0], gossh.FingerprintSHA256(oldKey))
+	content, readErr := os.ReadFile(path)
+	require.NoError(t, readErr)
+	assert.Contains(t, string(content), keyMaterial(newKey))
+	assert.NotContains(t, string(content), keyMaterial(oldKey))
+}
+
+func TestHandleChangedHostKeyWarnRejects(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "known_hosts")
+	oldKey := newTestPublicKey(t)
+	require.NoError(t, appendKnownHost(path, "example.com", oldKey))
+	check := hostKeyCheck{
+		hostname: "example.com:22", remote: &net.TCPAddr{Port: 22}, key: newTestPublicKey(t),
+		knownHostsPath: path, policy: HostKeyPolicyWarn,
+		onHostKeyChange: func(_ string, _ string, _ string, _ []string) bool { return false },
+	}
+	callback, err := loadKnownHostsCallback(path)
+	require.NoError(t, err)
+	check.callback = callback
+
+	err = verifyHostKey(check)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "rejected by user")
+}
+
+func TestHandleNewHostKeyTrustAcceptsWithoutPrompt(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "known_hosts")
+	require.NoError(t, os.WriteFile(path, nil, 0o600))
+	prompted := false
+	check := hostKeyCheck{
+		hostname: "example.com:22", remote: &net.TCPAddr{Port: 22}, key: newTestPublicKey(t),
+		knownHostsPath: path, policy: HostKeyPolicyTrust,
+		onNewHostKey: func(_, _, _ string) bool { prompted = true; return true },
+	}
+	callback, err := loadKnownHostsCallback(path)
+	require.NoError(t, err)
+	check.callback = callback
+
+	err = verifyHostKey(check)
+
+	require.NoError(t, err)
+	assert.False(t, prompted)
+	content, readErr := os.ReadFile(path)
+	require.NoError(t, readErr)
+	assert.NotEmpty(t, strings.TrimSpace(string(content)))
+}
+
+func TestKnownHostLineForHost(t *testing.T) {
+	assert.True(t, knownHostLineForHost("example.com ssh-ed25519 AAAA", "example.com"))
+	assert.True(t, knownHostLineForHost("example.com:22 ssh-ed25519 AAAA", "example.com"))
+	assert.True(t, knownHostLineForHost("a.example.com,b.example.com ssh-ed25519 AAAA", "b.example.com"))
+	assert.False(t, knownHostLineForHost("other.com ssh-ed25519 AAAA", "example.com"))
+	assert.False(t, knownHostLineForHost("# comment ssh-ed25519 AAAA", "example.com"))
+	assert.False(t, knownHostLineForHost("|1|abc|def ssh-ed25519 AAAA", "example.com"))
+	assert.False(t, knownHostLineForHost("@revoked example.com ssh-ed25519 AAAA", "example.com"))
+	assert.False(t, knownHostLineForHost("", "example.com"))
+	assert.False(t, knownHostLineForHost("malformed", "example.com"))
+}
+
+func keyMaterial(key gossh.PublicKey) string {
+	return base64.StdEncoding.EncodeToString(key.Marshal())
 }
 
 func TestHostKeyOperationsRejectMissingKnownHosts(t *testing.T) {

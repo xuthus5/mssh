@@ -1,5 +1,4 @@
 import { type ReactNode } from 'react'
-import { Fingerprint, RefreshCw, Trash2 } from 'lucide-react'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -13,13 +12,15 @@ import {
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
-import { SettingsCard, SettingsSectionHeader } from '@/components/settings/settings-ui'
+import { LabeledSelect } from '@/components/ui/labeled-select'
+import { SettingsCard, SettingsRow, SettingsSectionHeader } from '@/components/settings/settings-ui'
 import { SecurityService } from '@/lib/wails'
+import { hostKeyChangePolicyOptions, normalizeHostKeyChangePolicy, useHostKeyChangePolicy } from '@/hooks/useHostKeyChangePolicy'
 import { t } from '@/i18n'
-import { useSecurityPanel, type HostKeyEntry } from '@/hooks/useSecurityPanel'
+import { useSecurityPanel } from '@/hooks/useSecurityPanel'
 
 type SecurityController = ReturnType<typeof useSecurityPanel>
-export type SecurityConfirmAction = null | { type: 'rotate' } | { type: 'host'; entry: HostKeyEntry }
+export type SecurityConfirmAction = null | { type: 'rotate' }
 
 interface SecurityPanelActions {
   confirmAction: SecurityConfirmAction
@@ -42,11 +43,11 @@ export function SecurityPanelView({ security, actions }: SecurityPanelViewProps)
       <SecurityErrors security={security} />
       <div className="mb-4">
         <h2 className="text-lg font-semibold">{t('安全')}</h2>
-        <p className="mt-1 text-sm text-muted-foreground">{t('管理应用密码与已信任主机指纹。')}</p>
+        <p className="mt-1 text-sm text-muted-foreground">{t('管理应用密码与主机指纹校验策略。')}</p>
       </div>
       <div className="space-y-6">
         <ApplicationPasswordSection security={security} actions={actions} />
-        <TrustedHostsSection security={security} onRemove={(entry) => actions.setConfirmAction({ type: 'host', entry })} />
+        <HostKeyPolicySection />
       </div>
       <SecurityConfirmation security={security} actions={actions} />
     </div>
@@ -149,39 +150,26 @@ function PasswordActionButtons({ security, actions }: SecurityPanelViewProps) {
   )
 }
 
-function TrustedHostsSection({ security, onRemove }: { security: SecurityController; onRemove: (entry: HostKeyEntry) => void }) {
+function HostKeyPolicySection() {
+  const { policy, loading, saving, error, save } = useHostKeyChangePolicy()
   return (
     <div>
-      <div className="mb-2.5 flex items-center justify-between gap-3">
-        <div>
-          <h3 className="text-sm font-semibold">{t('已信任主机')}</h3>
-          <p className="mt-1 text-xs text-muted-foreground">{t('管理 SSH known_hosts 指纹。指纹变化时连接会被阻止。')}</p>
-        </div>
-        <Button size="icon-sm" variant="outline" aria-label={t('刷新主机指纹')} onClick={() => void security.load()}><RefreshCw /></Button>
-      </div>
-      <SettingsCard>
-        <div className="space-y-2">
-          <TrustedHostsContent security={security} onRemove={onRemove} />
-        </div>
+      <SettingsSectionHeader title={t('已信任主机')} description={t('配置远端主机指纹变化时的处理方式。已信任主机列表可在总览中管理。')} />
+      <SettingsCard divided>
+        <SettingsRow label={t('指纹变化时')} description={t('阻止连接；提醒并展示新旧指纹供你决定；或默认信任新指纹。')}>
+          <LabeledSelect
+            ariaLabel={t('指纹变化时')}
+            value={policy}
+            disabled={loading || saving}
+            options={[...hostKeyChangePolicyOptions()].map((option) => ({ ...option, label: t(option.label) }))}
+            onValueChange={(value) => { void save(normalizeHostKeyChangePolicy(value)).catch(() => undefined) }}
+            className="w-44"
+          />
+        </SettingsRow>
       </SettingsCard>
+      {error ? <p role="alert" className="mt-2.5 text-sm text-destructive">{error}</p> : null}
     </div>
   )
-}
-
-function TrustedHostsContent({ security, onRemove }: { security: SecurityController; onRemove: (entry: HostKeyEntry) => void }) {
-  if (security.loading) return <p className="text-sm text-muted-foreground">{t('正在加载主机指纹...')}</p>
-  if (security.loadError) return <p className="text-sm text-muted-foreground">{t('主机指纹暂不可用，请先修复上方加载错误。')}</p>
-  if (security.entries.length === 0) return <p className="text-sm text-muted-foreground">{t('尚未信任任何 SSH 主机。')}</p>
-  return security.entries.map((entry) => (
-    <div key={`${entry.line}-${entry.fingerprint}`} className="flex items-center gap-3 rounded-xl border border-border p-3">
-      <Fingerprint className="size-4 shrink-0 text-muted-foreground" />
-      <div className="min-w-0 flex-1">
-        <div className="truncate text-sm font-medium">{entry.hosts}</div>
-        <div className="truncate font-mono text-xs text-muted-foreground">{entry.algorithm} · {entry.fingerprint}</div>
-      </div>
-      <Button size="icon-xs" variant="ghost" aria-label={t('删除 ${} 的主机指纹', entry.hosts)} onClick={() => onRemove(entry)}><Trash2 /></Button>
-    </div>
-  ))
 }
 
 function SecurityConfirmation({ security, actions }: SecurityPanelViewProps) {
@@ -190,14 +178,8 @@ function SecurityConfirmation({ security, actions }: SecurityPanelViewProps) {
     <AlertDialog open={action !== null} onOpenChange={(open) => { if (!open && !security.busy) actions.setConfirmAction(null) }}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>
-            {action?.type === 'rotate'
-              ? t('轮转应用密码会使用新密钥重新加密本地敏感数据（私钥、会话密码等）。其他设备必须使用相同应用密码，否则同步会失败。是否继续？')
-              : t('删除 ${} 的已信任主机指纹？下次连接时将重新确认。', action?.type === 'host' ? action.entry.hosts : '')}
-          </AlertDialogTitle>
-          <AlertDialogDescription>
-            {action?.type === 'rotate' ? t('请确认已备份当前密码策略，并在所有同步设备上使用相同应用密码。') : t('此操作不可撤销。')}
-          </AlertDialogDescription>
+          <AlertDialogTitle>{t('轮转应用密码会使用新密钥重新加密本地敏感数据（私钥、会话密码等）。其他设备必须使用相同应用密码，否则同步会失败。是否继续？')}</AlertDialogTitle>
+          <AlertDialogDescription>{t('请确认已备份当前密码策略，并在所有同步设备上使用相同应用密码。')}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel disabled={security.busy}>{t('取消')}</AlertDialogCancel>

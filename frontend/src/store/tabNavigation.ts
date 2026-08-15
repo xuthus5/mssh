@@ -2,7 +2,7 @@ import type { Tab } from '@/store/appStore'
 import { readStorageItem, readStorageNumber, writeStorageItem } from '@/lib/safeStorage'
 
 export type WorkspaceID = 'overview' | 'sessions' | 'macros'
-export type OverviewSection = 'sessions' | 'keys' | 'tunnels' | 'serial' | 'audit'
+export type OverviewSection = 'sessions' | 'keys' | 'tunnels' | 'serial' | 'trusted' | 'audit'
 
 export type ActiveSurface =
   | { type: 'workspace'; id: WorkspaceID }

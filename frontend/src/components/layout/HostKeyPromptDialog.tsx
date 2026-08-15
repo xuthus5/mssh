@@ -29,12 +29,22 @@ export function HostKeyPromptDialog() {
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogMedia><Fingerprint /></AlertDialogMedia>
-          <AlertDialogTitle>{t('主机指纹确认')}</AlertDialogTitle>
+          <AlertDialogTitle>{prompt.changed ? t('主机指纹已变化') : t('主机指纹确认')}</AlertDialogTitle>
           <AlertDialogDescription>
-            {t('首次连接到 ${}:${}。', endpoint.host, endpoint.port)}{t('请在信任前核对远端服务器展示的指纹。')}
+            {prompt.changed
+              ? t('连接到 ${}:${} 时，远端主机指纹与已信任记录不一致。', endpoint.host, endpoint.port)
+              : t('首次连接到 ${}:${}。', endpoint.host, endpoint.port)}
+            {prompt.changed ? t('请在信任前核对远端服务器展示的指纹。') : t('请在信任前核对远端服务器展示的指纹。')}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <div className="flex flex-col gap-2 rounded-xl border border-border bg-muted/50 p-3">
+          {prompt.changed && prompt.expected.length > 0 ? (
+            <div className="flex flex-col gap-1">
+              <span className="text-xs text-muted-foreground">{t('已信任指纹')}</span>
+              {prompt.expected.map((fingerprint) => <code key={fingerprint} className="break-all font-mono text-xs text-muted-foreground line-through">{fingerprint}</code>)}
+            </div>
+          ) : null}
+          {prompt.changed ? <span className="text-xs text-muted-foreground">{t('当前指纹')}</span> : null}
           <code className="break-all font-mono text-xs text-foreground">{prompt.fingerprint}</code>
           {prompt.algorithm ? <Badge variant="secondary">{prompt.algorithm}</Badge> : null}
         </div>
@@ -45,7 +55,7 @@ export function HostKeyPromptDialog() {
             {t('拒绝')}
           </AlertDialogAction>
           <AlertDialogAction type="button" disabled={pending} onClick={() => { void decide(true) }}>
-            {pending ? <><Spinner data-icon="inline-start" />{t('处理中...')}</> : t('信任并连接')}
+            {pending ? <><Spinner data-icon="inline-start" />{t('处理中...')}</> : prompt.changed ? t('信任新指纹并连接') : t('信任并连接')}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

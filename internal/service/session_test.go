@@ -68,6 +68,20 @@ func (m *mockEventBus) LastEvent() *CapturedEvent {
 	return &last
 }
 
+func (m *mockEventBus) lastHostKeyPayload() *event.HostKeyPayload {
+	for _, captured := range m.Events() {
+		if captured.Name != event.HostKeyFingerprint {
+			continue
+		}
+		payload, ok := captured.Payload.(event.HostKeyPayload)
+		if !ok {
+			continue
+		}
+		return &payload
+	}
+	return nil
+}
+
 func TestSessionService_FolderCRUD(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	bus := newMockEventBus()

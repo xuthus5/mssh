@@ -45,9 +45,11 @@ type TransferErrorPayload struct {
 }
 
 type HostKeyPayload struct {
-	AttemptID   string `json:"attempt_id"`
-	TerminalID  string `json:"terminal_id"`
-	Hostname    string `json:"hostname"`
-	Fingerprint string `json:"fingerprint"`
-	Algorithm   string `json:"algorithm"`
+	AttemptID   string   `json:"attempt_id"`
+	TerminalID  string   `json:"terminal_id"`
+	Hostname    string   `json:"hostname"`
+	Fingerprint string   `json:"fingerprint"`
+	Algorithm   string   `json:"algorithm"`
+	Changed     bool     `json:"changed"`
+	Expected    []string `json:"expected,omitempty"`
 }

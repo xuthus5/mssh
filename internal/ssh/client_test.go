@@ -71,13 +71,13 @@ func TestAuthMethodsBuilder(t *testing.T) {
 
 func TestCreateHostKeyCallbackNewFile(t *testing.T) {
 	knownHostsPath := t.TempDir() + "/known_hosts"
-	cb, err := createHostKeyCallback(knownHostsPath, nil, slog.Default())
+	cb, err := createHostKeyCallback(knownHostsPath, HostKeyOptions{}, slog.Default())
 	require.NoError(t, err)
 	assert.NotNil(t, cb)
 }
 
 func TestCreateHostKeyCallbackEmptyPath(t *testing.T) {
-	cb, err := createHostKeyCallback("", nil, slog.Default())
+	cb, err := createHostKeyCallback("", HostKeyOptions{}, slog.Default())
 	require.ErrorIs(t, err, ErrEmptyKnownHostsPath)
 	assert.Nil(t, cb)
 }
@@ -162,7 +162,7 @@ func TestCreateHostKeyCallbackWithVerifier(t *testing.T) {
 		assert.NotEmpty(t, fingerprint)
 		return true
 	}
-	cb, err := createHostKeyCallback(knownHostsPath, verifier, slog.Default())
+	cb, err := createHostKeyCallback(knownHostsPath, HostKeyOptions{OnNewHostKey: verifier}, slog.Default())
 	require.NoError(t, err)
 	assert.NotNil(t, cb)
 	_ = called
@@ -173,7 +173,7 @@ func TestCreateHostKeyCallbackVerifierRejects(t *testing.T) {
 	verifier := func(_, _, _ string) bool {
 		return false
 	}
-	cb, err := createHostKeyCallback(knownHostsPath, verifier, slog.Default())
+	cb, err := createHostKeyCallback(knownHostsPath, HostKeyOptions{OnNewHostKey: verifier}, slog.Default())
 	require.NoError(t, err)
 	assert.NotNil(t, cb)
 
@@ -265,7 +265,7 @@ func TestVerifyHostKeyBlocksChangedKey(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, appendKnownHost(knownHostsPath, "example.com", keyA))
 
-	cb, err := createHostKeyCallback(knownHostsPath, nil, slog.Default())
+	cb, err := createHostKeyCallback(knownHostsPath, HostKeyOptions{}, slog.Default())
 	require.NoError(t, err)
 	err = cb("example.com:22", &net.TCPAddr{IP: net.IPv4(1, 2, 3, 4), Port: 22}, keyB)
 	require.Error(t, err)
@@ -321,9 +321,9 @@ func TestConcurrentFirstSeenSameKeyPromptsOnce(t *testing.T) {
 		}
 		return true
 	}
-	first, err := createHostKeyCallback(path, verifier, slog.Default())
+	first, err := createHostKeyCallback(path, HostKeyOptions{OnNewHostKey: verifier}, slog.Default())
 	require.NoError(t, err)
-	second, err := createHostKeyCallback(path, verifier, slog.Default())
+	second, err := createHostKeyCallback(path, HostKeyOptions{OnNewHostKey: verifier}, slog.Default())
 	require.NoError(t, err)
 	remote := &net.TCPAddr{IP: net.IPv4(10, 0, 0, 1), Port: 22}
 	results := make(chan error, 2)
@@ -352,9 +352,9 @@ func TestFirstSeenHostKeyPromptsAreSerialized(t *testing.T) {
 		}
 		return true
 	}
-	first, err := createHostKeyCallback(path, verifier, slog.Default())
+	first, err := createHostKeyCallback(path, HostKeyOptions{OnNewHostKey: verifier}, slog.Default())
 	require.NoError(t, err)
-	second, err := createHostKeyCallback(path, verifier, slog.Default())
+	second, err := createHostKeyCallback(path, HostKeyOptions{OnNewHostKey: verifier}, slog.Default())
 	require.NoError(t, err)
 	remote := &net.TCPAddr{IP: net.IPv4(10, 0, 0, 2), Port: 22}
 	results := make(chan error, 2)
@@ -380,7 +380,7 @@ func TestAcceptedHostKeyFailsClosedWhenFileChangesDuringPrompt(t *testing.T) {
 		require.NoError(t, appendKnownHost(path, "example.com:22", other))
 		return true
 	}
-	callback, err := createHostKeyCallback(path, verifier, slog.Default())
+	callback, err := createHostKeyCallback(path, HostKeyOptions{OnNewHostKey: verifier}, slog.Default())
 	require.NoError(t, err)
 	err = callback("example.com:22", &net.TCPAddr{IP: net.IPv4(10, 0, 0, 3), Port: 22}, presented)
 	require.Error(t, err)

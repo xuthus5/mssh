@@ -33,7 +33,7 @@ function reconnectSessions(): ReconnectSession[] {
 }
 
 interface ConnectionPayload { terminal_id?: string; state?: string }
-interface FingerprintPayload { attempt_id?: string; hostname?: string; fingerprint?: string; algorithm?: string }
+interface FingerprintPayload { attempt_id?: string; hostname?: string; fingerprint?: string; algorithm?: string; changed?: boolean; expected?: string[] }
 interface TransferPayload {
   task_id?: string
   status?: 'running' | 'completed' | 'cancelled'
@@ -207,6 +207,8 @@ export function startEventBridge(): () => void {
         hostname: payload.hostname ?? '',
         fingerprint: payload.fingerprint ?? '',
         algorithm: payload.algorithm ?? '',
+        changed: payload.changed === true,
+        expected: payload.expected ?? [],
       })
     }),
     Events.On('session:state', handleSessionState),

@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react'
 import { SecurityPanelView, type SecurityConfirmAction } from '@/components/settings/SecurityPanelSections'
-import { SecurityService, SessionService } from '@/lib/wails'
+import { SecurityService } from '@/lib/wails'
 import { validateAppPassword } from '@/lib/appPassword'
 import { t } from '@/i18n'
 import { useSecurityPanel } from '@/hooks/useSecurityPanel'
@@ -34,14 +34,9 @@ function useConfirmSecurityAction(
 ) {
   return useCallback(async () => {
     if (!confirmAction) return
-    if (confirmAction.type === 'rotate') {
-      const succeeded = await security.run(t('应用密码已轮转'), '轮转应用密码失败: ${}', () => SecurityService.Rotate({
-        current_password: security.currentPassword, new_password: security.newPassword,
-      }))
-      if (succeeded) setConfirmAction(null)
-      return
-    }
-    const succeeded = await security.run(t('主机指纹已删除'), '删除主机指纹失败: ${}', () => SessionService.DeleteHostKey(confirmAction.entry.line))
+    const succeeded = await security.run(t('应用密码已轮转'), '轮转应用密码失败: ${}', () => SecurityService.Rotate({
+      current_password: security.currentPassword, new_password: security.newPassword,
+    }))
     if (succeeded) setConfirmAction(null)
   }, [confirmAction, security, setConfirmAction])
 }

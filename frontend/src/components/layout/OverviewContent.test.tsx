@@ -6,6 +6,7 @@ vi.mock('@/components/session/SessionAssetCenter', () => ({ SessionAssetCenter: 
 vi.mock('@/components/settings/KeyManager', () => ({ KeyManager: () => <div>密钥管理页面</div> }))
 vi.mock('@/components/session/TunnelDialog', () => ({ default: () => <div>隧道管理弹框</div> }))
 vi.mock('@/components/layout/AuditPanel', () => ({ AuditPanel: () => <div>审计日志页面</div> }))
+vi.mock('@/components/layout/TrustedHostsPanel', () => ({ TrustedHostsPanel: () => <div>已信任主机页面</div> }))
 const overviewMounts = vi.hoisted(() => ({ serial: 0 }))
 vi.mock('@/components/serial/SerialPortCenter', () => ({ SerialPortCenter: () => {
   useEffect(() => { overviewMounts.serial += 1 }, [])
@@ -57,6 +58,12 @@ describe('OverviewContent', () => {
     useAppStore.setState({ overviewSection: 'audit' })
     render(<OverviewContent />)
     expect(screen.getByText('审计日志页面')).toBeInTheDocument()
+  })
+
+  it('renders trusted host management before audit records', () => {
+    useAppStore.setState({ overviewSection: 'trusted' })
+    render(<OverviewContent />)
+    expect(screen.getByText('已信任主机页面')).toBeInTheDocument()
   })
 
   it('renders serial management as an overview page', () => {
