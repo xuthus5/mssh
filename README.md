@@ -42,6 +42,7 @@ MSSH is not a fleet orchestrator. It focuses on saved SSH sessions and terminal-
 - Persistent top-level terminal tabs with right-click rename of the temporary title
 - Recursive split panes with independent reconnect support
 - Close and close-all from the terminal tab context menu, with optional confirmation
+- Command history prediction ranked by most recent execution
 - Active search inside terminal output with text or regex mode
 - Playback for recorded sessions
 - Local shell terminals for machine-local workflows

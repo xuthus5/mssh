@@ -44,10 +44,16 @@ describe('predictCommandTokens', () => {
     expect(result.tokens).toEqual(['-lahrt'])
   })
 
-  it('suggests command names for a partial first token', () => {
+  it('suggests full command suffixes for a partial first token, newest first', () => {
     const result = predictCommandTokens('gi', history)
-    expect(result.mode).toBe('prefix')
-    expect(result.tokens).toEqual(['git'])
+    expect(result.mode).toBe('command')
+    expect(result.tokens).toEqual(['t status', 't commit -m "ship"'])
+  })
+
+  it('suggests command names when no full command shares the prefix', () => {
+    const result = predictCommandTokens('ku', ['kubectl get pods -n prod'])
+    expect(result.mode).toBe('command')
+    expect(result.tokens).toEqual(['bectl get pods -n prod'])
   })
 
   it('ranks by frequency then recency', () => {
@@ -82,6 +88,28 @@ describe('predictCommandTokens', () => {
     const complete = predictCommandTokens('kubectl get', chain)
     expect(complete.mode).toBe('next')
     expect(complete.tokens).toEqual(['pods'])
+  })
+
+  it('prioritizes the most recent full command for a partial first token', () => {
+    // History is time-descending: ls /root was executed most recently.
+    const history = [
+      'ls /root',
+      'ls -lahrt /tmp',
+    ]
+    const result = predictCommandTokens('l', history)
+    expect(result.mode).toBe('command')
+    expect(result.tokens).toEqual(['s /root', 's -lahrt /tmp'])
+  })
+
+  it('dedupes identical command suffixes keeping the newest one', () => {
+    const history = [
+      'git status',
+      'git status --short',
+      'git status',
+    ]
+    const result = predictCommandTokens('g', history)
+    expect(result.mode).toBe('command')
+    expect(result.tokens).toEqual(['it status', 'it status --short'])
   })
 })
 
