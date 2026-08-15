@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type WheelEvent } from 'react'
+import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode, type WheelEvent } from 'react'
 import { Circle, Copy, List, Play, Plus, Server, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -7,6 +7,7 @@ import { connectionStatusVisual } from '@/lib/connectionStatusVisual'
 import { useAppStore, type AppState, type Tab } from '@/store/appStore'
 import { dynamicPanelID, dynamicTabID } from '@/store/tabNavigation'
 import { TabCloseConfirmation, useTabCloseCoordinator } from '@/hooks/useTabCloseCoordinator'
+import { TabRenameDialog } from '@/components/layout/TabRenameDialog'
 import { useSessionWorkspace } from '@/hooks/SessionWorkspaceContext'
 import { SESSION_QUICK_SEARCH_EVENT } from '@/lib/sessionQuickSearch'
 import { t } from '@/i18n'
@@ -108,7 +109,7 @@ function scrollTabsWithWheel(event: WheelEvent<HTMLDivElement>) {
 	event.preventDefault()
 }
 
-function DynamicTab({ tab, active, connectionStatus, navigation, onActivate, onClose, onDuplicate, onCloseAll }: {
+function DynamicTab({ tab, active, connectionStatus, navigation, onActivate, onClose, onDuplicate, onCloseAll, onRename }: {
   tab: Tab
   active: boolean
   connectionStatus: AppState['connectionStatus']
@@ -117,6 +118,7 @@ function DynamicTab({ tab, active, connectionStatus, navigation, onActivate, onC
   onClose: (tabID: string) => void
   onDuplicate: (sessionID: number) => void
   onCloseAll: () => void
+  onRename: (tabID: string) => void
 }) {
   const statusLabel = tabStatusLabel(tab, connectionStatus)
   const content = (
@@ -135,6 +137,17 @@ function DynamicTab({ tab, active, connectionStatus, navigation, onActivate, onC
   )
 
   if (tab.type !== 'terminal') return content
+  return <TerminalTabContextMenu content={content} tab={tab} onClose={onClose} onDuplicate={onDuplicate} onCloseAll={onCloseAll} onRename={onRename} />
+}
+
+function TerminalTabContextMenu({ content, tab, onClose, onDuplicate, onCloseAll, onRename }: {
+  content: ReactNode
+  tab: Extract<Tab, { type: 'terminal' }>
+  onClose: (tabID: string) => void
+  onDuplicate: (sessionID: number) => void
+  onCloseAll: () => void
+  onRename: (tabID: string) => void
+}) {
   return (
     <ContextMenu>
       <ContextMenuTrigger>{content}</ContextMenuTrigger>
@@ -143,6 +156,9 @@ function DynamicTab({ tab, active, connectionStatus, navigation, onActivate, onC
           <ContextMenuItem onClick={() => onDuplicate(tab.sessionId)}>
             <Copy aria-hidden="true" />
             {t('复制终端')}
+          </ContextMenuItem>
+          <ContextMenuItem onClick={() => onRename(tab.id)}>
+            {t('重命名')}
           </ContextMenuItem>
         </ContextMenuGroup>
         <ContextMenuGroup>
@@ -237,6 +253,7 @@ export function DynamicTabStrip({ onOverflowChange }: { onOverflowChange?: (over
   const duplicateTerminal = useCallback((sessionID: number) => { void connect(String(sessionID)) }, [connect])
   const closeCoordinator = useTabCloseCoordinator()
   const quickConnectAfter = lastTerminalTabIndex(tabs)
+  const [renameTabID, setRenameTabID] = useState<string | null>(null)
   if (tabs.length === 0) return null
 
   return (
@@ -247,7 +264,7 @@ export function DynamicTabStrip({ onOverflowChange }: { onOverflowChange?: (over
       <div className={`relative min-w-0 ${scroll.overflow ? 'flex-1' : ''} ${scroll.canScrollLeft ? 'shadow-[inset_12px_0_8px_-12px_rgba(0,0,0,0.45)]' : ''} ${scroll.canScrollRight ? 'shadow-[inset_-12px_0_8px_-12px_rgba(0,0,0,0.45)]' : ''}`}>
         <div ref={scroll.tabListRef} role="tablist" aria-label={t('动态标签')} className="mssh-tab-strip-scroll flex h-9 min-w-0 items-end gap-1 overflow-x-auto overflow-y-hidden" onWheel={scrollTabsWithWheel} onScroll={scroll.syncScrollAffordances}>
           {tabs.map((tab, index) => <Fragment key={tab.id}>
-            <DynamicTab tab={tab} active={activeSurface?.id === tab.id} connectionStatus={connectionStatus} navigation={navigation} onActivate={activateWithFocus} onClose={closeCoordinator.requestClose} onDuplicate={duplicateTerminal} onCloseAll={closeCoordinator.requestCloseAll} />
+            <DynamicTab tab={tab} active={activeSurface?.id === tab.id} connectionStatus={connectionStatus} navigation={navigation} onActivate={activateWithFocus} onClose={closeCoordinator.requestClose} onDuplicate={duplicateTerminal} onCloseAll={closeCoordinator.requestCloseAll} onRename={setRenameTabID} />
             {index === quickConnectAfter && <QuickConnectButton />}
           </Fragment>)}
         </div>
@@ -256,6 +273,7 @@ export function DynamicTabStrip({ onOverflowChange }: { onOverflowChange?: (over
         <Button type="button" variant="ghost" size="icon-sm" aria-label={t('向右滚动标签')} className="h-9 w-7 shrink-0 rounded-none" disabled={!scroll.canScrollRight} onClick={() => scroll.scrollByTabs(1)}>›</Button>
       ) : null}
       <TabCloseConfirmation {...closeCoordinator.confirmation} />
+      <TabRenameDialog tabID={renameTabID} tabs={tabs} onOpenChange={setRenameTabID} />
     </div>
   )
 }
