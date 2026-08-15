@@ -33,6 +33,20 @@ func (s *SessionService) sessionForConnect(id int64) (*model.Session, error) {
 	return session, nil
 }
 
+// GetSessionCredentials returns the session login username and decrypted password.
+func (s *SessionService) GetSessionCredentials(id int64) (*model.SessionCredentials, error) {
+	finish, err := s.beginOperation()
+	if err != nil {
+		return nil, err
+	}
+	defer finish()
+	session, err := s.sessionForConnect(id)
+	if err != nil {
+		return nil, err
+	}
+	return &model.SessionCredentials{Username: session.Username, Password: session.Password}, nil
+}
+
 func redactSessionPassword(session *model.Session) *model.Session {
 	if session == nil {
 		return nil

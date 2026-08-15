@@ -2,6 +2,12 @@ package model
 
 import "time"
 
+// SessionCredentials carries a session's login username and decrypted password.
+type SessionCredentials struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
 type AuthMethod string
 
 const (

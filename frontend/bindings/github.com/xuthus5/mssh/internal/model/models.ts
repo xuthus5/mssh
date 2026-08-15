@@ -3133,6 +3133,34 @@ export class SessionCSVPreview {
     }
 }
 
+/**
+ * SessionCredentials carries a session's login username and decrypted password.
+ */
+export class SessionCredentials {
+    "username": string;
+    "password": string;
+
+    /** Creates a new SessionCredentials instance. */
+    constructor($$source: Partial<SessionCredentials> = {}) {
+        if (!("username" in $$source)) {
+            this["username"] = "";
+        }
+        if (!("password" in $$source)) {
+            this["password"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new SessionCredentials instance from a string or object.
+     */
+    static createFrom($$source: any = {}): SessionCredentials {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new SessionCredentials($$parsedSource as Partial<SessionCredentials>);
+    }
+}
+
 export class SessionDeleteImpact {
     "tunnels": number;
     "history": number;
