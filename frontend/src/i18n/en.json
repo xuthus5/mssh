@@ -1500,6 +1500,8 @@
   "释放文件以上传到当前目录": "Drop files to upload to the current directory",
   "重启应用后自动恢复上次未关闭的终端标签。默认开启。": "Automatically restores previously open terminal tabs after restart. On by default.",
   "重命名": "Rename",
+  "重命名终端标签": "Rename terminal tab",
+  "终端标签名称": "Terminal tab name",
   "重命名 ${}": "Rename ${}",
   "重命名 Custom": "Rename Custom",
   "重命名失败: ${}": "Failed to rename: ${}",
