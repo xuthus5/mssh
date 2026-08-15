@@ -3,9 +3,9 @@ import { Download } from 'lucide-react'
 import { ThemeDeleteDialog } from '@/components/settings/ThemeDeleteDialog'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Table, TableBody, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { SettingsCard, SettingsSectionHeader } from '@/components/settings/settings-ui'
 import { ThemeImportResults } from '@/components/settings/ThemeImportResults'
 import { ThemeManagerRow } from '@/components/settings/ThemeManagerRow'
 import { useThemeManagerRuntime, type ThemeManagerProps, type ThemeManagerRuntime } from '@/components/settings/themeManagerRuntime'
@@ -20,14 +20,19 @@ export function ThemeManager(props: ThemeManagerProps) {
     setRowResetRevision((current) => current + 1)
   })
   return (
-    <Card>
-      <ThemeHeader model={model} />
-      <CardContent className="flex flex-col gap-4">
-        <ThemeActionErrors model={model} />
-        <Input aria-label={t('搜索终端主题')} placeholder={t('搜索名称或来源')} value={model.query} onChange={(event) => model.setQuery(event.target.value)} />
-        {model.summary && <ThemeImportResults summary={model.summary} />}
-        <ThemeTable props={props} model={model} rowResetRevision={rowResetRevision} />
-      </CardContent>
+    <div>
+      <div className="mb-2.5 flex items-center justify-between gap-3">
+        <SettingsSectionHeader title={t('主题管理')} description={t('导入、创建并管理终端配色主题。')} />
+        <Button type="button" size="sm" variant="outline" disabled={model.importing || model.deleting || model.pendingRows.size > 0} onClick={() => { void model.importFiles() }}><Download data-icon="inline-start" />{model.importing ? t('导入中…') : t('导入 iTerm2 主题')}</Button>
+      </div>
+      <SettingsCard>
+        <div className="flex flex-col gap-4">
+          <ThemeActionErrors model={model} />
+          <Input aria-label={t('搜索终端主题')} placeholder={t('搜索名称或来源')} value={model.query} onChange={(event) => model.setQuery(event.target.value)} />
+          {model.summary && <ThemeImportResults summary={model.summary} />}
+          <ThemeTable props={props} model={model} rowResetRevision={rowResetRevision} />
+        </div>
+      </SettingsCard>
       <ThemeDeleteDialog
         target={model.deleteTarget}
         pending={model.deleting}
@@ -35,7 +40,7 @@ export function ThemeManager(props: ThemeManagerProps) {
         onOpenChange={model.handleDeleteOpenChange}
         onConfirm={() => { void model.confirmDelete() }}
       />
-    </Card>
+    </div>
   )
 }
 
@@ -43,10 +48,6 @@ function ThemeActionErrors({ model }: { model: ThemeManagerRuntime }) {
   const errors = [model.actionError, ...model.rowErrors.values()].filter(Boolean)
   if (errors.length === 0) return null
   return <Alert variant="destructive"><AlertDescription className="space-y-1">{errors.map((error, index) => <p key={`${index}-${error}`}>{error}</p>)}</AlertDescription></Alert>
-}
-
-function ThemeHeader({ model }: { model: ThemeManagerRuntime }) {
-  return <CardHeader><CardTitle className="flex items-center justify-between gap-3 text-sm"><span>{t('主题管理')}</span><Button type="button" size="sm" variant="outline" disabled={model.importing || model.deleting || model.pendingRows.size > 0} onClick={() => { void model.importFiles() }}><Download data-icon="inline-start" />{model.importing ? t('导入中…') : t('导入 iTerm2 主题')}</Button></CardTitle></CardHeader>
 }
 
 function ThemeTable({ props, model, rowResetRevision }: { props: ThemeManagerProps; model: ThemeManagerRuntime; rowResetRevision: number }) {

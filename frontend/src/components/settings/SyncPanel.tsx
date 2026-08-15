@@ -3,10 +3,10 @@ import { CloudCog, Download, Upload } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { SettingsCard } from '@/components/settings/settings-ui'
 import { SyncProviderTab } from '@/components/settings/SyncProviderTab'
 import { SyncStatusTab } from '@/components/settings/SyncStatusTab'
 import { useAutoSave } from '@/hooks/useAutoSave'
@@ -111,15 +111,15 @@ function SyncPanelContent(props: SyncPanelContentProps) {
   const dashboard = props.controller.dashboard
   const pending = props.controller.pending ?? (props.transfer.pending ? 'transfer' : null)
   return (
-    <div className="flex flex-col gap-4 pt-2">
+    <div className="flex flex-col">
       <SyncPanelHeader {...props} dashboard={dashboard} />
       <SyncLoadError controller={props.controller} dashboard={dashboard} />
       {props.transfer.error ? (
-        <div className="rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">
+        <div className="mt-4 rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">
           {props.transfer.error}
         </div>
       ) : null}
-      {props.input.enabled && <SyncSettingsCard {...props} dashboard={dashboard} pending={pending} />}
+      {props.input.enabled && <div className="mt-6"><SyncSettingsCard {...props} dashboard={dashboard} pending={pending} /></div>}
     </div>
   )
 }
@@ -136,10 +136,10 @@ function SyncPanelHeader(props: SyncPanelViewProps) {
         <div className="grid size-9 place-items-center rounded-lg bg-primary/10 text-primary"><CloudCog className="size-5" /></div>
         <div>
           <div className="flex items-center gap-2">
-            <h3 className="text-sm font-semibold">{t('云同步中心')}</h3>
+            <h2 className="text-lg font-semibold">{t('云同步中心')}</h2>
             {props.dashboard && <Badge variant="outline">{syncStateLabel(props.dashboard.state)}</Badge>}
           </div>
-          <p className="text-xs text-muted-foreground">{t('加密同步会话、密钥、隧道、宏、主题与资产归属数据。')}</p>
+          <p className="mt-1 text-sm text-muted-foreground">{t('加密同步会话、密钥、隧道、宏、主题与资产归属数据。')}</p>
         </div>
       </div>
       <div className="flex flex-wrap items-center justify-end gap-3">
@@ -189,19 +189,17 @@ interface SyncSettingsCardProps extends SyncPanelViewProps {
 
 function SyncSettingsCard(props: SyncSettingsCardProps) {
   return (
-    <Card>
-      <CardHeader><CardTitle className="text-sm">{t('同步设置')}</CardTitle></CardHeader>
-      <CardContent>
-        <Tabs orientation="horizontal" defaultValue="provider">
-          <TabsList className="flex-row">
-            <TabsTrigger value="provider">{t('云同步提供商')}</TabsTrigger>
-            <TabsTrigger value="status">{t('同步状态与配置')}</TabsTrigger>
-          </TabsList>
-          <SyncProviderContent {...props} />
-          {props.dashboard && <SyncStatusContent {...props} dashboard={props.dashboard} />}
-        </Tabs>
-      </CardContent>
-    </Card>
+    <SettingsCard>
+      <div className="mb-3"><h3 className="text-sm font-semibold text-foreground">{t('同步设置')}</h3></div>
+      <Tabs orientation="horizontal" defaultValue="provider">
+        <TabsList className="flex-row">
+          <TabsTrigger value="provider">{t('云同步提供商')}</TabsTrigger>
+          <TabsTrigger value="status">{t('同步状态与配置')}</TabsTrigger>
+        </TabsList>
+        <SyncProviderContent {...props} />
+        {props.dashboard && <SyncStatusContent {...props} dashboard={props.dashboard} />}
+      </Tabs>
+    </SettingsCard>
   )
 }
 
