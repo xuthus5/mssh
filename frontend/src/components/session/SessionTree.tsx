@@ -16,6 +16,9 @@ interface Props {
   sessions: Session[]
   onConnect: (sessionId: string) => void
   onEditSession?: (session: Session) => void
+  onDuplicateSession?: (session: Session) => void | Promise<void>
+  onQuickRenameSession?: (session: Session) => void
+  onCopyCredentials?: (session: Session) => void | Promise<void>
   onDeleteSession?: (sessionId: string) => void
   onEditFolder?: (folder: Folder) => void
   onDeleteFolder?: (folderId: string) => void
@@ -97,6 +100,9 @@ interface TreeRowProps {
   onSelectFolder?: (folderId: string) => void
   onConnect: (sessionId: string) => void
   onEditSession?: (session: Session) => void
+  onDuplicateSession?: (session: Session) => void | Promise<void>
+  onQuickRenameSession?: (session: Session) => void
+  onCopyCredentials?: (session: Session) => void | Promise<void>
   onDeleteSession?: (sessionId: string) => void
   onEditFolder?: (folder: Folder) => void
   onDeleteFolder?: (folderId: string) => void
@@ -164,10 +170,17 @@ function SessionTreeActions(props: TreeRowProps & { session: Session }) {
   return <>
     <ContextMenuItem onClick={() => props.onConnect(session.id)}>{t('连接')}</ContextMenuItem>
     <ContextMenuItem onClick={() => props.onEditSession?.(session)}>{t('编辑')}</ContextMenuItem>
+    <ContextMenuItem onClick={() => runSessionAction(props.onDuplicateSession, session)}>{t('复制会话')}</ContextMenuItem>
+    <ContextMenuItem onClick={() => props.onQuickRenameSession?.(session)}>{t('快速重命名')}</ContextMenuItem>
+    <ContextMenuItem onClick={() => runSessionAction(props.onCopyCredentials, session)}>{t('复制账号密码')}</ContextMenuItem>
     {props.onMoveToFolder ? <SessionMoveActions {...props} session={session} /> : null}
     <ContextMenuSeparator />
     <ContextMenuItem variant="destructive" onClick={() => props.onDeleteSession?.(session.id)}>{t('删除')}</ContextMenuItem>
   </>
+}
+
+function runSessionAction(action: ((session: Session) => void | Promise<void>) | undefined, session: Session) {
+  void Promise.resolve(action?.(session)).catch(() => undefined)
 }
 
 function SessionMoveActions(props: TreeRowProps & { session: Session }) {

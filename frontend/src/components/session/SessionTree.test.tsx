@@ -131,6 +131,35 @@ describe('SessionTree', () => {
     expect(await screen.findByRole('menuitem', { name: '连接' })).toBeInTheDocument()
   })
 
+  it('runs duplicate, quick rename, and copy-credentials context actions', async () => {
+    const user = userEvent.setup()
+    const onDuplicateSession = vi.fn()
+    const onQuickRenameSession = vi.fn()
+    const onCopyCredentials = vi.fn()
+    render(<SessionTree
+      folders={[]}
+      sessions={[SESSIONS[0]]}
+      onConnect={vi.fn()}
+      onEditSession={vi.fn()}
+      onDuplicateSession={onDuplicateSession}
+      onQuickRenameSession={onQuickRenameSession}
+      onCopyCredentials={onCopyCredentials}
+      onDeleteSession={vi.fn()}
+    />)
+
+    await user.pointer({ target: screen.getByRole('treeitem', { name: 'web-01' }), keys: '[MouseRight]' })
+    await user.click(await screen.findByRole('menuitem', { name: '复制会话' }))
+    expect(onDuplicateSession).toHaveBeenCalledWith(SESSIONS[0])
+
+    await user.pointer({ target: screen.getByRole('treeitem', { name: 'web-01' }), keys: '[MouseRight]' })
+    await user.click(await screen.findByRole('menuitem', { name: '快速重命名' }))
+    expect(onQuickRenameSession).toHaveBeenCalledWith(SESSIONS[0])
+
+    await user.pointer({ target: screen.getByRole('treeitem', { name: 'web-01' }), keys: '[MouseRight]' })
+    await user.click(await screen.findByRole('menuitem', { name: '复制账号密码' }))
+    expect(onCopyCredentials).toHaveBeenCalledWith(SESSIONS[0])
+  })
+
   it('shows session connection details on hover', async () => {
     const user = userEvent.setup()
     render(<SessionTree folders={[]} sessions={[SESSIONS[0]]} onConnect={vi.fn()} navigationOnly />)

@@ -49,6 +49,7 @@ MSSH is not a fleet orchestrator. It focuses on saved SSH sessions and terminal-
 
 - Central session catalog with folders, environments, projects, and tags
 - Session search, quick connect, and asset detail panels
+- Session context menu: connect, edit, duplicate, quick rename, copy credentials, delete
 - Import/export for MSSH, PuTTY, SecureCRT, and MobaXterm CSV formats
 - Batch update, delete, and macro execution across selected sessions
 

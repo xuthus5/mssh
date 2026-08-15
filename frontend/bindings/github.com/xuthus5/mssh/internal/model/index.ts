@@ -88,6 +88,7 @@ export {
     SessionCSVImportResult,
     SessionCSVImportSummary,
     SessionCSVPreview,
+    SessionCredentials,
     SessionDeleteImpact,
     SessionFolder,
     SessionInput,
