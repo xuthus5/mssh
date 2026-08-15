@@ -1,5 +1,6 @@
 import { Input } from '@/components/ui/input'
 import { LabeledSelect } from '@/components/ui/labeled-select'
+import { SettingsCard, SettingsSectionHeader } from '@/components/settings/settings-ui'
 import { t } from '@/i18n'
 
 const TERMINAL_TYPE_OPTIONS = ['xterm-256color', 'xterm', 'vt100', 'linux'].map((value) => ({
@@ -29,13 +30,9 @@ function ConnectionNumberField({ id, label, value, onChange }: {
 }
 
 export function TerminalConnectionDefaultsSettingsSection(props: Props) {
-  return <section className="rounded-xl border border-border bg-card p-3 shadow-sm">
-      <div className="mb-3">
-        <h3 className="text-sm font-medium text-foreground">{t('连接默认')}</h3>
-        <p className="mt-1 text-xs text-muted-foreground">
-          {t('控制终端连接池容量、SSH 保活与默认 TERM 类型。')}
-        </p>
-      </div>
+  return <div>
+    <SettingsSectionHeader title={t('连接默认')} description={t('控制终端连接池容量、SSH 保活与默认 TERM 类型。')} />
+    <SettingsCard>
       <div className="flex flex-col gap-3">
         <div className="grid grid-cols-2 gap-3">
           <ConnectionNumberField id="terminal-max-pool-size" label={t('最大终端池大小')} value={props.maxPoolSize} onChange={props.onMaxPoolSizeChange} />
@@ -51,5 +48,6 @@ export function TerminalConnectionDefaultsSettingsSection(props: Props) {
           />
         </div>
       </div>
-    </section>
+    </SettingsCard>
+  </div>
 }

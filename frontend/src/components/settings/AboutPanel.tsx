@@ -3,8 +3,8 @@ import { Browser } from '@wailsio/runtime'
 import { Code2, ExternalLink, RefreshCw } from 'lucide-react'
 import { AboutService } from '@/lib/wails'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { SettingsCard, SettingsRow, SettingsSectionHeader } from '@/components/settings/settings-ui'
 import { logger } from '@/lib/logger'
 import { t } from '@/i18n'
 
@@ -107,20 +107,23 @@ export function AboutPanel() {
   const { about, message, setMessage } = useAboutInfo(lifecycle)
   const { latestVersion, releaseURL, checking, checkUpdate } = useUpdateCheck(lifecycle, setMessage)
   const openURL = useOpenURL(lifecycle, setMessage)
-  return <div className="flex flex-col gap-4 pt-2">
-    <Card className="rounded-xl border shadow-sm">
-      <CardHeader><CardTitle className="text-base">MSSH</CardTitle></CardHeader>
-      <CardContent className="grid gap-3 text-sm">
-        <div className="flex items-center justify-between gap-4"><span className="text-muted-foreground">{t('当前版本')}</span><span className="font-mono">{about.currentVersion === null ? t('未知') : about.currentVersion || t('加载中…')}</span></div>
-        <div className="flex items-center justify-between gap-4"><span className="text-muted-foreground">{t('社区最新版本')}</span><span className="font-mono">{latestVersion || t('尚未检查')}</span></div>
-      </CardContent>
-    </Card>
-    {message && <Alert variant={message.variant}><AlertDescription>{message.text}</AlertDescription></Alert>}
-    <div className="flex flex-wrap gap-2">
+  return <div className="flex flex-col">
+    <div className="mb-4"><h2 className="text-lg font-semibold">{t('关于')}</h2><p className="mt-1 text-sm text-muted-foreground">{t('版本信息与社区链接。')}</p></div>
+    <SettingsSectionHeader title="MSSH" description={t('Secure Shell Client & Session Manager')} />
+    <SettingsCard divided>
+      <SettingsRow label={t('当前版本')}>
+        <span className="font-mono text-sm text-foreground">{about.currentVersion === null ? t('未知') : about.currentVersion || t('加载中…')}</span>
+      </SettingsRow>
+      <SettingsRow label={t('社区最新版本')}>
+        <span className="font-mono text-sm text-foreground">{latestVersion || t('尚未检查')}</span>
+      </SettingsRow>
+    </SettingsCard>
+    {message && <div className="mt-4"><Alert variant={message.variant}><AlertDescription>{message.text}</AlertDescription></Alert></div>}
+    <div className="mt-4 flex flex-wrap gap-2">
       <Button onClick={() => { void checkUpdate() }} disabled={checking}><RefreshCw className={checking ? 'animate-spin' : ''} />{checking ? t('检查中…') : t('检查更新')}</Button>
       {releaseURL && <Button variant="outline" onClick={() => openURL(releaseURL)}><ExternalLink />{t('查看发布页')}</Button>}
       <Button variant="outline" onClick={() => openURL(about.repositoryURL)}><Code2 />{t('GitHub 社区')}</Button>
     </div>
-    <p className="break-all text-xs text-muted-foreground">{about.repositoryURL}</p>
+    <p className="mt-3 break-all text-xs text-muted-foreground">{about.repositoryURL}</p>
   </div>
 }

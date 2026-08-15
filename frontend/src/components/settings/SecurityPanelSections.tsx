@@ -1,5 +1,5 @@
 import { type ReactNode } from 'react'
-import { Fingerprint, KeyRound, RefreshCw, ShieldCheck, Trash2 } from 'lucide-react'
+import { Fingerprint, RefreshCw, Trash2 } from 'lucide-react'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -11,9 +11,9 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
+import { SettingsCard, SettingsSectionHeader } from '@/components/settings/settings-ui'
 import { SecurityService } from '@/lib/wails'
 import { t } from '@/i18n'
 import { useSecurityPanel, type HostKeyEntry } from '@/hooks/useSecurityPanel'
@@ -38,10 +38,16 @@ interface SecurityPanelViewProps {
 
 export function SecurityPanelView({ security, actions }: SecurityPanelViewProps) {
   return (
-    <div className="space-y-4 pt-2">
+    <div className="flex flex-col">
       <SecurityErrors security={security} />
-      <ApplicationPasswordCard security={security} actions={actions} />
-      <TrustedHostsCard security={security} onRemove={(entry) => actions.setConfirmAction({ type: 'host', entry })} />
+      <div className="mb-4">
+        <h2 className="text-lg font-semibold">{t('安全')}</h2>
+        <p className="mt-1 text-sm text-muted-foreground">{t('管理应用密码与已信任主机指纹。')}</p>
+      </div>
+      <div className="space-y-6">
+        <ApplicationPasswordSection security={security} actions={actions} />
+        <TrustedHostsSection security={security} onRemove={(entry) => actions.setConfirmAction({ type: 'host', entry })} />
+      </div>
       <SecurityConfirmation security={security} actions={actions} />
     </div>
   )
@@ -62,22 +68,19 @@ function SecurityErrors({ security }: { security: SecurityController }) {
   )
 }
 
-function ApplicationPasswordCard({ security, actions }: SecurityPanelViewProps) {
+function ApplicationPasswordSection({ security, actions }: SecurityPanelViewProps) {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2"><KeyRound className="size-4" />{t('应用密码')}</CardTitle>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {t('统一保护本机敏感数据与云同步备份。轮转密码会触发数据重新加密；非同设备若密码不一致将导致同步失败。')}
-        </p>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <SecurityStatusSummary security={security} />
-        {!security.status.configured
-          ? <PasswordSetupForm security={security} actions={actions} />
-          : <PasswordRotationForm security={security} actions={actions} />}
-      </CardContent>
-    </Card>
+    <div>
+      <SettingsSectionHeader title={t('应用密码')} description={t('统一保护本机敏感数据与云同步备份。轮转密码会触发数据重新加密；非同设备若密码不一致将导致同步失败。')} />
+      <SettingsCard>
+        <div className="space-y-4">
+          <SecurityStatusSummary security={security} />
+          {!security.status.configured
+            ? <PasswordSetupForm security={security} actions={actions} />
+            : <PasswordRotationForm security={security} actions={actions} />}
+        </div>
+      </SettingsCard>
+    </div>
   )
 }
 
@@ -146,20 +149,22 @@ function PasswordActionButtons({ security, actions }: SecurityPanelViewProps) {
   )
 }
 
-function TrustedHostsCard({ security, onRemove }: { security: SecurityController; onRemove: (entry: HostKeyEntry) => void }) {
+function TrustedHostsSection({ security, onRemove }: { security: SecurityController; onRemove: (entry: HostKeyEntry) => void }) {
   return (
-    <Card>
-      <CardHeader className="flex-row items-start justify-between">
+    <div>
+      <div className="mb-2.5 flex items-center justify-between gap-3">
         <div>
-          <CardTitle className="flex items-center gap-2"><ShieldCheck className="size-4" />{t('已信任主机')}</CardTitle>
-          <p className="mt-1 text-sm text-muted-foreground">{t('管理 SSH known_hosts 指纹。指纹变化时连接会被阻止。')}</p>
+          <h3 className="text-sm font-semibold">{t('已信任主机')}</h3>
+          <p className="mt-1 text-xs text-muted-foreground">{t('管理 SSH known_hosts 指纹。指纹变化时连接会被阻止。')}</p>
         </div>
         <Button size="icon-sm" variant="outline" aria-label={t('刷新主机指纹')} onClick={() => void security.load()}><RefreshCw /></Button>
-      </CardHeader>
-      <CardContent className="space-y-2">
-        <TrustedHostsContent security={security} onRemove={onRemove} />
-      </CardContent>
-    </Card>
+      </div>
+      <SettingsCard>
+        <div className="space-y-2">
+          <TrustedHostsContent security={security} onRemove={onRemove} />
+        </div>
+      </SettingsCard>
+    </div>
   )
 }
 

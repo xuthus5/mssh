@@ -56,7 +56,7 @@ export interface SettingsViewProps {
   ai?: AISettingsController
 }
 
-const tabPanelClassName = 'min-h-0 min-w-0 overflow-y-auto overscroll-contain pr-2'
+const tabPanelClassName = 'min-h-0 min-w-0 overflow-y-auto overscroll-contain'
 
 const settingsTabValues = ['general', 'terminal', 'ai', 'sync', 'security', 'sftp', 'shortcuts', 'about'] as const
 
@@ -164,9 +164,9 @@ export function SettingsView(props: SettingsViewProps) {
       value={tab}
       onValueChange={selectTab}
       orientation="vertical"
-      className="min-h-0 flex-1 flex-row gap-4 overflow-hidden p-4"
+      className="min-h-0 flex-1 gap-6 overflow-hidden p-6"
     >
-      <TabsList className="w-36 shrink-0 justify-start overflow-visible rounded-xl border bg-muted/40 p-2">
+      <TabsList className="w-44 shrink-0 justify-start overflow-visible rounded-xl border border-border bg-muted/40 p-1.5">
         <TabsTrigger value="general">{t('通用')}</TabsTrigger>
         <TabsTrigger value="terminal">{t('终端')}</TabsTrigger>
         <TabsTrigger value="ai">AI</TabsTrigger>
