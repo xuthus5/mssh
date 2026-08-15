@@ -11,7 +11,7 @@ const general: GeneralSettings = {
   maxPoolSize: 10, defaultKeepAlive: 60, defaultTermType: 'xterm-256color',
   uiFontFamily: 'sans-serif', uiFontFallbackFamily: 'sans-serif', uiFontSize: 14,
   rightClickAction: 'menu', copyOnSelect: false, scrollbackLines: 10000, autoReconnect: false,
-  restoreTabsOnStartup: true, renderer: 'dom', historyPredict: false,
+  restoreTabsOnStartup: true, renderer: 'dom', historyPredict: false, autoCloseTerminalOnExit: false,
   localShell: '', localShellArgs: '', localShellCwd: '', localShellLogin: true, keywordHighlightEnabled: true, keywordHighlightCaseInsensitive: true, keywordHighlightRules: [{ keyword: 'Error', color: '#ff5555' }],
   closeButtonAction: 'tray', debug: false, logDir: '', logRetentionDays: 30,
   proxyMode: 'system', proxyURL: '', proxyNoProxy: '', proxyUsername: '',

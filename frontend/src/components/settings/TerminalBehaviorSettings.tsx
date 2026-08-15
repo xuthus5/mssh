@@ -23,12 +23,14 @@ interface Props {
   autoReconnect: boolean
   restoreTabsOnStartup: boolean
   historyPredict: boolean
+  autoCloseTerminalOnExit: boolean
   onRightClickActionChange: (value: TerminalRightClickAction) => void
   onCopyOnSelectChange: (value: boolean) => void
   onScrollbackLinesChange: (value: number) => void
   onAutoReconnectChange: (value: boolean) => void
   onRestoreTabsOnStartupChange: (value: boolean) => void
   onHistoryPredictChange: (value: boolean) => void
+  onAutoCloseTerminalOnExitChange: (value: boolean) => void
 }
 
 export function TerminalBehaviorSettingsSection({
@@ -38,12 +40,14 @@ export function TerminalBehaviorSettingsSection({
   autoReconnect,
   restoreTabsOnStartup,
   historyPredict,
+  autoCloseTerminalOnExit,
   onRightClickActionChange,
   onCopyOnSelectChange,
   onScrollbackLinesChange,
   onAutoReconnectChange,
   onRestoreTabsOnStartupChange,
   onHistoryPredictChange,
+  onAutoCloseTerminalOnExitChange,
 }: Props) {
   return <div>
     <SettingsSectionHeader title={t('行为')} description={t('控制终端中的鼠标、剪贴板、历史缓冲与连接恢复策略。')} />
@@ -52,6 +56,7 @@ export function TerminalBehaviorSettingsSection({
       <BehaviorSwitch id="terminal-copy-on-select" label="选择即复制" description="选中文本后自动写入系统剪贴板。" checked={copyOnSelect} onChange={onCopyOnSelectChange} />
       <ScrollbackField value={scrollbackLines} onChange={onScrollbackLinesChange} />
       <BehaviorSwitch id="terminal-auto-reconnect" label="SSH 断线自动重连" description="意外断开后自动尝试重新连接；手动断开或关闭标签不会触发。默认关闭。" checked={autoReconnect} onChange={onAutoReconnectChange} />
+      <BehaviorSwitch id="terminal-auto-close-on-exit" label="退出后自动关闭终端" description="关闭活动连接时不再弹窗确认，直接关闭标签。默认关闭，即关闭时询问确认。" checked={autoCloseTerminalOnExit} onChange={onAutoCloseTerminalOnExitChange} />
       <BehaviorSwitch id="terminal-restore-tabs" label="启动时恢复终端标签" description="重启应用后自动恢复上次未关闭的终端标签。默认开启。" checked={restoreTabsOnStartup} onChange={onRestoreTabsOnStartupChange} />
       <BehaviorSwitch id="terminal-history-predict" label="历史命令预测补全" description="根据本会话历史命令，输入时在光标处显示灰色预测，按 Tab 采纳当前 token 并展开候选列表，方向键选择、Enter 确认、Esc 关闭。开启后会拦截 Tab 完成补全；默认关闭。" checked={historyPredict} onChange={onHistoryPredictChange} />
     </SettingsCard>

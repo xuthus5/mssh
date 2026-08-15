@@ -66,6 +66,7 @@ describe('terminal behavior store', () => {
       restoreTabsOnStartup: false,
       renderer: 'webgl',
       historyPredict: true,
+      autoCloseTerminalOnExit: true,
     })
     expect(useTerminalBehaviorStore.getState()).toMatchObject({
       rightClickAction: 'paste',
@@ -86,7 +87,7 @@ describe('terminal behavior store', () => {
       autoReconnect: false,
       restoreTabsOnStartup: true,
       renderer: 'dom',
-      historyPredict: false,
+      historyPredict: false, autoCloseTerminalOnExit: false,
     })
     expect(useTerminalBehaviorStore.getState().scrollbackLines).toBe(MAX_TERMINAL_SCROLLBACK_LINES)
   })

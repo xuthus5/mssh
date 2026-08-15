@@ -3,6 +3,7 @@ import { applyUIFont, clampUIFontSize, DEFAULT_UI_FONT_FALLBACK_FAMILY, DEFAULT_
 import {
   DEFAULT_TERMINAL_SCROLLBACK_LINES,
   DEFAULT_TERMINAL_RENDERER,
+  normalizeAutoCloseTerminalOnExit,
   normalizeAutoReconnect,
   normalizeCopyOnSelect,
   normalizeHistoryPredict,
@@ -28,7 +29,7 @@ import { Events } from '@wailsio/runtime'
 
 export const generalSettingKeys = [
   'terminal.max_pool_size', 'terminal.default_keep_alive', 'terminal.default_term_type',
-  'terminal.right_click_action', 'terminal.copy_on_select', 'terminal.scrollback_lines', 'terminal.auto_reconnect', 'terminal.restore_tabs_on_startup', 'terminal.renderer', 'terminal.history_predict', 'terminal.local_shell', 'terminal.local_shell_args', 'terminal.local_shell_cwd', 'terminal.local_shell_login', 'terminal.keyword_highlight', 'appearance.ui_font_family',
+  'terminal.right_click_action', 'terminal.copy_on_select', 'terminal.scrollback_lines', 'terminal.auto_reconnect', 'terminal.restore_tabs_on_startup', 'terminal.renderer', 'terminal.history_predict', 'terminal.auto_close_terminal_on_exit', 'terminal.local_shell', 'terminal.local_shell_args', 'terminal.local_shell_cwd', 'terminal.local_shell_login', 'terminal.keyword_highlight', 'appearance.ui_font_family',
   'appearance.ui_font_fallback_family', 'appearance.ui_font_size',
   'application.close_button_action', 'application.log_dir', 'application.log_retention_days',
   'application.debug',
@@ -59,6 +60,7 @@ export interface GeneralSettings {
   restoreTabsOnStartup: boolean
   renderer: TerminalRenderer
   historyPredict: boolean
+  autoCloseTerminalOnExit: boolean
   localShell: string
   localShellArgs: string
   localShellCwd: string
@@ -92,7 +94,7 @@ export const defaultGeneralSettings: GeneralSettings = {
   maxPoolSize: DEFAULT_TERMINAL_POOL_SIZE, defaultKeepAlive: 60, defaultTermType: 'xterm-256color',
   uiFontFamily: DEFAULT_UI_FONT_FAMILY, uiFontFallbackFamily: DEFAULT_UI_FONT_FALLBACK_FAMILY,
   uiFontSize: DEFAULT_UI_FONT_SIZE,
-  rightClickAction: 'menu', copyOnSelect: false, scrollbackLines: DEFAULT_TERMINAL_SCROLLBACK_LINES, autoReconnect: false, restoreTabsOnStartup: true, renderer: DEFAULT_TERMINAL_RENDERER, historyPredict: false, localShell: '', localShellArgs: '', localShellCwd: '', localShellLogin: true,
+  rightClickAction: 'menu', copyOnSelect: false, scrollbackLines: DEFAULT_TERMINAL_SCROLLBACK_LINES, autoReconnect: false, restoreTabsOnStartup: true, renderer: DEFAULT_TERMINAL_RENDERER, historyPredict: false, autoCloseTerminalOnExit: false, localShell: '', localShellArgs: '', localShellCwd: '', localShellLogin: true,
   keywordHighlightEnabled: DEFAULT_KEYWORD_HIGHLIGHT_SETTINGS.enabled,
   keywordHighlightCaseInsensitive: DEFAULT_KEYWORD_HIGHLIGHT_SETTINGS.caseInsensitive,
   keywordHighlightRules: DEFAULT_KEYWORD_HIGHLIGHT_SETTINGS.rules,
@@ -175,6 +177,7 @@ export function normalizeGeneral(settings: GeneralSettings): GeneralSettings {
     restoreTabsOnStartup: normalizeRestoreTabsOnStartup(settings.restoreTabsOnStartup),
     renderer: normalizeTerminalRenderer(settings.renderer),
     historyPredict: normalizeHistoryPredict(settings.historyPredict),
+    autoCloseTerminalOnExit: normalizeAutoCloseTerminalOnExit(settings.autoCloseTerminalOnExit),
     localShell: String(settings.localShell ?? ''),
     localShellArgs: String(settings.localShellArgs ?? ''),
     localShellCwd: String(settings.localShellCwd ?? ''),
@@ -213,6 +216,7 @@ export function parseGeneral(settings: { [_ in string]?: Setting }): GeneralSett
     restoreTabsOnStartup: settingValue(settings, 'terminal.restore_tabs_on_startup', true),
     renderer: settingValue(settings, 'terminal.renderer', DEFAULT_TERMINAL_RENDERER),
     historyPredict: settingValue(settings, 'terminal.history_predict', false),
+    autoCloseTerminalOnExit: settingValue(settings, 'terminal.auto_close_terminal_on_exit', false),
     localShell: settingValue(settings, 'terminal.local_shell', ''),
     localShellArgs: settingValue(settings, 'terminal.local_shell_args', ''),
     localShellCwd: settingValue(settings, 'terminal.local_shell_cwd', ''),
@@ -237,7 +241,7 @@ export function parseGeneral(settings: { [_ in string]?: Setting }): GeneralSett
 
 export function applyGeneral(settings: GeneralSettings) {
   applyUIFont({ family: settings.uiFontFamily, fallbackFamily: settings.uiFontFallbackFamily, size: settings.uiFontSize })
-  useTerminalBehaviorStore.getState().setSettings({ rightClickAction: settings.rightClickAction, copyOnSelect: settings.copyOnSelect, scrollbackLines: settings.scrollbackLines, autoReconnect: settings.autoReconnect, restoreTabsOnStartup: settings.restoreTabsOnStartup, renderer: settings.renderer, historyPredict: settings.historyPredict })
+  useTerminalBehaviorStore.getState().setSettings({ rightClickAction: settings.rightClickAction, copyOnSelect: settings.copyOnSelect, scrollbackLines: settings.scrollbackLines, autoReconnect: settings.autoReconnect, restoreTabsOnStartup: settings.restoreTabsOnStartup, renderer: settings.renderer, historyPredict: settings.historyPredict, autoCloseTerminalOnExit: settings.autoCloseTerminalOnExit })
   useAppStore.getState().setMaxPoolSize(settings.maxPoolSize)
   useTerminalKeywordHighlightStore.getState().setSettings({
     enabled: settings.keywordHighlightEnabled,
@@ -266,7 +270,7 @@ export async function persistGeneral(settings: GeneralSettings) {
   await SettingService.SetMany([
     settingEntry('terminal.max_pool_size', normalized.maxPoolSize), settingEntry('terminal.default_keep_alive', normalized.defaultKeepAlive),
     settingEntry('terminal.default_term_type', normalized.defaultTermType), settingEntry('terminal.right_click_action', normalized.rightClickAction),
-    settingEntry('terminal.copy_on_select', normalized.copyOnSelect), settingEntry('terminal.scrollback_lines', normalized.scrollbackLines), settingEntry('terminal.auto_reconnect', normalized.autoReconnect), settingEntry('terminal.restore_tabs_on_startup', normalized.restoreTabsOnStartup), settingEntry('terminal.renderer', normalized.renderer), settingEntry('terminal.history_predict', normalized.historyPredict), settingEntry('terminal.local_shell', normalized.localShell), settingEntry('terminal.local_shell_args', normalized.localShellArgs), settingEntry('terminal.local_shell_cwd', normalized.localShellCwd), settingEntry('terminal.local_shell_login', normalized.localShellLogin), settingEntry('terminal.keyword_highlight', { enabled: normalized.keywordHighlightEnabled, caseInsensitive: normalized.keywordHighlightCaseInsensitive, rules: normalized.keywordHighlightRules }), settingEntry('appearance.ui_font_family', normalized.uiFontFamily),
+    settingEntry('terminal.copy_on_select', normalized.copyOnSelect), settingEntry('terminal.scrollback_lines', normalized.scrollbackLines), settingEntry('terminal.auto_reconnect', normalized.autoReconnect), settingEntry('terminal.restore_tabs_on_startup', normalized.restoreTabsOnStartup), settingEntry('terminal.renderer', normalized.renderer), settingEntry('terminal.history_predict', normalized.historyPredict), settingEntry('terminal.auto_close_terminal_on_exit', normalized.autoCloseTerminalOnExit), settingEntry('terminal.local_shell', normalized.localShell), settingEntry('terminal.local_shell_args', normalized.localShellArgs), settingEntry('terminal.local_shell_cwd', normalized.localShellCwd), settingEntry('terminal.local_shell_login', normalized.localShellLogin), settingEntry('terminal.keyword_highlight', { enabled: normalized.keywordHighlightEnabled, caseInsensitive: normalized.keywordHighlightCaseInsensitive, rules: normalized.keywordHighlightRules }), settingEntry('appearance.ui_font_family', normalized.uiFontFamily),
     settingEntry('appearance.ui_font_fallback_family', normalized.uiFontFallbackFamily), settingEntry('appearance.ui_font_size', normalized.uiFontSize),
     settingEntry('application.close_button_action', normalized.closeButtonAction),
     settingEntry('application.debug', normalized.debug),

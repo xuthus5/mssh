@@ -21,6 +21,8 @@ export interface TerminalBehaviorSettings {
   renderer: TerminalRenderer
   /** Predict and Tab-complete from historical commands while typing. */
   historyPredict: boolean
+  /** Close the terminal tab on exit without asking for confirmation. */
+  autoCloseTerminalOnExit: boolean
 }
 
 interface TerminalBehaviorState extends TerminalBehaviorSettings {
@@ -37,6 +39,7 @@ export const DEFAULT_TERMINAL_BEHAVIOR: TerminalBehaviorSettings = {
   restoreTabsOnStartup: true,
   renderer: DEFAULT_TERMINAL_RENDERER,
   historyPredict: false,
+  autoCloseTerminalOnExit: false,
 }
 
 export function normalizeTerminalRightClickAction(value: unknown): TerminalRightClickAction {
@@ -74,6 +77,10 @@ export function normalizeHistoryPredict(value: unknown): boolean {
   return value === true
 }
 
+export function normalizeAutoCloseTerminalOnExit(value: unknown): boolean {
+  return value === true
+}
+
 export const useTerminalBehaviorStore = create<TerminalBehaviorState>((set) => ({
   ...DEFAULT_TERMINAL_BEHAVIOR,
   settingsHydrated: false,
@@ -85,6 +92,7 @@ export const useTerminalBehaviorStore = create<TerminalBehaviorState>((set) => (
     restoreTabsOnStartup: normalizeRestoreTabsOnStartup(settings.restoreTabsOnStartup),
     renderer: normalizeTerminalRenderer(settings.renderer),
     historyPredict: normalizeHistoryPredict(settings.historyPredict),
+    autoCloseTerminalOnExit: normalizeAutoCloseTerminalOnExit(settings.autoCloseTerminalOnExit),
   }),
   markSettingsHydrated: () => set({ settingsHydrated: true }),
 }))
