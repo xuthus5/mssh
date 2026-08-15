@@ -54,6 +54,19 @@ describe('appStore', () => {
     expect(useAppStore.getState().activeSurface).toEqual({ type: 'terminal', id: 'terminal-1' })
   })
 
+  it('renames a terminal tab title without touching other tabs', () => {
+    const store = useAppStore.getState()
+    store.openTab({ id: 'terminal-1', title: 'one', type: 'terminal', terminalId: 'term-1', sessionId: 1 })
+    store.openTab({ id: 'terminal-2', title: 'two', type: 'terminal', terminalId: 'term-2', sessionId: 2 })
+
+    store.renameTerminalTab('terminal-1', 'renamed')
+
+    expect(useAppStore.getState().tabs).toEqual([
+      { id: 'terminal-1', title: 'renamed', type: 'terminal', terminalId: 'term-1', sessionId: 1 },
+      { id: 'terminal-2', title: 'two', type: 'terminal', terminalId: 'term-2', sessionId: 2 },
+    ])
+  })
+
   it('keeps the active terminal visible when opening the macro sidebar', () => {
     const store = useAppStore.getState()
     store.openTab({ id: 'terminal-1', title: 'one', type: 'terminal', terminalId: 'term-1', sessionId: 1 })

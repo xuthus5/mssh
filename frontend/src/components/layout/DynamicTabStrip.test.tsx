@@ -95,6 +95,38 @@ describe('DynamicTabStrip', () => {
     await waitFor(() => expect(closeTab).toHaveBeenCalledWith('terminal-1'))
   })
 
+  it('renames a terminal tab title from its context menu', async () => {
+    seedTabs()
+    const renameTerminalTab = vi.fn()
+    useAppStore.setState({ renameTerminalTab })
+    render(<DynamicTabStrip />)
+
+    fireEvent.contextMenu(screen.getByRole('tab', { name: /生产服务器/ }))
+    await userEvent.click(await screen.findByRole('menuitem', { name: '重命名' }))
+
+    const input = await screen.findByRole('textbox', { name: '终端标签名称' })
+    expect(input).toHaveValue('生产服务器')
+    await userEvent.clear(input)
+    await userEvent.type(input, '临时标题')
+    await userEvent.click(screen.getByRole('button', { name: '保存' }))
+
+    expect(renameTerminalTab).toHaveBeenCalledWith('terminal-1', '临时标题')
+  })
+
+  it('cancels a tab rename without committing', async () => {
+    seedTabs()
+    const renameTerminalTab = vi.fn()
+    useAppStore.setState({ renameTerminalTab })
+    render(<DynamicTabStrip />)
+
+    fireEvent.contextMenu(screen.getByRole('tab', { name: /生产服务器/ }))
+    await userEvent.click(await screen.findByRole('menuitem', { name: '重命名' }))
+
+    await userEvent.click(await screen.findByRole('button', { name: '取消' }))
+
+    expect(renameTerminalTab).not.toHaveBeenCalled()
+  })
+
   it('closes all terminal tabs from a context menu with a single confirmation', async () => {
     const closeTab = vi.fn(async () => {})
     seedTabs()

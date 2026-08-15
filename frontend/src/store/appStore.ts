@@ -160,6 +160,7 @@ export interface AppState {
   replaceTerminalConnection: (tabID: string, previousTerminalID: string, nextTerminalID: string) => boolean
   promoteTerminalConnection: (tabID: string, previousTerminalID: string, nextTerminalID: string) => boolean
   updateTerminalWorkspace: (tabID: string, updates: Pick<Partial<TerminalTab>, 'toolPanel' | 'splitLayout' | 'splitPaneIDs'>) => void
+  renameTerminalTab: (tabID: string, title: string) => void
   activateWorkspace: (id: WorkspaceID) => void
   setOverviewSection: (section: OverviewSection) => void
   leaveOverview: () => void

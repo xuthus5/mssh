@@ -20,7 +20,7 @@ import { rewriteSplitPaneIDs, scrubTerminalRuntime, terminalTabPaneIDs } from '@
 type StoreSet = StoreApi<AppState>['setState']
 type StoreGet = StoreApi<AppState>['getState']
 type TransferActions = Pick<AppState, 'addTransfer' | 'removeTransfer' | 'updateTransfer' | 'clearFinishedTransfers' | 'setTransfersLoadError' | 'setTransferCenterOpen'>
-type TabActions = Pick<AppState, 'openTab' | 'closeTab' | 'removeTabLocal' | 'replaceTerminalConnection' | 'promoteTerminalConnection' | 'updateTerminalWorkspace'>
+type TabActions = Pick<AppState, 'openTab' | 'closeTab' | 'removeTabLocal' | 'replaceTerminalConnection' | 'promoteTerminalConnection' | 'updateTerminalWorkspace' | 'renameTerminalTab'>
 type NavigationActions = Pick<AppState, 'activateWorkspace' | 'setOverviewSection' | 'leaveOverview' | 'activateTab' | 'requestTerminalFocus' | 'toggleNavigation' | 'setSidebarWidth'>
 type PoolActions = Pick<AppState, 'registerTerminal' | 'unregisterTerminal' | 'forgetTerminal' | 'updateLastUsed' | 'evictLRU'>
 function workspaceTabForSurface(activeSurface: ActiveSurface | null, workspaceTab: WorkspaceID): WorkspaceID {
@@ -192,6 +192,9 @@ export function createTabActions(set: StoreSet, get: StoreGet): TabActions {
     },
     updateTerminalWorkspace: (tabID, updates) => set((state) => ({
       tabs: state.tabs.map((tab) => tab.id === tabID && tab.type === 'terminal' ? { ...tab, ...updates } : tab),
+    })),
+    renameTerminalTab: (tabID, title) => set((state) => ({
+      tabs: state.tabs.map((tab) => tab.id === tabID && tab.type === 'terminal' ? { ...tab, title } : tab),
     })),
   }
 }
