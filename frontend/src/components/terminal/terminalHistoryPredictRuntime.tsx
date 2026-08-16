@@ -202,19 +202,22 @@ class TokenPredictController {
 
   private handleKeydown(event: KeyboardEvent): boolean {
     if (event.type !== 'keydown' || !this.enabled()) return true
-    if (isPlainKey(event) && event.key === 'Tab') {
+    const isTab = event.key === 'Tab'
+    if (isTab && !event.shiftKey) {
+      // Plain Tab passes through to the shell so file/path completion still works.
+      this.hideOverlay()
+      return true
+    }
+    if (isTab && event.shiftKey) {
+      if (this.state.candidates.length === 0) return true
+      event.preventDefault()
       if (this.state.open) {
-        event.preventDefault()
         this.state.selected = (this.state.selected + 1) % this.state.candidates.length
         this.renderOverlay()
-        return false
-      }
-      if (this.state.candidates.length > 0) {
-        event.preventDefault()
+      } else {
         this.acceptToken(0)
-        return false
       }
-      return true
+      return false
     }
     if (this.state.open) {
       if (isPlainKey(event) && event.key === 'ArrowDown') {

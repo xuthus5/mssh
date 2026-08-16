@@ -124,7 +124,7 @@ describe('installCommandTokenPredict', () => {
     expect(await screen.findByText((content) => content.includes('-lahrt'))).toBeInTheDocument()
   })
 
-  it('accepts the inline token on Tab and continues selecting', async () => {
+  it('accepts the inline token on Shift+Tab and continues selecting', async () => {
     recordCommand(7, 'ls -lahrt /usr/local/bin/claude')
     const { term } = createTermMock()
     let buffer = 'ls'
@@ -135,7 +135,7 @@ describe('installCommandTokenPredict', () => {
       applyCompletion,
     })
     await act(async () => { handlers.update() })
-    expect(term.trigger({ key: 'Tab' })).toBe(false)
+    expect(term.trigger({ key: 'Tab', shiftKey: true })).toBe(false)
     expect(applyCompletion).toHaveBeenCalledWith(' -lahrt ')
     expect(buffer).toBe('ls -lahrt ')
 
@@ -158,10 +158,10 @@ describe('installCommandTokenPredict', () => {
       applyCompletion,
     })
     await act(async () => { handlers.update() })
-    expect(term.trigger({ key: 'Tab' })).toBe(false)
+    expect(term.trigger({ key: 'Tab', shiftKey: true })).toBe(false)
     await act(async () => { handlers.update() })
-    expect(term.trigger({ key: 'Tab' })).toBe(false)
-    expect(term.trigger({ key: 'Tab' })).toBe(false)
+    expect(term.trigger({ key: 'Tab', shiftKey: true })).toBe(false)
+    expect(term.trigger({ key: 'Tab', shiftKey: true })).toBe(false)
     expect(term.trigger({ key: 'Enter' })).toBe(false)
     expect(applyCompletion).toHaveBeenLastCalledWith('release ')
   })
@@ -177,11 +177,24 @@ describe('installCommandTokenPredict', () => {
       applyCompletion,
     })
     await act(async () => { handlers.update() })
-    expect(term.trigger({ key: 'Tab' })).toBe(false)
+    expect(term.trigger({ key: 'Tab', shiftKey: true })).toBe(false)
     await act(async () => { handlers.update() })
     expect(term.trigger({ key: 'Escape' })).toBe(false)
-    expect(term.trigger({ key: 'Tab' })).toBe(false)
+    expect(term.trigger({ key: 'Tab', shiftKey: true })).toBe(false)
     expect(applyCompletion).toHaveBeenLastCalledWith('/usr/local/bin/claude ')
+  })
+
+  it('passes plain Tab through so shell path completion still works', async () => {
+    recordCommand(7, 'ls -lahrt /usr/local/bin/claude')
+    const { term } = createTermMock()
+    const applyCompletion = vi.fn()
+    installCommandTokenPredict(term as never, {
+      getSessionId: () => 7,
+      getBuffer: () => 'ls',
+      applyCompletion,
+    })
+    expect(term.trigger({ key: 'Tab' })).toBe(true)
+    expect(applyCompletion).not.toHaveBeenCalled()
   })
 
   it('passes Tab through when disabled or without candidates', async () => {
@@ -203,6 +216,7 @@ describe('installCommandTokenPredict', () => {
       applyCompletion,
     })
     expect(term.trigger({ key: 'Tab' })).toBe(true)
+    expect(term.trigger({ key: 'Tab', shiftKey: true })).toBe(true)
   })
 
   it('disposes the overlay and resets the key handler', async () => {
@@ -216,7 +230,7 @@ describe('installCommandTokenPredict', () => {
     })
     await act(async () => { handlers.update() })
     handlers.dispose()
-    expect(term.trigger({ key: 'Tab' })).toBe(true)
+    expect(term.trigger({ key: 'Tab', shiftKey: true })).toBe(true)
     expect(applyCompletion).not.toHaveBeenCalled()
   })
 })
