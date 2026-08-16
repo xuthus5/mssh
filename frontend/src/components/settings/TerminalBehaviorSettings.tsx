@@ -58,7 +58,7 @@ export function TerminalBehaviorSettingsSection({
       <BehaviorSwitch id="terminal-auto-reconnect" label="SSH 断线自动重连" description="意外断开后自动尝试重新连接；手动断开或关闭标签不会触发。默认关闭。" checked={autoReconnect} onChange={onAutoReconnectChange} />
       <BehaviorSwitch id="terminal-auto-close-on-exit" label="退出后自动关闭终端" description="关闭活动连接时不再弹窗确认，直接关闭标签。默认关闭，即关闭时询问确认。" checked={autoCloseTerminalOnExit} onChange={onAutoCloseTerminalOnExitChange} />
       <BehaviorSwitch id="terminal-restore-tabs" label="启动时恢复终端标签" description="重启应用后自动恢复上次未关闭的终端标签。默认开启。" checked={restoreTabsOnStartup} onChange={onRestoreTabsOnStartupChange} />
-      <BehaviorSwitch id="terminal-history-predict" label="历史命令预测补全" description="根据本会话历史命令预测整条命令或下一个参数，输入时在光标处显示灰色提示，按 Tab 采纳并展开候选列表，方向键选择、Enter 确认、Esc 关闭。开启后会拦截 Tab 完成补全；默认关闭。" checked={historyPredict} onChange={onHistoryPredictChange} />
+      <BehaviorSwitch id="terminal-history-predict" label="历史命令预测补全" description="根据本会话历史命令预测整条命令或下一个参数，输入时在光标处显示灰色提示，按 Shift+Tab 采纳并展开候选列表，方向键选择、Enter 确认、Esc 关闭。普通 Tab 保留给 Shell 的路径补全。默认关闭。" checked={historyPredict} onChange={onHistoryPredictChange} />
     </SettingsCard>
   </div>
 }

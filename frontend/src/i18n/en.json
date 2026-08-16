@@ -1087,7 +1087,7 @@
   "样例": "Sample",
   "核心": "Core",
   "核心分组": "Core folder",
-  "根据本会话历史命令预测整条命令或下一个参数，输入时在光标处显示灰色提示，按 Tab 采纳并展开候选列表，方向键选择、Enter 确认、Esc 关闭。开启后会拦截 Tab 完成补全；默认关闭。": "Predict the full command or next argument from this session's history: a grey hint appears at the cursor while typing, Tab accepts and expands the candidate list, arrow keys select, Enter confirms, Esc closes. Tab is intercepted when enabled. Off by default.",
+  "根据本会话历史命令预测整条命令或下一个参数，输入时在光标处显示灰色提示，按 Shift+Tab 采纳并展开候选列表，方向键选择、Enter 确认、Esc 关闭。普通 Tab 保留给 Shell 的路径补全。默认关闭。": "Predict the full command or next argument from this session's history: a grey hint appears at the cursor while typing, Shift+Tab accepts and expands the candidate list, arrow keys select, Enter confirms, Esc closes. Plain Tab stays with the shell for path completion. Off by default.",
   "根目录": "Root directory",
   "格式版本": "Format version",
   "检查中…": "Checking…",
