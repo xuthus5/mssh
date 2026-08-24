@@ -144,7 +144,7 @@ func (t *TerminalService) closeTerminalStateLocked(terminalID string, allowMissi
 	if err := validateTerminalID(terminalID); err != nil {
 		return err
 	}
-	t.logger.Info("closing terminal", "terminalID", terminalID)
+	t.logger.Info("closing terminal", "terminalID", terminalID, "state", state)
 	if t.clearBufferedTerminal(terminalID) {
 		return nil
 	}
@@ -208,6 +208,11 @@ func (t *TerminalService) finishTerminalClose(cleanup terminalCloseCleanup) erro
 			closeErr = errors.Join(closeErr, fmt.Errorf("disconnect terminal connection: %w", err))
 		}
 	}
+	t.logger.Info("terminal closed by app",
+		"terminalID", cleanup.terminalID,
+		"state", cleanup.state,
+		"openTerminals", t.Count(),
+	)
 	t.eventBus.Emit(event.TerminalClosed, event.ConnectionStatePayload{
 		TerminalID: cleanup.terminalID,
 		State:      cleanup.state,

@@ -1,6 +1,11 @@
 package service
 
 import (
+	"bytes"
+	"errors"
+	"io"
+	"log/slog"
+	"net"
 	"testing"
 	"time"
 
@@ -67,4 +72,71 @@ func TestEvictLRUEmitsClosed(t *testing.T) {
 	assert.True(t, closed)
 	assert.True(t, bus.hasEvent(event.TerminalClosed))
 	require.Equal(t, 0, svc.Count())
+}
+
+type timeoutError struct{}
+
+func (timeoutError) Error() string   { return "i/o timeout" }
+func (timeoutError) Timeout() bool   { return true }
+func (timeoutError) Temporary() bool { return false }
+
+func TestDescribeExitReason(t *testing.T) {
+	cases := []struct {
+		name string
+		err  error
+		want string
+	}{
+		{"clean exit", nil, "clean-exit"},
+		{"remote eof", io.EOF, "remote-eof"},
+		{"local close", net.ErrClosed, "local-close"},
+		{"timeout", &net.OpError{Op: "read", Err: timeoutError{}}, "timeout"},
+		{"connection reset", &net.OpError{Op: "read", Err: errors.New("read tcp 1.2.3.4:22: connection reset by peer")}, "connection-reset"},
+		{"unknown", errors.New("ssh: handshake failed"), "unknown"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, describeExitReason(tc.err))
+		})
+	}
+}
+
+func TestHandlePTYExitLogsDetailedReason(t *testing.T) {
+	var buf bytes.Buffer
+	logger := slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelInfo}))
+	bus := newMockEventBus()
+	svc := NewTerminalService(nil, bus, 4, logger)
+	fake := &ssh.PTYSession{}
+	svc.mu.Lock()
+	svc.ptys["term-log"] = fake
+	svc.lastUsed["term-log"] = time.Now()
+	svc.attached["term-log"] = true
+	svc.connIDs["term-log"] = "conn"
+	svc.mu.Unlock()
+
+	svc.handlePTYExit("term-log", fake, &net.OpError{Op: "read", Err: errors.New("connection reset by peer")})
+
+	output := buf.String()
+	assert.Contains(t, output, "terminal disconnected by remote")
+	assert.Contains(t, output, `"reason":"connection-reset"`)
+	assert.Contains(t, output, `"attached":true`)
+	assert.Contains(t, output, `"openTerminals":0`)
+}
+
+func TestCloseLogsAppState(t *testing.T) {
+	var buf bytes.Buffer
+	logger := slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelInfo}))
+	bus := newMockEventBus()
+	svc := NewTerminalService(nil, bus, 4, logger)
+	fake := &ssh.PTYSession{}
+	svc.mu.Lock()
+	svc.ptys["term-close"] = fake
+	svc.lastUsed["term-close"] = time.Now()
+	svc.mu.Unlock()
+
+	require.NoError(t, svc.closeTerminal("term-close"))
+
+	output := buf.String()
+	assert.Contains(t, output, "closing terminal")
+	assert.Contains(t, output, `"state":"closed"`)
+	assert.Contains(t, output, "terminal closed by app")
 }

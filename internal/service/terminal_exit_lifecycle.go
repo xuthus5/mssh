@@ -1,6 +1,10 @@
 package service
 
 import (
+	"errors"
+	"io"
+	"net"
+	"strings"
 	"sync"
 
 	"github.com/xuthus5/mssh/pkg/event"
@@ -38,6 +42,28 @@ func (t *TerminalService) resumeTerminalExitCallbacks() {
 	t.exitMu.Unlock()
 }
 
+// describeExitReason normalizes a PTY exit error into a compact, greppable reason.
+// The raw error stays available via the `error` log field.
+func describeExitReason(err error) string {
+	if err == nil {
+		return "clean-exit"
+	}
+	if errors.Is(err, io.EOF) {
+		return "remote-eof"
+	}
+	if errors.Is(err, net.ErrClosed) {
+		return "local-close"
+	}
+	var netErr net.Error
+	if errors.As(err, &netErr) && netErr.Timeout() {
+		return "timeout"
+	}
+	if strings.Contains(strings.ToLower(err.Error()), "reset") {
+		return "connection-reset"
+	}
+	return "unknown"
+}
+
 func (t *TerminalService) handlePTYExit(terminalID string, exitedPTY terminalIO, exitErr error) {
 	t.mu.Lock()
 	if t.ignorePTYExitLocked(terminalID, exitedPTY) {
@@ -49,7 +75,8 @@ func (t *TerminalService) handlePTYExit(terminalID string, exitedPTY terminalIO,
 	delete(t.ptys, terminalID)
 	delete(t.closingPTYs, terminalID)
 	delete(t.lastUsed, terminalID)
-	if t.attached[terminalID] {
+	wasAttached := t.attached[terminalID]
+	if wasAttached {
 		delete(t.attached, terminalID)
 		delete(t.pendingOutput, terminalID)
 	}
@@ -83,7 +110,14 @@ func (t *TerminalService) handlePTYExit(terminalID string, exitedPTY terminalIO,
 	if expirePending {
 		t.schedulePendingOutputExpiry(terminalID)
 	}
-	t.logger.Info("terminal disconnected by remote", "terminalID", terminalID, "error", exitErr)
+	t.logger.Info("terminal disconnected by remote",
+		"terminalID", terminalID,
+		"sessionID", sessionID,
+		"attached", wasAttached,
+		"openTerminals", t.Count(),
+		"reason", describeExitReason(exitErr),
+		"error", exitErr,
+	)
 }
 
 func (t *TerminalService) ignorePTYExitLocked(terminalID string, exitedPTY terminalIO) bool {
