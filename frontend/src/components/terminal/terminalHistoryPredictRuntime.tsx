@@ -1,4 +1,4 @@
-import type { IDecoration, Terminal } from '@xterm/xterm'
+import type { IDecoration, IDisposable, Terminal } from '@xterm/xterm'
 import { createRoot, type Root } from 'react-dom/client'
 import { TerminalSuggestionOverlay } from '@/components/terminal/TerminalSuggestionOverlay'
 import { predictCommandTokens, readSessionCommands, splitCommandTokens, type PredictionMode } from '@/lib/commandHistoryPredict'
@@ -110,10 +110,13 @@ class TokenPredictController {
   private state: PredictState = { candidates: [], selected: 0, open: false, mode: 'next', pendingReopen: false }
   private rootEntry: { element: HTMLElement; root: Root } | null = null
   private overlay: OverlayAnchor
+  private renderSubscription: IDisposable | null = null
+  private lastCursorX = -1
 
   constructor(private term: Terminal, private options: TokenPredictOptions) {
     this.overlay = createOverlayAnchor(term, () => this.renderOverlay())
     term.attachCustomKeyEventHandler((event) => this.handleKeydown(event))
+    this.renderSubscription = term.onRender(() => this.repositionOnRender())
   }
 
   update() {
@@ -122,12 +125,23 @@ class TokenPredictController {
 
   dispose() {
     this.term.attachCustomKeyEventHandler(() => true)
+    this.renderSubscription?.dispose()
+    this.renderSubscription = null
     this.hideOverlay()
   }
 
   private enabled(): boolean {
     if (this.options.isEnabled) return this.options.isEnabled()
     return useTerminalBehaviorStore.getState().historyPredict
+  }
+
+  /** Recompute the ghost position once the terminal actually renders (echo catches up). */
+  private repositionOnRender() {
+    if (!this.enabled()) return
+    if (this.state.candidates.length === 0 && !this.state.open) return
+    const active = this.term.buffer.active
+    if (active.cursorX === this.lastCursorX) return
+    this.renderOverlay()
   }
 
   private lineKey(): string {
@@ -171,6 +185,7 @@ class TokenPredictController {
     const buffer = this.options.getBuffer()
     const token = this.state.candidates[0] ?? ''
     const active = this.term.buffer.active
+    this.lastCursorX = active.cursorX
     this.rootEntry.root.render(
       <TerminalSuggestionOverlay
         inline={this.state.open ? '' : inlineSuggestionText(buffer, token, this.state.mode)}

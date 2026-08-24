@@ -8,12 +8,22 @@ import {
 } from '@/components/terminal/terminalHistoryPredictRuntime'
 import { DEFAULT_TERMINAL_BEHAVIOR, useTerminalBehaviorStore } from '@/store/terminalBehaviorStore'
 
-function createTermMock() {
-  let keyHandler: ((event: KeyboardEvent) => boolean) | null = null
+function createAnchorElement() {
   const element = document.createElement('div')
   element.id = 'overlay-anchor'
   element.style.width = '8px'
+  element.getBoundingClientRect = () => ({
+    width: 8, height: 16, top: 0, left: 0, right: 8, bottom: 16, x: 0, y: 0,
+    toJSON: () => ({}),
+  } as DOMRect)
   document.body.appendChild(element)
+  return element
+}
+
+function createTermMock() {
+  let keyHandler: ((event: KeyboardEvent) => boolean) | null = null
+  let renderHandler: (() => void) | null = null
+  const element = createAnchorElement()
   const state = { baseY: 0, cursorY: 23, cursorX: 0, rows: 24 }
   const term = {
     rows: 24,
@@ -26,6 +36,10 @@ function createTermMock() {
     },
     attachCustomKeyEventHandler(handler: ((event: KeyboardEvent) => boolean) | null) {
       keyHandler = handler
+    },
+    onRender(handler: () => void) {
+      renderHandler = handler
+      return { dispose: vi.fn() }
     },
     registerMarker: vi.fn(() => ({ line: state.baseY + state.cursorY, dispose: vi.fn() })),
     registerDecoration: vi.fn(() => ({
@@ -45,8 +59,11 @@ function createTermMock() {
         ...event,
       } as KeyboardEvent)
     },
+    render() {
+      renderHandler?.()
+    },
   }
-  return { term, state, element }
+  return { term, state, element, render: () => renderHandler?.() }
 }
 
 describe('tokenInsertion', () => {
@@ -122,6 +139,22 @@ describe('installCommandTokenPredict', () => {
     await act(async () => { handlers.update() })
     expect(term.registerDecoration.mock.calls.length).toBe(decoratedOnce)
     expect(await screen.findByText((content) => content.includes('-lahrt'))).toBeInTheDocument()
+  })
+
+  it('repositions the ghost to follow the echoed cursor on render', async () => {
+    recordCommand(7, 'ls -lahrt /usr/local/bin/claude')
+    const { term, state, render } = createTermMock()
+    const handlers = installCommandTokenPredict(term as never, {
+      getSessionId: () => 7,
+      getBuffer: () => 'ls',
+      applyCompletion: vi.fn(),
+    })
+    await act(async () => { handlers.update() })
+    expect(screen.getByText((content) => content.includes('-lahrt'))).toHaveStyle({ left: '0px' })
+
+    state.cursorX = 5
+    await act(async () => { render() })
+    expect(screen.getByText((content) => content.includes('-lahrt'))).toHaveStyle({ left: '40px' })
   })
 
   it('accepts the inline token on Shift+Tab and continues selecting', async () => {

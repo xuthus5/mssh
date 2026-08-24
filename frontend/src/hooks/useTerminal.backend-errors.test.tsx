@@ -29,6 +29,7 @@ vi.mock('@xterm/xterm', () => ({
     open() {}
     loadAddon(addon: { dispose: () => void }) { this.addons.push(addon) }
     attachCustomKeyEventHandler() { return true }
+    onRender() { return { dispose: vi.fn() } }
     onData(handler: (data: string) => void) {
       const dispose = vi.fn()
       dataHandlers.push(handler)
