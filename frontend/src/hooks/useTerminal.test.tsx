@@ -51,6 +51,7 @@ class MockTerminal {
     return this.unicodeApi
   }
   attachCustomKeyEventHandler() { return true }
+  onRender() { return { dispose: vi.fn() } }
   onData() {
     const dispose = vi.fn()
     dataDisposes.push(dispose)
