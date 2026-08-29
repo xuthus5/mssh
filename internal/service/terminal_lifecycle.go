@@ -52,6 +52,7 @@ func (t *TerminalService) closeAll(permanent bool) error {
 	t.stopPendingOutputExpiries()
 	closeErr = errors.Join(closeErr, closeTerminalIDsIfPresent(t, t.snapshotTerminalIDs()))
 	closeErr = errors.Join(closeErr, t.retryPendingSerialCleanups())
+	t.closeAllSystemProbeConnections()
 	t.mu.Lock()
 	resume := !permanent && !t.shuttingDown
 	t.mu.Unlock()

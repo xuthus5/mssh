@@ -250,14 +250,18 @@ func TestUpdateSystemRatesHandlesInitialAndInvalidIntervals(t *testing.T) {
 }
 
 func TestTerminalServiceSystemInfo(t *testing.T) {
-	original := _runSystemInfoCommand
-	t.Cleanup(func() { _runSystemInfoCommand = original })
+	originalCommand := _runSystemInfoCommand
+	t.Cleanup(func() { _runSystemInfoCommand = originalCommand })
 	_runSystemInfoCommand = func(_ *ssh.ClientWrapper, _ string) ([]byte, error) {
 		return []byte("CPU 200 80 MEMTOTAL 8589934592 MEMAVAILABLE 4294967296 NET 2048 4096 DISK 107374182400 536870912000 CPUCOUNT 4"), nil
 	}
-	sessionService := &SessionService{conns: map[string]*managedConn{"conn-1": {wrapper: &ssh.ClientWrapper{}}}}
-	service := NewTerminalService(sessionService, newMockEventBus(), 2, testutil.NewTestLogger())
-	service.connIDs["term-1"] = "conn-1"
+	originalProbe := _openSystemProbeConnection
+	t.Cleanup(func() { _openSystemProbeConnection = originalProbe })
+	_openSystemProbeConnection = func(_ *SessionService, _ int64) (*ssh.ClientWrapper, func(), error) {
+		return &ssh.ClientWrapper{}, func() {}, nil
+	}
+	service := NewTerminalService(&SessionService{}, newMockEventBus(), 2, testutil.NewTestLogger())
+	service.sessionIDs["term-1"] = 1
 	service.systemMu.Lock()
 	service.systemSamples["term-1"] = systemSample{total: 100, idle: 40, received: 1024, transmitted: 2048, at: time.Now().Add(-time.Second)}
 	service.systemMu.Unlock()
@@ -270,31 +274,42 @@ func TestTerminalServiceSystemInfo(t *testing.T) {
 }
 
 func TestTerminalServiceSystemInfoErrors(t *testing.T) {
-	service := NewTerminalService(&SessionService{conns: map[string]*managedConn{}}, newMockEventBus(), 2, testutil.NewTestLogger())
+	service := NewTerminalService(&SessionService{}, newMockEventBus(), 2, testutil.NewTestLogger())
 	_, err := service.SystemInfo("missing")
 	require.ErrorContains(t, err, "terminal missing not found")
 
-	service.connIDs["term-1"] = "missing"
+	originalProbe := _openSystemProbeConnection
+	t.Cleanup(func() { _openSystemProbeConnection = originalProbe })
+	_openSystemProbeConnection = func(_ *SessionService, _ int64) (*ssh.ClientWrapper, func(), error) {
+		return nil, nil, errors.New("probe connection failed")
+	}
+	service.sessionIDs["term-1"] = 1
 	_, err = service.SystemInfo("term-1")
-	require.ErrorContains(t, err, "connection missing not found")
+	require.ErrorContains(t, err, "probe connection failed")
 
-	original := _runSystemInfoCommand
-	t.Cleanup(func() { _runSystemInfoCommand = original })
-	service.sessionSvc.conns["conn-1"] = &managedConn{wrapper: &ssh.ClientWrapper{}}
-	service.connIDs["term-1"] = "conn-1"
+	originalCommand := _runSystemInfoCommand
+	t.Cleanup(func() { _runSystemInfoCommand = originalCommand })
+	_openSystemProbeConnection = func(_ *SessionService, _ int64) (*ssh.ClientWrapper, func(), error) {
+		return &ssh.ClientWrapper{}, func() {}, nil
+	}
 	_runSystemInfoCommand = func(_ *ssh.ClientWrapper, _ string) ([]byte, error) { return nil, errors.New("probe failed") }
 	_, err = service.SystemInfo("term-1")
 	require.ErrorContains(t, err, "probe failed")
 }
 
 func TestTerminalServiceProcessInfo(t *testing.T) {
-	original := _runSystemInfoCommand
-	t.Cleanup(func() { _runSystemInfoCommand = original })
+	originalCommand := _runSystemInfoCommand
+	t.Cleanup(func() { _runSystemInfoCommand = originalCommand })
 	_runSystemInfoCommand = func(_ *ssh.ClientWrapper, _ string) ([]byte, error) {
 		return []byte("10 1 root S 9.5 1024 tmux server\ninvalid row\n11 1 dev R bad 2048 vim"), nil
 	}
-	service := NewTerminalService(&SessionService{conns: map[string]*managedConn{"conn-1": {wrapper: &ssh.ClientWrapper{}}}}, newMockEventBus(), 2, testutil.NewTestLogger())
-	service.connIDs["term-1"] = "conn-1"
+	originalProbe := _openSystemProbeConnection
+	t.Cleanup(func() { _openSystemProbeConnection = originalProbe })
+	_openSystemProbeConnection = func(_ *SessionService, _ int64) (*ssh.ClientWrapper, func(), error) {
+		return &ssh.ClientWrapper{}, func() {}, nil
+	}
+	service := NewTerminalService(&SessionService{}, newMockEventBus(), 2, testutil.NewTestLogger())
+	service.sessionIDs["term-1"] = 1
 
 	processes, err := service.ProcessInfo("term-1")
 	require.NoError(t, err)
@@ -302,14 +317,24 @@ func TestTerminalServiceProcessInfo(t *testing.T) {
 }
 
 func TestTerminalServiceProcessInfoErrors(t *testing.T) {
-	service := NewTerminalService(&SessionService{conns: map[string]*managedConn{}}, newMockEventBus(), 2, testutil.NewTestLogger())
+	service := NewTerminalService(&SessionService{}, newMockEventBus(), 2, testutil.NewTestLogger())
 	_, err := service.ProcessInfo("missing")
 	require.ErrorContains(t, err, "terminal missing not found")
 
-	original := _runSystemInfoCommand
-	t.Cleanup(func() { _runSystemInfoCommand = original })
-	service.sessionSvc.conns["conn-1"] = &managedConn{wrapper: &ssh.ClientWrapper{}}
-	service.connIDs["term-1"] = "conn-1"
+	originalProbe := _openSystemProbeConnection
+	t.Cleanup(func() { _openSystemProbeConnection = originalProbe })
+	_openSystemProbeConnection = func(_ *SessionService, _ int64) (*ssh.ClientWrapper, func(), error) {
+		return nil, nil, errors.New("probe connection failed")
+	}
+	service.sessionIDs["term-1"] = 1
+	_, err = service.ProcessInfo("term-1")
+	require.ErrorContains(t, err, "probe connection failed")
+
+	originalCommand := _runSystemInfoCommand
+	t.Cleanup(func() { _runSystemInfoCommand = originalCommand })
+	_openSystemProbeConnection = func(_ *SessionService, _ int64) (*ssh.ClientWrapper, func(), error) {
+		return &ssh.ClientWrapper{}, func() {}, nil
+	}
 	_runSystemInfoCommand = func(_ *ssh.ClientWrapper, _ string) ([]byte, error) { return nil, errors.New("process probe failed") }
 	_, err = service.ProcessInfo("term-1")
 	require.ErrorContains(t, err, "process probe failed")

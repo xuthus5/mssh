@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/xuthus5/mssh/internal/model"
-	ssh "github.com/xuthus5/mssh/internal/ssh"
 )
 
 type systemSample struct {
@@ -25,10 +24,15 @@ func (t *TerminalService) SystemInfo(terminalID string) (*model.SystemInfo, erro
 		return nil, err
 	}
 	defer finish()
-	wrapper, err := t.systemInfoClient(terminalID)
+	sessionID, ok := t.terminalSessionID(terminalID)
+	if !ok {
+		return nil, fmt.Errorf("terminal %s not found", terminalID)
+	}
+	wrapper, release, err := t.acquireSystemProbeConnection(sessionID)
 	if err != nil {
 		return nil, err
 	}
+	defer release()
 	output, err := _runSystemInfoCommand(wrapper, systemInfoCommand)
 	if err != nil {
 		return nil, err
@@ -41,16 +45,6 @@ func (t *TerminalService) SystemInfo(terminalID string) (*model.SystemInfo, erro
 	return info, nil
 }
 
-func (t *TerminalService) systemInfoClient(terminalID string) (*ssh.ClientWrapper, error) {
-	t.mu.RLock()
-	connID, ok := t.connIDs[terminalID]
-	t.mu.RUnlock()
-	if !ok {
-		return nil, fmt.Errorf("terminal %s not found", terminalID)
-	}
-	return t.sessionSvc.GetClientWrapper(connID)
-}
-
 func (t *TerminalService) ProcessInfo(terminalID string) ([]model.ProcessInfo, error) {
 	if err := validateTerminalID(terminalID); err != nil {
 		return nil, err
@@ -60,10 +54,15 @@ func (t *TerminalService) ProcessInfo(terminalID string) ([]model.ProcessInfo, e
 		return nil, err
 	}
 	defer finish()
-	wrapper, err := t.systemInfoClient(terminalID)
+	sessionID, ok := t.terminalSessionID(terminalID)
+	if !ok {
+		return nil, fmt.Errorf("terminal %s not found", terminalID)
+	}
+	wrapper, release, err := t.acquireSystemProbeConnection(sessionID)
 	if err != nil {
 		return nil, err
 	}
+	defer release()
 	output, err := _runSystemInfoCommand(wrapper, processInfoCommand)
 	if err != nil {
 		return nil, err

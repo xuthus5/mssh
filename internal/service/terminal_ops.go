@@ -267,10 +267,12 @@ func (t *TerminalService) detachTerminal(terminalID string) (terminalIO, string,
 	delete(t.pendingOutput, terminalID)
 	delete(t.pendingSessionIDs, terminalID)
 	connID := t.connIDs[terminalID]
+	sessionID := t.sessionIDs[terminalID]
 	delete(t.connIDs, terminalID)
 	delete(t.sessionIDs, terminalID)
 	delete(t.outputSequences, terminalID)
 	closeOutputFlowLocked(t, terminalID)
+	t.releaseProbeTerminalRef(sessionID)
 	closeHandler := t.closeHandler
 	t.outputMu.Unlock()
 	t.unlockOutputDispatcher(terminalID, dispatcher)
