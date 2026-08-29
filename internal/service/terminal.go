@@ -34,6 +34,9 @@ type TerminalService struct {
 	outputSequences                map[string]uint64
 	outputDispatchers              map[string]*sync.Mutex
 	outputFlows                    map[string]*terminalOutputFlow
+	probeMu                        sync.Mutex
+	probeConns                     map[int64]*systemProbeConn
+	probeTerminalRefs              map[int64]int
 	eventBus                       EventBus
 	maxSize                        int
 	lastUsed                       map[string]time.Time
@@ -96,6 +99,8 @@ func NewTerminalService(sessionSvc *SessionService, eventBus EventBus, maxSize i
 		outputSequences:        make(map[string]uint64),
 		outputDispatchers:      make(map[string]*sync.Mutex),
 		outputFlows:            make(map[string]*terminalOutputFlow),
+		probeConns:             make(map[int64]*systemProbeConn),
+		probeTerminalRefs:      make(map[int64]int),
 		eventBus:               eventBus,
 		maxSize:                maxSize,
 		lastUsed:               make(map[string]time.Time),
@@ -239,6 +244,7 @@ func (t *TerminalService) registerTerminalState(registration terminalRegistratio
 	t.sessionIDs[registration.terminalID] = registration.sessionID
 	delete(t.pendingSessionIDs, registration.terminalID)
 	t.lastUsed[registration.terminalID] = time.Now()
+	t.addProbeTerminalRef(registration.sessionID)
 	t.mu.Unlock()
 	if evictionErr != nil {
 		t.logger.Warn("terminal pool eviction completed with cleanup errors", "error", evictionErr)

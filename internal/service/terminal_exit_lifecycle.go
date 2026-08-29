@@ -86,6 +86,7 @@ func (t *TerminalService) handlePTYExit(terminalID string, exitedPTY terminalIO,
 	delete(t.sessionIDs, terminalID)
 	delete(t.outputSequences, terminalID)
 	closeOutputFlowLocked(t, terminalID)
+	t.releaseProbeTerminalRef(sessionID)
 	closeHandler := t.closeHandler
 	expirePending := !t.attached[terminalID] && len(t.pendingOutput[terminalID]) > 0
 	t.updatePendingSessionOwnerLocked(terminalID, sessionID, expirePending)
