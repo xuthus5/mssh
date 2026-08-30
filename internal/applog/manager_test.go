@@ -116,6 +116,40 @@ func TestManagerHandlerWritesStructuredLog(t *testing.T) {
 	assert.Contains(t, string(content), "handler-path")
 }
 
+func TestManagerHandlerLevelGatesDebugLogs(t *testing.T) {
+	dir := t.TempDir()
+	manager := New(Options{Dir: dir, RetentionDays: 7, Now: func() time.Time {
+		return time.Date(2026, 7, 15, 10, 0, 0, 0, time.Local)
+	}, Level: slog.LevelDebug})
+	t.Cleanup(func() { _ = manager.Close() })
+	require.NoError(t, manager.Configure(dir, 7))
+
+	logger := slog.New(manager.Handler())
+	logger.Debug("debug-line-should-appear")
+	logger.Info("info-line-should-appear")
+	content, err := os.ReadFile(filepath.Join(dir, "2026-07-15.log"))
+	require.NoError(t, err)
+	assert.Contains(t, string(content), "debug-line-should-appear")
+	assert.Contains(t, string(content), "info-line-should-appear")
+}
+
+func TestManagerHandlerDropsDebugLogsAtDefaultLevel(t *testing.T) {
+	dir := t.TempDir()
+	manager := New(Options{Dir: dir, RetentionDays: 7, Now: func() time.Time {
+		return time.Date(2026, 7, 15, 11, 0, 0, 0, time.Local)
+	}})
+	t.Cleanup(func() { _ = manager.Close() })
+	require.NoError(t, manager.Configure(dir, 7))
+
+	logger := slog.New(manager.Handler())
+	logger.Debug("debug-line-should-be-dropped")
+	logger.Info("info-line-should-appear")
+	content, err := os.ReadFile(filepath.Join(dir, "2026-07-15.log"))
+	require.NoError(t, err)
+	assert.NotContains(t, string(content), "debug-line-should-be-dropped")
+	assert.Contains(t, string(content), "info-line-should-appear")
+}
+
 func TestDefaultDirUsesHome(t *testing.T) {
 	dir := DefaultDir()
 	assert.NotEmpty(t, dir)

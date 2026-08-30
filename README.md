@@ -205,6 +205,20 @@ wails3 task benchmark
 wails3 task package
 ```
 
+### Diagnostics
+
+Run with `MSSH_LOG_LEVEL=debug` to write detailed logs (including terminal I/O timings and byte previews) to `~/.mssh/logs/`; frontend terminal traces are forwarded to the same file automatically.
+
+Terminal output aggregation (reduces high-frequency events) can be tuned with environment variables:
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `MSSH_TERMINAL_BATCH_DISABLE` | unset | Set to `1` to disable aggregation |
+| `MSSH_TERMINAL_BATCH_IDLE_MS` | `10` | Idle flush window (ms) |
+| `MSSH_TERMINAL_BATCH_SIZE` | `16384` | Flush once buffered bytes reach this |
+| `MSSH_TERMINAL_BATCH_MAX` | `65536` | Maximum buffered bytes |
+| `MSSH_WEBVIEW_GPU` | unset | Override the WebView hardware-acceleration policy (`always`/`never`); defaults to Settings → Terminal → Rendering → Hardware acceleration, applied on restart, off by default for dialog stability |
+
 ---
 
 ## Packaging

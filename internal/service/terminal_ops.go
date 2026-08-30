@@ -68,12 +68,17 @@ func (t *TerminalService) Write(terminalID string, data string) (int, error) {
 		return 0, err
 	}
 	defer finish()
-	t.logger.Debug("writing to terminal", "terminalID", terminalID, "len", len(data))
+	start := t.traceWriteStarted(terminalID, []byte(data))
 	pty, ok := t.terminalForActivity(terminalID)
 	if !ok {
 		return 0, fmt.Errorf("terminal %s not found", terminalID)
 	}
-	return pty.Write([]byte(data))
+	n, writeErr := pty.Write([]byte(data))
+	t.traceWriteFinished(terminalID, start, n)
+	if writeErr != nil {
+		return n, writeErr
+	}
+	return n, nil
 }
 
 func (t *TerminalService) terminalForActivity(terminalID string) (terminalIO, bool) {
@@ -246,6 +251,8 @@ func (t *TerminalService) clearBufferedTerminal(terminalID string) bool {
 	t.mu.Unlock()
 	expiry.stopAndWait()
 	t.deleteSystemSample(terminalID)
+	t.cleanupTerminalTrace(terminalID)
+	t.stopTerminalOutputBatch(terminalID)
 	t.eventBus.Emit(event.TerminalClosed, event.ConnectionStatePayload{TerminalID: terminalID, State: "closed"})
 	return true
 }
@@ -279,5 +286,7 @@ func (t *TerminalService) detachTerminal(terminalID string) (terminalIO, string,
 	t.mu.Unlock()
 	expiry.stopAndWait()
 	t.deleteSystemSample(terminalID)
+	t.cleanupTerminalTrace(terminalID)
+	t.stopTerminalOutputBatch(terminalID)
 	return pty, connID, closeHandler, true
 }

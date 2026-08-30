@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bytes"
 	"io/fs"
+	"log/slog"
 	"path/filepath"
 	"strings"
 	"sync/atomic"
@@ -16,7 +18,7 @@ import (
 )
 
 func TestMainWindowOptionsUseStableLinuxRendering(t *testing.T) {
-	options := mainWindowOptions()
+	options := mainWindowOptions(application.WebviewGpuPolicyNever)
 
 	assert.Equal(t, "main", options.Name)
 	assert.Equal(t, 1280, options.Width)
@@ -86,4 +88,30 @@ func TestWaitForWindowsClosedObservesAsynchronousCleanup(t *testing.T) {
 
 func TestWaitForWindowsClosedTimesOut(t *testing.T) {
 	assert.False(t, waitForWindowsClosed(func() int { return 1 }, 5*time.Millisecond, time.Millisecond))
+}
+
+func TestResolveWebviewGpuPolicy(t *testing.T) {
+	assert.Equal(t, application.WebviewGpuPolicyNever, resolveWebviewGpuPolicy("never"))
+	assert.Equal(t, application.WebviewGpuPolicyNever, resolveWebviewGpuPolicy(""))
+	assert.Equal(t, application.WebviewGpuPolicyAlways, resolveWebviewGpuPolicy("always"))
+
+	t.Setenv("MSSH_WEBVIEW_GPU", "always")
+	assert.Equal(t, application.WebviewGpuPolicyAlways, resolveWebviewGpuPolicy("never"))
+	t.Setenv("MSSH_WEBVIEW_GPU", "on")
+	assert.Equal(t, application.WebviewGpuPolicyAlways, resolveWebviewGpuPolicy("never"))
+	t.Setenv("MSSH_WEBVIEW_GPU", "never")
+	assert.Equal(t, application.WebviewGpuPolicyNever, resolveWebviewGpuPolicy("always"))
+	t.Setenv("MSSH_WEBVIEW_GPU", "invalid")
+	assert.Equal(t, application.WebviewGpuPolicyAlways, resolveWebviewGpuPolicy("always"))
+	t.Setenv("MSSH_WEBVIEW_GPU", "")
+	assert.Equal(t, application.WebviewGpuPolicyAlways, resolveWebviewGpuPolicy("always"))
+}
+
+func TestFrontendTraceHandlerLogsPayload(t *testing.T) {
+	var buffer bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&buffer, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	handler := newFrontendTraceHandler(logger)
+	handler(&application.CustomEvent{Name: "terminal:trace", Data: "sample"})
+	assert.Contains(t, buffer.String(), "frontend trace")
+	assert.Contains(t, buffer.String(), "sample")
 }

@@ -24,6 +24,7 @@ type Manager struct {
 	mu        sync.Mutex
 	dir       string
 	retention int
+	level     slog.Level
 	file      *os.File
 	day       string
 	stderr    io.Writer
@@ -36,6 +37,9 @@ type Options struct {
 	RetentionDays int
 	Stderr        io.Writer
 	Now           func() time.Time
+	// Level is the minimum slog level written to stderr and the log file.
+	// Zero defaults to slog.LevelInfo.
+	Level slog.Level
 }
 
 // New creates a manager with validated defaults. Call Configure/Open before first file write.
@@ -43,8 +47,12 @@ func New(opts Options) *Manager {
 	manager := &Manager{
 		dir:       strings.TrimSpace(opts.Dir),
 		retention: NormalizeRetentionDays(opts.RetentionDays),
+		level:     opts.Level,
 		stderr:    opts.Stderr,
 		now:       opts.Now,
+	}
+	if manager.level == 0 {
+		manager.level = slog.LevelInfo
 	}
 	if manager.stderr == nil {
 		manager.stderr = os.Stderr
@@ -146,9 +154,10 @@ func (m *Manager) RetentionDays() int {
 	return NormalizeRetentionDays(m.retention)
 }
 
-// Handler returns a text handler writing to stderr and the daily log file.
+// Handler returns a text handler writing to stderr and the daily log file
+// at the configured minimum level.
 func (m *Manager) Handler() slog.Handler {
-	return slog.NewTextHandler(io.MultiWriter(m.stderr, m), &slog.HandlerOptions{Level: slog.LevelInfo})
+	return slog.NewTextHandler(io.MultiWriter(m.stderr, m), &slog.HandlerOptions{Level: m.level})
 }
 
 // Write implements io.Writer for slog and ensures the correct daily file is open.
