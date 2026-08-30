@@ -116,6 +116,37 @@ describe('VaultGate', () => {
     expect(await screen.findByText('app-ready')).toBeInTheDocument()
   })
 
+  it('shows a dismissible banner when remembering unlock fails', async () => {
+    security.Status.mockResolvedValue(unlockedStatus())
+    render(<VaultGate><div>app-ready</div></VaultGate>)
+    expect(await screen.findByText('app-ready')).toBeInTheDocument()
+
+    await act(async () => {
+      await Events.Emit('security:remember-failed', { message: 'store remembered vault DEK: rejected' })
+    })
+
+    expect(await screen.findByText('系统钥匙串不可用')).toBeInTheDocument()
+    expect(screen.getByText('store remembered vault DEK: rejected')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: '关闭' }))
+    expect(screen.queryByText('系统钥匙串不可用')).not.toBeInTheDocument()
+  })
+
+  it('clears the remember warning once unlock is remembered successfully', async () => {
+    security.Status.mockResolvedValue(unlockedStatus())
+    render(<VaultGate><div>app-ready</div></VaultGate>)
+    expect(await screen.findByText('app-ready')).toBeInTheDocument()
+
+    await act(async () => {
+      await Events.Emit('security:remember-failed', { message: 'boom' })
+    })
+    expect(await screen.findByText('系统钥匙串不可用')).toBeInTheDocument()
+
+    await act(async () => {
+      await Events.Emit('security:vault-changed', unlockedStatus())
+    })
+    await waitFor(() => expect(screen.queryByText('系统钥匙串不可用')).not.toBeInTheDocument())
+  })
+
   it('revalidates security policy after synchronized data changes', async () => {
     security.Status
       .mockResolvedValueOnce(unlockedStatus())

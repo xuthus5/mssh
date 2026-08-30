@@ -49,17 +49,18 @@ func (s *SecurityService) tryAutoUnlockLocked() (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("read remembered vault fingerprint: %w", err)
 	}
-	dek, err := s.keychain.Get(securityKeychainService, securityKeychainDEKAccount)
+	storedDEK, err := s.keychain.Get(securityKeychainService, securityKeychainDEKAccount)
 	if err != nil {
 		return false, fmt.Errorf("read remembered vault DEK: %w", err)
 	}
-	defer clear(dek)
-	if len(dek) != 32 {
+	dek, ok := decodeRememberedDEK(storedDEK)
+	if !ok {
 		if clearErr := s.clearRememberedDEK(); clearErr != nil {
 			s.warnKeychain("clear invalid remembered vault credentials failed", clearErr)
 		}
 		return false, nil
 	}
+	defer clear(dek)
 	fingerprint, err := vaultFingerprint(vault, dek)
 	if err != nil {
 		return false, err

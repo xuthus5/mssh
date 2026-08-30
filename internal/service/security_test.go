@@ -104,8 +104,11 @@ func TestSecurityService_SetupUnlockRotate(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "s3cret-password", forConnect.Password)
 
-	// remembered DEK present
-	assert.Len(t, keychain.data[securityKeychainDEKAccount], 32)
+	// remembered DEK stored as text-safe hex and restorable to 32 bytes
+	storedDEK := keychain.data[securityKeychainDEKAccount]
+	decodedDEK, ok := decodeRememberedDEK(storedDEK)
+	require.True(t, ok)
+	assert.Len(t, decodedDEK, 32)
 	_ = filepath.Join(dir, crypto.VaultFileName)
 }
 

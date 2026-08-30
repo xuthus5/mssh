@@ -559,6 +559,8 @@
   "固定终端主题": "Fixed Terminal Theme",
   "在侧边栏「宏」中新增命令，或在此管理快捷命令模板。": "Add commands in the sidebar Macros panel, or manage templates here.",
   "在系统钥匙串中记住解锁状态（默认）": "Remember unlock in the system keychain (default)",
+  "系统钥匙串不可用": "System keychain unavailable",
+  "无法在系统钥匙串中保存解锁状态，下次启动仍将要求输入密码": "Unable to save the unlock state to the system keychain; you will be asked for the password on next launch",
   "在线": "Available",
   "块状": "Block",
   "基本信息": "Basic Info",
