@@ -55,6 +55,12 @@ type TerminalService struct {
 	closing                        bool
 	shuttingDown                   bool
 	logger                         *slog.Logger
+	traceMu                        sync.Mutex
+	writeSerials                   map[string]uint64
+	lastWriteDone                  map[string]time.Time
+	lastOutputAt                   map[string]time.Time
+	outputBatchCfg                 terminalOutputBatchConfig
+	outputBatchers                 map[string]*terminalOutputBatcher
 }
 
 var _openPTY = ssh.PreparePTY
@@ -107,6 +113,7 @@ func NewTerminalService(sessionSvc *SessionService, eventBus EventBus, maxSize i
 		sessionSvc:             sessionSvc,
 		logger:                 logger,
 		systemSamples:          make(map[string]systemSample),
+		outputBatchCfg:         terminalOutputBatchConfigFromEnv(),
 	}
 }
 
@@ -249,7 +256,10 @@ func (t *TerminalService) registerTerminalState(registration terminalRegistratio
 	if evictionErr != nil {
 		t.logger.Warn("terminal pool eviction completed with cleanup errors", "error", evictionErr)
 	}
-	registration.pty.SetReadCallback(func(data []byte) { t.handlePTYOutput(registration.terminalID, data) })
+	registration.pty.SetReadCallback(func(data []byte) {
+		t.traceOutputRead(registration.terminalID, data)
+		t.pushTerminalOutput(registration.terminalID, data)
+	})
 	exitReady := make(chan struct{})
 	exitGeneration := t.terminalExitGeneration()
 	registration.pty.SetExitCallback(func(err error) {

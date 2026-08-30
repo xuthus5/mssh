@@ -32,7 +32,7 @@ export const generalSettingKeys = [
   'terminal.right_click_action', 'terminal.copy_on_select', 'terminal.scrollback_lines', 'terminal.auto_reconnect', 'terminal.restore_tabs_on_startup', 'terminal.renderer', 'terminal.history_predict', 'terminal.auto_close_terminal_on_exit', 'terminal.local_shell', 'terminal.local_shell_args', 'terminal.local_shell_cwd', 'terminal.local_shell_login', 'terminal.keyword_highlight', 'appearance.ui_font_family',
   'appearance.ui_font_fallback_family', 'appearance.ui_font_size',
   'application.close_button_action', 'application.log_dir', 'application.log_retention_days',
-  'application.debug',
+  'application.debug', 'application.webview_gpu',
   'application.proxy_mode', 'application.proxy_url', 'application.proxy_no_proxy',
   'application.proxy_username', 'application.proxy_password', 'application.proxy_password_saved',
   LANGUAGE_SETTING_KEY,
@@ -45,6 +45,7 @@ export const DEFAULT_PROXY_NO_PROXY =
 
 export type CloseButtonAction = 'tray' | 'exit'
 export type NetworkProxyMode = 'system' | 'direct' | 'manual'
+export type WebviewGpu = 'never' | 'always'
 
 export interface GeneralSettings {
   maxPoolSize: number
@@ -70,6 +71,7 @@ export interface GeneralSettings {
   keywordHighlightRules: KeywordHighlightSettings['rules']
   closeButtonAction: CloseButtonAction
   debug: boolean
+  webviewGpu: WebviewGpu
   logDir: string
   logRetentionDays: number
   proxyMode: NetworkProxyMode
@@ -99,7 +101,7 @@ export const defaultGeneralSettings: GeneralSettings = {
   keywordHighlightCaseInsensitive: DEFAULT_KEYWORD_HIGHLIGHT_SETTINGS.caseInsensitive,
   keywordHighlightRules: DEFAULT_KEYWORD_HIGHLIGHT_SETTINGS.rules,
   closeButtonAction: 'tray',
-  debug: false,
+  debug: false, webviewGpu: 'never',
   logDir: '',
   logRetentionDays: 30,
   proxyMode: 'system',
@@ -118,6 +120,10 @@ export function normalizeCloseButtonAction(value: unknown): CloseButtonAction {
 
 export function normalizeDebug(value: unknown): boolean {
   return value === true
+}
+
+export function normalizeWebviewGpu(value: unknown): WebviewGpu {
+  return value === 'always' ? 'always' : 'never'
 }
 
 export function normalizeLogDir(value: unknown): string {
@@ -189,7 +195,7 @@ export function normalizeGeneral(settings: GeneralSettings): GeneralSettings {
       rules: settings.keywordHighlightRules,
     }).rules,
     closeButtonAction: normalizeCloseButtonAction(settings.closeButtonAction),
-    debug: normalizeDebug(settings.debug),
+    debug: normalizeDebug(settings.debug), webviewGpu: normalizeWebviewGpu(settings.webviewGpu),
     logDir: normalizeLogDir(settings.logDir),
     logRetentionDays: normalizeLogRetentionDays(settings.logRetentionDays),
     proxyMode: normalizeProxyMode(settings.proxyMode),
@@ -225,7 +231,7 @@ export function parseGeneral(settings: { [_ in string]?: Setting }): GeneralSett
     uiFontFamily, uiFontFallbackFamily: settingValue(settings, 'appearance.ui_font_fallback_family', DEFAULT_UI_FONT_FALLBACK_FAMILY),
     uiFontSize: settingValue(settings, 'appearance.ui_font_size', DEFAULT_UI_FONT_SIZE),
     closeButtonAction: settingValue(settings, 'application.close_button_action', 'tray'),
-    debug: settingValue(settings, 'application.debug', false),
+    debug: settingValue(settings, 'application.debug', false), webviewGpu: settingValue(settings, 'application.webview_gpu', 'never'),
     logDir: settingValue(settings, 'application.log_dir', ''),
     logRetentionDays: settingValue(settings, 'application.log_retention_days', 30),
     proxyMode: settingValue(settings, 'application.proxy_mode', 'system'),
@@ -273,7 +279,7 @@ export async function persistGeneral(settings: GeneralSettings) {
     settingEntry('terminal.copy_on_select', normalized.copyOnSelect), settingEntry('terminal.scrollback_lines', normalized.scrollbackLines), settingEntry('terminal.auto_reconnect', normalized.autoReconnect), settingEntry('terminal.restore_tabs_on_startup', normalized.restoreTabsOnStartup), settingEntry('terminal.renderer', normalized.renderer), settingEntry('terminal.history_predict', normalized.historyPredict), settingEntry('terminal.auto_close_terminal_on_exit', normalized.autoCloseTerminalOnExit), settingEntry('terminal.local_shell', normalized.localShell), settingEntry('terminal.local_shell_args', normalized.localShellArgs), settingEntry('terminal.local_shell_cwd', normalized.localShellCwd), settingEntry('terminal.local_shell_login', normalized.localShellLogin), settingEntry('terminal.keyword_highlight', { enabled: normalized.keywordHighlightEnabled, caseInsensitive: normalized.keywordHighlightCaseInsensitive, rules: normalized.keywordHighlightRules }), settingEntry('appearance.ui_font_family', normalized.uiFontFamily),
     settingEntry('appearance.ui_font_fallback_family', normalized.uiFontFallbackFamily), settingEntry('appearance.ui_font_size', normalized.uiFontSize),
     settingEntry('application.close_button_action', normalized.closeButtonAction),
-    settingEntry('application.debug', normalized.debug),
+    settingEntry('application.debug', normalized.debug), settingEntry('application.webview_gpu', normalized.webviewGpu),
     settingEntry('application.log_dir', normalized.logDir),
     settingEntry('application.log_retention_days', normalized.logRetentionDays),
     settingEntry('application.proxy_mode', normalized.proxyMode),

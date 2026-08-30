@@ -31,6 +31,7 @@ const general: GeneralSettings = {
   keywordHighlightRules: [{ keyword: 'Error', color: '#ff5555' }],
   closeButtonAction: 'tray' as const,
   debug: false,
+  webviewGpu: 'never' as const,
   logDir: '',
   logRetentionDays: 30,
   proxyMode: 'system' as const,

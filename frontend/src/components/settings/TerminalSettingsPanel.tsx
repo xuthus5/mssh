@@ -37,6 +37,7 @@ interface TerminalDraft {
   historyPredict: boolean
   autoCloseTerminalOnExit: boolean
   renderer: GeneralSettings['renderer']
+  webviewGpu: GeneralSettings['webviewGpu']
   keywordHighlightEnabled: boolean
   keywordHighlightCaseInsensitive: boolean
   keywordHighlightRules: GeneralSettings['keywordHighlightRules']
@@ -80,6 +81,7 @@ function createDraft(general: GeneralSettings): TerminalDraft {
     historyPredict: general.historyPredict,
     autoCloseTerminalOnExit: general.autoCloseTerminalOnExit,
     renderer: general.renderer,
+    webviewGpu: general.webviewGpu,
     keywordHighlightEnabled: general.keywordHighlightEnabled,
     keywordHighlightCaseInsensitive: general.keywordHighlightCaseInsensitive,
     keywordHighlightRules: general.keywordHighlightRules,
@@ -104,6 +106,7 @@ function buildSavePayload(general: GeneralSettings, draft: TerminalDraft): Gener
     historyPredict: draft.historyPredict,
     autoCloseTerminalOnExit: draft.autoCloseTerminalOnExit,
     renderer: draft.renderer,
+    webviewGpu: draft.webviewGpu,
     keywordHighlightEnabled: draft.keywordHighlightEnabled,
     keywordHighlightCaseInsensitive: draft.keywordHighlightCaseInsensitive,
     keywordHighlightRules: draft.keywordHighlightRules,
@@ -154,7 +157,7 @@ function SettingsErrors({ loadError = '', onReloadSettings, themeLoadError = '',
 function TerminalPreferenceSections({ model }: { model: TerminalModel }) {
   const { draft, update } = model
   const shellCandidates = useLocalShellCandidates()
-  return <div className="space-y-6"><TerminalConnectionDefaultsSettingsSection maxPoolSize={draft.maxPoolSize} defaultKeepAlive={draft.defaultKeepAlive} defaultTermType={draft.defaultTermType} onMaxPoolSizeChange={(value) => update('maxPoolSize', value)} onDefaultKeepAliveChange={(value) => update('defaultKeepAlive', value)} onDefaultTermTypeChange={(value) => update('defaultTermType', value)} /><TerminalBehaviorSettingsSection rightClickAction={draft.rightClickAction} copyOnSelect={draft.copyOnSelect} scrollbackLines={draft.scrollbackLines} autoReconnect={draft.autoReconnect} restoreTabsOnStartup={draft.restoreTabsOnStartup} historyPredict={draft.historyPredict} autoCloseTerminalOnExit={draft.autoCloseTerminalOnExit} onRightClickActionChange={(value) => update('rightClickAction', value)} onCopyOnSelectChange={(value) => update('copyOnSelect', value)} onScrollbackLinesChange={(value) => update('scrollbackLines', value > 0 ? String(value) : '')} onAutoReconnectChange={(value) => update('autoReconnect', value)} onRestoreTabsOnStartupChange={(value) => update('restoreTabsOnStartup', value)} onHistoryPredictChange={(value) => update('historyPredict', value)} onAutoCloseTerminalOnExitChange={(value) => update('autoCloseTerminalOnExit', value)} /><TerminalRendererSettingsSection renderer={draft.renderer} onRendererChange={(value) => update('renderer', value)} /><TerminalLocalShellSettingsSection shell={draft.localShell} args={draft.localShellArgs} cwd={draft.localShellCwd} login={draft.localShellLogin} candidates={shellCandidates} onShellChange={(value) => update('localShell', value)} onArgsChange={(value) => update('localShellArgs', value)} onCwdChange={(value) => update('localShellCwd', value)} onLoginChange={(value) => update('localShellLogin', value)} /><TerminalKeywordHighlightSettingsSection enabled={draft.keywordHighlightEnabled} caseInsensitive={draft.keywordHighlightCaseInsensitive} rules={draft.keywordHighlightRules} onEnabledChange={(value) => update('keywordHighlightEnabled', value)} onCaseInsensitiveChange={(value) => update('keywordHighlightCaseInsensitive', value)} onRulesChange={(value) => update('keywordHighlightRules', value)} onReset={() => update('keywordHighlightRules', DEFAULT_KEYWORD_HIGHLIGHT_SETTINGS.rules)} /></div>
+  return <div className="space-y-6"><TerminalConnectionDefaultsSettingsSection maxPoolSize={draft.maxPoolSize} defaultKeepAlive={draft.defaultKeepAlive} defaultTermType={draft.defaultTermType} onMaxPoolSizeChange={(value) => update('maxPoolSize', value)} onDefaultKeepAliveChange={(value) => update('defaultKeepAlive', value)} onDefaultTermTypeChange={(value) => update('defaultTermType', value)} /><TerminalBehaviorSettingsSection rightClickAction={draft.rightClickAction} copyOnSelect={draft.copyOnSelect} scrollbackLines={draft.scrollbackLines} autoReconnect={draft.autoReconnect} restoreTabsOnStartup={draft.restoreTabsOnStartup} historyPredict={draft.historyPredict} autoCloseTerminalOnExit={draft.autoCloseTerminalOnExit} onRightClickActionChange={(value) => update('rightClickAction', value)} onCopyOnSelectChange={(value) => update('copyOnSelect', value)} onScrollbackLinesChange={(value) => update('scrollbackLines', value > 0 ? String(value) : '')} onAutoReconnectChange={(value) => update('autoReconnect', value)} onRestoreTabsOnStartupChange={(value) => update('restoreTabsOnStartup', value)} onHistoryPredictChange={(value) => update('historyPredict', value)} onAutoCloseTerminalOnExitChange={(value) => update('autoCloseTerminalOnExit', value)} /><TerminalRendererSettingsSection renderer={draft.renderer} webviewGpu={draft.webviewGpu} onRendererChange={(value) => update('renderer', value)} onWebviewGpuChange={(value) => update('webviewGpu', value)} /><TerminalLocalShellSettingsSection shell={draft.localShell} args={draft.localShellArgs} cwd={draft.localShellCwd} login={draft.localShellLogin} candidates={shellCandidates} onShellChange={(value) => update('localShell', value)} onArgsChange={(value) => update('localShellArgs', value)} onCwdChange={(value) => update('localShellCwd', value)} onLoginChange={(value) => update('localShellLogin', value)} /><TerminalKeywordHighlightSettingsSection enabled={draft.keywordHighlightEnabled} caseInsensitive={draft.keywordHighlightCaseInsensitive} rules={draft.keywordHighlightRules} onEnabledChange={(value) => update('keywordHighlightEnabled', value)} onCaseInsensitiveChange={(value) => update('keywordHighlightCaseInsensitive', value)} onRulesChange={(value) => update('keywordHighlightRules', value)} onReset={() => update('keywordHighlightRules', DEFAULT_KEYWORD_HIGHLIGHT_SETTINGS.rules)} /></div>
 }
 
 function ThemeSections(props: Pick<Props, 'themeProfiles' | 'themeAssignments' | 'terminalGlobalStyle' | 'colorMode' | 'onSaveThemeConfiguration' | 'onResetBuiltinThemes' | 'onImportThemes' | 'onCreateThemeProfile' | 'onUpdateThemeProfile' | 'onDeleteThemeProfile' | 'onDeleteThemeDefinition'>) {

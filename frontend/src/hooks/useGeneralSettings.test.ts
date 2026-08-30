@@ -20,6 +20,7 @@ const savedGeneral = {
   keywordHighlightEnabled: true, keywordHighlightCaseInsensitive: true, keywordHighlightRules: [{ keyword: 'Error', color: '#ff5555' }],
   closeButtonAction: 'exit' as const,
   debug: false,
+  webviewGpu: 'never' as const,
   logDir: '/tmp/mssh-logs',
   logRetentionDays: 14,
   proxyMode: 'system' as const,

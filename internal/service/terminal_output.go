@@ -99,7 +99,7 @@ func (t *TerminalService) handlePTYOutput(terminalID string, data []byte) {
 			return
 		}
 		if stage.attached {
-			if stage.flow != nil && !stage.flow.wait() {
+			if stage.flow != nil && !t.traceFlowWait(terminalID, stage.flow) {
 				return
 			}
 			if len(stage.remaining) > 0 {
@@ -115,6 +115,7 @@ func (t *TerminalService) handlePTYOutput(terminalID string, data []byte) {
 }
 
 func (t *TerminalService) dispatchLiveOutput(terminalID string, data []byte) {
+	start := time.Now()
 	t.mu.Lock()
 	if _, ok := t.ptys[terminalID]; !ok || !t.attached[terminalID] {
 		t.mu.Unlock()
@@ -126,6 +127,7 @@ func (t *TerminalService) dispatchLiveOutput(terminalID string, data []byte) {
 	t.mu.Unlock()
 	t.dispatchTerminalOutputLocked(terminalID, data, handler)
 	dispatcher.Unlock()
+	t.traceOutputDispatched(terminalID, data, start)
 }
 
 func (t *TerminalService) dispatchTerminalOutputLocked(terminalID string, data []byte, handler func(string, []byte)) {

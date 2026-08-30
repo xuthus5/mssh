@@ -2,6 +2,7 @@ import { ShieldAlert } from 'lucide-react'
 import { LabeledSelect } from '@/components/ui/labeled-select'
 import { SettingsCard, SettingsRow, SettingsSectionHeader } from '@/components/settings/settings-ui'
 import { useThemeCatalogStore } from '@/hooks/useThemeCatalog'
+import { normalizeWebviewGpu, type WebviewGpu } from '@/hooks/useGeneralSettings'
 import {
   normalizeTerminalRenderer,
   type TerminalRenderer,
@@ -18,10 +19,12 @@ function rendererOptions() {
 
 interface Props {
   renderer: TerminalRenderer
+  webviewGpu: WebviewGpu
   onRendererChange: (value: TerminalRenderer) => void
+  onWebviewGpuChange: (value: WebviewGpu) => void
 }
 
-export function TerminalRendererSettingsSection({ renderer, onRendererChange }: Props) {
+export function TerminalRendererSettingsSection({ renderer, webviewGpu, onRendererChange, onWebviewGpuChange }: Props) {
   const ligaturesEnabled = useThemeCatalogStore((state) => state.globalStyle.ligatures_enabled)
   return (
     <div>
@@ -33,6 +36,15 @@ export function TerminalRendererSettingsSection({ renderer, onRendererChange }: 
             value={renderer}
             options={[...rendererOptions()]}
             onValueChange={(value) => onRendererChange(normalizeTerminalRenderer(value))}
+            className="w-40"
+          />
+        </SettingsRow>
+        <SettingsRow label={t('硬件加速')} description={t('启用 WebView 硬件加速可缓解大量输出时的渲染卡顿。更改后需重启应用才能生效，默认关闭。')}>
+          <LabeledSelect
+            ariaLabel={t('硬件加速')}
+            value={webviewGpu}
+            options={[{ value: 'never', label: t('关闭') }, { value: 'always', label: t('开启') }]}
+            onValueChange={(value) => onWebviewGpuChange(normalizeWebviewGpu(value))}
             className="w-40"
           />
         </SettingsRow>

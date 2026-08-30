@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -29,7 +30,11 @@ const (
 )
 
 func main() {
-	logManager := applog.New(applog.Options{Dir: applog.DefaultDir(), RetentionDays: applog.DefaultRetentionDays})
+	logLevel := slog.LevelInfo
+	if os.Getenv("MSSH_LOG_LEVEL") == "debug" {
+		logLevel = slog.LevelDebug
+	}
+	logManager := applog.New(applog.Options{Dir: applog.DefaultDir(), RetentionDays: applog.DefaultRetentionDays, Level: logLevel})
 	if err := logManager.Configure(applog.DefaultDir(), applog.DefaultRetentionDays); err != nil {
 		fmt.Fprintf(os.Stderr, "open application log failed: %v\n", err)
 	}
@@ -55,11 +60,23 @@ func main() {
 	} else {
 		debugEnabled = enabled
 	}
+	gpuPolicy := application.WebviewGpuPolicyNever
+	if stored, readErr := appInstance.Setting.WebviewGpu(); readErr != nil {
+		logger.Warn("read webview gpu setting failed", "error", readErr)
+	} else {
+		gpuPolicy = resolveWebviewGpuPolicy(stored)
+	}
+	traceFrontend := logLevel == slog.LevelDebug
 	wailsApp := newWailsApplication(appInstance, logger)
+	if traceFrontend {
+		_ = wailsApp.Event.On("terminal:trace", newFrontendTraceHandler(logger))
+	}
 	configureWindows(wailsApp, windowConfiguration{
-		Settings:     appInstance.Setting,
-		Logger:       logger,
-		DebugEnabled: debugEnabled,
+		Settings:      appInstance.Setting,
+		Logger:        logger,
+		DebugEnabled:  debugEnabled,
+		TraceFrontend: traceFrontend,
+		GpuPolicy:     gpuPolicy,
 	})
 	wailsApp.OnShutdown(func() {
 		shutdownRuntime(appInstance, logManager, os.Stderr)
@@ -160,6 +177,13 @@ func newWailsSystemLogger(logger *slog.Logger) *slog.Logger {
 	return slog.New(&wailsSystemLogHandler{next: logger.Handler()})
 }
 
+// newFrontendTraceHandler logs terminal trace events forwarded by the frontend.
+func newFrontendTraceHandler(logger *slog.Logger) func(*application.CustomEvent) {
+	return func(event *application.CustomEvent) {
+		logger.Debug("frontend trace", "payload", event.Data)
+	}
+}
+
 func (h *wailsSystemLogHandler) Enabled(ctx context.Context, level slog.Level) bool {
 	if level < slog.LevelInfo {
 		return false
@@ -186,12 +210,21 @@ type windowConfiguration struct {
 	Settings     windowing.CloseActionReader
 	Logger       *slog.Logger
 	DebugEnabled bool
+	// TraceFrontend enables forwarding of frontend terminal traces to the app log.
+	TraceFrontend bool
+	// GpuPolicy is the Linux webview hardware acceleration policy.
+	GpuPolicy application.WebviewGpuPolicy
 }
 
 func configureWindows(wailsApp *application.App, configuration windowConfiguration) {
-	mainWindow := wailsApp.Window.NewWithOptions(mainWindowOptions())
+	mainWindow := wailsApp.Window.NewWithOptions(mainWindowOptions(configuration.GpuPolicy))
 	if configuration.DebugEnabled {
 		openMainWindowDevToolsOnFirstShow(mainWindow)
+	}
+	if configuration.TraceFrontend {
+		_ = mainWindow.OnWindowEvent(events.Common.WindowRuntimeReady, func(*application.WindowEvent) {
+			mainWindow.ExecJS("window.__msshTrace = true")
+		})
 	}
 	settingsController := windowing.NewSettingsWindowController(wailsApp.Window, mainWindow, wailsApp.Event.Emit)
 	settingsController.Preload()
@@ -258,7 +291,7 @@ func waitForWindowsClosed(count func() int, timeout, interval time.Duration) boo
 	return true
 }
 
-func mainWindowOptions() application.WebviewWindowOptions {
+func mainWindowOptions(gpuPolicy application.WebviewGpuPolicy) application.WebviewWindowOptions {
 	return application.WebviewWindowOptions{
 		Name:           "main",
 		Title:          "MSSH",
@@ -267,9 +300,25 @@ func mainWindowOptions() application.WebviewWindowOptions {
 		Frameless:      true,
 		EnableFileDrop: true,
 		Linux: application.LinuxWindow{
-			WebviewGpuPolicy: application.WebviewGpuPolicyNever,
+			WebviewGpuPolicy: gpuPolicy,
 		},
 	}
+}
+
+// resolveWebviewGpuPolicy resolves the Linux webview GPU acceleration policy.
+// The MSSH_WEBVIEW_GPU env override takes precedence, then the persisted setting
+// ("always"), and otherwise GPU stays disabled (default, for dialog stability).
+func resolveWebviewGpuPolicy(stored string) application.WebviewGpuPolicy {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv("MSSH_WEBVIEW_GPU"))) {
+	case "always", "on":
+		return application.WebviewGpuPolicyAlways
+	case "never", "off":
+		return application.WebviewGpuPolicyNever
+	}
+	if stored == "always" {
+		return application.WebviewGpuPolicyAlways
+	}
+	return application.WebviewGpuPolicyNever
 }
 
 func defaultDataDir() string {

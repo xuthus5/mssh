@@ -4,6 +4,7 @@ import type { Terminal } from '@xterm/xterm'
 import type { TerminalRuntimeErrorReporter } from '@/components/terminal/TerminalErrorBoundary'
 import { runTerminalRuntime } from '@/components/terminal/terminalRuntime'
 import { logger } from '@/lib/logger'
+import { terminalTrace } from '@/lib/terminalTrace'
 import { applyTerminalTheme } from '@/lib/terminalTheme'
 import { TerminalService } from '@/lib/wails'
 import { useAppStore, type AppState } from '@/store/appStore'
@@ -58,6 +59,7 @@ function reportWriteFailure(terminalID: string, error: unknown, refs: TerminalLi
 
 function writeTerminalInput(data: string, refs: TerminalLifecycleRefs) {
   const terminalID = refs.terminalIDRef.current
+  terminalTrace('input:write-call', { terminalID, len: data.length })
   const reportFailure = (error: unknown) => {
     if (refs.terminalIDRef.current === terminalID) reportWriteFailure(terminalID, error, refs)
   }

@@ -8,6 +8,7 @@ import { runTerminalRuntime } from '@/components/terminal/terminalRuntime'
 import { SynchronizedOutputWriter } from '@/components/terminal/terminalSynchronizedOutput'
 import { TerminalOutputCoalescer } from '@/components/terminal/terminalOutputCoalescer'
 import { logger } from '@/lib/logger'
+import { terminalTrace } from '@/lib/terminalTrace'
 
 interface TerminalOutputEvent {
   terminal_id?: string
@@ -150,7 +151,10 @@ function createOutputFlowControl({ term, terminalIDRef, reportRuntimeError, setO
     reportRuntimeError(new Error('terminal output flow control unavailable'), 'terminal output flow control')
   })
   flowControl = new TerminalOutputFlowControl({
-    write: (data, onParsed) => runTerminalRuntime(reportRuntimeError, 'terminal output write', () => term.write(data, onParsed)),
+    write: (data, onParsed) => {
+      terminalTrace('output:write', { terminalID: terminalIDRef.current, len: data.byteLength })
+      return runTerminalRuntime(reportRuntimeError, 'terminal output write', () => term.write(data, onParsed))
+    },
     pause: () => requestPause(true),
     resume: () => requestPause(false),
     onWriteFailure: () => logger.warn('terminal output flow stopped after write failure'),
@@ -174,6 +178,7 @@ function createTerminalOutputEventHandler({ terminalIDRef, reportRuntimeError, o
     const terminalID = terminalIDRef.current
     const payloadTerminalID = payload?.terminal_id
     if (!terminalID || payloadTerminalID !== terminalID || !encodedData) return
+    terminalTrace('output:event', { terminalID, seq: payload?.sequence, len: encodedData.length })
     if (outputTerminalID !== payloadTerminalID) {
       flowControl?.resume()
       flush()
@@ -218,6 +223,7 @@ export function subscribeToTerminalOutput({ term, terminalIDRef, reportRuntimeEr
   const transform = outputTransform ?? ((data: Uint8Array) => data)
   const flowControl = setOutputPaused ? createOutputFlowControl({ term, terminalIDRef, reportRuntimeError, setOutputPaused }) : null
   const coalescer = new TerminalOutputCoalescer((data) => {
+    terminalTrace('output:write', { terminalID: terminalIDRef.current, len: data.byteLength })
     if (flowControl) {
       flowControl.push(data)
       return

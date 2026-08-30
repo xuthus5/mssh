@@ -1,6 +1,7 @@
 import type { Terminal } from '@xterm/xterm'
 import type { RefObject } from 'react'
 import { recordCommand } from '@/lib/commandHistory'
+import { terminalTrace } from '@/lib/terminalTrace'
 import { TerminalCommandCapture } from '@/lib/terminalCommandCapture'
 import type { AppState } from '@/store/appStore'
 
@@ -42,6 +43,7 @@ export function subscribeToTerminalData(...args: [
   return term.onData((data) => {
     const terminalID = refs.terminalIDRef.current
     refs.storeRef.current.updateLastUsed(terminalID)
+    terminalTrace('input:keypress', { terminalID, len: data.length })
     writeTerminalInput(data)
     const sessionID = resolveSessionId(refs)
     for (const command of capture.feed(data)) {
