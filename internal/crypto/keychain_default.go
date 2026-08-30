@@ -6,7 +6,11 @@ import (
 	keyring "github.com/zalando/go-keyring"
 )
 
-type defaultKeychain struct{}
+type defaultKeychain struct {
+	// available, when set, overrides the platform availability probe.
+	// Tests use it to force a deterministic answer.
+	available func() bool
+}
 
 func (d *defaultKeychain) Get(service, account string) ([]byte, error) {
 	value, err := keyring.Get(service, account)
@@ -28,6 +32,11 @@ func (d *defaultKeychain) Delete(service, account string) error {
 	return err
 }
 
-func (d *defaultKeychain) IsAvailable() bool { return true }
+func (d *defaultKeychain) IsAvailable() bool {
+	if d.available != nil {
+		return d.available()
+	}
+	return keychainPlatformAvailable()
+}
 
 func NewKeychainAdapter() KeychainAdapter { return &defaultKeychain{} }

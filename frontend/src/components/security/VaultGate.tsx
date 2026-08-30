@@ -1,9 +1,10 @@
 import { type ReactNode } from 'react'
-import { KeyRound, Shield, Upload } from 'lucide-react'
+import { KeyRound, Shield, TriangleAlert, Upload, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
+import { Alert, AlertAction, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { t } from '@/i18n'
 import { useVaultGate } from '@/hooks/useVaultGate'
 
@@ -16,8 +17,34 @@ interface VaultGateProps {
 
 export function VaultGate({ children, clearOnSettingsHide = false }: VaultGateProps) {
   const gate = useVaultGate({ clearOnSettingsHide })
-  if (gate.mode === 'ready') return <>{children}</>
+  if (gate.mode === 'ready') {
+    return (
+      <>
+        {gate.rememberWarning && <RememberUnlockWarning message={gate.rememberWarning} onClose={gate.clearRememberWarning} />}
+        {children}
+      </>
+    )
+  }
   return <VaultGateScreen gate={gate} />
+}
+
+function RememberUnlockWarning({ message, onClose }: { message: string, onClose: () => void }) {
+  return (
+    <div className="fixed inset-x-0 top-0 z-50 p-3">
+      <Alert variant="destructive">
+        <AlertTitle className="flex items-center gap-2">
+          <TriangleAlert className="size-4" />
+          {t('系统钥匙串不可用')}
+        </AlertTitle>
+        <AlertDescription>{message}</AlertDescription>
+        <AlertAction>
+          <button type="button" aria-label={t('关闭')} className="rounded-md p-1 hover:bg-muted" onClick={onClose}>
+            <X className="size-4" />
+          </button>
+        </AlertAction>
+      </Alert>
+    </div>
+  )
 }
 
 function VaultGateScreen({ gate }: { gate: VaultGateController }) {
