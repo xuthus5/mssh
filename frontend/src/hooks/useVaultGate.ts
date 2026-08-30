@@ -18,6 +18,7 @@ const emptyStatus: SecurityStatus = {
 
 const vaultLockedEvent = 'security:vault-locked'
 const vaultChangedEvent = 'security:vault-changed'
+const vaultRememberFailedEvent = 'security:remember-failed'
 
 export type GateMode = 'loading' | 'setup' | 'unlock' | 'ready' | 'error'
 type VaultOperation = (isCurrent: () => boolean) => Promise<boolean | void>
@@ -36,10 +37,12 @@ function useVaultState() {
   const [rememberUnlock, setRememberUnlock] = useState(true)
   const [busy, setBusy] = useState(false)
   const [restoreMode, setRestoreMode] = useState(false)
+  const [rememberWarning, setRememberWarning] = useState('')
   return {
     status, setStatus, mode, setMode, error, setError, password, setPassword,
     confirmPassword, setConfirmPassword, requireLaunch, setRequireLaunch,
     rememberUnlock, setRememberUnlock, busy, setBusy, restoreMode, setRestoreMode,
+    rememberWarning, setRememberWarning,
   }
 }
 
@@ -63,14 +66,15 @@ function useVaultRuntime() {
 type VaultRuntime = ReturnType<typeof useVaultRuntime>
 
 function useVaultStatus(state: VaultState, runtime: VaultRuntime) {
-  const { setError, setMode, setRememberUnlock, setRequireLaunch, setStatus } = state
+  const { setError, setMode, setRememberUnlock, setRequireLaunch, setStatus, setRememberWarning } = state
   const { lifecycle, statusRequest } = runtime
   const applyStatus = useCallback((next: SecurityStatus) => {
     setStatus(next)
     setRequireLaunch(next.require_password_on_launch)
     setRememberUnlock(next.remember_unlock)
     setMode(!next.configured ? 'setup' : !next.unlocked ? 'unlock' : 'ready')
-  }, [setMode, setRememberUnlock, setRequireLaunch, setStatus])
+    if (next.remember_unlock) setRememberWarning('')
+  }, [setMode, setRememberUnlock, setRequireLaunch, setStatus, setRememberWarning])
   const refresh = useCallback(async () => {
     const lifecycleToken = lifecycle.current
     const request = ++statusRequest.current
@@ -163,7 +167,7 @@ interface VaultEventsOptions {
 }
 
 function useVaultEvents({ state, refresh, clearSecrets, invalidatePending }: VaultEventsOptions) {
-  const { setError, setMode, setStatus } = state
+  const { setError, setMode, setStatus, setRememberWarning } = state
   useEffect(() => {
     const stopLocked = Events.On(vaultLockedEvent, () => {
       invalidatePending()
@@ -182,8 +186,14 @@ function useVaultEvents({ state, refresh, clearSecrets, invalidatePending }: Vau
       invalidatePending()
       void refresh()
     })
-    return () => { stopLocked(); stopChanged(); stopSync() }
-  }, [clearSecrets, invalidatePending, refresh, setError, setMode, setStatus])
+    const stopRememberFailed = Events.On(vaultRememberFailedEvent, (event) => {
+      const message = typeof event?.data?.message === 'string' && event.data.message ? event.data.message : ''
+      const notice = message || t('无法在系统钥匙串中保存解锁状态，下次启动仍将要求输入密码')
+      setError(notice)
+      setRememberWarning(notice)
+    })
+    return () => { stopLocked(); stopChanged(); stopSync(); stopRememberFailed() }
+  }, [clearSecrets, invalidatePending, refresh, setError, setMode, setRememberWarning, setStatus])
 }
 
 function useVaultPasswordActions(state: VaultState, run: (operation: VaultOperation) => Promise<void>) {
@@ -243,6 +253,7 @@ export function useVaultGate({ clearOnSettingsHide = false }: UseVaultGateOption
   const runtime = useVaultRuntime()
   const refresh = useVaultStatus(state, runtime)
   const clearSecrets = useClearSecrets(state)
+  const clearRememberWarning = useCallback(() => state.setRememberWarning(''), [state])
   const run = useVaultRunner({ state, runtime, refresh, clearSecrets })
   const { invalidateAll, invalidateOperation } = useInvalidatePending(runtime)
   useSettingsWindowHide(useCallback(() => {
@@ -261,6 +272,7 @@ export function useVaultGate({ clearOnSettingsHide = false }: UseVaultGateOption
     requireLaunch: state.requireLaunch, setRequireLaunch: state.setRequireLaunch,
     rememberUnlock: state.rememberUnlock, setRememberUnlock: state.setRememberUnlock,
     busy: state.busy, restoreMode: state.restoreMode, refresh,
+    rememberWarning: state.rememberWarning, clearRememberWarning,
     ...passwordActions, ...restoreActions,
   }
 }

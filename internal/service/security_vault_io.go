@@ -7,11 +7,17 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/xuthus5/mssh/internal/crypto"
 	"github.com/xuthus5/mssh/internal/model"
 	"github.com/xuthus5/mssh/internal/store"
 )
+
+// rememberedDEKHexPrefix marks DEK values stored in the keychain as hex text.
+// Raw binary secrets are rejected by strict Secret Service providers (for
+// example KDE ksecretd) that enforce UTF-8 on text/plain content.
+const rememberedDEKHexPrefix = "dek1:"
 
 //wails:ignore
 func (s *SecurityService) SyncSecret() (string, error) {
@@ -123,6 +129,7 @@ func (s *SecurityService) configureUnlockPreferences(requireLaunch, remember boo
 		return nil
 	} else {
 		s.warnKeychain("remember unlock failed; disabling preference", err)
+		s.emitRememberFailed(err)
 		rollbackErr := s.savePreferences(requireLaunch, false)
 		if clearErr := s.clearRememberedDEK(); clearErr != nil {
 			s.warnKeychain("clear partial remembered unlock failed", clearErr)
@@ -179,11 +186,33 @@ func (s *SecurityService) persistRememberedDEK(dek []byte) error {
 	if err := s.keychain.Set(securityKeychainService, securityKeychainVaultAccount, []byte(fingerprint)); err != nil {
 		return fmt.Errorf("store remembered vault fingerprint: %w", err)
 	}
-	if err := s.keychain.Set(securityKeychainService, securityKeychainDEKAccount, dek); err != nil {
+	if err := s.keychain.Set(securityKeychainService, securityKeychainDEKAccount, encodeRememberedDEK(dek)); err != nil {
 		cleanupErr := s.keychain.Delete(securityKeychainService, securityKeychainVaultAccount)
 		return errors.Join(fmt.Errorf("store remembered vault DEK: %w", err), cleanupErr)
 	}
 	return nil
+}
+
+// encodeRememberedDEK renders the binary DEK as an ASCII hex string so strict
+// Secret Service providers accept the value as text.
+func encodeRememberedDEK(dek []byte) []byte {
+	return []byte(rememberedDEKHexPrefix + hex.EncodeToString(dek))
+}
+
+// decodeRememberedDEK restores the DEK stored by encodeRememberedDEK. The bool
+// result is false for legacy raw-binary values, malformed text, or a wrong
+// length; callers must then clear the remembered credentials.
+func decodeRememberedDEK(stored []byte) ([]byte, bool) {
+	text := string(stored)
+	if !strings.HasPrefix(text, rememberedDEKHexPrefix) {
+		return nil, false
+	}
+	dek, err := hex.DecodeString(strings.TrimPrefix(text, rememberedDEKHexPrefix))
+	if err != nil || len(dek) != 32 {
+		clear(dek)
+		return nil, false
+	}
+	return dek, true
 }
 
 func (s *SecurityService) clearRememberedDEK() error {

@@ -39,7 +39,9 @@ func TestSecurityService_TryAutoUnlockRejectsFingerprintDEKMismatch(t *testing.T
 	security := NewSecurityService(db, dir, runtime, keychain, testutil.NewTestLogger())
 	_, err := security.Setup(model.SecuritySetupInput{Password: "initial-pass-12", RememberUnlock: true})
 	require.NoError(t, err)
-	require.Len(t, keychain.data[securityKeychainDEKAccount], 32)
+	decodedDEK, ok := decodeRememberedDEK(keychain.data[securityKeychainDEKAccount])
+	require.True(t, ok)
+	require.Len(t, decodedDEK, 32)
 	require.NotEmpty(t, keychain.data[securityKeychainVaultAccount])
 	wrongDEK := append([]byte(nil), keychain.data[securityKeychainDEKAccount]...)
 	wrongDEK[0] ^= 0xff

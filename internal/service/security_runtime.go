@@ -49,6 +49,19 @@ func (s *SecurityService) emitVaultLocked() {
 	}
 }
 
+// emitRememberFailed notifies the frontend that remembering the unlock in the
+// system keychain failed and has been disabled, so the user is not silently
+// surprised on the next launch.
+func (s *SecurityService) emitRememberFailed(err error) {
+	s.callbackMu.RLock()
+	bus := s.eventBus
+	s.callbackMu.RUnlock()
+	if bus == nil {
+		return
+	}
+	bus.Emit(securityVaultRememberFailedEvent, map[string]any{"message": err.Error()})
+}
+
 // RequireUnlocked returns a stable error when the application vault is locked.
 //
 //wails:ignore

@@ -13,14 +13,15 @@ import (
 )
 
 const (
-	securityRequireLaunchSetting  = "security.require_password_on_launch"
-	securityRememberUnlockSetting = "security.remember_unlock"
-	securityKeychainService       = "mssh"
-	securityKeychainDEKAccount    = "app-dek"
-	securityKeychainVaultAccount  = "app-vault-fingerprint"
-	sessionPasswordPrefix         = "enc1:"
-	securityVaultChangedEvent     = "security:vault-changed"
-	securityVaultLockedEvent      = "security:vault-locked"
+	securityRequireLaunchSetting     = "security.require_password_on_launch"
+	securityRememberUnlockSetting    = "security.remember_unlock"
+	securityKeychainService          = "mssh"
+	securityKeychainDEKAccount       = "app-dek"
+	securityKeychainVaultAccount     = "app-vault-fingerprint"
+	sessionPasswordPrefix            = "enc1:"
+	securityVaultChangedEvent        = "security:vault-changed"
+	securityVaultLockedEvent         = "security:vault-locked"
+	securityVaultRememberFailedEvent = "security:remember-failed"
 )
 
 type SecurityService struct {
