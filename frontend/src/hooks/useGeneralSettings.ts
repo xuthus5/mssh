@@ -24,6 +24,7 @@ export type {
   CloseButtonAction,
   GeneralSettings,
   NetworkProxyMode,
+  WebviewGpu,
 } from '@/hooks/generalSettingsModel'
 
 export type GeneralSettingsSaveScope = 'all' | 'general' | 'terminal'
@@ -42,6 +43,7 @@ export {
   normalizeMaxPoolSize,
   normalizeProxyMode,
   normalizeProxyText,
+  normalizeWebviewGpu,
   resolveProxyPasswordWrite,
   settingEntry,
 } from '@/hooks/generalSettingsModel'

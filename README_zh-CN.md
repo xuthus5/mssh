@@ -205,6 +205,20 @@ wails3 task benchmark
 wails3 task package
 ```
 
+### 故障诊断
+
+以 `MSSH_LOG_LEVEL=debug` 启动应用，将详细日志写入 `~/.mssh/logs/`，包含终端输入/输出链路的耗时与字节预览；前端终端 trace 也会自动转发到同一日志文件。
+
+终端输出聚合（减少高频事件）可通过环境变量调整：
+
+| 变量 | 默认 | 说明 |
+| --- | --- | --- |
+| `MSSH_TERMINAL_BATCH_DISABLE` | 未设置 | 设为 `1` 关闭聚合 |
+| `MSSH_TERMINAL_BATCH_IDLE_MS` | `10` | 聚合空闲刷新窗口（毫秒） |
+| `MSSH_TERMINAL_BATCH_SIZE` | `16384` | 达到该字节数即刷新 |
+| `MSSH_TERMINAL_BATCH_MAX` | `65536` | 最大缓冲字节数 |
+| `MSSH_WEBVIEW_GPU` | 未设置 | 覆盖 WebView 硬件加速策略（`always`/`never`）；默认取「设置 → 终端 → 渲染 → 硬件加速」，重启生效，默认关闭以稳定对话框渲染 |
+
 ---
 
 ## 打包与发布

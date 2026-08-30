@@ -65,6 +65,7 @@ func describeExitReason(err error) string {
 }
 
 func (t *TerminalService) handlePTYExit(terminalID string, exitedPTY terminalIO, exitErr error) {
+	t.drainTerminalOutputBatch(terminalID)
 	t.mu.Lock()
 	if t.ignorePTYExitLocked(terminalID, exitedPTY) {
 		t.mu.Unlock()
