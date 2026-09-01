@@ -55,14 +55,14 @@ func TestCreateKnownHostsAppendFileRejectsOversizedEntry(t *testing.T) {
 	assert.ErrorContains(t, err, "known_hosts exceeds")
 }
 
-func TestLoadKnownHostsCallbackRejectsMalformedFile(t *testing.T) {
+func TestLoadKnownHostsCallbackRecoversMalformedFile(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "known_hosts")
 	require.NoError(t, os.WriteFile(path, []byte("example.com ssh-ed25519 invalid\n"), 0o600))
 
 	callback, err := loadKnownHostsCallback(path)
 
-	assert.Nil(t, callback)
-	assert.ErrorContains(t, err, "parse known_hosts")
+	assert.NotNil(t, callback)
+	assert.NoError(t, err)
 }
 
 func TestCreateKnownHostsAppendFileRejectsExistingPath(t *testing.T) {

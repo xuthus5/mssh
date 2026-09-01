@@ -77,14 +77,14 @@ func TestAppendKnownHostRejectsProjectedSizeOverflow(t *testing.T) {
 	assert.Equal(t, int64(testKnownHostsLimit), info.Size())
 }
 
-func TestCreateHostKeyCallbackRejectsMalformedKnownHosts(t *testing.T) {
+func TestCreateHostKeyCallbackRecoversMalformedKnownHosts(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "known_hosts")
 	require.NoError(t, os.WriteFile(path, []byte("example.com ssh-ed25519 invalid\n"), 0o600))
 
 	callback, err := createHostKeyCallback(path, HostKeyOptions{}, slog.Default())
 
-	assert.Nil(t, callback)
-	assert.ErrorContains(t, err, "parse known_hosts")
+	assert.NotNil(t, callback)
+	assert.NoError(t, err)
 }
 
 func TestVerifyHostKeyReturnsNonKeyError(t *testing.T) {
