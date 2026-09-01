@@ -3,6 +3,7 @@ import type { ActiveSurface, OverviewSection, WorkspaceID } from '@/store/tabNav
 import { isSplitLayoutSnapshot, type SplitLayoutSnapshot } from '@/components/terminal/splitLayout'
 import { releaseAppTerminalOpenReservation } from '@/lib/openTerminal'
 import { terminalConnectionInfo } from '@/lib/terminalTabs'
+import { migrateWorkspaceSnapshot } from '@/store/workspacePersistenceMigration'
 
 export const WORKSPACE_LAYOUT_SETTING = 'workspace.layout'
 
@@ -110,31 +111,8 @@ function tabIntent(tab: Tab): TabIntent {
 }
 
 
-/** Upgrade older durable workspace snapshots into the current schema when possible. */
-export function migrateWorkspaceSnapshot(value: unknown): unknown {
-  if (!isRecord(value) || typeof value.version !== 'number') return value
-  if (value.version === WORKSPACE_LAYOUT_VERSION) return value
-  // v2 -> v3: additive splitLayout field; topology absent means single-pane.
-  if (value.version === 2 && Array.isArray(value.tabs)) {
-    return {
-      ...value,
-      version: 3,
-      tabs: value.tabs.map((tab) => {
-        if (!isRecord(tab) || tab.type !== 'terminal') return tab
-        // Drop accidental split payloads on serial tabs.
-        if (tab.connectionKind === 'serial' && 'splitLayout' in tab) {
-          const { splitLayout: _drop, ...rest } = tab
-          return rest
-        }
-        return tab
-      }),
-    }
-  }
-  return value
-}
-
 export function parseWorkspaceSnapshot(raw: string): WorkspaceSnapshot {
-  const value: unknown = migrateWorkspaceSnapshot(JSON.parse(raw))
+  const value: unknown = migrateWorkspaceSnapshot(JSON.parse(raw), WORKSPACE_LAYOUT_VERSION)
   if (!isWorkspaceSnapshot(value)) throw new Error('workspace layout is invalid')
   return value
 }

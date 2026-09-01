@@ -2,6 +2,9 @@ package service
 
 import (
 	"context"
+	"errors"
+	"os"
+	"path/filepath"
 	"sync/atomic"
 	"testing"
 
@@ -149,4 +152,28 @@ func TestSystemInfoUsesDedicatedProbeConnection(t *testing.T) {
 
 	require.NoError(t, service.Close(terminalID))
 	require.Equal(t, 0, sessionSvc.ConnectionCount())
+}
+
+func TestSystemInfoProbeIgnoresMalformedKnownHostsLine(t *testing.T) {
+	sessionSvc, service, created, cleanup := newDirectoryIntegrationTestHarness(t, false)
+	defer cleanup()
+
+	terminalID, err := service.Open(context.Background(), created.ID, 80, 24)
+	require.NoError(t, err)
+	knownHostsPath := filepath.Join(sessionSvc.dataDir, "known_hosts")
+	file, err := os.OpenFile(knownHostsPath, os.O_APPEND|os.O_WRONLY, 0o600)
+	require.NoError(t, err)
+	_, writeErr := file.WriteString("broken ssh-ed25519 illegal-base64\n")
+	closeErr := file.Close()
+	require.NoError(t, errors.Join(writeErr, closeErr))
+
+	original := _runSystemInfoCommand
+	t.Cleanup(func() { _runSystemInfoCommand = original })
+	_runSystemInfoCommand = func(_ *ssh.ClientWrapper, _ string) ([]byte, error) {
+		return []byte("CPU 200 80 MEMTOTAL 8589934592 MEMAVAILABLE 4294967296 NET 2048 4096 DISK 107374182400 536870912000 CPUCOUNT 4"), nil
+	}
+
+	info, err := service.SystemInfo(terminalID)
+	require.NoError(t, err)
+	require.Equal(t, 4, info.CPUCount)
 }
