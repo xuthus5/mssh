@@ -104,6 +104,35 @@ describe('WorkspacePersistence', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('恢复工作区失败: workspace restore failed')
   })
 
+  it('repairs a transiently invalid current workspace without showing a failure banner', async () => {
+    services.get.mockResolvedValue({
+      value: JSON.stringify({
+        version: 3,
+        tabs: [
+          { type: 'terminal', title: 'invalid', sessionId: 0 },
+          { type: 'terminal', title: '', sessionId: 7, toolPanel: 'unknown' },
+        ],
+        active: { type: 'tab', index: 1 },
+        workspaceTab: 'invalid',
+        overviewSection: 'invalid',
+      }),
+    })
+
+    render(<><WorkspacePersistence /><WorkspaceRestoreBanner /></>)
+
+    await waitFor(() => expect(useAppStore.getState().tabs[0]).toMatchObject({
+      terminalId: 'fresh-terminal',
+      title: 'Session 7',
+    }))
+    expect(useAppStore.getState().workspaceRestoreError).toBe('')
+    expect(screen.queryByText(/恢复工作区失败/)).not.toBeInTheDocument()
+    await waitFor(() => expect(services.set).toHaveBeenCalledOnce())
+    const repaired = JSON.parse(services.set.mock.calls[0][0].value)
+    expect(repaired.tabs).toEqual([
+      expect.objectContaining({ type: 'terminal', title: 'Session 7', sessionId: 7 }),
+    ])
+  })
+
   it('does not overwrite the saved workspace after restore fails and resumes after retry', async () => {
     services.get
       .mockRejectedValueOnce(new Error('workspace restore failed'))

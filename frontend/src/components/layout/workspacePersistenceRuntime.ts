@@ -118,6 +118,7 @@ async function restoreSavedWorkspace(options: {
   isCurrent: () => boolean
 }) {
   const snapshot = parseWorkspaceSnapshot(options.value)
+  const repairStoredSnapshot = workspaceSnapshotNeedsRepair(options.value, snapshot)
   const serial = await loadSerialPortIDs()
   if (!options.isCurrent()) return
   const sessionIDs = new Set(options.runtime.sessionsRef.current.map((session) => Number(session.id)))
@@ -134,7 +135,28 @@ async function restoreSavedWorkspace(options: {
   if (failures > 0) notices.push(t('${} 个工作区标签恢复失败', failures))
   useAppStore.getState().setWorkspaceRestoreNotice(notices.join(' · '))
   useAppStore.getState().setWorkspaceRestoreError('')
+  if (repairStoredSnapshot) await persistRepairedWorkspace()
   completeRestore(options.runtime, options.restoreNonce)
+}
+
+function workspaceSnapshotNeedsRepair(raw: string, snapshot: ReturnType<typeof parseWorkspaceSnapshot>): boolean {
+  try {
+    const original = JSON.parse(raw) as { version?: unknown }
+    return original?.version === snapshot.version && JSON.stringify(original) !== JSON.stringify(snapshot)
+  } catch {
+    return false
+  }
+}
+
+async function persistRepairedWorkspace() {
+  try {
+    await persistWorkspaceSnapshot(currentWorkspaceSnapshotValue())
+    useAppStore.getState().setWorkspaceSaveError('')
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error)
+    logger.error('save repaired workspace failed', error)
+    useAppStore.getState().setWorkspaceSaveError(message)
+  }
 }
 
 async function runWorkspaceRestore(options: {
