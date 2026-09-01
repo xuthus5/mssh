@@ -52,7 +52,7 @@ func createHostKeyCallback(knownHostsPath string, options HostKeyOptions, logger
 	if err := ensureKnownHostsFile(knownHostsPath); err != nil {
 		return nil, err
 	}
-	baseCallback, err := loadKnownHostsCallback(knownHostsPath)
+	baseCallback, err := loadKnownHostsCallbackWithLogger(knownHostsPath, logger)
 	if err != nil {
 		return nil, err
 	}
@@ -145,7 +145,7 @@ func hostKeyAlreadyTrusted(check hostKeyCheck) (bool, error) {
 func verifyCurrentHostKey(check hostKeyCheck) error {
 	knownHostsMu.Lock()
 	defer knownHostsMu.Unlock()
-	callback, err := loadKnownHostsCallback(check.knownHostsPath)
+	callback, err := loadKnownHostsCallbackWithLogger(check.knownHostsPath, check.logger)
 	if err != nil {
 		return err
 	}
@@ -166,7 +166,7 @@ func validateUnknownHostKeyError(hostname string, presented gossh.PublicKey, err
 func appendKnownHostIfUnknown(check hostKeyCheck) error {
 	knownHostsMu.Lock()
 	defer knownHostsMu.Unlock()
-	callback, err := loadKnownHostsCallback(check.knownHostsPath)
+	callback, err := loadKnownHostsCallbackWithLogger(check.knownHostsPath, check.logger)
 	if err != nil {
 		return err
 	}
@@ -207,12 +207,23 @@ func appendKnownHostLocked(knownHostsPath, hostname string, key gossh.PublicKey)
 }
 
 func loadKnownHostsCallback(path string) (gossh.HostKeyCallback, error) {
+	return loadKnownHostsCallbackWithLogger(path, nil)
+}
+
+func loadKnownHostsCallbackWithLogger(path string, logger *slog.Logger) (gossh.HostKeyCallback, error) {
 	if err := secureKnownHostsFile(path); err != nil {
 		return nil, err
 	}
 	callback, err := knownhosts.New(path)
-	if err != nil {
-		return nil, fmt.Errorf("parse known_hosts: %w", err)
+	if err == nil {
+		return callback, nil
+	}
+	callback, invalidLines, recoveryErr := loadKnownHostsIgnoringInvalidLines(path)
+	if recoveryErr != nil {
+		return nil, fmt.Errorf("parse known_hosts: %w", errors.Join(err, recoveryErr))
+	}
+	if logger != nil {
+		logger.Warn("ignored invalid known_hosts lines", "path", path, "lines", invalidLines, "error", err)
 	}
 	return callback, nil
 }
