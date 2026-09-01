@@ -4,6 +4,7 @@ import { isSplitLayoutSnapshot, type SplitLayoutSnapshot } from '@/components/te
 import { releaseAppTerminalOpenReservation } from '@/lib/openTerminal'
 import { terminalConnectionInfo } from '@/lib/terminalTabs'
 import { migrateWorkspaceSnapshot } from '@/store/workspacePersistenceMigration'
+import { recoverWorkspaceSnapshot } from '@/store/workspacePersistenceRecovery'
 
 export const WORKSPACE_LAYOUT_SETTING = 'workspace.layout'
 
@@ -112,7 +113,8 @@ function tabIntent(tab: Tab): TabIntent {
 
 
 export function parseWorkspaceSnapshot(raw: string): WorkspaceSnapshot {
-  const value: unknown = migrateWorkspaceSnapshot(JSON.parse(raw), WORKSPACE_LAYOUT_VERSION)
+  const migrated = migrateWorkspaceSnapshot(JSON.parse(raw), WORKSPACE_LAYOUT_VERSION)
+  const value: unknown = recoverWorkspaceSnapshot(migrated, WORKSPACE_LAYOUT_VERSION)
   if (!isWorkspaceSnapshot(value)) throw new Error('workspace layout is invalid')
   return value
 }

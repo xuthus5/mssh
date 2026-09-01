@@ -106,7 +106,36 @@ describe('workspace persistence', () => {
 
   it('rejects unsupported or malformed layouts', () => {
     expect(() => parseWorkspaceSnapshot('{"version":0,"tabs":[]}')).toThrow('workspace layout is invalid')
-    expect(() => parseWorkspaceSnapshot('{"version":3,"tabs":[],"active":null,"workspaceTab":"bad","overviewSection":"sessions"}')).toThrow('workspace layout is invalid')
+    expect(() => parseWorkspaceSnapshot('{"version":3')).toThrow()
+  })
+
+  it('repairs transient current-version fields left by an abnormal exit', () => {
+    const recovered = parseWorkspaceSnapshot(JSON.stringify({
+      version: 3,
+      tabs: [
+        { type: 'terminal', title: 'invalid ssh', sessionId: 0 },
+        {
+          type: 'terminal', title: '', sessionId: 7, terminalInstance: 'bad', toolPanel: 'unknown',
+          connectionHost: 'partial.example',
+          splitLayout: { paneCount: 2, tree: { kind: 'leaf', role: 0 } },
+        },
+        { type: 'playback', title: 'recording', recordingPath: '/tmp/a.msshlog' },
+      ],
+      active: { type: 'tab', index: 1 },
+      workspaceTab: 'invalid',
+      overviewSection: 'invalid',
+    }))
+
+    expect(recovered).toEqual({
+      version: 3,
+      tabs: [
+        { type: 'terminal', title: 'Session 7', sessionId: 7 },
+        { type: 'playback', title: 'recording', recordingPath: '/tmp/a.msshlog' },
+      ],
+      active: { type: 'tab', index: 0 },
+      workspaceTab: 'sessions',
+      overviewSection: 'sessions',
+    })
   })
 
   it('reconnects valid session intents with new terminal IDs and restores active layout state', async () => {
@@ -202,8 +231,8 @@ describe('workspace persistence', () => {
     })
   })
 
-  it('rejects serial tabs that claim multi-pane split layouts', () => {
-    expect(() => parseWorkspaceSnapshot(JSON.stringify({
+  it('drops multi-pane split layouts from serial tabs', () => {
+    const recovered = parseWorkspaceSnapshot(JSON.stringify({
       version: 3,
       tabs: [{
         type: 'terminal',
@@ -219,14 +248,17 @@ describe('workspace persistence', () => {
       active: null,
       workspaceTab: 'sessions',
       overviewSection: 'serial',
-    }))).toThrow('workspace layout is invalid')
+    }))
+    expect(recovered.tabs[0]).toEqual({
+      type: 'terminal', title: 'COM', sessionId: 0, connectionKind: 'serial', serialPortId: 1,
+    })
   })
 
   it.each([
     { connectionKind: undefined, sessionId: 1, title: 'SSH' },
     { connectionKind: 'local', sessionId: 0, title: 'Local' },
-  ])('rejects invalid split layouts for $title tabs', ({ connectionKind, sessionId, title }) => {
-    expect(() => parseWorkspaceSnapshot(JSON.stringify({
+  ])('drops invalid split layouts for $title tabs', ({ connectionKind, sessionId, title }) => {
+    const recovered = parseWorkspaceSnapshot(JSON.stringify({
       version: 3,
       tabs: [{
         type: 'terminal',
@@ -241,7 +273,9 @@ describe('workspace persistence', () => {
       active: null,
       workspaceTab: 'sessions',
       overviewSection: 'sessions',
-    }))).toThrow('workspace layout is invalid')
+    }))
+    expect(recovered.tabs[0]).toMatchObject({ type: 'terminal', title, sessionId })
+    expect(recovered.tabs[0]).not.toHaveProperty('splitLayout')
   })
 
   it('limits simultaneous reconnects to four workers', async () => {
