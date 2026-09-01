@@ -1,9 +1,60 @@
 import { describe, expect, it, vi } from 'vitest'
-import { resolveSessionId, subscribeToTerminalData } from '@/hooks/terminalInputRuntime'
+import { createTerminalInputBatcher, resolveSessionId, subscribeToTerminalData, TERMINAL_INPUT_BATCH_DELAY_MS, TERMINAL_INPUT_BATCH_MAX_LENGTH } from '@/hooks/terminalInputRuntime'
 import { TerminalCommandCapture } from '@/lib/terminalCommandCapture'
 import { readCommandHistory } from '@/lib/commandHistory'
 
 describe('terminalInputRuntime', () => {
+  it('coalesces rapid input and preserves order', async () => {
+    vi.useFakeTimers()
+    const send = vi.fn(() => Promise.resolve())
+    const batcher = createTerminalInputBatcher(send)
+
+    batcher.write('a')
+    batcher.write('b')
+    expect(send).not.toHaveBeenCalled()
+    await vi.advanceTimersByTimeAsync(TERMINAL_INPUT_BATCH_DELAY_MS)
+
+    expect(send).toHaveBeenCalledWith('ab')
+    batcher.dispose()
+    vi.useRealTimers()
+  })
+
+  it('flushes control input immediately and flushes pending data on dispose', async () => {
+    vi.useFakeTimers()
+    const send = vi.fn(() => Promise.resolve())
+    const batcher = createTerminalInputBatcher(send)
+
+    batcher.write('ls')
+    batcher.write('\r')
+    await vi.runAllTimersAsync()
+    expect(send).toHaveBeenCalledWith('ls\r')
+
+    batcher.write('next')
+    batcher.dispose()
+    await vi.runAllTimersAsync()
+    expect(send).toHaveBeenLastCalledWith('next')
+    vi.useRealTimers()
+  })
+
+  it('ignores empty input and flushes oversized batches without waiting', () => {
+    vi.useFakeTimers()
+    const send = vi.fn()
+    const batcher = createTerminalInputBatcher(send)
+
+    batcher.write('')
+    expect(send).not.toHaveBeenCalled()
+    batcher.write('x'.repeat(TERMINAL_INPUT_BATCH_MAX_LENGTH))
+
+    expect(send).toHaveBeenCalledWith('x'.repeat(TERMINAL_INPUT_BATCH_MAX_LENGTH))
+    vi.useRealTimers()
+  })
+
+  it('does not throw when the transport callback fails synchronously', () => {
+    const batcher = createTerminalInputBatcher(() => { throw new Error('transport failed') })
+
+    expect(() => batcher.write('\u0003')).not.toThrow()
+  })
+
   it('resolves session id from terminal tab', () => {
     const refs = {
       terminalIDRef: { current: 'term-1' },
