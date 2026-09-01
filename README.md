@@ -10,6 +10,11 @@ A cross-platform SSH workstation for people who manage many hosts, many terminal
 
 ---
 
+## Show
+
+![light](./screenshots/light.png)
+![dark](./screenshots/dark.png)****
+
 ## Product overview
 
 MSSH is designed around a simple idea: a connection is more than a shell. A useful SSH client must also manage sessions, keep related assets close to the terminal, preserve context across reconnects, and make repetitive work safer.
