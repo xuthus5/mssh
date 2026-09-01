@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	defaultTerminalBatchIdleTimeout = 10 * time.Millisecond
+	defaultTerminalBatchIdleTimeout = 2 * time.Millisecond
 	defaultTerminalBatchSize        = 16 << 10
 	defaultTerminalBatchMaxPending  = 64 << 10
 )
