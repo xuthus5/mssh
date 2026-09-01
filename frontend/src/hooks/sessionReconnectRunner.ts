@@ -33,6 +33,7 @@ interface ReconnectContext {
 
 const reconnectRuns = new Map<string, ReconnectRun>()
 const reconnectDelays = [500, 1000]
+export const RECONNECT_ATTEMPT_TIMEOUT_MS = 30_000
 const hostKeyRejectedMarker = 'host key rejected by user'
 let reconnectDialogOwner: ReconnectRun | null = null
 
@@ -111,13 +112,30 @@ function openReconnectTerminal(context: ReconnectContext) {
   const tab = useAppStore.getState().tabs.find((item) => item.id === context.tabID)
   const cols = context.terminal?.cols ?? 80
   const rows = context.terminal?.rows ?? 24
-  if (tab?.type === 'terminal' && tab.connectionKind === 'serial' && tab.serialPortId) {
-    return bindWailsCallToSignal(TerminalService.OpenSerial(tab.serialPortId, cols, rows), context.run.controller.signal)
-  }
-  if (tab?.type === 'terminal' && tab.connectionKind === 'local') {
-    return bindWailsCallToSignal(TerminalService.OpenLocal(cols, rows), context.run.controller.signal)
-  }
-  return bindWailsCallToSignal(TerminalService.Open(Number(context.session.id), cols, rows), context.run.controller.signal)
+  const call = tab?.type === 'terminal' && tab.connectionKind === 'serial' && tab.serialPortId
+    ? TerminalService.OpenSerial(tab.serialPortId, cols, rows)
+    : tab?.type === 'terminal' && tab.connectionKind === 'local'
+      ? TerminalService.OpenLocal(cols, rows)
+      : TerminalService.Open(Number(context.session.id), cols, rows)
+  return withReconnectTimeout(call, context.run.controller)
+}
+
+function withReconnectTimeout<T>(call: Promise<T>, runController: AbortController): Promise<T> {
+  const timeoutController = new AbortController()
+  const abortTimeout = () => timeoutController.abort()
+  runController.signal.addEventListener('abort', abortTimeout, { once: true })
+  let timeoutHandle: number | null = null
+  const callResult = bindWailsCallToSignal(call, timeoutController.signal)
+  const timeout = new Promise<T>((_resolve, reject) => {
+    timeoutHandle = window.setTimeout(() => {
+      abortTimeout()
+      reject(new Error('reconnect attempt timed out'))
+    }, RECONNECT_ATTEMPT_TIMEOUT_MS)
+  })
+  return Promise.race([callResult, timeout]).finally(() => {
+    if (timeoutHandle !== null) window.clearTimeout(timeoutHandle)
+    runController.signal.removeEventListener('abort', abortTimeout)
+  })
 }
 
 async function closeStaleTerminal(terminalID: string) {

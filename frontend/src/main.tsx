@@ -15,8 +15,6 @@ async function selectedRoot() {
 }
 
 async function mount() {
-  await loadWailsTransport()
-  if ((window as unknown as { __wailsWSURL?: string }).__wailsWSURL) initIPCTransport()
   const Root = await selectedRoot()
   ReactDOM.createRoot(document.getElementById('root')!).render(
     <LanguageProvider>
@@ -25,4 +23,7 @@ async function mount() {
   )
 }
 
+void loadWailsTransport().then(() => {
+  if ((window as unknown as { __wailsWSURL?: string }).__wailsWSURL) initIPCTransport()
+})
 void mount().catch((error: unknown) => logger.error('mount application failed', error))

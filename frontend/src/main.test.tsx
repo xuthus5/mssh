@@ -52,4 +52,14 @@ describe('application entry', () => {
     expect(application.props.children.props.children.type.name).toBe('SettingsWindowApp')
     expect(startEventBridge).not.toHaveBeenCalled()
   })
+
+  it('mounts the UI without waiting for an optional IPC transport probe', async () => {
+    document.body.innerHTML = '<div id="root"></div>'
+    vi.stubGlobal('fetch', () => new Promise<Response>(() => {}))
+
+    await import('./main')
+
+    await waitFor(() => expect(render).toHaveBeenCalledTimes(1))
+    vi.unstubAllGlobals()
+  })
 })
