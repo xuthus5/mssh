@@ -5,6 +5,7 @@ import type { TerminalRuntimeErrorReporter } from '@/components/terminal/Termina
 import { runTerminalRuntime } from '@/components/terminal/terminalRuntime'
 import { logger } from '@/lib/logger'
 import { terminalTrace } from '@/lib/terminalTrace'
+import { isIPCTransportInstalled, sendTerminalInput } from '@/lib/wsTransport'
 import { applyTerminalTheme } from '@/lib/terminalTheme'
 import { TerminalService } from '@/lib/wails'
 import { useAppStore, type AppState } from '@/store/appStore'
@@ -62,9 +63,10 @@ function writeTerminalInput(data: string, refs: TerminalLifecycleRefs) {
   terminalTrace('input:write-call', { terminalID, len: data.length })
   const reportFailure = (error: unknown) => {
     if (refs.terminalIDRef.current === terminalID) reportWriteFailure(terminalID, error, refs)
-  }
-  try {
-    void TerminalService.Write(terminalID, data).catch(reportFailure)
+	}
+	try {
+    const write = isIPCTransportInstalled() ? sendTerminalInput : TerminalService.Write
+    void write(terminalID, data).catch(reportFailure)
   } catch (error: unknown) {
     reportFailure(error)
   }

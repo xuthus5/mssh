@@ -6,8 +6,6 @@ import (
 	"errors"
 	"io"
 	"log/slog"
-	"net/http"
-	"net/http/httptest"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -70,95 +68,72 @@ func TestWailsWSTransportJSClientExposesWSURL(t *testing.T) {
 	client := string(transport.JSClient())
 	assert.Contains(t, client, "window.__wailsWSURL")
 	assert.Contains(t, client, url)
+	assert.Contains(t, url, "token=")
 }
 
-func TestWailsWSTransportHTTPRPCText(t *testing.T) {
-	transport, _ := startTestWSTransport(t, func(_ context.Context, req *application.RuntimeRequest) (any, error) {
-		assert.Equal(t, 1, req.Object)
-		assert.Equal(t, 2, req.Method)
-		return "hello", nil
-	})
-	handler := transport.Handler()(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
-		t.Fatal("next handler should not be reached for /wails/runtime")
-	}))
-	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/wails/runtime", strings.NewReader(`{"object":1,"method":2}`))
-	handler.ServeHTTP(rec, req)
-	assert.Equal(t, http.StatusOK, rec.Code)
-	assert.Equal(t, "text/plain", rec.Header().Get("Content-Type"))
-	assert.Equal(t, "hello", rec.Body.String())
-}
-
-func TestWailsWSTransportHTTPRPCJSON(t *testing.T) {
-	transport, _ := startTestWSTransport(t, func(context.Context, *application.RuntimeRequest) (any, error) {
-		return map[string]any{"count": 3}, nil
-	})
-	handler := transport.Handler()(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { t.Fatal("unexpected next") }))
-	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/wails/runtime", strings.NewReader(`{"object":1,"method":2}`))
-	handler.ServeHTTP(rec, req)
-	assert.Equal(t, http.StatusOK, rec.Code)
-	assert.Equal(t, "application/json", rec.Header().Get("Content-Type"))
-	assert.JSONEq(t, `{"count":3}`, rec.Body.String())
-}
-
-func TestWailsWSTransportHTTPRPCError(t *testing.T) {
-	transport, _ := startTestWSTransport(t, func(context.Context, *application.RuntimeRequest) (any, error) {
-		return nil, errTestCall
-	})
-	handler := transport.Handler()(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { t.Fatal("unexpected next") }))
-	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/wails/runtime", strings.NewReader(`{"object":1,"method":2}`))
-	handler.ServeHTTP(rec, req)
-	assert.Equal(t, http.StatusUnprocessableEntity, rec.Code)
-	assert.Contains(t, rec.Body.String(), "test call failed")
-}
-
-func TestWailsWSTransportHTTPRPCRejectsMalformed(t *testing.T) {
-	transport, _ := startTestWSTransport(t, func(context.Context, *application.RuntimeRequest) (any, error) {
-		t.Fatal("handler must not run for malformed request")
-		return nil, nil
-	})
-	handler := transport.Handler()(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { t.Fatal("unexpected next") }))
-	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/wails/runtime", strings.NewReader(`not-json`))
-	handler.ServeHTTP(rec, req)
-	assert.Equal(t, http.StatusBadRequest, rec.Code)
-}
-
-func TestWailsWSTransportHTTPRPCWithoutProcessor(t *testing.T) {
-	transport, _ := startTestWSTransport(t, nil)
-	handler := transport.Handler()(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { t.Fatal("unexpected next") }))
-	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/wails/runtime", strings.NewReader(`{"object":1,"method":2}`))
-	handler.ServeHTTP(rec, req)
-	assert.Equal(t, http.StatusInternalServerError, rec.Code)
-}
-
-func TestWailsWSTransportPassesUnknownPathsToNext(t *testing.T) {
-	transport, _ := startTestWSTransport(t, nil)
-	called := false
-	handler := transport.Handler()(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { called = true }))
-	rec := httptest.NewRecorder()
-	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/index.html", nil))
-	assert.True(t, called)
+func TestWailsWSTransportRejectsInvalidToken(t *testing.T) {
+	transport, url := startTestWSTransport(t, nil)
+	invalidURL := strings.Replace(url, transport.token, "invalid", 1)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_, _, err := websocket.Dial(ctx, invalidURL, nil)
+	assert.Error(t, err)
 }
 
 func TestWailsWSTransportRPCTextResponse(t *testing.T) {
 	_, url := startTestWSTransport(t, func(_ context.Context, req *application.RuntimeRequest) (any, error) {
 		assert.Equal(t, 1, req.Object)
 		assert.Equal(t, 2, req.Method)
+		assert.Equal(t, "client-1", req.ClientID)
 		assert.NotNil(t, req.Args)
 		assert.Equal(t, `{"x":1}`, req.Args.String())
 		return "hello", nil
 	})
 	conn := dialWSTransport(t, url)
-	require.NoError(t, conn.Write(context.Background(), websocket.MessageText, []byte(`{"id":"req-1","object":1,"method":2,"args":{"x":1}}`)))
+	require.NoError(t, conn.Write(context.Background(), websocket.MessageText, []byte(`{"type":"call","id":"req-1","object":1,"method":2,"args":{"x":1},"clientId":"client-1"}`)))
 	message := readWSMessage(t, conn)
 	assert.Equal(t, "req-1", message["id"])
 	assert.Equal(t, true, message["ok"])
 	assert.Equal(t, "text", message["type"])
 	assert.Equal(t, "hello", message["data"])
+}
+
+func TestWailsWSTransportTerminalInputFastPath(t *testing.T) {
+	transport, url := startTestWSTransport(t, nil)
+	transport.SetTerminalInputHandler(func(terminalID, data string) (int, error) {
+		assert.Equal(t, "term-1", terminalID)
+		assert.Equal(t, "ls\r", data)
+		return len(data), nil
+	})
+	conn := dialWSTransport(t, url)
+	request := `{"type":"terminal_input","id":"input-1","terminalID":"term-1","data":"ls\r"}`
+	require.NoError(t, conn.Write(context.Background(), websocket.MessageText, []byte(request)))
+	message := readWSMessage(t, conn)
+	assert.Equal(t, "input-1", message["id"])
+	assert.Equal(t, true, message["ok"])
+	assert.Equal(t, "json", message["type"])
+	assert.Equal(t, "3", message["data"])
+}
+
+func TestWailsWSTransportTerminalInputRequiresHandler(t *testing.T) {
+	_, url := startTestWSTransport(t, nil)
+	conn := dialWSTransport(t, url)
+	require.NoError(t, conn.Write(context.Background(), websocket.MessageText, []byte(`{"type":"terminal_input","id":"input-2","terminalID":"term-1","data":"x"}`)))
+	message := readWSMessage(t, conn)
+	assert.Equal(t, false, message["ok"])
+	assert.Equal(t, "terminal input handler is not configured", message["error"])
+}
+
+func TestWailsWSTransportDispatchesEventsToConnectedClients(t *testing.T) {
+	transport, url := startTestWSTransport(t, nil)
+	conn := dialWSTransport(t, url)
+	waitClientCount(t, transport, 1)
+	transport.DispatchWailsEvent(&application.CustomEvent{Name: "session:state", Data: map[string]any{"state": "connected"}})
+	message := readWSMessage(t, conn)
+	assert.Equal(t, "event", message["type"])
+	eventPayload, ok := message["event"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "session:state", eventPayload["name"])
 }
 
 func TestWailsWSTransportRPCJSONResponse(t *testing.T) {

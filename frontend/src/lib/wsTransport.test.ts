@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { initWsTransport, loadWailsTransport } from '@/lib/wsTransport'
+import { initWsTransport, loadWailsTransport, sendTerminalInput, IPC_RECONNECTED_EVENT } from '@/lib/wsTransport'
 
 const { mockSetTransport, mockDispatchEvent } = vi.hoisted(() => ({
   mockSetTransport: vi.fn(),
@@ -90,19 +90,21 @@ afterEach(() => {
 })
 
 describe('wsTransport', () => {
-  it('uses HTTP fallback when the socket is not connected', async () => {
+  it('queues calls until the single IPC socket is connected', async () => {
     initWsTransport()
     const transport = mockSetTransport.mock.calls[0][0] as WsTransport
-    mockFetch.mockResolvedValue(new Response('hello', { headers: { 'Content-Type': 'text/plain' } }))
-
-    await expect(transport.call(1, 2, '', null)).resolves.toBe('hello')
-    expect(mockFetch).toHaveBeenCalledTimes(1)
-    const [url, init] = mockFetch.mock.calls[0]
-    expect(String(url)).toContain('/wails/runtime')
-    const body = JSON.parse(init.body as string)
-    expect(body.object).toBe(1)
-    expect(body.method).toBe(2)
-    expect(init.headers['x-wails-client-id']).toBe('test-client-id')
+    setWSURL()
+    const result = transport.call(1, 2, '', null)
+    await flushProbe()
+    const ws = MockWebSocket.instances[0]
+    expect(ws.sent).toHaveLength(0)
+    ws.open()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(ws.sent).toHaveLength(1)
+    const sent = JSON.parse(ws.sent[0])
+    expect(sent.type).toBe('call')
+    ws.receive(JSON.stringify({ id: sent.id, ok: true, type: 'text', data: 'hello' }))
+    await expect(result).resolves.toBe('hello')
   })
 
   it('uses WebSocket once it is open', async () => {
@@ -117,6 +119,28 @@ describe('wsTransport', () => {
 
     ws.receive(JSON.stringify({ id: sent.id, ok: true, type: 'text', data: 'ok' }))
     await expect(result).resolves.toBe('ok')
+  })
+
+  it('notifies terminal owners after a reconnect', async () => {
+    const listener = vi.fn()
+    window.addEventListener(IPC_RECONNECTED_EVENT, listener)
+    const { ws } = await openAndGetTransport()
+    ws.close()
+    await vi.advanceTimersByTimeAsync(50)
+    const reconnect = MockWebSocket.instances[1]
+    reconnect.open()
+    expect(listener).toHaveBeenCalledOnce()
+    window.removeEventListener(IPC_RECONNECTED_EVENT, listener)
+  })
+
+  it('uses the unified terminal input frame on the same IPC socket', async () => {
+    const { ws } = await openAndGetTransport()
+    const result = sendTerminalInput('term-1', 'echo hi')
+    await vi.advanceTimersByTimeAsync(0)
+    const sent = JSON.parse(ws.sent[0])
+    expect(sent).toMatchObject({ type: 'terminal_input', terminalID: 'term-1', data: 'echo hi' })
+    ws.receive(JSON.stringify({ id: sent.id, ok: true, type: 'json', data: '7' }))
+    await expect(result).resolves.toBe(7)
   })
 
   it('parses JSON responses over WebSocket', async () => {
@@ -146,12 +170,13 @@ describe('wsTransport', () => {
     expect(mockDispatchEvent).toHaveBeenCalledWith({ name: 'terminal:output', data: { x: 1 } })
   })
 
-  it('falls back to HTTP after the socket disconnects', async () => {
+  it('rejects in-flight calls after the socket disconnects and reconnects', async () => {
     const { transport, ws } = await openAndGetTransport()
+    const result = transport.call(1, 2, '', null)
     ws.close()
-    mockFetch.mockResolvedValue(new Response('after-drop', { headers: { 'Content-Type': 'text/plain' } }))
-    await expect(transport.call(1, 2, '', null)).resolves.toBe('after-drop')
-    expect(mockFetch).toHaveBeenCalledTimes(1)
+    await expect(result).rejects.toThrow('mssh IPC disconnected')
+    await vi.advanceTimersByTimeAsync(50)
+    expect(MockWebSocket.instances).toHaveLength(2)
   })
 
   it('loads the transport.js script to inject the WS url', async () => {

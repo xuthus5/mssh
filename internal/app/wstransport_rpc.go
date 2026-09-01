@@ -2,28 +2,37 @@ package app
 
 import (
 	"context"
+	"crypto/subtle"
 	"encoding/json"
-	"io"
 	"net/http"
+	"strconv"
 
 	"github.com/coder/websocket"
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
 type wsRPCRequest struct {
+	Type       string          `json:"type"`
 	ID         string          `json:"id"`
 	Object     int             `json:"object"`
 	Method     int             `json:"method"`
 	Args       json.RawMessage `json:"args"`
 	WindowName string          `json:"windowName"`
+	ClientID   string          `json:"clientId"`
+	TerminalID string          `json:"terminalID"`
+	Data       string          `json:"data"`
 }
 
 func (t *wailsWSTransport) handleWebSocket(rw http.ResponseWriter, req *http.Request) {
+	if subtle.ConstantTimeCompare([]byte(req.URL.Query().Get("token")), []byte(t.token)) != 1 {
+		http.Error(rw, "forbidden", http.StatusForbidden)
+		return
+	}
 	conn, err := websocket.Accept(rw, req, &websocket.AcceptOptions{InsecureSkipVerify: true})
 	if err != nil {
 		return
 	}
-	client := &wailsWSClient{conn: conn, writeCh: make(chan []byte, 256)}
+	client := &wailsWSClient{conn: conn, writeCh: make(chan []byte, 256), done: make(chan struct{})}
 	t.addClient(client)
 	defer t.removeClient(client)
 	ctx, cancel := context.WithCancel(req.Context())
@@ -43,11 +52,18 @@ func (t *wailsWSTransport) handleRPC(ctx context.Context, client *wailsWSClient,
 	if err := json.Unmarshal(data, &req); err != nil || req.ID == "" {
 		return
 	}
+	if req.Type == "terminal_input" {
+		t.handleTerminalInput(client, req)
+		return
+	}
+	if req.Type != "" && req.Type != "call" {
+		return
+	}
 	if t.runtimeCall == nil {
 		t.sendRPCError(client, req.ID, "wails runtime not started")
 		return
 	}
-	resp, err := t.runtimeCall(ctx, buildRuntimeRequest(req.Object, req.Method, req.Args, req.WindowName, ""))
+	resp, err := t.runtimeCall(ctx, buildRuntimeRequest(req.Object, req.Method, req.Args, req.WindowName, req.ClientID))
 	if err != nil {
 		t.sendRPCError(client, req.ID, err.Error())
 		return
@@ -64,12 +80,28 @@ func (t *wailsWSTransport) handleRPC(ctx context.Context, client *wailsWSClient,
 	t.sendRPCResponse(client, req.ID, "json", string(raw))
 }
 
+func (t *wailsWSTransport) handleTerminalInput(client *wailsWSClient, req wsRPCRequest) {
+	t.mu.RLock()
+	handler := t.terminalInput
+	t.mu.RUnlock()
+	if handler == nil {
+		t.sendRPCError(client, req.ID, "terminal input handler is not configured")
+		return
+	}
+	n, err := handler(req.TerminalID, req.Data)
+	if err != nil {
+		t.sendRPCError(client, req.ID, err.Error())
+		return
+	}
+	t.sendRPCResponse(client, req.ID, "json", strconv.Itoa(n))
+}
+
 func (t *wailsWSTransport) sendRPCResponse(client *wailsWSClient, id, kind, data string) {
 	payload, err := json.Marshal(map[string]any{"id": id, "ok": true, "type": kind, "data": data})
 	if err != nil {
 		return
 	}
-	client.writeCh <- payload
+	_ = client.enqueue(payload)
 }
 
 func (t *wailsWSTransport) sendRPCError(client *wailsWSClient, id, message string) {
@@ -77,58 +109,38 @@ func (t *wailsWSTransport) sendRPCError(client *wailsWSClient, id, message strin
 	if err != nil {
 		return
 	}
-	client.writeCh <- payload
+	_ = client.enqueue(payload)
 }
 
-func (t *wailsWSTransport) handleHTTPRPC(rw http.ResponseWriter, req *http.Request) {
-	if t.runtimeCall == nil {
-		t.writeHTTPError(rw, http.StatusInternalServerError, "wails runtime not started")
+func (t *wailsWSTransport) DispatchWailsEvent(event *application.CustomEvent) {
+	if event == nil {
 		return
 	}
-	body, err := io.ReadAll(io.LimitReader(req.Body, 8<<20))
+	rawEvent := event.ToJSON()
+	if rawEvent == "" {
+		return
+	}
+	payload, err := json.Marshal(struct {
+		Type  string          `json:"type"`
+		Event json.RawMessage `json:"event"`
+	}{Type: "event", Event: json.RawMessage(rawEvent)})
 	if err != nil {
-		t.writeHTTPError(rw, http.StatusBadRequest, "unable to read request body")
+		if t.logger != nil {
+			t.logger.Warn("marshal wails event failed", "error", err)
+		}
 		return
 	}
-	var parsed struct {
-		Object *int            `json:"object"`
-		Method *int            `json:"method"`
-		Args   json.RawMessage `json:"args"`
+	t.mu.RLock()
+	clients := make([]*wailsWSClient, 0, len(t.clients))
+	for _, client := range t.clients {
+		clients = append(clients, client)
 	}
-	if len(body) > 0 {
-		if err := json.Unmarshal(body, &parsed); err != nil {
-			t.writeHTTPError(rw, http.StatusBadRequest, "unable to parse request body as JSON")
-			return
+	t.mu.RUnlock()
+	for _, client := range clients {
+		if !client.enqueue(payload) && t.logger != nil {
+			t.logger.Debug("drop event for disconnected ws client")
 		}
 	}
-	if parsed.Object == nil || parsed.Method == nil {
-		t.writeHTTPError(rw, http.StatusBadRequest, "missing object or method")
-		return
-	}
-	runtimeReq := buildRuntimeRequest(*parsed.Object, *parsed.Method, parsed.Args,
-		req.Header.Get("x-wails-window-name"), req.Header.Get("x-wails-client-id"))
-	resp, err := t.runtimeCall(req.Context(), runtimeReq)
-	if err != nil {
-		t.writeHTTPError(rw, http.StatusUnprocessableEntity, err.Error())
-		return
-	}
-	if text, ok := resp.(string); ok {
-		rw.Header().Set("Content-Type", "text/plain")
-		rw.WriteHeader(http.StatusOK)
-		_, _ = io.WriteString(rw, text)
-		return
-	}
-	rw.Header().Set("Content-Type", "application/json")
-	rw.WriteHeader(http.StatusOK)
-	if err := json.NewEncoder(rw).Encode(resp); err != nil && t.logger != nil {
-		t.logger.Warn("write http rpc response failed", "error", err)
-	}
-}
-
-func (t *wailsWSTransport) writeHTTPError(rw http.ResponseWriter, status int, message string) {
-	rw.Header().Set("Content-Type", "text/plain")
-	rw.WriteHeader(status)
-	_, _ = io.WriteString(rw, message)
 }
 
 // buildRuntimeRequest constructs a wails RuntimeRequest. Args carries raw JSON
