@@ -117,16 +117,19 @@ func shutdownRuntime(application runtimeShutdowner, logCloser runtimeLogCloser, 
 }
 
 func newWailsApplication(appInstance *app.App, logger *slog.Logger) *application.App {
-	// Use one local IPC channel for all runtime calls and Wails events.
-	// The transport binds to loopback and authenticates each WebSocket with a
-	// per-process random token exposed only through the bundled transport.js.
-	ipcTransport := app.NewUnifiedIPCTransport(logger)
-	if appInstance != nil && appInstance.Terminal != nil {
-		ipcTransport.SetTerminalInputHandler(func(terminalID, data string) (int, error) {
-			return appInstance.Terminal.Write(terminalID, data)
-		})
+	// Keep the unified IPC transport behind an explicit rollout flag until the
+	// installed desktop builds have completed a full protocol compatibility pass.
+	// The official Wails HTTP/ExecJS path remains the production fallback.
+	var transport application.Transport
+	if os.Getenv("MSSH_ENABLE_UNIFIED_IPC") == "1" {
+		ipcTransport := app.NewUnifiedIPCTransport(logger)
+		if appInstance != nil && appInstance.Terminal != nil {
+			ipcTransport.SetTerminalInputHandler(func(terminalID, data string) (int, error) {
+				return appInstance.Terminal.Write(terminalID, data)
+			})
+		}
+		transport = ipcTransport
 	}
-	transport := application.Transport(ipcTransport)
 	wailsApp := application.New(application.Options{
 		Name:        "mssh",
 		Description: "A cross-platform SSH client",

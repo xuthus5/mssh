@@ -6,9 +6,6 @@ import { AppErrorBoundary } from '@/components/AppErrorBoundary'
 import { logger } from '@/lib/logger'
 import { initIPCTransport, loadWailsTransport } from '@/lib/wsTransport'
 
-void loadWailsTransport()
-initIPCTransport()
-
 async function selectedRoot() {
   const settingsWindow = new URLSearchParams(window.location.search).get('window') === 'settings'
   if (settingsWindow) return (await import('@/components/settings/SettingsWindowApp')).SettingsWindowApp
@@ -18,6 +15,8 @@ async function selectedRoot() {
 }
 
 async function mount() {
+  await loadWailsTransport()
+  if ((window as unknown as { __wailsWSURL?: string }).__wailsWSURL) initIPCTransport()
   const Root = await selectedRoot()
   ReactDOM.createRoot(document.getElementById('root')!).render(
     <LanguageProvider>

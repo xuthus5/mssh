@@ -37,7 +37,7 @@
 
 ## Unified desktop IPC
 
-- Desktop Wails calls and custom events use the authenticated `UnifiedIPCTransport`; the previous HTTP runtime and `ExecJS` event split is no longer used.
+- The authenticated `UnifiedIPCTransport` is available behind `MSSH_ENABLE_UNIFIED_IPC=1`; the installed default keeps the official Wails transport until cross-platform soak testing completes.
 - Calls queue briefly during startup/reconnect and fail with a bounded timeout instead of silently falling back to a second protocol.
 
 ## File tree

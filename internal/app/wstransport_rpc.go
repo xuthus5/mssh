@@ -43,7 +43,7 @@ func (t *wailsWSTransport) handleWebSocket(rw http.ResponseWriter, req *http.Req
 		if readErr != nil {
 			return
 		}
-		t.handleRPC(ctx, client, data)
+		go t.handleRPC(ctx, client, data)
 	}
 }
 
