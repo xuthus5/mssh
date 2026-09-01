@@ -10,6 +10,11 @@ MSSH 是面向多主机、多终端、多重复操作场景的跨平台 SSH 工�
 
 ---
 
+## 演示
+
+![light](./screenshots/light.png)
+![dark](./screenshots/dark.png)
+
 ## 产品定位
 
 MSSH 的设计前提是：一次 SSH 连接不只是一个 Shell。真正可用的 SSH 客户端还需要管理会话资产、保留终端上下文、处理断线恢复，并让重复操作更安全。
