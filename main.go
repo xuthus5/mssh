@@ -117,6 +117,15 @@ func shutdownRuntime(application runtimeShutdowner, logCloser runtimeLogCloser, 
 }
 
 func newWailsApplication(appInstance *app.App, logger *slog.Logger) *application.App {
+	// The WebSocket IPC transport is experimental: wails beta's event bridge
+	// (dispatchWailsEvent -> eventListeners) is unreliable for WebSocket
+	// delivery in WebKitGTK, which breaks interactive flows like host key
+	// confirmation. It also interferes with the default ExecJS event path, so
+	// it stays opt-in. The default HTTP+ExecJS transport is fully functional.
+	var transport application.Transport
+	if os.Getenv("MSSH_ENABLE_WS_TRANSPORT") == "1" {
+		transport = app.NewWailsWSTransport(logger)
+	}
 	wailsApp := application.New(application.Options{
 		Name:        "mssh",
 		Description: "A cross-platform SSH client",
@@ -145,6 +154,7 @@ func newWailsApplication(appInstance *app.App, logger *slog.Logger) *application
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(frontendAssets()),
 		},
+		Transport: transport,
 		Mac: application.MacOptions{
 			ApplicationShouldTerminateAfterLastWindowClosed: false,
 		},
