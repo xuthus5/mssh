@@ -52,6 +52,11 @@ export const Clipboard = {
   Text: async () => { throw new Error('native clipboard unavailable') },
 }
 
+export function setTransport(transport: unknown) {
+  // Transport selection is exercised by wsTransport.test.ts with its own mock.
+  void transport
+}
+
 export function __registerHandler(name: string, fn: (...args: any[]) => Promise<any>) {
   handlers.set(name, fn)
 }
