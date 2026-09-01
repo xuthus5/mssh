@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { markIntentionalDisconnect, maybeAutoReconnectTerminal, reconnectSessionTab } from '@/hooks/sessionReconnect'
+import { RECONNECT_ATTEMPT_TIMEOUT_MS } from '@/hooks/sessionReconnectRunner'
 import { DEFAULT_TERMINAL_BEHAVIOR, useTerminalBehaviorStore } from '@/store/terminalBehaviorStore'
 import { logger } from '@/lib/logger'
 import { useToastStore } from '@/components/ui/toast'
@@ -125,6 +126,21 @@ describe('reconnectSessionTab', () => {
     expect(open).toHaveBeenCalledTimes(3)
     expect(useAppStore.getState().connectionStatus['term-old']).toBe('error')
     expect(useConnectDialog.getState().error).toContain('network failed')
+    vi.useRealTimers()
+  })
+
+  it('fails a reconnect attempt that never resolves instead of staying reconnecting forever', async () => {
+    vi.useFakeTimers()
+    const open = vi.fn(() => new Promise<string>(() => {}))
+    __registerHandler(service + 'Open', open)
+
+    const reconnecting = reconnectSessionTab('tab-1', sessions)
+    await vi.advanceTimersByTimeAsync(RECONNECT_ATTEMPT_TIMEOUT_MS * 3 + 2_000)
+    await reconnecting
+
+    expect(open).toHaveBeenCalledTimes(3)
+    expect(useAppStore.getState().connectionStatus['term-old']).toBe('error')
+    expect(useConnectDialog.getState().error).toContain('timed out')
     vi.useRealTimers()
   })
 
