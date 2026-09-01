@@ -5,6 +5,63 @@ import { terminalTrace } from '@/lib/terminalTrace'
 import { TerminalCommandCapture } from '@/lib/terminalCommandCapture'
 import type { AppState } from '@/store/appStore'
 
+/** Keep interactive input responsive while coalescing rapid key events. */
+export const TERMINAL_INPUT_BATCH_DELAY_MS = 8
+export const TERMINAL_INPUT_BATCH_MAX_LENGTH = 16 * 1024
+
+const immediateInputPattern = /[\r\n\u0003\u0004\u001a\u001b]/
+
+export interface TerminalInputBatcher {
+  write(data: string): void
+  flush(): void
+  dispose(): void
+}
+
+export function createTerminalInputBatcher(
+  send: (data: string) => void | Promise<unknown>,
+  delayMs = TERMINAL_INPUT_BATCH_DELAY_MS,
+): TerminalInputBatcher {
+  let pending = ''
+  let timer: number | null = null
+
+  const clearTimer = () => {
+    if (timer === null) return
+    window.clearTimeout(timer)
+    timer = null
+  }
+
+  const flush = () => {
+    clearTimer()
+    if (!pending) return
+    const data = pending
+    pending = ''
+    try {
+      void Promise.resolve(send(data)).catch(() => undefined)
+    } catch {
+      // The caller owns reporting transport failures; batching must not throw from xterm's event handler.
+    }
+  }
+
+  const write = (data: string) => {
+    if (!data) return
+    pending += data
+    if (pending.length >= TERMINAL_INPUT_BATCH_MAX_LENGTH || immediateInputPattern.test(data)) {
+      flush()
+      return
+    }
+    if (timer === null) timer = window.setTimeout(flush, delayMs)
+  }
+
+  return {
+    write,
+    flush,
+    dispose: () => {
+      flush()
+      clearTimer()
+    },
+  }
+}
+
 export interface TerminalInputRefs {
   terminalIDRef: RefObject<string>
   storeRef: RefObject<AppState>

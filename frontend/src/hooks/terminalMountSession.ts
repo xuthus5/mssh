@@ -11,7 +11,7 @@ import { runTerminalRuntime } from '@/components/terminal/terminalRuntime'
 import { subscribeToRenderer, subscribeToScrollback } from '@/hooks/terminalBehaviorSubscriptions'
 import { subscribeToTerminalWorkingDirectory } from '@/hooks/terminalDirectoryRuntime'
 import { fitAndRefresh } from '@/hooks/terminalFitRuntime'
-import { resolveSessionId, subscribeToTerminalData } from '@/hooks/terminalInputRuntime'
+import { createTerminalInputBatcher, resolveSessionId, subscribeToTerminalData } from '@/hooks/terminalInputRuntime'
 import { createTerminalInstance, createTerminalRendererController, safelyDisposeTerminalResource } from '@/hooks/terminalInstanceRuntime'
 import { createLigaturesController, type TerminalLigaturesController } from '@/hooks/terminalInstanceRuntime'
 import { subscribeToSynchronizedOutputQuery, subscribeToTerminalOutput, subscribeToTerminalVersionQuery } from '@/hooks/terminalOutputRuntime'
@@ -94,12 +94,13 @@ function createBaseResources(options: MountOptions): BaseResources {
 function createInputSubscriptions(options: MountOptions, resources: BaseResources) {
   const { refs, reportRuntimeError } = options
   const { term } = resources
+  const inputBatcher = createTerminalInputBatcher((data) => options.writeTerminalInput(data, refs))
   const commandCapture = new TerminalCommandCapture()
   const historyPredict = installCommandTokenPredict(term, {
     getSessionId: () => resolveSessionId(refs),
     getBuffer: () => commandCapture.current(),
     applyCompletion: (data) => {
-      options.writeTerminalInput(data, refs)
+      inputBatcher.write(data)
       commandCapture.feed(data)
     },
   })
@@ -108,9 +109,9 @@ function createInputSubscriptions(options: MountOptions, resources: BaseResource
   })
   resources.container?.addEventListener('focusin', focusHandler)
   resources.container?.addEventListener('pointerdown', focusHandler)
-  const dataDispose = subscribeToTerminalData(term, refs, commandCapture, (data) => options.writeTerminalInput(data, refs))
+  const dataDispose = subscribeToTerminalData(term, refs, commandCapture, inputBatcher.write)
   const predictObserve = term.onData(() => historyPredict.update())
-  return { historyPredict, predictObserve, focusHandler, dataDispose }
+  return { historyPredict, predictObserve, focusHandler, dataDispose, inputBatcher }
 }
 
 function createRuntimeSubscriptions(options: MountOptions, resources: BaseResources) {
@@ -184,6 +185,7 @@ function disposeMount(context: {
   resources.container?.removeEventListener('focusin', input.focusHandler)
   resources.container?.removeEventListener('pointerdown', input.focusHandler)
   safelyDisposeTerminalResource('history predict', input.historyPredict.dispose)
+  safelyDisposeTerminalResource('input batcher', input.inputBatcher.dispose)
   safelyDisposeTerminalResource('data subscription', () => input.dataDispose.dispose())
   safelyDisposeTerminalResource('predict observe', () => input.predictObserve.dispose())
   safelyDisposeTerminalResource('synchronized output query', () => subscriptions.synchronizedOutputQueryDispose.dispose())
