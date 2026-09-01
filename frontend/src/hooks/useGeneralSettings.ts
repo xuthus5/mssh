@@ -81,6 +81,7 @@ function mergeTerminalScope(current: GeneralSettings, next: GeneralSettings): Ge
     autoReconnect: next.autoReconnect,
     restoreTabsOnStartup: next.restoreTabsOnStartup,
     renderer: next.renderer,
+    webviewGpu: next.webviewGpu,
     historyPredict: next.historyPredict,
     autoCloseTerminalOnExit: next.autoCloseTerminalOnExit,
     localShell: next.localShell,

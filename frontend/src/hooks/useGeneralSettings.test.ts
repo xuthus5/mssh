@@ -236,6 +236,21 @@ describe('useGeneralSettings cross-window sync', () => {
     expect(result.current.general.debug).toBe(false)
   })
 
+  it('persists hardware acceleration from the terminal settings scope', async () => {
+    let savedEntries: Array<{ key: string; value: string }> = []
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.SetMany', async (entries) => { savedEntries = entries })
+    const { result } = renderHook(() => useGeneralSettings())
+
+    await act(async () => {
+      await result.current.saveGeneral({ ...result.current.general, webviewGpu: 'always' }, { scope: 'terminal' })
+    })
+
+    expect(savedEntries).toContainEqual(expect.objectContaining({
+      key: 'application.webview_gpu', value: '"always"',
+    }))
+    expect(result.current.general.webviewGpu).toBe('always')
+  })
+
   it('loads and persists the close button action using the final setting contract', async () => {
     let savedEntries: Array<{ key: string; value: string }> = []
     __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.GetMany', async () => ({
