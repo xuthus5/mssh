@@ -6,6 +6,12 @@ const root = path.resolve('src')
 const maxFileLines = 300
 const maxFunctionLines = 50
 const maxPositionalParameters = 3
+// Framework/contract functions that require more positional parameters than
+// the project limit. wails' RuntimeTransport.call must keep its 4-argument
+// signature because the runtime invokes it by position.
+const positionalParameterExemptions = [
+  { file: 'src/lib/wsTransport.ts', name: 'call' },
+]
 const fileLimitIgnore = [
   /\.test\.(ts|tsx)$/,
   /\.behavior\.test\.(ts|tsx)$/,
@@ -68,7 +74,8 @@ function scanFunctions(file) {
       const relativeFile = path.relative(process.cwd(), file)
       const name = functionName(node, sourceFile)
       if (lines > maxFunctionLines) violations.push({ kind: 'function-lines', file: relativeFile, line: start, name, actual: lines })
-      if (node.parameters.length > maxPositionalParameters) {
+      const exempt = positionalParameterExemptions.some((rule) => rule.file === relativeFile && rule.name === name)
+      if (!exempt && node.parameters.length > maxPositionalParameters) {
         violations.push({ kind: 'parameters', file: relativeFile, line: start, name, actual: node.parameters.length })
       }
     }

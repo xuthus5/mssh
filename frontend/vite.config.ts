@@ -12,6 +12,21 @@ export default defineConfig({
       // declares main as the missing CJS file; route it to the real entry.
       '@xterm/addon-ligatures': path.resolve(__dirname, 'node_modules/@xterm/addon-ligatures/lib/addon-ligatures.mjs'),
     },
+    // @wailsio/runtime keeps module-level singleton state (clientId,
+    // eventListeners, window._wails). It must resolve to a single instance or
+    // Events.On registrations land on a different eventListeners map than the
+    // one the transport dispatches through.
+    dedupe: ['@wailsio/runtime'],
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('@wailsio/runtime')) return 'wails-runtime'
+          return undefined
+        },
+      },
+    },
   },
   server: {
     host: '127.0.0.1',
