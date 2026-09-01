@@ -29,6 +29,12 @@
 - `TerminalOutputFlowControl` serializes xterm writes, acknowledges parsed batches, and requests backend pause/resume at the high/low watermarks.
 - Data remains lossless and ordered; terminal dispose, PTY exit, and LRU eviction release any paused reader. Guardian tests: `terminalOutputCoalescer.test.ts`, `terminalOutputFlowControl.test.ts`, `terminalOutputRuntime.flow.test.ts`.
 
+## Terminal input batching
+
+- Rapid printable input is coalesced per terminal in an 8ms window before calling `TerminalService.Write`.
+- Enter, newline, and common control/escape bytes flush immediately; batches are capped at 16KiB.
+- The batcher flushes pending input during terminal disposal so the existing Wails WebSocket IPC remains ordered without one RPC per character.
+
 ## File tree
 
 - `FileTreeView` virtualizes when flattened visible nodes > 80.
