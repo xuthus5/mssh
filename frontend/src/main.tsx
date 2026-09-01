@@ -4,10 +4,10 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 import { LanguageProvider } from '@/i18n/LanguageProvider'
 import { AppErrorBoundary } from '@/components/AppErrorBoundary'
 import { logger } from '@/lib/logger'
-import { initWsTransport, loadWailsTransport } from '@/lib/wsTransport'
+import { initIPCTransport, loadWailsTransport } from '@/lib/wsTransport'
 
 void loadWailsTransport()
-initWsTransport()
+initIPCTransport()
 
 async function selectedRoot() {
   const settingsWindow = new URLSearchParams(window.location.search).get('window') === 'settings'

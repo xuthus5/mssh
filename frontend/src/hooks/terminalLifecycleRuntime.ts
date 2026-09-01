@@ -5,6 +5,7 @@ import type { TerminalRuntimeErrorReporter } from '@/components/terminal/Termina
 import { runTerminalRuntime } from '@/components/terminal/terminalRuntime'
 import { logger } from '@/lib/logger'
 import { replaceTerminalSearch } from '@/lib/terminalSearchRegistry'
+import { IPC_RECONNECTED_EVENT } from '@/lib/wsTransport'
 import { TerminalService } from '@/lib/wails'
 import { useAppStore } from '@/store/appStore'
 
@@ -90,11 +91,16 @@ export function useTerminalAttachment(terminalID: string) {
       useAppStore.getState().setConnectionError(terminalID, error instanceof Error ? error.message : String(error))
       useAppStore.getState().setConnectionStatus(terminalID, 'error')
     }
-    try {
-      void TerminalService.Attach(terminalID).catch(markFailed)
-    } catch (error: unknown) {
-      markFailed(error)
+    const attach = () => {
+      try {
+        void TerminalService.Attach(terminalID).catch(markFailed)
+      } catch (error: unknown) {
+        markFailed(error)
+      }
     }
+    attach()
+    window.addEventListener(IPC_RECONNECTED_EVENT, attach)
+    return () => window.removeEventListener(IPC_RECONNECTED_EVENT, attach)
   }, [terminalID])
 }
 
