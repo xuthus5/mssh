@@ -33,7 +33,7 @@ MSSH fits desktop workflows where operators need a reliable local control plane 
 
 MSSH is not a fleet orchestrator. It focuses on saved SSH sessions and terminal-centered operations, with each task bound to a specific session and its own connection lifecycle.
 
-The desktop app uses one authenticated local IPC channel for Wails calls, terminal input, and event notifications. Interactive xterm input uses a dedicated frame and frontend batching, avoiding one RPC per character.
+The desktop app has an authenticated unified local IPC transport available for rollout testing. The default build keeps Wails' compatibility transport until cross-platform soak testing completes; interactive xterm input is batched to avoid one RPC per character.
 
 ---
 

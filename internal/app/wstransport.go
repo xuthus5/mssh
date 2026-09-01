@@ -42,6 +42,9 @@ func (c *wailsWSClient) writeLoop(ctx context.Context) {
 	for {
 		select {
 		case payload := <-c.writeCh:
+			if len(payload) == 0 {
+				continue
+			}
 			writeCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 			err := c.conn.Write(writeCtx, websocket.MessageText, payload)
 			cancel()

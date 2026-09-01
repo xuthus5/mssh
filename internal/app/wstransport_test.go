@@ -98,6 +98,22 @@ func TestWailsWSTransportRPCTextResponse(t *testing.T) {
 	assert.Equal(t, "hello", message["data"])
 }
 
+func TestWailsWSTransportDoesNotBlockSubsequentCallsOnSlowCall(t *testing.T) {
+	_, url := startTestWSTransport(t, func(ctx context.Context, req *application.RuntimeRequest) (any, error) {
+		if req.Method == 1 {
+			<-ctx.Done()
+			return nil, ctx.Err()
+		}
+		return "fast", nil
+	})
+	conn := dialWSTransport(t, url)
+	require.NoError(t, conn.Write(context.Background(), websocket.MessageText, []byte(`{"type":"call","id":"slow","object":0,"method":1}`)))
+	require.NoError(t, conn.Write(context.Background(), websocket.MessageText, []byte(`{"type":"call","id":"fast","object":0,"method":2}`)))
+	message := readWSMessage(t, conn)
+	assert.Equal(t, "fast", message["data"])
+	assert.Equal(t, "fast", message["id"])
+}
+
 func TestWailsWSTransportTerminalInputFastPath(t *testing.T) {
 	transport, url := startTestWSTransport(t, nil)
 	transport.SetTerminalInputHandler(func(terminalID, data string) (int, error) {
