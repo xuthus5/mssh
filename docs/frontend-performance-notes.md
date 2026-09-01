@@ -31,9 +31,14 @@
 
 ## Terminal input batching
 
-- Rapid printable input is coalesced per terminal in an 8ms window before calling `TerminalService.Write`.
+- Rapid printable input is coalesced per terminal in an 8ms window before sending a `terminal_input` frame.
 - Enter, newline, and common control/escape bytes flush immediately; batches are capped at 16KiB.
-- The batcher flushes pending input during terminal disposal so the existing Wails WebSocket IPC remains ordered without one RPC per character.
+- The batcher flushes pending input during terminal disposal so the unified IPC channel remains ordered without one RPC per character.
+
+## Unified desktop IPC
+
+- Desktop Wails calls and custom events use the authenticated `UnifiedIPCTransport`; the previous HTTP runtime and `ExecJS` event split is no longer used.
+- Calls queue briefly during startup/reconnect and fail with a bounded timeout instead of silently falling back to a second protocol.
 
 ## File tree
 
