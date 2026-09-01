@@ -2,13 +2,13 @@
 
 ## Decision
 
-MSSH uses one authenticated, loopback-only WebSocket transport for all desktop webview communication:
+MSSH provides one authenticated, loopback-only WebSocket transport for unified desktop communication. It is currently enabled by the explicit `MSSH_ENABLE_UNIFIED_IPC=1` rollout flag; the default installed build keeps Wails' official HTTP/ExecJS path as a compatibility fallback until the new transport completes cross-platform soak testing.
 
 - Wails generated method calls use `type: call` frames and correlated responses.
 - Interactive xterm input uses `type: terminal_input` frames and reaches `TerminalService.Write` directly, bypassing Wails reflection while staying on the same channel.
 - Wails custom events use `type: event` frames on the same connection.
 - The frontend keeps `Events.On` and generated bindings unchanged; the transport dispatches received events through `window._wails.dispatchWailsEvent`.
-- HTTP runtime fallback and Wails `ExecJS` event delivery are not part of the desktop runtime path.
+- When unified IPC is enabled, HTTP runtime fallback and Wails `ExecJS` event delivery are not used for runtime calls/events. When it is disabled or unavailable, the official Wails path remains authoritative.
 
 The loopback socket is an adapter around the native webview networking stack. It avoids per-call HTTP connection setup while remaining available on Linux, macOS and Windows, where browser JavaScript cannot open Unix-domain sockets or named pipes directly.
 
