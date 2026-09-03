@@ -194,7 +194,7 @@ func TestPrepareCodexModelCatalogForMCPDisablesSearchTool(t *testing.T) {
 
 func TestPrepareCodexModelCatalogForMCPHonorsConfigPath(t *testing.T) {
 	codexHome := t.TempDir()
-	custom := filepath.Join(t.TempDir(), "custom-catalog.json")
+	custom := filepath.Join(codexHome, "custom-catalog.json")
 	writeTestCodexModelCatalogAt(t, custom, true)
 	config := "model = \"deepseek-v4-flash\"\nmodel_catalog_json = \"" + custom + "\"\n"
 	require.NoError(t, os.WriteFile(filepath.Join(codexHome, "config.toml"), []byte(config), 0o600))
@@ -204,6 +204,18 @@ func TestPrepareCodexModelCatalogForMCPHonorsConfigPath(t *testing.T) {
 	data, err := os.ReadFile(path)
 	require.NoError(t, err)
 	assert.Contains(t, string(data), "supports_search_tool")
+}
+
+func TestPrepareCodexModelCatalogForMCPRejectsCatalogOutsideCodexHome(t *testing.T) {
+	codexHome := t.TempDir()
+	custom := filepath.Join(t.TempDir(), "custom-catalog.json")
+	writeTestCodexModelCatalogAt(t, custom, true)
+	config := "model_catalog_json = \"" + custom + "\"\n"
+	require.NoError(t, os.WriteFile(filepath.Join(codexHome, "config.toml"), []byte(config), 0o600))
+
+	path, err := prepareCodexModelCatalogForMCP(t.TempDir(), codexHome)
+	require.NoError(t, err)
+	assert.Empty(t, path)
 }
 
 func TestPrepareCodexModelCatalogForMCPIgnoresMissingCatalog(t *testing.T) {

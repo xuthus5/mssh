@@ -110,7 +110,7 @@ func prepareAIAgentToolRequest(action aiAgentAction, security model.AISecuritySe
 		if err := decodeAIAgentArguments(action.Arguments, &args); err != nil {
 			return request, err
 		}
-		validated, err := validateAIAgentRemotePath(args.Path)
+		validated, err := validateAIAgentWritePath(args.Path)
 		if err != nil {
 			return request, err
 		}
@@ -138,6 +138,32 @@ func validateAIAgentRemotePath(value string) (string, error) {
 		return "", fmt.Errorf("remote root path is not allowed")
 	}
 	return cleaned, nil
+}
+
+func validateAIAgentWritePath(value string) (string, error) {
+	cleaned, err := validateAIAgentRemotePath(value)
+	if err != nil {
+		return "", err
+	}
+	if isProtectedAIAgentPath(cleaned) {
+		return "", fmt.Errorf("remote path is protected from AI writes")
+	}
+	return cleaned, nil
+}
+
+func isProtectedAIAgentPath(value string) bool {
+	protectedRoots := []string{"/boot", "/dev", "/etc", "/proc", "/root", "/sys", "/usr", "/var/lib", "/var/run"}
+	for _, root := range protectedRoots {
+		if value == root || strings.HasPrefix(value, root+"/") {
+			return true
+		}
+	}
+	for _, component := range strings.Split(strings.TrimPrefix(value, "/"), "/") {
+		if component == ".ssh" || component == ".gnupg" {
+			return true
+		}
+	}
+	return false
 }
 
 func (connection *aiAgentSSH) Execute(ctx context.Context, request aiAgentToolRequest) (string, error) {

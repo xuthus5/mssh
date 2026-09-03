@@ -81,6 +81,7 @@ func TestTerminalTraceOutputReadComputesLatencies(t *testing.T) {
 	assert.Contains(t, output, "terminal output read")
 	assert.Contains(t, output, "since_last_write_ms=")
 	assert.Contains(t, output, "since_last_output_ms=")
+	assert.NotContains(t, output, "preview=")
 }
 
 func TestTerminalTraceOutputReadHandlesMissingWrite(t *testing.T) {

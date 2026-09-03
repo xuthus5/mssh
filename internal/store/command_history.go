@@ -8,6 +8,8 @@ import (
 	"github.com/xuthus5/mssh/internal/model"
 )
 
+const commandHistoryRetentionLimit = 10000
+
 func AddCommandHistory(db *sql.DB, sessionID int64, command string) (*model.CommandHistory, error) {
 	result, err := db.Exec("INSERT INTO command_history (session_id, command) VALUES (?, ?)", sessionID, command)
 	if err != nil {
@@ -16,6 +18,9 @@ func AddCommandHistory(db *sql.DB, sessionID int64, command string) (*model.Comm
 	id, err := result.LastInsertId()
 	if err != nil {
 		return nil, fmt.Errorf("add command history id: %w", err)
+	}
+	if _, err = db.Exec("DELETE FROM command_history WHERE session_id = ? AND id NOT IN (SELECT id FROM command_history WHERE session_id = ? ORDER BY id DESC LIMIT ?)", sessionID, sessionID, commandHistoryRetentionLimit); err != nil {
+		return nil, fmt.Errorf("prune command history: %w", err)
 	}
 	return &model.CommandHistory{ID: id, SessionID: sessionID, Command: command, CreatedAt: time.Now()}, nil
 }

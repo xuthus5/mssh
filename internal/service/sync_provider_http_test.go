@@ -38,12 +38,7 @@ func TestGistProviderCreatesFetchesAndProtectsUpdates(t *testing.T) {
 		case request.Method == http.MethodPatch && request.URL.Path == "/gists/gist-1":
 			lastPatchHadIfMatch = request.Header.Get("If-Match") != ""
 			require.NoError(t, json.NewDecoder(request.Body).Decode(&lastPatchBody))
-			// 模拟真实 GitHub：PATCH 不支持 If-Match / public，否则 400。
-			if lastPatchHadIfMatch {
-				writer.WriteHeader(http.StatusBadRequest)
-				_, _ = writer.Write([]byte(`{"message":"Invalid request"}`))
-				return
-			}
+			assert.Equal(t, etag, request.Header.Get("If-Match"))
 			if _, hasPublic := lastPatchBody["public"]; hasPublic {
 				writer.WriteHeader(http.StatusBadRequest)
 				_, _ = writer.Write([]byte(`{"message":"Invalid request"}`))
@@ -75,7 +70,7 @@ func TestGistProviderCreatesFetchesAndProtectsUpdates(t *testing.T) {
 	updated, err := provider.Put(t.Context(), []byte("next"), etag)
 	require.NoError(t, err)
 	assert.Equal(t, `"v2"`, updated.ETag)
-	assert.False(t, lastPatchHadIfMatch)
+	assert.True(t, lastPatchHadIfMatch)
 	_, hasPublic := lastPatchBody["public"]
 	assert.False(t, hasPublic)
 	assert.Equal(t, "next", content)
@@ -95,7 +90,7 @@ func TestNormalizeETagAndGistAPIError(t *testing.T) {
 	defer server.Close()
 	provider, err := newGistSyncProvider(server.Client(), server.URL, "gist-1", "token")
 	require.NoError(t, err)
-	_, err = provider.Put(t.Context(), []byte("backup"), "")
+	_, err = provider.Put(t.Context(), []byte("backup"), `"etag"`)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "400")
 	assert.Contains(t, err.Error(), "Invalid request")

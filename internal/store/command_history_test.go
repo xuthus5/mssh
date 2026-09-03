@@ -39,6 +39,20 @@ func TestCommandHistoryClosedDatabaseErrors(t *testing.T) {
 	require.Error(t, ClearCommandHistory(db, 1))
 }
 
+func TestCommandHistoryRetentionKeepsNewestEntries(t *testing.T) {
+	db := setupTestDB(t)
+	session, err := CreateSession(db, testCommandSession())
+	require.NoError(t, err)
+	_, err = db.Exec("WITH RECURSIVE seq(n) AS (SELECT 0 UNION ALL SELECT n + 1 FROM seq WHERE n < ?) INSERT INTO command_history (session_id, command) SELECT ?, 'command-' || n FROM seq", commandHistoryRetentionLimit+4, session.ID)
+	require.NoError(t, err)
+	_, err = AddCommandHistory(db, session.ID, "command-final")
+	require.NoError(t, err)
+	items, err := ListCommandHistory(db, session.ID, "", commandHistoryRetentionLimit+10)
+	require.NoError(t, err)
+	require.Len(t, items, commandHistoryRetentionLimit)
+	require.Equal(t, "command-final", items[0].Command)
+}
+
 func testCommandSession() model.Session {
 	return model.Session{Name: "history", Host: "127.0.0.1", Port: 22, Username: "root", AuthMethod: model.AuthPassword, KeepAlive: 30, TermType: "xterm"}
 }

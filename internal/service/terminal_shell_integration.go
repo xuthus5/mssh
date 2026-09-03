@@ -6,6 +6,7 @@ import (
 	"errors"
 	"log/slog"
 	"sync"
+	"time"
 
 	msshssh "github.com/xuthus5/mssh/internal/ssh"
 	"github.com/xuthus5/mssh/internal/store"
@@ -51,7 +52,13 @@ func (t *TerminalService) terminalDirectoryIntegrationEnabled() bool {
 // never affect the terminal's live connection.
 func (t *TerminalService) runTerminalDirectoryIntegration(sessionID int64) {
 	logger := terminalServiceLogger(t)
-	wrapper, disconnect, err := t.openTerminalDirectoryIntegrationConnection(context.Background(), sessionID)
+	ctx := context.Background()
+	if t != nil && t.lifecycleContext != nil {
+		ctx = t.lifecycleContext
+	}
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	wrapper, disconnect, err := t.openTerminalDirectoryIntegrationConnection(ctx, sessionID)
 	if err != nil {
 		logger.Warn("terminal directory integration connection failed",
 			"sessionID", sessionID, "error", err)

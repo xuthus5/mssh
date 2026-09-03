@@ -186,7 +186,7 @@ func TestMoveFolder(t *testing.T) {
 	db := setupTestDB(t)
 	folder, err := CreateFolder(db, "child", nil)
 	require.NoError(t, err)
-	var parent2 int64 = 2
+	var parent2 int64 = 1
 	err = MoveFolder(db, folder.ID, &parent2)
 	require.NoError(t, err)
 
@@ -199,7 +199,67 @@ func TestMoveFolder(t *testing.T) {
 		}
 	}
 	require.NotNil(t, moved.ParentID)
-	assert.Equal(t, int64(2), *moved.ParentID)
+	assert.Equal(t, parent2, *moved.ParentID)
+}
+
+func TestMoveFolderRejectsMissingTargetsAndCycles(t *testing.T) {
+	db := setupTestDB(t)
+	root, err := CreateFolder(db, "root", nil)
+	require.NoError(t, err)
+	child, err := CreateFolder(db, "child", &root.ID)
+	require.NoError(t, err)
+	grandchild, err := CreateFolder(db, "grandchild", &child.ID)
+	require.NoError(t, err)
+
+	missing := int64(999)
+	assert.ErrorContains(t, MoveFolder(db, child.ID, &missing), "parent folder not found")
+	assert.ErrorContains(t, MoveFolder(db, child.ID, &child.ID), "own parent")
+	assert.ErrorContains(t, MoveFolder(db, root.ID, &grandchild.ID), "descendant")
+	assert.ErrorContains(t, MoveFolder(db, missing, nil), "folder not found")
+
+	folders, err := ListFolders(db)
+	require.NoError(t, err)
+	for _, folder := range folders {
+		switch folder.ID {
+		case root.ID:
+			assert.Nil(t, folder.ParentID)
+		case child.ID:
+			require.NotNil(t, folder.ParentID)
+			assert.Equal(t, root.ID, *folder.ParentID)
+		case grandchild.ID:
+			require.NotNil(t, folder.ParentID)
+			assert.Equal(t, child.ID, *folder.ParentID)
+		}
+	}
+}
+
+func TestMoveFolderRejectsCorruptAncestorCycle(t *testing.T) {
+	db := setupTestDB(t)
+	first, err := CreateFolder(db, "first", nil)
+	require.NoError(t, err)
+	second, err := CreateFolder(db, "second", &first.ID)
+	require.NoError(t, err)
+	_, err = db.Exec("UPDATE session_folders SET parent_id = ? WHERE id = ?", second.ID, first.ID)
+	require.NoError(t, err)
+	defaultID, err := GetDefaultFolderID(db)
+	require.NoError(t, err)
+	assert.ErrorContains(t, MoveFolder(db, defaultID, &first.ID), "hierarchy contains a cycle")
+}
+
+func TestMoveSessionRejectsMissingTargets(t *testing.T) {
+	db := setupTestDB(t)
+	defaultID, err := GetDefaultFolderID(db)
+	require.NoError(t, err)
+	session, err := CreateSession(db, model.Session{FolderID: &defaultID, Name: "server", Host: "127.0.0.1", Port: 22, Username: "root", AuthMethod: model.AuthPassword})
+	require.NoError(t, err)
+	missing := int64(999)
+	assert.ErrorContains(t, MoveSession(db, session.ID, &missing), "target folder not found")
+	assert.ErrorContains(t, MoveSession(db, missing, &defaultID), "session not found")
+	assert.ErrorContains(t, MoveSession(db, missing, nil), "session not found")
+	fetched, err := GetSession(db, session.ID)
+	require.NoError(t, err)
+	require.NotNil(t, fetched.FolderID)
+	assert.Equal(t, defaultID, *fetched.FolderID)
 }
 
 func TestDefaultFolderRulesAndDeleteMigration(t *testing.T) {

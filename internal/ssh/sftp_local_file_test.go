@@ -9,6 +9,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/xuthus5/mssh/internal/fsutil"
 )
 
 func TestDownloadFileExclusiveContextRejectsExistingLocalPath(t *testing.T) {
@@ -62,6 +64,31 @@ func TestOpenExclusiveDownloadTargetCreatesPrivateRegularFile(t *testing.T) {
 	if runtime.GOOS != "windows" {
 		assert.Equal(t, os.FileMode(0o600), info.Mode().Perm())
 	}
+}
+
+func TestNonExclusiveDownloadReplacesSymlinkWithoutFollowingIt(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink creation requires elevated privileges on some Windows hosts")
+	}
+	dir := t.TempDir()
+	target := filepath.Join(dir, "target")
+	linkTarget := filepath.Join(dir, "protected")
+	require.NoError(t, os.WriteFile(linkTarget, []byte("keep"), 0o600))
+	require.NoError(t, os.Symlink(linkTarget, target))
+
+	file, temporaryPath, err := openDownloadTargetForDownload(target, false)
+	require.NoError(t, err)
+	_, err = file.Write([]byte("new"))
+	require.NoError(t, err)
+	require.NoError(t, finalizeDownloadedFile(file))
+	require.NoError(t, fsutil.ReplaceFile(temporaryPath, target))
+
+	content, err := os.ReadFile(target)
+	require.NoError(t, err)
+	assert.Equal(t, "new", string(content))
+	protected, err := os.ReadFile(linkTarget)
+	require.NoError(t, err)
+	assert.Equal(t, "keep", string(protected))
 }
 
 func TestOpenUploadSourceRejectsDirectory(t *testing.T) {

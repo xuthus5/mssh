@@ -8,9 +8,6 @@ import (
 	"time"
 )
 
-// maxTracePreviewBytes caps the escaped preview logged per output read.
-const maxTracePreviewBytes = 160
-
 // terminalTraceEnabled reports whether debug-level terminal tracing is active.
 // All trace helpers no-op when disabled so production hot paths stay untouched.
 func (t *TerminalService) terminalTraceEnabled() bool {
@@ -105,7 +102,6 @@ func (t *TerminalService) traceOutputRead(terminalID string, data []byte) {
 	if !lastOutput.IsZero() {
 		attrs = append(attrs, "since_last_output_ms", sinceMillis(lastOutput, now))
 	}
-	attrs = append(attrs, "preview", escapeTerminalPreview(data, maxTracePreviewBytes))
 	t.logger.Debug("terminal output read", attrs...)
 }
 

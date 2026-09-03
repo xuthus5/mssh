@@ -15,7 +15,7 @@ import (
 func handleChangedHostKey(check hostKeyCheck, keyErr *knownhosts.KeyError) error {
 	switch check.policy {
 	case HostKeyPolicyTrust:
-		return replaceHostKey(check)
+		return replaceHostKey(check, keyErr)
 	case HostKeyPolicyWarn:
 		if check.onHostKeyChange != nil {
 			accepted := check.onHostKeyChange(check.hostname, check.key.Type(), gossh.FingerprintSHA256(check.key), expectedHostKeyFingerprints(keyErr))
@@ -23,7 +23,7 @@ func handleChangedHostKey(check hostKeyCheck, keyErr *knownhosts.KeyError) error
 				return fmt.Errorf("host key change rejected by user: %s", check.hostname)
 			}
 		}
-		return replaceHostKey(check)
+		return replaceHostKey(check, keyErr)
 	default:
 		return hostKeyChangedError(check.hostname, check.key, keyErr)
 	}
@@ -52,7 +52,7 @@ func expectedHostKeyFingerprints(keyErr *knownhosts.KeyError) []string {
 
 // replaceHostKey replaces the stored fingerprint for the host with the newly
 // presented key by removing old matching lines and appending the new one.
-func replaceHostKey(check hostKeyCheck) error {
+func replaceHostKey(check hostKeyCheck, keyErr *knownhosts.KeyError) error {
 	if check.logger != nil {
 		check.logger.Info("replacing host key", "hostname", check.hostname, "algorithm", check.key.Type())
 	}
@@ -65,8 +65,10 @@ func replaceHostKey(check hostKeyCheck) error {
 	lines := strings.Split(string(content), "\n")
 	kept := make([]string, 0, len(lines))
 	target := knownhosts.Normalize(check.hostname)
-	for _, line := range lines {
-		if knownHostLineForHost(line, target) {
+	removeLines := hostKeyReplacementLines(keyErr, check.key.Type())
+	for index, line := range lines {
+		lineNumber := index + 1
+		if removeLines[lineNumber] || (len(removeLines) == 0 && knownHostLineForHost(line, target)) {
 			continue
 		}
 		kept = append(kept, line)
@@ -77,6 +79,19 @@ func replaceHostKey(check hostKeyCheck) error {
 		return fmt.Errorf("replace known_hosts: %w", err)
 	}
 	return nil
+}
+
+func hostKeyReplacementLines(keyErr *knownhosts.KeyError, keyType string) map[int]bool {
+	lines := make(map[int]bool)
+	if keyErr == nil {
+		return lines
+	}
+	for _, known := range keyErr.Want {
+		if known.Key != nil && known.Key.Type() == keyType && known.Line > 0 {
+			lines[known.Line] = true
+		}
+	}
+	return lines
 }
 
 // knownHostLineForHost reports whether a known_hosts line is addressed to the

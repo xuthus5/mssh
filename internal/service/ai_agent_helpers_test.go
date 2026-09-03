@@ -88,6 +88,8 @@ func TestPrepareAIAgentToolRequestVariants(t *testing.T) {
 		{name: "stat", action: aiAgentAction{Tool: "ssh.stat", Arguments: []byte(`{"path":"/tmp/a"}`)}, wantName: "ssh.stat", wantPath: "/tmp/a"},
 		{name: "read file", action: aiAgentAction{Tool: "ssh.read_file", Arguments: []byte(`{"path":"/tmp/a"}`)}, wantName: "ssh.read_file", wantPath: "/tmp/a"},
 		{name: "write file", action: aiAgentAction{Tool: "ssh.write_file", Arguments: []byte(`{"path":"/tmp/a","content":"data"}`)}, wantName: "ssh.write_file", wantPath: "/tmp/a"},
+		{name: "protected etc write", action: aiAgentAction{Tool: "ssh.write_file", Arguments: []byte(`{"path":"/etc/ssh_config","content":"data"}`)}, wantError: "protected"},
+		{name: "protected ssh write", action: aiAgentAction{Tool: "ssh.write_file", Arguments: []byte(`{"path":"/home/a/.ssh/config","content":"data"}`)}, wantError: "protected"},
 		{name: "large write", action: aiAgentAction{Tool: "ssh.write_file", Arguments: []byte(`{"path":"/tmp/a","content":"large"}`)}, wantError: "exceeds"},
 		{name: "root path", action: aiAgentAction{Tool: "ssh.stat", Arguments: []byte(`{"path":"/"}`)}, wantError: "root path"},
 		{name: "nul path", action: aiAgentAction{Tool: "ssh.stat", Arguments: []byte("{\"path\":\"/tmp/\\u0000a\"}")}, wantError: "required"},

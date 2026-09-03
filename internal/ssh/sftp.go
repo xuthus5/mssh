@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 
 	"github.com/pkg/sftp"
+
+	"github.com/xuthus5/mssh/internal/fsutil"
 )
 
 // SFTPClient is an alias for the SFTP client, exported for use by the service layer.
@@ -144,10 +146,16 @@ func downloadFileContext(
 		return false, fmt.Errorf("create local dir: %w", err)
 	}
 
-	local, err := openDownloadTarget(dst, exclusive)
+	local, temporaryPath, err := openDownloadTargetForDownload(dst, exclusive)
 	if err != nil {
 		return false, err
 	}
+	cleanupTemporary := true
+	defer func() {
+		if cleanupTemporary && temporaryPath != "" {
+			_ = os.Remove(temporaryPath)
+		}
+	}()
 	localClosed := false
 	defer func() {
 		if !localClosed {
@@ -166,7 +174,24 @@ func downloadFileContext(
 		return true, errors.Join(fmt.Errorf("copy: %w", copyErr), closeErr)
 	}
 	localClosed = true
-	return true, finalizeDownloadedFile(local)
+	if err := finalizeDownloadedFile(local); err != nil {
+		return true, err
+	}
+	if temporaryPath != "" {
+		if err := fsutil.ReplaceFile(temporaryPath, dst); err != nil {
+			return true, fmt.Errorf("replace local download target: %w", err)
+		}
+		cleanupTemporary = false
+	}
+	return true, nil
+}
+
+func openDownloadTargetForDownload(path string, exclusive bool) (*os.File, string, error) {
+	if exclusive {
+		file, err := openDownloadTarget(path, true)
+		return file, "", err
+	}
+	return openDownloadTemporary(path)
 }
 
 type durableDownloadedFile interface {
@@ -240,55 +265,4 @@ func writeCopyChunk(dst io.Writer, data []byte, written int64, onProgress func(i
 		return written, io.ErrShortWrite
 	}
 	return written, nil
-}
-
-func RemoveFile(client *sftp.Client, path string) error {
-	if err := client.Remove(path); err != nil {
-		return fmt.Errorf("remove %s: %w", path, err)
-	}
-	return nil
-}
-
-func RemoveDir(client *sftp.Client, path string) error {
-	if err := client.RemoveDirectory(path); err != nil {
-		return fmt.Errorf("remove dir %s: %w", path, err)
-	}
-	return nil
-}
-
-func Mkdir(client *sftp.Client, path string) error {
-	if err := client.MkdirAll(path); err != nil {
-		return fmt.Errorf("mkdir %s: %w", path, err)
-	}
-	return nil
-}
-
-func Rename(client *sftp.Client, oldname, newname string) error {
-	if err := client.Rename(oldname, newname); err != nil {
-		return fmt.Errorf("rename %s -> %s: %w", oldname, newname, err)
-	}
-	return nil
-}
-
-// RemoteFileSize returns the size in bytes of a remote file, or an error.
-func RemoteFileSize(client *SFTPClient, path string) (int64, error) {
-	info, err := client.Stat(path)
-	if err != nil {
-		return 0, fmt.Errorf("stat remote %s: %w", path, err)
-	}
-	return info.Size(), nil
-}
-
-type progressWriter struct {
-	total      int64
-	onProgress ProgressFn
-}
-
-func (pw *progressWriter) Write(p []byte) (int, error) {
-	n := len(p)
-	pw.total += int64(n)
-	if pw.onProgress != nil {
-		pw.onProgress(pw.total, 0)
-	}
-	return n, nil
 }

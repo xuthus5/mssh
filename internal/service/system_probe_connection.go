@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"time"
 
 	ssh "github.com/xuthus5/mssh/internal/ssh"
 )
@@ -23,11 +24,19 @@ type systemProbeConn struct {
 // and returns an exactly-once disconnect that tears it down.
 var _openSystemProbeConnection = openSystemProbeConnection
 
+var probeContexts sync.Map
+
 func openSystemProbeConnection(sessionSvc *SessionService, sessionID int64) (*ssh.ClientWrapper, func(), error) {
 	if sessionSvc == nil {
 		return nil, nil, errors.New("session service unavailable")
 	}
-	connID, err := sessionSvc.connect(context.Background(), sessionID, false)
+	connectCtx := context.Background()
+	if value, ok := probeContexts.Load(sessionSvc); ok {
+		if ctx, valid := value.(context.Context); valid && ctx != nil {
+			connectCtx = ctx
+		}
+	}
+	connID, err := sessionSvc.connect(connectCtx, sessionID, false)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -54,7 +63,15 @@ func (t *TerminalService) acquireSystemProbeConnection(sessionID int64) (*ssh.Cl
 	}
 	entry := t.probeConns[sessionID]
 	if entry == nil || entry.closed {
+		connectCtx := context.Background()
+		if t.lifecycleContext != nil {
+			var cancel context.CancelFunc
+			connectCtx, cancel = context.WithTimeout(t.lifecycleContext, 30*time.Second)
+			defer cancel()
+		}
+		probeContexts.Store(t.sessionSvc, connectCtx)
 		wrapper, disconnect, err := _openSystemProbeConnection(t.sessionSvc, sessionID)
+		probeContexts.Delete(t.sessionSvc)
 		if err != nil {
 			t.probeMu.Unlock()
 			return nil, nil, err

@@ -1,6 +1,7 @@
 package service
 
 import (
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -41,6 +42,13 @@ func TestSaveProviderPersistsAdvancedFields(t *testing.T) {
 	require.NotNil(t, profile.PresencePenalty)
 	assert.InDelta(t, 0.3, *profile.PresencePenalty, 0.001)
 	assert.Equal(t, "value-1", profile.CustomHeaders["X-Custom-Header"])
+}
+
+func TestValidateAIProviderRejectsCredentialHeaders(t *testing.T) {
+	for _, header := range []string{"Authorization", "x-api-key", "X-Goog-Api-Key", "Anthropic-Version", "Cookie"} {
+		err := validateAIProviderFields(model.AIProviderProfileInput{Provider: model.AIProviderOpenAICompatible, CustomHeaders: map[string]string{header: "secret"}})
+		assert.ErrorContains(t, err, "reserved")
+	}
 }
 
 func TestValidateAIProviderAdvancedFields(t *testing.T) {
@@ -93,4 +101,10 @@ func TestProviderHTTPClientSkipTLSVerifyPreservesProxyManager(t *testing.T) {
 	proxyURL, err := transport.Proxy(request)
 	require.NoError(t, err)
 	require.Equal(t, "http://127.0.0.1:8080", proxyURL.String())
+}
+
+func TestProviderHTTPClientSkipTLSVerifyKeepsUnknownTransportSafe(t *testing.T) {
+	base := &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) { return nil, errors.New("stop") })}
+	skip := providerHTTPClient(base, true)
+	assert.IsType(t, base.Transport, skip.Transport)
 }

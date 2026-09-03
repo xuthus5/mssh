@@ -40,6 +40,9 @@ func (t *TerminalService) closeAll(permanent bool) error {
 		t.shuttingDown = true
 	}
 	t.mu.Unlock()
+	if permanent && t.lifecycleCancel != nil {
+		t.lifecycleCancel()
+	}
 	if t.sessionSvc != nil {
 		t.sessionSvc.CancelConnectAttempts()
 	}

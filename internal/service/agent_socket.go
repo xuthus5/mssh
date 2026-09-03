@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 )
 
@@ -21,6 +22,9 @@ func resolveSSHAgentEndpoint(socketPath string) (string, string, error) {
 	}
 	if !filepath.IsAbs(socketPath) {
 		return "", "", fmt.Errorf("SSH_AUTH_SOCK path must be absolute")
+	}
+	if runtime.GOOS == "windows" && strings.EqualFold(filepath.Clean(socketPath), `\\.\pipe\openssh-ssh-agent`) {
+		return "npipe", filepath.Clean(socketPath), nil
 	}
 	resolvedPath, err := filepath.EvalSymlinks(filepath.Clean(socketPath))
 	if err != nil {
