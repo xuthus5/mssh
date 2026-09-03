@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"sync"
 
 	"github.com/coder/websocket"
 	"github.com/wailsapp/wails/v3/pkg/application"
@@ -32,30 +33,102 @@ func (t *wailsWSTransport) handleWebSocket(rw http.ResponseWriter, req *http.Req
 	if err != nil {
 		return
 	}
-	client := &wailsWSClient{conn: conn, writeCh: make(chan []byte, 256), done: make(chan struct{})}
+	conn.SetReadLimit(wsMaxMessageBytes)
+	client := &wailsWSClient{
+		conn:    conn,
+		writeCh: make(chan []byte, wsRPCQueueSize),
+		eventCh: make(chan []byte, wsEventQueueSize),
+		inbound: make(chan []byte, wsInboundQueueSize),
+		done:    make(chan struct{}),
+	}
 	t.addClient(client)
 	defer t.removeClient(client)
 	ctx, cancel := context.WithCancel(req.Context())
 	defer cancel()
 	go client.writeLoop(ctx)
+	var dispatchWG sync.WaitGroup
+	var rpcWG sync.WaitGroup
+	dispatchWG.Add(1)
+	go t.dispatchInbound(ctx, client, &rpcWG, &dispatchWG)
+	t.readInbound(ctx, client)
+	cancel()
+	client.close()
+	_ = conn.CloseNow()
+	dispatchWG.Wait()
+	rpcWG.Wait()
+}
+
+func (t *wailsWSTransport) dispatchInbound(ctx context.Context, client *wailsWSClient, rpcWG, dispatchWG *sync.WaitGroup) {
+	defer dispatchWG.Done()
+	rpcSlots := make(chan struct{}, wsMaxConcurrentRPC)
 	for {
-		_, data, readErr := conn.Read(ctx)
-		if readErr != nil {
+		select {
+		case data := <-client.inbound:
+			request, ok := decodeWSRPCRequest(data)
+			if !ok {
+				continue
+			}
+			if request.Type == "terminal_input" {
+				t.handleTerminalInput(client, request)
+				continue
+			}
+			if !acquireRPCSlot(ctx, client, rpcSlots) {
+				return
+			}
+			rpcWG.Add(1)
+			go func(request wsRPCRequest) {
+				defer rpcWG.Done()
+				defer func() { <-rpcSlots }()
+				t.handleRPCRequest(ctx, client, request)
+			}(request)
+		case <-ctx.Done():
+			return
+		case <-client.done:
 			return
 		}
-		go t.handleRPC(ctx, client, data)
 	}
 }
 
-func (t *wailsWSTransport) handleRPC(ctx context.Context, client *wailsWSClient, data []byte) {
-	var req wsRPCRequest
-	if err := json.Unmarshal(data, &req); err != nil || req.ID == "" {
-		return
+func decodeWSRPCRequest(data []byte) (wsRPCRequest, bool) {
+	var request wsRPCRequest
+	if err := json.Unmarshal(data, &request); err != nil || request.ID == "" {
+		return wsRPCRequest{}, false
 	}
-	if req.Type == "terminal_input" {
-		t.handleTerminalInput(client, req)
-		return
+	return request, true
+}
+
+func acquireRPCSlot(ctx context.Context, client *wailsWSClient, slots chan struct{}) bool {
+	select {
+	case slots <- struct{}{}:
+		return true
+	case <-ctx.Done():
+		return false
+	case <-client.done:
+		return false
 	}
+}
+
+func (t *wailsWSTransport) readInbound(ctx context.Context, client *wailsWSClient) {
+	for {
+		_, data, err := client.conn.Read(ctx)
+		if err != nil {
+			return
+		}
+		select {
+		case client.inbound <- data:
+		case <-ctx.Done():
+			return
+		case <-client.done:
+			return
+		default:
+			client.close()
+			_ = client.conn.CloseNow()
+			return
+		}
+	}
+}
+
+func (t *wailsWSTransport) handleRPCRequest(ctx context.Context, client *wailsWSClient, req wsRPCRequest) {
 	if req.Type != "" && req.Type != "call" {
 		return
 	}
@@ -101,7 +174,7 @@ func (t *wailsWSTransport) sendRPCResponse(client *wailsWSClient, id, kind, data
 	if err != nil {
 		return
 	}
-	_ = client.enqueue(payload)
+	_ = client.enqueueRPC(payload)
 }
 
 func (t *wailsWSTransport) sendRPCError(client *wailsWSClient, id, message string) {
@@ -109,7 +182,7 @@ func (t *wailsWSTransport) sendRPCError(client *wailsWSClient, id, message strin
 	if err != nil {
 		return
 	}
-	_ = client.enqueue(payload)
+	_ = client.enqueueRPC(payload)
 }
 
 func (t *wailsWSTransport) DispatchWailsEvent(event *application.CustomEvent) {
@@ -137,7 +210,7 @@ func (t *wailsWSTransport) DispatchWailsEvent(event *application.CustomEvent) {
 	}
 	t.mu.RUnlock()
 	for _, client := range clients {
-		if !client.enqueue(payload) && t.logger != nil {
+		if !client.enqueueEvent(payload) && t.logger != nil {
 			t.logger.Debug("drop event for disconnected ws client")
 		}
 	}

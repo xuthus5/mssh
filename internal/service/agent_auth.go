@@ -63,7 +63,13 @@ func openAgentAuth() (*agentAuth, error) {
 }
 
 func openAgentAuthContext(ctx context.Context) (*agentAuth, error) {
-	return openAgentAuthAt(ctx, os.Getenv("SSH_AUTH_SOCK"), sshAgentOperationTimeout, &net.Dialer{})
+	return openAgentAuthAt(ctx, os.Getenv("SSH_AUTH_SOCK"), sshAgentOperationTimeout, platformAgentDialer{})
+}
+
+type platformAgentDialer struct{}
+
+func (platformAgentDialer) DialContext(ctx context.Context, network, address string) (net.Conn, error) {
+	return dialAgentEndpoint(ctx, network, address)
 }
 
 func openAgentAuthAt(

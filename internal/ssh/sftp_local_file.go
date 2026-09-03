@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 )
 
 func inspectUploadSource(file *os.File) (*os.File, os.FileInfo, error) {
@@ -38,6 +39,19 @@ func openDownloadTarget(path string, exclusive bool) (*os.File, error) {
 		return nil, closeRejectedLocalFile(file, fmt.Errorf("download target must be a regular file"))
 	}
 	return file, nil
+}
+
+func openDownloadTemporary(path string) (*os.File, string, error) {
+	directory := filepath.Dir(path)
+	base := filepath.Base(path)
+	file, err := os.CreateTemp(directory, "."+base+".mssh-download-*")
+	if err != nil {
+		return nil, "", fmt.Errorf("create temporary download target: %w", err)
+	}
+	if err := file.Chmod(0o600); err != nil {
+		return nil, "", closeRejectedLocalFile(file, fmt.Errorf("secure temporary download target: %w", err))
+	}
+	return file, file.Name(), nil
 }
 
 func closeRejectedLocalFile(file *os.File, cause error) error {

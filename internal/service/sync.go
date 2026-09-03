@@ -274,9 +274,9 @@ func readTable(querier tableQuerier, table string) ([]map[string]any, error) {
 }
 
 func insertRow(tx *sql.Tx, table string, row map[string]any) error {
-	columns := make([]string, 0, len(row))
-	for column := range row {
-		columns = append(columns, column)
+	columns, err := validateSyncInsertRow(table, row)
+	if err != nil {
+		return err
 	}
 	sort.Strings(columns)
 	values := make([]any, len(columns))
@@ -287,6 +287,6 @@ func insertRow(tx *sql.Tx, table string, row map[string]any) error {
 	for i := range placeholders {
 		placeholders[i] = "?"
 	}
-	_, err := tx.Exec("INSERT INTO "+table+" ("+strings.Join(columns, ",")+") VALUES ("+strings.Join(placeholders, ",")+")", values...)
+	_, err = tx.Exec("INSERT INTO "+table+" ("+strings.Join(columns, ",")+") VALUES ("+strings.Join(placeholders, ",")+")", values...)
 	return err
 }

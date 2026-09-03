@@ -181,10 +181,9 @@ func providerHTTPClient(base *http.Client, skipTLS bool) *http.Client {
 		// the TLS verification override.
 		transport = cloneWithInsecureTLS(typed.Transport())
 	default:
-		transport = &http.Transport{
-			TLSClientConfig:   &tls.Config{InsecureSkipVerify: true},
-			ForceAttemptHTTP2: true,
-		}
+		// Unknown transports may carry custom proxy or SSRF-dial policies.
+		// Keep them unchanged rather than silently replacing those controls.
+		transport = typed
 	}
 	cloned.Transport = transport
 	return &cloned

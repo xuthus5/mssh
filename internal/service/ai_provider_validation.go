@@ -56,11 +56,23 @@ func validateAIProviderAdvancedFields(input model.AIProviderProfileInput) error 
 		return fmt.Errorf("custom headers must not exceed %d entries", maxAICustomHeaderCount)
 	}
 	for key := range input.CustomHeaders {
+		if isReservedAIHeader(key) {
+			return fmt.Errorf("custom header %q is reserved", key)
+		}
 		if utf8.RuneCountInString(key) > maxAICustomHeaderKeyRunes {
 			return fmt.Errorf("custom header key must not exceed %d characters", maxAICustomHeaderKeyRunes)
 		}
 	}
 	return nil
+}
+
+func isReservedAIHeader(key string) bool {
+	switch strings.ToLower(strings.TrimSpace(key)) {
+	case "authorization", "cookie", "set-cookie", "x-api-key", "x-goog-api-key", "anthropic-version":
+		return true
+	default:
+		return false
+	}
 }
 
 func validateAIProviderFloat(value *float64, min, max float64, name string) error {

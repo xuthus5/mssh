@@ -128,6 +128,9 @@ func handleNewHostKey(check hostKeyCheck) error {
 	if check.policy != HostKeyPolicyTrust && check.onNewHostKey != nil && !check.onNewHostKey(check.hostname, algorithm, fingerprint) {
 		return fmt.Errorf("host key rejected by user: %s", check.hostname)
 	}
+	if check.policy != HostKeyPolicyTrust && check.onNewHostKey == nil {
+		return fmt.Errorf("unknown host key rejected: explicit verification callback required for %s", check.hostname)
+	}
 	return appendKnownHostIfUnknown(check)
 }
 

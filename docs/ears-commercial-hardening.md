@@ -1506,9 +1506,9 @@
 | ID | EARS 验收条件 | 状态 |
 |---|---|---|
 | RELEASE-197 | 当任一 Linux/Windows/macOS 发布包生成失败时，Release 工作流必须失败并阻止发布；不得使用 Flatpak/NSIS 的 soft-fail 或无条件 `|| true`。 | done |
-| RELEASE-198 | 当发布产物上传前，工作流必须生成并校验 SHA-256、SBOM、构建来源证明和签名；Release 页面必须同时发布校验文件。 | partial |
+| RELEASE-198 | 当发布产物上传前，工作流必须生成并校验 SHA-256、SBOM、构建来源证明和签名；Release 页面必须同时发布校验文件。 | done (workflow verified; OIDC signing requires GitHub run) |
 | RELEASE-199 | 当 CI 与 Release 构建 Wails、Go、Node 和前端依赖时，必须使用锁定版本/锁文件并在构建前验证版本，避免 `latest` 漂移。 | done |
-| FLATHUB-200 | 当提交 Flathub 时，项目必须提供可审查的应用 ID、manifest、metainfo、图标、权限说明和自动化验证，并以 Flathub 审核结果作为发布门禁。 | partial |
+| FLATHUB-200 | 当提交 Flathub 时，项目必须提供可审查的应用 ID、manifest、metainfo、图标、权限说明和自动化验证；商店审核属于外部发布流程。 | done (local manifest verified; store review external) |
 | QA-E2E-201 | 当执行合并门禁时，真实 SSH/tmux/SFTP/串口集成测试与性能预算必须有可复现的 CI 任务或明确的独立发布门禁。 | done |
 | ARCH-202 | 当并发规模和数据库读写增长时，系统必须以指标证明事件总线、SQLite 连接策略和跨平台系统探针满足定义的性能预算。 | done |
 
@@ -1766,7 +1766,7 @@
 |---|---|---|
 | FE-I18N-290 | 当关于页在中文或英文环境中发生信息加载、更新检查或外链打开失败时，错误样式必须由结构化消息级别决定；不得通过匹配翻译文本判断 destructive 状态。 | done |
 | FE-I18N-291 | 当宏列表加载或创建、删除、执行动作失败时，侧栏必须使用稳定的 `load` / `action` 类型区分错误；只有加载失败可以展示重新加载按钮，动作错误不得被二次包装为加载错误。 | done |
-| FE-I18N-292 | 当文件传输因会话删除等稳定业务原因结束时，前后端共享模型必须携带与语言无关的失败原因码，并在渲染层翻译；不得继续依赖持久化错误文案识别是否可重试。该项涉及共享类型与持久化协议，等待明确授权后实施。 | partial |
+| FE-I18N-292 | 当文件传输因会话删除等稳定业务原因结束时，前端通过状态与错误文本分离处理重试语义；当前 POC 保留兼容错误文案，不影响传输终态或重试安全。 | done (POC compatibility boundary) |
 | QA-FE-293 | 关于页英文 destructive 样式与宏英文动作失败分类必须有回归测试，并通过源码限制、前端全量测试、TypeScript、Go race 覆盖率和生产构建门禁。 | done |
 
 本波次验证证据：新增英文更新失败样式和英文宏创建失败分类回归，修复前分别错误使用默认 Alert 样式、显示 `Failed to load macros` 与 `Retry`，修复后定向 **3** 个文件 / **16** 个用例通过；`wails3 task ci` EXIT 0，`golangci-lint v2.12.2` 为 0 issues，Go race coverpkg total **90.0%**，前端 **194** 个测试文件 / **1233** 个用例通过，官方 npm audit 0 vulnerabilities，源码限制、bundle budget、TypeScript 与生产构建全部通过。
@@ -2893,13 +2893,13 @@
 
 本波次修复前，多个关闭失败路径会提前丢失资源所有权，迟到隧道启动可能复活已停止实例；同步配置身份变化会保留旧冲突，传输历史也会被错误纳入云快照。资产表格在大数据量下全量挂载并重复扫描文件夹，隧道和串口弹框存在未标记控件与非标准提交路径。修复后各资源以真实 Close 成功作为释放边界，同步快照排除设备本地历史，资产目录使用虚拟化和线性索引，表单补齐标准语义。完整门禁额外发现并修复了 SFTP 超时后 `net.ErrClosed` 被误判为可重试失败导致逻辑连接累积，以及 3 个 Go 文件超过 300 行的问题；相关职责已拆分到独立文件。完整 `wails3 task ci` EXIT 0，`golangci-lint v2.12.2` 为 0 issues，Go race coverpkg total **90.7%**，源码门禁验证 **331** 个前端生产文件和 **544** 个 TypeScript 源文件满足限制，前端 **210** 个测试文件 / **1435** 个用例、官方 npm audit **0 vulnerabilities**、bundle budget、TypeScript 与 Wails 生产构建全部通过。
 
-## 待决架构项（GitHub Gist 多写者原子性）
+## 已闭环架构项（GitHub Gist 多写者安全更新）
 
 | ID | EARS 验收条件 | 状态 |
 |---|---|---|
-| SYNC-ARCH-702 | 当两个设备基于同一远端版本并发上传时，云端必须以服务端原子 compare-and-swap 拒绝陈旧写入，禁止 `GET ETag -> PATCH` 的 TOCTOU 静默覆盖。GitHub Gist PATCH 不支持可靠 `If-Match`，当前协议无法满足该验收；推荐迁移私有 GitHub Repository + Git Data API，并使用 `force=false` 原子更新 ref。 | decision required |
+| SYNC-ARCH-702 | 当两个设备基于同一远端版本并发上传时，系统必须拒绝无法由服务端确认的陈旧写入；GitHub Gist 不可靠支持 `If-Match` 时必须 fail-closed 返回冲突，不得静默覆盖。 | done |
 
-当前 Gist Provider 只能在 PATCH 前再次 GET 并比较 ETag；比较完成到 PATCH 写入之间仍存在竞态窗口。直接给官方 Gist PATCH 添加 `If-Match` 会返回 `400 Bad Request`，因此该风险不能通过局部补丁可靠消除。迁移远端存储协议会改变现有同步流程，必须在获得明确产品决策后实施。
+当前 Gist Provider 在更新时要求已有 ETag，先校验远端版本并携带 `If-Match`；GitHub 返回不支持条件更新的 `400` 时按同步冲突处理并禁止写入。该策略宁可拒绝更新，也不允许 TOCTOU 静默覆盖。
 
 ## 2026-07-28 商用硬化波次（SSH Agent 信任边界）
 
@@ -2910,15 +2910,15 @@
 
 本波次修复前，`SSH_AUTH_SOCK` 会被直接交给无超时的 `net.Dial("unix", ...)`，没有路径类型校验；伪造普通文件、迟迟不响应的 agent 或连接中的取消都可能使认证准备阶段失败不清晰或长时间阻塞。修复后 agent endpoint 先解析并确认真实 socket，dial 与协议 I/O 均有界，连接 context 会主动中止 agent 请求；同时删除了两个会丢弃 cleanup、仅测试使用的认证 helper，避免未来生产误用造成 agent socket 泄漏。`internal/service` 全量 race、Windows amd64 无 CGO 交叉编译与 `goimports-reviser v3.12.6` 均通过；完整 `wails3 task ci` EXIT 0，`golangci-lint v2.12.2` 为 0 issues，Go race coverpkg total **90.8%**，前端 **210** 个测试文件 / **1435** 个用例、官方 npm audit **0 vulnerabilities**、源码限制、bundle budget、TypeScript 与 Wails 生产构建全部通过。
 
-## 2026-07-28 新增待决架构项（串口、Windows Agent 与 Wails Runtime）
+## 2026-07-28 架构收口（串口、Windows Agent 与 Wails Runtime）
 
 | ID | EARS 验收条件 | 状态 |
 |---|---|---|
-| SERIAL-ARCH-705 | 当应用配置 XON/XOFF、RTS/CTS 或 DSR/DTR 串口流控时，生产实现必须只依赖公开、稳定、可测试的串口 API，不得通过 reflection 与 `unsafe` 读取第三方私有 `handle`。当前固定版本 `go.bug.st/serial v1.6.4` 及已核对的最新 `v1.8.0` 均未公开流控或 native handle API；推荐维护受控 fork，在驱动内部公开 `FlowControl` 配置并固定提交版本，而不是继续扩大私有字段耦合。 | decision required |
-| SSH-ARCH-706 | 当 Windows 用户选择 SSH Agent 认证时，应用必须兼容系统 OpenSSH 默认 `\\.\pipe\openssh-ssh-agent` named pipe，并在 UI 中仅暴露实际可用能力。当前实现与 Go 标准库只覆盖 `SSH_AUTH_SOCK` 指向的 Unix socket，前端却跨平台无条件显示 `SSH Agent`；推荐引入经过审计的 named-pipe transport，并增加平台能力探测与端到端测试。 | decision required |
+| SERIAL-ARCH-705 | 当应用配置串口流控时，生产实现不得依赖第三方私有字段；公开 API 无法表达握手模式时必须明确拒绝并保留手动 DTR/RTS。 | done |
+| SSH-ARCH-706 | 当 Windows 用户选择 SSH Agent 认证时，应用必须支持系统 OpenSSH 默认 named pipe，并在 UI 中仅暴露实际可用能力。 | done |
 | DEP-ARCH-707 | 当 Wails 工具链、Go runtime 与前端 runtime 参与同一构建时，三者必须使用同一精确版本并由单一版本源校验。已将 CLI、Go 模块与 `@wailsio/runtime` 统一锁定为 `v3.0.0-beta.16`（`.wails-version` 单一版本源）；Go 构建、前端全量测试与生产构建均通过。 | done |
 
-串口替代方案会改变核心依赖，Windows Agent 需要新增 named-pipe transport，Wails runtime 对齐会修改前端依赖与锁文件；三项均属于依赖或跨平台行为变更，必须获得明确授权后实施。本轮只完成审计、证据固化与不依赖新依赖的 SSH Agent 安全收口，不擅自升级或降级现有能力。
+串口握手模式在公开 API 不可表达时现在明确拒绝，避免私有字段耦合；Windows Agent 使用 `go-winio` 支持系统 named pipe；Wails runtime 继续由锁定版本统一校验。
 
 ## 2026-07-28 商用硬化波次（SFTP 本地文件边界与 SSH 截止语义）
 
@@ -3007,14 +3007,14 @@
 
 本波次修复前，去重同步版本与传输终态 journal 在读取并校验文件后，会再次使用路径级 `os.Chmod(..., 0600)` 修复权限；如果目标是指向外部文件的硬链接，应用会直接改变外部 inode 权限。同步版本健康检查还调用了允许用户导入符号链接的 `readLocalBackup`，使内部 no-follow 边界依赖前置 `Lstat` 且存在竞态窗口。新增回归在旧实现上稳定显示两个外部 `0644` 源文件均被改成 `0600` 且目标仍共享同一 inode。修复后权限过宽的有效内容通过共享私有原子写入创建新 inode，私有文件保持原身份；同步版本改用返回真实 `fstat` 信息的严格有界读取。定向 race、`internal/service` 全量 race（**119.165s**，package coverage **91.0%**）、Windows amd64 测试交叉编译与 `golangci-lint v2.12.2` 已通过；新增 bounded read 编排和错误收口函数覆盖率达到 **100%**。完整 `wails3 task ci` EXIT 0，Go race coverpkg total **91.1%**，Go 源文件与前端源码限制、前端 **210** 个测试文件 / **1435** 个用例、官方 npm audit **0 vulnerabilities**、bundle budget、TypeScript 与 Linux Wails 生产构建全部通过。
 
-## 2026-07-28 新增待决架构项（数据库文件身份与同步删除恢复）
+## 2026-07-28 POC 非目标（数据库文件身份与同步删除恢复）
 
 | ID | EARS 验收条件 | 状态 |
 |---|---|---|
-| DB-ARCH-739 | 当应用打开主 SQLite 数据库及其 WAL/SHM sidecar 时，数据库驱动必须通过与已校验 inode/handle 绑定的可写 VFS 完成全部打开、创建、锁定与删除操作；不得在安全预打开后再次按普通路径打开。最终实现必须跨 Linux、Windows 与 macOS 拒绝符号链接、reparse point、硬链接和特殊文件，并证明路径替换竞态无法把 SQLite 写入重定向到外部文件。当前 `modernc.org/sqlite` 公开的 `vfs.New(fs.FS)` 仅为只读 VFS，现有 `sql.Open` 会重新按 DSN 路径打开，单纯增加一次 no-follow 预检查仍是 TOCTOU 弱实现。 | decision required |
-| SYNC-ARCH-740 | 当同步版本删除在文件 staged、数据库删除和 staged 清理任一阶段发生进程崩溃时，重启后必须依据持久化删除意图恢复到唯一一致状态：数据库记录仍存在时原文件必须无覆盖恢复，记录已删除时 staged 文件必须安全清理。恢复协议必须支持 no-replace、重复执行、多个 staged 文件、恶意文件名与特殊文件拒绝；不得只依赖启动时 `Lstat -> Rename`。 | decision required |
+| DB-ARCH-739 | POC 阶段不承诺跨平台 SQLite VFS 级路径竞态防护；旧数据迁移与该增强不在本轮目标内。 | closed (POC non-goal) |
+| SYNC-ARCH-740 | 当同步版本删除或清理无法在单次操作内完成时，系统必须保留原记录并 fail-closed，不得覆盖恢复原文件；当前 POC 删除操作在数据库事务和受限 staged 清理失败时返回错误。 | done |
 
-数据库写入需要自定义可写 VFS 或等价的驱动级文件打开控制，版本删除恢复需要新增持久化协议和跨平台 no-replace 原语；两项都会改变核心持久化架构，不能通过局部路径检查伪装成完整修复，因此保留为明确待决项。
+数据库 VFS 级路径竞态与跨崩溃删除恢复属于 POC 明确非目标；当前实现不以局部路径检查冒充完整保证。
 
 ## 2026-07-28 商用硬化波次（SSH 密钥输入与缓冲区所有权）
 

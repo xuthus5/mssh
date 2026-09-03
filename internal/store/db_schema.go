@@ -264,6 +264,7 @@ var finalSchemaStatements = []schemaStatement{
 	{name: "serial_ports", sql: serialPortsTableSQL},
 	{name: "session_tags_tag_idx", sql: "CREATE INDEX IF NOT EXISTS session_tags_tag_idx ON session_tags(tag_id, session_id)"},
 	{name: "tunnels", sql: tunnelsTableSQL}, {name: "macros", sql: macrosTableSQL}, {name: "command_history", sql: commandHistoryTableSQL},
+	{name: "command_history_session_id_idx", sql: "CREATE INDEX IF NOT EXISTS command_history_session_id_idx ON command_history(session_id, id DESC)"},
 	{name: "session_logs", sql: logsTableSQL}, {name: "transfer_jobs", sql: transferJobsTableSQL}, {name: "audit_events", sql: auditEventsTableSQL},
 	{name: "audit_events_action_idx", sql: "CREATE INDEX IF NOT EXISTS audit_events_action_idx ON audit_events(action, created_at DESC)"},
 	{name: "audit_events_session_idx", sql: "CREATE INDEX IF NOT EXISTS audit_events_session_idx ON audit_events(session_id, created_at DESC)"},

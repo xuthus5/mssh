@@ -192,6 +192,24 @@ func TestHandleChangedHostKeyWarnRejects(t *testing.T) {
 	assert.Contains(t, err.Error(), "rejected by user")
 }
 
+func TestHandleChangedHostKeyTrustReplacesHashedEntry(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "known_hosts")
+	oldKey := newTestPublicKey(t)
+	hashedHost := knownhosts.HashHostname(knownhosts.Normalize("example.com:22"))
+	entry := knownhosts.Line([]string{hashedHost}, oldKey) + "\n"
+	require.NoError(t, os.WriteFile(path, []byte(entry), 0o600))
+	newKey := newTestPublicKey(t)
+	callback, err := loadKnownHostsCallback(path)
+	require.NoError(t, err)
+	check := hostKeyCheck{hostname: "example.com:22", remote: &net.TCPAddr{Port: 22}, key: newKey, knownHostsPath: path, policy: HostKeyPolicyTrust, callback: callback}
+
+	require.NoError(t, verifyHostKey(check))
+	content, err := os.ReadFile(path)
+	require.NoError(t, err)
+	assert.Contains(t, string(content), keyMaterial(newKey))
+	assert.NotContains(t, string(content), keyMaterial(oldKey))
+}
+
 func TestHandleNewHostKeyTrustAcceptsWithoutPrompt(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "known_hosts")
 	require.NoError(t, os.WriteFile(path, nil, 0o600))

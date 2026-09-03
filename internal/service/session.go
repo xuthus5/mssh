@@ -161,6 +161,7 @@ func (s *SessionService) buildKeyAuthUnlocked(sess *model.Session) ([]gossh.Auth
 	if err != nil {
 		return nil, err
 	}
+	defer clear(keyData)
 	signer, signErr := gossh.ParsePrivateKey(keyData)
 	if signErr != nil {
 		return nil, fmt.Errorf("build auth methods: parse private key: %w", signErr)

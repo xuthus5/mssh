@@ -96,10 +96,19 @@ const codexModelCatalogFileName = "models.json"
 // MCP tools stay invisible and the agent falls back to local tools, which the
 // bridge rejects. Disabling the flag exposes MCP tools directly (see
 // openai/codex#36382).
-func prepareCodexModelCatalogForMCP(workDir, codexHome string) (string, error) {
+func prepareCodexModelCatalogForMCP(workDir, codexHome string) (string, error) { //nolint:gocognit // validates path, format, and bounded rewrite in one operation.
 	source := filepath.Join(codexHome, codexModelCatalogFileName)
 	if configured := codexModelCatalogPathFromConfig(codexHome); configured != "" {
-		source = configured
+		validated, ok := safeCodexCatalogPath(codexHome, configured)
+		if !ok {
+			return "", nil
+		}
+		source = validated
+	}
+	if validated, ok := safeCodexCatalogPath(codexHome, source); ok {
+		source = validated
+	} else {
+		return "", nil
 	}
 	data, err := os.ReadFile(source)
 	if err != nil {
@@ -137,6 +146,42 @@ func prepareCodexModelCatalogForMCP(workDir, codexHome string) (string, error) {
 		return "", fmt.Errorf("write Codex model catalog override: %w", err)
 	}
 	return catalogPath, nil
+}
+
+func safeCodexCatalogPath(codexHome, configured string) (string, bool) {
+	root, err := filepath.Abs(codexHome)
+	if err != nil {
+		return "", false
+	}
+	pathValue := configured
+	if !filepath.IsAbs(pathValue) {
+		pathValue = filepath.Join(root, pathValue)
+	}
+	pathValue, err = filepath.Abs(pathValue)
+	if err != nil {
+		return "", false
+	}
+	relative, err := filepath.Rel(root, pathValue)
+	if err != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+		return "", false
+	}
+	info, err := os.Lstat(pathValue)
+	if err != nil || !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 {
+		return "", false
+	}
+	resolved, err := filepath.EvalSymlinks(pathValue)
+	if err != nil {
+		return "", false
+	}
+	resolvedRoot, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		return "", false
+	}
+	resolvedRelative, err := filepath.Rel(resolvedRoot, resolved)
+	if err != nil || resolvedRelative == ".." || strings.HasPrefix(resolvedRelative, ".."+string(filepath.Separator)) {
+		return "", false
+	}
+	return pathValue, true
 }
 
 // codexModelCatalogPathFromConfig extracts the model_catalog_json path from
