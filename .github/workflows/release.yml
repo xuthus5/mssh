@@ -11,7 +11,7 @@ permissions:
   attestations: write
 
 env:
-  WAILS_VERSION: 'v3.0.0-beta.2'
+  WAILS_VERSION: 'v3.0.0-beta.16'
   SYFT_VERSION: 'v1.49.0'
   COSIGN_VERSION: 'v3.1.2'
 
