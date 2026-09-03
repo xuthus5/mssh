@@ -7,6 +7,7 @@ import { TerminalOutputFlowControl } from '@/components/terminal/terminalOutputF
 import { runTerminalRuntime } from '@/components/terminal/terminalRuntime'
 import { SynchronizedOutputWriter } from '@/components/terminal/terminalSynchronizedOutput'
 import { TerminalOutputCoalescer } from '@/components/terminal/terminalOutputCoalescer'
+import { createTerminalOutputTransformRuntime, type TerminalOutputTransformRuntime } from '@/hooks/terminalOutputTransformRuntime'
 import { logger } from '@/lib/logger'
 import { terminalTrace } from '@/lib/terminalTrace'
 
@@ -162,16 +163,15 @@ function createOutputFlowControl({ term, terminalIDRef, reportRuntimeError, setO
   return flowControl
 }
 
-function createTerminalOutputEventHandler({ terminalIDRef, reportRuntimeError, output, flowControl, flush, outputTransform }: {
+function createTerminalOutputEventHandler({ terminalIDRef, reportRuntimeError, flowControl, flush, writeOrdered }: {
   terminalIDRef: RefObject<string | null>
   reportRuntimeError: TerminalRuntimeErrorReporter
-  output: SynchronizedOutputWriter
   flowControl: TerminalOutputFlowControl | null
   flush: () => void
-  outputTransform: (data: Uint8Array) => Uint8Array
+  writeOrdered: (data: Uint8Array) => void
 }) {
   let outputTerminalID = terminalIDRef.current
-  let sequencer = new TerminalOutputSequencer((data) => output.push(data))
+  let sequencer = new TerminalOutputSequencer(writeOrdered)
   return (event: { data?: TerminalOutputEvent }) => {
     const payload = event.data
     const encodedData = payload?.data
@@ -183,17 +183,16 @@ function createTerminalOutputEventHandler({ terminalIDRef, reportRuntimeError, o
       flowControl?.resume()
       flush()
       outputTerminalID = payloadTerminalID
-      sequencer = new TerminalOutputSequencer((data) => output.push(data))
+      sequencer = new TerminalOutputSequencer(writeOrdered)
     }
     runTerminalRuntime(reportRuntimeError, 'terminal output decode', () => {
       const decoded = decodeTerminalOutput(encodedData)
-      const transformed = outputTransform(decoded)
       if (payload.sequence === undefined) {
-        output.push(transformed)
+        writeOrdered(decoded)
         return
       }
       try {
-        sequencer.push(payload.sequence, transformed)
+        sequencer.push(payload.sequence, decoded)
       } catch (error: unknown) {
         logger.warn('terminal output sequence gap exceeded; resynchronizing', {
           terminalID,
@@ -208,20 +207,13 @@ function createTerminalOutputEventHandler({ terminalIDRef, reportRuntimeError, o
   }
 }
 
-export function subscribeToTerminalOutput({ term, terminalIDRef, reportRuntimeError, shouldCoalesce, setOutputPaused, outputTransform, outputFlush }: {
+function createTerminalOutputPipeline({ term, terminalIDRef, reportRuntimeError, flowControl, shouldCoalesce }: {
   term: Terminal
   terminalIDRef: RefObject<string | null>
   reportRuntimeError: TerminalRuntimeErrorReporter
-  /** When true, batch writes to reduce inactive-tab write storms (still keeps buffer in sync). */
+  flowControl: TerminalOutputFlowControl | null
   shouldCoalesce?: () => boolean
-  setOutputPaused?: SetOutputPaused
-  /** Optional transform applied to each decoded chunk before writing (e.g. keyword highlighting). */
-  outputTransform?: (data: Uint8Array) => Uint8Array
-  /** Returns any buffered transform output that must be flushed before the terminal buffer settles. */
-  outputFlush?: () => Uint8Array | undefined
-}): TerminalOutputSubscription {
-  const transform = outputTransform ?? ((data: Uint8Array) => data)
-  const flowControl = setOutputPaused ? createOutputFlowControl({ term, terminalIDRef, reportRuntimeError, setOutputPaused }) : null
+}): { output: SynchronizedOutputWriter; coalescer: TerminalOutputCoalescer } {
   const coalescer = new TerminalOutputCoalescer((data) => {
     terminalTrace('output:write', { terminalID: terminalIDRef.current, len: data.byteLength })
     if (flowControl) {
@@ -243,12 +235,47 @@ export function subscribeToTerminalOutput({ term, terminalIDRef, reportRuntimeEr
       ...diagnostics,
     }),
   })
-  const flush = createTerminalOutputFlush({ output, coalescer, flowControl, outputFlush })
-  const handleOutput = createTerminalOutputEventHandler({ terminalIDRef, reportRuntimeError, output, flowControl, flush, outputTransform: transform })
+  return { output, coalescer }
+}
+
+export function subscribeToTerminalOutput({ term, terminalIDRef, reportRuntimeError, shouldCoalesce, setOutputPaused, outputTransform, outputFlush, shouldScheduleOutputFlush }: {
+  term: Terminal
+  terminalIDRef: RefObject<string | null>
+  reportRuntimeError: TerminalRuntimeErrorReporter
+  /** When true, batch writes to reduce inactive-tab write storms (still keeps buffer in sync). */
+  shouldCoalesce?: () => boolean
+  setOutputPaused?: SetOutputPaused
+  /** Optional transform applied to each decoded chunk before writing (e.g. keyword highlighting). */
+  outputTransform?: (data: Uint8Array) => Uint8Array
+  /** Returns any buffered transform output that must be flushed before the terminal buffer settles. */
+  outputFlush?: () => Uint8Array | undefined
+  /** Avoid scheduling idle work when the transform has no buffered output. */
+  shouldScheduleOutputFlush?: () => boolean
+}): TerminalOutputSubscription {
+  const transform = outputTransform ?? ((data: Uint8Array) => data)
+  const flowControl = setOutputPaused ? createOutputFlowControl({ term, terminalIDRef, reportRuntimeError, setOutputPaused }) : null
+  const { output, coalescer } = createTerminalOutputPipeline({ term, terminalIDRef, reportRuntimeError, flowControl, shouldCoalesce })
+  const transformRuntime = outputFlush
+    ? createTerminalOutputTransformRuntime({
+      transform,
+      flush: outputFlush,
+      emit: (data) => output.push(data),
+      shouldSchedule: shouldScheduleOutputFlush,
+      onError: (error) => reportRuntimeError(error, 'terminal output transform flush'),
+    })
+    : null
+  const writeOrdered = (data: Uint8Array) => {
+    const transformed = transformRuntime?.transform(data) ?? transform(data)
+    if (transformed.length > 0) output.push(transformed)
+  }
+  const flush = createTerminalOutputFlush({ output, coalescer, flowControl, transformRuntime })
+  const handleOutput = createTerminalOutputEventHandler({ terminalIDRef, reportRuntimeError, flowControl, flush, writeOrdered })
   const unsubscribe = Events.On('terminal:output', handleOutput)
   return {
     dispose: () => {
       unsubscribe()
+      transformRuntime?.flush()
+      transformRuntime?.dispose()
       output.dispose()
       coalescer.dispose()
       flowControl?.dispose()
@@ -257,15 +284,14 @@ export function subscribeToTerminalOutput({ term, terminalIDRef, reportRuntimeEr
   }
 }
 
-function createTerminalOutputFlush({ output, coalescer, flowControl, outputFlush }: {
+function createTerminalOutputFlush({ output, coalescer, flowControl, transformRuntime }: {
   output: SynchronizedOutputWriter
   coalescer: TerminalOutputCoalescer
   flowControl: TerminalOutputFlowControl | null
-  outputFlush?: () => Uint8Array | undefined
+  transformRuntime: TerminalOutputTransformRuntime | null
 }): () => void {
   return () => {
-    const extras = outputFlush?.()
-    if (extras && extras.length > 0) output.push(extras)
+    transformRuntime?.flush()
     output.flush()
     coalescer.flush()
     flowControl?.flush()

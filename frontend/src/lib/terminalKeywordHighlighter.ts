@@ -240,6 +240,10 @@ export class TerminalKeywordHighlighter {
     return Uint8Array.from(output)
   }
 
+  hasPending(): boolean {
+    return this.window.length > 0
+  }
+
   private emitSafe(): Uint8Array {
     if (this.window.length === 0) return new Uint8Array(0)
     const keep = this.longestKeywordPrefixLength(this.window)

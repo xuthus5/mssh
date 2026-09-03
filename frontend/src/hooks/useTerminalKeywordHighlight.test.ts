@@ -40,6 +40,15 @@ describe('createTerminalKeywordHighlightController', () => {
     expect(text(controller.flush())).toBe('')
   })
 
+  it('does not drop a buffered suffix when highlighting is disabled', () => {
+    const controller = createTerminalKeywordHighlightController({ reportRuntimeError: vi.fn() })
+    expect(text(controller.transform(bytes('cmd In')))).toBe('cmd ')
+
+    useTerminalKeywordHighlightStore.setState({ enabled: false, rules: [] })
+
+    expect(text(controller.flush())).toBe('In')
+  })
+
   it('applies store rule changes without dropping buffered output', () => {
     const controller = createTerminalKeywordHighlightController({ reportRuntimeError: vi.fn() })
     const buffered = text(controller.transform(bytes('look ')))
@@ -60,8 +69,13 @@ describe('createTerminalKeywordHighlightController', () => {
   it('returns an empty flush result for empty input', () => {
     const report = vi.fn()
     const controller = createTerminalKeywordHighlightController({ reportRuntimeError: report })
+    expect(controller.hasPending()).toBe(false)
     expect(controller.transform(new Uint8Array(0)).length).toBe(0)
     expect(controller.flush().length).toBe(0)
+    controller.transform(bytes('cmd In'))
+    expect(controller.hasPending()).toBe(true)
+    controller.flush()
+    expect(controller.hasPending()).toBe(false)
   })
 
   it('stops reacting to store changes after dispose', () => {

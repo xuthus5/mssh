@@ -205,6 +205,7 @@ describe('useTerminal', () => {
 
   const encodedOutput = (value: string) => btoa(value)
   const outputBytes = (value: string) => new TextEncoder().encode(value)
+  const terminalText = () => terminalWrites.map((data) => typeof data === 'string' ? data : new TextDecoder().decode(data)).join('')
 
   it('opens the terminal before loading renderer addons', () => {
     const containerRef = createRef<HTMLDivElement>()
@@ -584,6 +585,26 @@ describe('useTerminal', () => {
       Array.from(outputBytes('old frame')),
       Array.from(outputBytes('new prompt')),
     ])
+  })
+
+  it('flushes pending keyword bytes before a terminal identity replacement', () => {
+    vi.useFakeTimers()
+    const containerRef = createRef<HTMLDivElement>()
+    containerRef.current = document.createElement('div')
+    const hook = renderHook(({ terminalID }) => useTerminal(terminalID, containerRef, {
+      active: true,
+      focusRequest: { sequence: 0 },
+    }), { initialProps: { terminalID: 'term-old' } })
+
+    act(() => outputHandlers[0]({ data: { terminal_id: 'term-old', data: encodedOutput('cmd In') } }))
+    expect(terminalText()).toBe('cmd ')
+
+    hook.rerender({ terminalID: 'term-new' })
+    expect(terminalText()).toBe('cmd In')
+    act(() => vi.advanceTimersByTime(32))
+    expect(terminalText()).toBe('cmd In')
+    act(() => hook.unmount())
+    vi.useRealTimers()
   })
 
   it('coalesces inactive terminal output until activation flushes', () => {

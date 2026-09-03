@@ -126,6 +126,7 @@ function createRuntimeSubscriptions(options: MountOptions, resources: BaseResour
       : undefined,
     outputTransform: keywordHighlight.transform,
     outputFlush: keywordHighlight.flush,
+    shouldScheduleOutputFlush: keywordHighlight.hasPending,
   })
   refs.outputFlushRef.current = () => outputSubscription.flush()
   const unsubscribeTheme = options.subscribeToTheme({ term, fitAddon, containerRef, refs, reportRuntimeError, ligaturesController: resources.ligaturesController })
