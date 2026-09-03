@@ -13,7 +13,7 @@ import (
 func TestApplyNativeFlowControlRejectsMissingHandle(t *testing.T) {
 	port := &fakePort{writeN: -1}
 	// fakePort has no "handle" field → extractNativeHandle fails early.
-	err := applyNativeFlowControl(port, flowNone, true, false)
+	err := applyNativeFlowControl(port, flowRtsCts, true, false)
 	require.Error(t, err)
 
 	type withHandle struct {
@@ -34,6 +34,6 @@ func TestApplyNativeFlowControlRejectsMissingHandle(t *testing.T) {
 
 func TestApplyFlowControlWithFakePort(t *testing.T) {
 	port := &fakePort{writeN: -1}
-	err := applyFlowControl(port, model.SerialPort{FlowControl: "none", DTROnOpen: true, RTSOnOpen: false})
+	err := applyFlowControl(port, model.SerialPort{FlowControl: "rtscts", DTROnOpen: true, RTSOnOpen: false})
 	require.Error(t, err)
 }

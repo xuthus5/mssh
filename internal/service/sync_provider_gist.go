@@ -105,8 +105,11 @@ func (g *gistSyncProvider) Fetch(ctx context.Context) (syncRemoteObject, error) 
 	return syncRemoteObject{Content: content, ETag: response.Header.Get("ETag"), ProviderID: gist.ID}, nil
 }
 
-func (g *gistSyncProvider) Put(ctx context.Context, content []byte, etag string) (syncRemoteObject, error) {
+func (g *gistSyncProvider) Put(ctx context.Context, content []byte, etag string) (syncRemoteObject, error) { //nolint:gocognit // create/update/conflict handling is one atomic provider operation.
 	if g.gistID != "" {
+		if strings.TrimSpace(etag) == "" {
+			return syncRemoteObject{}, errSyncConflict
+		}
 		if err := g.ensureGistETag(ctx, etag); err != nil {
 			return syncRemoteObject{}, err
 		}
@@ -126,12 +129,19 @@ func (g *gistSyncProvider) Put(ctx context.Context, content []byte, etag string)
 	if g.gistID != "" {
 		method, path = http.MethodPatch, "/gists/"+url.PathEscape(g.gistID)
 	}
-	response, err := g.do(ctx, method, path, bytes.NewReader(encoded))
+	headers := map[string]string{}
+	if g.gistID != "" && etag != "" {
+		headers["If-Match"] = etag
+	}
+	response, err := g.doWithHeaders(ctx, method, path, bytes.NewReader(encoded), headers)
 	if err != nil {
 		return syncRemoteObject{}, err
 	}
 	defer func() { _ = response.Body.Close() }()
 	if response.StatusCode == http.StatusPreconditionFailed || response.StatusCode == http.StatusConflict {
+		return syncRemoteObject{}, errSyncConflict
+	}
+	if g.gistID != "" && etag != "" && response.StatusCode == http.StatusBadRequest {
 		return syncRemoteObject{}, errSyncConflict
 	}
 	if response.StatusCode != http.StatusOK && response.StatusCode != http.StatusCreated {
@@ -157,8 +167,8 @@ func (g *gistSyncProvider) ensureGistETag(ctx context.Context, etag string) erro
 	if response.StatusCode == http.StatusNotFound {
 		return errSyncRemoteNotFound
 	}
-	if err := expectHTTPStatus(response, http.StatusOK, "fetch GitHub Gist"); err != nil {
-		return err
+	if response.StatusCode != http.StatusOK {
+		return gistAPIError(response, "fetch GitHub Gist")
 	}
 	current := response.Header.Get("ETag")
 	if current != "" && !etagEqual(current, etag) {
@@ -242,50 +252,4 @@ func validateGistRawURL(rawURL, apiBase string) (*url.URL, bool, error) {
 		return parsed, false, nil
 	}
 	return nil, false, fmt.Errorf("GitHub Gist raw URL host is not trusted")
-}
-
-func (g *gistSyncProvider) gistRawHTTPClient() *http.Client {
-	client := *g.client
-	baseRedirect := g.client.CheckRedirect
-	client.CheckRedirect = func(request *http.Request, via []*http.Request) error {
-		if baseRedirect != nil {
-			if err := baseRedirect(request, via); err != nil {
-				return err
-			}
-		}
-		_, includeCredential, err := validateGistRawURL(request.URL.String(), g.apiBase)
-		if err != nil {
-			return err
-		}
-		if !includeCredential {
-			request.Header.Del("Authorization")
-		}
-		return nil
-	}
-	return &client
-}
-
-func (g *gistSyncProvider) do(ctx context.Context, method, path string, body io.Reader) (*http.Response, error) {
-	request, err := http.NewRequestWithContext(ctx, method, g.apiBase+path, body)
-	if err != nil {
-		return nil, err
-	}
-	request.Header.Set("Accept", "application/vnd.github+json")
-	request.Header.Set("Authorization", "Bearer "+g.token)
-	request.Header.Set("X-GitHub-Api-Version", "2022-11-28")
-	if body != nil {
-		request.Header.Set("Content-Type", "application/json")
-	}
-	response, err := sameOriginHTTPClient(g.client, request.URL).Do(request)
-	if err != nil {
-		return nil, fmt.Errorf("GitHub Gist request: %w", err)
-	}
-	return response, nil
-}
-
-func expectHTTPStatus(response *http.Response, expected int, action string) error {
-	if response.StatusCode != expected {
-		return fmt.Errorf("%s returned %s", action, response.Status)
-	}
-	return nil
 }

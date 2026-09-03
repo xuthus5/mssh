@@ -25,6 +25,8 @@ const (
 	terminalDirectoryIntegrationEndMarker   = "# <<< mssh osc7 cwd integration <<<"
 )
 
+const maxShellIntegrationFileBytes = 1 << 20
+
 type shellIntegrationTarget struct {
 	shell           shellIntegration
 	path            string
@@ -186,7 +188,7 @@ func installShellIntegrationFile(client terminalDirectoryIntegrationClient, targ
 	return true, nil
 }
 
-func readRemoteIntegrationFile(client terminalDirectoryIntegrationClient, remotePath string, createIfMissing bool) (string, os.FileMode, error) {
+func readRemoteIntegrationFile(client terminalDirectoryIntegrationClient, remotePath string, createIfMissing bool) (string, os.FileMode, error) { //nolint:gocognit // remote file validation and bounded read are inseparable.
 	info, err := client.Lstat(remotePath)
 	switch {
 	case err == nil:
@@ -196,17 +198,23 @@ func readRemoteIntegrationFile(client terminalDirectoryIntegrationClient, remote
 		if info.IsDir() {
 			return "", 0, fmt.Errorf("refusing to update directory: %s", remotePath)
 		}
+		if info.Size() > maxShellIntegrationFileBytes {
+			return "", 0, fmt.Errorf("remote shell integration file exceeds %d bytes", maxShellIntegrationFileBytes)
+		}
 		file, openErr := client.OpenFile(remotePath, os.O_RDONLY)
 		if openErr != nil {
 			return "", 0, fmt.Errorf("open remote file %s: %w", remotePath, openErr)
 		}
-		content, readErr := io.ReadAll(file)
+		content, readErr := io.ReadAll(io.LimitReader(file, maxShellIntegrationFileBytes+1))
 		closeErr := file.Close()
 		if readErr != nil {
 			return "", 0, fmt.Errorf("read remote file %s: %w", remotePath, readErr)
 		}
 		if closeErr != nil {
 			return "", 0, fmt.Errorf("close remote file %s: %w", remotePath, closeErr)
+		}
+		if len(content) > maxShellIntegrationFileBytes {
+			return "", 0, fmt.Errorf("remote shell integration file exceeds %d bytes", maxShellIntegrationFileBytes)
 		}
 		return string(content), info.Mode().Perm(), nil
 	case isRemoteNotExist(err):

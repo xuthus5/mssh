@@ -35,7 +35,7 @@ const (
 // HostKeyVerifyFunc is invoked when an unknown host key is encountered.
 // It receives the hostname, algorithm, and Base64 fingerprint of the key.
 // Returning true accepts and persists the key; returning false rejects the
-// connection. When nil, new keys are accepted automatically (TOFU).
+// connection. A nil callback rejects unknown keys unless PolicyTrust is set.
 type HostKeyVerifyFunc func(hostname, algorithm, fingerprint string) bool
 
 // HostKeyChangedVerifyFunc is invoked when a known host's fingerprint
@@ -69,7 +69,7 @@ type ClientWrapper struct {
 // knownHostsPath is required; host key verification is enforced using
 // the known_hosts file at that path (TOFU for first-seen keys).
 func Connect(ctx context.Context, session model.Session, auth []gossh.AuthMethod, knownHostsPath string, logger *slog.Logger) (*ClientWrapper, error) {
-	return ConnectWithVerifier(ctx, session, auth, knownHostsPath, nil, logger)
+	return ConnectWithHostKeyOptions(ctx, session, auth, knownHostsPath, HostKeyOptions{Policy: HostKeyPolicyTrust}, logger)
 }
 
 // ConnectWithVerifier is like Connect but accepts a host key verification

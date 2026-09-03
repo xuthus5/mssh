@@ -4,9 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
+	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -129,6 +132,32 @@ func TestWailsWSTransportTerminalInputFastPath(t *testing.T) {
 	assert.Equal(t, true, message["ok"])
 	assert.Equal(t, "json", message["type"])
 	assert.Equal(t, "3", message["data"])
+}
+
+func TestWailsWSTransportPreservesTerminalInputOrder(t *testing.T) {
+	transport, url := startTestWSTransport(t, nil)
+	var received []string
+	var mu sync.Mutex
+	transport.SetTerminalInputHandler(func(_, data string) (int, error) {
+		mu.Lock()
+		received = append(received, data)
+		mu.Unlock()
+		return len(data), nil
+	})
+	conn := dialWSTransport(t, url)
+	for index := 0; index < 32; index++ {
+		request := fmt.Sprintf(`{"type":"terminal_input","id":"input-%d","terminalID":"term-1","data":"%d"}`, index, index)
+		require.NoError(t, conn.Write(context.Background(), websocket.MessageText, []byte(request)))
+	}
+	for range 32 {
+		_ = readWSMessage(t, conn)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	require.Len(t, received, 32)
+	for index, value := range received {
+		assert.Equal(t, strconv.Itoa(index), value)
+	}
 }
 
 func TestWailsWSTransportTerminalInputRequiresHandler(t *testing.T) {

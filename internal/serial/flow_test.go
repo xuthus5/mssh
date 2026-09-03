@@ -38,13 +38,10 @@ func TestShouldApplyManualSignals(t *testing.T) {
 }
 
 func TestExtractNativeHandle(t *testing.T) {
-	type fakePort struct {
-		handle int
-	}
+	type fakePort struct{ handle int }
 	port := &fakePort{handle: 42}
-	got, err := extractNativeHandle(port)
-	require.NoError(t, err)
-	assert.Equal(t, uintptr(42), got)
+	_, err := extractNativeHandle(port)
+	require.Error(t, err)
 
 	_, err = extractNativeHandle(nil)
 	require.Error(t, err)

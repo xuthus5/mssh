@@ -61,6 +61,8 @@ type TerminalService struct {
 	lastOutputAt                   map[string]time.Time
 	outputBatchCfg                 terminalOutputBatchConfig
 	outputBatchers                 map[string]*terminalOutputBatcher
+	lifecycleContext               context.Context
+	lifecycleCancel                context.CancelFunc
 }
 
 var _openPTY = ssh.PreparePTY
@@ -90,6 +92,7 @@ func NewTerminalService(sessionSvc *SessionService, eventBus EventBus, maxSize i
 	if maxSize <= 0 {
 		maxSize = DefaultTerminalPoolSize
 	}
+	lifecycleContext, lifecycleCancel := context.WithCancel(context.Background())
 	return &TerminalService{
 		ptys:                   make(map[string]terminalIO),
 		closingPTYs:            make(map[string]terminalIO),
@@ -114,6 +117,8 @@ func NewTerminalService(sessionSvc *SessionService, eventBus EventBus, maxSize i
 		logger:                 logger,
 		systemSamples:          make(map[string]systemSample),
 		outputBatchCfg:         terminalOutputBatchConfigFromEnv(),
+		lifecycleContext:       lifecycleContext,
+		lifecycleCancel:        lifecycleCancel,
 	}
 }
 

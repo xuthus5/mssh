@@ -2,105 +2,11 @@ package store
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
-	"time"
 
 	"github.com/xuthus5/mssh/internal/model"
 )
-
-func CreateFolder(db *sql.DB, name string, parentID *int64) (*model.SessionFolder, error) {
-	result, err := db.Exec(
-		"INSERT INTO session_folders (name, parent_id) VALUES (?, ?)",
-		name, parentID,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("create folder: %w", err)
-	}
-	id, err := result.LastInsertId()
-	if err != nil {
-		return nil, fmt.Errorf("create folder: last insert id: %w", err)
-	}
-	return &model.SessionFolder{ID: id, Name: name, ParentID: parentID, CreatedAt: time.Now(), UpdatedAt: time.Now()}, nil
-}
-
-func ListFolders(db *sql.DB) ([]model.SessionFolder, error) {
-	rows, err := db.Query(
-		"SELECT id, name, parent_id, is_default, sort_order, created_at, updated_at FROM session_folders ORDER BY sort_order, id",
-	)
-	if err != nil {
-		return nil, fmt.Errorf("list folders: %w", err)
-	}
-	defer func() { _ = rows.Close() }()
-	var folders []model.SessionFolder
-	for rows.Next() {
-		var f model.SessionFolder
-		var createdAt, updatedAt string
-		err := rows.Scan(&f.ID, &f.Name, &f.ParentID, &f.IsDefault, &f.SortOrder, &createdAt, &updatedAt)
-		if err != nil {
-			return nil, fmt.Errorf("scan folder: %w", err)
-		}
-		f.CreatedAt, err = time.Parse("2006-01-02 15:04:05", createdAt)
-		if err != nil {
-			return nil, fmt.Errorf("scan folder: parse created_at: %w", err)
-		}
-		f.UpdatedAt, err = time.Parse("2006-01-02 15:04:05", updatedAt)
-		if err != nil {
-			return nil, fmt.Errorf("scan folder: parse updated_at: %w", err)
-		}
-		folders = append(folders, f)
-	}
-	if folders == nil {
-		folders = []model.SessionFolder{}
-	}
-	return folders, rows.Err()
-}
-
-func UpdateFolder(db *sql.DB, id int64, name string) error {
-	_, err := db.Exec(
-		"UPDATE session_folders SET name = ?, updated_at = datetime('now') WHERE id = ?",
-		name, id,
-	)
-	if err != nil {
-		return fmt.Errorf("update folder: %w", err)
-	}
-	return nil
-}
-
-func DeleteFolder(db *sql.DB, id int64) error {
-	tx, err := db.Begin()
-	if err != nil {
-		return fmt.Errorf("delete folder: %w", err)
-	}
-	defer func() { _ = tx.Rollback() }()
-	var count int
-	var isDefault bool
-	if err := tx.QueryRow("SELECT (SELECT count(*) FROM session_folders), is_default FROM session_folders WHERE id = ?", id).Scan(&count, &isDefault); err != nil {
-		return fmt.Errorf("delete folder: %w", err)
-	}
-	if count <= 1 {
-		return fmt.Errorf("delete folder: at least one folder is required")
-	}
-	if isDefault {
-		return fmt.Errorf("delete folder: default folder cannot be deleted")
-	}
-	var defaultID int64
-	if err := tx.QueryRow("SELECT id FROM session_folders WHERE is_default = 1").Scan(&defaultID); err != nil {
-		return fmt.Errorf("delete folder: %w", err)
-	}
-	if _, err := tx.Exec("UPDATE sessions SET folder_id = ? WHERE folder_id = ?", defaultID, id); err != nil {
-		return fmt.Errorf("delete folder: %w", err)
-	}
-	if _, err := tx.Exec("UPDATE session_folders SET parent_id = ? WHERE parent_id = ?", defaultID, id); err != nil {
-		return fmt.Errorf("delete folder: %w", err)
-	}
-	if _, err := tx.Exec("DELETE FROM session_folders WHERE id = ?", id); err != nil {
-		return fmt.Errorf("delete folder: %w", err)
-	}
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("delete folder: %w", err)
-	}
-	return nil
-}
 
 func SetDefaultFolder(db *sql.DB, id int64) error {
 	tx, err := db.Begin()
@@ -253,23 +159,123 @@ func MarkSessionConnected(db *sql.DB, id int64) error {
 }
 
 func MoveFolder(db *sql.DB, id int64, newParentID *int64) error {
-	_, err := db.Exec(
+	tx, err := db.Begin()
+	if err != nil {
+		return fmt.Errorf("move folder: begin transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if err := ensureFolderExists(tx, id, "folder"); err != nil {
+		return fmt.Errorf("move folder: %w", err)
+	}
+	if newParentID != nil {
+		if *newParentID == id {
+			return fmt.Errorf("move folder: folder cannot be its own parent")
+		}
+		if err := ensureFolderExists(tx, *newParentID, "parent folder"); err != nil {
+			return fmt.Errorf("move folder: %w", err)
+		}
+		if err := ensureFolderNotDescendant(tx, id, *newParentID); err != nil {
+			return fmt.Errorf("move folder: %w", err)
+		}
+	}
+	result, err := tx.Exec(
 		"UPDATE session_folders SET parent_id = ?, updated_at = datetime('now') WHERE id = ?",
 		newParentID, id,
 	)
 	if err != nil {
+		return fmt.Errorf("move folder: update: %w", err)
+	}
+	if err := requireAffected(result, "folder"); err != nil {
 		return fmt.Errorf("move folder: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("move folder: commit transaction: %w", err)
 	}
 	return nil
 }
 
 func MoveSession(db *sql.DB, id int64, newFolderID *int64) error {
-	_, err := db.Exec(
+	tx, err := db.Begin()
+	if err != nil {
+		return fmt.Errorf("move session: begin transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	if err := ensureSessionExists(tx, id); err != nil {
+		return fmt.Errorf("move session: %w", err)
+	}
+	if newFolderID != nil {
+		if err := ensureFolderExists(tx, *newFolderID, "target folder"); err != nil {
+			return fmt.Errorf("move session: %w", err)
+		}
+	}
+	result, err := tx.Exec(
 		"UPDATE sessions SET folder_id = ?, updated_at = datetime('now') WHERE id = ?",
 		newFolderID, id,
 	)
 	if err != nil {
+		return fmt.Errorf("move session: update: %w", err)
+	}
+	if err := requireAffected(result, "session"); err != nil {
 		return fmt.Errorf("move session: %w", err)
 	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("move session: commit transaction: %w", err)
+	}
 	return nil
+}
+
+type folderTxQuerier interface {
+	QueryRow(query string, args ...any) *sql.Row
+}
+
+func ensureFolderExists(tx folderTxQuerier, id int64, entity string) error {
+	var foundID int64
+	if err := tx.QueryRow("SELECT id FROM session_folders WHERE id = ?", id).Scan(&foundID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return fmt.Errorf("%s not found", entity)
+		}
+		return fmt.Errorf("check %s: %w", entity, err)
+	}
+	return nil
+}
+
+func ensureSessionExists(tx folderTxQuerier, id int64) error {
+	var foundID int64
+	if err := tx.QueryRow("SELECT id FROM sessions WHERE id = ?", id).Scan(&foundID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return errors.New("session not found")
+		}
+		return fmt.Errorf("check session: %w", err)
+	}
+	return nil
+}
+
+// ensureFolderNotDescendant walks from the proposed parent toward the root.
+// Encountering the moved folder would create a cycle; repeated ancestors
+// indicate an already-corrupt hierarchy and are rejected as well.
+func ensureFolderNotDescendant(tx folderTxQuerier, folderID, proposedParentID int64) error {
+	visited := make(map[int64]struct{})
+	current := proposedParentID
+	for {
+		if current == folderID {
+			return errors.New("folder cannot be moved into its descendant")
+		}
+		if _, seen := visited[current]; seen {
+			return errors.New("folder hierarchy contains a cycle")
+		}
+		visited[current] = struct{}{}
+
+		var parentID sql.NullInt64
+		if err := tx.QueryRow("SELECT parent_id FROM session_folders WHERE id = ?", current).Scan(&parentID); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return errors.New("parent folder not found")
+			}
+			return fmt.Errorf("check parent folder: %w", err)
+		}
+		if !parentID.Valid {
+			return nil
+		}
+		current = parentID.Int64
+	}
 }
