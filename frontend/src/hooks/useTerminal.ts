@@ -1,4 +1,4 @@
-import { useEffect, useRef, type RefObject } from 'react'
+import { useEffect, useLayoutEffect, useRef, type RefObject } from 'react'
 import type { Terminal } from '@xterm/xterm'
 import { useTerminalRuntimeErrorReporter } from '@/components/terminal/TerminalErrorBoundary'
 import { useAppStore } from '@/store/appStore'
@@ -25,6 +25,7 @@ function useTerminalLifecycle(containerRef: RefObject<HTMLDivElement | null>, re
 
 export function useTerminal(terminalID: string, containerRef: RefObject<HTMLDivElement | null>, { active, focusRequest }: UseTerminalOptions) {
   const reportRuntimeError = useTerminalRuntimeErrorReporter()
+  const previousTerminalIDRef = useRef(terminalID)
   const refs: TerminalLifecycleRefs = {
     termRef: useRef<Terminal | null>(null),
     fitAddonRef: useRef<import("@xterm/addon-fit").FitAddon | null>(null),
@@ -49,6 +50,12 @@ export function useTerminal(terminalID: string, containerRef: RefObject<HTMLDivE
   refs.storeRef.current = useAppStore.getState()
   refs.requestedSequenceRef.current = focusRequest.sequence
   useTerminalLifecycle(containerRef, refs, reportRuntimeError)
+  useLayoutEffect(() => {
+    if (previousTerminalIDRef.current === terminalID) return
+    // Flush the old transform before an in-place reconnect reuses this xterm instance.
+    refs.outputFlushRef.current?.()
+    previousTerminalIDRef.current = terminalID
+  }, [terminalID])
   useTerminalIdentity(terminalID, refs.registeredTerminalIDRef)
   useTerminalAttachment(terminalID)
   useEffect(() => {

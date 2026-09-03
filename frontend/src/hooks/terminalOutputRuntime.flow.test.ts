@@ -1,12 +1,14 @@
 import { createRef } from 'react'
 import type { Terminal } from '@xterm/xterm'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { createTerminalKeywordHighlightController } from '@/hooks/useTerminalKeywordHighlight'
+import { useTerminalKeywordHighlightStore } from '@/store/terminalKeywordHighlightStore'
 
-const handlers: Array<(event: { data?: { terminal_id?: string; data?: string } }) => void> = []
+const handlers: Array<(event: { data?: { terminal_id?: string; sequence?: number; data?: string } }) => void> = []
 
 vi.mock('@wailsio/runtime', () => ({
   Events: {
-    On: vi.fn((_name: string, handler: (event: { data?: { terminal_id?: string; data?: string } }) => void) => {
+    On: vi.fn((_name: string, handler: (event: { data?: { terminal_id?: string; sequence?: number; data?: string } }) => void) => {
       handlers.push(handler)
       return vi.fn()
     }),
@@ -23,8 +25,24 @@ function encodeBytes(data: Uint8Array): string {
   return btoa(binary)
 }
 
+function writtenText(writes: Uint8Array[]): string {
+  const total = writes.reduce((sum, data) => sum + data.length, 0)
+  const merged = new Uint8Array(total)
+  let offset = 0
+  for (const data of writes) {
+    merged.set(data, offset)
+    offset += data.length
+  }
+  return new TextDecoder().decode(merged)
+}
+
 describe('subscribeToTerminalOutput flow control', () => {
-  beforeEach(() => { handlers.length = 0 })
+  beforeEach(() => {
+    handlers.length = 0
+    useTerminalKeywordHighlightStore.getState().resetToDefault()
+  })
+
+  afterEach(() => { vi.useRealTimers() })
 
   it('pauses the backend before xterm write backlog grows and resumes after parsing', async () => {
     const writes: Uint8Array[] = []
@@ -96,5 +114,59 @@ describe('subscribeToTerminalOutput flow control', () => {
     handlers[0]({ data: { terminal_id: 'term-fail-safe', data: encodeBytes(new Uint8Array([1])) } })
     expect(terminal.write).toHaveBeenCalledTimes(writesBeforeFailure + 1)
     subscription.dispose()
+  })
+
+  it('flushes a trailing keyword prefix after output becomes idle', () => {
+    vi.useFakeTimers()
+    const writes: Uint8Array[] = []
+    const terminal = {
+      write: vi.fn((data: Uint8Array) => { writes.push(new Uint8Array(data)) }),
+    } as unknown as Terminal
+    const terminalIDRef = createRef<string>()
+    terminalIDRef.current = 'term-keyword-idle'
+    const highlight = createTerminalKeywordHighlightController({ reportRuntimeError: vi.fn() })
+    const subscription = subscribeToTerminalOutput({
+      term: terminal,
+      terminalIDRef,
+      reportRuntimeError: vi.fn(),
+      shouldCoalesce: () => false,
+      outputTransform: highlight.transform,
+      outputFlush: highlight.flush,
+      shouldScheduleOutputFlush: highlight.hasPending,
+    })
+
+    handlers[0]({ data: { terminal_id: 'term-keyword-idle', data: encodeBytes(new TextEncoder().encode('prompt$ cmd In')) } })
+    expect(writtenText(writes)).toBe('prompt$ cmd ')
+
+    vi.advanceTimersByTime(32)
+    expect(writtenText(writes)).toBe('prompt$ cmd In')
+    subscription.dispose()
+    highlight.dispose()
+  })
+
+  it('applies stateful output transforms only after restoring event sequence', () => {
+    const writes: Uint8Array[] = []
+    const terminal = {
+      write: vi.fn((data: Uint8Array) => { writes.push(new Uint8Array(data)) }),
+    } as unknown as Terminal
+    const terminalIDRef = createRef<string>()
+    terminalIDRef.current = 'term-keyword-order'
+    const highlight = createTerminalKeywordHighlightController({ reportRuntimeError: vi.fn() })
+    const subscription = subscribeToTerminalOutput({
+      term: terminal,
+      terminalIDRef,
+      reportRuntimeError: vi.fn(),
+      shouldCoalesce: () => false,
+      outputTransform: highlight.transform,
+      outputFlush: highlight.flush,
+      shouldScheduleOutputFlush: highlight.hasPending,
+    })
+
+    handlers[0]({ data: { terminal_id: 'term-keyword-order', sequence: 2, data: encodeBytes(new TextEncoder().encode('\u001b[D')) } })
+    handlers[0]({ data: { terminal_id: 'term-keyword-order', sequence: 1, data: encodeBytes(new TextEncoder().encode('cmd In')) } })
+
+    expect(writtenText(writes)).toBe('cmd In\u001b[D')
+    subscription.dispose()
+    highlight.dispose()
   })
 })

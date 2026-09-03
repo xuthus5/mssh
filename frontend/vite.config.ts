@@ -7,10 +7,10 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './src'),
+      '@': path.resolve(import.meta.dirname, './src'),
       // @xterm/addon-ligatures@0.10.0 publishes only the ESM build but
       // declares main as the missing CJS file; route it to the real entry.
-      '@xterm/addon-ligatures': path.resolve(__dirname, 'node_modules/@xterm/addon-ligatures/lib/addon-ligatures.mjs'),
+      '@xterm/addon-ligatures': path.resolve(import.meta.dirname, 'node_modules/@xterm/addon-ligatures/lib/addon-ligatures.mjs'),
     },
     // @wailsio/runtime keeps module-level singleton state (clientId,
     // eventListeners, window._wails). It must resolve to a single instance or
@@ -38,7 +38,7 @@ export default defineConfig({
     setupFiles: ['./src/test/setup.ts'],
     css: false,
     alias: {
-      '@wailsio/runtime': path.resolve(__dirname, 'src/test/__mocks__/wails-runtime.ts'),
+      '@wailsio/runtime': path.resolve(import.meta.dirname, 'src/test/__mocks__/wails-runtime.ts'),
     },
     coverage: {
       provider: 'v8',

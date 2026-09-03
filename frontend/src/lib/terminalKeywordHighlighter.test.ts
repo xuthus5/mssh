@@ -110,7 +110,9 @@ describe('TerminalKeywordHighlighter', () => {
   it('colours a keyword ending exactly at the stream boundary on flush', () => {
     const highlighter = new TerminalKeywordHighlighter(RULES)
     highlighter.push(bytes('failed: Error'), true)
+    expect(highlighter.hasPending()).toBe(true)
     expect(text(highlighter.flush())).toContain(`${sgr('#ff5555')}Error\u001b[0m`)
+    expect(highlighter.hasPending()).toBe(false)
   })
 
   it('colours multiple distinct keywords on one line', () => {
