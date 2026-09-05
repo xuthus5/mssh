@@ -169,6 +169,31 @@ async function copySessionCredentials(workspace: Workspace, session: Session) {
   }
 }
 
+async function copySessionConnectionInfo(workspace: Workspace, session: Session) {
+  try {
+    const credentials = await SessionService.GetSessionCredentials(Number(session.id))
+    if (!credentials) throw new Error(t('未找到会话凭据'))
+    
+    const folder = workspace.folders.find((f) => f.id === session.folderId)
+    const fields = [
+      { key: t('连接名称'), value: session.name },
+      { key: t('分组'), value: folder?.name ?? t('未分组') },
+      { key: t('IP'), value: session.host },
+      { key: t('端口'), value: String(session.port) },
+      { key: t('用户名'), value: credentials.username },
+      { key: t('密码'), value: credentials.password ?? '' },
+    ]
+    
+    const text = fields.map((f) => `${f.key}  ${f.value}`).join('\n')
+    
+    await getClipboard().writeText(text)
+    toast(t('连接信息已复制'), 'success')
+  } catch (error) {
+    logger.error('Sidebar: copy session connection info error', error)
+    toast(t('复制连接信息失败: ${}', error instanceof Error ? error.message : String(error)), 'error')
+  }
+}
+
 async function deleteSession(workspace: Workspace, session: Session) {
   const confirmed = await requestConfirm({
     title: t('删除会话'),
@@ -234,6 +259,7 @@ export function useSidebarDialogs(workspace: Workspace) {
     renameName: state.renameName, setRenameName: state.setRenameName, renameError: state.renameError,
     quickRenameSession, saveRename,
     duplicateSession: (session: Session) => duplicateSession(workspace, session),
+    copyConnectionInfo: (session: Session) => copySessionConnectionInfo(workspace, session),
     copyCredentials: (session: Session) => copySessionCredentials(workspace, session),
     deleteSession: (session: Session) => deleteSession(workspace, session),
     editFolder: events.editFolder,

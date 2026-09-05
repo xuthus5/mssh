@@ -19,6 +19,7 @@ interface Props {
   onDuplicateSession?: (session: Session) => void | Promise<void>
   onQuickRenameSession?: (session: Session) => void
   onCopyCredentials?: (session: Session) => void | Promise<void>
+  onCopyConnectionInfo?: (session: Session) => void | Promise<void>
   onDeleteSession?: (sessionId: string) => void
   onEditFolder?: (folder: Folder) => void
   onDeleteFolder?: (folderId: string) => void
@@ -103,6 +104,7 @@ interface TreeRowProps {
   onDuplicateSession?: (session: Session) => void | Promise<void>
   onQuickRenameSession?: (session: Session) => void
   onCopyCredentials?: (session: Session) => void | Promise<void>
+  onCopyConnectionInfo?: (session: Session) => void | Promise<void>
   onDeleteSession?: (sessionId: string) => void
   onEditFolder?: (folder: Folder) => void
   onDeleteFolder?: (folderId: string) => void
@@ -172,6 +174,7 @@ function SessionTreeActions(props: TreeRowProps & { session: Session }) {
     <ContextMenuItem onClick={() => props.onEditSession?.(session)}>{t('编辑')}</ContextMenuItem>
     <ContextMenuItem onClick={() => runSessionAction(props.onDuplicateSession, session)}>{t('复制会话')}</ContextMenuItem>
     <ContextMenuItem onClick={() => props.onQuickRenameSession?.(session)}>{t('快速重命名')}</ContextMenuItem>
+    <ContextMenuItem onClick={() => runSessionAction(props.onCopyConnectionInfo, session)}>{t('复制连接信息')}</ContextMenuItem>
     <ContextMenuItem onClick={() => runSessionAction(props.onCopyCredentials, session)}>{t('复制账号密码')}</ContextMenuItem>
     {props.onMoveToFolder ? <SessionMoveActions {...props} session={session} /> : null}
     <ContextMenuSeparator />
