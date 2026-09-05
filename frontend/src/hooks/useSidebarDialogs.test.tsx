@@ -6,6 +6,7 @@ import type { Session } from '@/hooks/useSession'
 
 const workspace = vi.hoisted(() => ({
   sessions: [] as Session[],
+  folders: [] as { id: string; name: string }[],
   createSession: vi.fn(async () => undefined),
   updateSession: vi.fn(async () => undefined),
   deleteSession: vi.fn(async () => undefined),
@@ -29,7 +30,7 @@ vi.mock('@/lib/logger', () => ({ logger }))
 
 const session: Session = {
   id: '1', name: 'web-01', host: '10.0.0.1', port: 22, username: 'root',
-  authMethod: 'password', keepAlive: 30, termType: 'xterm', folderId: null,
+  authMethod: 'password', keepAlive: 30, termType: 'xterm', folderId: '1',
 }
 
 describe('useSidebarDialogs session context actions', () => {
@@ -84,6 +85,38 @@ describe('useSidebarDialogs session context actions', () => {
 
     expect(clipboard.writeText).toHaveBeenCalledWith('deploy:pw-123')
     expect(useToastStore.getState().toasts.at(-1)).toMatchObject({ type: 'success' })
+  })
+
+  it('copies complete connection information to the clipboard', async () => {
+    sessionService.GetSessionCredentials.mockResolvedValue({ username: 'deploy', password: 'pw-123' })
+    workspace.folders = [{ id: '1', name: '生产环境' }]
+    const { result } = renderHook(() => useSidebarDialogs(workspace as never))
+
+    await act(async () => { await result.current.copyConnectionInfo(session) })
+
+    expect(sessionService.GetSessionCredentials).toHaveBeenCalledWith(1)
+    expect(clipboard.writeText).toHaveBeenCalledWith('连接名称  web-01\n分组  生产环境\nIP  10.0.0.1\n端口  22\n用户名  deploy\n密码  pw-123')
+    expect(useToastStore.getState().toasts.at(-1)).toMatchObject({ type: 'success' })
+  })
+
+  it('keeps an empty password field in copied connection information', async () => {
+    sessionService.GetSessionCredentials.mockResolvedValue({ username: 'deploy', password: '' })
+    workspace.folders = [{ id: '1', name: '生产环境' }]
+    const { result } = renderHook(() => useSidebarDialogs(workspace as never))
+
+    await act(async () => { await result.current.copyConnectionInfo(session) })
+
+    expect(clipboard.writeText).toHaveBeenCalledWith('连接名称  web-01\n分组  生产环境\nIP  10.0.0.1\n端口  22\n用户名  deploy\n密码  ')
+  })
+
+  it('reports connection information copy failures without exposing data', async () => {
+    sessionService.GetSessionCredentials.mockRejectedValue(new Error('vault locked'))
+    const { result } = renderHook(() => useSidebarDialogs(workspace as never))
+
+    await act(async () => { await result.current.copyConnectionInfo(session) })
+
+    expect(clipboard.writeText).not.toHaveBeenCalled()
+    expect(useToastStore.getState().toasts.at(-1)).toMatchObject({ type: 'error' })
   })
 
   it('copies only the username when no password is stored', async () => {
