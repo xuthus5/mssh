@@ -33,6 +33,7 @@ function reconnectSessions(): ReconnectSession[] {
 }
 
 interface ConnectionPayload { terminal_id?: string; state?: string }
+interface AttemptPayload { attempt_id?: string; state?: string }
 interface FingerprintPayload { attempt_id?: string; hostname?: string; fingerprint?: string; algorithm?: string; changed?: boolean; expected?: string[] }
 interface TransferPayload {
   task_id?: string
@@ -199,6 +200,10 @@ export function startEventBridge(): () => void {
   void restoreTransfers()
   const hostKeyPrompts = createHostKeyPromptCoordinator()
   const unsubscribers = [
+    Events.On('session:attempt', (event: EventEnvelope<AttemptPayload>) => {
+      const payload = event.data
+      if (payload?.attempt_id && payload.state === 'finished') hostKeyPrompts.finish(payload.attempt_id)
+    }),
     Events.On('session:fingerprint', (event: EventEnvelope<FingerprintPayload>) => {
       const payload = event.data
       if (!payload?.attempt_id) return

@@ -1656,5 +1656,10 @@
   "Agent 任务": "Agent tasks",
   "硬件加速": "Hardware acceleration",
   "启用 WebView 硬件加速可缓解大量输出时的渲染卡顿。更改后需重启应用才能生效，默认关闭。": "Enable WebView hardware acceleration to reduce rendering lag under heavy output. Requires an app restart to take effect. Off by default.",
-  "开启": "On"
+  "开启": "On",
+  "建立连接": "Establish connection",
+  "指纹确认": "Verify fingerprint",
+  "连接进度": "Connection progress",
+  "正在进入终端...": "Opening terminal...",
+  "进入终端": "Enter terminal"
 }
