@@ -177,6 +177,11 @@ func (s *SessionService) createSession(input model.SessionInput) (*model.Session
 		}
 		session.Password = sealed
 	}
+	jump, err := s.prepareSSHJumpHost(session.JumpHost, nil)
+	if err != nil {
+		return nil, err
+	}
+	session.JumpHost = jump
 	s.logger.Info("creating session", "name", session.Name, "authMethod", session.AuthMethod)
 	result, err := store.CreateSessionWithTags(s.db, session, input.TagIDs)
 	if err != nil {
@@ -215,6 +220,11 @@ func (s *SessionService) updateSession(input model.SessionInput) error {
 		}
 		session.Password = sealed
 	}
+	jump, err := s.prepareSSHJumpHost(session.JumpHost, existing.JumpHost)
+	if err != nil {
+		return err
+	}
+	session.JumpHost = jump
 	s.logger.Info("updating session", "id", session.ID, "name", session.Name)
 	err = store.UpdateSessionWithTags(s.db, session, input.TagIDs)
 	if err != nil {

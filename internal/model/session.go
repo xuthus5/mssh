@@ -4,8 +4,9 @@ import "time"
 
 // SessionCredentials carries a session's login username and decrypted password.
 type SessionCredentials struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
+	Username         string `json:"username"`
+	Password         string `json:"password"`
+	JumpHostPassword string `json:"jump_host_password,omitempty"`
 }
 
 type AuthMethod string
@@ -43,6 +44,7 @@ type Session struct {
 	AuthMethod      AuthMethod        `json:"auth_method"`
 	Password        string            `json:"password,omitempty"`
 	KeyID           *int64            `json:"key_id,omitempty"`
+	JumpHost        *SSHJumpHost      `json:"jump_host,omitempty"`
 	KeepAlive       int               `json:"keep_alive"`
 	TermType        string            `json:"term_type"`
 	SortOrder       int               `json:"sort_order"`
@@ -50,4 +52,40 @@ type Session struct {
 	ConnectionCount int               `json:"connection_count"`
 	CreatedAt       time.Time         `json:"created_at"`
 	UpdatedAt       time.Time         `json:"updated_at"`
+}
+
+// SSHJumpHost 保存用于登录目标会话的单级 SSH 跳板配置。
+type SSHJumpHost struct {
+	Host       string     `json:"host"`
+	Port       int        `json:"port"`
+	Username   string     `json:"username"`
+	AuthMethod AuthMethod `json:"auth_method"`
+	Password   string     `json:"password,omitempty"`
+	KeyID      *int64     `json:"key_id,omitempty"`
+}
+
+type SSHJumpHostTestInput struct {
+	SessionID int64       `json:"session_id"`
+	RequestID string      `json:"request_id"`
+	JumpHost  SSHJumpHost `json:"jump_host"`
+}
+
+type SSHOpenRequest struct {
+	SessionID int64  `json:"session_id"`
+	Cols      int    `json:"cols"`
+	Rows      int    `json:"rows"`
+	RequestID string `json:"request_id"`
+}
+
+// Clone 避免表单转换和脱敏修改原始跳板凭证。
+func (jump *SSHJumpHost) Clone() *SSHJumpHost {
+	if jump == nil {
+		return nil
+	}
+	cloned := *jump
+	if jump.KeyID != nil {
+		keyID := *jump.KeyID
+		cloned.KeyID = &keyID
+	}
+	return &cloned
 }

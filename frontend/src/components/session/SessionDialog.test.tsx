@@ -6,7 +6,7 @@ import { useToastStore } from '@/components/ui/toast'
 import type { AssetColorToken } from '@/lib/sessionModels'
 
 const listKeys = vi.fn(async (): Promise<Array<{ id: number; name: string; type: string }>> => [])
-vi.mock('@/lib/wails', () => ({ KeyService: { List: () => listKeys() } }))
+vi.mock('@/lib/wails', () => ({ KeyService: { List: () => listKeys() }, SessionService: { TestSSHJumpHost: vi.fn() } }))
 
 describe('SessionDialog', () => {
   const defaultProps = {

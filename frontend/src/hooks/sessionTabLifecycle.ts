@@ -8,10 +8,15 @@ import type { Session } from '@/lib/sessionModels'
 import { t } from '@/i18n'
 import { bindWailsCallToSignal } from '@/lib/wailsCancellation'
 
-export async function openSessionTab(session: Session, signal?: AbortSignal): Promise<string> {
+export async function openSessionTab(session: Session, signal?: AbortSignal, requestId?: string): Promise<string> {
   const size = resolveOpenTerminalSize()
   const terminalId = await openTerminalWithPoolCapacity(
-    () => bindWailsCallToSignal(TerminalService.Open(Number(session.id), size.cols, size.rows), signal),
+    () => {
+      const call = session.jumpHost && requestId
+        ? TerminalService.OpenWithProgress({ session_id: Number(session.id), ...size, request_id: requestId })
+        : TerminalService.Open(Number(session.id), size.cols, size.rows)
+      return bindWailsCallToSignal(call, signal)
+    },
   )
   if (signal?.aborted) {
     await closeCancelledTerminal(terminalId)

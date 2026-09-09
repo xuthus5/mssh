@@ -11,7 +11,7 @@ var syncInsertColumns = map[string]map[string]struct{}{
 	"asset_environments":      columnSet("id", "name", "name_key", "color_token", "sort_order", "created_at", "updated_at"),
 	"asset_projects":          columnSet("id", "name", "name_key", "code", "code_key", "description", "sort_order", "created_at", "updated_at"),
 	"asset_tags":              columnSet("id", "name", "name_key", "color_token", "created_at", "updated_at"),
-	"sessions":                columnSet("id", "folder_id", "name", "host", "port", "username", "notes", "environment_id", "project_id", "auth_method", "password", "key_id", "keep_alive", "term_type", "sort_order", "last_connected_at", "connection_count", "created_at", "updated_at"),
+	"sessions":                columnSet("id", "folder_id", "name", "host", "port", "username", "notes", "environment_id", "project_id", "auth_method", "password", "key_id", "jump_host", "jump_port", "jump_username", "jump_auth_method", "jump_password", "jump_key_id", "keep_alive", "term_type", "sort_order", "last_connected_at", "connection_count", "created_at", "updated_at"),
 	"session_tags":            columnSet("session_id", "tag_id", "created_at"),
 	"tunnels":                 columnSet("id", "session_id", "name", "type", "local_host", "local_port", "remote_host", "remote_port", "created_at"),
 	"macros":                  columnSet("id", "name", "command", "shortcut", "delay_ms", "sort_order", "created_at"),

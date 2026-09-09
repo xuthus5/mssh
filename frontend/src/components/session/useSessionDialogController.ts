@@ -3,6 +3,7 @@ import { KeyService } from '@/lib/wails'
 import type { AssetEnvironment, AssetProject, AssetTag, Folder, Session } from '@/hooks/useSession'
 import type { AssetColorToken } from '@/lib/sessionModels'
 import { t } from '@/i18n'
+import { useSSHJumpHostForm } from '@/components/session/useSSHJumpHostForm'
 
 export interface SessionDialogProps {
   open: boolean
@@ -23,10 +24,14 @@ interface KeyItem { id: number; name: string; type: string }
 export function useSessionDialogController(props: SessionDialogProps) {
   const fields = useSessionDialogFields(props)
   const runtime = useSessionDialogRuntime(props.open, props.session?.id)
+  const jumpHost = useSSHJumpHostForm(props)
   const keys = useSessionKeyList(props.open, runtime.lifecycle)
-  const handleSubmit = createSessionSubmit({ props, fields, runtime })
-  const handleOpenChange = (open: boolean) => changeSessionDialogOpen({ open, runtime, onOpenChange: props.onOpenChange })
-  return { ...fields, ...keys, pending: runtime.pending, submitError: runtime.submitError,
+  const handleSubmit = createSessionSubmit({ props, fields, runtime, jumpHost })
+  const handleOpenChange = (open: boolean) => {
+    if (!open && !runtime.saveActive.current) jumpHost.cancelTest()
+    changeSessionDialogOpen({ open, runtime, onOpenChange: props.onOpenChange })
+  }
+  return { ...fields, ...keys, jumpHost, pending: runtime.pending, submitError: runtime.submitError,
     handleSubmit, handleOpenChange, isEditing: Boolean(props.session) }
 }
 
@@ -108,18 +113,20 @@ function useSessionKeyList(open: boolean, lifecycle: { current: number }) {
 type SessionFields = ReturnType<typeof useSessionDialogFields>
 type SessionRuntime = ReturnType<typeof useSessionDialogRuntime>
 
-function createSessionSubmit(context: { props: SessionDialogProps; fields: SessionFields; runtime: SessionRuntime }) {
+function createSessionSubmit(context: { props: SessionDialogProps; fields: SessionFields; runtime: SessionRuntime; jumpHost: ReturnType<typeof useSSHJumpHostForm> }) {
   return async () => {
-    const { props, fields, runtime } = context
+    const { props, fields, runtime, jumpHost } = context
+    if (runtime.saveActive.current || jumpHost.isTesting()) return
     if (fields.authMethod === 'key' && !fields.keyId) {
       runtime.setSubmitError(t('请选择 SSH 密钥'))
       return
     }
-    if (runtime.saveActive.current) return
+    const jumpHostError = jumpHost.validate()
+    if (jumpHostError) { runtime.setSubmitError(jumpHostError); return }
     const request = beginSaveRequest(runtime)
     runtime.setPending(true); runtime.setSubmitError('')
     try {
-      await props.onSave(buildSessionData(props, fields))
+      await props.onSave({ ...buildSessionData(props, fields), jumpHost: jumpHost.value() })
       if (request.isCurrent()) changeSessionDialogOpen({ open: false, runtime, onOpenChange: props.onOpenChange, force: true })
     } catch (error) {
       if (request.isCurrent()) runtime.setSubmitError(saveErrorMessage(props.session, error))

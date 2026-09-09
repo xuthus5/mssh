@@ -21,6 +21,9 @@ export function ConnectDialog() {
   const dialog = useConnectDialog()
   const prompt = useHostKeyPromptDialog()
   const lifecycle = useConnectDialogLifecycle(dialog, Boolean(prompt.active))
+  const hasJumpHost = prompt.active ? prompt.active.prompt.usesJumpHost ?? (prompt.active.prompt.isJumpHost === true
+    || Boolean(dialog.jumpHost && prompt.active.prompt.requestId === dialog.requestId)) : Boolean(dialog.jumpHost)
+  const stage = prompt.active ? prompt.active.prompt.isJumpHost ? 'jump' : 'target' : dialog.stage
   const target = prompt.active
     ? formatEndpoint(prompt.active.endpoint.host, prompt.active.endpoint.port)
     : `${dialog.user}@${formatEndpoint(dialog.host, dialog.port)}`
@@ -35,7 +38,7 @@ export function ConnectDialog() {
           <DialogTitle>{t('SSH 连接')}</DialogTitle>
           <DialogDescription className="break-all font-mono text-xs">{target}</DialogDescription>
         </DialogHeader>
-        <ConnectProgress state={prompt.active ? 'fingerprint' : dialog.state} />
+        <ConnectProgress state={prompt.active ? 'fingerprint' : dialog.state} hasJumpHost={hasJumpHost} stage={stage} />
         {prompt.active ? <HostKeyPromptContent /> : <ConnectStateContent dialog={dialog} finish={lifecycle.finish} />}
       </DialogContent>
     </Dialog>
@@ -54,7 +57,8 @@ function ConnectingState({ dialog }: { dialog: ConnectDialogModel }) {
   return <>
     <div role="status" className="flex flex-col items-center gap-3 py-6 text-center">
       <Loader2 aria-hidden="true" className="size-9 animate-spin text-primary motion-reduce:animate-none" />
-      <p className="text-sm text-muted-foreground">{dialog.state === 'cancelling' ? t('正在取消连接...') : t('SSH 握手进行中...')}</p>
+      <p className="text-sm text-muted-foreground">{dialog.state === 'cancelling' ? t('正在取消连接...') : dialog.stage === 'jump' ? t('正在连接 SSH 跳板机...') : t('SSH 握手进行中...')}</p>
+      {dialog.jumpHost && <p className="break-all font-mono text-xs text-muted-foreground">{t('通过 SSH 跳板机 ${}', `${dialog.jumpHost.username}@${formatEndpoint(dialog.jumpHost.host, dialog.jumpHost.port)}`)}</p>}
     </div>
     <DialogFooter>
       <Button variant="outline" disabled={dialog.state === 'cancelling'} onClick={() => { void dialog.cancelConnection().catch((error: unknown) => logger.error('cancel connection failed', error)) }}>{t('取消连接')}</Button>
@@ -77,7 +81,7 @@ function FailedState({ dialog }: { dialog: ConnectDialogModel }) {
   return <>
     <div role="alert" className="flex flex-col items-center gap-3 py-6 text-center">
       <XCircle aria-hidden="true" className="size-9 text-destructive" />
-      <h3 className="font-medium text-destructive">{t('连接失败')}</h3>
+      <h3 className="font-medium text-destructive">{dialog.jumpHost ? dialog.stage === 'jump' ? t('SSH 连接隧道失败') : t('目标 SSH 连接失败') : t('连接失败')}</h3>
       <p className="max-w-full break-all whitespace-pre-wrap text-xs text-muted-foreground">{formatConnectError(dialog.error, t)}</p>
     </div>
     <DialogFooter>

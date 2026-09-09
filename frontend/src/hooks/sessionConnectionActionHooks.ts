@@ -62,7 +62,8 @@ export function useConnectSession(options: SessionConnectionOptions) {
     const dialogId = dialog.openDialog(session.host, session.port, session.username, () => { void connect(sessionId) }, sessionId)
     dialog.setCancelHandler(dialogId, () => controller.abort())
     try {
-      const terminalId = await openSessionTab(session, controller.signal)
+      const requestId = session.jumpHost ? dialog.beginConnectionAttempt(dialogId, session.jumpHost) : undefined
+      const terminalId = await openSessionTab(session, controller.signal, requestId)
       dialog.completeDialog(dialogId)
       logger.info('connected', { terminalId, host: session.host })
       refreshSessionLists(options)

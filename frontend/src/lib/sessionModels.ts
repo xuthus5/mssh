@@ -1,4 +1,5 @@
 import type { Session as BindingSession, Tunnel as BindingTunnel } from '../../bindings/github.com/xuthus5/mssh/internal/model/models'
+import { mapSSHJumpHost } from '@/lib/sshJumpHost'
 
 export type AssetColorToken = 'slate' | 'red' | 'orange' | 'amber' | 'yellow' | 'lime' | 'green' | 'teal' | 'cyan' | 'blue' | 'violet' | 'pink'
 
@@ -11,6 +12,15 @@ export interface Folder {
   name: string
   parentId: string | null
   isDefault: boolean
+}
+
+export interface SSHJumpHost {
+  host: string
+  port: number
+  username: string
+  authMethod: 'password' | 'key' | 'agent' | 'keyboard-interactive'
+  password?: string
+  keyId?: string
 }
 
 export interface Session {
@@ -28,6 +38,7 @@ export interface Session {
   authMethod: 'password' | 'key' | 'agent' | 'keyboard-interactive'
   password?: string
   keyId?: string
+  jumpHost?: SSHJumpHost
   keepAlive: number
   termType: string
   folderId: string | null
@@ -59,7 +70,7 @@ export function mapSession(session: BindingSession): Session {
     environment: session.environment ? mapEnvironment(session.environment) : undefined,
     project: session.project ? mapProject(session.project) : undefined,
     authMethod: session.auth_method as Session['authMethod'], password: session.password,
-    keyId: session.key_id != null ? String(session.key_id) : undefined, keepAlive: session.keep_alive,
+    keyId: session.key_id != null ? String(session.key_id) : undefined, jumpHost: mapSSHJumpHost(session.jump_host), keepAlive: session.keep_alive,
     termType: session.term_type, folderId: session.folder_id != null ? String(session.folder_id) : null,
     lastConnectedAt: session.last_connected_at ?? undefined, connectionCount: session.connection_count,
   }
