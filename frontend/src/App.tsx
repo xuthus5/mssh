@@ -3,7 +3,6 @@ import Sidebar from '@/components/layout/Sidebar'
 import StatusBar from '@/components/layout/StatusBar'
 import { ToastContainer, toast } from '@/components/ui/toast'
 import { ConnectDialog } from '@/components/layout/ConnectDialog'
-import { HostKeyPromptDialog } from '@/components/layout/HostKeyPromptDialog'
 import { useAppStore, type AppState, type Tab } from '@/store/appStore'
 import { logger } from '@/lib/logger'
 import { WindowTitleBar } from '@/components/layout/WindowTitleBar'
@@ -196,7 +195,6 @@ function AppShell() {
       <ToastContainer />
       <ConfirmDialogHost />
       <ConnectDialog />
-      <HostKeyPromptDialog />
       <SessionQuickSearchHost />
       <AIAgentTaskCenter />
     </>

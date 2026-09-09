@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ConnectDialog } from '@/components/layout/ConnectDialog'
 import { useToastStore } from '@/components/ui/toast'
 import { useConnectDialog } from '@/store/connectDialog'
@@ -45,5 +45,29 @@ describe('ConnectDialog', () => {
     expect(useToastStore.getState().toasts).toHaveLength(0)
     expect(await screen.findByText('连接失败')).toBeInTheDocument()
     expect(screen.getByText('cancel boom')).toBeInTheDocument()
+  })
+
+  it.each(['connected', 'failed'])('dismisses the %s result with Escape', async (state) => {
+    const cancelRequest = vi.fn()
+    const dialogId = useConnectDialog.getState().openDialog('example.com', 22, 'root', vi.fn())
+    useConnectDialog.getState().setCancelHandler(dialogId, cancelRequest)
+    if (state === 'connected') useConnectDialog.getState().completeDialog(dialogId)
+    else useConnectDialog.getState().failDialog(dialogId, 'connection failed')
+    render(<ConnectDialog />)
+
+    await userEvent.keyboard('{Escape}')
+
+    expect(useConnectDialog.getState().open).toBe(false)
+    expect(cancelRequest).toHaveBeenCalledTimes(state === 'connected' ? 0 : 1)
+  })
+
+  it('closes a failed connection from its footer action', async () => {
+    const dialogId = useConnectDialog.getState().openDialog('example.com', 22, 'root', vi.fn())
+    useConnectDialog.getState().failDialog(dialogId, 'connection failed')
+    render(<ConnectDialog />)
+
+    await userEvent.click(screen.getByRole('button', { name: '关闭' }))
+
+    expect(useConnectDialog.getState().open).toBe(false)
   })
 })

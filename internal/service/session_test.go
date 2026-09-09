@@ -215,19 +215,19 @@ func TestSessionService_InternalConnectDisconnect(t *testing.T) {
 
 	lastEvent := bus.LastEvent()
 	require.NotNil(t, lastEvent)
-	assert.Equal(t, event.ConnectionState, lastEvent.Name)
+	assert.Equal(t, event.ConnectionAttempt, lastEvent.Name)
 	payload, ok := lastEvent.Payload.(event.ConnectionStatePayload)
 	require.True(t, ok)
-	assert.Equal(t, terminalID, payload.TerminalID)
-	assert.Equal(t, "connected", payload.State)
+	assert.NotEmpty(t, payload.AttemptID)
+	assert.Equal(t, "finished", payload.State)
 
 	err = svc.disconnect(terminalID, true)
 	require.NoError(t, err)
 	assert.Equal(t, 0, svc.ConnectionCount())
 
 	allEvents := bus.Events()
-	// attempt + host-key fingerprint + connected + disconnected
-	require.GreaterOrEqual(t, len(allEvents), 4)
+	// attempt + host-key fingerprint + connected + finished + disconnected
+	require.GreaterOrEqual(t, len(allEvents), 5)
 	var states []string
 	for _, captured := range allEvents {
 		if captured.Name != event.ConnectionState {
@@ -235,6 +235,7 @@ func TestSessionService_InternalConnectDisconnect(t *testing.T) {
 		}
 		payload, ok := captured.Payload.(event.ConnectionStatePayload)
 		require.True(t, ok)
+		assert.Equal(t, terminalID, payload.TerminalID)
 		states = append(states, payload.State)
 	}
 	assert.Equal(t, []string{"connected", "disconnected"}, states)

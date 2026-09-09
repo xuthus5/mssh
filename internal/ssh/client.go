@@ -132,20 +132,17 @@ func establishSSHConnection(
 	addr string,
 	config *gossh.ClientConfig,
 ) (gossh.Conn, <-chan gossh.NewChannel, <-chan *gossh.Request, error) {
-	deadline := time.Now().Add(sshConnectTimeout)
-	contextDeadline, contextDeadlineApplied := ctx.Deadline()
-	if contextDeadlineApplied && contextDeadline.Before(deadline) {
-		deadline = contextDeadline
-	} else {
-		contextDeadlineApplied = false
-	}
-	if err := conn.SetDeadline(deadline); err != nil {
+	deadline := newHandshakeDeadline(ctx, conn, sshConnectTimeout)
+	if err := deadline.applyNetworkDeadline(); err != nil {
 		_ = conn.Close()
 		return nil, nil, nil, fmt.Errorf("set handshake deadline: %w", err)
 	}
+	handshakeConfig := *config
+	handshakeConfig.HostKeyCallback = deadline.wrapHostKeyCallback(config.HostKeyCallback)
 	stopCancellation := context.AfterFunc(ctx, func() { _ = conn.Close() })
-	sshConn, channels, requests, err := gossh.NewClientConn(conn, addr, config)
+	sshConn, channels, requests, err := gossh.NewClientConn(conn, addr, &handshakeConfig)
 	stopCancellation()
+	contextDeadline, contextDeadlineApplied := deadline.stop()
 	if err != nil {
 		_ = conn.Close()
 		return nil, nil, nil, normalizeHandshakeError(

@@ -64,7 +64,7 @@ function createDialogLifecycleActions(set: DialogSet, get: DialogGet) {
     if (get().dialogId === dialogId) set({ cancelRequest })
   },
   completeDialog: (dialogId: number) => {
-    if (get().dialogId === dialogId) set(idleDialog())
+    if (get().dialogId === dialogId) set({ state: 'connected', error: '', cancelRequest: null })
   },
   failDialog: (dialogId: number, message: string) => {
     if (get().dialogId === dialogId) set({ state: 'failed', error: message })

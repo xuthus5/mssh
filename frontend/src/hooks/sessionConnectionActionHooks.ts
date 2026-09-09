@@ -2,6 +2,7 @@ import { useCallback, type Dispatch, type SetStateAction } from 'react'
 import { TerminalService } from '@/lib/wails'
 import { useAppStore } from '@/store/appStore'
 import { useConnectDialog } from '@/store/connectDialog'
+import { useHostKeyPromptDialog } from '@/store/hostKeyPromptDialog'
 import { toast } from '@/components/ui/toast'
 import { logger } from '@/lib/logger'
 import { markIntentionalDisconnect, reconnectSessionTab } from '@/hooks/sessionReconnect'
@@ -11,6 +12,7 @@ import type { Session } from '@/lib/sessionModels'
 import { t } from '@/i18n'
 
 type SetSessions = Dispatch<SetStateAction<Session[]>>
+const TERMINAL_FOCUS_ATTEMPTS = 40
 
 function nextAnimationFrame(): Promise<void> {
   return new Promise((resolve) => requestAnimationFrame(() => resolve()))
@@ -18,7 +20,8 @@ function nextAnimationFrame(): Promise<void> {
 
 /** Keep keyboard focus on the freshly opened terminal once it mounts. */
 export async function focusOpenedTerminal(terminalId: string) {
-  for (let attempt = 0; attempt < 40; attempt++) {
+  for (let attempt = 0; attempt < TERMINAL_FOCUS_ATTEMPTS; attempt++) {
+    if (!canFocusOpenedTerminal(terminalId)) return
     const term = useAppStore.getState().terminalPool.get(terminalId)?.terminal
     if (!term) {
       await nextAnimationFrame()
@@ -28,6 +31,16 @@ export async function focusOpenedTerminal(terminalId: string) {
     await nextAnimationFrame()
     if (document.activeElement === term.textarea) return
   }
+}
+
+function canFocusOpenedTerminal(terminalId: string) {
+  if (useConnectDialog.getState().open || useHostKeyPromptDialog.getState().active) return false
+  const { tabs, activeSurface, activePaneId } = useAppStore.getState()
+  const tab = tabs.find((item) => activeSurface?.type === 'terminal' && item.id === activeSurface.id)
+  if (tab?.type !== 'terminal') return false
+  const panes = [tab.terminalId, ...(tab.splitPaneIDs ?? [])]
+  if (!panes.includes(terminalId)) return false
+  return !activePaneId || !panes.includes(activePaneId) || activePaneId === terminalId
 }
 
 export interface SessionConnectionOptions {
@@ -52,9 +65,6 @@ export function useConnectSession(options: SessionConnectionOptions) {
       const terminalId = await openSessionTab(session, controller.signal)
       dialog.completeDialog(dialogId)
       logger.info('connected', { terminalId, host: session.host })
-      // The connect dialog's focus-return can steal focus back to the session
-      // tree after the terminal mounts; re-focus the terminal until it sticks.
-      void focusOpenedTerminal(terminalId)
       refreshSessionLists(options)
     } catch (error) {
       if (controller.signal.aborted) return

@@ -73,6 +73,9 @@ describe('automatic reconnect scheduling', () => {
 
     firstOpen.resolve('term-1-new')
 
+    await waitFor(() => expect(useConnectDialog.getState().state).toBe('connected'))
+    expect(open).toHaveBeenCalledOnce()
+    useConnectDialog.getState().closeDialog()
     await waitFor(() => expect(open).toHaveBeenCalledTimes(2))
     expect(open).toHaveBeenLastCalledWith(6, 80, 24)
     expect(useAppStore.getState().tabs).toEqual([

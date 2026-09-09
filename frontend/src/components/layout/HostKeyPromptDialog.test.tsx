@@ -1,10 +1,10 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { HostKeyPromptDialog } from '@/components/layout/HostKeyPromptDialog'
+import { HostKeyPromptContent } from '@/components/layout/HostKeyPromptDialog'
 import { useHostKeyPromptDialog, type HostKeyPromptRequest } from '@/store/hostKeyPromptDialog'
 
-describe('HostKeyPromptDialog', () => {
+describe('HostKeyPromptContent', () => {
   beforeEach(() => {
     useHostKeyPromptDialog.setState({ active: null, pending: false, error: '' })
   })
@@ -12,7 +12,7 @@ describe('HostKeyPromptDialog', () => {
   it('shows endpoint details and accepts the active fingerprint', async () => {
     const decide = vi.fn(async () => {})
     presentPrompt({ decide })
-    render(<HostKeyPromptDialog />)
+    render(<HostKeyPromptContent />)
 
     expect(screen.getByText('host.internal:2222', { exact: false })).toBeInTheDocument()
     expect(screen.getByText('SHA256:test')).toBeInTheDocument()
@@ -26,7 +26,7 @@ describe('HostKeyPromptDialog', () => {
   it('rejects the active fingerprint', async () => {
     const decide = vi.fn(async () => {})
     presentPrompt({ decide })
-    render(<HostKeyPromptDialog />)
+    render(<HostKeyPromptContent />)
 
     await userEvent.click(screen.getByRole('button', { name: '拒绝' }))
 
@@ -37,7 +37,7 @@ describe('HostKeyPromptDialog', () => {
   it('keeps a failed decision visible and allows fail-closed dismissal', async () => {
     const dismiss = vi.fn(async () => {})
     presentPrompt({ decide: async () => { throw new Error('decision boom') }, dismiss })
-    render(<HostKeyPromptDialog />)
+    render(<HostKeyPromptContent />)
 
     await userEvent.click(screen.getByRole('button', { name: '信任并连接' }))
     await waitFor(() => expect(screen.getByText('decision boom')).toBeInTheDocument())
@@ -63,7 +63,7 @@ describe('HostKeyPromptDialog', () => {
       decide,
       dismiss: async () => {},
     })
-    render(<HostKeyPromptDialog />)
+    render(<HostKeyPromptContent />)
 
     expect(screen.getByText('主机指纹已变化')).toBeInTheDocument()
     expect(screen.getByText('SHA256:old')).toBeInTheDocument()
@@ -79,7 +79,7 @@ describe('HostKeyPromptDialog', () => {
       decide: async () => { throw new Error('decision boom') },
       dismiss: async () => { throw new Error('dismiss boom') },
     })
-    render(<HostKeyPromptDialog />)
+    render(<HostKeyPromptContent />)
 
     await userEvent.click(screen.getByRole('button', { name: '信任并连接' }))
     await waitFor(() => expect(screen.getByText('decision boom')).toBeInTheDocument())

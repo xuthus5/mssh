@@ -6,6 +6,7 @@ import { toast } from '@/components/ui/toast'
 import { openTerminalWithPoolCapacity, releaseAppTerminalOpenReservation } from '@/lib/openTerminal'
 import { t } from '@/i18n'
 import { bindWailsCallToSignal } from '@/lib/wailsCancellation'
+import { startReconnectAttemptTimeout } from '@/hooks/reconnectAttemptTimeout'
 
 export interface ReconnectSession {
   id: string
@@ -117,23 +118,28 @@ function openReconnectTerminal(context: ReconnectContext) {
     : tab?.type === 'terminal' && tab.connectionKind === 'local'
       ? TerminalService.OpenLocal(cols, rows)
       : TerminalService.Open(Number(context.session.id), cols, rows)
-  return withReconnectTimeout(call, context.run.controller)
+  const waitForFingerprint = tab?.type === 'terminal' && (tab.connectionKind ?? 'ssh') === 'ssh'
+  return withReconnectTimeout(call, context.run.controller, waitForFingerprint)
 }
 
-function withReconnectTimeout<T>(call: Promise<T>, runController: AbortController): Promise<T> {
+function withReconnectTimeout<T>(call: Promise<T>, runController: AbortController, waitForFingerprint: boolean): Promise<T> {
   const timeoutController = new AbortController()
   const abortTimeout = () => timeoutController.abort()
   runController.signal.addEventListener('abort', abortTimeout, { once: true })
-  let timeoutHandle: number | null = null
+  let stopTimeout: (() => void) | undefined
   const callResult = bindWailsCallToSignal(call, timeoutController.signal)
   const timeout = new Promise<T>((_resolve, reject) => {
-    timeoutHandle = window.setTimeout(() => {
-      abortTimeout()
-      reject(new Error('reconnect attempt timed out'))
-    }, RECONNECT_ATTEMPT_TIMEOUT_MS)
+    stopTimeout = startReconnectAttemptTimeout({
+      durationMs: RECONNECT_ATTEMPT_TIMEOUT_MS,
+      waitForFingerprint,
+      onTimeout: () => {
+        abortTimeout()
+        reject(new Error('reconnect attempt timed out'))
+      },
+    })
   })
   return Promise.race([callResult, timeout]).finally(() => {
-    if (timeoutHandle !== null) window.clearTimeout(timeoutHandle)
+    stopTimeout?.()
     runController.signal.removeEventListener('abort', abortTimeout)
   })
 }

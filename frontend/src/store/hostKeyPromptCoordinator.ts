@@ -7,11 +7,13 @@ import {
 } from '@/store/hostKeyPromptDialog'
 
 const MAX_PENDING_HOST_KEY_PROMPTS = 32
+const MAX_FINISHED_HOST_KEY_ATTEMPTS = 256
 let nextCoordinatorId = 1
 
 class HostKeyPromptCoordinator {
   private readonly coordinatorId = nextCoordinatorId++
   private readonly pending: HostKeyPrompt[] = []
+  private readonly finished = new Set<string>()
   private readonly unsubscribe: () => void
   private stopped = false
   private pumpScheduled = false
@@ -23,7 +25,7 @@ class HostKeyPromptCoordinator {
   }
 
   handle(prompt: HostKeyPrompt) {
-    if (this.stopped) return
+    if (this.stopped || this.finished.has(prompt.attemptId)) return
     if (!isValidPrompt(prompt)) return this.rejectPrompt(prompt, 'invalid host key prompt')
     const active = useHostKeyPromptDialog.getState().active
     if (active?.prompt.attemptId === prompt.attemptId || this.hasPending(prompt.attemptId)) return
@@ -37,6 +39,21 @@ class HostKeyPromptCoordinator {
     this.pending.push(prompt)
   }
 
+  finish(attemptId: string) {
+    if (this.stopped || !attemptId.trim()) return
+    this.finished.add(attemptId)
+    if (this.finished.size > MAX_FINISHED_HOST_KEY_ATTEMPTS) {
+      const oldest = this.finished.values().next().value
+      if (oldest) this.finished.delete(oldest)
+    }
+    const pendingIndex = this.pending.findIndex((prompt) => prompt.attemptId === attemptId)
+    if (pendingIndex >= 0) this.pending.splice(pendingIndex, 1)
+    const active = useHostKeyPromptDialog.getState().active
+    if (active?.coordinatorId === this.coordinatorId && active.prompt.attemptId === attemptId) {
+      useHostKeyPromptDialog.getState().clear(this.coordinatorId)
+    }
+  }
+
   stop() {
     if (this.stopped) return
     this.stopped = true
@@ -44,6 +61,7 @@ class HostKeyPromptCoordinator {
     const active = useHostKeyPromptDialog.getState().active
     const prompts = active?.coordinatorId === this.coordinatorId ? [active.prompt, ...this.pending] : [...this.pending]
     this.pending.length = 0
+    this.finished.clear()
     useHostKeyPromptDialog.getState().clear(this.coordinatorId)
     for (const prompt of prompts) this.rejectPrompt(prompt, 'host key prompt coordinator stopped')
   }

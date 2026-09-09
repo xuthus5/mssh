@@ -135,6 +135,8 @@ func (s *SessionService) finishConnectAttempt(attemptID string) {
 	s.mu.Lock()
 	delete(s.attempts, attemptID)
 	s.mu.Unlock()
+	// 结束通知只清理指纹请求，终端是否就绪仍由 Open 的结果判定。
+	s.eventBus.Emit(event.ConnectionAttempt, event.ConnectionStatePayload{AttemptID: attemptID, State: "finished"})
 }
 
 func (s *SessionService) awaitHostKeyDecision(ctx context.Context, attemptID, hostname, algorithm, fingerprint string, changed bool, expected []string) bool {

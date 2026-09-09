@@ -128,8 +128,7 @@ describe('useSession behavior', () => {
     __registerHandler(service + 'SessionService.ListRecentSessions', async () => { throw new Error('recent boom') })
     await act(async () => result.current.connect('5'))
     expect(useAppStore.getState().tabs).toHaveLength(1)
-    expect(useConnectDialog.getState().open).toBe(false)
-    expect(useConnectDialog.getState().state).toBe('idle')
+    expect(useConnectDialog.getState()).toMatchObject({ open: true, state: 'connected' })
     const messages = useToastStore.getState().toasts.map((item) => item.message)
     expect(messages.some((message) => message.includes('加载会话失败'))).toBe(false)
     expect(messages.some((message) => message.includes('加载最近会话失败'))).toBe(false)
@@ -301,6 +300,8 @@ describe('useSession behavior', () => {
     await waitFor(() => expect(result.current.sessions).toHaveLength(1))
 
     await act(async () => result.current.connect('5'))
+    expect(useConnectDialog.getState().state).toBe('connected')
+    act(() => useConnectDialog.getState().closeDialog())
     await act(async () => result.current.connect('5'))
 
     expect(openTerminal).toHaveBeenCalledTimes(2)
