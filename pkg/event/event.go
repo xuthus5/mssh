@@ -9,6 +9,7 @@ const (
 	ConnectionState    = "session:state"
 	ConnectionError    = "session:error"
 	ConnectionAttempt  = "session:attempt"
+	ConnectionProgress = "session:progress"
 	TunnelState        = "tunnel:state"
 	HostKeyFingerprint = "session:fingerprint"
 	VaultLocked        = "security:vault-locked"
@@ -28,6 +29,12 @@ type ConnectionStatePayload struct {
 	State      string `json:"state"`
 }
 
+type ConnectionProgressPayload struct {
+	RequestID string `json:"request_id"`
+	AttemptID string `json:"attempt_id"`
+	Stage     string `json:"stage"`
+}
+
 type TransferProgressPayload struct {
 	TaskID      string  `json:"task_id"`
 	Status      string  `json:"status"`
@@ -45,11 +52,14 @@ type TransferErrorPayload struct {
 }
 
 type HostKeyPayload struct {
-	AttemptID   string   `json:"attempt_id"`
-	TerminalID  string   `json:"terminal_id"`
-	Hostname    string   `json:"hostname"`
-	Fingerprint string   `json:"fingerprint"`
-	Algorithm   string   `json:"algorithm"`
-	Changed     bool     `json:"changed"`
-	Expected    []string `json:"expected,omitempty"`
+	RequestID    string   `json:"request_id,omitempty"`
+	IsJumpHost   bool     `json:"is_jump_host,omitempty"`
+	UsesJumpHost bool     `json:"uses_jump_host,omitempty"`
+	AttemptID    string   `json:"attempt_id"`
+	TerminalID   string   `json:"terminal_id"`
+	Hostname     string   `json:"hostname"`
+	Fingerprint  string   `json:"fingerprint"`
+	Algorithm    string   `json:"algorithm"`
+	Changed      bool     `json:"changed"`
+	Expected     []string `json:"expected,omitempty"`
 }

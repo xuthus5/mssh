@@ -58,6 +58,20 @@ describe('useSidebarDialogs session context actions', () => {
     expect(useToastStore.getState().toasts.at(-1)).toMatchObject({ type: 'success' })
   })
 
+  it('duplicates jump host credentials without including them in copied target credentials', async () => {
+    const withJump = { ...session, jumpHost: { host: 'jump.internal', port: 2222, username: 'admin', authMethod: 'password' as const } }
+    sessionService.GetSessionCredentials.mockResolvedValue({ username: 'root', password: 'target-secret', jump_host_password: 'jump-secret' })
+    const { result } = renderHook(() => useSidebarDialogs(workspace as never))
+
+    await act(async () => { await result.current.duplicateSession(withJump) })
+
+    expect(workspace.createSession).toHaveBeenCalledWith(expect.objectContaining({
+      jumpHost: { ...withJump.jumpHost, password: 'jump-secret' }, password: 'target-secret',
+    }))
+    expect(withJump.jumpHost).not.toHaveProperty('password')
+    expect(JSON.stringify(useToastStore.getState().toasts)).not.toContain('jump-secret')
+  })
+
   it('appends a counter when the copy name already exists', async () => {
     sessionService.GetSessionCredentials.mockResolvedValue({ username: 'root', password: '' })
     Object.assign(workspace, { sessions: [session, { ...session, id: '2', name: 'web-01 副本' }] })

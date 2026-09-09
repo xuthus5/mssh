@@ -17,12 +17,8 @@ func (s *SessionService) sessionForConnect(id int64) (*model.Session, error) {
 		if loadErr != nil {
 			return loadErr
 		}
-		if loaded.Password != "" {
-			plain, openErr := openSessionPassword(s.crypto, loaded.Password)
-			if openErr != nil {
-				return fmt.Errorf("decrypt session password: %w", openErr)
-			}
-			loaded.Password = plain
+		if err := openSessionPasswords(s.crypto, loaded); err != nil {
+			return err
 		}
 		session = loaded
 		return nil
@@ -44,7 +40,11 @@ func (s *SessionService) GetSessionCredentials(id int64) (*model.SessionCredenti
 	if err != nil {
 		return nil, err
 	}
-	return &model.SessionCredentials{Username: session.Username, Password: session.Password}, nil
+	credentials := &model.SessionCredentials{Username: session.Username, Password: session.Password}
+	if session.JumpHost != nil {
+		credentials.JumpHostPassword = session.JumpHost.Password
+	}
+	return credentials, nil
 }
 
 func redactSessionPassword(session *model.Session) *model.Session {
@@ -52,17 +52,21 @@ func redactSessionPassword(session *model.Session) *model.Session {
 		return nil
 	}
 	copy := *session
-	if copy.Password != "" {
-		copy.Password = ""
+	copy.Password = ""
+	copy.JumpHost = session.JumpHost.Clone()
+	if copy.JumpHost != nil {
+		copy.JumpHost.Password = ""
 	}
 	return &copy
 }
 
 func redactSessionPasswords(sessions []model.Session) []model.Session {
-	for index := range sessions {
-		if sessions[index].Password != "" {
-			sessions[index].Password = ""
-		}
+	if sessions == nil {
+		return nil
 	}
-	return sessions
+	redacted := make([]model.Session, len(sessions))
+	for index := range sessions {
+		redacted[index] = *redactSessionPassword(&sessions[index])
+	}
+	return redacted
 }

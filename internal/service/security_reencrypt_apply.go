@@ -72,7 +72,7 @@ func applyKeyPrivateKeyUpdate(tx *sql.Tx, update reencryptKeyUpdate) error {
 }
 
 func applySessionPasswordUpdate(tx *sql.Tx, update reencryptSessionUpdate) error {
-	result, err := tx.Exec("UPDATE sessions SET password = ?, updated_at=datetime('now') WHERE id = ?", update.password, update.id)
+	result, err := tx.Exec("UPDATE sessions SET password = ?, jump_password = ?, updated_at=datetime('now') WHERE id = ?", update.password, update.jumpPassword, update.id)
 	if err != nil {
 		return fmt.Errorf("update session %d password: %w", update.id, err)
 	}

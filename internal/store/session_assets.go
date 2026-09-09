@@ -10,6 +10,7 @@ import (
 )
 
 const sessionSelectColumns = `SELECT s.id, s.folder_id, s.name, s.host, s.port, s.username, s.notes, s.environment_id, s.project_id, s.auth_method, s.password, s.key_id, s.keep_alive, s.term_type, s.sort_order, s.last_connected_at, s.connection_count, s.created_at, s.updated_at,
+	s.jump_host, s.jump_port, s.jump_username, s.jump_auth_method, s.jump_password, s.jump_key_id,
 	e.id, e.name, e.color_token, e.sort_order, e.created_at, e.updated_at,
 	p.id, p.name, p.code, p.description, p.sort_order, p.created_at, p.updated_at`
 
@@ -17,16 +18,21 @@ type sessionScanner interface{ Scan(...any) error }
 
 func scanSession(scanner sessionScanner) (model.Session, error) {
 	var session model.Session
+	var jump model.SSHJumpHost
 	var password, lastConnected sql.NullString
 	var createdAt, updatedAt string
 	var environmentID, environmentSort, projectID, projectSort sql.NullInt64
 	var environmentName, environmentColor, environmentCreated, environmentUpdated sql.NullString
 	var projectName, projectCode, projectDescription, projectCreated, projectUpdated sql.NullString
 	err := scanner.Scan(&session.ID, &session.FolderID, &session.Name, &session.Host, &session.Port, &session.Username, &session.Notes, &session.EnvironmentID, &session.ProjectID, &session.AuthMethod, &password, &session.KeyID, &session.KeepAlive, &session.TermType, &session.SortOrder, &lastConnected, &session.ConnectionCount, &createdAt, &updatedAt,
+		&jump.Host, &jump.Port, &jump.Username, &jump.AuthMethod, &jump.Password, &jump.KeyID,
 		&environmentID, &environmentName, &environmentColor, &environmentSort, &environmentCreated, &environmentUpdated,
 		&projectID, &projectName, &projectCode, &projectDescription, &projectSort, &projectCreated, &projectUpdated)
 	if err != nil {
 		return session, err
+	}
+	if jump.Host != "" {
+		session.JumpHost = &jump
 	}
 	if err := applyOptionalSessionFields(&session, password, lastConnected); err != nil {
 		return session, err

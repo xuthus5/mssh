@@ -58,7 +58,7 @@ func validateSessionAssetInput(input model.SessionInput, updating bool) error {
 		}
 		seen[id] = struct{}{}
 	}
-	return nil
+	return validateSSHJumpHost(input.JumpHost)
 }
 
 func validateSessionCoreFields(input model.SessionInput) error {

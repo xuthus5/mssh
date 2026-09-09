@@ -14,6 +14,7 @@ import {
 import { releaseAppTerminalOpenReservation } from '@/lib/openTerminal'
 import { scrubTerminalRuntime } from '@/store/terminalTabPanes'
 import { createHostKeyPromptCoordinator } from '@/store/hostKeyPromptCoordinator'
+import { createConnectionProgressBridge, type ConnectionProgressPayload, type FingerprintPayload } from '@/store/connectionProgressBridge'
 
 
 interface EventEnvelope<T> { data?: T }
@@ -34,7 +35,6 @@ function reconnectSessions(): ReconnectSession[] {
 
 interface ConnectionPayload { terminal_id?: string; state?: string }
 interface AttemptPayload { attempt_id?: string; state?: string }
-interface FingerprintPayload { attempt_id?: string; hostname?: string; fingerprint?: string; algorithm?: string; changed?: boolean; expected?: string[] }
 interface TransferPayload {
   task_id?: string
   status?: 'running' | 'completed' | 'cancelled'
@@ -199,23 +199,14 @@ export function startEventBridge(): () => void {
   pendingTransferUpdates.clear()
   void restoreTransfers()
   const hostKeyPrompts = createHostKeyPromptCoordinator()
+  const connectionProgress = createConnectionProgressBridge(hostKeyPrompts)
   const unsubscribers = [
     Events.On('session:attempt', (event: EventEnvelope<AttemptPayload>) => {
       const payload = event.data
-      if (payload?.attempt_id && payload.state === 'finished') hostKeyPrompts.finish(payload.attempt_id)
+      if (payload?.attempt_id && payload.state === 'finished') connectionProgress.finish(payload.attempt_id)
     }),
-    Events.On('session:fingerprint', (event: EventEnvelope<FingerprintPayload>) => {
-      const payload = event.data
-      if (!payload?.attempt_id) return
-      hostKeyPrompts.handle({
-        attemptId: payload.attempt_id,
-        hostname: payload.hostname ?? '',
-        fingerprint: payload.fingerprint ?? '',
-        algorithm: payload.algorithm ?? '',
-        changed: payload.changed === true,
-        expected: payload.expected ?? [],
-      })
-    }),
+    Events.On('session:progress', (event: EventEnvelope<ConnectionProgressPayload>) => connectionProgress.progress(event.data)),
+    Events.On('session:fingerprint', (event: EventEnvelope<FingerprintPayload>) => connectionProgress.fingerprint(event.data)),
     Events.On('session:state', handleSessionState),
     Events.On('terminal:closed', handleTerminalClosed),
     Events.On('tunnel:state', handleTunnelState),
@@ -227,6 +218,7 @@ export function startEventBridge(): () => void {
     invalidateTransferRestore()
     pendingTransferUpdates.clear()
     for (const unsubscribe of unsubscribers) unsubscribe()
+    connectionProgress.stop()
     hostKeyPrompts.stop()
     shutdownReconnectRuntime()
   }

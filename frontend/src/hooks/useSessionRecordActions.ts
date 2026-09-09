@@ -4,6 +4,7 @@ import { SessionService } from '@/lib/wails'
 import { useConnectDialog } from '@/store/connectDialog'
 import { logger } from '@/lib/logger'
 import { mapSession, type Session } from '@/lib/sessionModels'
+import { redactSSHJumpHost, toSSHJumpHostInput } from '@/lib/sshJumpHost'
 import { cancelTransfersForSessions, closeTerminalTabsForSessions } from '@/hooks/sessionTabLifecycle'
 import { SessionMutationTracker } from '@/hooks/sessionMutationTracker'
 
@@ -32,6 +33,7 @@ function toSessionInput(session: SessionDraft, id: number): SessionInput {
     auth_method: session.authMethod as SessionInput['auth_method'],
     password: session.password,
     key_id: session.keyId ? Number(session.keyId) : null,
+    jump_host: toSSHJumpHostInput(session.jumpHost),
     keep_alive: session.keepAlive,
     term_type: session.termType,
     folder_id: session.folderId ? Number(session.folderId) : null,
@@ -66,7 +68,7 @@ function useCreateSession(options: SessionActionOptions) {
 }
 
 function applyOptimisticSession(session: Session, options: SessionActionOptions) {
-  const optimistic = { ...session, password: undefined }
+  const optimistic = { ...session, password: undefined, jumpHost: redactSSHJumpHost(session.jumpHost) }
   options.setSessions((previous) => previous.map((item) => (item.id === session.id ? optimistic : item)))
   options.setRecentSessions((previous) => previous.map((item) => (item.id === session.id ? { ...item, ...optimistic } : item)))
 }

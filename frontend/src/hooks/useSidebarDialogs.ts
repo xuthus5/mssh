@@ -146,6 +146,7 @@ async function duplicateSession(workspace: Workspace, session: Session) {
       tags: session.tags, environmentId: session.environmentId, projectId: session.projectId,
       authMethod: session.authMethod, password: credentials?.password ?? undefined,
       keyId: session.keyId, keepAlive: session.keepAlive, termType: session.termType, folderId: session.folderId,
+      jumpHost: session.jumpHost ? { ...session.jumpHost, password: credentials?.jump_host_password } : undefined,
     }
     await workspace.createSession(input)
     toast(t('已复制会话「${}」', name), 'success')

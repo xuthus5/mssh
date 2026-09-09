@@ -17,26 +17,27 @@ func SettingInputFrom(setting Setting) SettingInput {
 }
 
 type SessionInput struct {
-	ID            int64      `json:"id"`
-	FolderID      *int64     `json:"folder_id"`
-	Name          string     `json:"name"`
-	Host          string     `json:"host"`
-	Port          int        `json:"port"`
-	Username      string     `json:"username"`
-	Notes         string     `json:"notes"`
-	EnvironmentID *int64     `json:"environment_id,omitempty"`
-	ProjectID     *int64     `json:"project_id,omitempty"`
-	TagIDs        []int64    `json:"tag_ids"`
-	AuthMethod    AuthMethod `json:"auth_method"`
-	Password      string     `json:"password,omitempty"`
-	KeyID         *int64     `json:"key_id,omitempty"`
-	KeepAlive     int        `json:"keep_alive"`
-	TermType      string     `json:"term_type"`
-	SortOrder     int        `json:"sort_order"`
+	ID            int64        `json:"id"`
+	FolderID      *int64       `json:"folder_id"`
+	Name          string       `json:"name"`
+	Host          string       `json:"host"`
+	Port          int          `json:"port"`
+	Username      string       `json:"username"`
+	Notes         string       `json:"notes"`
+	EnvironmentID *int64       `json:"environment_id,omitempty"`
+	ProjectID     *int64       `json:"project_id,omitempty"`
+	TagIDs        []int64      `json:"tag_ids"`
+	AuthMethod    AuthMethod   `json:"auth_method"`
+	Password      string       `json:"password,omitempty"`
+	KeyID         *int64       `json:"key_id,omitempty"`
+	JumpHost      *SSHJumpHost `json:"jump_host,omitempty"`
+	KeepAlive     int          `json:"keep_alive"`
+	TermType      string       `json:"term_type"`
+	SortOrder     int          `json:"sort_order"`
 }
 
 func (input SessionInput) Session() Session {
-	return Session{ID: input.ID, FolderID: input.FolderID, Name: input.Name, Host: input.Host, Port: input.Port, Username: input.Username, Notes: input.Notes, EnvironmentID: input.EnvironmentID, ProjectID: input.ProjectID, AuthMethod: input.AuthMethod, Password: input.Password, KeyID: input.KeyID, KeepAlive: input.KeepAlive, TermType: input.TermType, SortOrder: input.SortOrder}
+	return Session{ID: input.ID, FolderID: input.FolderID, Name: input.Name, Host: input.Host, Port: input.Port, Username: input.Username, Notes: input.Notes, EnvironmentID: input.EnvironmentID, ProjectID: input.ProjectID, AuthMethod: input.AuthMethod, Password: input.Password, KeyID: input.KeyID, JumpHost: input.JumpHost.Clone(), KeepAlive: input.KeepAlive, TermType: input.TermType, SortOrder: input.SortOrder}
 }
 
 func SessionInputFrom(session Session) SessionInput {
@@ -44,7 +45,7 @@ func SessionInputFrom(session Session) SessionInput {
 	for index, tag := range session.Tags {
 		tagIDs[index] = tag.ID
 	}
-	return SessionInput{ID: session.ID, FolderID: session.FolderID, Name: session.Name, Host: session.Host, Port: session.Port, Username: session.Username, Notes: session.Notes, EnvironmentID: session.EnvironmentID, ProjectID: session.ProjectID, TagIDs: tagIDs, AuthMethod: session.AuthMethod, Password: session.Password, KeyID: session.KeyID, KeepAlive: session.KeepAlive, TermType: session.TermType, SortOrder: session.SortOrder}
+	return SessionInput{ID: session.ID, FolderID: session.FolderID, Name: session.Name, Host: session.Host, Port: session.Port, Username: session.Username, Notes: session.Notes, EnvironmentID: session.EnvironmentID, ProjectID: session.ProjectID, TagIDs: tagIDs, AuthMethod: session.AuthMethod, Password: session.Password, KeyID: session.KeyID, JumpHost: session.JumpHost.Clone(), KeepAlive: session.KeepAlive, TermType: session.TermType, SortOrder: session.SortOrder}
 }
 
 type TunnelInput struct {

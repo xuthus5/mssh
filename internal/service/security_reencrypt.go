@@ -23,8 +23,9 @@ type reencryptKeyUpdate struct {
 }
 
 type reencryptSessionUpdate struct {
-	id       int64
-	password string
+	id           int64
+	password     string
+	jumpPassword string
 }
 
 func (s *SecurityService) reencryptProtectedData(oldDEK, newDEK []byte) error {
@@ -93,16 +94,31 @@ func planSessionPasswordUpdates(db *sql.DB, oldCrypto, newCrypto KeyCrypto) ([]r
 	}
 	updates := make([]reencryptSessionUpdate, 0)
 	for _, session := range sessions {
-		if session.Password == "" {
-			continue
-		}
-		sealed, err := reencryptSessionPassword(oldCrypto, newCrypto, session.Password)
+		update, err := planSessionSecrets(session, oldCrypto, newCrypto)
 		if err != nil {
-			return nil, fmt.Errorf("session %d password: %w", session.ID, err)
+			return nil, err
 		}
-		updates = append(updates, reencryptSessionUpdate{id: session.ID, password: sealed})
+		if update.password != "" || update.jumpPassword != "" {
+			updates = append(updates, update)
+		}
 	}
 	return updates, nil
+}
+
+func planSessionSecrets(session model.Session, oldCrypto, newCrypto KeyCrypto) (reencryptSessionUpdate, error) {
+	update := reencryptSessionUpdate{id: session.ID}
+	var err error
+	update.password, err = reencryptSessionPassword(oldCrypto, newCrypto, session.Password)
+	if err != nil {
+		return update, fmt.Errorf("session %d password: %w", session.ID, err)
+	}
+	if session.JumpHost != nil {
+		update.jumpPassword, err = reencryptSessionPassword(oldCrypto, newCrypto, session.JumpHost.Password)
+		if err != nil {
+			return update, fmt.Errorf("session %d jump host password: %w", session.ID, err)
+		}
+	}
+	return update, nil
 }
 
 func planSettingSecretUpdates(db *sql.DB, oldCrypto, newCrypto KeyCrypto) ([]model.Setting, error) {
