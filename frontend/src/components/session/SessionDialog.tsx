@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button'
 import { t } from '@/i18n'
 import { SessionAssetSection, SessionConnectionSection, SessionTerminalSection } from '@/components/session/SessionDialogSections'
 import { useSessionDialogController, type SessionDialogProps } from '@/components/session/useSessionDialogController'
+import { SSHJumpHostSection } from '@/components/session/SSHJumpHostSection'
 
 
 function FormSection({ title, children, disabled }: { title: string; children: ReactNode; disabled: boolean }) {
@@ -30,11 +31,12 @@ export default function SessionDialog(props: SessionDialogProps) {
         <form onSubmit={(event) => { event.preventDefault(); void controller.handleSubmit() }} className="flex flex-col gap-3">
           {controller.submitError && <div role="alert" className="rounded-lg border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">{controller.submitError}</div>}
           <FormSection title={t('连接与认证')} disabled={controller.pending}><SessionConnectionSection props={props} controller={controller} /></FormSection>
+          <FormSection title={t('SSH 连接隧道')} disabled={controller.pending}><SSHJumpHostSection controller={controller} /></FormSection>
           <FormSection title={t('资产归属')} disabled={controller.pending}><SessionAssetSection props={props} controller={controller} /></FormSection>
           <FormSection title={t('终端选项')} disabled={controller.pending}><SessionTerminalSection controller={controller} /></FormSection>
           <DialogFooter>
             <Button type="button" variant="outline" disabled={controller.pending} onClick={() => controller.handleOpenChange(false)}>{t('取消')}</Button>
-            <Button type="submit" disabled={controller.pending}>{controller.pending ? t('保存中...') : controller.isEditing ? t('保存') : t('创建会话')}</Button>
+            <Button type="submit" disabled={controller.pending || controller.jumpHost.testing}>{controller.pending ? t('保存中...') : controller.isEditing ? t('保存') : t('创建会话')}</Button>
           </DialogFooter>
         </form>
       </DialogContent>

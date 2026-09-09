@@ -31,6 +31,11 @@ func validateSnapshotSession(session model.Session) error {
 	if err := validateStoredSessionPassword(session.Password); err != nil {
 		return err
 	}
+	if session.JumpHost != nil {
+		if err := validateStoredSessionPassword(session.JumpHost.Password); err != nil {
+			return fmt.Errorf("SSH jump host password: %w", err)
+		}
+	}
 	if session.ConnectionCount < 0 {
 		return fmt.Errorf("connection_count must not be negative")
 	}
@@ -43,6 +48,7 @@ func snapshotSessionFromRow(row map[string]any) (model.Session, error) {
 		func() error { return readSnapshotSessionIdentity(row, &session) },
 		func() error { return readSnapshotSessionAssets(row, &session) },
 		func() error { return readSnapshotSessionAuthentication(row, &session) },
+		func() error { return readSnapshotSessionJumpHost(row, &session) },
 		func() error { return readSnapshotSessionRuntime(row, &session) },
 		func() error { return readSnapshotSessionTimes(row, &session) },
 	}

@@ -10,7 +10,20 @@ import (
 
 const keepAliveRequestTimeout = 10 * time.Second
 
+const defaultKeepAliveInterval = 30 * time.Second
+
 var errKeepAliveTimedOut = errors.New("SSH keep-alive request timed out")
+
+func (c *ClientWrapper) startManagedKeepAlive(interval time.Duration, logger *slog.Logger) {
+	if interval <= 0 {
+		interval = defaultKeepAliveInterval
+	}
+	c.keepAliveWG.Add(1)
+	go func() {
+		defer c.keepAliveWG.Done()
+		c.startKeepAlive(interval, logger)
+	}()
+}
 
 func (c *ClientWrapper) startKeepAlive(interval time.Duration, logger *slog.Logger) {
 	c.startKeepAliveWithTimeout(interval, keepAliveRequestTimeout, logger)

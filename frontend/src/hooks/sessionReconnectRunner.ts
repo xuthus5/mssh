@@ -7,12 +7,15 @@ import { openTerminalWithPoolCapacity, releaseAppTerminalOpenReservation } from 
 import { t } from '@/i18n'
 import { bindWailsCallToSignal } from '@/lib/wailsCancellation'
 import { startReconnectAttemptTimeout } from '@/hooks/reconnectAttemptTimeout'
+import type { SSHJumpHost } from '@/lib/sessionModels'
+import { retireConnectionRequest } from '@/store/connectionRequestRegistry'
 
 export interface ReconnectSession {
   id: string
   host: string
   port: number
   username: string
+  jumpHost?: SSHJumpHost
 }
 
 interface ReconnectRun {
@@ -21,6 +24,7 @@ interface ReconnectRun {
   controller: AbortController
   ownsDialog: boolean
   dialogID: number
+  requestId: string
 }
 
 interface ReconnectContext {
@@ -75,6 +79,7 @@ function restoreDisconnectedState(tabID: string, terminalID: string) {
 }
 
 function cancelReconnectRun(run: ReconnectRun) {
+  retireConnectionRequest(run.requestId)
   run.controller.abort()
   restoreDisconnectedState(run.tabID, run.terminalID)
   closeOwnedReconnectDialog(run)
@@ -102,10 +107,7 @@ export function shutdownReconnectRuns() {
 export function handleReconnectDialogClosed() {
   const run = reconnectDialogOwner
   reconnectDialogOwner = null
-  if (run && reconnectRuns.get(run.tabID) === run) {
-    run.controller.abort()
-    restoreDisconnectedState(run.tabID, run.terminalID)
-  }
+  if (run && reconnectRuns.get(run.tabID) === run) cancelReconnectRun(run)
 }
 
 function openReconnectTerminal(context: ReconnectContext) {
@@ -117,9 +119,17 @@ function openReconnectTerminal(context: ReconnectContext) {
     ? TerminalService.OpenSerial(tab.serialPortId, cols, rows)
     : tab?.type === 'terminal' && tab.connectionKind === 'local'
       ? TerminalService.OpenLocal(cols, rows)
-      : TerminalService.Open(Number(context.session.id), cols, rows)
+      : openSSHReconnect(context, { cols, rows })
   const waitForFingerprint = tab?.type === 'terminal' && (tab.connectionKind ?? 'ssh') === 'ssh'
   return withReconnectTimeout(call, context.run.controller, waitForFingerprint)
+}
+
+function openSSHReconnect(context: ReconnectContext, size: { cols: number; rows: number }) {
+  const { session, run } = context
+  if (!session.jumpHost) return TerminalService.Open(Number(session.id), size.cols, size.rows)
+  retireConnectionRequest(run.requestId)
+  run.requestId = useConnectDialog.getState().beginConnectionAttempt(run.dialogID, session.jumpHost)
+  return TerminalService.OpenWithProgress({ session_id: Number(session.id), ...size, request_id: run.requestId })
 }
 
 function withReconnectTimeout<T>(call: Promise<T>, runController: AbortController, waitForFingerprint: boolean): Promise<T> {
@@ -243,6 +253,7 @@ export async function performReconnectSessionTab(
     controller: new AbortController(),
     ownsDialog: shouldOpenReconnectDialog({ source, tabID, connectionKind: target.tab.connectionKind }),
     dialogID: 0,
+    requestId: '',
   }
   if (run.ownsDialog) {
     run.dialogID = dialog.openDialog(target.session.host, target.session.port, target.session.username, () => {

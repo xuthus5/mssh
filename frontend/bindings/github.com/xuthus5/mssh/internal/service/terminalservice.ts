@@ -46,6 +46,13 @@ export function OpenSerial(serialPortID: number, cols: number, rows: number): $C
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.TerminalService.OpenSerial", serialPortID, cols, rows);
 }
 
+/**
+ * OpenWithProgress 为此次打开操作绑定进度标识，避免并发会话串用连接状态。
+ */
+export function OpenWithProgress(request: model$0.SSHOpenRequest): $CancellablePromise<string> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.TerminalService.OpenWithProgress", request);
+}
+
 export function ProcessInfo(terminalID: string): $CancellablePromise<model$0.ProcessInfo[]> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.TerminalService.ProcessInfo", terminalID).then(($result: any) => {
         return $$createType2($result);

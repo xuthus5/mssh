@@ -1,19 +1,23 @@
-import { Check, Fingerprint, PlugZap } from 'lucide-react'
+import { Check, Fingerprint, Network, PlugZap } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { t } from '@/i18n'
-import type { ConnectState } from '@/store/connectDialog'
+import type { ConnectStage, ConnectState } from '@/store/connectDialog'
 
 interface ConnectProgressProps {
   state: ConnectState | 'fingerprint'
+  hasJumpHost?: boolean
+  stage?: ConnectStage
 }
 
-export function ConnectProgress({ state }: ConnectProgressProps) {
-  const current = state === 'connected' ? 2 : state === 'fingerprint' ? 1 : 0
+export function ConnectProgress({ state, hasJumpHost = false, stage = 'target' }: ConnectProgressProps) {
   const steps = [
+    ...(hasJumpHost ? [{ label: t('SSH 连接隧道'), icon: Network }] : []),
     { label: t('建立连接'), icon: PlugZap },
     { label: t('指纹确认'), icon: Fingerprint },
     { label: t('连接成功'), icon: Check },
   ]
+  const current = state === 'connected' ? steps.length - 1 : hasJumpHost && stage === 'jump' ? 0
+    : Number(hasJumpHost) + Number(state === 'fingerprint')
   return (
     <ol aria-label={t('连接进度')} className="flex items-start gap-2 border-b border-border pb-5">
       {steps.map(({ label, icon: Icon }, index) => (

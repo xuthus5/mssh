@@ -126,6 +126,13 @@ export function SetDefaultFolder(id: number): $CancellablePromise<void> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.SessionService.SetDefaultFolder", id);
 }
 
+/**
+ * TestSSHJumpHost 只验证跳板机登录，不保存草稿，也不创建目标终端或端口转发。
+ */
+export function TestSSHJumpHost(input: model$0.SSHJumpHostTestInput): $CancellablePromise<void> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.SessionService.TestSSHJumpHost", input);
+}
+
 export function UpdateFolder(id: number, name: string): $CancellablePromise<void> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.SessionService.UpdateFolder", id, name);
 }

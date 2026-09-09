@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -41,33 +40,8 @@ func (s *SessionService) connect(ctx context.Context, sessionID int64, emitState
 	if err := s.resolveKeepAlive(sess); err != nil {
 		return "", fmt.Errorf("connect: %w", err)
 	}
-	authMethods, cleanup, err := s.buildAuthBundleContext(connectCtx, sess)
+	wrapper, cleanup, err := s.connectSessionTransport(connectCtx, sess, attemptID)
 	if err != nil {
-		return "", fmt.Errorf("connect: %w", err)
-	}
-	if strings.TrimSpace(s.dataDir) == "" {
-		if cleanup != nil {
-			cleanup()
-		}
-		return "", fmt.Errorf("connect: application data directory is required for host key verification")
-	}
-	knownHostsPath := filepath.Join(s.dataDir, "known_hosts")
-	policy := s.hostKeyChangePolicy()
-	onNewHostKey := func(hostname, algorithm, fingerprint string) bool {
-		return s.awaitHostKeyDecision(connectCtx, attemptID, hostname, algorithm, fingerprint, false, nil)
-	}
-	onHostKeyChange := func(hostname, algorithm, fingerprint string, expected []string) bool {
-		return s.awaitHostKeyDecision(connectCtx, attemptID, hostname, algorithm, fingerprint, true, expected)
-	}
-	wrapper, err := ssh.ConnectWithHostKeyOptions(connectCtx, *sess, authMethods, knownHostsPath, ssh.HostKeyOptions{
-		Policy:          policy,
-		OnNewHostKey:    onNewHostKey,
-		OnHostKeyChange: onHostKeyChange,
-	}, s.logger)
-	if err != nil {
-		if cleanup != nil {
-			cleanup()
-		}
 		return "", fmt.Errorf("connect: %w", err)
 	}
 	if err := connectCtx.Err(); err != nil {
@@ -153,6 +127,9 @@ func (s *SessionService) awaitHostKeyDecision(ctx context.Context, attemptID, ho
 		return false
 	}
 	payload := event.HostKeyPayload{AttemptID: attemptID, Hostname: hostname, Fingerprint: fingerprint, Algorithm: algorithm, Changed: changed, Expected: expected}
+	payload.RequestID = connectionRequestID(ctx)
+	payload.IsJumpHost = isJumpHostVerification(ctx)
+	payload.UsesJumpHost = usesJumpHost(ctx)
 	s.eventBus.Emit(event.HostKeyFingerprint, payload)
 	if accepter, ok := s.eventBus.(hostKeyAutoAccepter); ok && accepter.AutoAcceptHostKeys() {
 		return true

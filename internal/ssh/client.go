@@ -113,15 +113,7 @@ func ConnectWithHostKeyOptions(ctx context.Context, session model.Session, auth 
 	}
 	client := gossh.NewClient(sshConn, channels, requests)
 	wrapper := newClientWrapper(client, conn)
-	interval := time.Duration(session.KeepAlive) * time.Second
-	if interval <= 0 {
-		interval = 30 * time.Second
-	}
-	wrapper.keepAliveWG.Add(1)
-	go func() {
-		defer wrapper.keepAliveWG.Done()
-		wrapper.startKeepAlive(interval, logger)
-	}()
+	wrapper.startManagedKeepAlive(time.Duration(session.KeepAlive)*time.Second, logger)
 	logger.Info("SSH connection established", "host", session.Host, "port", session.Port)
 	return wrapper, nil
 }

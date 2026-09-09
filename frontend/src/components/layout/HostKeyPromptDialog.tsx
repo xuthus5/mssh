@@ -20,7 +20,7 @@ export function HostKeyPromptContent() {
         <div className="flex flex-col gap-2" aria-live="polite">
           <div className="flex items-center gap-2">
             {prompt.changed ? <ShieldAlert aria-hidden="true" className="size-5 text-destructive" /> : <Fingerprint aria-hidden="true" className="size-5 text-primary" />}
-            <h3 className="font-medium">{prompt.changed ? t('主机指纹已变化') : t('主机指纹确认')}</h3>
+            <h3 className="font-medium">{hostKeyTitle(prompt)}</h3>
           </div>
           <p className="text-xs leading-relaxed text-muted-foreground">
             {prompt.changed
@@ -52,4 +52,9 @@ export function HostKeyPromptContent() {
         </DialogFooter>
     </>
   )
+}
+
+function hostKeyTitle(prompt: { isJumpHost?: boolean; changed: boolean }) {
+  if (prompt.isJumpHost) return prompt.changed ? t('跳板机指纹已变化') : t('跳板机指纹确认')
+  return prompt.changed ? t('主机指纹已变化') : t('主机指纹确认')
 }

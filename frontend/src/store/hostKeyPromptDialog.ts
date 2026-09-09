@@ -3,6 +3,9 @@ import { logger } from '@/lib/logger'
 
 export interface HostKeyPrompt {
   attemptId: string
+  requestId?: string
+  isJumpHost?: boolean
+  usesJumpHost?: boolean
   hostname: string
   fingerprint: string
   algorithm: string
