@@ -36,10 +36,16 @@ describe('connectDialog', () => {
     expect(useConnectDialog.getState()).toMatchObject({ open: false, state: 'idle', retry: null, sessionId: '' })
   })
 
-  it('closes automatically after the owned request completes', () => {
+  it('keeps success visible and releases the completed cancellation handler', () => {
+    const cancelRequest = vi.fn()
     const dialogId = useConnectDialog.getState().openDialog('example.com', 22, 'root', vi.fn())
+    useConnectDialog.getState().setCancelHandler(dialogId, cancelRequest)
     useConnectDialog.getState().completeDialog(dialogId)
+    expect(useConnectDialog.getState()).toMatchObject({ open: true, state: 'connected', cancelRequest: null })
+
+    useConnectDialog.getState().closeDialog(dialogId)
     expect(useConnectDialog.getState()).toMatchObject({ open: false, state: 'idle' })
+    expect(cancelRequest).not.toHaveBeenCalled()
   })
 
   it('uses local Wails cancellation and closes the dialog', async () => {
