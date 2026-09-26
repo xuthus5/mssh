@@ -93,7 +93,7 @@ The desktop app has an authenticated unified local IPC transport available for r
 ### Serial and desktop integration
 
 - Serial terminal support for baud rates from 300 to 4,000,000
-- Data bits, parity, stop bits, XON-XOFF, RTS-CTS, and DSR-DTR flow control
+- Data bits, parity, and stop bits, plus manual DTR/RTS signals; hardware and software flow control are rejected with an explicit error until a public driver API can express them
 - DTR, RTS, Break, local echo, and exclusive device lock controls
 - System tray, configurable close-button behavior, and daily local logs
 
@@ -184,9 +184,9 @@ wails3 task dev
 
 ### Prerequisites
 
-- Go 1.27+
-- Node.js 24+
-- [Wails v3 CLI](https://github.com/wailsapp/wails) (`go install github.com/wailsapp/wails/v3/cmd/wails3@latest`)
+- Go 1.27+ (`.go-version` pins the exact patch version)
+- Node.js 24+ (`.node-version` pins the exact version)
+- [Wails v3 CLI](https://github.com/wailsapp/wails) at the version in `.wails-version`: `go install github.com/wailsapp/wails/v3/cmd/wails3@$(tr -d '\r\n' < .wails-version)`
 - Linux only: GTK4 and WebKitGTK 6.0 development packages
 
 ### Quality gate
@@ -195,12 +195,18 @@ wails3 task dev
 wails3 task ci
 ```
 
-This runs:
+The gate first verifies that your Go, Node.js, and Wails versions match those three
+files exactly; a newer major/minor toolchain still fails that check by design.
+It then runs:
 
-1. `golangci-lint run --timeout 5m ./...`
+1. `golangci-lint run --timeout 5m ./...` (v2.12.2, built with the pinned Go)
 2. `go test -race -coverprofile=coverage.out -covermode=atomic -coverpkg=./internal/...,./pkg/... ./internal/... ./pkg/...`
 3. `npm run check:source-limits`, `npm run check:bundle-budget`, `npm test`
 4. `wails3 task build`
+
+The backend test stage is Linux-oriented: CI runs it on `ubuntu-latest`, and several
+suites assert POSIX paths and file modes. On Windows, `wails3 task test:windows`
+(plus `wails3 task lint` and `go vet ./...`) covers what is expected to pass there.
 
 ### Useful tasks
 
@@ -259,7 +265,7 @@ For packaging details, see [docs/packaging.md](docs/packaging.md).
 
 | Layer | Technology |
 | --- | --- |
-| Frontend | React 19, TypeScript, Vite 6, Tailwind CSS 4, xterm.js |
+| Frontend | React 19, TypeScript 7, Vite 8, Tailwind CSS 4, xterm.js 6 |
 | Backend | Go 1.27, Wails v3 (GTK4 + WebKitGTK 6.0) |
 | Database | SQLite (modernc.org/sqlite) |
 | SSH | golang.org/x/crypto, pkg/sftp |
