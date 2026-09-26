@@ -19,7 +19,7 @@ const CURSOR_STYLE_OPTIONS = [
   { value: 'bar', label: '竖线' },
 ] as const
 
-const RENDERER_LABELS: Record<string, string> = { dom: 'DOM', canvas: 'Canvas', webgl: 'WebGL' }
+const RENDERER_LABELS: Record<string, string> = { dom: 'DOM', webgl: 'WebGL' }
 
 interface Props {
   style: TerminalGlobalStyle

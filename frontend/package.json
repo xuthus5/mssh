@@ -19,7 +19,6 @@
     "@fontsource-variable/geist": "^5.3.0",
     "@tanstack/react-virtual": "^3.14.13",
     "@wailsio/runtime": "^3.0.0-beta.26",
-    "@xterm/addon-canvas": "^0.7.0",
     "@xterm/addon-fit": "^0.11.0",
     "@xterm/addon-ligatures": "^0.10.0",
     "@xterm/addon-search": "^0.16.0",
@@ -51,10 +50,5 @@
     "typescript": "^7.0.2",
     "vite": "^8.3.1",
     "vitest": "^5.0.2"
-  },
-  "overrides": {
-    "@xterm/addon-canvas": {
-      "@xterm/xterm": "$@xterm/xterm"
-    }
   }
 }

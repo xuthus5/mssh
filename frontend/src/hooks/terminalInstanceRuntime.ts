@@ -1,4 +1,3 @@
-import { CanvasAddon } from '@xterm/addon-canvas'
 import { WebglAddon } from '@xterm/addon-webgl'
 import { LigaturesAddon } from '@xterm/addon-ligatures'
 import { Terminal } from '@xterm/xterm'
@@ -69,15 +68,15 @@ export function createTerminalRendererController(term: Terminal): TerminalRender
     addon = null
   }
 
-  const loadAddon = (mode: 'canvas' | 'webgl'): boolean => {
+  const loadWebglAddon = (): boolean => {
     try {
-      const next = mode === 'webgl' ? new WebglAddon() : new CanvasAddon()
+      const next = new WebglAddon()
       term.loadAddon(next)
       addon = next
-      current = mode
+      current = 'webgl'
       return true
     } catch (error: unknown) {
-      logger.warn(`terminal ${mode} renderer unavailable`, error)
+      logger.warn('terminal webgl renderer unavailable', error)
       return false
     }
   }
@@ -86,12 +85,7 @@ export function createTerminalRendererController(term: Terminal): TerminalRender
     const mode = normalizeTerminalRenderer(requested)
     if (mode === current && (mode === 'dom' ? addon === null : addon !== null)) return current
     disposeAddon()
-    if (mode === 'dom') {
-      current = 'dom'
-      return current
-    }
-    if (loadAddon(mode)) return current
-    if (mode === 'webgl' && loadAddon('canvas')) return current
+    if (mode === 'webgl' && loadWebglAddon()) return current
     current = 'dom'
     return current
   }
@@ -101,11 +95,6 @@ export function createTerminalRendererController(term: Terminal): TerminalRender
     dispose: disposeAddon,
     mode: () => current,
   }
-}
-
-/** @deprecated Prefer createTerminalRendererController for selectable renderers. */
-export function loadCanvasRenderer(term: Terminal) {
-  createTerminalRendererController(term).apply('canvas')
 }
 
 export interface TerminalLigaturesController {

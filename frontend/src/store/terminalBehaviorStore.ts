@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 
 export type TerminalRightClickAction = 'menu' | 'paste'
-export type TerminalRenderer = 'dom' | 'canvas' | 'webgl'
+export type TerminalRenderer = 'dom' | 'webgl'
 
 export const DEFAULT_TERMINAL_SCROLLBACK_LINES = 10000
 export const MIN_TERMINAL_SCROLLBACK_LINES = 1000
@@ -68,8 +68,9 @@ export function normalizeRestoreTabsOnStartup(value: unknown): boolean {
   return value !== false
 }
 
+/** Legacy "canvas" values fall back to the default renderer. */
 export function normalizeTerminalRenderer(value: unknown): TerminalRenderer {
-  if (value === 'canvas' || value === 'webgl' || value === 'dom') return value
+  if (value === 'webgl' || value === 'dom') return value
   return DEFAULT_TERMINAL_RENDERER
 }
 
