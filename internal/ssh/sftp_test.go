@@ -466,6 +466,38 @@ func TestMkdir_Nested(t *testing.T) {
 	assert.True(t, info.IsDir())
 }
 
+func TestCreateFile(t *testing.T) {
+	addr, cleanup := startSFTPServer(t)
+	defer cleanup()
+	cw, client := connectSFTP(t, addr)
+	defer cw.Close()
+	defer client.Close()
+
+	err := CreateFile(client, "/created.txt")
+	require.NoError(t, err)
+
+	info, err := client.Stat("/created.txt")
+	require.NoError(t, err)
+	assert.False(t, info.IsDir())
+	assert.Equal(t, int64(0), info.Size())
+}
+
+func TestCreateFile_AlreadyExists(t *testing.T) {
+	addr, cleanup := startSFTPServer(t)
+	defer cleanup()
+	cw, client := connectSFTP(t, addr)
+	defer cw.Close()
+	defer client.Close()
+
+	file, err := client.Create("/existing.txt")
+	require.NoError(t, err)
+	require.NoError(t, file.Close())
+
+	err = CreateFile(client, "/existing.txt")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "create")
+}
+
 func TestRename(t *testing.T) {
 	addr, cleanup := startSFTPServer(t)
 	defer cleanup()

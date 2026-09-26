@@ -255,6 +255,28 @@ func TestFileService_Mkdir(t *testing.T) {
 	assert.Error(t, err)
 }
 
+func TestFileService_CreateFile(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	bus := newMockEventBus()
+	sessionSvc := NewSessionService(db, bus, 30, t.TempDir(), nil, testutil.NewTestLogger())
+
+	addr, cleanup := sshtestutil.NewMockServer(t)
+	defer cleanup()
+	port := parsePort(t, addr)
+
+	sess := model.Session{
+		Name: "test-file-create", Host: "127.0.0.1", Port: port, Username: "root",
+		AuthMethod: model.AuthPassword, Password: "", KeepAlive: 30, TermType: "xterm-256color",
+	}
+	created, err := sessionSvc.CreateSession(model.SessionInputFrom(sess))
+	require.NoError(t, err)
+
+	svc := NewFileService(sessionSvc, newMockEventBus(), testutil.NewTestLogger())
+
+	err = svc.CreateFile(created.ID, "/tmp/newfile.txt")
+	assert.Error(t, err)
+}
+
 func TestFileService_Rename(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	bus := newMockEventBus()

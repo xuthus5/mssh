@@ -2,6 +2,7 @@ package ssh
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/pkg/sftp"
 )
@@ -23,6 +24,19 @@ func RemoveDir(client *sftp.Client, path string) error {
 func Mkdir(client *sftp.Client, path string) error {
 	if err := client.MkdirAll(path); err != nil {
 		return fmt.Errorf("mkdir %s: %w", path, err)
+	}
+	return nil
+}
+
+// CreateFile creates an empty remote file and fails when the path is taken, so an
+// existing file is never truncated.
+func CreateFile(client *sftp.Client, path string) error {
+	file, err := client.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY)
+	if err != nil {
+		return fmt.Errorf("create %s: %w", path, err)
+	}
+	if err := file.Close(); err != nil {
+		return fmt.Errorf("close created %s: %w", path, err)
 	}
 	return nil
 }

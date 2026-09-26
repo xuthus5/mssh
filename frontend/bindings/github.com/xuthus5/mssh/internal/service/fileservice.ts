@@ -25,6 +25,13 @@ export function CancelTransfer(taskID: string): $CancellablePromise<void> {
 }
 
 /**
+ * CreateFile creates an empty remote file through SFTP.
+ */
+export function CreateFile(sessionID: number, path: string): $CancellablePromise<void> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.FileService.CreateFile", sessionID, path);
+}
+
+/**
  * Delete removes a remote file through SFTP.
  */
 export function Delete(sessionID: number, path: string): $CancellablePromise<void> {

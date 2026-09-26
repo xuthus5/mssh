@@ -69,7 +69,8 @@ function FileListRow({ file, selected, busy, onSelect, onNavigate, onDownload }:
   onNavigate: Props['onNavigate']
   onDownload: Props['onDownload']
 }) {
-  return <TableRow data-state={selected ? 'selected' : undefined} aria-disabled={busy} onClick={() => onSelect(file)}>
+  return <TableRow data-state={selected ? 'selected' : undefined} aria-disabled={busy}
+    onClick={() => onSelect(file)} onContextMenu={() => onSelect(file)}>
     <TableCell>{file.isDir ? <FolderOpen className="size-4" /> : <File className="size-4" />}</TableCell>
     <TableCell>
       <button type="button" disabled={busy} className="cursor-pointer text-left hover:underline disabled:cursor-not-allowed disabled:opacity-50"

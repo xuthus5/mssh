@@ -5,7 +5,7 @@ import FilePanel from '@/components/file/FilePanel'
 
 const handlers = {
   onClose: vi.fn(), onNavigateTo: vi.fn(), onNavigateUp: vi.fn(), onDelete: vi.fn(),
-  onRename: vi.fn(), onMakeDir: vi.fn(), onUpload: vi.fn(), onDownload: vi.fn(),
+  onRename: vi.fn(), onMakeDir: vi.fn(), onCreateFile: vi.fn(), onUpload: vi.fn(), onDownload: vi.fn(),
   onLoadDirectory: vi.fn(async () => []),
   transferActionPending: null, onSyncCurrentDirectory: vi.fn(), syncingCurrentDirectory: false,
 }
@@ -52,8 +52,8 @@ describe('FilePanel SFTP views', () => {
     render(<FilePanel open files={[
       { name: 'a.txt', path: '/a.txt', size: 1, modified: '', isDir: false },
     ]} currentPath="/" loading={false} dropTargetId="drop-zone" showHiddenFiles defaultView="list" {...handlers} onDelete={onDelete} />)
-    await user.click(screen.getByText('a.txt'))
-    await user.click(screen.getByRole('button', { name: '删除' }))
+    fireEvent.contextMenu(screen.getByText('a.txt'))
+    await user.click(await screen.findByRole('menuitem', { name: '删除' }))
     await user.click(screen.getByRole('button', { name: '删除' }))
     expect(await screen.findByText('删除文件失败: delete boom')).toBeInTheDocument()
     expect(screen.getByRole('alertdialog')).toBeInTheDocument()
@@ -108,8 +108,8 @@ describe('FilePanel SFTP views', () => {
     const props = { open: true, files: [{ name: 'a.txt', path: '/a.txt', size: 1, modified: '', isDir: false }], currentPath: '/', loading: false, dropTargetId: 'drop-zone', showHiddenFiles: false, defaultView: 'list' as const, ...handlers, onRename }
     const view = render(<FilePanel {...props} />)
     const user = userEvent.setup()
-    await user.click(screen.getByText('a.txt'))
-    await user.click(screen.getByRole('button', { name: '重命名' }))
+    fireEvent.contextMenu(screen.getByText('a.txt'))
+    await user.click(await screen.findByRole('menuitem', { name: '重命名' }))
     await user.click(screen.getByRole('button', { name: '保存' }))
     expect(screen.getByRole('button', { name: '保存' })).toBeDisabled()
     expect(screen.getByRole('textbox')).toBeDisabled()
@@ -158,9 +158,11 @@ describe('FilePanel SFTP views', () => {
     const user = userEvent.setup()
 
     await user.click(screen.getByText('app.log'))
-    expect(screen.getByRole('button', { name: '下载' })).toBeDisabled()
-    expect(screen.getByRole('button', { name: '重命名' })).toBeDisabled()
-    expect(screen.getByRole('button', { name: '删除' })).toBeDisabled()
+    fireEvent.contextMenu(screen.getByText('app.log'))
+    expect(await screen.findByRole('menuitem', { name: '下载' })).toHaveAttribute('aria-disabled', 'true')
+    expect(screen.getByRole('menuitem', { name: '重命名' })).toHaveAttribute('aria-disabled', 'true')
+    expect(screen.getByRole('menuitem', { name: '删除' })).toHaveAttribute('aria-disabled', 'true')
+    await user.keyboard('{Escape}')
     await user.dblClick(screen.getByText('app.log'))
     expect(onDownload).not.toHaveBeenCalled()
     expect(onNavigateTo).not.toHaveBeenCalled()
@@ -171,8 +173,8 @@ describe('FilePanel SFTP views', () => {
     const props = { open: true, files: [file], currentPath: '/srv', loading: false, dropTargetId: 'drop-zone', showHiddenFiles: false, defaultView: 'list' as const, ...handlers }
     const view = render(<FilePanel {...props} />)
     const user = userEvent.setup()
-    await user.click(screen.getByText('src'))
-    await user.click(screen.getByRole('button', { name: '删除' }))
+    fireEvent.contextMenu(screen.getByText('src'))
+    await user.click(await screen.findByRole('menuitem', { name: '删除' }))
 
     view.rerender(<FilePanel {...props} isMutationBusy={(entry) => entry.path === file.path} />)
     expect(screen.getByRole('button', { name: '删除' })).toBeDisabled()
@@ -188,16 +190,78 @@ describe('FilePanel SFTP views', () => {
     render(<FilePanel open files={[file]} currentPath="/srv" loading={false} dropTargetId="drop-zone" showHiddenFiles={false}
       defaultView="list" {...handlers} onRename={onRename} onDelete={onDelete} />)
     const user = userEvent.setup()
-    await user.click(screen.getByText('src'))
-    await user.click(screen.getByRole('button', { name: '重命名' }))
+    fireEvent.contextMenu(screen.getByText('src'))
+    await user.click(await screen.findByRole('menuitem', { name: '重命名' }))
     await user.clear(screen.getByRole('textbox'))
     await user.type(screen.getByRole('textbox'), 'renamed')
     await user.click(screen.getByRole('button', { name: '保存' }))
     expect(onRename).toHaveBeenCalledWith('/srv/src', 'renamed', true)
 
-    await user.click(screen.getByRole('button', { name: '删除' }))
+    fireEvent.contextMenu(screen.getByText('src'))
+    await user.click(await screen.findByRole('menuitem', { name: '删除' }))
     await user.click(screen.getByRole('button', { name: '删除' }))
     expect(onDelete).toHaveBeenCalledWith('/srv/src', true)
+  })
+
+  it('keeps only upload, mkdir, refresh and the view switch in the toolbar', () => {
+    render(<FilePanel open files={[{ name: 'a.txt', path: '/a.txt', size: 1, modified: '', isDir: false }]}
+      currentPath="/" loading={false} dropTargetId="drop-zone" showHiddenFiles={false} defaultView="list" {...handlers} />)
+
+    expect(screen.getByRole('button', { name: '上传' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '新建文件夹' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '刷新' })).toBeInTheDocument()
+    expect(screen.getByRole('group', { name: '文件视图' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '下载' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '重命名' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '删除' })).not.toBeInTheDocument()
+  })
+
+  it('offers download, create and directory actions from the row context menu', async () => {
+    const onDownload = vi.fn()
+    const onCreateFile = vi.fn(async () => undefined)
+    render(<FilePanel open files={[
+      { name: 'a.txt', path: '/a.txt', size: 1, modified: '', isDir: false },
+      { name: 'src', path: '/src', size: 0, modified: '', isDir: true },
+    ]} currentPath="/srv" loading={false} dropTargetId="drop-zone" showHiddenFiles={false} defaultView="list"
+      {...handlers} onDownload={onDownload} onCreateFile={onCreateFile} />)
+    const user = userEvent.setup()
+
+    fireEvent.contextMenu(screen.getByText('a.txt'))
+    expect(await screen.findByRole('menuitem', { name: '下载' })).not.toHaveAttribute('aria-disabled', 'true')
+    await user.click(screen.getByRole('menuitem', { name: '下载' }))
+    expect(onDownload).toHaveBeenCalledWith('/a.txt')
+
+    fireEvent.contextMenu(screen.getByText('a.txt'))
+    await user.click(await screen.findByRole('menuitem', { name: '新建文件夹' }))
+    expect(screen.getByPlaceholderText('文件夹名')).toBeInTheDocument()
+
+    fireEvent.contextMenu(screen.getByText('a.txt'))
+    await user.click(await screen.findByRole('menuitem', { name: '新建文件' }))
+    await user.type(screen.getByRole('textbox', { name: '文件名' }), 'notes.md')
+    await user.click(screen.getByRole('button', { name: '创建' }))
+    expect(onCreateFile).toHaveBeenCalledWith('notes.md')
+
+    fireEvent.contextMenu(screen.getByText('src'))
+    expect(await screen.findByRole('menuitem', { name: '下载' })).toHaveAttribute('aria-disabled', 'true')
+  })
+
+  it('surfaces create-file failures inline without toast', async () => {
+    const { useToastStore } = await import('@/components/ui/toast')
+    useToastStore.setState({ toasts: [] })
+    const onCreateFile = vi.fn(async () => { throw new Error('create boom') })
+    render(<FilePanel open files={[{ name: 'a.txt', path: '/a.txt', size: 1, modified: '', isDir: false }]}
+      currentPath="/srv" loading={false} dropTargetId="drop-zone" showHiddenFiles={false} defaultView="list"
+      {...handlers} onCreateFile={onCreateFile} />)
+    const user = userEvent.setup()
+
+    fireEvent.contextMenu(screen.getByText('a.txt'))
+    await user.click(await screen.findByRole('menuitem', { name: '新建文件' }))
+    await user.type(screen.getByRole('textbox', { name: '文件名' }), 'notes.md')
+    await user.click(screen.getByRole('button', { name: '创建' }))
+
+    expect(await screen.findByText('创建文件失败: create boom')).toBeInTheDocument()
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    expect(useToastStore.getState().toasts.filter((item) => item.type === 'error')).toHaveLength(0)
   })
 })
 
