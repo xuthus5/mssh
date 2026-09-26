@@ -64,10 +64,10 @@ The desktop app has an authenticated unified local IPC transport available for r
 
 ### File transfer
 
-- SFTP file browser with list/tree views
-- Hidden-file filtering and native file dialogs
+- SFTP file browser with list/tree views, multi-select uploads, and a right-click menu for download, rename, delete, new file, and new folder
+- Hidden-file filtering and native file dialogs; dismissed pickers are a no-op, not an error
 - OSC 7 directory following, with optional Bash/Zsh startup-script integration
-- Transfer center with progress, ETA, retry, history, and cancellation
+- Transfer center with progress, ETA, retry, history, and cancellation; the open directory reloads as soon as an upload into it completes
 
 ### Automation
 

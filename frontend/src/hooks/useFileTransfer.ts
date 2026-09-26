@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { logger } from '@/lib/logger'
 import { cancelTransfer as cancelTransferAction, startDownload, startUpload } from '@/lib/transferActions'
 import { FileService } from '@/lib/wails'
-import { useAppStore } from '@/store/appStore'
+import { useAppStore, type TransferJob } from '@/store/appStore'
 import type { FileEntry } from '../../bindings/github.com/xuthus5/mssh/internal/ssh/models'
 import { t } from '@/i18n'
 import {
@@ -11,6 +11,7 @@ import {
   normalizeRemotePath,
   parentRemotePath,
   useFileMutationState,
+  type FileCatalogChange,
 } from '@/lib/fileMutationCoordinator'
 import { isOperationBusyError, OperationBusyError } from '@/lib/operationBusyError'
 import { useFileCatalogSync } from '@/hooks/useFileCatalogSync'
@@ -140,6 +141,32 @@ function useTransferCommands({ sessionId, sessionName, captureLifecycle }: Trans
   return { upload, uploadMany, download }
 }
 
+/**
+ * Uploads run as background jobs, so the directory they landed in only refreshes
+ * when the job reports completion. The catalog change reloads the visible directory
+ * silently and invalidates it for panels that show it later.
+ */
+function useCompletedUploadRefresh(options: {
+  transfers: TransferJob[]
+  sessionId: number
+  source: symbol
+  applyCatalogChange: (change: FileCatalogChange) => void
+}) {
+  const refreshed = useRef(new Set<string>())
+  const { transfers, sessionId, source, applyCatalogChange } = options
+  useEffect(() => {
+    const completed = transfers.filter((job) => job.sessionId === sessionId && job.direction === 'upload'
+      && job.status === 'completed' && !refreshed.current.has(job.id))
+    if (completed.length === 0) return
+    for (const job of completed) refreshed.current.add(job.id)
+    applyCatalogChange({
+      sessionID: sessionId,
+      source,
+      directories: [...new Set(completed.map((job) => parentRemotePath(job.targetPath)))],
+    })
+  }, [applyCatalogChange, sessionId, source, transfers])
+}
+
 function useCancelTransfer() {
   return useCallback(async (jobId: string) => {
     try {
@@ -165,6 +192,7 @@ export function useFileTransfer(sessionId: number) {
     setFiles: listing.setFiles, captureLifecycle, ...catalog,
   }
   const mutations = useFileMutations(mutationOptions)
+  useCompletedUploadRefresh({ transfers, sessionId, source: catalog.source, applyCatalogChange: catalog.applyCatalogChange })
   const activeLeases = useFileMutationState((state) => state.activeLeases)
   const directoryMutationBusy = activeLeases.some((active) => fileMutationScopesConflict(active, {
     sessionID: sessionId, directoryPath: listing.currentPath,
