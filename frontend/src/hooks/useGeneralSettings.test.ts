@@ -360,13 +360,13 @@ describe('useGeneralSettings cross-window sync', () => {
     const { result } = renderHook(() => useGeneralSettings())
     await waitFor(() => expect(result.current.general.renderer).toBe('webgl'))
     await act(async () => {
-      await result.current.saveGeneral({ ...savedGeneral, renderer: 'canvas' })
+      await result.current.saveGeneral({ ...savedGeneral, renderer: 'dom' })
     })
     const payload = (setMany.mock.calls.at(-1) ?? []) as unknown[]
     const entries = (Array.isArray(payload[0]) ? payload[0] : []) as Array<{ key: string; value: string }>
     const rendererEntry = entries.find((entry) => entry.key === 'terminal.renderer')
-    expect(rendererEntry?.value).toBe(JSON.stringify('canvas'))
-    expect(result.current.general.renderer).toBe('canvas')
+    expect(rendererEntry?.value).toBe(JSON.stringify('dom'))
+    expect(result.current.general.renderer).toBe('dom')
   })
 
   it('loads and persists history predict preference', async () => {

@@ -14,7 +14,7 @@
 
 - 分层清晰：Zustand store + hooks + 展示组件，终端运行时被拆到 `terminal*Runtime` 系列。
 - UI 基线统一：shadcn/ui + CSS 变量（`bg-background` / `text-muted-foreground` 等），暗色默认、浅色 `.light` 齐全。
-- 终端体验有工程投入：连接状态机、`resize` 去抖、输出 sequencer、ErrorBoundary、Canvas renderer、分屏与懒加载 Tab。
+- 终端体验有工程投入：连接状态机、`resize` 去抖、输出 sequencer、ErrorBoundary、DOM/WebGL renderer 切换、分屏与懒加载 Tab。
 - 部分 a11y 到位：动态标签 `role="tablist/tab"`、会话树/文件树 `role="tree"`、工具面板 resize `role="separator"` + 键盘调节、隐藏层 `inert`。
 - 异步防重：`useAsyncAction` 支持 `dedupe` / `latest`，覆盖 UX-002 的部分路径。
 - 测试意识强：大量 `*.test.tsx` / `*.behavior.test.tsx`，覆盖率阈值 90%，include 已覆盖主路径；CI 运行 source-limits + vitest。

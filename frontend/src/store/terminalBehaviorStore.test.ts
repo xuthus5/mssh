@@ -49,7 +49,7 @@ describe('terminal behavior store', () => {
 
   it.each([
     ['dom', 'dom'],
-    ['canvas', 'canvas'],
+    ['canvas', 'dom'],
     ['webgl', 'webgl'],
     ['invalid', 'dom'],
     [null, 'dom'],
