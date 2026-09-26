@@ -17,6 +17,7 @@ func TestFileServiceRemoteOpsRejectInvalidPaths(t *testing.T) {
 
 	require.Error(t, svc.Delete(1, "  "))
 	require.Error(t, svc.Mkdir(1, "a"+string(rune(0))+"b"))
+	require.Error(t, svc.CreateFile(1, ""))
 	require.Error(t, svc.Rename(1, "", "/tmp/x"))
 	require.Error(t, svc.Rename(1, "/tmp/x", ""))
 }
@@ -30,6 +31,7 @@ func TestFileServiceRejectsInvalidSessionID(t *testing.T) {
 
 	require.Error(t, svc.Delete(-1, "/tmp/x"))
 	require.Error(t, svc.Mkdir(0, "/tmp/x"))
+	require.Error(t, svc.CreateFile(0, "/tmp/x"))
 	require.Error(t, svc.Rename(0, "/tmp/a", "/tmp/b"))
 }
 
