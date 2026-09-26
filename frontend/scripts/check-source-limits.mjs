@@ -1,6 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import * as ts from 'typescript'
+import { parse } from '@babel/parser'
 
 const root = path.resolve('src')
 const maxFileLines = 300
@@ -20,6 +20,36 @@ const fileLimitIgnore = [
 ]
 const functionScanIgnore = [/bindings\//]
 const testRegistrationRoots = new Set(['describe', 'it', 'test'])
+// TypeScript 7 dropped the in-process compiler API, so the checks parse with
+// babel instead. These are the function-like node types it reports.
+const functionTypes = new Set([
+  'FunctionDeclaration',
+  'FunctionExpression',
+  'ArrowFunctionExpression',
+  'ObjectMethod',
+  'ClassMethod',
+  'ClassPrivateMethod',
+  'TSDeclareMethod',
+])
+const nonChildKeys = new Set([
+  'loc',
+  'start',
+  'end',
+  'extra',
+  'errors',
+  'tokens',
+  'comments',
+  'leadingComments',
+  'trailingComments',
+  'innerComments',
+])
+
+// Windows reports paths with backslashes, which would never match the
+// forward-slash patterns and exemption entries below. Normalize so the checks
+// behave the same on every platform.
+function toPosix(value) {
+  return value.split(path.sep).join('/')
+}
 
 function walk(dir, out = []) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -30,69 +60,99 @@ function walk(dir, out = []) {
   return out
 }
 
-function lineNumber(sourceFile, position) {
-  return sourceFile.getLineAndCharacterOfPosition(position).line + 1
+function isNode(value) {
+  return typeof value === 'object' && value !== null && typeof value.type === 'string'
 }
 
-function functionName(node, sourceFile) {
-  if (node.name) return node.name.getText(sourceFile)
-  if (ts.isVariableDeclaration(node.parent)) return node.parent.name.getText(sourceFile)
-  if (ts.isPropertyAssignment(node.parent)) return node.parent.name.getText(sourceFile)
-  return '<anonymous>'
+function nodeList(value) {
+  return Array.isArray(value) ? value.filter(isNode) : []
 }
 
-function callRoot(expression) {
-  if (ts.isIdentifier(expression)) return expression.text
-  if (ts.isPropertyAccessExpression(expression) || ts.isElementAccessExpression(expression)) {
-    return callRoot(expression.expression)
+function childNodes(node) {
+  const children = []
+  for (const [key, value] of Object.entries(node)) {
+    if (nonChildKeys.has(key)) continue
+    if (Array.isArray(value)) children.push(...value.filter(isNode))
+    else if (isNode(value)) children.push(value)
   }
-  if (ts.isCallExpression(expression)) return callRoot(expression.expression)
+  return children
+}
+
+function parseSource(file) {
+  const source = fs.readFileSync(file, 'utf8')
+  const plugins = file.endsWith('.tsx') ? ['typescript', 'jsx'] : ['typescript']
+  try {
+    return parse(source, { sourceType: 'module', plugins })
+  } catch (error) {
+    throw new Error(`failed to parse ${toPosix(path.relative(process.cwd(), file))}: ${error.message}`)
+  }
+}
+
+function callRoot(callee) {
+  if (!isNode(callee)) return ''
+  if (callee.type === 'Identifier') return callee.name
+  if (callee.type === 'MemberExpression' || callee.type === 'OptionalMemberExpression') {
+    return callRoot(callee.object)
+  }
+  if (callee.type === 'CallExpression' || callee.type === 'OptionalCallExpression') {
+    return callRoot(callee.callee)
+  }
   return ''
 }
 
-function isTestRegistrationCallback(node, file) {
-  if (!/\.test\.(ts|tsx)$/.test(file) || !ts.isCallExpression(node.parent)) return false
-  if (!node.parent.arguments.includes(node)) return false
-  return testRegistrationRoots.has(callRoot(node.parent.expression))
+function isTestRegistrationCallback(node, parent, file) {
+  if (!/\.test\.(ts|tsx)$/.test(file)) return false
+  if (!parent || parent.type !== 'CallExpression') return false
+  if (!parent.arguments.includes(node)) return false
+  return testRegistrationRoots.has(callRoot(parent.callee))
+}
+
+function nodeName(node) {
+  if (!isNode(node)) return '<anonymous>'
+  if (typeof node.name === 'string') return node.name
+  if (typeof node.value === 'string') return node.value
+  return '<anonymous>'
+}
+
+function functionName(node, parent) {
+  if (isNode(node.id)) return nodeName(node.id)
+  if (isNode(node.key)) return nodeName(node.key)
+  if (parent && (parent.type === 'VariableDeclarator' || parent.type === 'ObjectProperty')) {
+    return nodeName(parent.id ?? parent.key)
+  }
+  return '<anonymous>'
 }
 
 function scanFunctions(file) {
-  const source = fs.readFileSync(file, 'utf8')
-  const sourceFile = ts.createSourceFile(
-    file,
-    source,
-    ts.ScriptTarget.Latest,
-    true,
-    file.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
-  )
   const violations = []
-  function visit(node) {
-    if (ts.isFunctionLike(node) && node.body && !isTestRegistrationCallback(node, file)) {
-      const start = lineNumber(sourceFile, node.getStart(sourceFile))
-      const end = lineNumber(sourceFile, node.end)
+  const relativeFile = toPosix(path.relative(process.cwd(), file))
+  const visit = (node, parent) => {
+    if (functionTypes.has(node.type) && node.body && !isTestRegistrationCallback(node, parent, file)) {
+      const start = node.loc.start.line
+      const end = node.loc.end.line
       const lines = end - start + 1
-      const relativeFile = path.relative(process.cwd(), file)
-      const name = functionName(node, sourceFile)
+      const name = functionName(node, parent)
       if (lines > maxFunctionLines) violations.push({ kind: 'function-lines', file: relativeFile, line: start, name, actual: lines })
+      const parameters = nodeList(node.params).length
       const exempt = positionalParameterExemptions.some((rule) => rule.file === relativeFile && rule.name === name)
-      if (!exempt && node.parameters.length > maxPositionalParameters) {
-        violations.push({ kind: 'parameters', file: relativeFile, line: start, name, actual: node.parameters.length })
+      if (!exempt && parameters > maxPositionalParameters) {
+        violations.push({ kind: 'parameters', file: relativeFile, line: start, name, actual: parameters })
       }
     }
-    ts.forEachChild(node, visit)
+    for (const child of childNodes(node)) visit(child, node)
   }
-  visit(sourceFile)
+  visit(parseSource(file), null)
   return violations
 }
 
 const allFiles = walk(root)
-const productionFiles = allFiles.filter((file) => !fileLimitIgnore.some((rule) => rule.test(file)))
+const productionFiles = allFiles.filter((file) => !fileLimitIgnore.some((rule) => rule.test(toPosix(file))))
 const violations = []
 for (const file of productionFiles) {
   const lines = fs.readFileSync(file, 'utf8').split(/\r?\n/).length
-  if (lines > maxFileLines) violations.push({ kind: 'file-lines', file: path.relative(process.cwd(), file), actual: lines })
+  if (lines > maxFileLines) violations.push({ kind: 'file-lines', file: toPosix(path.relative(process.cwd(), file)), actual: lines })
 }
-for (const file of allFiles.filter((file) => !functionScanIgnore.some((rule) => rule.test(file)))) {
+for (const file of allFiles.filter((file) => !functionScanIgnore.some((rule) => rule.test(toPosix(file))))) {
   violations.push(...scanFunctions(file))
 }
 if (violations.length) {
