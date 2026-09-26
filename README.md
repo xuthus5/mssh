@@ -199,7 +199,7 @@ The gate first verifies that your Go, Node.js, and Wails versions match those th
 files exactly; a newer major/minor toolchain still fails that check by design.
 It then runs:
 
-1. `golangci-lint run --timeout 5m ./...` (v2.12.2, built with the pinned Go)
+1. `golangci-lint run --timeout 5m ./...` (v2.14.0, built with the pinned Go)
 2. `go test -race -coverprofile=coverage.out -covermode=atomic -coverpkg=./internal/...,./pkg/... ./internal/... ./pkg/...`
 3. `npm run check:source-limits`, `npm run check:bundle-budget`, `npm test`
 4. `wails3 task build`
