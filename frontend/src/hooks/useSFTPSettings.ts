@@ -113,6 +113,24 @@ function useSFTPSave(runtime: ReturnType<typeof useSFTPRuntime>, setSettings: (s
   }, [runtime, setSettings])
 }
 
+/**
+ * Persists the display toggle owned by the file panel: the store updates first so
+ * the listing re-filters immediately, the single key is written, other windows
+ * receive the whole snapshot, and a failed write rolls the toggle back.
+ */
+export async function persistShowHiddenFiles(next: SFTPSettings): Promise<void> {
+  const store = useSFTPSettingsStore.getState()
+  const previous = store.showHiddenFiles
+  store.setShowHiddenFiles(next.showHiddenFiles)
+  try {
+    await SettingService.SetMany([settingEntry('sftp.show_hidden_files', next.showHiddenFiles)])
+  } catch (error) {
+    store.setShowHiddenFiles(previous)
+    throw error
+  }
+  emitSFTPSettings(next)
+}
+
 function useSFTPEventSync(runtime: ReturnType<typeof useSFTPRuntime>, setSettings: (settings: SFTPSettings) => void, reload: () => Promise<void>) {
   useEffect(() => {
     const stopChanged = Events.On(SETTINGS_SFTP_CHANGED_EVENT, (event: EventEnvelope<SFTPSettings>) => {

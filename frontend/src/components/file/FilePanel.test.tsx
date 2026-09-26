@@ -6,7 +6,7 @@ import FilePanel from '@/components/file/FilePanel'
 const handlers = {
   onClose: vi.fn(), onNavigateTo: vi.fn(), onNavigateUp: vi.fn(), onDelete: vi.fn(),
   onRename: vi.fn(), onMakeDir: vi.fn(), onCreateFile: vi.fn(), onUpload: vi.fn(), onDownload: vi.fn(),
-  onDismissActionError: vi.fn(),
+  onDismissActionError: vi.fn(), onToggleHiddenFiles: vi.fn(),
   onLoadDirectory: vi.fn(async () => []),
   transferActionPending: null, onSyncCurrentDirectory: vi.fn(), syncingCurrentDirectory: false,
 }
@@ -236,6 +236,32 @@ describe('FilePanel SFTP views', () => {
     expect(screen.queryByRole('button', { name: '下载' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '重命名' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '删除' })).not.toBeInTheDocument()
+  })
+
+  it('places the hidden-files toggle after refresh with matching button styles', async () => {
+    const onToggleHiddenFiles = vi.fn()
+    const onNavigateTo = vi.fn()
+    const props = { open: true, files: [], currentPath: '/srv', loading: false, dropTargetId: 'drop-zone', showHiddenFiles: false, defaultView: 'list' as const, ...handlers, onToggleHiddenFiles, onNavigateTo }
+    const view = render(<FilePanel {...props} />)
+    const user = userEvent.setup()
+
+    const toolbarLabels = screen.getAllByRole('button').map((button) => button.textContent ?? button.getAttribute('aria-label'))
+    expect(toolbarLabels.indexOf('显示隐藏文件')).toBe(toolbarLabels.indexOf('刷新') + 1)
+
+    const upload = screen.getByRole('button', { name: '上传' })
+    const refresh = screen.getByRole('button', { name: '刷新' })
+    const hidden = screen.getByRole('button', { name: '显示隐藏文件' })
+    expect(refresh.className).toBe(upload.className)
+    expect(hidden.className).toBe(upload.className)
+    expect(hidden).toHaveAttribute('aria-pressed', 'false')
+
+    await user.click(refresh)
+    expect(onNavigateTo).toHaveBeenCalledWith('/srv')
+    await user.click(hidden)
+    expect(onToggleHiddenFiles).toHaveBeenCalledOnce()
+
+    view.rerender(<FilePanel {...props} showHiddenFiles />)
+    expect(screen.getByRole('button', { name: '显示隐藏文件' })).toHaveAttribute('aria-pressed', 'true')
   })
 
   it('offers download, create and directory actions from the row context menu', async () => {

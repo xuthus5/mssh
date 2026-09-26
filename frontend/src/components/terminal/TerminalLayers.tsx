@@ -30,10 +30,11 @@ function useLayerFocusRequest(...args: [Tab, boolean, AppState['focusRequest'], 
   return resolvedRequestRef.current
 }
 
-function FilePanelView({ transfer, actionError, onDismissActionError, transferActionPending, onClose, onUpload, onDownload, dropTargetID, showHiddenFiles, defaultView, onLoadDirectory, onSyncCurrentDirectory, syncingCurrentDirectory, followsTerminalDirectory }: {
+function FilePanelView({ transfer, actionError, onDismissActionError, onToggleHiddenFiles, transferActionPending, onClose, onUpload, onDownload, dropTargetID, showHiddenFiles, defaultView, onLoadDirectory, onSyncCurrentDirectory, syncingCurrentDirectory, followsTerminalDirectory }: {
   transfer: FileTransfer
   actionError: string
   onDismissActionError: () => void
+  onToggleHiddenFiles: () => void
   transferActionPending: 'upload' | 'download' | null
   onClose: () => void
   onUpload: () => void
@@ -49,7 +50,7 @@ function FilePanelView({ transfer, actionError, onDismissActionError, transferAc
   return (
     <Suspense fallback={<div className="grid w-[340px] place-items-center border-l"><Spinner /></div>}>
       <FilePanel open onClose={onClose} files={transfer.files} currentPath={transfer.currentPath}
-        loading={transfer.loading} error={transfer.error} actionError={actionError} onDismissActionError={onDismissActionError} onNavigateTo={transfer.navigateTo}
+        loading={transfer.loading} error={transfer.error} actionError={actionError} onDismissActionError={onDismissActionError} onToggleHiddenFiles={onToggleHiddenFiles} onNavigateTo={transfer.navigateTo}
         onNavigateUp={transfer.navigateUp} onDelete={transfer.deleteFile} onRename={transfer.renameFile}
         onMakeDir={transfer.makeDir} onCreateFile={transfer.createFile} onUpload={onUpload} onDownload={onDownload} dropTargetId={dropTargetID}
         showHiddenFiles={showHiddenFiles} defaultView={defaultView} onLoadDirectory={onLoadDirectory}
@@ -64,7 +65,7 @@ function FilePanelView({ transfer, actionError, onDismissActionError, transferAc
 
 function FilePanelContainer({ sessionID, terminalID, onClose }: { sessionID: number; terminalID: string; onClose: () => void }) {
   const runtime = useFilePanelRuntime(sessionID, terminalID)
-  return <FilePanelView transfer={runtime.transfer} actionError={runtime.actionError} onDismissActionError={runtime.dismissActionError} transferActionPending={runtime.transferActionPending}
+  return <FilePanelView transfer={runtime.transfer} actionError={runtime.actionError} onDismissActionError={runtime.dismissActionError} onToggleHiddenFiles={runtime.toggleHiddenFiles} transferActionPending={runtime.transferActionPending}
     onClose={onClose} onUpload={() => { void runtime.handleUpload() }}
     onDownload={(path) => { void runtime.handleDownload(path) }} dropTargetID={runtime.dropTargetID} showHiddenFiles={runtime.showHiddenFiles}
     defaultView={runtime.defaultView} onLoadDirectory={runtime.transfer.loadDirectory} onSyncCurrentDirectory={() => { void runtime.syncCurrentDirectory() }}

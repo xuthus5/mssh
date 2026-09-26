@@ -6,6 +6,7 @@ import { useFileTransfer } from '@/hooks/useFileTransfer'
 import { isNativeDialogCancellation } from '@/lib/nativeDialog'
 import { t } from '@/i18n'
 import { TerminalService } from '@/lib/wails'
+import { persistShowHiddenFiles } from '@/hooks/useSFTPSettings'
 import { useSFTPSettingsStore } from '@/store/sftpSettingsStore'
 import { useTerminalDirectoryStore } from '@/store/terminalDirectoryStore'
 
@@ -220,6 +221,21 @@ function useDownloadDialog(options: {
   }, [options.captureLifecycle, options.dialog, options.setActionError, options.transfer.download])
 }
 
+/** Flips the persisted hidden-files preference from the panel toolbar. */
+function useHiddenFilesToggle(setActionError: SetError) {
+  return useCallback(() => {
+    const current = useSFTPSettingsStore.getState()
+    setActionError('')
+    void persistShowHiddenFiles({
+      showHiddenFiles: !current.showHiddenFiles,
+      followTerminalDirectory: current.followTerminalDirectory,
+      defaultView: current.defaultView,
+    }).catch((error: unknown) => {
+      setActionError(t('保存 SFTP 设置失败: ${}', error instanceof Error ? error.message : String(error)))
+    })
+  }, [setActionError])
+}
+
 export function useFilePanelRuntime(sessionID: number, terminalID: string) {
   const transfer = useFileTransfer(sessionID)
   const showHiddenFiles = useSFTPSettingsStore((state) => state.showHiddenFiles)
@@ -252,8 +268,9 @@ export function useFilePanelRuntime(sessionID: number, terminalID: string) {
   const handleUpload = useUploadDialog(shared)
   const handleDownload = useDownloadDialog(shared)
   const dismissActionError = useCallback(() => setActionError(''), [])
+  const toggleHiddenFiles = useHiddenFilesToggle(setActionError)
   return {
-    transfer, showHiddenFiles, defaultView, dropTargetID, actionError, dismissActionError,
+    transfer, showHiddenFiles, defaultView, dropTargetID, actionError, dismissActionError, toggleHiddenFiles,
     transferActionPending: dialog.pending, syncingCurrentDirectory, syncCurrentDirectory,
     followsTerminalDirectory: Boolean(followTerminalDirectory && terminalDirectory),
     handleUpload, handleDownload,
