@@ -32,10 +32,17 @@ function fromPort(port: SerialPort): SerialPortInput {
   }
 }
 
+// The backend rejects every handshake mode until a public driver API exists, so
+// saving one would only produce a profile that cannot open.
+const supportedFlowControl = new Set(['', 'none'])
+
 function validateDraft(draft: SerialPortInput) {
   if (!draft.name.trim() || !draft.device.trim()) return t('名称和设备路径不能为空')
   if (!draft.baud_rate || draft.baud_rate < 300 || draft.baud_rate > 4_000_000) {
     return t('波特率需在 300 到 4000000 之间')
+  }
+  if (!supportedFlowControl.has(String(draft.flow_control ?? 'none'))) {
+    return t('硬件与软件流控暂不支持，请将流控改为 None')
   }
   return ''
 }

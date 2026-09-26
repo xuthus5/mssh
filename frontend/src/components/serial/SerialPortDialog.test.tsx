@@ -82,6 +82,26 @@ describe('SerialPortDialog', () => {
     expect(screen.getByPlaceholderText('/dev/ttyUSB0')).toHaveValue('/dev/ttyUSB0')
   })
 
+  it('flags unsupported flow control and blocks saving it', async () => {
+    const onSave = vi.fn(async () => undefined)
+    const legacy = { id: 3, name: '旧串口', device: '/dev/ttyUSB0', baud_rate: 115200, data_bits: 8, parity: 'none' as never, stop_bits: 'one' as never, flow_control: 'rtscts', line_ending: 'CR' as never, local_echo: false, dtr_on_open: true, rts_on_open: true, notes: '', sort_order: 0, created_at: '', updated_at: '' }
+    render(<SerialPortDialog open onOpenChange={vi.fn()} port={legacy} devices={['/dev/ttyUSB0']} onSave={onSave} />)
+
+    const flow = screen.getByRole('combobox', { name: '流控' })
+    expect(flow).toHaveTextContent('RTS/CTS — 当前不支持')
+
+    await userEvent.click(screen.getByRole('button', { name: '保存修改' }))
+    expect(onSave).not.toHaveBeenCalled()
+    expect(await screen.findByRole('alert')).toHaveTextContent('硬件与软件流控暂不支持，请将流控改为 None')
+
+    await userEvent.click(flow)
+    expect(await screen.findByRole('option', { name: 'XON/XOFF — 当前不支持' })).toHaveAttribute('aria-disabled', 'true')
+    await userEvent.click(await screen.findByRole('option', { name: 'None' }))
+    await userEvent.click(screen.getByRole('button', { name: '保存修改' }))
+    await waitFor(() => expect(onSave).toHaveBeenCalledOnce())
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ flow_control: 'none' }))
+  })
+
   it('labels editable fields and submits once with Enter', async () => {
     const saving = deferred<void>()
     const onSave = vi.fn(() => saving.promise)
