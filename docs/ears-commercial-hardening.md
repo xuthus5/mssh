@@ -2916,7 +2916,7 @@
 |---|---|---|
 | SERIAL-ARCH-705 | 当应用配置串口流控时，生产实现不得依赖第三方私有字段；公开 API 无法表达握手模式时必须明确拒绝并保留手动 DTR/RTS。 | done |
 | SSH-ARCH-706 | 当 Windows 用户选择 SSH Agent 认证时，应用必须支持系统 OpenSSH 默认 named pipe，并在 UI 中仅暴露实际可用能力。 | done |
-| DEP-ARCH-707 | 当 Wails 工具链、Go runtime 与前端 runtime 参与同一构建时，三者必须使用同一精确版本并由单一版本源校验。已将 CLI、Go 模块与 `@wailsio/runtime` 统一锁定为 `v3.0.0-beta.16`（`.wails-version` 单一版本源）；Go 构建、前端全量测试与生产构建均通过。 | done |
+| DEP-ARCH-707 | 当 Wails 工具链、Go runtime 与前端 runtime 参与同一构建时，三者必须使用同一精确版本并由单一版本源校验。已将 CLI、Go 模块与 `@wailsio/runtime` 统一锁定为 `v3.0.0-beta.26`（`.wails-version` 单一版本源）；Go 构建、前端全量测试与生产构建均通过。 | done |
 
 串口握手模式在公开 API 不可表达时现在明确拒绝，避免私有字段耦合；Windows Agent 使用 `go-winio` 支持系统 named pipe；Wails runtime 继续由锁定版本统一校验。
 

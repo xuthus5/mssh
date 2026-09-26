@@ -283,4 +283,20 @@ describe('TerminalToolbar', () => {
     expect(useToastStore.getState().toasts.filter((item) => item.type === 'error')).toHaveLength(0)
   })
 
+  it('hides action labels through container queries so narrow toolbars never stack text', () => {
+    render(<TerminalToolbar terminalID="primary-1" sessionId={1} isRecording={false} recordingLogId={null}
+      onToggleRecording={vi.fn()} onOpenFiles={vi.fn()} onSplit={vi.fn()} splitDisabled={false} paneCount={1}
+      searchOpen={false} onToggleSearch={vi.fn()} onOpenHistory={vi.fn()} />)
+
+    const row = screen.getByText('复制').closest('[class~="@container"]')
+    expect(row).not.toBeNull()
+    const labelTexts = ['复制', '粘贴', '清屏', '搜索', '历史', '文件', '撰写', 'AI', '隧道', '系统', '分屏', '录制', '记录']
+    for (const text of labelTexts) {
+      const label = screen.getByText(text)
+      expect(row).toContainElement(label)
+      expect(label).toHaveClass('hidden', 'whitespace-nowrap')
+      expect(label.className).toContain('@min-[')
+    }
+  })
+
 })
