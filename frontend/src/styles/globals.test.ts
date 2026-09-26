@@ -17,8 +17,13 @@ describe('application styling', () => {
     expect(appSource).not.toContain('mssh-main-window')
   })
 
-  it('does not override xterm theme backgrounds with the application background token', () => {
-    expect(styles).not.toMatch(/\.xterm\s+\.xterm-viewport\s*\{[^}]*background(?:-color)?\s*:/s)
+  it('never paints the xterm viewport with an application background token', () => {
+    // The terminal theme owns the viewport background. The only declaration this
+    // stylesheet may make is clearing xterm's hard-coded black so the terminal
+    // surface background shows through, never an app color token.
+    const viewportBackgrounds = [...styles.matchAll(/\.xterm-viewport[^{}]*\{([^}]*)\}/g)]
+      .flatMap((rule) => [...rule[1].matchAll(/background(?:-color)?\s*:\s*([^;]+);/g)].map((declaration) => declaration[1].trim()))
+    expect(viewportBackgrounds).toEqual(['transparent'])
   })
 
   it('hides the native scrollbar on the dynamic tab strip', () => {
