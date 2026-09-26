@@ -117,7 +117,7 @@ tasks:
   lint:
     summary: Run golangci-lint with the same version and flags as CI
     vars:
-      GOLANGCI_LINT_VERSION: '{{.GOLANGCI_LINT_VERSION | default "v2.12.2"}}'
+      GOLANGCI_LINT_VERSION: '{{.GOLANGCI_LINT_VERSION | default "v2.14.0"}}'
     cmds:
       - |
         set -euo pipefail
