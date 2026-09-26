@@ -35,7 +35,7 @@ export function FileTreeView(props: Props) {
   const active = state.flat[activeIndex]
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => handleTreeKey({ event, active, state, toggle, props })
   const renderNode = (node: FlatNode, index: number) => (
-    <FileTreeNode node={node} index={index} itemID={`${treeID}-${index}`} state={state} props={props} toggle={toggle} />
+    <FileTreeNode key={node.file.path} node={node} index={index} itemID={`${treeID}-${index}`} state={state} props={props} toggle={toggle} />
   )
   return (
     <div role="tree" aria-label={t('远程文件树')} aria-activedescendant={active ? `${treeID}-${activeIndex}` : undefined} tabIndex={0} className="min-h-0 min-w-0 py-1 outline-none" onKeyDown={onKeyDown}>
@@ -148,7 +148,6 @@ function FileTreeNode({ node, index, itemID, state, props, toggle }: {
   const busy = props.isMutationBusy?.(node.file) ?? false
   return (
       <div
-        key={node.file.path}
         id={itemID}
         role="treeitem"
         aria-expanded={node.file.isDir ? state.expanded.has(node.file.path) : undefined}

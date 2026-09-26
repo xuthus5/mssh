@@ -10,7 +10,7 @@ const transfer = vi.hoisted(() => ({
 const terminalService = vi.hoisted(() => ({ write: vi.fn(async (_terminalID: string, _data: string) => 0) }))
 type DropHandler = (event: { data?: { files?: string[]; details?: { id?: string } } }) => void
 const runtime = vi.hoisted(() => ({
-  openFile: vi.fn(async (..._args: unknown[]) => ''),
+  openFile: vi.fn(async (..._args: unknown[]) => '' as string | string[]),
   saveFile: vi.fn(async (..._args: unknown[]) => ''),
   onFilesDropped: vi.fn((_handler?: DropHandler) => vi.fn()),
 }))
@@ -182,7 +182,7 @@ describe('TerminalLayers SFTP isolation', () => {
   })
 
   it('surfaces transfer upload start failures on the file panel without toast', async () => {
-    transfer.upload.mockRejectedValueOnce(new Error('upload denied'))
+    transfer.uploadMany.mockRejectedValueOnce(new Error('upload denied'))
     runtime.openFile.mockResolvedValue('/tmp/a.txt')
     render(<TerminalLayers />)
     const terminalA = (await screen.findByTestId('terminal-term-a')).closest('[data-layer-id="terminal-a"]') as HTMLElement
@@ -200,7 +200,7 @@ describe('TerminalLayers SFTP isolation', () => {
     fireEvent.click(await within(terminalA).findByRole('button', { name: 'upload' }))
     expect(await within(terminalA).findByRole('alert')).toHaveTextContent('选择上传文件失败: picker unavailable')
     expect(notify).not.toHaveBeenCalledWith(expect.stringContaining('选择上传文件失败'), 'error')
-    expect(transfer.upload).not.toHaveBeenCalled()
+    expect(transfer.uploadMany).not.toHaveBeenCalled()
   })
 
   it('surfaces download dialog failures without unhandled rejections', async () => {
@@ -234,7 +234,37 @@ describe('TerminalLayers SFTP isolation', () => {
     expect(upload).toBeDisabled()
     expect(download).toBeDisabled()
     await act(async () => { picker.resolve('/tmp/current.txt'); await Promise.resolve() })
-    expect(transfer.upload).toHaveBeenCalledWith('/tmp/current.txt', '/')
+    expect(transfer.uploadMany).toHaveBeenCalledWith(['/tmp/current.txt'], '/')
+  })
+
+  it('queues every file picked in the multi-select upload dialog', async () => {
+    runtime.openFile.mockResolvedValue(['/tmp/a.txt', '/tmp/b.txt', '/tmp/a.txt', ''])
+    render(<TerminalLayers />)
+    const terminalA = (await screen.findByTestId('terminal-term-a')).closest('[data-layer-id="terminal-a"]') as HTMLElement
+    fireEvent.click(within(terminalA).getByRole('button', { name: 'files' }))
+    fireEvent.click(await within(terminalA).findByRole('button', { name: 'upload' }))
+
+    await waitFor(() => expect(transfer.uploadMany).toHaveBeenCalledWith(['/tmp/a.txt', '/tmp/b.txt'], '/'))
+    expect(runtime.openFile).toHaveBeenCalledWith(expect.objectContaining({ AllowsMultipleSelection: true }))
+    expect(within(terminalA).queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('treats dismissed native pickers as a no-op instead of an error', async () => {
+    runtime.saveFile.mockRejectedValue(new Error('Invalid dialog call: Dialog.SaveFile failed: error getting selection: cancelled by user'))
+    render(<TerminalLayers />)
+    const terminalA = (await screen.findByTestId('terminal-term-a')).closest('[data-layer-id="terminal-a"]') as HTMLElement
+    fireEvent.click(within(terminalA).getByRole('button', { name: 'files' }))
+    const download = await within(terminalA).findByRole('button', { name: 'download' })
+    fireEvent.click(download)
+
+    await waitFor(() => expect(download).toBeEnabled())
+    expect(within(terminalA).queryByRole('alert')).not.toBeInTheDocument()
+    expect(transfer.download).not.toHaveBeenCalled()
+
+    runtime.openFile.mockRejectedValue(new Error('Dialog.OpenFile failed: error getting selection: cancelled by user'))
+    fireEvent.click(within(terminalA).getByRole('button', { name: 'upload' }))
+    await waitFor(() => expect(transfer.uploadMany).not.toHaveBeenCalled())
+    expect(within(terminalA).queryByRole('alert')).not.toBeInTheDocument()
   })
 
   it('retains the native picker lease when the selected terminal changes', async () => {
@@ -257,7 +287,7 @@ describe('TerminalLayers SFTP isolation', () => {
     expect(runtime.saveFile).not.toHaveBeenCalled()
 
     await act(async () => { firstPicker.resolve('/tmp/stale.txt'); await Promise.resolve() })
-    expect(transfer.upload).not.toHaveBeenCalled()
+    expect(transfer.uploadMany).not.toHaveBeenCalled()
     await waitFor(() => expect(download).toBeEnabled())
     fireEvent.click(download)
     await waitFor(() => expect(runtime.saveFile).toHaveBeenCalledOnce())
@@ -275,11 +305,11 @@ describe('TerminalLayers SFTP isolation', () => {
     fireEvent.click(filesButton)
 
     await act(async () => { firstPicker.resolve('/tmp/stale.txt'); await Promise.resolve() })
-    expect(transfer.upload).not.toHaveBeenCalled()
+    expect(transfer.uploadMany).not.toHaveBeenCalled()
 
     fireEvent.click(filesButton)
     fireEvent.click(await within(terminalA).findByRole('button', { name: 'upload' }))
-    await waitFor(() => expect(transfer.upload).toHaveBeenCalledWith('/tmp/fresh.txt', '/'))
+    await waitFor(() => expect(transfer.uploadMany).toHaveBeenCalledWith(['/tmp/fresh.txt'], '/'))
     expect(runtime.openFile).toHaveBeenCalledTimes(2)
   })
 

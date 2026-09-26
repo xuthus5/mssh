@@ -24,6 +24,20 @@ describe('FileTreeView', () => {
     expect(await screen.findByText('main.go')).toBeInTheDocument()
   })
 
+  it('renders sibling rows with React keys and no warning', () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    render(<FileTreeView currentPath="/" files={[
+      { name: 'a.txt', path: '/a.txt', size: 1, modified: '', isDir: false },
+      { name: 'b.txt', path: '/b.txt', size: 1, modified: '', isDir: false },
+      { name: 'src', path: '/src', size: 0, modified: '', isDir: true },
+    ]} loading={false} showHiddenFiles={false} selected={null} onSelect={vi.fn()} onNavigate={vi.fn()} onDownload={vi.fn()} onLoadDirectory={vi.fn(async () => [])} />)
+
+    expect(screen.getAllByRole('treeitem')).toHaveLength(3)
+    const warnings = consoleError.mock.calls.flat().map((entry) => String(entry)).join(' ')
+    expect(warnings).not.toContain('unique "key"')
+    consoleError.mockRestore()
+  })
+
   it('shows hidden files when enabled and collapses an expanded directory', async () => {
     const user = userEvent.setup()
     const onLoadDirectory = vi.fn(async () => [])

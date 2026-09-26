@@ -126,6 +126,7 @@
   "串口配置已更新": "Serial profile updated",
   "串口配置正在执行其他操作，请稍后重试": "Another operation is already running for this serial profile. Try again shortly.",
   "单次最多拖拽 ${} 个文件": "Drop at most ${} files at a time",
+  "单次最多选择 ${} 个文件": "Select at most ${} files at a time",
   "主密钥": "Master key",
   "主机": "Host",
   "主机地址": "Host Address",

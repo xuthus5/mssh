@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
 import { useFileTransfer } from '@/hooks/useFileTransfer'
 import { __registerHandler, __clearHandlers } from '@/test/__mocks__/wails-runtime'
-import { useAppStore } from '@/store/appStore'
+import { useAppStore, type TransferJob } from '@/store/appStore'
 import { useToastStore } from '@/components/ui/toast'
 import { logger } from '@/lib/logger'
 
@@ -244,6 +244,24 @@ describe('useFileTransfer', () => {
     expect(useToastStore.getState().toasts.some((item) => item.message.includes('reload boom') || item.message.includes('加载文件列表失败'))).toBe(false)
   })
 
+  it('reloads the directory an upload landed in once the job completes', async () => {
+    const listed: string[] = []
+    __registerHandler('github.com/xuthus5/mssh/internal/service.FileService.ListDir', async (_sessionID: number, path: string) => {
+      listed.push(path)
+      return []
+    })
+    const { result } = renderHook(() => useFileTransfer(SESSION_ID))
+    await act(async () => { await result.current.listFiles('/srv') })
+    expect(listed).toEqual(['/srv'])
+
+    await act(async () => { useAppStore.setState({ transfers: [completedUpload('task-1', '/srv/app.log')] }) })
+    expect(listed).toEqual(['/srv', '/srv'])
+
+    // An upload into a directory this panel does not show must not reload it.
+    await act(async () => { useAppStore.setState({ transfers: [completedUpload('task-2', '/elsewhere/app.log')] }) })
+    expect(listed).toEqual(['/srv', '/srv'])
+  })
+
   it('ignores a directory response from the previous session', async () => {
     const oldDirectory = deferred<Array<{ name: string; path: string; size: number; is_dir: boolean; mod_time: string }>>()
     __registerHandler('github.com/xuthus5/mssh/internal/service.FileService.ListDir', async (sessionID: number) => {
@@ -292,4 +310,12 @@ function deferred<T>() {
   let resolve!: (value: T) => void
   const promise = new Promise<T>((resolvePromise) => { resolve = resolvePromise })
   return { promise, resolve }
+}
+
+function completedUpload(id: string, targetPath: string): TransferJob {
+  return {
+    id, fileName: 'app.log', direction: 'upload', sessionId: SESSION_ID, sessionName: '生产服务器',
+    sourcePath: '/tmp/app.log', targetPath, totalBytes: 1, transferredBytes: 1,
+    speed: 0, eta: 0, status: 'completed', startedAt: Date.now(),
+  }
 }
