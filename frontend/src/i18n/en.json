@@ -315,6 +315,7 @@
   "关闭所有活动连接？": "Close all active connections?",
   "仍有活动 SSH 连接或录制任务。全部关闭将终止远程会话且无法恢复。": "There are still active SSH connections or recordings. Closing all will terminate the remote sessions and cannot be undone.",
   "关闭所有标签": "Close all tabs",
+  "关闭提示": "Dismiss",
   "全部关闭": "Close all",
   "下次不再提醒，直接关闭": "Don't ask again and close",
   "退出后自动关闭终端": "Auto-close terminal after exit",
