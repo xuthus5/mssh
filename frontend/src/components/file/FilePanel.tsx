@@ -5,7 +5,8 @@ import { ArrowUp, FolderTree, List, RefreshCw } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { FilePanelAlerts } from '@/components/file/FilePanelAlerts'
 import { FileListView } from '@/components/file/FileListView'
 import { FileTreeView, filterHiddenFiles } from '@/components/file/FileTreeView'
 import { FileContextMenu } from '@/components/file/FileContextMenu'
@@ -24,6 +25,7 @@ interface Props {
   loading: boolean
   error?: string
   actionError?: string
+  onDismissActionError: () => void
   onNavigateTo: (path: string) => void
   onNavigateUp: () => void
   onDelete: (path: string, isDir?: boolean) => void | Promise<void>
@@ -51,7 +53,7 @@ function errorText(error: unknown): string {
 }
 
 export default function FilePanel(props: Props) {
-  const { open, onClose, files, currentPath, loading, onNavigateTo, onNavigateUp, onDelete, onRename, onMakeDir, onCreateFile, onUpload, onDownload, transferActionPending, dropTargetId, error, actionError = '', showHiddenFiles, defaultView, onLoadDirectory, onSyncCurrentDirectory, syncingCurrentDirectory, followsTerminalDirectory = false, catalogRevision = 0, externalCatalogRevision = 0, directoryMutationBusy = false, isMutationBusy = () => false } = props
+  const { open, onClose, files, currentPath, loading, onNavigateTo, onNavigateUp, onDelete, onRename, onMakeDir, onCreateFile, onUpload, onDownload, transferActionPending, dropTargetId, error, actionError = '', onDismissActionError, showHiddenFiles, defaultView, onLoadDirectory, onSyncCurrentDirectory, syncingCurrentDirectory, followsTerminalDirectory = false, catalogRevision = 0, externalCatalogRevision = 0, directoryMutationBusy = false, isMutationBusy = () => false } = props
   const state = useFilePanelState({ defaultView, currentPath, panelOpen: open, externalCatalogRevision })
   const selectedMutationBusy = state.selected ? isMutationBusy(state.selected) : false
   const panel = useToolPanelResize('files')
@@ -71,12 +73,8 @@ export default function FilePanel(props: Props) {
         onToggleMkdir={state.toggleMkdir}
         mkdirPending={state.mkdirPending} transferActionPending={transferActionPending}
         directoryMutationBusy={directoryMutationBusy} />
-      {error && <Alert variant="destructive" className="m-2"><AlertTitle>{t('目录加载失败')}</AlertTitle><AlertDescription>{error}<Button size="xs" variant="outline" className="ml-2" onClick={() => onNavigateTo(currentPath)}>{t('重试')}</Button></AlertDescription></Alert>}
-      {(actionError || state.mutationError) ? (
-        <Alert variant="destructive" className="m-2">
-          <AlertDescription>{actionError || state.mutationError}</AlertDescription>
-        </Alert>
-      ) : null}
+      <FilePanelAlerts error={error} actionError={actionError} mutationError={state.mutationError}
+        onRetry={() => onNavigateTo(currentPath)} onDismiss={() => { state.setMutationError(''); onDismissActionError() }} />
       {state.showMkdir && <MkdirForm name={state.mkdirName} pending={state.mkdirPending || directoryMutationBusy} onChange={state.setMkdirName} onSubmit={(event) => { void state.submitMkdir(event, onMakeDir, directoryMutationBusy) }} />}
       <FileContextMenu selected={state.selected} transferPending={transferActionPending !== null}
         directoryMutationBusy={directoryMutationBusy} selectedMutationBusy={selectedMutationBusy}
