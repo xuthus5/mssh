@@ -50,7 +50,7 @@ function FilePanelView({ transfer, actionError, transferActionPending, onClose, 
       <FilePanel open onClose={onClose} files={transfer.files} currentPath={transfer.currentPath}
         loading={transfer.loading} error={transfer.error} actionError={actionError} onNavigateTo={transfer.navigateTo}
         onNavigateUp={transfer.navigateUp} onDelete={transfer.deleteFile} onRename={transfer.renameFile}
-        onMakeDir={transfer.makeDir} onUpload={onUpload} onDownload={onDownload} dropTargetId={dropTargetID}
+        onMakeDir={transfer.makeDir} onCreateFile={transfer.createFile} onUpload={onUpload} onDownload={onDownload} dropTargetId={dropTargetID}
         showHiddenFiles={showHiddenFiles} defaultView={defaultView} onLoadDirectory={onLoadDirectory}
         transferActionPending={transferActionPending} onSyncCurrentDirectory={onSyncCurrentDirectory}
         syncingCurrentDirectory={syncingCurrentDirectory} catalogRevision={transfer.catalogRevision}

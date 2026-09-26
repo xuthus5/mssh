@@ -8,6 +8,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { FileListView } from '@/components/file/FileListView'
 import { FileTreeView, filterHiddenFiles } from '@/components/file/FileTreeView'
+import { FileContextMenu } from '@/components/file/FileContextMenu'
+import { FileCreateFileDialog } from '@/components/file/FileCreateFileDialog'
 import type { SFTPDefaultView } from '@/lib/sftpSettings'
 import { useToolPanelResize } from '@/hooks/useToolPanelResize'
 import { t } from '@/i18n'
@@ -27,6 +29,7 @@ interface Props {
   onDelete: (path: string, isDir?: boolean) => void | Promise<void>
   onRename: (oldPath: string, newName: string, isDir?: boolean) => void | Promise<void>
   onMakeDir: (name: string) => void | Promise<void>
+  onCreateFile: (name: string) => void | Promise<void>
   onUpload: () => void
   onDownload: (path: string) => void
   transferActionPending: 'upload' | 'download' | null
@@ -48,7 +51,7 @@ function errorText(error: unknown): string {
 }
 
 export default function FilePanel(props: Props) {
-  const { open, onClose, files, currentPath, loading, onNavigateTo, onNavigateUp, onDelete, onRename, onMakeDir, onUpload, onDownload, transferActionPending, dropTargetId, error, actionError = '', showHiddenFiles, defaultView, onLoadDirectory, onSyncCurrentDirectory, syncingCurrentDirectory, followsTerminalDirectory = false, catalogRevision = 0, externalCatalogRevision = 0, directoryMutationBusy = false, isMutationBusy = () => false } = props
+  const { open, onClose, files, currentPath, loading, onNavigateTo, onNavigateUp, onDelete, onRename, onMakeDir, onCreateFile, onUpload, onDownload, transferActionPending, dropTargetId, error, actionError = '', showHiddenFiles, defaultView, onLoadDirectory, onSyncCurrentDirectory, syncingCurrentDirectory, followsTerminalDirectory = false, catalogRevision = 0, externalCatalogRevision = 0, directoryMutationBusy = false, isMutationBusy = () => false } = props
   const state = useFilePanelState({ defaultView, currentPath, panelOpen: open, externalCatalogRevision })
   const selectedMutationBusy = state.selected ? isMutationBusy(state.selected) : false
   const panel = useToolPanelResize('files')
@@ -63,11 +66,11 @@ export default function FilePanel(props: Props) {
       <div className="pointer-events-none absolute inset-3 z-40 hidden place-items-center rounded-xl border-2 border-dashed border-primary bg-background/90 text-sm font-medium text-primary shadow-sm group-[.file-drop-target-active]/drop:grid">{t('释放文件以上传到当前目录')}</div>
       <PanelHeader onClose={onClose} onSyncCurrentDirectory={onSyncCurrentDirectory} syncingCurrentDirectory={syncingCurrentDirectory} followsTerminalDirectory={followsTerminalDirectory} />
       <PathBar currentPath={currentPath} onNavigateUp={onNavigateUp} onNavigateTo={onNavigateTo} />
-      <FileActions selected={state.selected} currentPath={currentPath} view={state.view} showMkdir={state.showMkdir}
-        onUpload={onUpload} onDownload={onDownload} onNavigateTo={onNavigateTo} onSetView={state.setView}
-        onToggleMkdir={state.toggleMkdir} onRename={state.openRename} onDelete={state.openDelete}
+      <FileActions currentPath={currentPath} view={state.view} showMkdir={state.showMkdir}
+        onUpload={onUpload} onNavigateTo={onNavigateTo} onSetView={state.setView}
+        onToggleMkdir={state.toggleMkdir}
         mkdirPending={state.mkdirPending} transferActionPending={transferActionPending}
-        directoryMutationBusy={directoryMutationBusy} selectedMutationBusy={selectedMutationBusy} />
+        directoryMutationBusy={directoryMutationBusy} />
       {error && <Alert variant="destructive" className="m-2"><AlertTitle>{t('目录加载失败')}</AlertTitle><AlertDescription>{error}<Button size="xs" variant="outline" className="ml-2" onClick={() => onNavigateTo(currentPath)}>{t('重试')}</Button></AlertDescription></Alert>}
       {(actionError || state.mutationError) ? (
         <Alert variant="destructive" className="m-2">
@@ -75,11 +78,20 @@ export default function FilePanel(props: Props) {
         </Alert>
       ) : null}
       {state.showMkdir && <MkdirForm name={state.mkdirName} pending={state.mkdirPending || directoryMutationBusy} onChange={state.setMkdirName} onSubmit={(event) => { void state.submitMkdir(event, onMakeDir, directoryMutationBusy) }} />}
-      <FileContent view={state.view} files={files} loading={loading} currentPath={currentPath} showHiddenFiles={showHiddenFiles}
-        selected={state.selected} onSelect={state.setSelected} onNavigate={onNavigateTo} onDownload={onDownload}
-        onLoadDirectory={onLoadDirectory} catalogRevision={catalogRevision} isMutationBusy={isMutationBusy} />
+      <FileContextMenu selected={state.selected} transferPending={transferActionPending !== null}
+        directoryMutationBusy={directoryMutationBusy} selectedMutationBusy={selectedMutationBusy}
+        actions={{
+          onUpload, onDownload, onRename: state.openRename, onDelete: state.openDelete, onRefresh: () => onNavigateTo(currentPath),
+          onCreateFile: () => state.setCreateFileOpen(true), onMakeDir: state.openMkdir,
+        }}>
+        <FileContent view={state.view} files={files} loading={loading} currentPath={currentPath} showHiddenFiles={showHiddenFiles}
+          selected={state.selected} onSelect={state.setSelected} onNavigate={onNavigateTo} onDownload={onDownload}
+          onLoadDirectory={onLoadDirectory} catalogRevision={catalogRevision} isMutationBusy={isMutationBusy} />
+      </FileContextMenu>
     </aside> : null}
     {dialogs}
+    <FileCreateFileDialog panelOpen={open} open={state.createFileOpen} onOpenChange={state.setCreateFileOpen}
+      currentPath={currentPath} externalBusy={directoryMutationBusy} onCreate={onCreateFile} />
     </>
   )
 }
@@ -127,13 +139,15 @@ function useExternalCatalogReset(options: {
   setSelected: (file: FileInfo | null) => void
   setRenameOpen: (open: boolean) => void
   setDeleteOpen: (open: boolean) => void
+  setCreateFileOpen: (open: boolean) => void
 }) {
-  const { revision, setSelected, setRenameOpen, setDeleteOpen } = options
+  const { revision, setSelected, setRenameOpen, setDeleteOpen, setCreateFileOpen } = options
   useEffect(() => {
     setSelected(null)
     setRenameOpen(false)
     setDeleteOpen(false)
-  }, [revision, setDeleteOpen, setRenameOpen, setSelected])
+    setCreateFileOpen(false)
+  }, [revision, setCreateFileOpen, setDeleteOpen, setRenameOpen, setSelected])
 }
 
 function useFilePanelState(options: FilePanelStateOptions) {
@@ -144,6 +158,7 @@ function useFilePanelState(options: FilePanelStateOptions) {
   const [renameOpen, setRenameOpen] = useState(false)
   const [renameName, setRenameName] = useState('')
   const [deleteOpen, setDeleteOpen] = useState(false)
+  const [createFileOpen, setCreateFileOpen] = useState(false)
   const [view, setView] = useState<SFTPDefaultView>(defaultView)
   const [mutationError, setMutationError] = useState('')
   const [mkdirPending, setMkdirPending] = useState(false)
@@ -153,6 +168,7 @@ function useFilePanelState(options: FilePanelStateOptions) {
     setSelected,
     setRenameOpen,
     setDeleteOpen,
+    setCreateFileOpen,
   })
   const submitMkdir = createMkdirSubmit({
     runtime, panelOpen, mkdirName, setMkdirName, setShowMkdir, setMkdirPending, setMutationError,
@@ -163,10 +179,16 @@ function useFilePanelState(options: FilePanelStateOptions) {
     runtime.generation.current++
     setShowMkdir((current) => !current)
   }
+  const openMkdir = () => {
+    if (runtime.mkdirActive.current) return
+    runtime.generation.current++
+    setShowMkdir(true)
+  }
   return {
-    mkdirName, setMkdirName, showMkdir, mkdirPending, toggleMkdir, submitMkdir,
+    mkdirName, setMkdirName, showMkdir, mkdirPending, toggleMkdir, openMkdir, submitMkdir,
     selected, setSelected, renameOpen, setRenameOpen, renameName, setRenameName, openRename,
     deleteOpen, setDeleteOpen, openDelete: () => setDeleteOpen(true), view, setView, mutationError, setMutationError,
+    createFileOpen, setCreateFileOpen,
   }
 }
 
@@ -188,9 +210,9 @@ function PathBar({ currentPath, onNavigateUp, onNavigateTo }: { currentPath: str
   return <div className="flex items-center gap-1 overflow-x-auto border-b border-border px-3 py-1.5"><button type="button" aria-label={t('上级目录')} className="flex-shrink-0 rounded p-0.5 hover:bg-muted" onClick={onNavigateUp}><ArrowUp className="size-3.5" /></button>{currentPath === '/' ? <span className="text-sm text-muted-foreground">/</span> : breadcrumbs.map((crumb) => <span key={crumb.path} className="flex items-center text-sm"><span className="text-muted-foreground">/</span><button type="button" className="text-muted-foreground hover:text-foreground hover:underline" onClick={() => onNavigateTo(crumb.path)}>{crumb.name}</button></span>)}</div>
 }
 
-function FileActions({ selected, currentPath, view, showMkdir, mkdirPending, transferActionPending, directoryMutationBusy, selectedMutationBusy, onUpload, onDownload, onNavigateTo, onSetView, onToggleMkdir, onRename, onDelete }: { selected: FileInfo | null; currentPath: string; view: SFTPDefaultView; showMkdir: boolean; mkdirPending: boolean; transferActionPending: 'upload' | 'download' | null; directoryMutationBusy: boolean; selectedMutationBusy: boolean; onUpload: () => void; onDownload: (path: string) => void; onNavigateTo: (path: string) => void; onSetView: (view: SFTPDefaultView) => void; onToggleMkdir: () => void; onRename: () => void; onDelete: () => void }) {
+function FileActions({ currentPath, view, showMkdir, mkdirPending, transferActionPending, directoryMutationBusy, onUpload, onNavigateTo, onSetView, onToggleMkdir }: { currentPath: string; view: SFTPDefaultView; showMkdir: boolean; mkdirPending: boolean; transferActionPending: 'upload' | 'download' | null; directoryMutationBusy: boolean; onUpload: () => void; onNavigateTo: (path: string) => void; onSetView: (view: SFTPDefaultView) => void; onToggleMkdir: () => void }) {
   const transferPending = transferActionPending !== null
-  return <div className="flex items-center gap-1 overflow-x-auto border-b border-border px-3 py-1.5"><Button size="xs" variant="outline" disabled={transferPending || directoryMutationBusy} onClick={onUpload}>{transferActionPending === 'upload' ? t('处理中…') : t('上传')}</Button><Button size="xs" variant="outline" disabled={mkdirPending || (directoryMutationBusy && !showMkdir)} aria-pressed={showMkdir} onClick={onToggleMkdir}>{t('新建文件夹')}</Button><Button size="xs" variant="outline" disabled={!selected || transferPending || selectedMutationBusy} onClick={() => { if (selected) onDownload(selected.path) }}>{transferActionPending === 'download' ? t('处理中…') : t('下载')}</Button><Button size="xs" variant="outline" disabled={!selected || selectedMutationBusy} onClick={onRename}>{t('重命名')}</Button><Button size="xs" variant="destructive" disabled={!selected || selectedMutationBusy} onClick={onDelete}>{t('删除')}</Button><Button size="xs" variant="ghost" onClick={() => onNavigateTo(currentPath)}>{t('刷新')}</Button><div className="flex items-center rounded-md border border-border p-0.5" role="group" aria-label={t('文件视图')}><Button size="icon-xs" variant={view === 'list' ? 'secondary' : 'ghost'} aria-label={t('列表视图')} onClick={() => onSetView('list')}><List /></Button><Button size="icon-xs" variant={view === 'tree' ? 'secondary' : 'ghost'} aria-label={t('树状视图')} onClick={() => onSetView('tree')}><FolderTree /></Button></div></div>
+  return <div className="flex items-center gap-1 overflow-x-auto border-b border-border px-3 py-1.5"><Button size="xs" variant="outline" disabled={transferPending || directoryMutationBusy} onClick={onUpload}>{transferActionPending === 'upload' ? t('处理中…') : t('上传')}</Button><Button size="xs" variant="outline" disabled={mkdirPending || (directoryMutationBusy && !showMkdir)} aria-pressed={showMkdir} onClick={onToggleMkdir}>{t('新建文件夹')}</Button><Button size="xs" variant="ghost" onClick={() => onNavigateTo(currentPath)}>{t('刷新')}</Button><div className="flex items-center rounded-md border border-border p-0.5" role="group" aria-label={t('文件视图')}><Button size="icon-xs" variant={view === 'list' ? 'secondary' : 'ghost'} aria-label={t('列表视图')} onClick={() => onSetView('list')}><List /></Button><Button size="icon-xs" variant={view === 'tree' ? 'secondary' : 'ghost'} aria-label={t('树状视图')} onClick={() => onSetView('tree')}><FolderTree /></Button></div></div>
 }
 
 function useFileDialogRuntime({ panelOpen, renameOpen, deleteOpen, selectedPath, setBusy, setDeleteError }: {

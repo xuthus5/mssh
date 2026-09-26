@@ -28,6 +28,16 @@ func (f *FileService) Mkdir(sessionID int64, path string) error {
 	})
 }
 
+// CreateFile creates an empty remote file through SFTP.
+func (f *FileService) CreateFile(sessionID int64, path string) error {
+	if err := validateRemotePath(path); err != nil {
+		return fmt.Errorf("create file: %w", err)
+	}
+	return f.runMetadataMutation(sessionID, "create", func(client *ssh.SFTPClient) error {
+		return ssh.CreateFile(client, path)
+	})
+}
+
 // Rename renames a remote file through SFTP.
 func (f *FileService) Rename(sessionID int64, oldPath, newPath string) error {
 	if err := validateRemotePath(oldPath); err != nil {

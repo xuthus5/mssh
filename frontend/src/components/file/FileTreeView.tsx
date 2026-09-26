@@ -156,6 +156,7 @@ function FileTreeNode({ node, index, itemID, state, props, toggle }: {
         className={selected ? 'flex h-8 items-center gap-1 bg-muted px-2 text-sm' : 'flex h-8 items-center gap-1 px-2 text-sm hover:bg-muted/60'}
         style={{ paddingLeft: `${8 + node.depth * 16}px` }}
         onClick={() => { state.setActiveIndex(index); props.onSelect(node.file) }}
+        onContextMenu={() => { state.setActiveIndex(index); props.onSelect(node.file) }}
         onDoubleClick={() => { if (busy) return; if (node.file.isDir) props.onNavigate(node.file.path); else props.onDownload(node.file.path) }}
       >
         {node.file.isDir ? (
