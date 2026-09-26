@@ -18,7 +18,7 @@
 - 执行测试过程中产生的临时构建产物，比如二进制文件，测试数据等要进行清理
 - 代码编写完毕后，如果项目有README.md文件，需要做必要的修改，注意确保README.md文件的简洁性，不要啰嗦
 - **提交 / 推送前必须跑通与 CI 对齐的本地门禁**：`wails3 task ci`（或 `wails3 task check`）。该命令依次执行：
-  1. `golangci-lint run --timeout 5m ./...`（与 CI 同命令；工具版本与 CI 保持一致，当前为 v2.12.2）
+  1. `golangci-lint run --timeout 5m ./...`（与 CI 同命令；工具版本与 CI 保持一致，当前为 v2.14.0）
   2. 后端：`go test -race -coverprofile=coverage.out -covermode=atomic -coverpkg=./internal/...,./pkg/... ./internal/... ./pkg/...`，且 total coverage ≥ 90%
   3. 前端：`npm run check:source-limits`、`npm run check:bundle-budget`、`npm test`（在 `frontend/`）
   4. 生产构建：`wails3 task build`（等同 CI 的生产构建）
