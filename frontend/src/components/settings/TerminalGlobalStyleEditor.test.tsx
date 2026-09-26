@@ -94,9 +94,9 @@ describe('TerminalGlobalStyleEditor', () => {
   })
 
   it('warns when ligatures are enabled under a non-DOM renderer', () => {
-    useTerminalBehaviorStore.setState({ ...DEFAULT_TERMINAL_BEHAVIOR, renderer: 'canvas' })
+    useTerminalBehaviorStore.setState({ ...DEFAULT_TERMINAL_BEHAVIOR, renderer: 'webgl' })
     render(<TerminalGlobalStyleEditor style={{ ...globalStyle(), ligatures_enabled: true } as never} onChange={vi.fn()} />)
-    expect(screen.getByText(/当前渲染器为 Canvas/)).toBeInTheDocument()
+    expect(screen.getByText(/当前渲染器为 WebGL/)).toBeInTheDocument()
   })
 
   it('does not warn for a DOM renderer with ligatures enabled', () => {

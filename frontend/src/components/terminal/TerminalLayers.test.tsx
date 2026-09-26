@@ -65,7 +65,7 @@ describe('TerminalLayers focus targeting', () => {
     expect(panel).toHaveAttribute('aria-labelledby', 'dynamic-tab-tab-1')
   })
 
-  it('directly hides the canvas cursor layer for inactive terminal tabs', () => {
+  it('directly hides the terminal cursor layer for inactive terminal tabs', () => {
     useAppStore.setState({
       tabs: [
         { id: 'tab-1', title: 'First', type: 'terminal', terminalId: 'primary-1', sessionId: 1 },

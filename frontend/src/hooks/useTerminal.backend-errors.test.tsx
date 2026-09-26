@@ -48,7 +48,6 @@ vi.mock('@xterm/xterm', () => ({
   },
 }))
 vi.mock('@xterm/addon-fit', () => ({ FitAddon: class { proposeDimensions() { return { cols: 80, rows: 24 } }; fit() {}; dispose() {} } }))
-vi.mock('@xterm/addon-canvas', () => ({ CanvasAddon: class { dispose() {} } }))
 vi.mock('@xterm/addon-webgl', () => ({ WebglAddon: class { dispose() {} } }))
 vi.mock('@xterm/addon-unicode11', () => ({ Unicode11Addon: class { dispose() {} } }))
 vi.mock('@xterm/addon-search', () => ({ SearchAddon: class { dispose() {} } }))

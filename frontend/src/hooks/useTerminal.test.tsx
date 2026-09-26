@@ -8,7 +8,7 @@ const terminalInstances: Array<{ cols: number; rows: number }> = []
 const terminalDisposes: Array<ReturnType<typeof vi.fn>> = []
 const dataDisposes: Array<ReturnType<typeof vi.fn>> = []
 const addonDisposes: Array<ReturnType<typeof vi.fn>> = []
-const canvasDisposes: Array<ReturnType<typeof vi.fn>> = []
+const webglDisposes: Array<ReturnType<typeof vi.fn>> = []
 const observerDisconnects: Array<ReturnType<typeof vi.fn>> = []
 const outputUnsubscribes: Array<ReturnType<typeof vi.fn>> = []
 const parserHandlers: Array<(params: Array<number | number[]>) => boolean> = []
@@ -23,7 +23,7 @@ const terminalWrites: Array<string | Uint8Array> = []
 const resizeHandlers: ResizeObserverCallback[] = []
 let runtimeFailure: 'fit' | 'refresh' | 'focus' | 'write' | null = null
 let proposedDimensions: Array<{ cols: number; rows: number } | undefined> = []
-let canvasLoadFailure = false
+let webglLoadFailure = false
 
 class MockTerminal {
   cols = 80
@@ -44,7 +44,7 @@ class MockTerminal {
   loadAddon(addon: { name: string; dispose: () => void }) {
     calls.push(`load:${addon.name}`)
     this.addons.push(addon)
-    if (addon.name === 'canvas' && canvasLoadFailure) throw new Error('canvas unavailable')
+    if (addon.name === 'webgl' && webglLoadFailure) throw new Error('webgl unavailable')
   }
   get unicode() {
     if (!this.allowProposedApi) throw new Error('you must set the allowProposedApi option to true to use proposed api')
@@ -103,18 +103,12 @@ vi.mock('@xterm/addon-fit', () => ({
   },
 }))
 
-vi.mock('@xterm/addon-canvas', () => ({
-  CanvasAddon: class {
-    name = 'canvas'
-    private canvasDispose = vi.fn()
-    constructor() { canvasDisposes.push(this.canvasDispose) }
-    dispose() { this.canvasDispose() }
-  },
-}))
-
 vi.mock('@xterm/addon-webgl', () => ({
   WebglAddon: class {
-    dispose() {}
+    name = 'webgl'
+    private webglDispose = vi.fn()
+    constructor() { webglDisposes.push(this.webglDispose) }
+    dispose() { this.webglDispose() }
   },
 }))
 
@@ -165,7 +159,7 @@ describe('useTerminal', () => {
     terminalDisposes.length = 0
     dataDisposes.length = 0
     addonDisposes.length = 0
-    canvasDisposes.length = 0
+    webglDisposes.length = 0
     observerDisconnects.length = 0
     outputUnsubscribes.length = 0
     parserHandlers.length = 0
@@ -180,7 +174,7 @@ describe('useTerminal', () => {
     resizeHandlers.length = 0
     runtimeFailure = null
     proposedDimensions = []
-    canvasLoadFailure = false
+    webglLoadFailure = false
     Object.defineProperty(document, 'fonts', { configurable: true, value: undefined })
     useTerminalBehaviorStore.setState({ rightClickAction: 'menu', copyOnSelect: false, autoReconnect: false, restoreTabsOnStartup: true, scrollbackLines: 10000, renderer: 'dom', historyPredict: false, autoCloseTerminalOnExit: false })
     vi.stubGlobal('ResizeObserver', class {
@@ -249,19 +243,19 @@ describe('useTerminal', () => {
     expect(parserHandlers[1]([0, 1])).toBe(false)
   })
 
-  it('falls back to the DOM renderer when canvas activation fails', () => {
+  it('falls back to the DOM renderer when webgl activation fails', () => {
     const warn = vi.spyOn(logger, 'warn').mockImplementation(() => {})
-    canvasLoadFailure = true
-    useTerminalBehaviorStore.setState({ renderer: 'canvas' })
+    webglLoadFailure = true
+    useTerminalBehaviorStore.setState({ renderer: 'webgl' })
     const containerRef = createRef<HTMLDivElement>()
     containerRef.current = document.createElement('div')
 
-    const { unmount } = renderHook(() => useTerminal('term-canvas-fallback', containerRef, { active: false, focusRequest: { sequence: 0 } }))
+    const { unmount } = renderHook(() => useTerminal('term-webgl-fallback', containerRef, { active: false, focusRequest: { sequence: 0 } }))
 
-    expect(calls).toEqual(['open', 'load:canvas', 'load:undefined', 'load:unicode11', 'load:search', 'load:fit', 'blur'])
-    expect(warn).toHaveBeenCalledWith('terminal canvas renderer unavailable', expect.objectContaining({ message: 'canvas unavailable' }))
+    expect(calls).toEqual(['open', 'load:webgl', 'load:undefined', 'load:unicode11', 'load:search', 'load:fit', 'blur'])
+    expect(warn).toHaveBeenCalledWith('terminal webgl renderer unavailable', expect.objectContaining({ message: 'webgl unavailable' }))
     act(() => unmount())
-    expect(canvasDisposes[0]).toHaveBeenCalledOnce()
+    expect(webglDisposes[0]).toHaveBeenCalledOnce()
   })
 
   it('uses the restored global theme for the first terminal instance', () => {
@@ -473,7 +467,6 @@ describe('useTerminal', () => {
     expect(terminalDisposes.every((dispose) => dispose.mock.calls.length === 1)).toBe(true)
     expect(dataDisposes.every((dispose) => dispose.mock.calls.length === 1)).toBe(true)
     expect(addonDisposes.every((dispose) => dispose.mock.calls.length === 1)).toBe(true)
-    expect(canvasDisposes.every((dispose) => dispose.mock.calls.length === 1)).toBe(true)
     expect(observerDisconnects.every((disconnect) => disconnect.mock.calls.length === 1)).toBe(true)
     expect(outputUnsubscribes.every((unsubscribe) => unsubscribe.mock.calls.length === 1)).toBe(true)
     expect(themeUnsubscribes.every((unsubscribe) => unsubscribe.mock.calls.length === 1)).toBe(true)

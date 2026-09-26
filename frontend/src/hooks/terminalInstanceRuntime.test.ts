@@ -10,6 +10,7 @@ import {
   createLigaturesController,
   createTerminalInstance,
   createTerminalRendererController,
+  resolveTerminalRenderer,
 } from '@/hooks/terminalInstanceRuntime'
 
 const constructed: Array<Record<string, unknown>> = []
@@ -23,12 +24,6 @@ vi.mock('@xterm/xterm', () => ({
       constructed.push(options)
       this.options = { ...options }
     }
-  },
-}))
-
-vi.mock('@xterm/addon-canvas', () => ({
-  CanvasAddon: class {
-    dispose = vi.fn()
   },
 }))
 
@@ -77,16 +72,20 @@ describe('terminalInstanceRuntime renderer', () => {
     useTerminalBehaviorStore.setState(DEFAULT_TERMINAL_BEHAVIOR)
   })
 
-  it('loads webgl and canvas addons on demand and falls back to dom', () => {
+  it('loads the webgl addon on demand and falls back to dom', () => {
     const term = createTerminalInstance()
     const controller = createTerminalRendererController(term as never)
     expect(controller.apply('dom')).toBe('dom')
     expect(loadAddon).not.toHaveBeenCalled()
-    expect(controller.apply('canvas')).toBe('canvas')
-    expect(loadAddon).toHaveBeenCalledTimes(1)
     expect(controller.apply('webgl')).toBe('webgl')
-    expect(loadAddon).toHaveBeenCalledTimes(2)
+    expect(loadAddon).toHaveBeenCalledTimes(1)
     expect(controller.apply('dom')).toBe('dom')
+    expect(controller.mode()).toBe('dom')
+  })
+
+  it('resolves the retired canvas renderer to dom', () => {
+    expect(resolveTerminalRenderer('canvas')).toBe('dom')
+    expect(resolveTerminalRenderer('webgl')).toBe('webgl')
   })
 })
 
