@@ -184,7 +184,7 @@ wails3 task dev
 
 ### Prerequisites
 
-- Go 1.26+
+- Go 1.27+
 - Node.js 24+
 - [Wails v3 CLI](https://github.com/wailsapp/wails) (`go install github.com/wailsapp/wails/v3/cmd/wails3@latest`)
 - Linux only: GTK4 and WebKitGTK 6.0 development packages
@@ -260,7 +260,7 @@ For packaging details, see [docs/packaging.md](docs/packaging.md).
 | Layer | Technology |
 | --- | --- |
 | Frontend | React 19, TypeScript, Vite 6, Tailwind CSS 4, xterm.js |
-| Backend | Go 1.26, Wails v3 (GTK4 + WebKitGTK 6.0) |
+| Backend | Go 1.27, Wails v3 (GTK4 + WebKitGTK 6.0) |
 | Database | SQLite (modernc.org/sqlite) |
 | SSH | golang.org/x/crypto, pkg/sftp |
 | Crypto | Argon2id, AES-256-GCM |

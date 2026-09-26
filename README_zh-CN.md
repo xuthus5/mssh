@@ -184,7 +184,7 @@ wails3 task dev
 
 ### 前置要求
 
-- Go 1.26+
+- Go 1.27+
 - Node.js 24+
 - [Wails v3 CLI](https://github.com/wailsapp/wails)（`go install github.com/wailsapp/wails/v3/cmd/wails3@latest`）
 - Linux 仅开发环境需要 GTK4 与 WebKitGTK 6.0 开发包
@@ -260,7 +260,7 @@ wails3 task package
 | 层次 | 技术 |
 | --- | --- |
 | 前端 | React 19、TypeScript、Vite 6、Tailwind CSS 4、xterm.js |
-| 后端 | Go 1.26、Wails v3（GTK4 + WebKitGTK 6.0） |
+| 后端 | Go 1.27、Wails v3（GTK4 + WebKitGTK 6.0） |
 | 数据库 | SQLite（modernc.org/sqlite） |
 | SSH | golang.org/x/crypto、pkg/sftp |
 | 加密 | Argon2id、AES-256-GCM |
