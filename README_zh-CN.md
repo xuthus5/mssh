@@ -93,7 +93,7 @@ MSSH 不是集群编排平台。它聚焦已保存 SSH 会话和终端中心化�
 ### 串口与桌面集成
 
 - 串口终端支持 300 到 4,000,000 波特率
-- 支持数据位、校验位、停止位、XON-XOFF、RTS-CTS、DSR-DTR 流程控制
+- 支持数据位、校验位、停止位与手动 DTR/RTS 信号；在公开驱动 API 无法表达握手模式前，硬件/软件流控会被明确拒绝并给出错误
 - 支持 DTR、RTS、Break、本地回显和设备独占锁
 - 系统托盘、关闭按钮行为配置和按日写入的本地日志
 
@@ -184,9 +184,9 @@ wails3 task dev
 
 ### 前置要求
 
-- Go 1.27+
-- Node.js 24+
-- [Wails v3 CLI](https://github.com/wailsapp/wails)（`go install github.com/wailsapp/wails/v3/cmd/wails3@latest`）
+- Go 1.27+（补丁版本以 `.go-version` 为准）
+- Node.js 24+（精确版本以 `.node-version` 为准）
+- [Wails v3 CLI](https://github.com/wailsapp/wails)，版本以 `.wails-version` 为准：`go install github.com/wailsapp/wails/v3/cmd/wails3@$(tr -d '\r\n' < .wails-version)`
 - Linux 仅开发环境需要 GTK4 与 WebKitGTK 6.0 开发包
 
 ### 质量门禁
@@ -195,12 +195,15 @@ wails3 task dev
 wails3 task ci
 ```
 
-该命令会执行：
+门禁会先校验本机 Go、Node.js、Wails 版本与上述三个文件**完全一致**，版本更高同样不通过（这是刻意的版本源约束）。
+随后依次执行：
 
-1. `golangci-lint run --timeout 5m ./...`
+1. `golangci-lint run --timeout 5m ./...`（v2.12.2，需用钉定的 Go 版本编译）
 2. `go test -race -coverprofile=coverage.out -covermode=atomic -coverpkg=./internal/...,./pkg/... ./internal/... ./pkg/...`
 3. `npm run check:source-limits`、`npm run check:bundle-budget`、`npm test`
 4. `wails3 task build`
+
+后端测试阶段面向 Linux：CI 在 `ubuntu-latest` 上执行，且部分用例断言 POSIX 路径与文件权限位。Windows 上请改用 `wails3 task test:windows`（配合 `wails3 task lint` 与 `go vet ./...`），不要期望完整 `ci` 门禁在 Windows 通过。
 
 ### 常用任务
 
@@ -259,7 +262,7 @@ wails3 task package
 
 | 层次 | 技术 |
 | --- | --- |
-| 前端 | React 19、TypeScript、Vite 6、Tailwind CSS 4、xterm.js |
+| 前端 | React 19、TypeScript 7、Vite 8、Tailwind CSS 4、xterm.js 6 |
 | 后端 | Go 1.27、Wails v3（GTK4 + WebKitGTK 6.0） |
 | 数据库 | SQLite（modernc.org/sqlite） |
 | SSH | golang.org/x/crypto、pkg/sftp |
