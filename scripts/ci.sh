@@ -11,8 +11,8 @@ fi
 echo "wails3 not found; running gate steps directly" >&2
 
 if ! command -v golangci-lint >/dev/null 2>&1; then
-  echo "install golangci-lint v2.14.0 first:" >&2
-  echo "  go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.14.0" >&2
+  echo "install golangci-lint (latest) first:" >&2
+  echo "  go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest" >&2
   exit 1
 fi
 

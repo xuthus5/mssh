@@ -18,8 +18,10 @@ jobs:
       - name: Install Wails CLI
         run: go install github.com/wailsapp/wails/v3/cmd/wails3@$(tr -d '\r\n' < .wails-version)
       - name: Install golangci-lint
+        # Deliberately unpinned: the project tracks the latest release instead of
+        # owning a version bump chore. Pin it here if a future release misbehaves.
         run: |
-          go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.14.0
+          go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest
           golangci-lint version
       - name: Ensure frontend embed assets
         run: |

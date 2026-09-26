@@ -115,14 +115,12 @@ tasks:
           PRODUCTION: "true"
 
   lint:
-    summary: Run golangci-lint with the same version and flags as CI
-    vars:
-      GOLANGCI_LINT_VERSION: '{{.GOLANGCI_LINT_VERSION | default "v2.14.0"}}'
+    summary: Run golangci-lint with the same flags as CI (latest release)
     cmds:
       - |
         set -euo pipefail
         if ! command -v golangci-lint >/dev/null 2>&1; then
-          echo "golangci-lint not found; install with: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@{{.GOLANGCI_LINT_VERSION}}"
+          echo "golangci-lint not found; install with: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest"
           exit 1
         fi
         golangci-lint version

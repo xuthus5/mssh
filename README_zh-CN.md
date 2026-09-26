@@ -198,7 +198,7 @@ wails3 task ci
 门禁会先校验本机 Go、Node.js、Wails 版本与上述三个文件**完全一致**，版本更高同样不通过（这是刻意的版本源约束）。
 随后依次执行：
 
-1. `golangci-lint run --timeout 5m ./...`（v2.14.0，需用钉定的 Go 版本编译）
+1. `golangci-lint run --timeout 5m ./...`（最新发布版，需用钉定的 Go 版本编译）
 2. `go test -race -coverprofile=coverage.out -covermode=atomic -coverpkg=./internal/...,./pkg/... ./internal/... ./pkg/...`
 3. `npm run check:source-limits`、`npm run check:bundle-budget`、`npm test`
 4. `wails3 task build`
