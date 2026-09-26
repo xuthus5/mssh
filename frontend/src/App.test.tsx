@@ -157,7 +157,7 @@ describe('persistent content layers', () => {
     act(() => runtime.dropped?.({ data: { files: ['/tmp/drop.txt'], details: { id: 'sftp-drop-zone-term-1' } } }))
     expect(transfer.uploadMany).toHaveBeenCalledWith(['/tmp/drop.txt'], '/')
     fireEvent.click(screen.getByRole('button', { name: 'upload file' }))
-    await waitFor(() => expect(transfer.upload).toHaveBeenCalledWith('/tmp/upload.txt', '/'))
+    await waitFor(() => expect(transfer.uploadMany).toHaveBeenCalledWith(['/tmp/upload.txt'], '/'))
     fireEvent.click(screen.getByRole('button', { name: 'download file' }))
     await waitFor(() => expect(transfer.download).toHaveBeenCalledWith('/remote/file.txt', '/tmp/download.txt'))
     fireEvent.click(screen.getByRole('button', { name: 'close files' }))

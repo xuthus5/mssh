@@ -3,6 +3,7 @@ import { Dialogs, Events } from '@wailsio/runtime'
 import { toast } from '@/components/ui/toast'
 import { MANUAL_TERMINAL_DIRECTORY_REPORT, waitForTerminalWorkingDirectory } from '@/hooks/terminalDirectoryRuntime'
 import { useFileTransfer } from '@/hooks/useFileTransfer'
+import { isNativeDialogCancellation } from '@/lib/nativeDialog'
 import { t } from '@/i18n'
 import { TerminalService } from '@/lib/wails'
 import { useSFTPSettingsStore } from '@/store/sftpSettingsStore'
@@ -11,7 +12,8 @@ import { useTerminalDirectoryStore } from '@/store/terminalDirectoryStore'
 type FileTransfer = ReturnType<typeof useFileTransfer>
 type SetError = Dispatch<SetStateAction<string>>
 type TransferDialogAction = 'upload' | 'download'
-const maxDroppedUploadFiles = 32
+/** Cap for one drag-and-drop batch and for one multi-select picker run. */
+const maxBatchUploadFiles = 32
 
 function usePanelLifecycle(identity: string) {
   const lifecycle = useRef(0)
@@ -135,8 +137,8 @@ function useDroppedFileUpload(options: {
       options.setActionError(t('上传队列正在处理，请稍后重试'))
       return
     }
-    if (files.length > maxDroppedUploadFiles) {
-      options.setActionError(t('单次最多拖拽 ${} 个文件', maxDroppedUploadFiles))
+    if (files.length > maxBatchUploadFiles) {
+      options.setActionError(t('单次最多拖拽 ${} 个文件', maxBatchUploadFiles))
       return
     }
     active.current = true
@@ -165,21 +167,25 @@ function useUploadDialog(options: {
       options.setActionError('')
       const selected = await Dialogs.OpenFile({
         Title: t('选择要上传的文件'), CanChooseFiles: true,
-        CanChooseDirectories: false, AllowsMultipleSelection: false,
+        CanChooseDirectories: false, AllowsMultipleSelection: true,
       })
-      const localPath = typeof selected === 'string' ? selected : selected?.[0] ?? ''
-      if (!isCurrent() || !localPath) return
+      const localPaths = [...new Set((Array.isArray(selected) ? selected : [selected]).filter(Boolean))] as string[]
+      if (!isCurrent() || localPaths.length === 0) return
+      if (localPaths.length > maxBatchUploadFiles) {
+        options.setActionError(t('单次最多选择 ${} 个文件', maxBatchUploadFiles))
+        return
+      }
       phase = 'transfer'
-      await options.transfer.upload(localPath, options.transfer.currentPath)
+      await options.transfer.uploadMany(localPaths, options.transfer.currentPath)
     } catch (error) {
-      if (isCurrent()) {
+      if (isCurrent() && !isNativeDialogCancellation(error)) {
         const message = error instanceof Error ? error.message : String(error)
         options.setActionError(t(phase === 'picker' ? '选择上传文件失败: ${}' : '上传失败: ${}', message))
       }
     } finally {
       finishTransferDialog(options.dialog, request)
     }
-  }, [options.captureLifecycle, options.dialog, options.setActionError, options.transfer.currentPath, options.transfer.upload])
+  }, [options.captureLifecycle, options.dialog, options.setActionError, options.transfer.currentPath, options.transfer.uploadMany])
 }
 
 function useDownloadDialog(options: {
@@ -204,7 +210,7 @@ function useDownloadDialog(options: {
       phase = 'transfer'
       await options.transfer.download(remotePath, localPath)
     } catch (error) {
-      if (isCurrent()) {
+      if (isCurrent() && !isNativeDialogCancellation(error)) {
         const message = error instanceof Error ? error.message : String(error)
         options.setActionError(t(phase === 'picker' ? '选择下载位置失败: ${}' : '下载失败: ${}', message))
       }
