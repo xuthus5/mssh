@@ -4,6 +4,7 @@ import (
 	"errors"
 	"io"
 	"reflect"
+	"runtime"
 	"sync"
 	"testing"
 	"time"
@@ -551,8 +552,14 @@ func TestListDevicesPaths(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, []string{}, got)
 
+	// Aliases of one device must collapse to a single canonical entry on both
+	// platforms: symlink-style paths on Unix, COM spellings on Windows.
+	aliases := []string{"/dev/ttyUSB0", "/dev/./ttyUSB0"}
+	if runtime.GOOS == "windows" {
+		aliases = []string{"COM3", `\\.\COM3`}
+	}
 	listSerialPorts = func() ([]string, error) {
-		return []string{"/dev/ttyUSB0", "/dev/./ttyUSB0"}, nil
+		return aliases, nil
 	}
 	got, err = ListDevices()
 	require.NoError(t, err)
