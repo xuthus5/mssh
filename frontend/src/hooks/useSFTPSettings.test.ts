@@ -1,7 +1,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { Events } from '@wailsio/runtime'
-import { useSFTPSettings } from '@/hooks/useSFTPSettings'
+import { persistShowHiddenFiles, useSFTPSettings } from '@/hooks/useSFTPSettings'
 import { DEFAULT_SFTP_SETTINGS } from '@/lib/sftpSettings'
 import { SETTINGS_SFTP_CHANGED_EVENT } from '@/lib/settingsWindowEvents'
 import { useSFTPSettingsStore } from '@/store/sftpSettingsStore'
@@ -53,6 +53,29 @@ describe('useSFTPSettings', () => {
       expect.objectContaining({ key: 'sftp.default_view', value: '"tree"' }),
     ])
     expect(received).toContainEqual({ showHiddenFiles: true, followTerminalDirectory: false, defaultView: 'tree' })
+    stop()
+  })
+
+  it('persists the file-panel hidden-files toggle and rolls back on failure', async () => {
+    let entries: Array<{ key: string; value: string }> = []
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.SetMany', async (values) => { entries = values })
+    const received: unknown[] = []
+    const stop = Events.On(SETTINGS_SFTP_CHANGED_EVENT, (event) => received.push(event.data))
+
+    await act(async () => {
+      await persistShowHiddenFiles({ showHiddenFiles: true, followTerminalDirectory: true, defaultView: 'tree' })
+    })
+
+    expect(entries).toEqual([expect.objectContaining({ key: 'sftp.show_hidden_files', value: 'true' })])
+    expect(useSFTPSettingsStore.getState().showHiddenFiles).toBe(true)
+    expect(received).toContainEqual({ showHiddenFiles: true, followTerminalDirectory: true, defaultView: 'tree' })
+
+    __registerHandler('github.com/xuthus5/mssh/internal/service.SettingService.SetMany', async () => { throw new Error('save failed') })
+    await act(async () => {
+      await expect(persistShowHiddenFiles({ showHiddenFiles: false, followTerminalDirectory: true, defaultView: 'tree' }))
+        .rejects.toThrow('save failed')
+    })
+    expect(useSFTPSettingsStore.getState().showHiddenFiles).toBe(true)
     stop()
   })
 

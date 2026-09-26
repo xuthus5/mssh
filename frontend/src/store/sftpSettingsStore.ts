@@ -4,9 +4,11 @@ import { DEFAULT_SFTP_SETTINGS } from '@/lib/sftpSettings'
 
 interface SFTPSettingsState extends SFTPSettings {
   setSettings: (settings: SFTPSettings) => void
+  setShowHiddenFiles: (showHiddenFiles: boolean) => void
 }
 
 export const useSFTPSettingsStore = create<SFTPSettingsState>((set) => ({
   ...DEFAULT_SFTP_SETTINGS,
   setSettings: (settings) => set(settings),
+  setShowHiddenFiles: (showHiddenFiles) => set({ showHiddenFiles }),
 }))
