@@ -169,6 +169,17 @@ body {
   height: 0 !important;
 }
 
+/* xterm hard-codes a black .xterm-viewport behind the scrollable element that
+   actually carries the theme background. That black leaks through wherever the
+   theme background does not cover: the [&>.xterm]:pl-1 strip on the left and
+   the row-height remainder at the bottom, which read as a black border. Let the
+   TerminalEmulator container's theme background show instead.
+   The surface class also keeps this rule ahead of xterm.css, which the lazily
+   loaded TerminalRenderer chunk injects after this stylesheet. */
+.mssh-terminal-surface .xterm .xterm-viewport {
+  background-color: transparent;
+}
+
 .asset-color-badge {
   color: var(--asset-color);
   border-color: color-mix(in oklch, var(--asset-color) 35%, var(--border));

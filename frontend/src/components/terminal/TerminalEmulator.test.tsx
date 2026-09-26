@@ -1,6 +1,7 @@
 import { createRef } from 'react'
 import { render } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { useAppStore } from '@/store/appStore'
 import { useTerminalBehaviorStore } from '@/store/terminalBehaviorStore'
 
 const { useTerminal } = vi.hoisted(() => ({ useTerminal: vi.fn() }))
@@ -12,6 +13,7 @@ describe('TerminalEmulator', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     useTerminalBehaviorStore.setState({ rightClickAction: 'menu', copyOnSelect: false, autoReconnect: false, restoreTabsOnStartup: true, scrollbackLines: 10000, renderer: 'dom', historyPredict: false, autoCloseTerminalOnExit: false })
+    useAppStore.setState({ terminalTheme: { ...useAppStore.getState().terminalTheme, background: '#123456' } })
   })
 
   it('passes active state and the layer focus request to useTerminal', () => {
@@ -27,10 +29,22 @@ describe('TerminalEmulator', () => {
       focusRequest: { sequence: 7 },
     })
     expect(view.container.querySelector('.terminal-shell')).toHaveClass(
+      'mssh-terminal-surface',
       '[&>.xterm]:h-full',
       '[&>.xterm]:w-full',
       '[&>.xterm]:pl-1',
     )
     expect(view.container.querySelector('[data-slot="context-menu-trigger"]')).toHaveClass('select-text')
+  })
+
+  it('paints the container with the terminal theme background', () => {
+    const terminalRef = createRef<never>()
+    terminalRef.current = {} as never
+    useTerminal.mockReturnValue(terminalRef)
+    const view = render(
+      <TerminalEmulator terminalID="term-1" active focusRequest={{ sequence: 1 }} className="terminal-shell" />,
+    )
+
+    expect(view.container.querySelector('.terminal-shell')).toHaveStyle({ backgroundColor: '#123456' })
   })
 })
