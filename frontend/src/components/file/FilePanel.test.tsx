@@ -6,6 +6,7 @@ import FilePanel from '@/components/file/FilePanel'
 const handlers = {
   onClose: vi.fn(), onNavigateTo: vi.fn(), onNavigateUp: vi.fn(), onDelete: vi.fn(),
   onRename: vi.fn(), onMakeDir: vi.fn(), onCreateFile: vi.fn(), onUpload: vi.fn(), onDownload: vi.fn(),
+  onDismissActionError: vi.fn(),
   onLoadDirectory: vi.fn(async () => []),
   transferActionPending: null, onSyncCurrentDirectory: vi.fn(), syncingCurrentDirectory: false,
 }
@@ -71,6 +72,27 @@ describe('FilePanel SFTP views', () => {
     await user.click(screen.getByRole('button', { name: '确定' }))
     expect(await screen.findByText('创建目录失败: mkdir boom')).toBeInTheDocument()
     expect(useToastStore.getState().toasts.filter((item) => item.type === 'error')).toHaveLength(0)
+  })
+
+  it('dismisses the panel error banner from both sources', async () => {
+    const dismissActionError = vi.fn()
+    const onMakeDir = vi.fn(async () => { throw new Error('mkdir boom') })
+    const props = { open: true, files: [], currentPath: '/', loading: false, dropTargetId: 'drop-zone', showHiddenFiles: false, defaultView: 'list' as const, ...handlers, onMakeDir }
+    const view = render(<FilePanel {...props} />)
+    const user = userEvent.setup()
+
+    await user.click(screen.getByRole('button', { name: '新建文件夹' }))
+    await user.type(screen.getByPlaceholderText('文件夹名'), 'logs')
+    await user.click(screen.getByRole('button', { name: '确定' }))
+    expect(await screen.findByText('创建目录失败: mkdir boom')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: '关闭提示' }))
+    expect(screen.queryByText('创建目录失败: mkdir boom')).not.toBeInTheDocument()
+
+    view.rerender(<FilePanel {...props} actionError="上传失败: boom" onDismissActionError={dismissActionError} />)
+    expect(screen.getByText('上传失败: boom')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: '关闭提示' }))
+    expect(dismissActionError).toHaveBeenCalledOnce()
   })
 
   it('shows external actionError banner', () => {

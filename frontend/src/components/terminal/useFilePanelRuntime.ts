@@ -251,8 +251,9 @@ export function useFilePanelRuntime(sessionID: number, terminalID: string) {
   useDroppedFileUpload({ ...shared, dropTargetID })
   const handleUpload = useUploadDialog(shared)
   const handleDownload = useDownloadDialog(shared)
+  const dismissActionError = useCallback(() => setActionError(''), [])
   return {
-    transfer, showHiddenFiles, defaultView, dropTargetID, actionError,
+    transfer, showHiddenFiles, defaultView, dropTargetID, actionError, dismissActionError,
     transferActionPending: dialog.pending, syncingCurrentDirectory, syncCurrentDirectory,
     followsTerminalDirectory: Boolean(followTerminalDirectory && terminalDirectory),
     handleUpload, handleDownload,
