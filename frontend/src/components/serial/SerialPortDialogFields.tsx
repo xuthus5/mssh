@@ -26,12 +26,17 @@ const STOP_OPTIONS = [
   { value: SerialStopBits.SerialStopBitsOnePointFive, label: '1.5' },
   { value: SerialStopBits.SerialStopBitsTwo, label: '2' },
 ]
-const FLOW_OPTIONS = [
-  { value: 'none', label: 'None' },
-  { value: 'xonxoff', label: 'XON/XOFF' },
-  { value: 'rtscts', label: 'RTS/CTS' },
-  { value: 'dsrdtr', label: 'DSR/DTR' },
-]
+// Only "None" can be applied today; the handshake modes stay listed so saved
+// profiles keep showing their value, but they are not selectable.
+function flowOptions() {
+  const unsupported = ` — ${t('当前不支持')}`
+  return [
+    { value: 'none', label: 'None' },
+    { value: 'xonxoff', label: `XON/XOFF${unsupported}`, disabled: true },
+    { value: 'rtscts', label: `RTS/CTS${unsupported}`, disabled: true },
+    { value: 'dsrdtr', label: `DSR/DTR${unsupported}`, disabled: true },
+  ]
+}
 const LINE_OPTIONS = [
   { value: SerialLineEnding.SerialLineEndingCR, label: 'CR (\\r)' },
   { value: SerialLineEnding.SerialLineEndingLF, label: 'LF (\\n)' },
@@ -140,10 +145,10 @@ function SerialFlowFields({ draft, onChange }: DraftFieldsProps) {
     <Field>
       <FieldContent>
         <FieldLabel>{t('流控')}</FieldLabel>
-        <FieldDescription>{t('连接时应用到底层串口。DSR/DTR 在 Windows 启用硬件握手；Linux/macOS 仅保持 DTR/RTS 电平，不提供完整 DSR 握手。')}</FieldDescription>
+        <FieldDescription>{t('当前仅 None 可用：XON-XOFF、RTS-CTS、DSR-DTR 在打开串口时会被明确拒绝；DTR/RTS 电平由下方开关控制。')}</FieldDescription>
       </FieldContent>
       <LabeledSelect ariaLabel={t('流控')} value={String(draft.flow_control || 'none')}
-        options={FLOW_OPTIONS} onValueChange={(flowControl) => onChange({ flow_control: flowControl })} />
+        options={flowOptions()} onValueChange={(flowControl) => onChange({ flow_control: flowControl })} />
     </Field>
     <Field>
       <FieldLabel>{t('换行符')}</FieldLabel>
