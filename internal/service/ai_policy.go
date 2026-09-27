@@ -181,6 +181,9 @@ func validateAIInteractionSettings(settings model.AIInteractionSettings) error {
 	if err := validateAIAgentSettings(settings.Agent); err != nil {
 		return err
 	}
+	if err := validateAIMCPServerSettings(settings.MCP); err != nil {
+		return err
+	}
 	if settings.PanelWidth < 300 || settings.PanelWidth > 720 {
 		return fmt.Errorf("AI panel width must be between 300 and 720")
 	}
@@ -196,15 +199,21 @@ func validateAIInteractionSettings(settings model.AIInteractionSettings) error {
 	return nil
 }
 
+func validateAIMCPServerSettings(settings model.AIMCPServerSettings) error {
+	if settings.SessionID < 0 {
+		return fmt.Errorf("invalid MCP server session id")
+	}
+	if settings.Port < 0 || settings.Port > 65535 {
+		return fmt.Errorf("MCP server port must be between 0 and 65535")
+	}
+	return nil
+}
+
 func validateAIAgentSettings(settings model.AIAgentSettings) error {
 	switch settings.DefaultEngine {
 	case model.AIAgentEngineNative:
 	case model.AIAgentEngineLocalCLI:
-		switch settings.DefaultCLI {
-		case model.AIAgentCLICodex, model.AIAgentCLIClaude, model.AIAgentCLIOpenCode:
-		default:
-			return fmt.Errorf("unsupported default AI agent CLI %s", settings.DefaultCLI)
-		}
+		return validateAIAgentCLI(settings)
 	default:
 		return fmt.Errorf("unsupported default AI agent engine %s", settings.DefaultEngine)
 	}

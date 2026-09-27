@@ -145,7 +145,7 @@ func TestRunAIAgentCLIProcess(t *testing.T) {
 				adapter:        claudeAIAgentAdapter{},
 				maxOutputBytes: 256,
 			}
-			err = runAIAgentCLIProcess(context.Background(), process)
+			_, err = runAIAgentCLIProcess(context.Background(), process)
 			if test.wantError == "" {
 				require.NoError(t, err)
 				return

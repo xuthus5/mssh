@@ -40,6 +40,7 @@ type AIService struct {
 	modelsDevCachePath string
 	modelsDevCache     model.ModelsDevCatalog
 	agent              aiAgentRuntime
+	mcp                aiAgentMCPRuntime
 	sessions           *SessionService
 	eventBus           EventBus
 	dataDir            string
@@ -180,9 +181,6 @@ func (s *AIService) SaveSettings(input model.AISettingsInput) error {
 	defer s.configMu.Unlock()
 	settings := model.AISettings{DefaultProviderID: input.DefaultProviderID, FallbackProviderID: input.FallbackProviderID, Interaction: input.Interaction, Search: model.AISearchSettings{Enabled: input.Search.Enabled, Mode: input.Search.Mode, Provider: input.Search.Provider, TimeoutSeconds: input.Search.TimeoutSeconds, MaxResults: input.Search.MaxResults, RequireCitations: input.Search.RequireCitations}, Security: input.Security}
 	if err := validateAISettings(settings); err != nil {
-		return err
-	}
-	if err := validateAIAgentDefaultAvailability(settings.Interaction.Agent); err != nil {
 		return err
 	}
 	if err := validateAISearchAPIKey(input.Search.APIKey); err != nil {

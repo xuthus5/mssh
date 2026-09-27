@@ -60,6 +60,7 @@ func (s *AIService) Shutdown() {
 	cancel := s.lifecycle.cancel
 	s.lifecycle.mu.Unlock()
 	cancel()
+	_ = s.stopAgentMCPServer()
 	s.lifecycle.workers.Wait()
 	if s.db != nil {
 		if err := store.MarkAIAgentTasksInterrupted(s.db); err != nil && s.logger != nil {

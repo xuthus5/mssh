@@ -1,11 +1,11 @@
-import { useEffect, useRef } from 'react'
 import { Bot, CheckCircle2, RefreshCw, ShieldAlert, TerminalSquare, XCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { LabeledSelect } from '@/components/ui/labeled-select'
+import { CustomCLICard } from '@/components/settings/CustomCLICard'
+import { LabeledSelect, type LabeledSelectOption } from '@/components/ui/labeled-select'
+import { MCPServerCard } from '@/components/settings/MCPServerCard'
 import { Switch } from '@/components/ui/switch'
 import type { AISettingsController } from '@/hooks/useAISettings'
-import { isOperationBusyError } from '@/lib/operationBusyError'
 import { t } from '@/i18n'
 import { AIAgentCLI, AIAgentEngine, type AIAgentCLIStatus, type AISettingsInput } from '../../../bindings/github.com/xuthus5/mssh/internal/model/models'
 
@@ -19,18 +19,11 @@ const fallbackInteraction = {
   render_markdown: true,
   history_retention_days: 30,
   max_conversations: 100,
-  agent: { default_engine: AIAgentEngine.AIAgentEngineNative, default_cli: AIAgentCLI.AIAgentCLICodex, allow_codex: false },
+  agent: { default_engine: AIAgentEngine.AIAgentEngineNative, default_cli: AIAgentCLI.AIAgentCLICodex, allow_codex: false, custom_clis: [] },
+  mcp: { session_id: 0, port: 0 },
 }
 
 export function AIAgentPanel({ controller, draft, update = () => undefined }: { controller: AISettingsController; draft?: AISettingsInput; update?: (changes: Partial<AISettingsInput>) => void }) {
-  const autoRequested = useRef(false)
-  useEffect(() => {
-    if (controller.pending !== null || autoRequested.current) return
-    autoRequested.current = true
-    void controller.detectAgents().catch((error: unknown) => {
-      if (isOperationBusyError(error)) autoRequested.current = false
-    })
-  }, [controller.detectAgents, controller.pending])
   const interaction = draft?.interaction ?? fallbackInteraction
   const agent = interaction.agent
   const setAgent = (changes: Partial<typeof agent>) => update({ interaction: { ...interaction, agent: { ...agent, ...changes } } })
@@ -38,8 +31,23 @@ export function AIAgentPanel({ controller, draft, update = () => undefined }: { 
     <div className="grid gap-4">
       <DefaultEngineCard agent={agent} setAgent={setAgent} agents={controller.agents} />
       <AgentCLIStatusCard controller={controller} detecting={controller.pending === 'agents'} />
+      <CustomCLICard agent={agent} setAgent={setAgent} />
+      <MCPServerCard />
     </div>
   )
+}
+
+// Detected CLIs drive install state, but configured custom CLIs must be
+// selectable even before the machine has been scanned.
+function agentCLIOptions(agents: AIAgentCLIStatus[], agent: AISettingsInput['interaction']['agent']): LabeledSelectOption[] {
+  const options: LabeledSelectOption[] = agents.map((item) => ({ value: item.command, label: item.name + (item.version ? ` · ${item.version}` : ''), disabled: !item.installed || Boolean(item.error) }))
+  const detected = new Set(agents.map((item) => item.command))
+  for (const item of agent.custom_clis ?? []) {
+    const value = `custom:${item.id}`
+    if (!item.id || detected.has(value)) continue
+    options.push({ value, label: item.name || item.command || t('自定义 CLI'), disabled: !item.command })
+  }
+  return options
 }
 
 function DefaultEngineCard({ agent, setAgent, agents }: {
@@ -59,13 +67,13 @@ function DefaultEngineCard({ agent, setAgent, agents }: {
       </CardHeader>
       <CardContent className="grid gap-4">
         <div className="grid grid-cols-2 rounded-lg border border-border p-1">
-          <Button type="button" variant={agent.default_engine === AIAgentEngine.AIAgentEngineNative ? 'secondary' : 'ghost'} onClick={() => setAgent({ default_engine: AIAgentEngine.AIAgentEngineNative })}>{t('原生 Agent')}</Button>
+          <Button type="button" variant={agent.default_engine === AIAgentEngine.AIAgentEngineNative ? 'secondary' : 'ghost'} onClick={() => setAgent({ default_engine: AIAgentEngine.AIAgentEngineNative })}>{t('原生 API')}</Button>
           <Button type="button" variant={agent.default_engine === AIAgentEngine.AIAgentEngineLocalCLI ? 'secondary' : 'ghost'} onClick={() => setAgent({ default_engine: AIAgentEngine.AIAgentEngineLocalCLI })}>{t('本机 CLI')}</Button>
         </div>
         {agent.default_engine === AIAgentEngine.AIAgentEngineLocalCLI ? (
           <div className="grid gap-1.5">
             <span className="text-xs text-muted-foreground">{t('默认 CLI')}</span>
-            <LabeledSelect value={agent.default_cli} onValueChange={(value) => setAgent({ default_cli: value as AIAgentCLI })} ariaLabel={t('默认 Agent CLI')} options={agents.map((item) => ({ value: item.command, label: item.name + (item.version ? ` · ${item.version}` : ''), disabled: !item.installed || Boolean(item.error) }))} />
+            <LabeledSelect value={agent.default_cli} onValueChange={(value) => setAgent({ default_cli: value as AIAgentCLI })} ariaLabel={t('默认 Agent CLI')} options={agentCLIOptions(agents, agent)} />
             {selectedStatus?.error ? <p className="text-xs text-destructive">{selectedStatus.error}</p> : null}
             {codexSelected ? <CodexWeakIsolationOption allowCodex={agent.allow_codex} onChange={(value) => setAgent({ allow_codex: value })} /> : null}
           </div>
@@ -104,7 +112,9 @@ function AgentCLIStatusCard({ controller, detecting }: { controller: AISettingsC
         </Button>
       </CardHeader>
       <CardContent className="grid gap-2 md:grid-cols-3">
-        {controller.agents.map((item) => <AgentCLIStatusCardItem key={item.command} item={item} />)}
+        {controller.agents.length === 0
+          ? <p className="text-xs text-muted-foreground md:col-span-3">{t('尚未扫描本机 CLI，点击右上角“重新检测”按钮开始扫描。')}</p>
+          : controller.agents.map((item) => <AgentCLIStatusCardItem key={item.command} item={item} />)}
       </CardContent>
     </Card>
   )

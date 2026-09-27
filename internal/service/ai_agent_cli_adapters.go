@@ -12,7 +12,7 @@ import (
 	"github.com/xuthus5/mssh/internal/model"
 )
 
-func newAIAgentCLIAdapter(cli model.AIAgentCLI, allowCodex bool) (aiAgentCLIAdapter, error) {
+func newAIAgentCLIAdapter(cli model.AIAgentCLI, allowCodex bool, customCLIs []model.AICustomCLI) (aiAgentCLIAdapter, error) {
 	switch cli {
 	case model.AIAgentCLIClaude:
 		return claudeAIAgentAdapter{}, nil
@@ -23,9 +23,15 @@ func newAIAgentCLIAdapter(cli model.AIAgentCLI, allowCodex bool) (aiAgentCLIAdap
 			return nil, fmt.Errorf("codex CLI cannot prove local shell isolation in this installed version; enable the Codex weak isolation option in AI settings to run it anyway")
 		}
 		return codexAIAgentAdapter{}, nil
-	default:
+	}
+	custom := resolveCustomAICLI(customCLIs, cli)
+	if custom == nil {
 		return nil, fmt.Errorf("unsupported AI agent CLI %s", cli)
 	}
+	if strings.TrimSpace(custom.Command) == "" {
+		return nil, fmt.Errorf("custom AI agent CLI is not configured")
+	}
+	return customAIAgentAdapter{config: *custom}, nil
 }
 
 const codexAIAgentTokenEnv = "MSSH_AGENT_TOKEN"
