@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"crypto/subtle"
 	"encoding/json"
 	"net/http"
 )
@@ -25,38 +26,76 @@ type aiAgentMCPError struct {
 	Message string `json:"message"`
 }
 
-func (bridge *aiAgentMCPBridge) serveHTTP(writer http.ResponseWriter, request *http.Request) {
+// aiAgentMCPHandler is implemented by both the per-task CLI bridge and the
+// user-started external MCP server. serveAIAgentMCP owns the shared JSON-RPC
+// surface while the handler supplies transport-specific behavior.
+type aiAgentMCPHandler interface {
+	authorized(request *http.Request) bool
+	mcpMaxBytes() int
+	mcpServerInfo() map[string]string
+	mcpHandleToolCall(ctx context.Context, writer http.ResponseWriter, message aiAgentMCPRequest)
+	mcpWriteResult(writer http.ResponseWriter, id json.RawMessage, result any)
+	mcpWriteError(writer http.ResponseWriter, id json.RawMessage, code int, message string)
+}
+
+func serveAIAgentMCP(handler aiAgentMCPHandler, writer http.ResponseWriter, request *http.Request) {
 	if request.Method != http.MethodPost {
 		http.Error(writer, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	if request.Header.Get("Authorization") != "Bearer "+bridge.token {
+	if !handler.authorized(request) {
 		http.Error(writer, "unauthorized", http.StatusUnauthorized)
 		return
 	}
-	request.Body = http.MaxBytesReader(writer, request.Body, int64(bridge.security.MaxOutputBytes))
+	request.Body = http.MaxBytesReader(writer, request.Body, int64(handler.mcpMaxBytes()))
 	var message aiAgentMCPRequest
 	decoder := json.NewDecoder(request.Body)
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&message); err != nil {
-		bridge.writeMCPError(writer, nil, -32700, "invalid JSON-RPC request")
+		handler.mcpWriteError(writer, nil, -32700, "invalid JSON-RPC request")
 		return
 	}
 	writer.Header().Set("Content-Type", "application/json")
 	switch message.Method {
 	case "initialize":
-		bridge.writeMCPResult(writer, message.ID, map[string]any{"protocolVersion": aiAgentMCPProtocolVersion, "capabilities": map[string]any{"tools": map[string]any{}}, "serverInfo": map[string]string{"name": "mssh-agent", "version": "1"}})
+		handler.mcpWriteResult(writer, message.ID, map[string]any{"protocolVersion": aiAgentMCPProtocolVersion, "capabilities": map[string]any{"tools": map[string]any{}}, "serverInfo": handler.mcpServerInfo()})
 	case "notifications/initialized":
 		writer.WriteHeader(http.StatusAccepted)
 	case "ping":
-		bridge.writeMCPResult(writer, message.ID, map[string]any{})
+		handler.mcpWriteResult(writer, message.ID, map[string]any{})
 	case "tools/list":
-		bridge.writeMCPResult(writer, message.ID, map[string]any{"tools": aiAgentMCPTools()})
+		handler.mcpWriteResult(writer, message.ID, map[string]any{"tools": aiAgentMCPTools()})
 	case "tools/call":
-		bridge.handleMCPToolCall(request.Context(), writer, message)
+		handler.mcpHandleToolCall(request.Context(), writer, message)
 	default:
-		bridge.writeMCPError(writer, message.ID, -32601, "method not found")
+		handler.mcpWriteError(writer, message.ID, -32601, "method not found")
 	}
+}
+
+func (bridge *aiAgentMCPBridge) serveHTTP(writer http.ResponseWriter, request *http.Request) {
+	serveAIAgentMCP(bridge, writer, request)
+}
+
+func (bridge *aiAgentMCPBridge) authorized(request *http.Request) bool {
+	return subtle.ConstantTimeCompare([]byte(request.Header.Get("Authorization")), []byte("Bearer "+bridge.token)) == 1
+}
+
+func (bridge *aiAgentMCPBridge) mcpMaxBytes() int { return bridge.security.MaxOutputBytes }
+
+func (bridge *aiAgentMCPBridge) mcpServerInfo() map[string]string {
+	return map[string]string{"name": aiAgentMCPServerName, "version": "1"}
+}
+
+func (bridge *aiAgentMCPBridge) mcpHandleToolCall(ctx context.Context, writer http.ResponseWriter, message aiAgentMCPRequest) {
+	bridge.handleMCPToolCall(ctx, writer, message)
+}
+
+func (bridge *aiAgentMCPBridge) mcpWriteResult(writer http.ResponseWriter, id json.RawMessage, result any) {
+	bridge.writeMCPResult(writer, id, result)
+}
+
+func (bridge *aiAgentMCPBridge) mcpWriteError(writer http.ResponseWriter, id json.RawMessage, code int, message string) {
+	bridge.writeMCPError(writer, id, code, message)
 }
 
 func (bridge *aiAgentMCPBridge) handleMCPToolCall(ctx context.Context, writer http.ResponseWriter, message aiAgentMCPRequest) {

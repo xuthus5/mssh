@@ -85,8 +85,10 @@ The desktop app has an authenticated unified local IPC transport available for r
 
 ### AI tasks
 
-- Native agent tasks driven by configured OpenAI-compatible providers
+- Native API tasks driven by configured OpenAI-compatible providers
 - Local CLI tasks through the MSSH MCP bridge for Claude Code, OpenCode, or Codex (Codex requires an explicit weak-isolation opt-in)
+- Register a custom local CLI (command, args, env, prompt mode) and inject the MSSH MCP endpoint via `{mcp_url}`/`{token}`/`{workdir}`/`{prompt}` placeholders
+- External MCP endpoint: start a loopback, token-authenticated MCP server bound to one session so any external CLI can drive the MSSH SSH tools
 - Step-level mutation approval and hard-blocked destructive commands
 - Persistent task state with manual resume after restart
 

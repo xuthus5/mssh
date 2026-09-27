@@ -31,12 +31,14 @@ func (s *AIService) DetectAgentCLIs() []model.AIAgentCLIStatus {
 	}
 	defer finish()
 	allowCodex := false
+	var customCLIs []model.AICustomCLI
 	if s.db != nil {
 		if settings, loadErr := store.LoadAISettings(s.db, defaultAISettings()); loadErr == nil {
 			allowCodex = settings.Interaction.Agent.AllowCodex
+			customCLIs = settings.Interaction.Agent.CustomCLIs
 		}
 	}
-	result := make([]model.AIAgentCLIStatus, 0, len(aiCLIs))
+	result := make([]model.AIAgentCLIStatus, 0, len(aiCLIs)+len(customCLIs))
 	for _, cli := range aiCLIs {
 		if operationContext.Err() != nil {
 			break
@@ -44,14 +46,59 @@ func (s *AIService) DetectAgentCLIs() []model.AIAgentCLIStatus {
 		status := detectAICLIContext(operationContext, cli.name, cli.command)
 		result = append(result, applyAIAgentCLIIsolationStatus(status, allowCodex))
 	}
+	for _, custom := range customCLIs {
+		if operationContext.Err() != nil {
+			break
+		}
+		if strings.TrimSpace(custom.Command) == "" {
+			continue
+		}
+		result = append(result, detectCustomAICLI(operationContext, custom))
+	}
+	s.cacheAgentCLIStatuses(result)
 	return result
+}
+
+func detectCustomAICLI(ctx context.Context, custom model.AICustomCLI) model.AIAgentCLIStatus {
+	name := strings.TrimSpace(custom.Name)
+	if name == "" {
+		name = "Custom CLI"
+	}
+	status := model.AIAgentCLIStatus{Name: name, Command: string(aiAgentCustomCLIValue(custom.ID)), DetectedAt: time.Now()}
+	path, err := exec.LookPath(custom.Command)
+	if err != nil {
+		status.Error = "未找到可执行文件"
+		return status
+	}
+	status.Path = path
+	status.Installed = true
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+	output, err := readAICLIVersionArgs(ctx, path, aiAgentCustomVersionArgs(custom)...)
+	if err != nil {
+		if errors.Is(err, errAIAgentVersionOutputTooLarge) {
+			status.Error = fmt.Sprintf("读取版本失败: 输出过大（最多 %d 字节）", maxAIAgentVersionOutputBytes)
+			return status
+		}
+		status.Error = fmt.Sprintf("读取版本失败: %v", err)
+		return status
+	}
+	status.Version = strings.TrimSpace(output)
+	return status
+}
+
+func aiAgentCustomVersionArgs(custom model.AICustomCLI) []string {
+	if versionArg := strings.TrimSpace(custom.VersionArg); versionArg != "" {
+		return []string{versionArg}
+	}
+	return []string{"--version"}
 }
 
 func applyAIAgentCLIIsolationStatus(status model.AIAgentCLIStatus, allowCodex bool) model.AIAgentCLIStatus {
 	if status.Command != string(model.AIAgentCLICodex) || !status.Installed {
 		return status
 	}
-	if _, err := newAIAgentCLIAdapter(model.AIAgentCLICodex, allowCodex); err != nil {
+	if _, err := newAIAgentCLIAdapter(model.AIAgentCLICodex, allowCodex, nil); err != nil {
 		status.Installed = false
 		status.Error = fmt.Sprintf("%s: %v", status.Version, err)
 		status.Version = ""
@@ -88,9 +135,14 @@ func detectAICLIContext(ctx context.Context, name, command string) model.AIAgent
 }
 
 func readAICLIVersion(ctx context.Context, path string) (string, error) {
+	return readAICLIVersionArgs(ctx, path, "--version")
+}
+
+func readAICLIVersionArgs(ctx context.Context, path string, args ...string) (string, error) {
 	output := boundedAIVersionOutput{maxBytes: maxAIAgentVersionOutputBytes}
-	// #nosec G204 -- path is resolved by exec.LookPath from the fixed aiCLIs command allowlist.
-	command := exec.CommandContext(ctx, path, "--version")
+	// #nosec G204 -- path is resolved by exec.LookPath from the fixed aiCLIs command allowlist or a user-registered CLI.
+	command := exec.CommandContext(ctx, path, args...)
+	hideAIAgentConsoleWindow(command)
 	command.Stdout = &output
 	runErr := command.Run()
 	if output.exceeded {

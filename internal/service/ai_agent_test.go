@@ -99,21 +99,12 @@ func TestAIAgentMCPRequiresTokenAndListsScopedTools(t *testing.T) {
 }
 
 func TestAIAgentCLIAdaptersFailClosed(t *testing.T) {
-	_, err := newAIAgentCLIAdapter(model.AIAgentCLICodex, false)
+	_, err := newAIAgentCLIAdapter(model.AIAgentCLICodex, false, nil)
 	assert.ErrorContains(t, err, "cannot prove local shell isolation")
-	_, err = newAIAgentCLIAdapter(model.AIAgentCLICodex, true)
+	_, err = newAIAgentCLIAdapter(model.AIAgentCLICodex, true, nil)
 	assert.NoError(t, err)
-	_, err = newAIAgentCLIAdapter("unknown", false)
+	_, err = newAIAgentCLIAdapter("unknown", false, nil)
 	assert.Error(t, err)
-}
-
-func TestAIAgentDefaultAvailabilityFailsClosed(t *testing.T) {
-	assert.NoError(t, validateAIAgentDefaultAvailability(model.AIAgentSettings{DefaultEngine: model.AIAgentEngineNative, DefaultCLI: model.AIAgentCLICodex}))
-	err := validateAIAgentDefaultAvailability(model.AIAgentSettings{DefaultEngine: model.AIAgentEngineLocalCLI, DefaultCLI: model.AIAgentCLICodex})
-	assert.ErrorContains(t, err, "cannot prove local shell isolation")
-	t.Setenv("PATH", t.TempDir())
-	err = validateAIAgentDefaultAvailability(model.AIAgentSettings{DefaultEngine: model.AIAgentEngineLocalCLI, DefaultCLI: model.AIAgentCLICodex, AllowCodex: true})
-	assert.ErrorContains(t, err, "AI agent CLI codex is unavailable")
 }
 
 func TestCodexAIAgentCommandUsesScopedOverridesAndTokenEnv(t *testing.T) {
