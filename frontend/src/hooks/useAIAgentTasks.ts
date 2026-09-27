@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Events } from '@wailsio/runtime'
 import { AIService } from '@/lib/wails'
-import type { AIAgentCLI, AIAgentEngine, AIAgentTask } from '../../bindings/github.com/xuthus5/mssh/internal/model/models'
+import type { AIAgentCLI, AIAgentEngine, AIAgentTask, AICustomCLI } from '../../bindings/github.com/xuthus5/mssh/internal/model/models'
 
 const TASK_EVENT = 'ai:agent-task-changed'
 const STEP_EVENT = 'ai:agent-step-changed'
@@ -9,11 +9,26 @@ type RunAgentTaskInput = { sessionID: number; prompt: string; engine: AIAgentEng
 
 export function useAIAgentTasks(sessionID = 0, enabled = true) {
   const [tasks, setTasks] = useState<AIAgentTask[]>([])
+  const [customCLIs, setCustomCLIs] = useState<AICustomCLI[]>([])
   const [selectedID, setSelectedID] = useState(0)
   const [loading, setLoading] = useState(true)
   const [pending, setPending] = useState<string | null>(null)
   const [error, setError] = useState('')
   const generation = useRef(0)
+
+  useEffect(() => {
+    if (!enabled) return
+    let active = true
+    void (async () => {
+      try {
+        const dashboard = await AIService.Dashboard()
+        if (active) setCustomCLIs(dashboard.settings.interaction.agent.custom_clis ?? [])
+      } catch {
+        // The custom CLI list is optional; the built-in CLIs still work.
+      }
+    })()
+    return () => { active = false }
+  }, [enabled])
 
   const reload = useCallback(async () => {
 	if (!enabled) return
@@ -37,7 +52,7 @@ export function useAIAgentTasks(sessionID = 0, enabled = true) {
 
   const actions = useAIAgentTaskActions({ reload, setSelectedID, setPending, setError })
   const selected = tasks.find((task) => task.id === selectedID) ?? null
-  return { tasks, selected, selectedID, setSelectedID, loading, pending, error, reload, ...actions }
+  return { tasks, customCLIs, selected, selectedID, setSelectedID, loading, pending, error, reload, ...actions }
 }
 
 function useAIAgentTaskActions({ reload, setSelectedID, setPending, setError }: {

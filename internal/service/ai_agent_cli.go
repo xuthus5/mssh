@@ -42,7 +42,7 @@ type aiAgentMCPBridge struct {
 }
 
 func (s *AIService) runLocalCLIAgent(ctx context.Context, task model.AIAgentTask, execution *aiAgentExecution, connection *aiAgentSSH, settings model.AISettings) (string, error) {
-	adapter, err := newAIAgentCLIAdapter(task.CLI, settings.Interaction.Agent.AllowCodex)
+	adapter, err := newAIAgentCLIAdapter(task.CLI, settings.Interaction.Agent.AllowCodex, settings.Interaction.Agent.CustomCLIs)
 	if err != nil {
 		return "", err
 	}
@@ -59,6 +59,9 @@ func (s *AIService) runLocalCLIAgent(ctx context.Context, task model.AIAgentTask
 			s.logger.Warn("remove AI agent private directory failed", "taskID", task.ID, "error", removeErr)
 		}
 	}()
+	if own, ok := adapter.(aiAgentOwnMCPAdapter); ok && own.ManagesOwnMCP() {
+		return s.runAIAgentCLIWithOwnMCP(ctx, adapter, workDir, task, settings)
+	}
 	token, err := randomAIAgentToken()
 	if err != nil {
 		return "", err
@@ -85,7 +88,7 @@ func (s *AIService) runLocalCLIAgent(ctx context.Context, task model.AIAgentTask
 		return "", err
 	}
 	process := aiAgentCLIProcess{command: command, adapter: adapter, maxOutputBytes: settings.Security.MaxOutputBytes}
-	if err = runAIAgentCLIProcess(ctx, process); err != nil {
+	if _, err = runAIAgentCLIProcess(ctx, process); err != nil {
 		return "", err
 	}
 	bridge.mu.Lock()
@@ -96,16 +99,52 @@ func (s *AIService) runLocalCLIAgent(ctx context.Context, task model.AIAgentTask
 	return bridge.result, nil
 }
 
+// runAIAgentCLIWithOwnMCP launches a user-registered CLI that talks to an MCP
+// server it configured itself (route B). MSSH does not start a per-task MCP
+// endpoint and passes no credentials; the CLI's stdout becomes the task result.
+func (s *AIService) runAIAgentCLIWithOwnMCP(ctx context.Context, adapter aiAgentCLIAdapter, workDir string, task model.AIAgentTask, settings model.AISettings) (string, error) {
+	if !s.agentMCPServerRunning() {
+		return "", fmt.Errorf("MSSH MCP 服务未启动：请先在 AI 设置 → Agent → MCP 服务 中启动（并绑定到目标会话），再运行使用自有 MCP 的自定义 CLI 任务")
+	}
+	prompt, err := buildOwnMCPAgentPrompt(task)
+	if err != nil {
+		return "", err
+	}
+	command, err := adapter.Command(workDir, "", "", prompt)
+	if err != nil {
+		return "", err
+	}
+	return runAIAgentCLIProcess(ctx, aiAgentCLIProcess{command: command, adapter: adapter, maxOutputBytes: settings.Security.MaxOutputBytes})
+}
+
+func (s *AIService) agentMCPServerRunning() bool {
+	s.mcp.mu.Lock()
+	defer s.mcp.mu.Unlock()
+	return s.mcp.server != nil
+}
+
+// buildOwnMCPAgentPrompt describes the task for a CLI that already has the mssh
+// MCP server registered. It must not include aiAgentSystemPrompt: that prompt
+// asks the model to print a JSON tool action, which a real CLI would echo
+// instead of calling its MCP tools.
+func buildOwnMCPAgentPrompt(task model.AIAgentTask) (string, error) {
+	taskPrompt, err := buildAIAgentPrompt(task, aiAgentHistoryFromSteps(task.Steps))
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%s\n使用已注册的 mssh MCP 工具操作目标会话完成该任务，完成后直接输出最终结果。", taskPrompt), nil
+}
+
 type aiAgentCLIProcess struct {
 	command        *exec.Cmd
 	adapter        aiAgentCLIAdapter
 	maxOutputBytes int
 }
 
-func runAIAgentCLIProcess(ctx context.Context, process aiAgentCLIProcess) (resultErr error) {
+func runAIAgentCLIProcess(ctx context.Context, process aiAgentCLIProcess) (output string, resultErr error) {
 	command, lifecycle, err := commandWithContext(ctx, process.command)
 	if err != nil {
-		return err
+		return "", err
 	}
 	defer func() {
 		if closeErr := lifecycle.Close(); closeErr != nil {
@@ -114,25 +153,35 @@ func runAIAgentCLIProcess(ctx context.Context, process aiAgentCLIProcess) (resul
 	}()
 	stdout, err := command.StdoutPipe()
 	if err != nil {
-		return fmt.Errorf("open AI agent CLI stdout: %w", err)
+		return "", fmt.Errorf("open AI agent CLI stdout: %w", err)
 	}
 	stderr := newAIAgentBoundedBuffer(process.maxOutputBytes)
 	command.Stderr = stderr
 	if err = command.Start(); err != nil {
-		return fmt.Errorf("start AI agent CLI: %w", err)
+		return "", fmt.Errorf("start AI agent CLI: %w", err)
 	}
 	if err = lifecycle.Started(command); err != nil {
-		return stopAIAgentCLIProcessAfterStartFailure(command, err)
+		return "", stopAIAgentCLIProcessAfterStartFailure(command, err)
 	}
-	scanErr := scanAIAgentCLIEvents(stdout, process.adapter, process.maxOutputBytes)
+	collector := newAIAgentBoundedBuffer(process.maxOutputBytes)
+	var scanErr error
+	if own, ok := process.adapter.(aiAgentOwnMCPAdapter); ok && own.ManagesOwnMCP() {
+		// The CLI's stdout is its final answer, not an event stream, so it is
+		// collected verbatim instead of being scanned for JSON events.
+		if _, scanErr = io.Copy(collector, stdout); scanErr != nil {
+			scanErr = fmt.Errorf("read AI agent CLI stdout: %w", scanErr)
+		}
+	} else {
+		scanErr = scanAIAgentCLIEvents(io.TeeReader(stdout, collector), process.adapter, process.maxOutputBytes)
+	}
 	waitErr := command.Wait()
 	if scanErr != nil {
-		return scanErr
+		return "", scanErr
 	}
 	if waitErr != nil {
-		return fmt.Errorf("AI agent CLI exited: %w: %s", waitErr, stderr.String())
+		return "", fmt.Errorf("AI agent CLI exited: %w: %s", waitErr, stderr.String())
 	}
-	return nil
+	return strings.TrimSpace(collector.String()), nil
 }
 
 func commandWithContext(ctx context.Context, command *exec.Cmd) (*exec.Cmd, aiAgentProcessLifecycle, error) {

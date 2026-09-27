@@ -51,16 +51,17 @@ type AIProviderProfileInput struct {
 }
 
 type AIInteractionSettings struct {
-	PanelWidth             int             `json:"panel_width"`
-	ContextLines           int             `json:"context_lines"`
-	IncludeSessionMetadata bool            `json:"include_session_metadata"`
-	IncludeSystemSummary   bool            `json:"include_system_summary"`
-	StreamResponses        bool            `json:"stream_responses"`
-	AutoScroll             bool            `json:"auto_scroll"`
-	RenderMarkdown         bool            `json:"render_markdown"`
-	HistoryRetentionDays   int             `json:"history_retention_days"`
-	MaxConversations       int             `json:"max_conversations"`
-	Agent                  AIAgentSettings `json:"agent"`
+	PanelWidth             int                 `json:"panel_width"`
+	ContextLines           int                 `json:"context_lines"`
+	IncludeSessionMetadata bool                `json:"include_session_metadata"`
+	IncludeSystemSummary   bool                `json:"include_system_summary"`
+	StreamResponses        bool                `json:"stream_responses"`
+	AutoScroll             bool                `json:"auto_scroll"`
+	RenderMarkdown         bool                `json:"render_markdown"`
+	HistoryRetentionDays   int                 `json:"history_retention_days"`
+	MaxConversations       int                 `json:"max_conversations"`
+	Agent                  AIAgentSettings     `json:"agent"`
+	MCP                    AIMCPServerSettings `json:"mcp"`
 }
 
 type AIAgentEngine string
@@ -68,6 +69,7 @@ type AIAgentEngine string
 const (
 	AIAgentEngineNative   AIAgentEngine = "native"
 	AIAgentEngineLocalCLI AIAgentEngine = "local_cli"
+	AIAgentEngineExternal AIAgentEngine = "external"
 )
 
 type AIAgentCLI string
@@ -84,7 +86,8 @@ type AIAgentSettings struct {
 	// AllowCodex opts in to running the Codex CLI in weak isolation mode.
 	// Codex cannot prove local shell isolation (no MCP-only mode), so local
 	// tool calls are only blocked after the fact by event validation.
-	AllowCodex bool `json:"allow_codex"`
+	AllowCodex bool          `json:"allow_codex"`
+	CustomCLIs []AICustomCLI `json:"custom_clis"`
 }
 
 type AIAgentTaskStatus string
@@ -217,16 +220,6 @@ type AISettingsDashboard struct {
 	Settings          AISettings          `json:"settings"`
 	Providers         []AIProviderProfile `json:"providers"`
 	KeychainAvailable bool                `json:"keychain_available"`
-}
-
-type AIAgentCLIStatus struct {
-	Name       string    `json:"name"`
-	Command    string    `json:"command"`
-	Installed  bool      `json:"installed"`
-	Path       string    `json:"path"`
-	Version    string    `json:"version"`
-	Error      string    `json:"error"`
-	DetectedAt time.Time `json:"detected_at"`
 }
 
 type AICitation struct {

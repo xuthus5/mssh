@@ -95,6 +95,26 @@ describe('AIAgentSessionPanel', () => {
     expect(approve).toHaveBeenCalledWith(1, 4, false)
   })
 
+  it('surfaces pending approvals from other tasks in the current view', async () => {
+    const approve = vi.fn(async () => undefined)
+    const running = createTask({ id: 1, status: AIAgentTaskStatus.AIAgentTaskRunning, prompt: 'running task' })
+    const waiting = createTask({
+      id: 2,
+      status: AIAgentTaskStatus.AIAgentTaskWaitingApproval,
+      engine: AIAgentEngine.AIAgentEngineExternal,
+      prompt: 'external task',
+      steps: [{ id: 9, task_id: 2, sequence: 1, kind: 'tool', model_output: '', tool_name: 'ssh.write_file', tool_input: '{}', tool_output: '', risk: AICommandRisk.AICommandRiskModify, approval_status: AIAgentApprovalStatus.AIAgentApprovalPending, error: '', created_at: '', updated_at: '' }],
+    })
+    __registerHandler(listCall, async () => [running, waiting])
+    __registerHandler(approveCall, approve)
+    render(<AIAgentSessionPanel sessionID={9} sessionName="prod" />)
+
+    expect(await screen.findByText('其他任务中有 1 个待审批步骤')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: '批准' }))
+
+    expect(approve).toHaveBeenCalledWith(2, 9, true)
+  })
+
   it('deletes a task after confirmation', async () => {
     const remove = vi.fn(async () => undefined)
     __registerHandler(listCall, async () => [createTask({ status: AIAgentTaskStatus.AIAgentTaskCompleted })])

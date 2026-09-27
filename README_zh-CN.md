@@ -85,8 +85,10 @@ MSSH 不是集群编排平台。它聚焦已保存 SSH 会话和终端中心化�
 
 ### AI 任务
 
-- 使用已配置 OpenAI 兼容提供商运行原生 Agent 任务
+- 使用已配置 OpenAI 兼容提供商运行原生 API 任务
 - 通过 MSSH MCP 桥接本地 Claude Code、OpenCode 或 Codex（Codex 需显式开启弱隔离选项）
+- 手动录入自定义 CLI（命令、参数、环境变量、Prompt 传递方式），并用 `{mcp_url}`/`{token}`/`{workdir}`/`{prompt}` 占位符注入 MSSH MCP 端点
+- 外部 MCP 端点：按需启动仅监听本机、带 Token 鉴权的 MCP 服务并绑定单个会话，任意外部 CLI 均可驱动 MSSH 的 SSH 工具
 - 对修改操作进行逐步审批，高危命令硬阻断
 - 持久化任务状态，应用重启后可手动恢复
 

@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -34,7 +35,7 @@ func resolveAIAgentSelection(input model.AIAgentTaskInput, defaults model.AIAgen
 	if input.CLI != nil {
 		cli = *input.CLI
 	}
-	if err := validateAIAgentSettings(model.AIAgentSettings{DefaultEngine: engine, DefaultCLI: cli}); err != nil {
+	if err := validateAIAgentSettings(model.AIAgentSettings{DefaultEngine: engine, DefaultCLI: cli, AllowCodex: defaults.AllowCodex, CustomCLIs: defaults.CustomCLIs}); err != nil {
 		return "", "", err
 	}
 	if engine == model.AIAgentEngineNative {
@@ -43,22 +44,18 @@ func resolveAIAgentSelection(input model.AIAgentTaskInput, defaults model.AIAgen
 	return engine, cli, nil
 }
 
-func validateInstalledAIAgentCLI(cli model.AIAgentCLI, allowCodex bool) error {
-	if _, err := newAIAgentCLIAdapter(cli, allowCodex); err != nil {
+func validateInstalledAIAgentCLI(cli model.AIAgentCLI, allowCodex bool, customCLIs []model.AICustomCLI) error {
+	if _, err := newAIAgentCLIAdapter(cli, allowCodex, customCLIs); err != nil {
 		return err
 	}
 	status := detectAICLI(string(cli), string(cli))
+	if custom := resolveCustomAICLI(customCLIs, cli); custom != nil {
+		status = detectCustomAICLI(context.Background(), *custom)
+	}
 	if !status.Installed || status.Error != "" {
 		return fmt.Errorf("AI agent CLI %s is unavailable: %s", cli, status.Error)
 	}
 	return nil
-}
-
-func validateAIAgentDefaultAvailability(settings model.AIAgentSettings) error {
-	if settings.DefaultEngine == model.AIAgentEngineNative {
-		return nil
-	}
-	return validateInstalledAIAgentCLI(settings.DefaultCLI, settings.AllowCodex)
 }
 
 func normalizeAIAgentTaskCreateError(err error) error {

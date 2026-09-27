@@ -135,12 +135,29 @@ function useDetectAgents(state: AISettingsState, runtime: AISettingsRuntime, exe
   }, [execute, runtime, setAgents])
 }
 
+function useCachedAgentCLIs(runtime: AISettingsRuntime, setAgents: (value: AIAgentCLIStatus[]) => void) {
+  useEffect(() => {
+    const request = ++runtime.agentRequest.current
+    let active = true
+    void (async () => {
+      try {
+        const cached = await AIService.GetAgentCLIStatuses()
+        if (active && runtime.agentRequest.current === request) setAgents(cached ?? [])
+      } catch (loadError) {
+        logger.warn('load cached agent CLI statuses failed', loadError)
+      }
+    })()
+    return () => { active = false }
+  }, [runtime, setAgents])
+}
+
 export function useAISettings(): AISettingsController {
   const state = useAISettingsState()
   const runtime = useAISettingsRuntime()
   const reload = useAIReload(state, runtime)
   const execute = useAIExecute(state, runtime, reload)
   const detectAgents = useDetectAgents(state, runtime, execute)
+  useCachedAgentCLIs(runtime, state.setAgents)
   useEffect(() => {
     void reload()
   }, [reload])

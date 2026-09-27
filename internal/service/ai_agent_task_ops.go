@@ -22,7 +22,7 @@ func (s *AIService) StartAgentTask(input model.AIAgentTaskInput) (*model.AIAgent
 		return nil, err
 	}
 	if engine == model.AIAgentEngineLocalCLI {
-		if err = validateInstalledAIAgentCLI(cli, settings.Interaction.Agent.AllowCodex); err != nil {
+		if err = validateInstalledAIAgentCLI(cli, settings.Interaction.Agent.AllowCodex, settings.Interaction.Agent.CustomCLIs); err != nil {
 			return nil, err
 		}
 	}

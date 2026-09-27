@@ -10,6 +10,7 @@ const ai = vi.hoisted(() => ({
   testProvider: vi.fn(),
   saveSettings: vi.fn(),
   detect: vi.fn(),
+  cached: vi.fn(),
 }))
 const toast = vi.hoisted(() => vi.fn())
 vi.mock('@/lib/wails', () => ({
@@ -20,10 +21,11 @@ vi.mock('@/lib/wails', () => ({
     TestProvider: ai.testProvider,
     SaveSettings: ai.saveSettings,
     DetectAgentCLIs: ai.detect,
+    GetAgentCLIStatuses: ai.cached,
   },
 }))
 vi.mock('@/components/ui/toast', () => ({ toast }))
-vi.mock('@/lib/logger', () => ({ logger: { error: vi.fn() } }))
+vi.mock('@/lib/logger', () => ({ logger: { error: vi.fn(), warn: vi.fn() } }))
 
 import { useAISettings } from '@/hooks/useAISettings'
 import { AI_CONFIGURATION_CHANGED_EVENT } from '@/lib/settingsWindowEvents'
@@ -39,6 +41,14 @@ describe('useAISettings', () => {
     ai.testProvider.mockResolvedValue(undefined)
     ai.saveSettings.mockResolvedValue(undefined)
     ai.detect.mockResolvedValue([{ command: 'codex' }])
+    ai.cached.mockResolvedValue([])
+  })
+
+  it('shows the cached agent CLI snapshot without probing again', async () => {
+    ai.cached.mockResolvedValue([{ command: 'codex', installed: true }])
+    const { result } = renderHook(() => useAISettings())
+    await waitFor(() => expect(result.current.agents).toEqual([{ command: 'codex', installed: true }]))
+    expect(ai.detect).not.toHaveBeenCalled()
   })
 
   it('loads and executes every AI settings operation', async () => {

@@ -24,7 +24,8 @@ const emptyAISettingsInput: AISettingsInput = {
     render_markdown: true,
     history_retention_days: 30,
     max_conversations: 100,
-    agent: { default_engine: AIAgentEngine.AIAgentEngineNative, default_cli: AIAgentCLI.AIAgentCLICodex, allow_codex: false },
+    agent: { default_engine: AIAgentEngine.AIAgentEngineNative, default_cli: AIAgentCLI.AIAgentCLICodex, allow_codex: false, custom_clis: [] },
+    mcp: { session_id: 0, port: 0 },
   },
   search: {
     enabled: false,
