@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -284,6 +285,14 @@ func configureSystemTray(wailsApp *application.App, controller *windowing.Applic
 	tray := wailsApp.SystemTray.New()
 	tray.SetIcon(appIcon).SetMenu(menu).OnClick(controller.ShowMainWindow)
 	tray.SetTooltip("MSSH")
+	// A Linux StatusNotifierItem takes its Title and Id from the tray label and
+	// falls back to "Wails" when it is empty. "mssh" also matches
+	// build/linux/mssh.desktop, so KDE resolves the app name and icon. Other
+	// platforms render the label as visible text (macOS menu bar), so it stays
+	// unset there.
+	if runtime.GOOS == "linux" {
+		tray.SetLabel("mssh")
+	}
 	return tray, menu
 }
 
