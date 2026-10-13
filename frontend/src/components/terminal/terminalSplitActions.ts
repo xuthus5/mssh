@@ -19,6 +19,8 @@ import {
   replaceSecondaryTerminalRuntime,
 } from '@/components/terminal/splitPersistence'
 import { t } from '@/i18n'
+import { claimBackgroundHostKeyPromptTab } from '@/store/hostKeyPromptOwnership'
+import { isActiveTerminalTab } from '@/lib/activeTerminalTab'
 
 export const MAX_SPLIT_PANES = 8
 
@@ -139,10 +141,13 @@ export async function reconnectSplitPane(terminalID: string, ctx: SplitActionCon
   ctx.operationRef.current = true
   useAppStore.getState().setConnectionStatus(terminalID, 'reconnecting')
   ctx.setBusy(true)
+  // 后台页签的分屏重连同样锚定到该页签，避免指纹确认弹框打断当前页签。
+  const isForeground = isActiveTerminalTab(ctx.tabID)
+  const releaseClaim = isForeground ? null : claimBackgroundHostKeyPromptTab(ctx.tabID)
   try {
     const nextID = await openTerminalWithPoolCapacity(() => openSplitPane(
       ctx.sessionId, ctx.connectionKind, ctx.serialPortId, ctx.primaryRef.current,
-    ), { replacementTerminalID: terminalID })
+    ), { replacementTerminalID: terminalID, allowProtectedReclaim: isForeground })
     if (!ctx.mountedRef.current) {
       closeSplitTerminalInBackground(nextID, 'TerminalSplit: cancelled reconnect cleanup failed')
       return
@@ -169,6 +174,7 @@ export async function reconnectSplitPane(terminalID: string, ctx: SplitActionCon
     // ConnectionOverlay owns recovery UX for error status; avoid toast + overlay double reporting.
     useAppStore.getState().setConnectionStatus(terminalID, 'error')
   } finally {
+    releaseClaim?.()
     ctx.operationRef.current = false
     if (ctx.mountedRef.current) ctx.setBusy(false)
   }

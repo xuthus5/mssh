@@ -80,6 +80,23 @@ describe('HostKeyPromptCoordinator', () => {
     await waitFor(() => expect(useHostKeyPromptDialog.getState().active?.prompt.attemptId).toBe('third'))
   })
 
+  it('drains queued prompts into per-tab deferral once the active prompt settles', async () => {
+    useHostKeyPromptDialog.getState().setActiveTabId('tab-a')
+    const instance = coordinator()
+    instance.handle({ ...prompt('foreground'), targetTabId: 'tab-a' })
+    instance.handle({ ...prompt('background-1'), targetTabId: 'tab-b' })
+    instance.handle({ ...prompt('background-2'), targetTabId: 'tab-c' })
+
+    expect(useHostKeyPromptDialog.getState().active?.prompt.attemptId).toBe('foreground')
+
+    await useHostKeyPromptDialog.getState().decide(true)
+
+    await waitFor(() => {
+      expect(useHostKeyPromptDialog.getState().deferred.map((item) => item.prompt.attemptId)).toEqual(['background-1', 'background-2'])
+    })
+    expect(useHostKeyPromptDialog.getState().active).toBeNull()
+  })
+
   it('does not clear an active prompt owned by another coordinator', () => {
     const first = coordinator()
     const second = coordinator()

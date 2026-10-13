@@ -1,10 +1,11 @@
-import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode, type WheelEvent } from 'react'
-import { Circle, Copy, List, Play, Plus, Server, X } from 'lucide-react'
+import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode, type WheelEvent } from 'react'
+import { Bell, Circle, Copy, List, Play, Plus, Server, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { ContextMenu, ContextMenuContent, ContextMenuGroup, ContextMenuItem, ContextMenuTrigger } from '@/components/ui/context-menu'
 import { connectionStatusVisual } from '@/lib/connectionStatusVisual'
 import { useAppStore, type AppState, type Tab } from '@/store/appStore'
+import { useHostKeyPromptDialog } from '@/store/hostKeyPromptDialog'
 import { dynamicPanelID, dynamicTabID } from '@/store/tabNavigation'
 import { TabCloseConfirmation, useTabCloseCoordinator } from '@/hooks/useTabCloseCoordinator'
 import { TabRenameDialog } from '@/components/layout/TabRenameDialog'
@@ -87,10 +88,23 @@ function TabLeadingIcon({ tab }: { tab: Tab }) {
 	return <Server aria-hidden="true" data-testid={`server-icon-${tab.id}`} className="size-3.5 shrink-0 text-muted-foreground" />
 }
 
-function TabStatusIcon({ tab, connectionStatus }: { tab: Tab; connectionStatus: AppState['connectionStatus'] }) {
+function TabStatusIcon({ tab, connectionStatus, hasAlert }: { tab: Tab; connectionStatus: AppState['connectionStatus']; hasAlert: boolean }) {
 	if (tab.type === 'playback') return null
+	if (hasAlert) return <Bell aria-hidden="true" data-testid={`tab-alert-${tab.id}`} className="size-3 shrink-0 fill-current text-amber-500 motion-safe:animate-pulse" />
 	const visual = connectionStatusVisual(connectionStatus[tab.terminalId])
 	return <Circle aria-hidden="true" className={`size-2 shrink-0 ${visual.dotClass}`} />
+}
+
+/** 后台页签有待确认指纹时，用提醒图标提示用户切换过去处理。 */
+function useAlertTabIds() {
+	const deferred = useHostKeyPromptDialog((state) => state.deferred)
+	return useMemo(() => {
+		const ids = new Set<string>()
+		for (const request of deferred) {
+			if (request.prompt.targetTabId) ids.add(request.prompt.targetTabId)
+		}
+		return ids
+	}, [deferred])
 }
 
 function requestCloseFromKeyboard(event: KeyboardEvent<HTMLButtonElement>, tabID: string, onClose: (tabID: string) => void) {
@@ -109,10 +123,11 @@ function scrollTabsWithWheel(event: WheelEvent<HTMLDivElement>) {
 	event.preventDefault()
 }
 
-function DynamicTab({ tab, active, connectionStatus, navigation, onActivate, onClose, onDuplicate, onCloseAll, onRename }: {
+function DynamicTab({ tab, active, connectionStatus, hasAlert, navigation, onActivate, onClose, onDuplicate, onCloseAll, onRename }: {
   tab: Tab
   active: boolean
   connectionStatus: AppState['connectionStatus']
+  hasAlert: boolean
   navigation: TabNavigation
   onActivate: (tabID: string) => void
   onClose: (tabID: string) => void
@@ -125,10 +140,10 @@ function DynamicTab({ tab, active, connectionStatus, navigation, onActivate, onC
     <div
       className={`group flex h-8 shrink-0 items-center gap-1 border px-1.5 text-sm transition-colors duration-150 ${active ? 'rounded-t-md rounded-b-none border-transparent bg-muted/30 text-foreground' : 'rounded-md border-transparent bg-transparent text-muted-foreground hover:bg-muted/60 hover:text-foreground'}`}
     >
-      <button ref={(element) => navigation.registerTab(tab.id, element)} id={dynamicTabID(tab.id)} type="button" role="tab" tabIndex={active ? 0 : -1} aria-controls={dynamicPanelID(tab.id)} aria-label={t('${}，状态：${}', tab.title, statusLabel)} aria-selected={active} className="flex h-full min-w-0 flex-1 items-center gap-1.5 rounded-sm px-1 focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={() => onActivate(tab.id)} onKeyDown={(event) => navigation.onKeyDown(event, tab.id)}>
+      <button ref={(element) => navigation.registerTab(tab.id, element)} id={dynamicTabID(tab.id)} type="button" role="tab" tabIndex={active ? 0 : -1} aria-controls={dynamicPanelID(tab.id)} aria-label={hasAlert ? t('${}，状态：${}，有待确认的指纹', tab.title, statusLabel) : t('${}，状态：${}', tab.title, statusLabel)} aria-selected={active} className="flex h-full min-w-0 flex-1 items-center gap-1.5 rounded-sm px-1 focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={() => onActivate(tab.id)} onKeyDown={(event) => navigation.onKeyDown(event, tab.id)}>
         <TabLeadingIcon tab={tab} />
         <span className="min-w-0 max-w-40 truncate">{tab.title}</span>
-        <TabStatusIcon tab={tab} connectionStatus={connectionStatus} />
+        <TabStatusIcon tab={tab} connectionStatus={connectionStatus} hasAlert={hasAlert} />
       </button>
       <button type="button" aria-label={t('关闭 ${}', tab.title)} className="grid size-5 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-destructive/15 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={(event) => { event.stopPropagation(); onClose(tab.id) }} onKeyDown={(event) => requestCloseFromKeyboard(event, tab.id, onClose)}>
         <X aria-hidden="true" className="size-3.5" />
@@ -247,6 +262,7 @@ export function DynamicTabStrip({ onOverflowChange }: { onOverflowChange?: (over
   const activeSurface = useAppStore((state) => state.activeSurface)
   const activateTab = useAppStore((state) => state.activateTab)
   const connectionStatus = useAppStore((state) => state.connectionStatus)
+  const alertTabIds = useAlertTabIds()
   const navigation = useTabNavigation(tabs, activeSurface?.id ?? null, activateTab)
   const scroll = useTabStripScroll(tabs, onOverflowChange)
   const activateWithFocus = useCallback((tabID: string) => activateTab(tabID, true), [activateTab])
@@ -264,7 +280,7 @@ export function DynamicTabStrip({ onOverflowChange }: { onOverflowChange?: (over
       <div className={`relative min-w-0 ${scroll.overflow ? 'flex-1' : ''} ${scroll.canScrollLeft ? 'shadow-[inset_12px_0_8px_-12px_rgba(0,0,0,0.45)]' : ''} ${scroll.canScrollRight ? 'shadow-[inset_-12px_0_8px_-12px_rgba(0,0,0,0.45)]' : ''}`}>
         <div ref={scroll.tabListRef} role="tablist" aria-label={t('动态标签')} className="mssh-tab-strip-scroll flex h-9 min-w-0 items-end gap-1 overflow-x-auto overflow-y-hidden" onWheel={scrollTabsWithWheel} onScroll={scroll.syncScrollAffordances}>
           {tabs.map((tab, index) => <Fragment key={tab.id}>
-            <DynamicTab tab={tab} active={activeSurface?.id === tab.id} connectionStatus={connectionStatus} navigation={navigation} onActivate={activateWithFocus} onClose={closeCoordinator.requestClose} onDuplicate={duplicateTerminal} onCloseAll={closeCoordinator.requestCloseAll} onRename={setRenameTabID} />
+            <DynamicTab tab={tab} active={activeSurface?.id === tab.id} connectionStatus={connectionStatus} hasAlert={alertTabIds.has(tab.id)} navigation={navigation} onActivate={activateWithFocus} onClose={closeCoordinator.requestClose} onDuplicate={duplicateTerminal} onCloseAll={closeCoordinator.requestCloseAll} onRename={setRenameTabID} />
             {index === quickConnectAfter && <QuickConnectButton />}
           </Fragment>)}
         </div>

@@ -81,6 +81,11 @@ export type EnsureTerminalPoolCapacityOptions = TerminalPoolStoreAccess & {
   reserve?: number
   reserveCapacity?: boolean
   replacementTerminalID?: string
+  /**
+   * 是否允许回收受保护（仍绑定标签）的终端。后台重连等无人交互场景传 false，
+   * 避免在别的页签弹确认框，也避免占用连接池锁阻塞前台操作。
+   */
+  allowProtectedReclaim?: boolean
 }
 
 let capacityQueue = Promise.resolve()
@@ -171,6 +176,7 @@ async function ensureTerminalPoolCapacityUnlocked(options: EnsureTerminalPoolCap
 
     const protectedID = selectTerminalPoolEvictionID(state, 'include-protected')
     if (!protectedID) return false
+    if (options.allowProtectedReclaim === false) return false
     const victim = describeTerminalPoolVictim(state, protectedID)
     if (victim.protected && !(await confirmProtected(victim))) {
       toast(t('已取消打开新终端：终端池已满且未释放现有标签'), 'info')

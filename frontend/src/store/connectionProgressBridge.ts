@@ -3,6 +3,7 @@ import { logger } from '@/lib/logger'
 import { useConnectDialog } from '@/store/connectDialog'
 import type { createHostKeyPromptCoordinator } from '@/store/hostKeyPromptCoordinator'
 import { subscribeRetiredConnectionRequests } from '@/store/connectionRequestRegistry'
+import { currentBackgroundHostKeyPromptTab } from '@/store/hostKeyPromptOwnership'
 
 export interface ConnectionProgressPayload { request_id?: string; attempt_id?: string; stage?: string }
 export interface FingerprintPayload {
@@ -49,7 +50,14 @@ function handleFingerprint(context: {
     usesJumpHost: payload.uses_jump_host,
     hostname: payload.hostname ?? '', fingerprint: payload.fingerprint ?? '', algorithm: payload.algorithm ?? '',
     changed: payload.changed === true, expected: payload.expected ?? [],
+    targetTabId: resolvePromptTargetTab(),
   })
+}
+
+/** 前台连接由对话窗口承载，弹框保持全局；仅后台重连锚定到对应页签。 */
+function resolvePromptTargetTab(): string | null {
+  if (useConnectDialog.getState().open) return null
+  return currentBackgroundHostKeyPromptTab()
 }
 
 function trackPrompt(tracked: Map<string, string>, payload: FingerprintPayload) {

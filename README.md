@@ -110,7 +110,7 @@ The desktop app has an authenticated unified local IPC transport available for r
 
 - Master-key encryption for sensitive local data
 - Host key verification with change detection: block, warn, or trust new fingerprints
-- One SSH dialog for connection progress, fingerprint approval, and success, with automatic terminal focus
+- One SSH dialog for connection progress, fingerprint approval, and success, with automatic terminal focus; background reconnect prompts wait on their tab (marked with a bell) instead of interrupting the active one
 - Optional per-session SSH jump hosts with connection tests and progress, for hosts on private networks
 - Manage trusted host fingerprints from the Overview
 - System keychain integration on Linux, Windows, and macOS

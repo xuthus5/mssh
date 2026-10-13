@@ -9,6 +9,19 @@ import { __clearHandlers, __registerHandler } from '@/test/__mocks__/wails-runti
 const service = 'github.com/xuthus5/mssh/internal/service.TerminalService.'
 const sessions = [{ id: '5', host: 'server.internal', port: 22, username: 'root' }]
 
+function presentBackgroundFingerprint(targetTabId: string) {
+  useHostKeyPromptDialog.getState().present({
+    coordinatorId: 1,
+    prompt: {
+      attemptId: 'attempt-background', hostname: 'server.internal:22', fingerprint: 'SHA256:background',
+      algorithm: 'ssh-ed25519', changed: true, expected: ['SHA256:old'], targetTabId,
+    },
+    endpoint: { host: 'server.internal', port: 22 },
+    decide: async () => {},
+    dismiss: async () => {},
+  })
+}
+
 function waitForFingerprint() {
   useHostKeyPromptDialog.getState().present({
     coordinatorId: 1,
@@ -62,6 +75,25 @@ describe('SSH reconnect fingerprint wait', () => {
     await vi.advanceTimersByTimeAsync(RECONNECT_ATTEMPT_TIMEOUT_MS)
     expect(vi.getTimerCount()).toBe(0)
     expect(open).toHaveBeenCalledOnce()
+  })
+
+  it('excludes a deferred background prompt from the timeout until its tab is shown', async () => {
+    let resolveOpen!: (terminalId: string) => void
+    const open = vi.fn(() => new Promise<string>((resolve) => { resolveOpen = resolve }))
+    __registerHandler(service + 'Open', open)
+    const reconnecting = reconnectSessionTab('tab-1', sessions)
+    await vi.advanceTimersByTimeAsync(5000)
+    presentBackgroundFingerprint('tab-1')
+    await vi.advanceTimersByTimeAsync(RECONNECT_ATTEMPT_TIMEOUT_MS * 2)
+    expect(open).toHaveBeenCalledOnce()
+    expect(useHostKeyPromptDialog.getState().active).toBeNull()
+
+    useHostKeyPromptDialog.getState().setActiveTabId('tab-1')
+    await useHostKeyPromptDialog.getState().decide(true)
+    resolveOpen('term-new')
+    await reconnecting
+    expect(useAppStore.getState().tabs[0]).toMatchObject({ terminalId: 'term-new' })
+    expect(vi.getTimerCount()).toBe(0)
   })
 
   it('resumes the remaining timeout and still fails a stalled connection', async () => {

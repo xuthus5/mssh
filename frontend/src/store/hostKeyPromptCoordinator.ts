@@ -27,11 +27,11 @@ class HostKeyPromptCoordinator {
   handle(prompt: HostKeyPrompt) {
     if (this.stopped || this.finished.has(prompt.attemptId)) return
     if (!isValidPrompt(prompt)) return this.rejectPrompt(prompt, 'invalid host key prompt')
-    const active = useHostKeyPromptDialog.getState().active
-    if (active?.prompt.attemptId === prompt.attemptId || this.hasPending(prompt.attemptId)) return
+    const dialog = useHostKeyPromptDialog.getState()
+    if (dialog.hasAttempt(prompt.attemptId) || this.hasPending(prompt.attemptId)) return
     const endpoint = parseHostKeyEndpoint(prompt.hostname)
     if (!endpoint) return this.rejectPrompt(prompt, 'invalid host key prompt endpoint')
-    if (!active) return this.showPrompt(prompt, endpoint)
+    if (!dialog.active) return this.showPrompt(prompt, endpoint)
     if (this.pending.length >= MAX_PENDING_HOST_KEY_PROMPTS) {
       this.rejectPrompt(prompt, 'host key prompt queue full')
       return
@@ -48,10 +48,7 @@ class HostKeyPromptCoordinator {
     }
     const pendingIndex = this.pending.findIndex((prompt) => prompt.attemptId === attemptId)
     if (pendingIndex >= 0) this.pending.splice(pendingIndex, 1)
-    const active = useHostKeyPromptDialog.getState().active
-    if (active?.coordinatorId === this.coordinatorId && active.prompt.attemptId === attemptId) {
-      useHostKeyPromptDialog.getState().clear(this.coordinatorId)
-    }
+    useHostKeyPromptDialog.getState().finishAttempt(attemptId, this.coordinatorId)
   }
 
   stop() {
@@ -77,9 +74,12 @@ class HostKeyPromptCoordinator {
     })
   }
 
-  private showPrompt(prompt: HostKeyPrompt, parsed?: HostKeyEndpoint) {
+  private showPrompt(prompt: HostKeyPrompt, parsed?: HostKeyEndpoint): boolean {
     const endpoint = parsed ?? parseHostKeyEndpoint(prompt.hostname)
-    if (!endpoint) return this.rejectPrompt(prompt, 'invalid host key prompt endpoint')
+    if (!endpoint) {
+      this.rejectPrompt(prompt, 'invalid host key prompt endpoint')
+      return true
+    }
     const shown = useHostKeyPromptDialog.getState().present({
       coordinatorId: this.coordinatorId,
       prompt,
@@ -87,7 +87,9 @@ class HostKeyPromptCoordinator {
       decide: (accept) => SessionService.DecideHostKey(prompt.attemptId, accept),
       dismiss: () => rejectHostKeyAttempt(prompt.attemptId),
     })
-    if (!shown) this.pending.unshift(prompt)
+    if (shown) return true
+    this.pending.unshift(prompt)
+    return false
   }
 
   private schedulePump() {
@@ -98,9 +100,12 @@ class HostKeyPromptCoordinator {
 
   private pump() {
     this.pumpScheduled = false
-    if (this.stopped || useHostKeyPromptDialog.getState().active) return
-    const next = this.pending.shift()
-    if (next) this.showPrompt(next)
+    if (this.stopped) return
+    // 弹框可能被挂起到后台页签，继续排空队列，避免后续请求滞留。
+    while (!useHostKeyPromptDialog.getState().active) {
+      const next = this.pending.shift()
+      if (!next || !this.showPrompt(next)) return
+    }
   }
 }
 
