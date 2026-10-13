@@ -113,6 +113,16 @@ describe('SessionTree behavior', () => {
     expect(onDeleteSession).toHaveBeenCalledWith('s1')
   })
 
+  it('creates a session inside the right-clicked folder', async () => {
+    const user = userEvent.setup()
+    const onCreateSessionInFolder = vi.fn()
+    render(<SessionTree folders={folders} sessions={sessions} onConnect={vi.fn()} onCreateSessionInFolder={onCreateSessionInFolder} revealAll />)
+
+    await user.click(screen.getAllByRole('button', { name: '新建会话' })[0])
+
+    expect(onCreateSessionInFolder).toHaveBeenCalledWith('f1')
+  })
+
   it('scrolls the active treeitem into view on keyboard navigation', () => {
     const scrollIntoView = vi.fn()
     const original = Element.prototype.scrollIntoView

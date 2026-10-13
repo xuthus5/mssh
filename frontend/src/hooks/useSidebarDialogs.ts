@@ -42,6 +42,7 @@ function useDialogState() {
   const [folderError, setFolderError] = useState('')
   const [editingFolder, setEditingFolderState] = useState<Folder | null>(null)
   const [editingSession, setEditingSessionState] = useState<Session | null>(null)
+  const [sessionPresetFolderId, setSessionPresetFolderIdState] = useState<string | null>(null)
   const [renameSession, setRenameSessionState] = useState<Session | null>(null)
   const [renameName, setRenameNameState] = useState('')
   const [renameError, setRenameErrorState] = useState('')
@@ -59,9 +60,10 @@ function useDialogState() {
   const setFolderName = useCallback((name: string) => { folderGeneration.current++; setFolderNameState(name) }, [])
   const setEditingFolder = useCallback((folder: Folder | null) => { folderGeneration.current++; setEditingFolderState(folder) }, [])
   const setEditingSession = useCallback((session: Session | null) => { sessionGeneration.current++; setEditingSessionState(session) }, [])
+  const setSessionPresetFolderId = useCallback((folderId: string | null) => { setSessionPresetFolderIdState(folderId) }, [])
   const setRenameSession = useCallback((session: Session | null) => { setRenameSessionState(session); setRenameNameState(session?.name ?? ''); setRenameErrorState('') }, [])
   const setRenameName = useCallback((name: string) => { setRenameNameState(name); setRenameErrorState('') }, [])
-  return { sessionDialogOpen, setSessionDialogOpen, setSessionDialogOpenState, folderDialogOpen, setFolderDialogOpen, setFolderDialogOpenState, folderName, setFolderName, setFolderNameState, folderError, setFolderError, editingFolder, setEditingFolder, setEditingFolderState, editingSession, setEditingSession, setEditingSessionState, renameSession, setRenameSession, renameName, setRenameName, renameError, setRenameErrorState, lifecycle, sessionGeneration, folderGeneration, folderSaveRequest, folderSaveGeneration }
+  return { sessionDialogOpen, setSessionDialogOpen, setSessionDialogOpenState, folderDialogOpen, setFolderDialogOpen, setFolderDialogOpenState, folderName, setFolderName, setFolderNameState, folderError, setFolderError, editingFolder, setEditingFolder, setEditingFolderState, editingSession, setEditingSession, setEditingSessionState, sessionPresetFolderId, setSessionPresetFolderId, renameSession, setRenameSession, renameName, setRenameName, renameError, setRenameErrorState, lifecycle, sessionGeneration, folderGeneration, folderSaveRequest, folderSaveGeneration }
 }
 
 type DialogState = ReturnType<typeof useDialogState>
@@ -71,8 +73,9 @@ function useDialogOpeners(state: DialogState) {
     openFolder: () => { state.setEditingFolder(null); state.setFolderName(''); state.setFolderError(''); state.setFolderDialogOpen(true) },
     editSession: (session: Session) => { state.setEditingSession(session); state.setSessionDialogOpen(true) },
     editFolder: (folder: Folder) => { state.setEditingFolder(folder); state.setFolderName(folder.name); state.setFolderError(''); state.setFolderDialogOpen(true) },
-    newSession: () => { state.setEditingSession(null); state.setSessionDialogOpen(true) },
-  }), [state.setEditingFolder, state.setEditingSession, state.setFolderDialogOpen, state.setFolderName, state.setSessionDialogOpen])
+    newSession: () => { state.setEditingSession(null); state.setSessionPresetFolderId(null); state.setSessionDialogOpen(true) },
+    newSessionInFolder: (folderId: string) => { state.setEditingSession(null); state.setSessionPresetFolderId(folderId); state.setSessionDialogOpen(true) },
+  }), [state.setEditingFolder, state.setEditingSession, state.setFolderDialogOpen, state.setFolderName, state.setSessionDialogOpen, state.setSessionPresetFolderId])
 }
 
 function useSaveSession(workspace: Workspace, state: DialogState) {
@@ -256,6 +259,7 @@ export function useSidebarDialogs(workspace: Workspace) {
     folderName: state.folderName, setFolderName: state.setFolderName, folderError: state.folderError, setFolderError: state.setFolderError,
     editingFolder: state.editingFolder, setEditingFolder: state.setEditingFolder,
     editingSession: state.editingSession, setEditingSession: state.setEditingSession,
+    sessionPresetFolderId: state.sessionPresetFolderId, newSessionInFolder: events.newSessionInFolder,
     renameSession: state.renameSession, setRenameSession: state.setRenameSession,
     renameName: state.renameName, setRenameName: state.setRenameName, renameError: state.renameError,
     quickRenameSession, saveRename,

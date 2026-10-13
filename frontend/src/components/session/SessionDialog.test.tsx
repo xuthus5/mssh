@@ -167,6 +167,34 @@ describe('SessionDialog', () => {
     expect(defaultProps.onSave).toHaveBeenCalledWith(expect.objectContaining({ folderId: '1' }))
   })
 
+  it('preselects the preset folder when creating from a folder context menu', async () => {
+    const user = userEvent.setup()
+    render(<SessionDialog {...defaultProps} presetFolderId="2" folders={[
+      { id: '1', name: '默认分组', parentId: null, isDefault: true },
+      { id: '2', name: '生产环境', parentId: null, isDefault: false },
+    ]} />)
+
+    expect(within(screen.getByRole('combobox', { name: '分组' })).getByText('生产环境')).toBeInTheDocument()
+
+    const inputs = screen.getAllByRole('textbox')
+    await user.type(inputs[0], 'server')
+    await user.type(inputs[1], '127.0.0.1')
+    await user.type(inputs[2], 'root')
+    await user.click(screen.getByRole('button', { name: '创建会话' }))
+    expect(defaultProps.onSave).toHaveBeenCalledWith(expect.objectContaining({ folderId: '2' }))
+  })
+
+  it('keeps the edited session folder over a stale preset folder', () => {
+    render(<SessionDialog {...defaultProps} presetFolderId="2" session={{
+      id: '1', name: 'web-01', host: '10.0.0.1', port: 22, username: 'root', authMethod: 'password', keepAlive: 0, termType: 'xterm', folderId: '1',
+    } as never} folders={[
+      { id: '1', name: '默认分组', parentId: null, isDefault: true },
+      { id: '2', name: '生产环境', parentId: null, isDefault: false },
+    ]} />)
+
+    expect(within(screen.getByRole('combobox', { name: '分组' })).getByText('默认分组（默认）')).toBeInTheDocument()
+  })
+
   it('shows the selected folder label instead of its ID', () => {
     render(<SessionDialog {...defaultProps} folders={[
       { id: '1', name: '默认分组', parentId: null, isDefault: true },

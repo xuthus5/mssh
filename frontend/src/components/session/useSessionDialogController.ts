@@ -10,6 +10,7 @@ export interface SessionDialogProps {
   onOpenChange: (open: boolean) => void
   session?: Session | null
   folders?: Folder[]
+  presetFolderId?: string | null
   environments: AssetEnvironment[]
   projects: AssetProject[]
   assetTags: AssetTag[]
@@ -51,7 +52,8 @@ function useSessionDialogFields(props: SessionDialogProps) {
   const [keepAlive, setKeepAlive] = useState(session?.keepAlive?.toString() ?? '0')
   const [termType, setTermType] = useState(session?.termType ?? 'xterm-256color')
   const defaultFolderID = props.folders?.find((folder) => folder.isDefault)?.id ?? ''
-  const [folderId, setFolderId] = useState(session?.folderId ?? defaultFolderID)
+  const initialFolderID = resolveInitialFolderID(session, props.presetFolderId, defaultFolderID)
+  const [folderId, setFolderId] = useState(initialFolderID)
   useEffect(() => {
     if (!props.open) return
     setName(session?.name ?? ''); setHost(session?.host ?? '')
@@ -60,11 +62,11 @@ function useSessionDialogFields(props: SessionDialogProps) {
     setProjectId(session?.projectId ?? ''); setTagIds((session?.tags ?? []).map((tag) => tag.id))
     setAuthMethod(session?.authMethod ?? 'password'); setPassword(session?.password ?? '')
     setKeyId(session?.keyId ?? ''); setKeepAlive(session?.keepAlive?.toString() ?? '0')
-    setTermType(session?.termType ?? 'xterm-256color'); setFolderId(session?.folderId ?? defaultFolderID)
+    setTermType(session?.termType ?? 'xterm-256color'); setFolderId(initialFolderID)
   }, [props.open, session?.id])
   useEffect(() => {
-    if (props.open) setFolderId(session?.folderId ?? defaultFolderID)
-  }, [defaultFolderID, props.open, session?.folderId])
+    if (props.open) setFolderId(initialFolderID)
+  }, [props.open, initialFolderID])
   return { name, setName, host, setHost, port, setPort, username, setUsername, notes, setNotes,
     environmentId, setEnvironmentId, projectId, setProjectId, tagIds, setTagIds,
     authMethod, setAuthMethod, password, setPassword, keyId, setKeyId, keepAlive, setKeepAlive,
@@ -182,4 +184,13 @@ function useLifecycleRef() {
     return () => { if (lifecycle.current === token) lifecycle.current++ }
   }, [])
   return lifecycle
+}
+
+function resolveInitialFolderID(
+  session: Session | null | undefined,
+  presetFolderId: string | null | undefined,
+  defaultFolderID: string,
+) {
+  if (session) return session.folderId ?? defaultFolderID
+  return presetFolderId ?? defaultFolderID
 }

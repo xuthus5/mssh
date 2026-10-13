@@ -35,12 +35,13 @@ vi.mock('@/components/session/SessionTree', () => ({
     <span data-testid="tree-expanded">expanded:{(props.expandedFolderIDs ?? []).join(',')}</span>
     <button type="button" onClick={() => props.onExpandedFolderIDsChange?.(['parent'])}>tree-remember</button>
     <button type="button" onClick={() => props.onEditSession?.(props.sessions[0])}>tree-edit</button>
+    <button type="button" onClick={() => props.onCreateSessionInFolder?.('child')}>tree-create-in-folder</button>
     <button type="button" onClick={() => props.onSelectFolder?.('child')}>tree-select</button>
   </div>,
 }))
 vi.mock('@/components/layout/SidebarDialogs', () => ({
   SidebarDialogs: (props: any) => <div>
-    <span data-testid="session-dialog">session:{String(props.sessionDialogOpen)}:{props.editingSession?.name ?? 'new'}</span>
+    <span data-testid="session-dialog">session:{String(props.sessionDialogOpen)}:{props.editingSession?.name ?? 'new'}:preset-{props.sessionPresetFolderId ?? 'none'}</span>
     <button type="button" onClick={() => void props.onSaveSession(sessionDraft)}>session-save</button>
     <button type="button" onClick={() => props.onSessionOpenChange(false)}>session-close</button>
     <span data-testid="folder-dialog">folder:{String(props.folderDialogOpen)}:{props.editingFolder?.name ?? 'new'}</span>
@@ -157,6 +158,17 @@ describe('Sidebar behavior', () => {
     await user.click(screen.getByRole('button', { name: 'session-close' }))
     expect(screen.getByTestId('session-dialog')).toHaveTextContent('session:false:new')
 
+  })
+
+  it('presets the session dialog folder from a folder context menu and resets it after', async () => {
+    const user = userEvent.setup()
+    render(<Sidebar />)
+
+    await user.click(screen.getByRole('button', { name: 'tree-create-in-folder' }))
+    expect(screen.getByTestId('session-dialog')).toHaveTextContent('session:true:new:preset-child')
+
+    act(() => window.dispatchEvent(new CustomEvent('mssh:new-session')))
+    expect(screen.getByTestId('session-dialog')).toHaveTextContent('session:true:new:preset-none')
   })
 
   it('keeps a newly opened session dialog when an older save completes', async () => {
