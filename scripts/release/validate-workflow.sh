@@ -13,7 +13,7 @@ test -f "${taskfile}"
 test -f "${windows_taskfile}"
 for pattern in \
   'if-no-files-found: error' \
-  'actions/attest-build-provenance@v2' \
+  'actions/attest-build-provenance@v4' \
   'cosign sign-blob --yes' \
   '--bundle "upload/mssh-${version}-SHA256SUMS.sigstore.json"' \
   'cosign verify-blob' \
