@@ -1,6 +1,6 @@
 module github.com/xuthus5/mssh
 
-go 1.27.1
+go 1.27.2
 
 require (
 	github.com/Microsoft/go-winio v0.6.2
@@ -16,7 +16,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/pkg/sftp v1.13.11
 	github.com/stretchr/testify v1.12.1
-	github.com/wailsapp/wails/v3 v3.0.0-beta.26
+	github.com/wailsapp/wails/v3 v3.0.0-beta.28
 	github.com/zalando/go-keyring v0.2.8
 	go.bug.st/serial v1.8.0
 	golang.org/x/crypto v0.56.0
