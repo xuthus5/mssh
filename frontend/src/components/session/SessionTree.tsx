@@ -22,6 +22,7 @@ interface Props {
   onCopyConnectionInfo?: (session: Session) => void | Promise<void>
   onDeleteSession?: (sessionId: string) => void
   onEditFolder?: (folder: Folder) => void
+  onCreateSessionInFolder?: (folderId: string) => void
   onDeleteFolder?: (folderId: string) => void
   onMoveToFolder?: (sessionId: string, folderId: string | null) => void | Promise<void>
   onSelectFolder?: (folderId: string) => void
@@ -107,6 +108,7 @@ interface TreeRowProps {
   onCopyConnectionInfo?: (session: Session) => void | Promise<void>
   onDeleteSession?: (sessionId: string) => void
   onEditFolder?: (folder: Folder) => void
+  onCreateSessionInFolder?: (folderId: string) => void
   onDeleteFolder?: (folderId: string) => void
   onMoveToFolder?: (sessionId: string, folderId: string | null) => void | Promise<void>
 }
@@ -136,6 +138,7 @@ function FolderTreeRow(props: TreeRowProps & { node: Extract<SessionTreeNode, { 
   )
   if (props.navigationOnly) return row
   return <TreeContextMenu row={row}>
+    <ContextMenuItem onClick={() => props.onCreateSessionInFolder?.(folder.id)}>{t('新建会话')}</ContextMenuItem>
     <ContextMenuItem onClick={() => props.onEditFolder?.(folder)}>{t('编辑')}</ContextMenuItem>
     <ContextMenuItem variant="destructive" onClick={() => props.onDeleteFolder?.(folder.id)}>{t('删除')}</ContextMenuItem>
   </TreeContextMenu>

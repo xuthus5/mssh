@@ -12,6 +12,7 @@ interface Props {
   sessionDialogOpen: boolean
   onSessionOpenChange: (open: boolean) => void
   editingSession: Session | null
+  sessionPresetFolderId?: string | null
   onSaveSession: (session: Omit<Session, 'id'>) => Promise<void>
   renameSession: Session | null
   setRenameSession: (session: Session | null) => void
@@ -37,7 +38,7 @@ interface Props {
 
 export function SidebarDialogs(props: Props) {
   return <>
-    <SessionDialog key={props.sessionDialogOpen ? 'open' : 'closed'} open={props.sessionDialogOpen} onOpenChange={props.onSessionOpenChange} session={props.editingSession} folders={props.folders} environments={props.environments} projects={props.projects} assetTags={props.assetTags} onCreateEnvironment={props.onCreateEnvironment} onCreateProject={props.onCreateProject} onCreateTag={props.onCreateTag} onSave={props.onSaveSession} />
+    <SessionDialog key={props.sessionDialogOpen ? 'open' : 'closed'} open={props.sessionDialogOpen} onOpenChange={props.onSessionOpenChange} session={props.editingSession} folders={props.folders} presetFolderId={props.sessionPresetFolderId} environments={props.environments} projects={props.projects} assetTags={props.assetTags} onCreateEnvironment={props.onCreateEnvironment} onCreateProject={props.onCreateProject} onCreateTag={props.onCreateTag} onSave={props.onSaveSession} />
     <Dialog open={Boolean(props.renameSession)} onOpenChange={(open) => { if (!open) props.setRenameSession(null) }}>
       <DialogContent className="sm:max-w-sm"><DialogHeader><DialogTitle>{t('快速重命名')}</DialogTitle></DialogHeader><div className="flex flex-col gap-3"><label className="text-xs font-medium text-muted-foreground" htmlFor="sidebar-session-rename">{t('会话名称')}</label><Input id="sidebar-session-rename" value={props.renameName} onChange={(event) => props.setRenameName(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') void props.onSaveRename() }} autoFocus />{props.renameError ? <p role="alert" className="text-sm text-destructive">{props.renameError}</p> : null}</div><DialogFooter><Button variant="outline" onClick={() => props.setRenameSession(null)}>{t('取消')}</Button><Button onClick={() => void props.onSaveRename()}>{t('保存')}</Button></DialogFooter></DialogContent>
     </Dialog>
