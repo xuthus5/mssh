@@ -147,6 +147,10 @@ describe('SSH jump reconnect progress', () => {
     fingerprint(requests[0], 'target')
     expect(useHostKeyPromptDialog.getState().active).toBeNull()
     fingerprint(requests[1], 'jump')
+    // 后台页签的指纹确认先挂起，切换到该页签后才展示。
+    expect(useHostKeyPromptDialog.getState().active).toBeNull()
+    expect(useHostKeyPromptDialog.getState().deferred.map((item) => item.prompt.requestId)).toEqual([requests[1]])
+    useHostKeyPromptDialog.getState().setActiveTabId('tab-1')
     expect(useHostKeyPromptDialog.getState().active?.prompt.requestId).toBe(requests[1])
     await useHostKeyPromptDialog.getState().decide(true)
     pending.resolve('term-retried')

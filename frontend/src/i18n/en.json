@@ -34,6 +34,7 @@
   "${}默认值": "${} default",
   "${}（每行一个正则）": "${} (one regex per line)",
   "${}，状态：${}": "${}, status: ${}",
+  "${}，状态：${}，有待确认的指纹": "${}, status: ${}, pending fingerprint confirmation",
   "/固定": "/fixed",
   "0 条": "0 items",
   "1 条": "1 item",

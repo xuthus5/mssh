@@ -9,6 +9,8 @@ import { bindWailsCallToSignal } from '@/lib/wailsCancellation'
 import { startReconnectAttemptTimeout } from '@/hooks/reconnectAttemptTimeout'
 import type { SSHJumpHost } from '@/lib/sessionModels'
 import { retireConnectionRequest } from '@/store/connectionRequestRegistry'
+import { claimBackgroundHostKeyPromptTab } from '@/store/hostKeyPromptOwnership'
+import { isActiveTerminalTab } from '@/lib/activeTerminalTab'
 
 export interface ReconnectSession {
   id: string
@@ -115,13 +117,15 @@ function openReconnectTerminal(context: ReconnectContext) {
   const tab = useAppStore.getState().tabs.find((item) => item.id === context.tabID)
   const cols = context.terminal?.cols ?? 80
   const rows = context.terminal?.rows ?? 24
+  const waitForFingerprint = tab?.type === 'terminal' && (tab.connectionKind ?? 'ssh') === 'ssh'
+  // 后台页签重连时登记页签所有权，让指纹确认弹框锚定到该页签而不是打断当前页签。
+  const releaseClaim = waitForFingerprint && !isActiveTerminalTab(context.tabID) ? claimBackgroundHostKeyPromptTab(context.tabID) : null
   const call = tab?.type === 'terminal' && tab.connectionKind === 'serial' && tab.serialPortId
     ? TerminalService.OpenSerial(tab.serialPortId, cols, rows)
     : tab?.type === 'terminal' && tab.connectionKind === 'local'
       ? TerminalService.OpenLocal(cols, rows)
       : openSSHReconnect(context, { cols, rows })
-  const waitForFingerprint = tab?.type === 'terminal' && (tab.connectionKind ?? 'ssh') === 'ssh'
-  return withReconnectTimeout(call, context.run.controller, waitForFingerprint)
+  return withReconnectTimeout(call, context, waitForFingerprint).finally(() => releaseClaim?.())
 }
 
 function openSSHReconnect(context: ReconnectContext, size: { cols: number; rows: number }) {
@@ -132,7 +136,8 @@ function openSSHReconnect(context: ReconnectContext, size: { cols: number; rows:
   return TerminalService.OpenWithProgress({ session_id: Number(session.id), ...size, request_id: run.requestId })
 }
 
-function withReconnectTimeout<T>(call: Promise<T>, runController: AbortController, waitForFingerprint: boolean): Promise<T> {
+function withReconnectTimeout<T>(call: Promise<T>, context: ReconnectContext, waitForFingerprint: boolean): Promise<T> {
+  const runController = context.run.controller
   const timeoutController = new AbortController()
   const abortTimeout = () => timeoutController.abort()
   runController.signal.addEventListener('abort', abortTimeout, { once: true })
@@ -142,6 +147,7 @@ function withReconnectTimeout<T>(call: Promise<T>, runController: AbortControlle
     stopTimeout = startReconnectAttemptTimeout({
       durationMs: RECONNECT_ATTEMPT_TIMEOUT_MS,
       waitForFingerprint,
+      targetTabId: context.tabID,
       onTimeout: () => {
         abortTimeout()
         reject(new Error('reconnect attempt timed out'))
@@ -166,7 +172,7 @@ async function closeStaleTerminal(terminalID: string) {
 async function openAndInstallTerminal(context: ReconnectContext): Promise<boolean> {
   const nextTerminalID = await openTerminalWithPoolCapacity(
     () => openReconnectTerminal(context),
-    { replacementTerminalID: context.terminalID },
+    { replacementTerminalID: context.terminalID, allowProtectedReclaim: isActiveTerminalTab(context.tabID) },
   )
   if (context.run.controller.signal.aborted
     || !useAppStore.getState().replaceTerminalConnection(context.tabID, context.terminalID, nextTerminalID)) {

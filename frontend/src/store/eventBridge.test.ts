@@ -7,6 +7,7 @@ import { useAppStore } from '@/store/appStore'
 import { useConnectDialog } from '@/store/connectDialog'
 import { useHostKeyPromptDialog } from '@/store/hostKeyPromptDialog'
 import { TERMINAL_CLOSED_SPLIT_PANE_EVENT } from '@/hooks/sessionReconnect'
+import { claimBackgroundHostKeyPromptTab } from '@/store/hostKeyPromptOwnership'
 
 const sessionService = 'github.com/xuthus5/mssh/internal/service.SessionService.'
 
@@ -39,6 +40,27 @@ describe('eventBridge', () => {
       open: true, state: 'connecting', host: 'foreground.internal', sessionId: '9',
     })
     __emitEvent('session:attempt', { data: { attempt_id: 'attempt-unrelated' } })
+    expect(useHostKeyPromptDialog.getState().active?.prompt.attemptId).toBe('attempt-background')
+    stop()
+  })
+
+  it('defers a background reconnect fingerprint to its tab instead of interrupting the active one', () => {
+    useHostKeyPromptDialog.setState(useHostKeyPromptDialog.getInitialState())
+    const stop = startEventBridge()
+    const release = claimBackgroundHostKeyPromptTab('tab-b')
+
+    __emitEvent('session:fingerprint', { data: {
+      attempt_id: 'attempt-background', request_id: 'request-background',
+      hostname: 'background.internal:22', fingerprint: 'SHA256:background', algorithm: 'ssh-ed25519',
+    } })
+
+    expect(useHostKeyPromptDialog.getState().active).toBeNull()
+    expect(useHostKeyPromptDialog.getState().deferred).toMatchObject([
+      { prompt: { attemptId: 'attempt-background', targetTabId: 'tab-b' } },
+    ])
+
+    release()
+    useHostKeyPromptDialog.getState().setActiveTabId('tab-b')
     expect(useHostKeyPromptDialog.getState().active?.prompt.attemptId).toBe('attempt-background')
     stop()
   })
