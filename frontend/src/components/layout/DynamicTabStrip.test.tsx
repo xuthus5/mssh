@@ -24,6 +24,7 @@ import { DynamicTabOverflowMenu, DynamicTabStrip } from '@/components/layout/Dyn
 import { ToastContainer, useToastStore } from '@/components/ui/toast'
 import { logger } from '@/lib/logger'
 import { useAppStore } from '@/store/appStore'
+import { useHostKeyPromptDialog, type HostKeyPromptRequest } from '@/store/hostKeyPromptDialog'
 
 const scrollIntoView = vi.fn()
 
@@ -53,11 +54,22 @@ describe('DynamicTabStrip', () => {
       focusRequest: { id: '', terminalId: null, sequence: 0 },
       activePaneId: null,
     })
+    useHostKeyPromptDialog.setState(useHostKeyPromptDialog.getInitialState())
   })
 
   afterEach(() => {
     cleanup()
     vi.restoreAllMocks()
+  })
+
+  it('replaces the status dot with an alert icon for tabs awaiting fingerprint confirmation', () => {
+    seedTabs()
+    useHostKeyPromptDialog.setState({ deferred: [deferredPrompt('terminal-1')] })
+
+    render(<DynamicTabStrip />)
+
+    expect(screen.getByTestId('tab-alert-terminal-1')).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: /生产服务器，状态：已连接，有待确认的指纹/ })).toBeInTheDocument()
   })
 
   it('activates a terminal without closing background tabs', async () => {
@@ -412,3 +424,21 @@ describe('DynamicTabStrip', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 })
+
+function deferredPrompt(targetTabId: string): HostKeyPromptRequest {
+  return {
+    coordinatorId: 1,
+    prompt: {
+      attemptId: `attempt-${targetTabId}`,
+      hostname: 'host.internal:22',
+      fingerprint: 'SHA256:key',
+      algorithm: 'ssh-ed25519',
+      changed: true,
+      expected: [],
+      targetTabId,
+    },
+    endpoint: { host: 'host.internal', port: 22 },
+    decide: async () => {},
+    dismiss: async () => {},
+  }
+}

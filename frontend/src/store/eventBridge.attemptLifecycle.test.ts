@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { __clearHandlers, __emitEvent, __registerHandler } from '@/test/__mocks__/wails-runtime'
 import { startEventBridge } from '@/store/eventBridge'
 import { useHostKeyPromptDialog } from '@/store/hostKeyPromptDialog'
+import { claimBackgroundHostKeyPromptTab } from '@/store/hostKeyPromptOwnership'
 
 const sessionService = 'github.com/xuthus5/mssh/internal/service.SessionService.'
 let stopBridge: (() => void) | undefined
@@ -49,6 +50,21 @@ describe('eventBridge connection attempt lifecycle', () => {
     await useHostKeyPromptDialog.getState().decide(true)
 
     await waitFor(() => expect(useHostKeyPromptDialog.getState().active?.prompt.attemptId).toBe('third'))
+  })
+
+  it('clears a deferred background prompt when its attempt finishes', () => {
+    useHostKeyPromptDialog.setState(useHostKeyPromptDialog.getInitialState())
+    const release = claimBackgroundHostKeyPromptTab('tab-b')
+    __emitEvent('session:fingerprint', { data: {
+      attempt_id: 'background', request_id: 'request-background',
+      hostname: 'background.internal:22', fingerprint: 'SHA256:background', algorithm: 'ssh-ed25519',
+    } })
+    expect(useHostKeyPromptDialog.getState().deferred).toHaveLength(1)
+
+    __emitEvent('session:attempt', { data: { attempt_id: 'background', state: 'finished' } })
+
+    expect(useHostKeyPromptDialog.getState().deferred).toHaveLength(0)
+    release()
   })
 
   it('ignores a fingerprint delivered after its completion event', () => {

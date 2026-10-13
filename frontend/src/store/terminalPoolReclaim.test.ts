@@ -120,6 +120,23 @@ describe('ensureTerminalPoolCapacity', () => {
     )
   })
 
+  it('skips the protected reclaim prompt for background reconnect paths', async () => {
+    const store = createStore({
+      maxPoolSize: 1,
+      tabs: [terminalTab('tab-old', 'term-old', '生产')],
+      terminalPool: new Map([['term-old', entry(1)]]),
+    })
+    const confirmProtected = vi.fn(async () => true)
+
+    const ok = await ensureTerminalPoolCapacity({ ...store, confirmProtected, allowProtectedReclaim: false })
+
+    expect(ok).toBe(false)
+    expect(confirmProtected).not.toHaveBeenCalled()
+    expect(store.getState().tabs).toHaveLength(1)
+    expect(store.getState().terminalPool.has('term-old')).toBe(true)
+    expect(toast).not.toHaveBeenCalled()
+  })
+
   it('aborts when the user declines reclaiming a protected terminal', async () => {
     const store = createStore({
       maxPoolSize: 1,
@@ -156,6 +173,19 @@ describe('openTerminalWithPoolCapacity', () => {
     })
     const open = vi.fn(async () => 'term-new')
     await expect(openTerminalWithPoolCapacity(open, store, { confirmProtected: () => false }))
+      .rejects.toThrow('终端池已满')
+    expect(open).not.toHaveBeenCalled()
+  })
+
+  it('fails without opening or prompting when protected reclaim is disabled', async () => {
+    const store = createStore({
+      maxPoolSize: 1,
+      tabs: [terminalTab('tab-old', 'term-old')],
+      terminalPool: new Map([['term-old', entry(1)]]),
+    })
+    const open = vi.fn(async () => 'term-new')
+
+    await expect(openTerminalWithPoolCapacity(open, store, { allowProtectedReclaim: false }))
       .rejects.toThrow('终端池已满')
     expect(open).not.toHaveBeenCalled()
   })
