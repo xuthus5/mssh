@@ -2,6 +2,7 @@ import { CircleHelp } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { LabeledSelect } from '@/components/ui/labeled-select'
+import { Textarea } from '@/components/ui/textarea'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { SessionAssetFields } from '@/components/session/SessionAssetFields'
 import type { SessionDialogProps, useSessionDialogController } from '@/components/session/useSessionDialogController'
@@ -55,11 +56,18 @@ export function SessionAssetSection({ props, controller }: { props: SessionDialo
 
 export function SessionTerminalSection({ controller }: { controller: Controller }) {
   const termOptions = TERM_TYPES.map((termType) => ({ value: termType, label: termType }))
-  return <div className="grid grid-cols-2 gap-3">
-    <div className="flex flex-col gap-1.5"><div className="flex items-center gap-1">
-      <label htmlFor="session-keep-alive" className="text-xs font-medium text-muted-foreground">{t('保活间隔 (秒，0 使用全局默认)')}</label>
-      <Tooltip><TooltipTrigger render={<Button type="button" variant="ghost" size="icon-xs" aria-label={t('会话保活说明')} />}><CircleHelp /></TooltipTrigger><TooltipContent>{t('会话保活仅维持底层 SSH 连接，不能控制服务端 Shell 的空闲自动登出策略。')}</TooltipContent></Tooltip>
-    </div><Input id="session-keep-alive" type="number" value={controller.keepAlive} onChange={(event) => controller.setKeepAlive(event.target.value)} min={0} /></div>
-    <label className="flex flex-col gap-1.5"><span className="text-xs font-medium text-muted-foreground">{t('终端类型')}</span><LabeledSelect value={controller.termType} options={termOptions} onValueChange={controller.setTermType} /></label>
+  return <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-1.5">
+      <label htmlFor="session-startup-command" className="text-xs font-medium text-muted-foreground">{t('登录后执行命令')}</label>
+      <Textarea id="session-startup-command" aria-describedby="session-startup-command-hint" value={controller.startupCommand} onChange={(event) => controller.setStartupCommand(event.target.value)} rows={2} maxLength={4096} placeholder="cd /opt/app && ./start.sh" />
+      <span id="session-startup-command-hint" className="text-xs text-muted-foreground">{t('连接成功后自动执行，支持多行；留空则不执行。')}</span>
+    </div>
+    <div className="grid grid-cols-2 gap-3">
+      <div className="flex flex-col gap-1.5"><div className="flex items-center gap-1">
+        <label htmlFor="session-keep-alive" className="text-xs font-medium text-muted-foreground">{t('保活间隔 (秒，0 使用全局默认)')}</label>
+        <Tooltip><TooltipTrigger render={<Button type="button" variant="ghost" size="icon-xs" aria-label={t('会话保活说明')} />}><CircleHelp /></TooltipTrigger><TooltipContent>{t('会话保活仅维持底层 SSH 连接，不能控制服务端 Shell 的空闲自动登出策略。')}</TooltipContent></Tooltip>
+      </div><Input id="session-keep-alive" type="number" value={controller.keepAlive} onChange={(event) => controller.setKeepAlive(event.target.value)} min={0} /></div>
+      <label className="flex flex-col gap-1.5"><span className="text-xs font-medium text-muted-foreground">{t('终端类型')}</span><LabeledSelect value={controller.termType} options={termOptions} onValueChange={controller.setTermType} /></label>
+    </div>
   </div>
 }

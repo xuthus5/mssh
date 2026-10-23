@@ -9,12 +9,13 @@ import (
 )
 
 const (
-	sessionNotesLimit    = 2000
-	sessionNameLimit     = 128
-	sessionHostLimit     = 255
-	sessionUsernameLimit = 128
-	sessionTermTypeLimit = 64
-	sessionKeepAliveMax  = 86400
+	sessionNotesLimit          = 2000
+	sessionNameLimit           = 128
+	sessionHostLimit           = 255
+	sessionUsernameLimit       = 128
+	sessionTermTypeLimit       = 64
+	sessionStartupCommandLimit = 4096
+	sessionKeepAliveMax        = 86400
 )
 
 func validateSessionAssetInput(input model.SessionInput, updating bool) error {
@@ -82,6 +83,9 @@ func validateSessionCoreFields(input model.SessionInput) error {
 	}
 	if input.KeepAlive < 0 || input.KeepAlive > sessionKeepAliveMax {
 		return fmt.Errorf("keep_alive must be between 0 and %d", sessionKeepAliveMax)
+	}
+	if err := validateSessionText("startup_command", input.StartupCommand, 0, sessionStartupCommandLimit); err != nil {
+		return err
 	}
 	termType := strings.TrimSpace(input.TermType)
 	if termType == "" {
