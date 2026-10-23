@@ -54,9 +54,9 @@ func CreateSessionWithTags(db *sql.DB, s model.Session, tagIDs []int64) (*model.
 	}
 	jump := storedSessionJumpHost(s.JumpHost)
 	result, err := tx.Exec(
-		`INSERT INTO sessions (folder_id, name, host, port, username, notes, environment_id, project_id, auth_method, password, key_id, keep_alive, term_type, sort_order, jump_host, jump_port, jump_username, jump_auth_method, jump_password, jump_key_id)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		s.FolderID, s.Name, s.Host, s.Port, s.Username, s.Notes, s.EnvironmentID, s.ProjectID, s.AuthMethod, s.Password, s.KeyID, s.KeepAlive, s.TermType, s.SortOrder,
+		`INSERT INTO sessions (folder_id, name, host, port, username, notes, environment_id, project_id, auth_method, password, key_id, keep_alive, term_type, startup_command, sort_order, jump_host, jump_port, jump_username, jump_auth_method, jump_password, jump_key_id)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		s.FolderID, s.Name, s.Host, s.Port, s.Username, s.Notes, s.EnvironmentID, s.ProjectID, s.AuthMethod, s.Password, s.KeyID, s.KeepAlive, s.TermType, s.StartupCommand, s.SortOrder,
 		jump.Host, jump.Port, jump.Username, jump.AuthMethod, jump.Password, jump.KeyID,
 	)
 	if err != nil {
@@ -125,9 +125,9 @@ func UpdateSessionWithTags(db *sql.DB, s model.Session, tagIDs []int64) error {
 	defer func() { _ = tx.Rollback() }()
 	jump := storedSessionJumpHost(s.JumpHost)
 	result, err := tx.Exec(
-		`UPDATE sessions SET folder_id=?, name=?, host=?, port=?, username=?, notes=?, environment_id=?, project_id=?, auth_method=?, password=?, key_id=?, keep_alive=?, term_type=?, sort_order=?, jump_host=?, jump_port=?, jump_username=?, jump_auth_method=?, jump_password=?, jump_key_id=?, updated_at=datetime('now')
+		`UPDATE sessions SET folder_id=?, name=?, host=?, port=?, username=?, notes=?, environment_id=?, project_id=?, auth_method=?, password=?, key_id=?, keep_alive=?, term_type=?, startup_command=?, sort_order=?, jump_host=?, jump_port=?, jump_username=?, jump_auth_method=?, jump_password=?, jump_key_id=?, updated_at=datetime('now')
 		 WHERE id=?`,
-		s.FolderID, s.Name, s.Host, s.Port, s.Username, s.Notes, s.EnvironmentID, s.ProjectID, s.AuthMethod, s.Password, s.KeyID, s.KeepAlive, s.TermType, s.SortOrder,
+		s.FolderID, s.Name, s.Host, s.Port, s.Username, s.Notes, s.EnvironmentID, s.ProjectID, s.AuthMethod, s.Password, s.KeyID, s.KeepAlive, s.TermType, s.StartupCommand, s.SortOrder,
 		jump.Host, jump.Port, jump.Username, jump.AuthMethod, jump.Password, jump.KeyID, s.ID,
 	)
 	if err != nil {

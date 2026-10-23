@@ -36,6 +36,7 @@ function toSessionInput(session: SessionDraft, id: number): SessionInput {
     jump_host: toSSHJumpHostInput(session.jumpHost),
     keep_alive: session.keepAlive,
     term_type: session.termType,
+    startup_command: session.startupCommand ?? '',
     folder_id: session.folderId ? Number(session.folderId) : null,
     sort_order: 0,
   }

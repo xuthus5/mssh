@@ -41,6 +41,7 @@ export interface Session {
   jumpHost?: SSHJumpHost
   keepAlive: number
   termType: string
+  startupCommand?: string
   folderId: string | null
   lastConnectedAt?: string
   connectionCount?: number
@@ -71,7 +72,7 @@ export function mapSession(session: BindingSession): Session {
     project: session.project ? mapProject(session.project) : undefined,
     authMethod: session.auth_method as Session['authMethod'], password: session.password,
     keyId: session.key_id != null ? String(session.key_id) : undefined, jumpHost: mapSSHJumpHost(session.jump_host), keepAlive: session.keep_alive,
-    termType: session.term_type, folderId: session.folder_id != null ? String(session.folder_id) : null,
+    termType: session.term_type, startupCommand: session.startup_command, folderId: session.folder_id != null ? String(session.folder_id) : null,
     lastConnectedAt: session.last_connected_at ?? undefined, connectionCount: session.connection_count,
   }
 }

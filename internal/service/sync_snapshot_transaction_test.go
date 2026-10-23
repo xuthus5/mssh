@@ -88,7 +88,7 @@ func replaceSessionsTableWithPausedView(db *sql.DB, pauseName string) error {
 	}
 	columns := strings.Join([]string{
 		"id", "folder_id", "name", "host", "port", "username", "notes", "environment_id", "project_id",
-		"auth_method", "password", "key_id", "keep_alive", "term_type", "sort_order", "last_connected_at",
+		"auth_method", "password", "key_id", "keep_alive", "term_type", "startup_command", "sort_order", "last_connected_at",
 		"connection_count", "created_at", "updated_at",
 	}, ", ")
 	_, err := db.Exec("CREATE VIEW sessions AS SELECT " + columns + ", " + pauseName + "() AS snapshot_pause FROM sessions_real")

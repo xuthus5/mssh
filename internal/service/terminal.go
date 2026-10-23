@@ -65,7 +65,9 @@ type TerminalService struct {
 	lifecycleCancel                context.CancelFunc
 }
 
-var _openPTY = ssh.PreparePTY
+var _openPTY = func(wrapper *ssh.ClientWrapper, termType string, cols, rows int) (terminalIO, error) {
+	return ssh.PreparePTY(wrapper, termType, cols, rows)
+}
 
 //wails:ignore
 func (t *TerminalService) SetOutputHandler(fn func(terminalID string, data []byte)) {
@@ -160,61 +162,29 @@ func (t *TerminalService) openTerminalSession(ctx context.Context, sessionID int
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	connID, wrapper, termType, err := t.prepareTerminalConnection(ctx, sessionID)
+	prepared, err := t.prepareTerminalConnection(ctx, sessionID)
 	if err != nil {
 		return "", err
 	}
 	terminalID := uuid.New().String()
-	pty, err := _openPTY(wrapper, termType, cols, rows)
+	pty, err := _openPTY(prepared.wrapper, prepared.termType, cols, rows)
 	if err != nil {
-		return "", errors.Join(err, t.cleanupTerminalResources(connID, nil))
+		return "", errors.Join(err, t.cleanupTerminalResources(prepared.connID, nil))
 	}
 	if err := ctx.Err(); err != nil {
-		return "", errors.Join(err, t.cleanupTerminalResources(connID, pty))
+		return "", errors.Join(err, t.cleanupTerminalResources(prepared.connID, pty))
+	}
+	if err := writeStartupCommand(pty, prepared.startupCommand); err != nil {
+		return "", errors.Join(fmt.Errorf("write startup command: %w", err), t.cleanupTerminalResources(prepared.connID, pty))
 	}
 	registration := terminalRegistration{
-		terminalID: terminalID, connID: connID, sessionID: sessionID, generation: generation, pty: pty,
+		terminalID: terminalID, connID: prepared.connID, sessionID: sessionID, generation: generation, pty: pty,
 	}
 	if err := t.registerSessionTerminal(registration); err != nil {
-		return "", errors.Join(err, t.cleanupTerminalResources(connID, pty))
+		return "", errors.Join(err, t.cleanupTerminalResources(prepared.connID, pty))
 	}
 	t.startTerminalDirectoryIntegration(sessionID)
 	return terminalID, nil
-}
-
-func (t *TerminalService) cleanupTerminalResources(connID string, pty terminalIO) error {
-	var cleanupErr error
-	if pty != nil {
-		if err := pty.Close(); err != nil {
-			cleanupErr = errors.Join(cleanupErr, fmt.Errorf("close terminal IO: %w", err))
-		}
-	}
-	if t.sessionSvc != nil && connID != "" {
-		if err := t.sessionSvc.disconnect(connID, false); err != nil {
-			cleanupErr = errors.Join(cleanupErr, fmt.Errorf("disconnect terminal connection: %w", err))
-		}
-	}
-	return cleanupErr
-}
-
-func (t *TerminalService) prepareTerminalConnection(ctx context.Context, sessionID int64) (string, *ssh.ClientWrapper, string, error) {
-	connID, err := t.sessionSvc.connect(ctx, sessionID, false)
-	if err != nil {
-		return "", nil, "", err
-	}
-	wrapper, err := t.sessionSvc.GetClientWrapper(connID)
-	if err != nil {
-		return "", nil, "", errors.Join(err, t.cleanupTerminalResources(connID, nil))
-	}
-	sess, err := t.sessionSvc.GetSession(sessionID)
-	if err != nil {
-		return "", nil, "", errors.Join(err, t.cleanupTerminalResources(connID, nil))
-	}
-	termType := sess.TermType
-	if termType == "" {
-		termType = "xterm-256color"
-	}
-	return connID, wrapper, termType, nil
 }
 
 func (t *TerminalService) registerTerminal(terminalID, connID string, sessionID int64, pty terminalIO) error {

@@ -51,6 +51,7 @@ function useSessionDialogFields(props: SessionDialogProps) {
   const [keyId, setKeyId] = useState<string>(session?.keyId ?? '')
   const [keepAlive, setKeepAlive] = useState(session?.keepAlive?.toString() ?? '0')
   const [termType, setTermType] = useState(session?.termType ?? 'xterm-256color')
+  const [startupCommand, setStartupCommand] = useState(session?.startupCommand ?? '')
   const defaultFolderID = props.folders?.find((folder) => folder.isDefault)?.id ?? ''
   const initialFolderID = resolveInitialFolderID(session, props.presetFolderId, defaultFolderID)
   const [folderId, setFolderId] = useState(initialFolderID)
@@ -62,7 +63,8 @@ function useSessionDialogFields(props: SessionDialogProps) {
     setProjectId(session?.projectId ?? ''); setTagIds((session?.tags ?? []).map((tag) => tag.id))
     setAuthMethod(session?.authMethod ?? 'password'); setPassword(session?.password ?? '')
     setKeyId(session?.keyId ?? ''); setKeepAlive(session?.keepAlive?.toString() ?? '0')
-    setTermType(session?.termType ?? 'xterm-256color'); setFolderId(initialFolderID)
+    setTermType(session?.termType ?? 'xterm-256color'); setStartupCommand(session?.startupCommand ?? '')
+    setFolderId(initialFolderID)
   }, [props.open, session?.id])
   useEffect(() => {
     if (props.open) setFolderId(initialFolderID)
@@ -70,7 +72,7 @@ function useSessionDialogFields(props: SessionDialogProps) {
   return { name, setName, host, setHost, port, setPort, username, setUsername, notes, setNotes,
     environmentId, setEnvironmentId, projectId, setProjectId, tagIds, setTagIds,
     authMethod, setAuthMethod, password, setPassword, keyId, setKeyId, keepAlive, setKeepAlive,
-    termType, setTermType, folderId, setFolderId }
+    termType, setTermType, startupCommand, setStartupCommand, folderId, setFolderId }
 }
 
 function useSessionDialogRuntime(open: boolean, sessionID?: string) {
@@ -148,7 +150,8 @@ function buildSessionData(props: SessionDialogProps, fields: SessionFields): Omi
     environmentId: fields.environmentId || undefined, projectId: fields.projectId || undefined,
     password: needsPassword ? fields.password : undefined, keyId: fields.authMethod === 'key' ? fields.keyId : undefined,
     keepAlive: Math.max(0, Number.parseInt(fields.keepAlive, 10) || 0),
-    termType: fields.termType.trim() || 'xterm-256color', folderId: fields.folderId || null,
+    termType: fields.termType.trim() || 'xterm-256color', startupCommand: fields.startupCommand.trim(),
+    folderId: fields.folderId || null,
   }
 }
 

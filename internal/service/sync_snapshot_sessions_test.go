@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/xuthus5/mssh/internal/service/testutil"
@@ -98,6 +99,13 @@ func TestSnapshotSessionFromRowAcceptsNullableAndReferencedValues(t *testing.T) 
 	require.NotNil(t, session.LastConnectedAt)
 }
 
+func TestSnapshotSessionFromRowAcceptsMissingStartupCommand(t *testing.T) {
+	row := snapshotSessionRowWithout("", "startup_command")
+	session, err := snapshotSessionFromRow(row)
+	require.NoError(t, err)
+	assert.Empty(t, session.StartupCommand)
+}
+
 func TestSnapshotSessionFromRowRejectsInvalidFieldTypesAndTimes(t *testing.T) {
 	password := testStoredSessionPassword(t, "secret")
 	tests := []struct {
@@ -109,6 +117,7 @@ func TestSnapshotSessionFromRowRejectsInvalidFieldTypesAndTimes(t *testing.T) {
 		{name: "nullable integer type", field: "folder_id", value: "1"},
 		{name: "nullable time type", field: "last_connected_at", value: int64(1)},
 		{name: "same length invalid time", field: "created_at", value: "2026-13-28 12:00:00"},
+		{name: "startup command type", field: "startup_command", value: int64(1)},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -123,6 +132,7 @@ func snapshotSessionRow(password string) map[string]any {
 		"id": int64(1), "folder_id": nil, "name": "server", "host": "127.0.0.1", "port": int64(22),
 		"username": "root", "notes": "", "environment_id": nil, "project_id": nil, "auth_method": "password",
 		"password": password, "key_id": nil, "keep_alive": int64(30), "term_type": "xterm-256color", "sort_order": int64(0),
+		"startup_command":   "",
 		"last_connected_at": nil, "connection_count": int64(0), "created_at": "2026-07-28 12:00:00", "updated_at": "2026-07-28 12:00:00",
 	}
 }
