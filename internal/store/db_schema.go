@@ -72,6 +72,7 @@ const sessionsTableSQL = `CREATE TABLE IF NOT EXISTS sessions (
 	jump_key_id INTEGER REFERENCES ssh_keys(id),
 	keep_alive INTEGER NOT NULL DEFAULT 30,
 	term_type TEXT NOT NULL DEFAULT 'xterm-256color',
+	startup_command TEXT NOT NULL DEFAULT '',
 	sort_order INTEGER NOT NULL DEFAULT 0,
 	last_connected_at TEXT,
 	connection_count INTEGER NOT NULL DEFAULT 0,

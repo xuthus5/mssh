@@ -103,6 +103,9 @@ func InitializeSchema(db *sql.DB) error {
 	if err = initializeSessionJumpHostSchema(tx); err != nil {
 		return fmt.Errorf("initialize schema: SSH jump host: %w", err)
 	}
+	if err = initializeSessionStartupCommandSchema(tx); err != nil {
+		return fmt.Errorf("initialize schema: session startup command: %w", err)
+	}
 	if err = initializeDefaultFolder(tx); err != nil {
 		return err
 	}

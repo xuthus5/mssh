@@ -191,6 +191,8 @@
   "代理模式状态": "Proxy mode status",
   "代理用户名": "Proxy username",
   "以登录 Shell 启动": "Start as a login shell",
+  "登录后执行命令": "Command after login",
+  "连接成功后自动执行，支持多行；留空则不执行。": "Runs automatically after connecting. Multiline commands are supported; leave blank to disable.",
   "会清空会话、密钥、隧道、宏与资产归属数据。操作前将创建恢复点，审计日志和同步配置不会删除。": "This clears sessions, keys, tunnels, macros, and asset ownership. A restore point is created first; audit logs and sync settings are kept.",
   "会话": "Session",
   "会话 #${}": "Session #${}",

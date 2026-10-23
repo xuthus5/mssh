@@ -58,6 +58,7 @@ The desktop app has an authenticated unified local IPC transport available for r
 
 - Central session catalog with folders, environments, projects, and tags
 - Session search, quick connect, and asset detail panels
+- Optional per-session startup command executed automatically after login, including multiline commands
 - Session context menu: connect, edit, duplicate, quick rename, copy credentials, delete
 - Folder context menu: create a session in that folder with the group preselected
 - Import/export for MSSH, PuTTY, SecureCRT, and MobaXterm CSV formats

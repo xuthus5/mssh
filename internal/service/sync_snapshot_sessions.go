@@ -108,7 +108,10 @@ func readSnapshotSessionAuthentication(row map[string]any, session *model.Sessio
 	if session.KeepAlive, err = snapshotIntField(row, "keep_alive"); err != nil {
 		return err
 	}
-	session.TermType, err = snapshotStringField(row, "term_type")
+	if session.TermType, err = snapshotStringField(row, "term_type"); err != nil {
+		return err
+	}
+	session.StartupCommand, err = snapshotOptionalStringField(row, "startup_command")
 	return err
 }
 

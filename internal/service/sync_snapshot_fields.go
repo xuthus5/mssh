@@ -74,6 +74,13 @@ func snapshotNullableStringField(row map[string]any, field string) (string, erro
 	return value, nil
 }
 
+func snapshotOptionalStringField(row map[string]any, field string) (string, error) {
+	if _, exists := row[field]; !exists {
+		return "", nil
+	}
+	return snapshotStringField(row, field)
+}
+
 func snapshotTimeField(row map[string]any, field string) (time.Time, error) {
 	raw, err := snapshotStringField(row, field)
 	if err != nil {

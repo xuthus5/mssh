@@ -47,6 +47,7 @@ type Session struct {
 	JumpHost        *SSHJumpHost      `json:"jump_host,omitempty"`
 	KeepAlive       int               `json:"keep_alive"`
 	TermType        string            `json:"term_type"`
+	StartupCommand  string            `json:"startup_command"`
 	SortOrder       int               `json:"sort_order"`
 	LastConnectedAt *time.Time        `json:"last_connected_at,omitempty"`
 	ConnectionCount int               `json:"connection_count"`

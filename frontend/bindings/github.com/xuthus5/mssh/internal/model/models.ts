@@ -3091,6 +3091,7 @@ export class Session {
     "jump_host"?: SSHJumpHost | null;
     "keep_alive": number;
     "term_type": string;
+    "startup_command": string;
     "sort_order": number;
     "last_connected_at"?: string | null;
     "connection_count": number;
@@ -3131,6 +3132,9 @@ export class Session {
         }
         if (!("term_type" in $$source)) {
             this["term_type"] = "";
+        }
+        if (!("startup_command" in $$source)) {
+            this["startup_command"] = "";
         }
         if (!("sort_order" in $$source)) {
             this["sort_order"] = 0;
@@ -3537,6 +3541,7 @@ export class SessionInput {
     "jump_host"?: SSHJumpHost | null;
     "keep_alive": number;
     "term_type": string;
+    "startup_command": string;
     "sort_order": number;
 
     /** Creates a new SessionInput instance. */
@@ -3573,6 +3578,9 @@ export class SessionInput {
         }
         if (!("term_type" in $$source)) {
             this["term_type"] = "";
+        }
+        if (!("startup_command" in $$source)) {
+            this["startup_command"] = "";
         }
         if (!("sort_order" in $$source)) {
             this["sort_order"] = 0;
