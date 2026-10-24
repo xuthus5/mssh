@@ -32,6 +32,7 @@ describe('SessionDialog startup command', () => {
     await user.type(screen.getByLabelText('名称'), 'app')
     await user.type(screen.getByLabelText('主机'), '10.0.0.1')
     await user.type(screen.getByLabelText('用户名'), 'root')
+    await user.click(screen.getByRole('button', { name: '终端选项' }))
     await user.type(screen.getByLabelText('登录后执行命令'), '  cd /srv/app{enter}./run.sh  ')
     await user.click(screen.getByRole('button', { name: '创建会话' }))
 
@@ -40,12 +41,16 @@ describe('SessionDialog startup command', () => {
     }))
   })
 
-  it('prefills the command when editing', () => {
+  it('prefills the command when editing', async () => {
+    const user = userEvent.setup()
     render(<SessionDialog {...defaultProps} session={{
       id: '1', name: 'app', host: '10.0.0.1', port: 22, username: 'root', authMethod: 'agent',
       keepAlive: 30, termType: 'xterm-256color', startupCommand: 'tmux attach || tmux new', folderId: null,
     }} />)
 
+    const terminalToggle = screen.getByRole('button', { name: '终端选项' })
+    expect(terminalToggle).toHaveAttribute('aria-expanded', 'false')
+    await user.click(terminalToggle)
     expect(screen.getByLabelText('登录后执行命令')).toHaveValue('tmux attach || tmux new')
   })
 })
