@@ -11,5 +11,9 @@ it('passes the configured selection background to xterm', () => {
     ansiBrightBlue: '#cccccc', ansiBrightMagenta: '#dddddd', ansiBrightCyan: '#eeeeee', ansiBrightWhite: '#ffffff',
   }
 
-  expect(xtermTheme(theme).selectionBackground).toBe('#4f46e5')
+  const result = xtermTheme(theme)
+
+  expect(result.selectionBackground).toBe('#4f46e5')
+  expect(result.extendedAnsi).toHaveLength(240)
+  expect(result.extendedAnsi[180]).toBe('#999999')
 })

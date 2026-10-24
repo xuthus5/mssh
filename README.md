@@ -103,7 +103,7 @@ The desktop app has an authenticated unified local IPC transport available for r
 
 ### Appearance and shortcuts
 
-- Offline terminal themes, including GitHub, Dracula, Nord, TokyoNight, and Catppuccin variants
+- Offline 16/256-color terminal themes, including GitHub, Dracula, Nord, TokyoNight, and Catppuccin variants
 - `.itermcolors` import
 - Dark, light, and fixed theme assignments
 - Customizable keyboard shortcuts with conflict detection
