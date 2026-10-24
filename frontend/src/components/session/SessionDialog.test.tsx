@@ -56,6 +56,23 @@ describe('SessionDialog', () => {
     expect(password.compareDocumentPosition(environment) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
+  it('collapses terminal options by default', async () => {
+    const user = userEvent.setup()
+    render(<SessionDialog {...defaultProps} />)
+
+    const terminalToggle = screen.getByRole('button', { name: '终端选项' })
+    expect(terminalToggle).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByLabelText('登录后执行命令')).not.toBeInTheDocument()
+
+    await user.click(terminalToggle)
+    expect(terminalToggle).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByLabelText('登录后执行命令')).toBeInTheDocument()
+
+    await user.click(terminalToggle)
+    expect(terminalToggle).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByLabelText('登录后执行命令')).not.toBeInTheDocument()
+  })
+
   it('shows password field by default (auth=password)', () => {
     render(<SessionDialog {...defaultProps} />)
     expect(screen.getAllByText('密码').length).toBeGreaterThan(0)
@@ -124,8 +141,10 @@ describe('SessionDialog', () => {
   })
 
   it('uses the global keep-alive default for new sessions', async () => {
+    const user = userEvent.setup()
     render(<SessionDialog {...defaultProps} />)
 
+    await user.click(screen.getByRole('button', { name: '终端选项' }))
     await waitFor(() => expect(screen.getByRole('spinbutton', { name: '保活间隔 (秒，0 使用全局默认)' })).toHaveValue(0))
   })
 
@@ -133,6 +152,7 @@ describe('SessionDialog', () => {
     const user = userEvent.setup()
     render(<SessionDialog {...defaultProps} />)
 
+    await user.click(screen.getByRole('button', { name: '终端选项' }))
     await user.hover(screen.getByRole('button', { name: '会话保活说明' }))
 
     expect(await screen.findByText('会话保活仅维持底层 SSH 连接，不能控制服务端 Shell 的空闲自动登出策略。')).toBeInTheDocument()
