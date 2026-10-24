@@ -9,4 +9,6 @@ it('previews the configured terminal selection background', () => {
   }} />)
 
   expect(screen.getByTestId('terminal-selection-preview')).toHaveStyle({ backgroundColor: '#4f46e5' })
+  expect(screen.getByTestId('terminal-256-preview')).toHaveTextContent('256 色')
+  expect(screen.getByTestId('terminal-256-preview').querySelectorAll('span[style]')).toHaveLength(6)
 })

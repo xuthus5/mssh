@@ -1,4 +1,5 @@
 import type { TerminalTheme } from '@/store/appStore'
+import { buildExtendedAnsiPalette } from '@/lib/extendedAnsiPalette'
 
 export function xtermTheme(theme: TerminalTheme) {
   return {
@@ -23,6 +24,12 @@ export function xtermTheme(theme: TerminalTheme) {
     brightMagenta: theme.ansiBrightMagenta,
     brightCyan: theme.ansiBrightCyan,
     brightWhite: theme.ansiBrightWhite,
+    extendedAnsi: buildExtendedAnsiPalette([
+      theme.ansiBlack, theme.ansiRed, theme.ansiGreen, theme.ansiYellow,
+      theme.ansiBlue, theme.ansiMagenta, theme.ansiCyan, theme.ansiWhite,
+      theme.ansiBrightBlack, theme.ansiBrightRed, theme.ansiBrightGreen, theme.ansiBrightYellow,
+      theme.ansiBrightBlue, theme.ansiBrightMagenta, theme.ansiBrightCyan, theme.ansiBrightWhite,
+    ]),
   }
 }
 

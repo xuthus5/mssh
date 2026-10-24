@@ -1,7 +1,11 @@
 import { Badge } from '@/components/ui/badge'
 import type { TerminalTheme } from '@/hooks/useSettings'
+import { buildExtendedAnsiPalette } from '@/lib/extendedAnsiPalette'
 import { t } from '@/i18n'
 
+
+const EXTENDED_PALETTE_START = 16
+const EXTENDED_PREVIEW_INDICES = [196, 46, 226, 51, 201, 21]
 
 interface Props {
   theme: TerminalTheme
@@ -17,6 +21,7 @@ function Cursor({ theme }: Props) {
 }
 
 export function TerminalThemePreview({ theme }: Props) {
+  const extended = buildExtendedAnsiPalette(theme.ansi)
   return <div className="flex flex-col gap-3">
     <div
       data-testid="terminal-theme-preview"
@@ -29,6 +34,7 @@ export function TerminalThemePreview({ theme }: Props) {
         <p><span style={{ color: theme.ansi[14] }}>●</span> SSH transport connected <span style={{ color: theme.ansi[10] }}>success</span></p>
         <p><span style={{ color: theme.ansi[11] }}>!</span> 2 sessions are using agent forwarding</p>
         <p><span style={{ color: theme.ansi[9] }}>×</span> staging-node connection timed out</p>
+        <p data-testid="terminal-256-preview"><span>{t('256 色')} </span>{EXTENDED_PREVIEW_INDICES.map((index) => <span key={index} style={{ color: extended[index - EXTENDED_PALETTE_START] }}>■</span>)}</p>
         <p className="flex items-center"><span style={{ color: theme.ansi[10] }}>root@x-dev</span><span>:</span><span style={{ color: theme.ansi[12] }}>~</span><span>#&nbsp;</span><Cursor theme={theme} /></p>
       </div>
     </div>
