@@ -47,6 +47,10 @@ export const Dialogs = {
   OpenFile: async () => '' as string | string[],
 }
 
+export const Browser = {
+  OpenURL: async (_url: string) => {},
+}
+
 export const Clipboard = {
   SetText: async () => { throw new Error('native clipboard unavailable') },
   Text: async () => { throw new Error('native clipboard unavailable') },

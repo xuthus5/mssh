@@ -209,6 +209,8 @@ function SyncProviderContent(props: SyncSettingsCardProps) {
       <SyncProviderTab
         input={props.input} saved={props.dashboard?.config} pending={props.pending} error={props.controller.error}
         onChange={props.setInput} onTest={() => props.controller.testProvider(props.input)}
+        onStartGistOAuth={props.controller.startGistOAuth} onPollGistOAuth={props.controller.pollGistOAuth}
+        onCancelGistOAuth={props.controller.cancelGistOAuth} onReload={props.controller.reload}
       />
     </TabsContent>
   )

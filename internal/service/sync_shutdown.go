@@ -103,6 +103,7 @@ func (s *SyncService) Shutdown() {
 	s.stopped = true
 	cancel := s.activeCancel
 	s.shutdownMu.Unlock()
+	s.clearGistOAuthFlows()
 	if cancel != nil {
 		cancel()
 	}

@@ -81,7 +81,7 @@ The desktop app has an authenticated unified local IPC transport available for r
 ### Cloud sync and backup
 
 - Encrypted `.msshbackup` export and import
-- GitHub Gist, WebDAV, and AWS S3 sync providers
+- GitHub Gist via OAuth Device Flow (manual token fallback), WebDAV, and AWS S3 sync providers
 - S3-compatible path-style access for MinIO and Ceph deployments
 - Local version history and sync operation records
 
