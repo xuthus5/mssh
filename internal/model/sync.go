@@ -47,6 +47,30 @@ const (
 	SyncConflictCancel   SyncConflictChoice = "cancel"
 )
 
+type GistOAuthStatus string
+
+const (
+	GistOAuthPending GistOAuthStatus = "pending"
+	GistOAuthSuccess GistOAuthStatus = "success"
+	GistOAuthFailed  GistOAuthStatus = "failed"
+)
+
+type GistOAuthStart struct {
+	FlowID          string    `json:"flow_id"`
+	UserCode        string    `json:"user_code"`
+	VerificationURI string    `json:"verification_uri"`
+	ExpiresAt       time.Time `json:"expires_at"`
+	IntervalSeconds int       `json:"interval_seconds"`
+}
+
+type GistOAuthResult struct {
+	Status            GistOAuthStatus `json:"status"`
+	Message           string          `json:"message"`
+	Account           string          `json:"account"`
+	GistID            string          `json:"gist_id"`
+	RetryAfterSeconds int             `json:"retry_after_seconds"`
+}
+
 type GistSyncConfig struct {
 	GistID     string `json:"gist_id"`
 	TokenSaved bool   `json:"token_saved"`

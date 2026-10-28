@@ -38,7 +38,7 @@
 - `retention_days`
 - 三种 provider 的非敏感配置
 
-Gist Token、WebDAV 密码、S3 Secret Key 分别加密保存到 local-only setting。所有 `sync.*` setting 都从 `.msshbackup` 快照中排除。
+Gist Token、GitHub OAuth refresh token、WebDAV 密码、S3 Secret Key 分别加密保存到 local-only setting。所有 `sync.*` setting 都从 `.msshbackup` 快照中排除。
 
 ### 云端 Artifact
 
@@ -79,7 +79,7 @@ Gist Token、WebDAV 密码、S3 Secret Key 分别加密保存到 local-only sett
 
 Provider 实现统一的测试、读取和条件写入能力：
 
-- Gist：GitHub REST API；无 Gist ID 时首次写入创建 Secret Gist；更新时写入 `.msshbackup`。
+- Gist：GitHub REST API；优先使用 OAuth Device Flow 授权并自动发现包含 `.msshbackup` 的唯一 Secret Gist，无匹配时首次写入自动创建；手动 Gist ID/Token 作为回退方案。Device Flow 不包含 client secret，OAuth App 需启用 Device Flow；回调地址不参与授权，可填写本机占位地址。
 - WebDAV：配置目录 URL；使用 `PROPFIND` 测试，`GET` 读取，`PUT` 条件写入。
 - S3：AWS SDK v2；支持自定义 endpoint、region、bucket、prefix 和 path-style；对象 key 固定为 `{prefix}/.msshbackup`。
 

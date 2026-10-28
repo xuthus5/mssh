@@ -9,6 +9,13 @@ import { Call as $Call, CancellablePromise as $CancellablePromise, Create as $Cr
 // @ts-ignore: Unused imports
 import * as model$0 from "../model/models.js";
 
+/**
+ * CancelGistOAuth drops a pending Device Flow and its in-memory device code.
+ */
+export function CancelGistOAuth(flowID: string): $CancellablePromise<void> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.SyncService.CancelGistOAuth", flowID);
+}
+
 export function Dashboard(): $CancellablePromise<model$0.SyncDashboard> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.SyncService.Dashboard").then(($result: any) => {
         return $$createType0($result);
@@ -63,6 +70,15 @@ export function LoadConfig(): $CancellablePromise<model$0.SyncConfig> {
     });
 }
 
+/**
+ * PollGistOAuth exchanges a pending device code once and stores the resulting token only on success.
+ */
+export function PollGistOAuth(flowID: string): $CancellablePromise<model$0.GistOAuthResult> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.SyncService.PollGistOAuth", flowID).then(($result: any) => {
+        return $$createType7($result);
+    });
+}
+
 export function PullNow(): $CancellablePromise<model$0.SyncResult> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.SyncService.PullNow").then(($result: any) => {
         return $$createType1($result);
@@ -92,6 +108,15 @@ export function RestoreVersion(id: number): $CancellablePromise<void> {
 export function SaveConfig(input: model$0.SyncConfigInput): $CancellablePromise<model$0.SyncDashboard> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.SyncService.SaveConfig", input).then(($result: any) => {
         return $$createType0($result);
+    });
+}
+
+/**
+ * StartGistOAuth begins GitHub's Device Flow without exposing the device code to the frontend.
+ */
+export function StartGistOAuth(): $CancellablePromise<model$0.GistOAuthStart> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.SyncService.StartGistOAuth").then(($result: any) => {
+        return $$createType8($result);
     });
 }
 
@@ -125,3 +150,5 @@ const $$createType3 = $Create.Array($$createType2);
 const $$createType4 = model$0.SyncVersion.createFrom;
 const $$createType5 = $Create.Array($$createType4);
 const $$createType6 = model$0.SyncConfig.createFrom;
+const $$createType7 = model$0.GistOAuthResult.createFrom;
+const $$createType8 = model$0.GistOAuthStart.createFrom;

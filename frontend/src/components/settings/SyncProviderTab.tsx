@@ -1,12 +1,13 @@
-import { type ReactNode } from 'react'
-import { Cloud, Database, GitFork, PlugZap } from 'lucide-react'
+import { useState, type ReactNode } from 'react'
+import { ChevronDown, Cloud, Database, GitFork, PlugZap } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
+import { GistOAuthConnect } from '@/components/settings/GistOAuthConnect'
 import { cn } from '@/lib/utils'
-import { SyncProvider, type SyncConfig, type SyncConfigInput } from '../../../bindings/github.com/xuthus5/mssh/internal/model/models'
+import { SyncProvider, type GistOAuthResult, type GistOAuthStart, type SyncConfig, type SyncConfigInput } from '../../../bindings/github.com/xuthus5/mssh/internal/model/models'
 import { t } from '@/i18n'
 
 
@@ -17,6 +18,10 @@ interface Props {
   error: string | null
   onChange: (input: SyncConfigInput) => void
   onTest: () => Promise<void>
+  onStartGistOAuth: () => Promise<GistOAuthStart>
+  onPollGistOAuth: (flowID: string) => Promise<GistOAuthResult>
+  onCancelGistOAuth: (flowID: string) => Promise<void>
+  onReload: () => Promise<void>
 }
 
 const providers = [
@@ -56,8 +61,26 @@ function ProviderSelector({ input, onChange }: { input: SyncConfigInput; onChang
 
 function GistFields(props: Props) {
   const gist = props.input.gist
+  const [manualOpen, setManualOpen] = useState(false)
   const change = (patch: Partial<SyncConfigInput['gist']>) => props.onChange({ ...props.input, gist: { ...gist, ...patch } })
-  return <div className="grid gap-3 md:grid-cols-2"><Field label={t('Gist ID 或 URL')}><Input aria-label={t('Gist ID 或 URL')} value={gist.gist_id} placeholder={t('首次推送可留空自动创建')} onChange={(event) => change({ gist_id: event.target.value })} /></Field><SecretField label="GitHub Token" value={gist.token} saved={props.saved?.gist.token_saved} clear={gist.clear_token} onValue={(token) => change({ token })} onClear={(clear_token) => change({ clear_token })} /></div>
+  const connected = async (result: GistOAuthResult) => {
+    change({ gist_id: result.gist_id || gist.gist_id, token: '', clear_token: false })
+    await props.onReload()
+  }
+  return <div className="flex flex-col gap-4">
+    <GistOAuthConnect
+      saved={props.saved?.gist} pending={props.pending}
+      onStart={props.onStartGistOAuth} onPoll={props.onPollGistOAuth}
+      onCancel={props.onCancelGistOAuth} onConnected={connected}
+    />
+    <div className="overflow-hidden rounded-xl border border-border">
+      <button type="button" aria-expanded={manualOpen} className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left hover:bg-muted/40" onClick={() => setManualOpen((open) => !open)}>
+        <span><span className="block text-sm font-medium">{t('手动配置')}</span><span className="block text-xs text-muted-foreground">{t('使用已有 Gist URL/ID 和个人访问令牌')}</span></span>
+        <ChevronDown className={cn('size-4 shrink-0 text-muted-foreground transition-transform', manualOpen && 'rotate-180')} />
+      </button>
+      {manualOpen ? <div className="grid gap-3 border-t border-border p-3 md:grid-cols-2"><Field label={t('Gist ID 或 URL')}><Input aria-label={t('Gist ID 或 URL')} value={gist.gist_id} placeholder={t('首次推送可留空自动创建')} onChange={(event) => change({ gist_id: event.target.value })} /></Field><SecretField label="GitHub Token" value={gist.token} saved={props.saved?.gist.token_saved} clear={gist.clear_token} onValue={(token) => change({ token })} onClear={(clear_token) => change({ clear_token })} /></div> : null}
+    </div>
+  </div>
 }
 
 function WebDAVFields(props: Props) {

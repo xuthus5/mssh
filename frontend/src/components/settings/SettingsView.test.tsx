@@ -6,7 +6,7 @@ import { SettingsView } from '@/components/settings/SettingsView'
 import { useToastStore } from '@/components/ui/toast'
 import type { GeneralSettings } from '@/hooks/useSettings'
 import { SETTINGS_PREVIEW_CANCELLED_EVENT } from '@/lib/settingsWindowEvents'
-import { CursorStyle } from '../../../bindings/github.com/xuthus5/mssh/internal/model/models'
+import { CursorStyle, GistOAuthStatus, type GistOAuthResult, type GistOAuthStart } from '../../../bindings/github.com/xuthus5/mssh/internal/model/models'
 
 const general: GeneralSettings = {
   maxPoolSize: 10,
@@ -56,6 +56,9 @@ function settingsProps() {
     cloudSync: {
       dashboard: null, loading: false, pending: null, error: null,
       reload: vi.fn(async () => {}), saveConfig: vi.fn(async () => {}), testProvider: vi.fn(async () => {}),
+      startGistOAuth: vi.fn(async (): Promise<GistOAuthStart> => ({ flow_id: '', user_code: '', verification_uri: '', expires_at: '', interval_seconds: 0 })),
+      pollGistOAuth: vi.fn(async (): Promise<GistOAuthResult> => ({ status: GistOAuthStatus.GistOAuthPending, message: '', account: '', gist_id: '', retry_after_seconds: 0 })),
+      cancelGistOAuth: vi.fn(async () => {}),
       syncNow: vi.fn(async () => {}), pushNow: vi.fn(async () => {}), pullNow: vi.fn(async () => {}),
       resolveConflict: vi.fn(async () => {}), restoreVersion: vi.fn(async () => {}), deleteVersion: vi.fn(async () => {}), resetLocalData: vi.fn(async () => {}),
     },

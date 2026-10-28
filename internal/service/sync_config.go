@@ -244,6 +244,7 @@ func (s *SyncService) prepareInputSecrets(input model.SyncConfigInput) (syncSecr
 			changes.settings = append(changes.settings, setting)
 		}
 	}
+	changes.deletes = append(changes.deletes, gistOAuthSecretDeletes(input.Gist)...)
 	return changes, nil
 }
 

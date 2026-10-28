@@ -81,7 +81,7 @@ MSSH 不是集群编排平台。它聚焦已保存 SSH 会话和终端中心化�
 ### 云同步与备份
 
 - 加密 `.msshbackup` 导出与导入
-- GitHub Gist、WebDAV、AWS S3 同步提供商
+- GitHub Gist（OAuth Device Flow，保留手动 Token 回退）、WebDAV、AWS S3 同步提供商
 - 支持 MinIO、Ceph 等 S3 兼容服务的 path-style 访问
 - 本地版本历史与同步操作记录
 
