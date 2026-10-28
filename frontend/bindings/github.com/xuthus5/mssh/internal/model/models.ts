@@ -1900,6 +1900,91 @@ export enum CursorStyle {
     CursorStyleBar = "bar",
 };
 
+export class GistOAuthResult {
+    "status": GistOAuthStatus;
+    "message": string;
+    "account": string;
+    "gist_id": string;
+    "retry_after_seconds": number;
+
+    /** Creates a new GistOAuthResult instance. */
+    constructor($$source: Partial<GistOAuthResult> = {}) {
+        if (!("status" in $$source)) {
+            this["status"] = GistOAuthStatus.$zero;
+        }
+        if (!("message" in $$source)) {
+            this["message"] = "";
+        }
+        if (!("account" in $$source)) {
+            this["account"] = "";
+        }
+        if (!("gist_id" in $$source)) {
+            this["gist_id"] = "";
+        }
+        if (!("retry_after_seconds" in $$source)) {
+            this["retry_after_seconds"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new GistOAuthResult instance from a string or object.
+     */
+    static createFrom($$source: any = {}): GistOAuthResult {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new GistOAuthResult($$parsedSource as Partial<GistOAuthResult>);
+    }
+}
+
+export class GistOAuthStart {
+    "flow_id": string;
+    "user_code": string;
+    "verification_uri": string;
+    "expires_at": string;
+    "interval_seconds": number;
+
+    /** Creates a new GistOAuthStart instance. */
+    constructor($$source: Partial<GistOAuthStart> = {}) {
+        if (!("flow_id" in $$source)) {
+            this["flow_id"] = "";
+        }
+        if (!("user_code" in $$source)) {
+            this["user_code"] = "";
+        }
+        if (!("verification_uri" in $$source)) {
+            this["verification_uri"] = "";
+        }
+        if (!("expires_at" in $$source)) {
+            this["expires_at"] = "0001-01-01T00:00:00.000Z";
+        }
+        if (!("interval_seconds" in $$source)) {
+            this["interval_seconds"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new GistOAuthStart instance from a string or object.
+     */
+    static createFrom($$source: any = {}): GistOAuthStart {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new GistOAuthStart($$parsedSource as Partial<GistOAuthStart>);
+    }
+}
+
+export enum GistOAuthStatus {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    GistOAuthPending = "pending",
+    GistOAuthSuccess = "success",
+    GistOAuthFailed = "failed",
+};
+
 export class GistSyncConfig {
     "gist_id": string;
     "token_saved": boolean;

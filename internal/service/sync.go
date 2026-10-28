@@ -62,6 +62,7 @@ type SyncService struct {
 	unlockCatchUpRunning      atomic.Bool
 	proxyManager              *netproxy.Manager
 	runtimeSettings           SyncRuntimeSettings
+	gistOAuthState
 }
 
 type SyncOption func(*SyncService)
@@ -71,6 +72,7 @@ func NewSyncService(db *sql.DB, logger *slog.Logger, options ...SyncOption) *Syn
 	service := &SyncService{
 		db: db, logger: logger, providerFactory: defaultSyncProviderFactory{},
 		schedulerContext: schedulerContext, schedulerStop: schedulerStop,
+		gistOAuthState: newGistOAuthState(),
 	}
 	for _, option := range options {
 		option(service)

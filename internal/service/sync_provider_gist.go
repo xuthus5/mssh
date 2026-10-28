@@ -32,8 +32,10 @@ type gistFile struct {
 }
 
 type gistResponse struct {
-	ID    string              `json:"id"`
-	Files map[string]gistFile `json:"files"`
+	ID          string              `json:"id"`
+	Description string              `json:"description"`
+	Public      bool                `json:"public"`
+	Files       map[string]gistFile `json:"files"`
 }
 
 func newGistSyncProvider(client *http.Client, apiBase, gistID, token string) (*gistSyncProvider, error) {

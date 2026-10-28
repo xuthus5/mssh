@@ -11,7 +11,11 @@ function controller(overrides: Record<string, unknown> = {}) {
     config: { enabled: false, master_key_saved: true, provider: SyncProvider.SyncProviderGist, strategy: SyncStrategy.SyncStrategySmart, interval_minutes: 15, retention_count: 30, retention_days: 90, gist: { gist_id: '', token_saved: false }, webdav: { url: '', username: '', password_saved: false }, s3: { endpoint: '', region: 'us-east-1', bucket: '', prefix: '', access_key_id: '', secret_key_saved: false, path_style: false } },
     state: SyncState.SyncStateDisabled, message: '', last_synced_at: '', local_version: null, remote_version: null, conflict: null, versions: [], events: [],
   }
-  return { dashboard, loading: false, pending: null, error: null, reload: vi.fn(async () => {}), saveConfig: vi.fn(async () => {}), testProvider: vi.fn(async () => {}), syncNow: vi.fn(async () => {}), pushNow: vi.fn(async () => {}), pullNow: vi.fn(async () => {}), resolveConflict: vi.fn(async () => {}), restoreVersion: vi.fn(async () => {}), deleteVersion: vi.fn(async () => {}), resetLocalData: vi.fn(async () => {}), ...overrides } as any
+  return { dashboard, loading: false, pending: null, error: null, reload: vi.fn(async () => {}), saveConfig: vi.fn(async () => {}), testProvider: vi.fn(async () => {}), startGistOAuth: vi.fn(async () => ({ flow_id: 'flow', user_code: 'ABCD', verification_uri: 'https://github.com/login/device', expires_at: '', interval_seconds: 5 })), pollGistOAuth: vi.fn(async () => ({ status: 'pending', message: '', account: '', gist_id: '', retry_after_seconds: 5 })), cancelGistOAuth: vi.fn(async () => {}), syncNow: vi.fn(async () => {}), pushNow: vi.fn(async () => {}), pullNow: vi.fn(async () => {}), resolveConflict: vi.fn(async () => {}), restoreVersion: vi.fn(async () => {}), deleteVersion: vi.fn(async () => {}), resetLocalData: vi.fn(async () => {}), ...overrides } as any
+}
+
+async function openManualGistConfig() {
+  await userEvent.click(screen.getByRole('button', { name: /手动配置/ }))
 }
 
 describe('SyncPanel', () => {
@@ -48,6 +52,7 @@ describe('SyncPanel', () => {
     const sync = controller()
     render(<SyncPanel controller={sync} onExport={vi.fn()} onImport={vi.fn()} />)
     await userEvent.click(screen.getByRole('switch', { name: '启用云同步' }))
+    await openManualGistConfig()
     expect(screen.getByLabelText('GitHub Token')).toHaveAttribute('type', 'password')
 
     await userEvent.click(screen.getByRole('button', { name: /WebDAV/ }))
@@ -98,6 +103,7 @@ describe('SyncPanel', () => {
     const sync = controller({ saveConfig: vi.fn(() => save.promise) })
     const view = render(<SyncPanel controller={sync} onExport={vi.fn()} onImport={vi.fn()} />)
     await userEvent.click(screen.getByRole('switch', { name: '启用云同步' }))
+    await openManualGistConfig()
     await userEvent.type(screen.getByLabelText('GitHub Token'), 'gist-secret')
     await vi.advanceTimersByTimeAsync(500)
     expect(sync.saveConfig).toHaveBeenCalledOnce()
@@ -126,6 +132,7 @@ describe('SyncPanel', () => {
     const sync = controller({ saveConfig: vi.fn(() => save.promise) })
     render(<SyncPanel controller={sync} onExport={vi.fn()} onImport={vi.fn()} />)
     await userEvent.click(screen.getByRole('switch', { name: '启用云同步' }))
+    await openManualGistConfig()
     await userEvent.type(screen.getByLabelText('GitHub Token'), 'gist-secret')
 
     await act(async () => { await Events.Emit(SETTINGS_PREVIEW_CANCELLED_EVENT, { data: null }) })

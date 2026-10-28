@@ -3,7 +3,7 @@ import { Events } from '@wailsio/runtime'
 import { SyncService } from '@/lib/wails'
 import { logger } from '@/lib/logger'
 import { toast } from '@/components/ui/toast'
-import type { SyncConfigInput, SyncConflictChoice, SyncDashboard } from '../../bindings/github.com/xuthus5/mssh/internal/model/models'
+import type { GistOAuthResult, GistOAuthStart, SyncConfigInput, SyncConflictChoice, SyncDashboard } from '../../bindings/github.com/xuthus5/mssh/internal/model/models'
 import { t } from '@/i18n'
 import { OperationBusyError } from '@/lib/operationBusyError'
 import { syncDataChangedEvent } from '@/lib/syncDataReload'
@@ -25,6 +25,9 @@ export interface CloudSyncController {
   reload: () => Promise<void>
   saveConfig: (input: SyncConfigInput, options?: { quiet?: boolean }) => Promise<void>
   testProvider: (input: SyncConfigInput) => Promise<void>
+  startGistOAuth: () => Promise<GistOAuthStart>
+  pollGistOAuth: (flowID: string) => Promise<GistOAuthResult>
+  cancelGistOAuth: (flowID: string) => Promise<void>
   syncNow: () => Promise<void>
   pushNow: () => Promise<void>
   pullNow: () => Promise<void>
@@ -135,6 +138,9 @@ export function useCloudSyncCenter(): CloudSyncController {
 
   return {
     dashboard: state.dashboard, loading: state.loading, pending: state.pending, error: state.error, reload,
+    startGistOAuth: () => SyncService.StartGistOAuth(),
+    pollGistOAuth: (flowID) => SyncService.PollGistOAuth(flowID),
+    cancelGistOAuth: (flowID) => SyncService.CancelGistOAuth(flowID),
     ...createCloudSyncActions(execute),
   }
 }
