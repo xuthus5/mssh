@@ -2,6 +2,7 @@ package store
 
 import (
 	"database/sql"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -33,6 +34,32 @@ func TestTransferJobLifecycle(t *testing.T) {
 	require.Equal(t, int64(50), jobs[0].TransferredBytes)
 	require.Equal(t, "completed", jobs[0].Status)
 	require.NotNil(t, jobs[0].CompletedAt)
+}
+
+func TestGetTransferJob(t *testing.T) {
+	db := transferTestDB(t)
+	startedAt := time.Now().UTC().Truncate(time.Nanosecond)
+	require.NoError(t, CreateTransferJob(db, model.TransferJob{
+		ID: "get-task", SessionID: 7, SessionName: "server", Direction: "download",
+		SourcePath: "/remote/a", TargetPath: "/tmp/a", Status: "running", StartedAt: startedAt,
+	}))
+
+	job, err := GetTransferJob(db, "get-task")
+	require.NoError(t, err)
+	assert.Equal(t, "get-task", job.ID)
+	assert.Equal(t, "download", job.Direction)
+	assert.Equal(t, "/tmp/a", job.TargetPath)
+	assert.True(t, job.StartedAt.Equal(startedAt))
+	assert.Nil(t, job.CompletedAt)
+
+	require.NoError(t, FinishTransferJob(db, "get-task", "completed", ""))
+	job, err = GetTransferJob(db, "get-task")
+	require.NoError(t, err)
+	assert.Equal(t, "completed", job.Status)
+	require.NotNil(t, job.CompletedAt)
+
+	_, err = GetTransferJob(db, "missing")
+	assert.True(t, errors.Is(err, sql.ErrNoRows))
 }
 
 func TestFinishTransferJobWithProgress(t *testing.T) {

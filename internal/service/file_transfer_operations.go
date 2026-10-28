@@ -18,6 +18,7 @@ type fileTransferOperations struct {
 	renameRemote   func(*ssh.SFTPClient, string, string) error
 	removeLocal    func(string) error
 	replaceLocal   func(string, string) error
+	revealLocal    func(string) error
 }
 
 func defaultFileTransferOperations() fileTransferOperations {
@@ -29,6 +30,7 @@ func defaultFileTransferOperations() fileTransferOperations {
 		renameRemote:   ssh.Rename,
 		removeLocal:    os.Remove,
 		replaceLocal:   fsutil.ReplaceFile,
+		revealLocal:    revealLocalFile,
 	}
 }
 
@@ -54,6 +56,9 @@ func (operations fileTransferOperations) withDefaults() fileTransferOperations {
 	}
 	if operations.replaceLocal == nil {
 		operations.replaceLocal = defaults.replaceLocal
+	}
+	if operations.revealLocal == nil {
+		operations.revealLocal = defaults.revealLocal
 	}
 	return operations
 }

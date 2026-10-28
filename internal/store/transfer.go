@@ -103,6 +103,24 @@ func ListTransferJobs(db *sql.DB) ([]model.TransferJob, error) {
 	return result, rows.Err()
 }
 
+// GetTransferJob retrieves a single persisted transfer task by ID.
+func GetTransferJob(db *sql.DB, id string) (model.TransferJob, error) {
+	var job model.TransferJob
+	var started string
+	var completed sql.NullString
+	err := db.QueryRow(`SELECT id, session_id, session_name, direction, source_path, target_path, total_bytes, transferred_bytes, speed, eta, status, error, started_at, completed_at FROM transfer_jobs WHERE id = ?`, id).
+		Scan(&job.ID, &job.SessionID, &job.SessionName, &job.Direction, &job.SourcePath, &job.TargetPath, &job.TotalBytes, &job.TransferredBytes, &job.Speed, &job.ETA, &job.Status, &job.Error, &started, &completed)
+	if err != nil {
+		return model.TransferJob{}, fmt.Errorf("get transfer job: %w", err)
+	}
+	job.StartedAt, _ = time.Parse(time.RFC3339Nano, started)
+	if completed.Valid {
+		value, _ := time.Parse(time.RFC3339Nano, completed.String)
+		job.CompletedAt = &value
+	}
+	return job, nil
+}
+
 func CancelTransferJobsForSessions(db *sql.DB, sessionIDs []int64) error {
 	if db == nil || len(sessionIDs) == 0 {
 		return nil
