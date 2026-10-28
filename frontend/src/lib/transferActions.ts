@@ -52,6 +52,10 @@ export function cancelTransfer(jobId: string): Promise<void> {
   return FileService.CancelTransfer(jobId)
 }
 
+export function revealTransfer(jobId: string): Promise<void> {
+  return FileService.RevealTransfer(jobId)
+}
+
 export async function retryTransfer(transfer: TransferJob): Promise<TransferJob> {
   if (transfer.status === 'cancelled' || transfer.error === '会话已删除') {
     throw new Error('会话已删除，无法重试传输')

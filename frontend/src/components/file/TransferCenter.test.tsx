@@ -62,6 +62,43 @@ describe('TransferCenter', () => {
     expect(useAppStore.getState().transfers.some((item) => item.id === 'retry-1')).toBe(false)
   })
 
+  it('reveals completed downloads only', async () => {
+    const completedDownload = { ...baseJob, id: 'download-done', fileName: 'movie.mkv', direction: 'download', status: 'completed', targetPath: '/local/movie.mkv', completedAt: 2 } satisfies TransferJob
+    const completedUpload = { ...baseJob, id: 'upload-done', fileName: 'server.log', direction: 'upload', status: 'completed', completedAt: 2 } satisfies TransferJob
+    const failedDownload = { ...baseJob, id: 'download-failed', fileName: 'broken.zip', direction: 'download', status: 'failed', error: 'denied', completedAt: 2 } satisfies TransferJob
+    let revealed = ''
+    __registerHandler('github.com/xuthus5/mssh/internal/service.FileService.RevealTransfer', async (id: string) => { revealed = id })
+    useAppStore.setState({ transferCenterOpen: true, transfers: [completedDownload, completedUpload, failedDownload] })
+    render(<TransferCenter />)
+
+    expect(screen.queryByRole('button', { name: '在文件管理器中显示 server.log' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '在文件管理器中显示 broken.zip' })).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: '在文件管理器中显示 movie.mkv' }))
+    expect(revealed).toBe('download-done')
+  })
+
+  it('keeps reveal single-flight and surfaces launch failures', async () => {
+    const reveal = deferred<void>()
+    let calls = 0
+    __registerHandler('github.com/xuthus5/mssh/internal/service.FileService.RevealTransfer', async () => {
+      calls += 1
+      return reveal.promise
+    })
+    useAppStore.setState({ transferCenterOpen: true, transfers: [
+      { ...baseJob, id: 'download-done', fileName: 'movie.mkv', direction: 'download', status: 'completed', targetPath: '/local/movie.mkv', completedAt: 2 },
+    ] })
+    render(<TransferCenter />)
+
+    const revealButton = screen.getByRole('button', { name: '在文件管理器中显示 movie.mkv' })
+    await userEvent.click(revealButton)
+    await userEvent.click(revealButton)
+    expect(calls).toBe(1)
+    expect(revealButton).toBeDisabled()
+
+    await act(async () => { reveal.reject(new Error('file manager unavailable')); await Promise.resolve() })
+    expect(await screen.findByRole('alert')).toHaveTextContent('在文件管理器中显示失败: file manager unavailable')
+  })
+
   it('shows restore failure instead of empty list and allows retry', async () => {
     useAppStore.setState({ transferCenterOpen: true, transfers: [], transfersLoadError: 'list transfers failed' })
     let calls = 0

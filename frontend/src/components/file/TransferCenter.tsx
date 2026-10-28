@@ -10,7 +10,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '
 import { Spinner } from '@/components/ui/spinner'
 import { TransferItem } from '@/components/file/TransferItem'
 import { aggregateTransferProgress, partitionTransfers } from '@/lib/transferMetrics'
-import { cancelTransfer, retryTransfer } from '@/lib/transferActions'
+import { cancelTransfer, retryTransfer, revealTransfer } from '@/lib/transferActions'
 import { useAppStore, type TransferJob } from '@/store/appStore'
 import { restoreTransfers } from '@/store/eventBridge'
 import { t } from '@/i18n'
@@ -68,8 +68,9 @@ function useTransferActions(setTransfersLoadError: (message: string) => void) {
   const transferError = (prefix: string) => (error: unknown) => setActionError(t(prefix, error instanceof Error ? error.message : String(error)))
   const handleCancel = (transfer: TransferJob) => runAction(`transfer:${transfer.id}`, () => cancelTransfer(transfer.id), transferError('取消传输失败: ${}'))
   const handleRetry = (transfer: TransferJob) => runAction(`transfer:${transfer.id}`, () => retryTransfer(transfer), transferError('重试失败: ${}'))
+  const handleReveal = (transfer: TransferJob) => runAction(`transfer:${transfer.id}`, () => revealTransfer(transfer.id), transferError('在文件管理器中显示失败: ${}'))
   const reloadTransfers = () => runAction('reload', restoreTransfers, (error) => setTransfersLoadError(error instanceof Error ? error.message : String(error)))
-  return { actionError, handleCancel, handleRetry, reloadTransfers,
+  return { actionError, handleCancel, handleRetry, handleReveal, reloadTransfers,
     reloadPending: pendingKeys.has('reload'), isTransferPending: (id: string) => pendingKeys.has(`transfer:${id}`) }
 }
 
@@ -136,7 +137,7 @@ function TransferSection({ title, transfers, badgeVariant, removeTransfer, actio
   if (transfers.length === 0) return null
   return <section className="flex flex-col gap-3">
     <div className="flex items-center justify-between"><h3 className="text-sm font-medium text-foreground">{title}</h3><Badge variant={badgeVariant}>{transfers.length}</Badge></div>
-    {transfers.map((transfer) => <TransferItem key={transfer.id} transfer={transfer} pending={actions.isTransferPending(transfer.id)} onCancel={actions.handleCancel} onRetry={actions.handleRetry} onRemove={(item) => removeTransfer(item.id)} />)}
+    {transfers.map((transfer) => <TransferItem key={transfer.id} transfer={transfer} pending={actions.isTransferPending(transfer.id)} onCancel={actions.handleCancel} onRetry={actions.handleRetry} onReveal={actions.handleReveal} onRemove={(item) => removeTransfer(item.id)} />)}
   </section>
 }
 

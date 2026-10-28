@@ -1,4 +1,4 @@
-import { ArrowDownToLine, ArrowUpFromLine, LoaderCircle, RotateCcw, Trash2, X } from 'lucide-react'
+import { ArrowDownToLine, ArrowUpFromLine, FolderOpen, LoaderCircle, RotateCcw, Trash2, X } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -12,6 +12,7 @@ interface TransferItemProps {
   transfer: TransferJob
   onCancel: (transfer: TransferJob) => void
   onRetry: (transfer: TransferJob) => void
+  onReveal: (transfer: TransferJob) => void
   onRemove: (transfer: TransferJob) => void
   pending?: boolean
 }
@@ -53,10 +54,11 @@ function progressValue(transfer: TransferJob): number | null {
   return Math.min(100, Math.round((transfer.transferredBytes / transfer.totalBytes) * 100))
 }
 
-export function TransferItem({ transfer, onCancel, onRetry, onRemove, pending = false }: TransferItemProps) {
+export function TransferItem({ transfer, onCancel, onRetry, onReveal, onRemove, pending = false }: TransferItemProps) {
   const active = isActiveTransfer(transfer)
   const percentage = progressValue(transfer)
   const DirectionIcon = transfer.direction === 'upload' ? ArrowUpFromLine : ArrowDownToLine
+  const canReveal = transfer.status === 'completed' && transfer.direction === 'download'
 
   return <Card className="gap-3 py-3">
     <CardHeader className="flex flex-row items-start gap-3 px-3">
@@ -70,6 +72,7 @@ export function TransferItem({ transfer, onCancel, onRetry, onRemove, pending = 
       </div>
       {active && <Button size="icon-xs" variant="ghost" aria-label={t('取消 ${}', transfer.fileName)} aria-busy={pending} disabled={pending} onClick={() => onCancel(transfer)}>{pending ? <LoaderCircle className="animate-spin" /> : <X />}</Button>}
       {transfer.status === 'failed' && transfer.error !== t('会话已删除') && transfer.error !== '会话已删除' && <Button size="icon-xs" variant="outline" aria-label={t('重试 ${}', transfer.fileName)} aria-busy={pending} disabled={pending} onClick={() => onRetry(transfer)}>{pending ? <LoaderCircle className="animate-spin" /> : <RotateCcw />}</Button>}
+      {canReveal && <Button size="icon-xs" variant="ghost" aria-label={t('在文件管理器中显示 ${}', transfer.fileName)} aria-busy={pending} disabled={pending} onClick={() => onReveal(transfer)}>{pending ? <LoaderCircle className="animate-spin" /> : <FolderOpen />}</Button>}
       {!active && <Button size="icon-xs" variant="ghost" aria-label={t('移除 ${}', transfer.fileName)} disabled={pending} onClick={() => onRemove(transfer)}><Trash2 /></Button>}
     </CardHeader>
     <CardContent className="flex flex-col gap-2 px-3">
