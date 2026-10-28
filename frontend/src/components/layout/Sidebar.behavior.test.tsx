@@ -109,6 +109,24 @@ describe('Sidebar behavior', () => {
     expect(workspace.listSessions).toHaveBeenCalled()
   })
 
+  it('clears the session search and returns focus to the input', async () => {
+    const user = userEvent.setup()
+    render(<Sidebar />)
+
+    const searchInput = screen.getByPlaceholderText('搜索会话...')
+    expect(screen.queryByRole('button', { name: '清空会话搜索' })).not.toBeInTheDocument()
+
+    await user.type(searchInput, 'db.internal')
+    expect(screen.getByText('匹配 1 个会话')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: '清空会话搜索' }))
+
+    expect(searchInput).toHaveValue('')
+    expect(searchInput).toHaveFocus()
+    expect(screen.getByText('共 2 个会话')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '清空会话搜索' })).not.toBeInTheDocument()
+  })
+
   it('remembers session tree expanded folders across sidebar tab switches', async () => {
     const user = userEvent.setup()
     render(<Sidebar />)
