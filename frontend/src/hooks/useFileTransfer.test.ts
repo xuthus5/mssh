@@ -207,6 +207,21 @@ describe('useFileTransfer', () => {
     expect(result.current.files).toHaveLength(0)
   })
 
+  it('keeps the current directory when a manual path does not exist', async () => {
+    __registerHandler('github.com/xuthus5/mssh/internal/service.FileService.ListDir', async (_sid: number, path: string) => {
+      if (path === '/missing') throw new Error('no such file or directory')
+      return [{ name: 'home.txt', path: '/home/home.txt', size: 1, is_dir: false, mod_time: '' }]
+    })
+
+    const { result } = renderHook(() => useFileTransfer(SESSION_ID))
+    await act(async () => { await result.current.listFiles('/home') })
+    await act(async () => { await result.current.listFiles('/missing') })
+
+    expect(result.current.currentPath).toBe('/home')
+    expect(result.current.files.map((file) => file.name)).toEqual(['home.txt'])
+    expect(result.current.error).toContain('no such file or directory')
+  })
+
   it('rethrows deleteFile failures without toast', async () => {
     __registerHandler('github.com/xuthus5/mssh/internal/service.FileService.Delete', async () => {
       throw new Error('delete denied')

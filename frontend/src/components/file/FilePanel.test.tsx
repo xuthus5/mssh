@@ -1,7 +1,9 @@
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import FilePanel from '@/components/file/FilePanel'
+import { useFileTransfer } from '@/hooks/useFileTransfer'
+import { __clearHandlers, __registerHandler } from '@/test/__mocks__/wails-runtime'
 
 const handlers = {
   onClose: vi.fn(), onNavigateTo: vi.fn(), onNavigateUp: vi.fn(), onDelete: vi.fn(),
@@ -12,6 +14,11 @@ const handlers = {
 }
 
 describe('FilePanel SFTP views', () => {
+  beforeEach(() => {
+    __clearHandlers()
+    vi.clearAllMocks()
+  })
+
   it('filters hidden files and switches between list and tree views', async () => {
     const user = userEvent.setup()
     render(<FilePanel open files={[
@@ -34,6 +41,32 @@ describe('FilePanel SFTP views', () => {
       defaultView="list" {...handlers} followsTerminalDirectory />)
     expect(screen.queryByRole('button', { name: '同步当前目录' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: '关闭' })).toBeInTheDocument()
+  })
+
+  it('shows a directory load error for a manually entered missing path', async () => {
+    const user = userEvent.setup()
+    const listDirectory = vi.fn(async (_sessionID: number, path: string) => {
+      if (path === '/missing') throw new Error('no such file or directory')
+      return []
+    })
+    __registerHandler('github.com/xuthus5/mssh/internal/service.FileService.ListDir', listDirectory)
+    function ManualPathPanel() {
+      const transfer = useFileTransfer(1)
+      return <FilePanel {...handlers} open files={transfer.files} currentPath={transfer.currentPath} loading={transfer.loading} error={transfer.error}
+        dropTargetId="drop-zone" showHiddenFiles={false} defaultView="list" onNavigateTo={transfer.navigateTo}
+        onNavigateUp={transfer.navigateUp} onLoadDirectory={transfer.loadDirectory} />
+    }
+    render(<ManualPathPanel />)
+
+    await user.click(screen.getByRole('button', { name: '编辑路径' }))
+    const input = screen.getByRole('textbox', { name: '目录路径' })
+    await user.clear(input)
+    await user.type(input, '/missing')
+    await user.click(screen.getByRole('button', { name: '前往' }))
+
+    expect(await screen.findByText('目录加载失败')).toBeInTheDocument()
+    expect(screen.getByText(/no such file or directory/)).toBeInTheDocument()
+    expect(listDirectory).toHaveBeenCalledWith(1, '/missing')
   })
 
   it('uses the configured tree view and shows hidden files', () => {
