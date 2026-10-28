@@ -1203,6 +1203,7 @@
   "清空命令历史": "Clear command history",
   "清空命令历史失败: ${}": "Failed to clear command history: ${}",
   "清空当前终端可见内容。": "Clear the visible content of the current terminal.",
+  "清空会话搜索": "Clear session search",
   "清空本地业务数据": "Clear local business data",
   "清空本地业务数据失败: ${}": "Failed to reset local data: ${}",
   "清空本地业务数据？": "Clear local business data?",

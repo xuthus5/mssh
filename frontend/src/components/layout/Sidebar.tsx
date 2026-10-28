@@ -1,4 +1,5 @@
-import { ArrowLeft, Cable, KeyRound, Network, ScrollText, Search, Server, ShieldCheck } from 'lucide-react'
+import { useRef } from 'react'
+import { ArrowLeft, Cable, KeyRound, Network, ScrollText, Search, Server, ShieldCheck, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -44,10 +45,15 @@ function SessionPanel({ workspace, filter, editSession, dialogs }: {
 }) {
   const expandedFolderIDs = useAppStore((state) => state.sessionTreeExpandedFolderIDs)
   const setExpandedFolderIDs = useAppStore((state) => state.setSessionTreeExpandedFolderIDs)
+  const searchInputRef = useRef<HTMLInputElement>(null)
+  const clearSearch = () => {
+    filter.setSearchQuery('')
+    searchInputRef.current?.focus()
+  }
   const retry = () => { void Promise.all([workspace.listFolders(), workspace.listSessions()]) }
   const hasSessionData = workspace.folders.length > 0 || workspace.sessions.length > 0
   return <>
-    <div className="flex flex-col gap-1.5 border-b border-border/50 px-2 py-2"><div className="relative"><Search className="absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" /><Input value={filter.searchQuery} onChange={(event) => filter.setSearchQuery(event.target.value)} placeholder={t('搜索会话...')} className="h-7 pl-7 text-xs" /></div></div>
+    <div className="flex flex-col gap-1.5 border-b border-border/50 px-2 py-2"><div className="relative"><Search className="absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" /><Input ref={searchInputRef} value={filter.searchQuery} onChange={(event) => filter.setSearchQuery(event.target.value)} placeholder={t('搜索会话...')} className="h-7 pl-7 pr-7 text-xs" />{filter.searchQuery && <Button type="button" size="icon-xs" variant="ghost" aria-label={t('清空会话搜索')} className="absolute right-1 top-1/2 -translate-y-1/2" onClick={clearSearch}><X /></Button>}</div></div>
     <div className="flex items-center justify-between border-b border-border/30 px-3 py-1"><span className="text-[11px] text-muted-foreground">{filter.searchQuery.trim() ? t('匹配 ${} 个会话', filter.filteredSessions.length) : t('共 ${} 个会话', workspace.sessions.length)}</span>{filter.searchQuery.trim() && <span className="text-[10px] text-muted-foreground/60">{t('已筛选')}</span>}</div>
     <div className="min-h-0 flex-1">
       {workspace.error ? <Alert variant="destructive" className="m-2"><AlertDescription>{workspace.error}<Button size="xs" variant="outline" className="mt-2" onClick={retry}>{t('重试')}</Button></AlertDescription></Alert> : !hasSessionData && workspace.loading ? <div className="flex flex-col gap-2 p-3"><Skeleton className="h-7 w-full" /><Skeleton className="h-7 w-4/5" /><Skeleton className="h-7 w-3/5" /></div> : <SessionTree folders={filter.filteredFolders} sessions={filter.filteredSessions} onConnect={workspace.connect} onEditSession={editSession} onDuplicateSession={dialogs.duplicateSession} onQuickRenameSession={dialogs.quickRenameSession} onCopyConnectionInfo={dialogs.copyConnectionInfo} onCopyCredentials={dialogs.copyCredentials} onDeleteSession={(sessionId) => { const session = workspace.sessions.find((item) => item.id === sessionId); if (session) void dialogs.deleteSession(session) }} onEditFolder={dialogs.editFolder} onCreateSessionInFolder={dialogs.newSessionInFolder} onDeleteFolder={(folderId) => { const folder = workspace.folders.find((item) => item.id === folderId); if (folder) void dialogs.deleteFolder(folder) }} onSelectFolder={(id) => window.dispatchEvent(new CustomEvent('mssh:select-folder', { detail: id }))} expandedFolderIDs={expandedFolderIDs} onExpandedFolderIDsChange={setExpandedFolderIDs} revealAll={Boolean(filter.searchQuery.trim())} />}
