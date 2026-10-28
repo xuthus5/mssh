@@ -71,6 +71,13 @@ export function Rename(sessionID: number, oldPath: string, newPath: string): $Ca
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.FileService.Rename", sessionID, oldPath, newPath);
 }
 
+/**
+ * RevealTransfer shows a completed download in the platform file manager.
+ */
+export function RevealTransfer(taskID: string): $CancellablePromise<void> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.FileService.RevealTransfer", taskID);
+}
+
 export function Upload(sessionID: number, localPath: string, remotePath: string): $CancellablePromise<string> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.FileService.Upload", sessionID, localPath, remotePath);
 }
