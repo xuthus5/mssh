@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef, type FormEvent } from 'react'
 import { Button } from '@/components/ui/button'
 import type { FileInfo } from '@/hooks/useFileTransfer'
-import { ArrowUp, Eye, FolderTree, List, RefreshCw } from 'lucide-react'
+import { Eye, FolderTree, List, RefreshCw } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { FilePanelAlerts } from '@/components/file/FilePanelAlerts'
+import { FilePathBar } from '@/components/file/FilePathBar'
 import { FileListView } from '@/components/file/FileListView'
 import { FileTreeView, filterHiddenFiles } from '@/components/file/FileTreeView'
 import { FileContextMenu } from '@/components/file/FileContextMenu'
@@ -68,7 +69,7 @@ export default function FilePanel(props: Props) {
       <ToolPanelResizeHandle {...panel.resizeHandleProps} />
       <div className="pointer-events-none absolute inset-3 z-40 hidden place-items-center rounded-xl border-2 border-dashed border-primary bg-background/90 text-sm font-medium text-primary shadow-sm group-[.file-drop-target-active]/drop:grid">{t('释放文件以上传到当前目录')}</div>
       <PanelHeader onClose={onClose} onSyncCurrentDirectory={onSyncCurrentDirectory} syncingCurrentDirectory={syncingCurrentDirectory} followsTerminalDirectory={followsTerminalDirectory} />
-      <PathBar currentPath={currentPath} onNavigateUp={onNavigateUp} onNavigateTo={onNavigateTo} />
+      <FilePathBar currentPath={currentPath} onNavigateUp={onNavigateUp} onNavigateTo={onNavigateTo} />
       <FileActions currentPath={currentPath} view={state.view} showMkdir={state.showMkdir}
         onUpload={onUpload} onNavigateTo={onNavigateTo} onSetView={state.setView}
         onToggleMkdir={state.toggleMkdir} showHiddenFiles={showHiddenFiles} onToggleHiddenFiles={onToggleHiddenFiles}
@@ -202,11 +203,6 @@ function FileContent({ view, files, loading, currentPath, showHiddenFiles, selec
 
 function PanelHeader({ onClose, onSyncCurrentDirectory, syncingCurrentDirectory, followsTerminalDirectory }: { onClose: () => void; onSyncCurrentDirectory: () => void; syncingCurrentDirectory: boolean; followsTerminalDirectory: boolean }) {
   return <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2"><span className="text-sm font-medium">{t('文件管理')}</span><div className="flex shrink-0 items-center gap-1">{!followsTerminalDirectory ? <Button size="xs" variant="outline" title={t('同步当前终端的 Shell 工作目录（需要处于 Shell 提示符）')} disabled={syncingCurrentDirectory} onClick={onSyncCurrentDirectory}><RefreshCw className={syncingCurrentDirectory ? 'animate-spin' : undefined} data-icon="inline-start" />{syncingCurrentDirectory ? t('同步中') : t('同步当前目录')}</Button> : null}<Button size="xs" variant="ghost" onClick={onClose}>{t('关闭')}</Button></div></div>
-}
-
-function PathBar({ currentPath, onNavigateUp, onNavigateTo }: { currentPath: string; onNavigateUp: () => void; onNavigateTo: (path: string) => void }) {
-  const breadcrumbs = currentPath.split('/').filter(Boolean).map((name, index, parts) => ({ name, path: `/${parts.slice(0, index + 1).join('/')}` }))
-  return <div className="flex items-center gap-1 overflow-x-auto border-b border-border px-3 py-1.5"><button type="button" aria-label={t('上级目录')} className="flex-shrink-0 rounded p-0.5 hover:bg-muted" onClick={onNavigateUp}><ArrowUp className="size-3.5" /></button>{currentPath === '/' ? <span className="text-sm text-muted-foreground">/</span> : breadcrumbs.map((crumb) => <span key={crumb.path} className="flex items-center text-sm"><span className="text-muted-foreground">/</span><button type="button" className="text-muted-foreground hover:text-foreground hover:underline" onClick={() => onNavigateTo(crumb.path)}>{crumb.name}</button></span>)}</div>
 }
 
 function FileActions({ currentPath, view, showMkdir, mkdirPending, transferActionPending, directoryMutationBusy, showHiddenFiles, onUpload, onNavigateTo, onSetView, onToggleMkdir, onToggleHiddenFiles }: { currentPath: string; view: SFTPDefaultView; showMkdir: boolean; mkdirPending: boolean; transferActionPending: 'upload' | 'download' | null; directoryMutationBusy: boolean; showHiddenFiles: boolean; onUpload: () => void; onNavigateTo: (path: string) => void; onSetView: (view: SFTPDefaultView) => void; onToggleMkdir: () => void; onToggleHiddenFiles: () => void }) {
