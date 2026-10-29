@@ -22,6 +22,7 @@ for pattern in \
   'body_path: release-body.md' \
   'releases/generate-notes' \
   'previous_tag_name="${previous_tag}"' \
+  'release-commits.tsv' \
   'go-version-file: .go-version' \
   'node-version-file: .node-version' \
   'runner: macos-15'; do

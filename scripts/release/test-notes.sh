@@ -30,12 +30,17 @@ cat > "${work_dir}/changes.md" <<'EOF'
 **Full Changelog**: https://github.com/xuthus5/mssh/compare/v1.0.0...v1.0.1
 EOF
 
+printf '%s\x1f%s\x1f%s\x1f%s\x1f%s\n' \
+  1111111111111111111111111111111111111111 1111111 2026-10-28 alice 'feat: direct push without pull request' \
+  2222222222222222222222222222222222222222 2222222 2026-10-29 bob 'fix: handle release | metadata' \
+  > "${work_dir}/commits.tsv"
+
 (
   cd "${root_dir}"
   GITHUB_REPOSITORY=xuthus5/mssh GITHUB_SHA=1234567890abcdef GITHUB_RUN_ID=99 \
   GITHUB_RUN_NUMBER=7 RELEASE_VERSION=1.0.1 RELEASE_TAG=v1.0.1 \
     bash scripts/release/generate-release-notes.sh \
-      "${work_dir}/upload" "${work_dir}/changes.md" v1.0.0 > "${work_dir}/release.md"
+      "${work_dir}/upload" "${work_dir}/changes.md" "${work_dir}/commits.tsv" v1.0.0 > "${work_dir}/release.md"
   GITHUB_REPOSITORY=xuthus5/mssh GITHUB_SHA=1234567890abcdef GITHUB_RUN_ID=99 \
   GITHUB_RUN_NUMBER=7 NIGHTLY_VERSION=nightly-20261029-1-abcdef0 RELEASE_TAG=nightly \
     bash scripts/release/generate-nightly-notes.sh "${work_dir}/upload" > "${work_dir}/nightly.md"
@@ -50,6 +55,10 @@ grep -Fq '| macOS 应用 | amd64 |' "${release_notes}"
 grep -Fq '#### What’s Changed' "${release_notes}" || grep -Fq "#### What's Changed" "${release_notes}"
 grep -Fq 'https://github.com/xuthus5/mssh/pull/42' "${release_notes}"
 grep -Fq 'https://github.com/xuthus5/mssh/pull/43' "${release_notes}"
+grep -Fq '### 🔧 Commits' "${release_notes}"
+grep -Fq '[`1111111`](https://github.com/xuthus5/mssh/commit/1111111111111111111111111111111111111111)' "${release_notes}"
+grep -Fq 'feat: direct push without pull request' "${release_notes}"
+grep -Fq 'fix: handle release \| metadata' "${release_notes}"
 grep -Fq 'sha256sum -c mssh-1.0.1-SHA256SUMS' "${release_notes}"
 
 grep -Fq '## 🚀 Nightly Build `nightly-20261029-1-abcdef0`' "${nightly_notes}"
@@ -63,7 +72,7 @@ printf '**Full Changelog**: https://github.com/xuthus5/mssh/compare/v1.0.0...v1.
   GITHUB_REPOSITORY=xuthus5/mssh GITHUB_SHA=1234567890abcdef GITHUB_RUN_ID=99 \
   GITHUB_RUN_NUMBER=7 RELEASE_VERSION=1.0.1 RELEASE_TAG=v1.0.1 \
     bash scripts/release/generate-release-notes.sh \
-      "${work_dir}/upload" "${work_dir}/no-prs.md" v1.0.0 > "${work_dir}/no-prs-release.md"
+      "${work_dir}/upload" "${work_dir}/no-prs.md" "${work_dir}/commits.tsv" v1.0.0 > "${work_dir}/no-prs-release.md"
 )
 grep -Fq '_未发现关联的 Pull Request。_' "${work_dir}/no-prs-release.md"
 
