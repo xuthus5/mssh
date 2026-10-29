@@ -17,6 +17,8 @@ for pattern in \
   'cosign sign-blob --yes' \
   '--bundle "upload/mssh-${version}-SHA256SUMS.sigstore.json"' \
   'cosign verify-blob' \
+  'RELEASE_WORKFLOW_PATH: .github/workflows/release.yml' \
+  '--certificate-identity "https://github.com/${RELEASE_REPOSITORY}/${RELEASE_WORKFLOW_PATH}@${RELEASE_REF}"' \
   'go-version-file: .go-version' \
   'node-version-file: .node-version' \
   'runner: macos-15'; do
