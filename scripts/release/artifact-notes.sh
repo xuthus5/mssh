@@ -44,7 +44,7 @@ print_platform_table() {
     [[ -f "${file}" ]] || continue
     local name
     name="$(basename "${file}")"
-    case "${name}" in *SHA256SUMS*|*sigstore*|*provenance*) continue ;; esac
+    case "${name}" in *SHA256SUMS*|*sigstore*|*provenance*|*.sbom.*) continue ;; esac
     local size
     size="$(human_size "$(stat -c%s "${file}")")"
     printf '| %s | %s | %s | [下载](%s/%s) |\n' \

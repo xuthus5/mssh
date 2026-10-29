@@ -13,6 +13,7 @@ for name in \
   mssh-1.0.1-linux-amd64.deb \
   mssh-1.0.1-linux-amd64.flatpak \
   mssh-1.0.1-linux-amd64.rpm \
+  mssh-1.0.1-linux-amd64.deb.sbom.cdx.json \
   mssh-1.0.1-windows-amd64-installer.exe \
   mssh-1.0.1-windows-arm64.exe \
   mssh-1.0.1-darwin-amd64.app.zip; do
