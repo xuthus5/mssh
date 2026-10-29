@@ -27,6 +27,57 @@ func TestAboutServiceCheckUpdate(t *testing.T) {
 	assert.Equal(t, "v0.2.0", info.LatestVersion)
 }
 
+func TestAboutServiceCheckUpdateFromNightlyBuild(t *testing.T) {
+	originalVersion := Version
+	Version = "nightly-20261028-1234567890-abcdef0"
+	t.Cleanup(func() { Version = originalVersion })
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		_, err := writer.Write([]byte(`{"tag_name":"v1.0.1","html_url":"https://github.com/xuthus5/mssh/releases/tag/v1.0.1","published_at":"2026-10-29T06:58:01Z"}`))
+		require.NoError(t, err)
+	}))
+	t.Cleanup(server.Close)
+	service := NewAboutService()
+	service.latestAPIURL = server.URL
+
+	info, err := service.CheckUpdate(t.Context())
+
+	require.NoError(t, err)
+	assert.True(t, info.UpdateAvailable)
+	assert.Equal(t, "v1.0.1", info.LatestVersion)
+}
+
+func TestIsUpdateAvailableForNightlyBuild(t *testing.T) {
+	tests := []struct {
+		name          string
+		current       string
+		publishedAt   string
+		expected      bool
+		expectedError bool
+	}{
+		{name: "release after nightly", current: "nightly-20261028-1-abcdef0", publishedAt: "2026-10-29T06:58:01Z", expected: true},
+		{name: "release same day as nightly", current: "nightly-20261029-1-abcdef0", publishedAt: "2026-10-29T06:58:01Z", expected: false},
+		{name: "release before nightly", current: "nightly-20261030-1-abcdef0", publishedAt: "2026-10-29T06:58:01Z", expected: false},
+		{name: "invalid nightly date", current: "nightly-20261340-1-abcdef0", publishedAt: "2026-10-29T06:58:01Z", expectedError: true},
+		{name: "missing nightly suffix", current: "nightly-20261028", publishedAt: "2026-10-29T06:58:01Z", expectedError: true},
+		{name: "invalid release time", current: "nightly-20261028-1-abcdef0", publishedAt: "unknown", expectedError: true},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			available, err := isUpdateAvailable("v1.0.1", test.current, test.publishedAt)
+			if test.expectedError {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, test.expected, available)
+		})
+	}
+
+	available, err := isUpdateAvailable("v1.0.0", "0.9.0", "")
+	require.NoError(t, err)
+	assert.True(t, available)
+}
+
 func TestCompareVersions(t *testing.T) {
 	tests := []struct {
 		name        string

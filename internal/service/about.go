@@ -30,8 +30,9 @@ type AboutService struct {
 }
 
 type githubReleaseResponse struct {
-	TagName string `json:"tag_name"`
-	HTMLURL string `json:"html_url"`
+	TagName     string `json:"tag_name"`
+	HTMLURL     string `json:"html_url"`
+	PublishedAt string `json:"published_at"`
 }
 
 func NewAboutService(proxy ...*netproxy.Manager) *AboutService {
@@ -70,7 +71,7 @@ func (a *AboutService) CheckUpdate(ctx context.Context) (*model.UpdateInfo, erro
 	if strings.TrimSpace(release.TagName) == "" {
 		return nil, fmt.Errorf("check update: latest release has no version")
 	}
-	comparison, err := compareVersions(release.TagName, Version)
+	updateAvailable, err := isUpdateAvailable(release.TagName, Version, release.PublishedAt)
 	if err != nil {
 		return nil, fmt.Errorf("check update: compare versions: %w", err)
 	}
@@ -78,7 +79,7 @@ func (a *AboutService) CheckUpdate(ctx context.Context) (*model.UpdateInfo, erro
 	if err != nil {
 		return nil, fmt.Errorf("check update: %w", err)
 	}
-	return &model.UpdateInfo{CurrentVersion: Version, LatestVersion: release.TagName, ReleaseURL: releaseURL, UpdateAvailable: comparison > 0}, nil
+	return &model.UpdateInfo{CurrentVersion: Version, LatestVersion: release.TagName, ReleaseURL: releaseURL, UpdateAvailable: updateAvailable}, nil
 }
 
 func decodeUpdateRelease(reader io.Reader) (githubReleaseResponse, error) {
