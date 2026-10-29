@@ -163,11 +163,7 @@ func downloadFileContext(
 		}
 	}()
 
-	_, copyErr := copyWithContext(ctx, local, remote, func(transferred int64) {
-		if onProgress != nil {
-			onProgress(transferred, info.Size())
-		}
-	})
+	copyErr := copyDownloadedFile(ctx, remote, local, info.Size(), onProgress)
 	if copyErr != nil {
 		localClosed = true
 		closeErr := closeFile(local, "close partial local download")
@@ -184,6 +180,21 @@ func downloadFileContext(
 		cleanupTemporary = false
 	}
 	return true, nil
+}
+
+func copyDownloadedFile(ctx context.Context, remote *sftp.File, local io.Writer, total int64, onProgress ProgressFn) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	// File.WriteTo pipelines multiple SFTP reads, avoiding the per-packet RTT
+	// limit of calling Read repeatedly on high-latency links.
+	_, err := remote.WriteTo(&progressWriter{
+		ctx: ctx, dst: local, total: total, onProgress: onProgress,
+	})
+	if ctxErr := ctx.Err(); ctxErr != nil {
+		return ctxErr
+	}
+	return err
 }
 
 func openDownloadTargetForDownload(path string, exclusive bool) (*os.File, string, error) {

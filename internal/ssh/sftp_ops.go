@@ -1,7 +1,9 @@
 package ssh
 
 import (
+	"context"
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/pkg/sftp"
@@ -57,15 +59,29 @@ func RemoteFileSize(client *SFTPClient, path string) (int64, error) {
 }
 
 type progressWriter struct {
+	ctx        context.Context
+	dst        io.Writer
 	total      int64
+	written    int64
 	onProgress ProgressFn
 }
 
 func (pw *progressWriter) Write(p []byte) (int, error) {
-	n := len(p)
-	pw.total += int64(n)
-	if pw.onProgress != nil {
-		pw.onProgress(pw.total, 0)
+	if err := pw.ctx.Err(); err != nil {
+		return 0, err
+	}
+	n, err := pw.dst.Write(p)
+	if n > 0 {
+		pw.written += int64(n)
+		if pw.onProgress != nil {
+			pw.onProgress(pw.written, pw.total)
+		}
+	}
+	if err != nil {
+		return n, err
+	}
+	if n != len(p) {
+		return n, io.ErrShortWrite
 	}
 	return n, nil
 }

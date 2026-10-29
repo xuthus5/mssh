@@ -534,12 +534,60 @@ func TestRename_SourceNotFound(t *testing.T) {
 }
 
 func TestProgressWriter_NilCallback(t *testing.T) {
-	pw := &progressWriter{}
+	var dst bytes.Buffer
+	pw := &progressWriter{ctx: context.Background(), dst: &dst, total: 5}
 
 	n, err := pw.Write([]byte("hello"))
 	require.NoError(t, err)
 	assert.Equal(t, 5, n)
 	assert.Equal(t, int64(5), pw.total)
+	assert.Equal(t, int64(5), pw.written)
+	assert.Equal(t, "hello", dst.String())
+}
+
+type shortWriter struct{}
+
+func (shortWriter) Write(p []byte) (int, error) {
+	return max(0, len(p)-1), nil
+}
+
+type errorWriter struct {
+	err error
+}
+
+func (w errorWriter) Write([]byte) (int, error) {
+	return 0, w.err
+}
+
+func TestProgressWriterHandlesShortWrite(t *testing.T) {
+	pw := &progressWriter{ctx: context.Background(), dst: shortWriter{}, total: 5}
+
+	n, err := pw.Write([]byte("hello"))
+
+	assert.Equal(t, 4, n)
+	assert.ErrorIs(t, err, io.ErrShortWrite)
+	assert.Equal(t, int64(4), pw.written)
+}
+
+func TestProgressWriterReportsDestinationError(t *testing.T) {
+	writeErr := errors.New("write failed")
+	pw := &progressWriter{ctx: context.Background(), dst: errorWriter{err: writeErr}, total: 5}
+
+	_, err := pw.Write([]byte("hello"))
+
+	assert.ErrorIs(t, err, writeErr)
+}
+
+func TestProgressWriterStopsAfterContextCancellation(t *testing.T) {
+	var dst bytes.Buffer
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	pw := &progressWriter{ctx: ctx, dst: &dst, total: 5}
+
+	_, err := pw.Write([]byte("hello"))
+
+	assert.ErrorIs(t, err, context.Canceled)
+	assert.Empty(t, dst.String())
 }
 
 func TestMkdirError(t *testing.T) {
