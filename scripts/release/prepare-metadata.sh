@@ -45,14 +45,41 @@ if ! command -v jq >/dev/null 2>&1; then
   exit 1
 fi
 
+is_wrapper_artifact() {
+  case "$(basename "$1")" in
+    *.AppImage|*.appimage|*.flatpak) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+validate_sbom() {
+  local sbom="$1"
+  local name="$2"
+  if ! jq -e '(.bomFormat == "CycloneDX") and (.specVersion != null) and ((.components // []) | type == "array")' "${sbom}" >/dev/null; then
+    echo "invalid CycloneDX SBOM generated for ${name}" >&2
+    return 1
+  fi
+}
+
 artifact_json='[]'
 for artifact in "${primary_artifacts[@]}"; do
   name="$(basename "${artifact}")"
   sbom="${artifact_dir}/${name}.sbom.cdx.json"
-  syft "file:${artifact}" -o cyclonedx-json > "${sbom}"
-  jq -e '(.bomFormat == "CycloneDX") and (.specVersion != null) and (.components | type == "array")' "${sbom}" >/dev/null
   digest="$(sha256sum "${artifact}" | awk '{print $1}')"
   artifact_json="$(jq --arg name "${name}" --arg sha256 "${digest}" '. + [{name: $name, sha256: $sha256}]' <<<"${artifact_json}")"
+
+  if is_wrapper_artifact "${artifact}"; then
+    echo "SBOM skipped for unsupported wrapper: ${name}"
+    continue
+  fi
+
+  if ! syft "file:${artifact}" -o cyclonedx-json > "${sbom}"; then
+    echo "failed to generate SBOM for ${name}" >&2
+    exit 1
+  fi
+  if ! validate_sbom "${sbom}" "${name}"; then
+    exit 1
+  fi
 done
 
 provenance="${artifact_dir}/mssh-${version}-provenance.json"
