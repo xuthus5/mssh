@@ -27,14 +27,6 @@ type FileEntry struct {
 
 type ProgressFn func(bytesTransferred, totalBytes int64)
 
-func OpenSFTP(cw *ClientWrapper) (*sftp.Client, error) {
-	client, err := sftp.NewClient(cw.Inner)
-	if err != nil {
-		return nil, fmt.Errorf("open sftp: %w", err)
-	}
-	return client, nil
-}
-
 func ListDir(client *sftp.Client, path string) ([]FileEntry, error) {
 	entries, err := client.ReadDir(path)
 	if err != nil {

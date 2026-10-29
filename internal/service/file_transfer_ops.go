@@ -139,7 +139,7 @@ func (f *FileService) launchTransfer(worker transferWorker) {
 		defer f.disconnect(worker.connID)
 		defer worker.cancel()
 		defer f.clearStart(worker.taskID)
-		sftpClient, sftpErr := ssh.OpenSFTP(worker.wrapper)
+		sftpClient, sftpErr := ssh.OpenTransferSFTP(worker.wrapper)
 		if sftpErr != nil {
 			outcome := transferOutcomeForError(worker.ctx, sftpErr)
 			f.resolveTransfer(worker.runtime, worker.taskID, func() transferOutcome { return outcome })

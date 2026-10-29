@@ -77,13 +77,19 @@ func startSFTPServer(t *testing.T) (string, func()) {
 
 func connectSFTP(t *testing.T, addr string) (cw *ClientWrapper, client *sftp.Client) {
 	t.Helper()
+	cw = connectWrapper(t, addr)
+	client, err := OpenSFTP(cw)
+	require.NoError(t, err)
+	return cw, client
+}
+
+func connectWrapper(t *testing.T, addr string) *ClientWrapper {
+	t.Helper()
 	s := model.Session{Host: "127.0.0.1", Port: mustParsePort(addr), Username: "test"}
 	ctx := context.Background()
 	cw, err := Connect(ctx, s, nil, testutil.KnownHostsPath(t), slog.Default())
 	require.NoError(t, err)
-	client, err = OpenSFTP(cw)
-	require.NoError(t, err)
-	return cw, client
+	return cw
 }
 
 func TestOpenSFTP(t *testing.T) {

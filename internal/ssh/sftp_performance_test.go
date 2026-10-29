@@ -75,3 +75,51 @@ func TestDownloadFilePipelinesConcurrentReads(t *testing.T) {
 	assert.Equal(t, content, downloaded)
 	assert.Greater(t, tracker.maxActive.Load(), int32(1))
 }
+
+func TestTransferSFTPOptions(t *testing.T) {
+	assert.Len(t, transferSFTPOptions(false), 1)
+	assert.Len(t, transferSFTPOptions(true), 2)
+}
+
+func TestOpenTransferSFTPFallsBackForServersWithoutLimitsExtension(t *testing.T) {
+	address, cleanup := startSFTPServer(t)
+	t.Cleanup(cleanup)
+	wrapper := connectWrapper(t, address)
+	t.Cleanup(func() { assert.NoError(t, wrapper.Close()) })
+
+	supported, err := probeSFTPExtensions(wrapper)
+	require.NoError(t, err)
+	assert.False(t, supported)
+
+	client, err := OpenTransferSFTP(wrapper)
+
+	require.NoError(t, err)
+	t.Cleanup(func() { assert.NoError(t, client.Close()) })
+	content := bytes.Repeat([]byte("0123456789abcdef"), 32*1024)
+	remote, err := client.Create("/transfer-fallback.bin")
+	require.NoError(t, err)
+	_, err = remote.Write(content)
+	require.NoError(t, err)
+	require.NoError(t, remote.Close())
+	target := filepath.Join(t.TempDir(), "download.bin")
+
+	err = DownloadFileContext(context.Background(), client, "/transfer-fallback.bin", target, nil)
+
+	require.NoError(t, err)
+	downloaded, err := os.ReadFile(target)
+	require.NoError(t, err)
+	assert.Equal(t, content, downloaded)
+}
+
+func TestProbeSFTPExtensionsRejectsClosedClient(t *testing.T) {
+	address, cleanup := startSFTPServer(t)
+	t.Cleanup(cleanup)
+	wrapper := connectWrapper(t, address)
+	t.Cleanup(func() { assert.NoError(t, wrapper.Close()) })
+	require.NoError(t, wrapper.Close())
+
+	supported, err := probeSFTPExtensions(wrapper)
+
+	assert.False(t, supported)
+	require.Error(t, err)
+}
