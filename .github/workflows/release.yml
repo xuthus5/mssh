@@ -458,6 +458,7 @@ jobs:
           RELEASE_REPOSITORY: ${{ github.repository }}
           RELEASE_REF: refs/tags/${{ github.ref_name }}
           RELEASE_WORKFLOW: ${{ github.workflow }}
+          RELEASE_WORKFLOW_PATH: .github/workflows/release.yml
         run: |
           set -euo pipefail
           version="${RELEASE_VERSION#v}"
@@ -465,6 +466,7 @@ jobs:
             cosign verify-blob \
               --bundle "upload/mssh-${version}-${subject}.sigstore.json" \
               --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+              --certificate-identity "https://github.com/${RELEASE_REPOSITORY}/${RELEASE_WORKFLOW_PATH}@${RELEASE_REF}" \
               --certificate-github-workflow-repository "${RELEASE_REPOSITORY}" \
               --certificate-github-workflow-ref "${RELEASE_REF}" \
               --certificate-github-workflow-name "${RELEASE_WORKFLOW}" \
