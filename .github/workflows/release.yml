@@ -386,6 +386,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
       - name: Download all artifacts
         uses: actions/download-artifact@v8
         with:
@@ -476,6 +478,29 @@ jobs:
         uses: actions/attest-build-provenance@v4
         with:
           subject-path: upload/*
+      - name: Generate release notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_VERSION: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          mapfile -t release_tags < <(git tag --list 'v[0-9]*' --sort=-v:refname | grep -vxF "${RELEASE_TAG}")
+          previous_tag="${release_tags[0]:-}"
+          if [[ -n "${previous_tag}" ]]; then
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/releases/generate-notes" \
+              -f tag_name="${RELEASE_TAG}" \
+              -f previous_tag_name="${previous_tag}" \
+              --jq .body > generated-changes.md
+          else
+            printf '_首个正式版本，暂无历史 Pull Request。_\n' > generated-changes.md
+          fi
+          RELEASE_VERSION="${RELEASE_VERSION#v}" \
+          RELEASE_TAG="${RELEASE_TAG}" \
+            bash scripts/release/generate-release-notes.sh \
+              upload generated-changes.md "${previous_tag}" > release-body.md
+          test -s release-body.md
+          cat release-body.md
       - name: Recreate GitHub Release shell
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -490,7 +515,7 @@ jobs:
           tag_name: ${{ github.ref_name }}
           name: ${{ github.ref_name }}
           files: upload/*
-          generate_release_notes: true
+          body_path: release-body.md
           fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

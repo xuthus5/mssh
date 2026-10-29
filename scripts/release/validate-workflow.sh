@@ -19,6 +19,9 @@ for pattern in \
   'cosign verify-blob' \
   'RELEASE_WORKFLOW_PATH: .github/workflows/release.yml' \
   '--certificate-identity "https://github.com/${RELEASE_REPOSITORY}/${RELEASE_WORKFLOW_PATH}@${RELEASE_REF}"' \
+  'body_path: release-body.md' \
+  'releases/generate-notes' \
+  'previous_tag_name="${previous_tag}"' \
   'go-version-file: .go-version' \
   'node-version-file: .node-version' \
   'runner: macos-15'; do
@@ -54,6 +57,11 @@ done
 
 if grep -Eq 'soft.?fail|output-signature|output-certificate|\|\|[[:space:]]*true' "${workflow}"; then
   echo "release workflow contains a soft-fail or unsupported signing option" >&2
+  exit 1
+fi
+
+if grep -Fq -- 'generate_release_notes: true' "${workflow}"; then
+  echo "release workflow must use generated download and PR notes" >&2
   exit 1
 fi
 

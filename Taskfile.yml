@@ -206,6 +206,7 @@ tasks:
     cmds:
       - bash scripts/release/validate-workflow.sh
       - bash scripts/release/test-metadata.sh
+      - bash scripts/release/test-notes.sh
 
   ci:
     summary: Full local gate aligned with .github/workflows/ci.yml
