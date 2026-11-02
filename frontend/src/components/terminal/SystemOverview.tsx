@@ -3,7 +3,7 @@ import { t } from '@/i18n'
 
 export type NetworkMetric = {
   name: string; received_bytes: number; transmitted_bytes: number
-  download_rate: number; upload_rate: number; virtual?: boolean
+  download_rate: number; upload_rate: number; virtual?: boolean; role?: string
 }
 
 export type DiskMetric = {
@@ -11,11 +11,12 @@ export type DiskMetric = {
 }
 
 export type Info = {
-  schema_version?: number; sampled_at_unix_ms?: number; source?: string; warnings?: string[]
+  schema_version?: number; sampled_at_unix_ms?: number; source?: string; capabilities?: string[]; warnings?: string[]
   cpu_percent: number; cpu_count: number; memory_used: number; memory_total: number
   disk_used: number; disk_total: number; download_rate: number; upload_rate: number
   swap_used: number; swap_total: number; load_1: number; load_5: number; load_15: number
   uptime_seconds: number; os_name: string; kernel_version: string; latency_ms?: number
+  sample_sequence?: number; sample_interval_ms?: number
   interfaces?: NetworkMetric[]; disk_mounts?: DiskMetric[]
 }
 
@@ -29,6 +30,14 @@ const WARNING_LABELS: Record<string, string> = {
   disk_unavailable: '磁盘指标不可用',
   load_unavailable: '负载指标不可用',
   uptime_unavailable: '运行时长不可用',
+  disk_truncated: '挂载点过多，已截断',
+}
+
+const NETWORK_ROLE_LABELS: Record<string, string> = {
+  bond: '聚合',
+  bridge: '网桥',
+  team: '聚合',
+  slave: '从接口',
 }
 
 export function formatBytes(value: number) {
@@ -48,6 +57,11 @@ function formatDuration(seconds: number) {
   const hours = Math.floor(seconds % 86400 / 3600)
   const minutes = Math.floor(seconds % 3600 / 60)
   return `${days}d ${hours}h ${minutes}m`
+}
+
+function formatInterval(milliseconds?: number) {
+  if (!milliseconds) return '未知'
+  return `${(milliseconds / 1000).toFixed(1)}s`
 }
 
 function Metric({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
@@ -83,6 +97,7 @@ function NetworkDetails({ interfaces }: { interfaces?: NetworkMetric[] }) {
       {interfaces.map((item) => <div key={item.name} className="grid grid-cols-[1fr_auto] items-center gap-3">
         <span className="flex min-w-0 items-center gap-2">
           <span className="truncate font-mono text-foreground" title={`${formatBytes(item.received_bytes)} / ${formatBytes(item.transmitted_bytes)}`}>{item.name}</span>
+          {item.role && NETWORK_ROLE_LABELS[item.role] ? <span className="rounded-md border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground">{t(NETWORK_ROLE_LABELS[item.role])}</span> : null}
           {item.virtual ? <span className="rounded-md border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground">{t('虚拟')}</span> : null}
         </span>
         <span className="flex items-center gap-2 tabular-nums text-muted-foreground">
@@ -111,6 +126,7 @@ export function Overview({ info }: { info: Info }) {
   const network = `↓${formatBytes(info.download_rate)}/s ↑${formatBytes(info.upload_rate)}/s`
   const source = info.source || t('未知')
   const latency = typeof info.latency_ms === 'number' ? `${info.latency_ms.toFixed(0)}ms` : t('未知')
+  const capabilities = info.capabilities?.length ? info.capabilities.join(' ') : t('未知')
   return <div className="space-y-4">
     <CollectionWarnings warnings={info.warnings} />
     <div className="grid grid-cols-2 gap-2">
@@ -129,6 +145,8 @@ export function Overview({ info }: { info: Info }) {
         <DetailItem label="Swap" value={`${formatBytes(info.swap_used)}/${formatBytes(info.swap_total)}`} wide />
         <DetailItem label={t('数据源')} value={`${source} · v${info.schema_version ?? 0}`} wide />
         <DetailItem label={t('采集耗时')} value={latency} wide />
+        <DetailItem label={t('采样间隔')} value={`${formatInterval(info.sample_interval_ms)} · #${info.sample_sequence ?? 0}`} wide />
+        <DetailItem label={t('采集能力')} value={capabilities} wide />
       </div>
     </section>
     <NetworkDetails interfaces={info.interfaces} />

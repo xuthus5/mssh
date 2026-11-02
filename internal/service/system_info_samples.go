@@ -15,6 +15,7 @@ type networkCounter struct {
 type systemSample struct {
 	total, idle, iowait, received, transmitted uint64
 	interfaces                                 map[string]networkCounter
+	roles                                      map[string]string
 	at                                         time.Time
 	sampledAtMS                                int64
 	monotonicMS                                uint64
@@ -25,6 +26,7 @@ type systemSample struct {
 	hasDisk                                    bool
 	hasLoad                                    bool
 	hasUptime                                  bool
+	sequence                                   uint64
 }
 
 type processKey struct {
@@ -46,8 +48,10 @@ func (t *TerminalService) updateSystemRates(terminalID string, info *model.Syste
 		t.systemSamples = make(map[string]systemSample)
 	}
 	previous, exists := t.systemSamples[terminalID]
+	stored.sequence = previous.sequence + 1
 	t.systemSamples[terminalID] = stored
 	t.systemMu.Unlock()
+	info.SampleSequence = stored.sequence
 	if !exists {
 		return
 	}
@@ -55,6 +59,7 @@ func (t *TerminalService) updateSystemRates(terminalID string, info *model.Syste
 	if elapsed <= 0 {
 		return
 	}
+	info.SampleIntervalMS = uint64(elapsed*1000 + 0.5)
 	if previous.total > 0 && sample.total > 0 {
 		info.CPUPercent = cpuPercent(previous, sample)
 	}
@@ -68,7 +73,7 @@ func (t *TerminalService) updateSystemRates(terminalID string, info *model.Syste
 
 func applyInterfaceRates(info *model.SystemInfo, previous systemSample, elapsed float64) {
 	aggregateDownload, aggregateUpload := uint64(0), uint64(0)
-	hasPhysical := false
+	hasAggregate := false
 	for index := range info.Interfaces {
 		networkInterface := &info.Interfaces[index]
 		before, exists := previous.interfaces[networkInterface.Name]
@@ -76,15 +81,15 @@ func applyInterfaceRates(info *model.SystemInfo, previous systemSample, elapsed 
 			networkInterface.DownloadRate = byteRate(before.received, networkInterface.ReceivedBytes, elapsed)
 			networkInterface.UploadRate = byteRate(before.transmitted, networkInterface.TransmittedBytes, elapsed)
 		}
-		if !networkInterface.Virtual {
-			hasPhysical = true
+		if isNetworkAggregateEndpoint(*networkInterface) {
+			hasAggregate = true
 			aggregateDownload += networkInterface.DownloadRate
 			aggregateUpload += networkInterface.UploadRate
 		}
 	}
-	if !hasPhysical {
+	if !hasAggregate {
 		for _, networkInterface := range info.Interfaces {
-			if strings.HasPrefix(networkInterface.Name, "lo") {
+			if networkInterface.Role == networkRoleLoopback || networkInterface.Role == networkRoleSlave || strings.HasPrefix(networkInterface.Name, "lo") {
 				continue
 			}
 			aggregateDownload += networkInterface.DownloadRate
@@ -93,6 +98,17 @@ func applyInterfaceRates(info *model.SystemInfo, previous systemSample, elapsed 
 	}
 	info.DownloadRate = aggregateDownload
 	info.UploadRate = aggregateUpload
+}
+
+func isNetworkAggregateEndpoint(networkInterface model.NetworkInterface) bool {
+	switch networkInterface.Role {
+	case networkRoleLoopback, networkRoleSlave:
+		return false
+	case networkRoleBond, networkRoleBridge, networkRoleTeam:
+		return true
+	default:
+		return !networkInterface.Virtual
+	}
 }
 
 func cloneNetworkCounters(source map[string]networkCounter) map[string]networkCounter {
@@ -123,6 +139,7 @@ func (t *TerminalService) deleteSystemSample(terminalID string) {
 	t.systemMu.Lock()
 	delete(t.systemSamples, terminalID)
 	delete(t.systemProcessSamples, terminalID)
+	delete(t.systemInfoSnapshots, terminalID)
 	t.systemMu.Unlock()
 }
 

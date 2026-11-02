@@ -1,12 +1,16 @@
 package model
 
-const SystemInfoSchemaVersion = 1
+const (
+	SystemInfoSchemaVersion  = 1
+	ProcessInfoSchemaVersion = 1
+)
 
 type SystemInfo struct {
 	SchemaVersion      int                `json:"schema_version"`
 	SampledAtUnixMS    int64              `json:"sampled_at_unix_ms"`
 	SampledMonotonicMS uint64             `json:"sampled_monotonic_ms"`
 	Source             string             `json:"source"`
+	Capabilities       []string           `json:"capabilities"`
 	Warnings           []string           `json:"warnings"`
 	CPUPercent         float64            `json:"cpu_percent"`
 	CPUCount           int                `json:"cpu_count"`
@@ -25,6 +29,8 @@ type SystemInfo struct {
 	OSName             string             `json:"os_name"`
 	KernelVersion      string             `json:"kernel_version"`
 	LatencyMS          float64            `json:"latency_ms"`
+	SampleSequence     uint64             `json:"sample_sequence"`
+	SampleIntervalMS   uint64             `json:"sample_interval_ms"`
 	Interfaces         []NetworkInterface `json:"interfaces"`
 	DiskMounts         []DiskMount        `json:"disk_mounts"`
 }
@@ -36,6 +42,7 @@ type NetworkInterface struct {
 	DownloadRate     uint64 `json:"download_rate"`
 	UploadRate       uint64 `json:"upload_rate"`
 	Virtual          bool   `json:"virtual"`
+	Role             string `json:"role,omitempty"`
 }
 
 type DiskMount struct {

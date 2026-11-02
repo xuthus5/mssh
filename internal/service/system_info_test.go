@@ -5,15 +5,64 @@ import (
 	"os/exec"
 	"runtime"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/xuthus5/mssh/internal/model"
 	"github.com/xuthus5/mssh/internal/service/testutil"
 	ssh "github.com/xuthus5/mssh/internal/ssh"
 )
+
+func TestTerminalServiceSystemInfoCoalescesConcurrentSampling(t *testing.T) {
+	originalCommand := _runSystemInfoCommand
+	originalProbe := _openSystemProbeConnection
+	t.Cleanup(func() {
+		_runSystemInfoCommand = originalCommand
+		_openSystemProbeConnection = originalProbe
+	})
+	var calls atomic.Int32
+	started := make(chan struct{}, 1)
+	release := make(chan struct{})
+	_runSystemInfoCommand = func(_ *ssh.ClientWrapper, _ string) ([]byte, error) {
+		calls.Add(1)
+		select {
+		case started <- struct{}{}:
+		default:
+		}
+		<-release
+		return []byte("SCHEMA 1 SOURCE test SAMPLE 1 1 CPU 100 20 IOWAIT 0 MEMTOTAL 100 MEMAVAILABLE 50 SWAPTOTAL 0 SWAPFREE 0 NETIF eth0 1 2 DISKMOUNT /dev/sda1 / 1 2 1 CPUCOUNT 1 LOAD 1 1 1 UPTIME 10 KERNEL test OS test CAP cpu_delta"), nil
+	}
+	_openSystemProbeConnection = func(_ *SessionService, _ int64) (*ssh.ClientWrapper, func(), error) {
+		return &ssh.ClientWrapper{}, func() {}, nil
+	}
+	service := NewTerminalService(&SessionService{}, newMockEventBus(), 2, testutil.NewTestLogger())
+	service.sessionIDs["term-1"] = 1
+
+	var waitGroup sync.WaitGroup
+	waitGroup.Add(2)
+	errors := make(chan error, 2)
+	for range 2 {
+		go func() {
+			defer waitGroup.Done()
+			_, err := service.SystemInfo("term-1")
+			errors <- err
+		}()
+	}
+	<-started
+	time.Sleep(20 * time.Millisecond)
+	close(release)
+	waitGroup.Wait()
+	close(errors)
+	for err := range errors {
+		require.NoError(t, err)
+	}
+	assert.Equal(t, int32(1), calls.Load())
+}
 
 func TestSystemInfoCommandProducesParsableOutput(t *testing.T) {
 	if runtime.GOOS != "linux" {
@@ -25,6 +74,7 @@ func TestSystemInfoCommandProducesParsableOutput(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, model.SystemInfoSchemaVersion, info.SchemaVersion)
 	require.NotEmpty(t, info.Source)
+	require.NotEmpty(t, info.Capabilities)
 	require.Positive(t, info.CPUCount)
 	require.NotEmpty(t, info.OSName)
 }

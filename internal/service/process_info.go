@@ -11,6 +11,7 @@ import (
 const (
 	processCPUSourceProcfs = "procfs_delta"
 	processCPUSourcePS     = "ps_average"
+	maxProcessCommandBytes = 16 * 1024
 )
 
 type processReading struct {
@@ -20,6 +21,7 @@ type processReading struct {
 }
 
 type processProbe struct {
+	schema     int
 	mode       string
 	cpuCount   uint64
 	totalTicks uint64
@@ -49,6 +51,9 @@ func (t *TerminalService) ProcessInfo(terminalID string) ([]model.ProcessInfo, e
 		return nil, err
 	}
 	probe := parseProcessProbe(string(output))
+	if probe.schema != 0 && probe.schema != model.ProcessInfoSchemaVersion {
+		return nil, fmt.Errorf("unsupported process info schema %d", probe.schema)
+	}
 	processes := make([]model.ProcessInfo, len(probe.readings))
 	for index := range probe.readings {
 		processes[index] = probe.readings[index].info
@@ -84,7 +89,14 @@ func parseProcessProbe(output string) processProbe {
 func parseProcessProbeHeader(probe *processProbe, fields []string) bool {
 	switch fields[0] {
 	case "SCHEMA":
-		return len(fields) >= 2
+		probe.schema = -1
+		if len(fields) >= 2 {
+			schema, err := strconv.Atoi(fields[1])
+			if err == nil {
+				probe.schema = schema
+			}
+		}
+		return true
 	case "MODE":
 		if len(fields) >= 2 {
 			probe.mode = fields[1]
@@ -120,7 +132,7 @@ func parseProcReading(line string) (processReading, bool) {
 	}
 	info := model.ProcessInfo{
 		PID: pid, PPID: ppid, User: fields[3], State: fields[4], RSSBytes: rss * 1024,
-		MemoryBytes: rss * 1024, Command: strings.TrimSpace(fields[8]), CPUSource: processCPUSourceProcfs,
+		MemoryBytes: rss * 1024, Command: truncateProcessCommand(strings.TrimSpace(fields[8])), CPUSource: processCPUSourceProcfs,
 	}
 	return processReading{info: info, ticks: ticks, startTicks: startTicks}, true
 }
@@ -144,7 +156,14 @@ func parseProcessInfo(line string) (model.ProcessInfo, bool) {
 	}
 	return model.ProcessInfo{
 		PID: pid, PPID: ppid, User: fields[2], State: fields[3], CPUPercent: cpu,
-		RSSBytes: rss * 1024, MemoryBytes: rss * 1024, Command: strings.Join(fields[6:], " "),
+		RSSBytes: rss * 1024, MemoryBytes: rss * 1024, Command: truncateProcessCommand(strings.Join(fields[6:], " ")),
 		CPUSource: processCPUSourcePS,
 	}, true
+}
+
+func truncateProcessCommand(command string) string {
+	if len(command) <= maxProcessCommandBytes {
+		return command
+	}
+	return command[:maxProcessCommandBytes]
 }

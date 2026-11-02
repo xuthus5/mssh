@@ -35,6 +35,18 @@ func parseProtocolMetadataField(result *model.SystemInfo, values []string, valid
 		result.SampledAtUnixMS = sampledAt
 		result.SampledMonotonicMS = monotonic
 		return 3
+	case "CAP":
+		length := systemInfoValueLength(values)
+		if length < 2 {
+			*valid = false
+			return -1
+		}
+		for _, capability := range values[1:length] {
+			if capability = trimField(capability); capability != "" && !containsStringValue(result.Capabilities, capability) {
+				result.Capabilities = append(result.Capabilities, capability)
+			}
+		}
+		return length
 	case "WARN":
 		if code := trimField(values[1]); code != "" {
 			addSystemWarning(result, code)
@@ -43,6 +55,15 @@ func parseProtocolMetadataField(result *model.SystemInfo, values []string, valid
 		return 0
 	}
 	return 2
+}
+
+func containsStringValue(values []string, target string) bool {
+	for _, value := range values {
+		if value == target {
+			return true
+		}
+	}
+	return false
 }
 
 func parseSystemLabelField(result *model.SystemInfo, sample *systemSample, values []string, valid *bool) int {
@@ -114,60 +135,31 @@ func parseSystemIOField(result *model.SystemInfo, sample *systemSample, values [
 func parseSystemTopologyField(result *model.SystemInfo, sample *systemSample, values []string, uint func(string) uint64, valid *bool) int {
 	switch values[0] {
 	case "NETIF":
-		if len(values) < 4 {
-			return -1
-		}
-		networkInterface := model.NetworkInterface{
-			Name: trimField(values[1]), ReceivedBytes: uint(values[2]), TransmittedBytes: uint(values[3]),
-		}
-		if networkInterface.Name == "" {
-			*valid = false
-			return 4
-		}
-		networkInterface.Virtual = isVirtualNetworkInterface(networkInterface.Name)
-		result.Interfaces = append(result.Interfaces, networkInterface)
-		sample.interfaces[networkInterface.Name] = networkCounter{
-			received: networkInterface.ReceivedBytes, transmitted: networkInterface.TransmittedBytes,
-		}
-		sample.received += networkInterface.ReceivedBytes
-		sample.transmitted += networkInterface.TransmittedBytes
-		sample.hasNetwork = true
-		sample.hasInterfaces = true
-		return 4
+		return parseSystemNetworkInterfaceField(result, sample, values, uint, valid)
+	case "NETROLE":
+		return parseSystemNetworkRoleField(result, sample, values, valid)
 	case "DISKMOUNT":
-		if len(values) < 6 {
-			return -1
-		}
-		mount := model.DiskMount{
-			Device: unescapeDiskField(values[1]), MountPoint: unescapeDiskField(values[2]),
-			UsedBytes: uint(values[3]), TotalBytes: uint(values[4]), AvailableBytes: uint(values[5]),
-		}
-		if mount.MountPoint == "" {
-			*valid = false
-			return 6
-		}
-		result.DiskMounts = append(result.DiskMounts, mount)
-		sample.hasDisk = true
-		return 6
+		return parseSystemDiskMountField(result, sample, values, uint, valid)
 	default:
 		return 0
 	}
 }
 
-func isVirtualNetworkInterface(name string) bool {
-	if name == "lo" || strings.HasPrefix(name, "lo0") {
-		return true
+func parseSystemDiskMountField(result *model.SystemInfo, sample *systemSample, values []string, uint func(string) uint64, valid *bool) int {
+	if len(values) < 6 {
+		return -1
 	}
-	virtualPrefixes := []string{
-		"veth", "docker", "br-", "virbr", "cni", "flannel", "cali", "vxlan", "vnet",
-		"utun", "awdl", "llw", "bridge", "anpi", "gif", "stf", "tunl", "tun", "tap", "wg",
+	mount := model.DiskMount{
+		Device: unescapeDiskField(values[1]), MountPoint: unescapeDiskField(values[2]),
+		UsedBytes: uint(values[3]), TotalBytes: uint(values[4]), AvailableBytes: uint(values[5]),
 	}
-	for _, prefix := range virtualPrefixes {
-		if strings.HasPrefix(name, prefix) {
-			return true
-		}
+	if mount.MountPoint == "" {
+		*valid = false
+		return 6
 	}
-	return false
+	result.DiskMounts = append(result.DiskMounts, mount)
+	sample.hasDisk = true
+	return 6
 }
 
 func parseUintField(value string, valid *bool) (uint64, error) {

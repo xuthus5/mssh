@@ -1,5 +1,7 @@
 package service
 
+const processCommandLineSanitizer = `tr '\000-\037\177' ' '`
+
 const processInfoCommand = `LC_ALL=C
 export LC_ALL
 if [ -r /proc/stat ] && [ -d /proc/self ]; then
@@ -11,7 +13,8 @@ if [ -r /proc/stat ] && [ -d /proc/self ]; then
     printf 'SCHEMA 1\nMODE procfs\nCPUCOUNT %s\nCPUTOTAL %s\n' "$cpu_count" "$total_ticks"
     printf '%s\n' "$rows" | while read -r pid ppid user state rss command_text; do
       case "$pid:$ppid:$rss" in ''|*[!0-9:]*|::*) continue ;; esac
-      stat_line="$(sed -n '1p' "/proc/$pid/stat" 2>/dev/null)" || continue
+      stat_line=""
+      IFS= read -r stat_line < "/proc/$pid/stat" 2>/dev/null || continue
       case "$stat_line" in *') '*) ;; *) continue ;; esac
       stat_rest="${stat_line##*) }"
       set -- $stat_rest
@@ -20,7 +23,7 @@ if [ -r /proc/stat ] && [ -d /proc/self ]; then
       start_ticks="${20:-0}"
       case "$utime:$stime:$start_ticks" in *[!0-9:]*|::*) continue ;; esac
       proc_ticks=$((utime + stime))
-      cmdline="$(tr '\000\011' '  ' < "/proc/$pid/cmdline" 2>/dev/null)"
+      cmdline="$(` + processCommandLineSanitizer + ` < "/proc/$pid/cmdline" 2>/dev/null)"
       if [ -n "$cmdline" ]; then command_text="$cmdline"; fi
       printf 'PROC\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$pid" "$ppid" "$user" "$state" "$rss" "$proc_ticks" "$start_ticks" "$command_text"
     done

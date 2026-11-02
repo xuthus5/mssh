@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { SystemPanel } from '@/components/terminal/SystemPanel'
@@ -33,9 +33,12 @@ describe('SystemPanel', () => {
       schema_version: 1,
       source: 'linux-procfs',
       latency_ms: 18.6,
+      sample_sequence: 5,
+      sample_interval_ms: 3000,
+      capabilities: ['cpu_delta', 'network_roles', 'disk_mounts'],
       warnings: ['disk_unavailable', 'custom_warning'],
       interfaces: [
-        { name: 'eth0', received_bytes: 4096, transmitted_bytes: 2048, download_rate: 1024, upload_rate: 512, virtual: false },
+        { name: 'eth0', received_bytes: 4096, transmitted_bytes: 2048, download_rate: 1024, upload_rate: 512, virtual: false, role: 'slave' },
         { name: 'lo', received_bytes: 10, transmitted_bytes: 20, download_rate: 0, upload_rate: 0, virtual: true },
       ],
       disk_mounts: [{ device: '/dev/sda1', mount_point: '/', used_bytes: 10 * 1024 ** 3, total_bytes: 100 * 1024 ** 3, available_bytes: 90 * 1024 ** 3 }],
@@ -47,8 +50,11 @@ describe('SystemPanel', () => {
     expect(warnings).toHaveTextContent('custom_warning')
     expect(screen.getByText('linux-procfs · v1')).toBeInTheDocument()
     expect(screen.getByText('19ms')).toBeInTheDocument()
+    expect(screen.getByText('3.0s · #5')).toBeInTheDocument()
+    expect(screen.getByText('cpu_delta network_roles disk_mounts')).toBeInTheDocument()
     const network = screen.getByTestId('network-interfaces')
     expect(within(network).getByText('eth0')).toBeInTheDocument()
+    expect(within(network).getByText('从接口')).toBeInTheDocument()
     expect(within(network).getByText('虚拟')).toBeInTheDocument()
     expect(within(network).getByText('1K/s')).toBeInTheDocument()
     const disks = screen.getByTestId('disk-mounts')
@@ -174,6 +180,22 @@ describe('SystemPanel', () => {
     await act(async () => { first.resolve({ ...systemInfo, cpu_percent: 80 }); await Promise.resolve() })
     expect(screen.getByText('80% (8c)')).toBeInTheDocument()
     await act(async () => { await vi.advanceTimersByTimeAsync(3000) })
+    expect(terminalService.SystemInfo).toHaveBeenCalledTimes(2)
+  })
+
+  it('pauses overview polling while another tab is active', async () => {
+    vi.useFakeTimers()
+    render(<SystemPanel terminalID="term-overview-pause" onClose={vi.fn()} />)
+    await act(async () => { await Promise.resolve() })
+    expect(terminalService.SystemInfo).toHaveBeenCalledTimes(1)
+
+    fireEvent.click(screen.getByRole('tab', { name: '进程' }))
+    await act(async () => { await Promise.resolve() })
+    await act(async () => { await vi.advanceTimersByTimeAsync(9000) })
+    expect(terminalService.SystemInfo).toHaveBeenCalledTimes(1)
+
+    fireEvent.click(screen.getByRole('tab', { name: '概览' }))
+    await act(async () => { await Promise.resolve() })
     expect(terminalService.SystemInfo).toHaveBeenCalledTimes(2)
   })
 

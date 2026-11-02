@@ -12,22 +12,54 @@ protocol_header() {
   fi
   epoch_ms="$(date +%s 2>/dev/null)"
   case "$epoch_ms" in ''|*[!0-9]*) epoch_ms=0 ;; *) epoch_ms=$((epoch_ms * 1000)) ;; esac
-  printf 'SCHEMA 1\nSOURCE %s\nSAMPLE %s %s\n' "$source_name" "$epoch_ms" "$monotonic_ms"
+  case "$source_name" in
+    linux-procfs) capabilities="cpu_delta network_interfaces network_roles disk_mounts" ;;
+    darwin-sysctl) capabilities="cpu_snapshot network_interfaces disk_mounts" ;;
+    *) capabilities="disk_mounts" ;;
+  esac
+  printf 'SCHEMA 1\nSOURCE %s\nSAMPLE %s %s\nCAP %s\n' "$source_name" "$epoch_ms" "$monotonic_ms" "$capabilities"
 }
 
 emit_disks() {
-  df -Pk 2>/dev/null | awk 'function escape(value) {gsub(/ /, "\\040", value); return value}
+  if command -v timeout >/dev/null 2>&1; then
+    timeout 2 df -Pk 2>/dev/null
+  else
+    df -Pk 2>/dev/null
+  fi | awk 'function escape(value) {gsub(/ /, "\\040", value); return value}
   NR > 1 {
     device = $1
     mount = $6
     for (position = 7; position <= NF; position++) mount = mount " " $position
     if (device ~ /^(tmpfs|devtmpfs|proc|procfs|sysfs|cgroup.*|mqueue|shm|ramfs|none|map|devfs|udev|autofs|debugfs|tracefs|securityfs|pstore|bpf|hugetlbfs|configfs|fusectl|binfmt_misc)$/) next
+    key = device SUBSEP mount
+    if (seen[key]++) next
+    if (mount_count >= 128) {truncated = 1; next}
     used = $3 * 1024
     total = $2 * 1024
     available = $4 * 1024
     printf "DISKMOUNT %s %s %.0f %.0f %.0f\n", escape(device), escape(mount), used, total, available
     if (mount == "/") printf "DISK %.0f %.0f\n", used, total
-  }'
+    mount_count++
+  }
+  END {if (truncated) print "WARN disk_truncated"}'
+}
+
+emit_network_interfaces() {
+  awk 'NR > 2 {name=$1; sub(/:$/, "", name); printf "%s %s %s\n", name, $2, $10}' /proc/net/dev 2>/dev/null |
+  while read -r name received transmitted; do
+    role=physical
+    case "$name" in lo|lo0*) role=loopback ;; esac
+    if [ -e "/sys/class/net/$name/master" ]; then
+      role=slave
+    elif [ -d "/sys/class/net/$name/bonding" ]; then
+      role=bond
+    elif [ -d "/sys/class/net/$name/bridge" ]; then
+      role=bridge
+    elif [ -d "/sys/class/net/$name/team" ]; then
+      role=team
+    fi
+    printf 'NETIF %s %s %s\nNETROLE %s %s\n' "$name" "$received" "$transmitted" "$name" "$role"
+  done
 }
 
 emit_cpu_count() {
@@ -57,7 +89,7 @@ emit_linux() {
       if (available > total) available=total
       printf "MEMTOTAL %.0f\nMEMAVAILABLE %.0f\nSWAPTOTAL %.0f\nSWAPFREE %.0f\n", total, available, swap_total, swap_free
     }' /proc/meminfo 2>/dev/null
-  awk 'NR > 2 {name=$1; sub(/:$/, "", name); printf "NETIF %s %.0f %.0f\n", name, $2, $10}' /proc/net/dev 2>/dev/null
+  emit_network_interfaces
   emit_disks
   emit_cpu_count
   if [ -r /etc/os-release ]; then

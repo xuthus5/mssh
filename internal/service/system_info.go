@@ -17,6 +17,12 @@ func (t *TerminalService) SystemInfo(terminalID string) (*model.SystemInfo, erro
 		return nil, err
 	}
 	defer finish()
+	return t.loadSystemInfoSnapshot(terminalID, func() (*model.SystemInfo, error) {
+		return t.collectSystemInfo(terminalID)
+	})
+}
+
+func (t *TerminalService) collectSystemInfo(terminalID string) (*model.SystemInfo, error) {
 	sessionID, ok := t.terminalSessionID(terminalID)
 	if !ok {
 		return nil, fmt.Errorf("terminal %s not found", terminalID)

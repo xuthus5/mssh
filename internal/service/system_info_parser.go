@@ -24,11 +24,12 @@ func parseSystemInfo(values []string) (*model.SystemInfo, systemSample, error) {
 		return nil, systemSample{}, fmt.Errorf("invalid system info response")
 	}
 	result := &model.SystemInfo{
-		Warnings:   make([]string, 0),
-		Interfaces: make([]model.NetworkInterface, 0),
-		DiskMounts: make([]model.DiskMount, 0),
+		Capabilities: make([]string, 0),
+		Warnings:     make([]string, 0),
+		Interfaces:   make([]model.NetworkInterface, 0),
+		DiskMounts:   make([]model.DiskMount, 0),
 	}
-	sample := systemSample{interfaces: make(map[string]networkCounter)}
+	sample := systemSample{interfaces: make(map[string]networkCounter), roles: make(map[string]string)}
 	for index := 0; index < len(values); {
 		consumed := parseSystemInfoField(result, &sample, values[index:])
 		if consumed < 0 {
@@ -52,6 +53,9 @@ func parseSystemInfo(values []string) (*model.SystemInfo, systemSample, error) {
 
 func parseSystemInfoField(result *model.SystemInfo, sample *systemSample, values []string) int {
 	if len(values) < 2 {
+		if isSystemInfoField(values[0]) {
+			return -1
+		}
 		return 0
 	}
 	valid := true
@@ -175,8 +179,8 @@ func systemInfoValueLength(values []string) int {
 
 func isSystemInfoField(value string) bool {
 	switch value {
-	case "SCHEMA", "SOURCE", "SAMPLE", "WARN", "CPU", "CPUPERCENT", "IOWAIT", "MEMTOTAL",
-		"MEMAVAILABLE", "NET", "NETIF", "DISK", "DISKMOUNT", "LOAD", "UPTIME", "KERNEL", "OS",
+	case "SCHEMA", "SOURCE", "SAMPLE", "CAP", "WARN", "CPU", "CPUPERCENT", "IOWAIT", "MEMTOTAL",
+		"MEMAVAILABLE", "NET", "NETIF", "NETROLE", "DISK", "DISKMOUNT", "LOAD", "UPTIME", "KERNEL", "OS",
 		"CPUCOUNT", "SWAPTOTAL", "SWAPFREE":
 		return true
 	default:

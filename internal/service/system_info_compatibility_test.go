@@ -1,6 +1,7 @@
 package service
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -34,6 +35,7 @@ func TestSystemInfoCommandSupportsDarwinFixtures(t *testing.T) {
 	assert.Equal(t, uint64(2147), sample.transmitted)
 	assert.Equal(t, model.SystemInfoSchemaVersion, info.SchemaVersion)
 	assert.Equal(t, "darwin-sysctl", info.Source)
+	assert.Contains(t, info.Capabilities, "cpu_snapshot")
 	require.Len(t, info.Interfaces, 2)
 	assert.Equal(t, "en0", info.Interfaces[0].Name)
 	assert.Equal(t, "lo0", info.Interfaces[1].Name)
@@ -66,6 +68,24 @@ func TestSystemInfoCommandFiltersPseudoFilesystems(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, info.DiskMounts, 1)
 	assert.Equal(t, "/run/media/demo", info.DiskMounts[0].MountPoint)
+}
+
+func TestSystemInfoCommandLimitsAndDeduplicatesDiskMounts(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("system information probe fixture requires Linux procfs")
+	}
+	var fixture strings.Builder
+	fixture.WriteString("cat <<'EOF'\nFilesystem 1024-blocks Used Available Capacity Mounted on\n")
+	for index := range 130 {
+		_, _ = fmt.Fprintf(&fixture, "/dev/sd%d 1000 400 600 40%% /mnt/disk-%d\n", index, index)
+	}
+	fixture.WriteString("/dev/sd0 1000 400 600 40% /mnt/disk-0\nEOF")
+	output := runProbeCommandWithFixtures(t, systemInfoCommand, map[string]string{"df": fixture.String()})
+
+	info, _, err := parseSystemInfo(strings.Fields(string(output)))
+	require.NoError(t, err)
+	assert.Len(t, info.DiskMounts, 128)
+	assert.Contains(t, info.Warnings, "disk_truncated")
 }
 
 func TestProcessInfoCommandSupportsBusyBoxFallback(t *testing.T) {
@@ -102,6 +122,12 @@ esac`,
 	assert.Equal(t, "root", process.User)
 	assert.Equal(t, "daemon --flag", process.Command)
 	assert.Zero(t, process.MemoryBytes)
+}
+
+func TestProcessCommandLineSanitizerRemovesRecordSeparators(t *testing.T) {
+	output, err := exec.Command("sh", "-c", `printf 'a\0b\tc\nd\re\001f\177g' | `+processCommandLineSanitizer).Output()
+	require.NoError(t, err)
+	assert.Equal(t, "a b c d e f g", string(output))
 }
 
 func TestProcessInfoCommandProducesParsableOutput(t *testing.T) {

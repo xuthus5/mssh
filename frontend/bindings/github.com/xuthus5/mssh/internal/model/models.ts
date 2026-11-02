@@ -2595,6 +2595,7 @@ export class NetworkInterface {
     "download_rate": number;
     "upload_rate": number;
     "virtual": boolean;
+    "role"?: string;
 
     /** Creates a new NetworkInterface instance. */
     constructor($$source: Partial<NetworkInterface> = {}) {
@@ -4587,6 +4588,7 @@ export class SystemInfo {
     "sampled_at_unix_ms": number;
     "sampled_monotonic_ms": number;
     "source": string;
+    "capabilities": string[];
     "warnings": string[];
     "cpu_percent": number;
     "cpu_count": number;
@@ -4605,6 +4607,8 @@ export class SystemInfo {
     "os_name": string;
     "kernel_version": string;
     "latency_ms": number;
+    "sample_sequence": number;
+    "sample_interval_ms": number;
     "interfaces": NetworkInterface[];
     "disk_mounts": DiskMount[];
 
@@ -4621,6 +4625,9 @@ export class SystemInfo {
         }
         if (!("source" in $$source)) {
             this["source"] = "";
+        }
+        if (!("capabilities" in $$source)) {
+            this["capabilities"] = [];
         }
         if (!("warnings" in $$source)) {
             this["warnings"] = [];
@@ -4676,6 +4683,12 @@ export class SystemInfo {
         if (!("latency_ms" in $$source)) {
             this["latency_ms"] = 0;
         }
+        if (!("sample_sequence" in $$source)) {
+            this["sample_sequence"] = 0;
+        }
+        if (!("sample_interval_ms" in $$source)) {
+            this["sample_interval_ms"] = 0;
+        }
         if (!("interfaces" in $$source)) {
             this["interfaces"] = [];
         }
@@ -4691,17 +4704,21 @@ export class SystemInfo {
      */
     static createFrom($$source: any = {}): SystemInfo {
         const $$createField4_0 = $$createType8;
-        const $$createField22_0 = $$createType57;
-        const $$createField23_0 = $$createType59;
+        const $$createField5_0 = $$createType8;
+        const $$createField25_0 = $$createType57;
+        const $$createField26_0 = $$createType59;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("capabilities" in $$parsedSource) {
+            $$parsedSource["capabilities"] = $$createField4_0($$parsedSource["capabilities"]);
+        }
         if ("warnings" in $$parsedSource) {
-            $$parsedSource["warnings"] = $$createField4_0($$parsedSource["warnings"]);
+            $$parsedSource["warnings"] = $$createField5_0($$parsedSource["warnings"]);
         }
         if ("interfaces" in $$parsedSource) {
-            $$parsedSource["interfaces"] = $$createField22_0($$parsedSource["interfaces"]);
+            $$parsedSource["interfaces"] = $$createField25_0($$parsedSource["interfaces"]);
         }
         if ("disk_mounts" in $$parsedSource) {
-            $$parsedSource["disk_mounts"] = $$createField23_0($$parsedSource["disk_mounts"]);
+            $$parsedSource["disk_mounts"] = $$createField26_0($$parsedSource["disk_mounts"]);
         }
         return new SystemInfo($$parsedSource as Partial<SystemInfo>);
     }

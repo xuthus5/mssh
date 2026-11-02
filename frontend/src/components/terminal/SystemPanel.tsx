@@ -57,11 +57,12 @@ function ProcessesView({ processes, query, onQueryChange }: { processes: Process
   </div>
 }
 
-function useSystemInfo(terminalID: string) {
+function useSystemInfo(terminalID: string, active: boolean) {
   const [snapshot, setSnapshot] = useState<TerminalSnapshot<Info> | null>(null)
   const [failedTerminalID, setFailedTerminalID] = useState<string | null>(null)
   const [attempt, setAttempt] = useState(0)
   useEffect(() => {
+    if (!active) return
     let cancelled = false
     let requestID = 0
     let poller: AsyncPoller | null = null
@@ -92,7 +93,7 @@ function useSystemInfo(terminalID: string) {
     poller = new AsyncPoller({ task: load, delayMs: 3000, onError: (error) => logger.error('system info polling failed', error) })
     void poller.start()
     return () => { cancelled = true; requestID += 1; poller?.stop() }
-  }, [terminalID, attempt])
+  }, [active, terminalID, attempt])
   const retry = () => {
     setSnapshot(null)
     setFailedTerminalID(null)
@@ -162,7 +163,7 @@ export function SystemPanel({ terminalID, onClose }: { terminalID: string; onClo
   const panel = useToolPanelResize('system')
   const [tab, setTab] = useState('overview')
   const [query, setQuery] = useState('')
-  const system = useSystemInfo(terminalID)
+  const system = useSystemInfo(terminalID, tab === 'overview')
   const processState = useProcesses(terminalID, tab === 'processes')
   return <aside style={panel.panelStyle} className="absolute inset-y-0 right-0 z-20 flex flex-col border-l border-border bg-card shadow-xl" data-testid="system-panel">
     <div {...panel.resizeHandleProps} className="absolute inset-y-0 -left-1 z-30 w-2 cursor-col-resize touch-none outline-none after:absolute after:inset-y-0 after:left-1/2 after:w-px after:-translate-x-1/2 after:bg-transparent hover:after:bg-primary/60 focus-visible:after:bg-primary active:after:bg-primary" />

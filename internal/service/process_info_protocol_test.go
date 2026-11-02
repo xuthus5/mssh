@@ -2,6 +2,7 @@ package service
 
 import (
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -25,6 +26,7 @@ func TestParseProcessProbeStructured(t *testing.T) {
 	assert.Equal(t, processCPUSourceProcfs, probe.readings[0].info.CPUSource)
 	assert.Equal(t, uint64(100), probe.readings[0].ticks)
 	assert.Equal(t, uint64(50), probe.readings[0].startTicks)
+	assert.Equal(t, 1, probe.schema)
 }
 
 func TestParseProcessProbeFallsBackToPSRows(t *testing.T) {
@@ -37,12 +39,35 @@ func TestParseProcessProbeFallsBackToPSRows(t *testing.T) {
 func TestParseProcessProbeHeaderRejectsMalformedValues(t *testing.T) {
 	probe := processProbe{}
 	assert.True(t, parseProcessProbeHeader(&probe, []string{"SCHEMA", "1"}))
+	assert.Equal(t, 1, probe.schema)
 	assert.True(t, parseProcessProbeHeader(&probe, []string{"MODE"}))
 	assert.True(t, parseProcessProbeHeader(&probe, []string{"CPUCOUNT", "invalid"}))
 	assert.True(t, parseProcessProbeHeader(&probe, []string{"CPUTOTAL", "invalid"}))
 	assert.False(t, parseProcessProbeHeader(&probe, []string{"UNKNOWN"}))
 	assert.Zero(t, probe.cpuCount)
 	assert.Zero(t, probe.totalTicks)
+}
+
+func TestParseProcessProbeHeaderRejectsInvalidSchema(t *testing.T) {
+	tests := []struct {
+		fields []string
+		want   int
+	}{
+		{fields: []string{"SCHEMA"}, want: -1},
+		{fields: []string{"SCHEMA", "invalid"}, want: -1},
+		{fields: []string{"SCHEMA", "2"}, want: 2},
+	}
+	for _, test := range tests {
+		probe := processProbe{}
+		assert.True(t, parseProcessProbeHeader(&probe, test.fields))
+		assert.Equal(t, test.want, probe.schema)
+	}
+}
+
+func TestTruncateProcessCommand(t *testing.T) {
+	assert.Equal(t, "short", truncateProcessCommand("short"))
+	command := strings.Repeat("x", maxProcessCommandBytes+1)
+	assert.Len(t, truncateProcessCommand(command), maxProcessCommandBytes)
 }
 
 func TestParseProcReadingRejectsMalformedRows(t *testing.T) {
@@ -161,4 +186,23 @@ func TestTerminalServiceProcessInfoReturnsProbeFailure(t *testing.T) {
 	service.sessionIDs["term-1"] = 1
 	_, err := service.ProcessInfo("term-1")
 	require.ErrorContains(t, err, "process probe failed")
+}
+
+func TestTerminalServiceProcessInfoRejectsUnsupportedSchema(t *testing.T) {
+	originalCommand := _runSystemInfoCommand
+	originalProbe := _openSystemProbeConnection
+	t.Cleanup(func() {
+		_runSystemInfoCommand = originalCommand
+		_openSystemProbeConnection = originalProbe
+	})
+	_openSystemProbeConnection = func(_ *SessionService, _ int64) (*ssh.ClientWrapper, func(), error) {
+		return &ssh.ClientWrapper{}, func() {}, nil
+	}
+	_runSystemInfoCommand = func(_ *ssh.ClientWrapper, _ string) ([]byte, error) {
+		return []byte("SCHEMA 2\nMODE procfs\nCPUCOUNT 4\nCPUTOTAL 1000\nPROC\t10\t1\troot\tS\t1024\t100\t50\ttmux\n"), nil
+	}
+	service := NewTerminalService(&SessionService{}, newMockEventBus(), 2, testutil.NewTestLogger())
+	service.sessionIDs["term-1"] = 1
+	_, err := service.ProcessInfo("term-1")
+	require.ErrorContains(t, err, "unsupported process info schema 2")
 }

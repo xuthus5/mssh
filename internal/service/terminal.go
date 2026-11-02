@@ -47,6 +47,7 @@ type TerminalService struct {
 	systemMu                       sync.Mutex
 	systemSamples                  map[string]systemSample
 	systemProcessSamples           map[string]processSample
+	systemInfoSnapshots            map[string]*systemInfoSnapshot
 	operationWG                    sync.WaitGroup
 	terminalDirectoryIntegrationWG sync.WaitGroup
 	exitMu                         sync.Mutex
@@ -120,6 +121,7 @@ func NewTerminalService(sessionSvc *SessionService, eventBus EventBus, maxSize i
 		logger:                 logger,
 		systemSamples:          make(map[string]systemSample),
 		systemProcessSamples:   make(map[string]processSample),
+		systemInfoSnapshots:    make(map[string]*systemInfoSnapshot),
 		outputBatchCfg:         terminalOutputBatchConfigFromEnv(),
 		lifecycleContext:       lifecycleContext,
 		lifecycleCancel:        lifecycleCancel,
