@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { SystemPanel } from '@/components/terminal/SystemPanel'
@@ -42,6 +42,18 @@ describe('SystemPanel', () => {
     expect((await screen.findAllByText('tmux')).length).toBeGreaterThan(0)
     await user.type(screen.getByPlaceholderText('搜索 PID、用户或命令'), 'vim')
     expect(screen.getAllByText('vim').length).toBeGreaterThan(0)
+  })
+
+  it('shows separate CPU and memory columns for processes', async () => {
+    const user = userEvent.setup()
+    render(<SystemPanel terminalID="term-columns" onClose={vi.fn()} />)
+    await user.click(screen.getByRole('tab', { name: '进程' }))
+    const table = await screen.findByTestId('process-table')
+    expect(within(table).getByText('CPU')).toBeInTheDocument()
+    expect(within(table).getByText('内存')).toBeInTheDocument()
+    expect(within(table).getByText('9.5%')).toBeInTheDocument()
+    expect(within(table).getByText('1M')).toBeInTheDocument()
+    expect(within(table).getByText('2M')).toBeInTheDocument()
   })
 
   it('shows collection errors without throwing and supports retry', async () => {

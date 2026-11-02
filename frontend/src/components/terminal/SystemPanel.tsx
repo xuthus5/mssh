@@ -93,14 +93,14 @@ function Rank({ title, rows, cpu = false }: { title: string; rows: Process[]; cp
 }
 
 function ProcessTable({ processes }: { processes: Process[] }) {
-  return <div className="overflow-hidden rounded-xl border border-border shadow-sm">
-    <div className="grid grid-cols-[55px_70px_1fr_65px] gap-2 bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-      <span>PID</span><span>{t('用户')}</span><span>{t('命令')}</span><span>{t('资源')}</span>
+  return <div data-testid="process-table" className="overflow-hidden rounded-xl border border-border shadow-sm">
+    <div className="grid grid-cols-[55px_70px_1fr_55px_70px] gap-2 bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+      <span>PID</span><span>{t('用户')}</span><span>{t('命令')}</span><span>{t('CPU')}</span><span>{t('内存')}</span>
     </div>
-    {processes.map((process) => <div key={process.pid} className="grid grid-cols-[55px_70px_1fr_65px] gap-2 border-t border-border px-3 py-2 text-xs">
+    {processes.map((process) => <div key={process.pid} className="grid grid-cols-[55px_70px_1fr_55px_70px] gap-2 border-t border-border px-3 py-2 text-xs">
       <span>{process.pid}</span><span className="truncate">{process.user}</span>
       <span className="truncate" title={process.command}>{process.command}</span>
-      <span className="tabular-nums">{process.cpu_percent.toFixed(1)}%</span>
+      <span className="tabular-nums">{process.cpu_percent.toFixed(1)}%</span><span className="tabular-nums">{formatBytes(process.memory_bytes)}</span>
     </div>)}
   </div>
 }
