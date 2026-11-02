@@ -3,22 +3,46 @@ package service
 const systemInfoCommand = `LC_ALL=C
 export LC_ALL
 
-emit_disk() {
-  df -Pk / 2>/dev/null | awk 'NR == 2 {printf "DISK %.0f %.0f\n", $3 * 1024, $2 * 1024; found = 1} END {if (!found) print "DISK 0 0"}'
+protocol_header() {
+  source_name="$1"
+  monotonic_ms=0
+  if [ "$source_name" = "linux-procfs" ]; then
+    monotonic_ms="$(awk '{printf "%.0f", $1 * 1000}' /proc/uptime 2>/dev/null)"
+    case "$monotonic_ms" in ''|*[!0-9]*) monotonic_ms=0 ;; esac
+  fi
+  epoch_ms="$(date +%s 2>/dev/null)"
+  case "$epoch_ms" in ''|*[!0-9]*) epoch_ms=0 ;; *) epoch_ms=$((epoch_ms * 1000)) ;; esac
+  printf 'SCHEMA 1\nSOURCE %s\nSAMPLE %s %s\n' "$source_name" "$epoch_ms" "$monotonic_ms"
+}
+
+emit_disks() {
+  df -Pk 2>/dev/null | awk 'function escape(value) {gsub(/ /, "\\040", value); return value}
+  NR > 1 {
+    device = $1
+    mount = $6
+    for (position = 7; position <= NF; position++) mount = mount " " $position
+    if (device ~ /^(tmpfs|devtmpfs|proc|procfs|sysfs|cgroup.*|mqueue|shm|ramfs|none|map|devfs|udev|autofs|debugfs|tracefs|securityfs|pstore|bpf|hugetlbfs|configfs|fusectl|binfmt_misc)$/) next
+    used = $3 * 1024
+    total = $2 * 1024
+    available = $4 * 1024
+    printf "DISKMOUNT %s %s %.0f %.0f %.0f\n", escape(device), escape(mount), used, total, available
+    if (mount == "/") printf "DISK %.0f %.0f\n", used, total
+  }'
 }
 
 emit_cpu_count() {
   count="$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN 2>/dev/null || awk '/^processor[[:space:]]*:/ {count++} END {print count}' /proc/cpuinfo 2>/dev/null)"
-  case "$count" in ''|*[!0-9]*|0) count=1 ;; esac
+  case "$count" in ''|*[!0-9]*|0) return ;; esac
   printf 'CPUCOUNT %s\n' "$count"
 }
 
 emit_linux() {
-  awk '{print "LOAD", $1, $2, $3}' /proc/loadavg 2>/dev/null || printf 'LOAD 0 0 0\n'
-  awk '{print "UPTIME", $1}' /proc/uptime 2>/dev/null || printf 'UPTIME 0\n'
+  protocol_header linux-procfs
+  awk '{printf "LOAD %s %s %s\n", $1, $2, $3}' /proc/loadavg 2>/dev/null
+  awk '{printf "UPTIME %.0f\n", $1}' /proc/uptime 2>/dev/null
   printf 'KERNEL '
   uname -r 2>/dev/null || printf 'unknown\n'
-  awk '/^cpu / {print "CPU", $2+$3+$4+$5+$6+$7+$8+$9, $5+$6; found=1; exit} END {if (!found) print "CPU 0 0"}' /proc/stat 2>/dev/null
+  awk '/^cpu / {total=0; for (i=2; i<=9; i++) total+=$i; printf "CPU %.0f %.0f\nIOWAIT %.0f\n", total, $5, $6; found=1; exit} END {if (!found) exit 0}' /proc/stat 2>/dev/null
   awk '
     /^MemTotal:/ {total=$2*1024}
     /^MemAvailable:/ {available=$2*1024; has_available=1}
@@ -28,12 +52,13 @@ emit_linux() {
     /^SwapTotal:/ {swap_total=$2*1024}
     /^SwapFree:/ {swap_free=$2*1024}
     END {
+      if (total <= 0) exit 0
       if (!has_available) available=(free+buffers+cached)*1024
       if (available > total) available=total
       printf "MEMTOTAL %.0f\nMEMAVAILABLE %.0f\nSWAPTOTAL %.0f\nSWAPFREE %.0f\n", total, available, swap_total, swap_free
     }' /proc/meminfo 2>/dev/null
-  awk 'NR > 2 {rx+=$2; tx+=$10} END {printf "NET %.0f %.0f\n", rx, tx}' /proc/net/dev 2>/dev/null
-  emit_disk
+  awk 'NR > 2 {name=$1; sub(/:$/, "", name); printf "NETIF %s %.0f %.0f\n", name, $2, $10}' /proc/net/dev 2>/dev/null
+  emit_disks
   emit_cpu_count
   if [ -r /etc/os-release ]; then
     awk -F= '/^PRETTY_NAME=/ {value=substr($0,index($0,"=")+1); sub(/^"/,"",value); sub(/"$/,"",value); print "OS",value; found=1; exit} END {if (!found) print "OS Linux"}' /etc/os-release
@@ -43,7 +68,8 @@ emit_linux() {
 }
 
 emit_darwin() {
-  sysctl -n vm.loadavg 2>/dev/null | tr -d '{}' | awk 'NF >= 3 {print "LOAD", $1, $2, $3; found=1} END {if (!found) print "LOAD 0 0 0"}'
+  protocol_header darwin-sysctl
+  sysctl -n vm.loadavg 2>/dev/null | tr -d '{}' | awk 'NF >= 3 {print "LOAD", $1, $2, $3; found=1} END {if (!found) exit 0}'
   boot_time="$(sysctl -n kern.boottime 2>/dev/null | awk -F'[=,]' '{value=$2; gsub(/[^0-9]/,"",value); print value; exit}')"
   now="$(date +%s 2>/dev/null)"
   case "$boot_time:$now" in *[!0-9:]*|:*) uptime=0 ;; *) uptime=$((now - boot_time)) ;; esac
@@ -51,7 +77,7 @@ emit_darwin() {
   printf 'UPTIME %s\n' "$uptime"
   printf 'KERNEL '
   uname -r 2>/dev/null || printf 'unknown\n'
-  top -l 1 -n 0 2>/dev/null | awk -F'[:,% ]+' '/CPU usage/ {value=$3+$5; if (value < 0) value=0; if (value > 100) value=100; print "CPUPERCENT", value; found=1; exit} END {if (!found) print "CPUPERCENT 0"}'
+  top -l 1 -n 0 2>/dev/null | awk -F'[:,% ]+' '/CPU usage/ {value=$3+$5; if (value < 0) value=0; if (value > 100) value=100; print "CPUPERCENT", value; found=1; exit} END {if (!found) exit 0}'
   memory_total="$(sysctl -n hw.memsize 2>/dev/null)"
   case "$memory_total" in ''|*[!0-9]*) memory_total=0 ;; esac
   vm_stat 2>/dev/null | awk -v total="$memory_total" '
@@ -59,13 +85,13 @@ emit_darwin() {
     /^Pages free:/ {free=$3; gsub(/[^0-9]/,"",free)}
     /^Pages inactive:/ {inactive=$3; gsub(/[^0-9]/,"",inactive)}
     /^Pages speculative:/ {speculative=$3; gsub(/[^0-9]/,"",speculative)}
-    END {available=(free+inactive+speculative)*page; if (available > total) available=total; printf "MEMTOTAL %.0f\nMEMAVAILABLE %.0f\n", total, available}'
+    END {if (total <= 0) exit 0; available=(free+inactive+speculative)*page; if (available > total) available=total; printf "MEMTOTAL %.0f\nMEMAVAILABLE %.0f\n", total, available}'
   sysctl -n vm.swapusage 2>/dev/null | awk '
     function bytes(value, amount, unit) {amount=value+0; unit=substr(value,length(value),1); if (unit=="K") return amount*1024; if (unit=="M") return amount*1048576; if (unit=="G") return amount*1073741824; if (unit=="T") return amount*1099511627776; return amount}
     {for (position=1; position<=NF; position++) {if ($position=="total") total=bytes($(position+2)); if ($position=="free") free=bytes($(position+2))}}
     END {printf "SWAPTOTAL %.0f\nSWAPFREE %.0f\n", total, free}'
-  netstat -ibdn 2>/dev/null | awk 'NR > 1 && $1 != "lo0" && !seen[$1]++ && $7 ~ /^[0-9]+$/ && $10 ~ /^[0-9]+$/ {rx+=$7; tx+=$10} END {printf "NET %.0f %.0f\n", rx, tx}'
-  emit_disk
+  netstat -ibdn 2>/dev/null | awk 'NR > 1 && !seen[$1]++ && $7 ~ /^[0-9]+$/ && $10 ~ /^[0-9]+$/ {printf "NETIF %s %s %s\n", $1, $7, $10}'
+  emit_disks
   count="$(sysctl -n hw.ncpu 2>/dev/null)"
   case "$count" in ''|*[!0-9]*|0) emit_cpu_count ;; *) printf 'CPUCOUNT %s\n' "$count" ;; esac
   product="$(sw_vers -productName 2>/dev/null)"
@@ -74,17 +100,10 @@ emit_darwin() {
 }
 
 emit_portable() {
-  printf 'LOAD 0 0 0\n'
-  printf 'UPTIME 0\n'
+  protocol_header portable
   printf 'KERNEL '
   uname -r 2>/dev/null || printf 'unknown\n'
-  printf 'CPUPERCENT 0\n'
-  printf 'MEMTOTAL 0\n'
-  printf 'MEMAVAILABLE 0\n'
-  printf 'SWAPTOTAL 0\n'
-  printf 'SWAPFREE 0\n'
-  printf 'NET 0 0\n'
-  emit_disk
+  emit_disks
   emit_cpu_count
   printf 'OS '
   uname -s 2>/dev/null || printf 'Unix\n'
@@ -95,62 +114,3 @@ case "$(uname -s 2>/dev/null)" in
   Darwin) emit_darwin ;;
   *) emit_portable ;;
 esac`
-
-const processInfoCommand = `LC_ALL=C
-export LC_ALL
-if ps -eo pid=,ppid=,user=,state=,%cpu=,rss=,comm= >/dev/null 2>&1; then
-  exec ps -eo pid=,ppid=,user=,state=,%cpu=,rss=,comm=
-fi
-if ps ax -o pid=,ppid=,user=,state=,%cpu=,rss=,comm= >/dev/null 2>&1; then
-  exec ps ax -o pid=,ppid=,user=,state=,%cpu=,rss=,comm=
-fi
-if ps -o pid,ppid,user,stat,rss,comm >/dev/null 2>&1; then
-  ps -o pid,ppid,user,stat,rss,comm | awk 'NR > 1 {print $1, $2, $3, substr($4,1,1), 0, $5, $6}'
-  exit 0
-fi
-if ps -o pid,ppid,user,stat,vsz,comm >/dev/null 2>&1; then
-  ps -o pid,ppid,user,stat,vsz,comm | awk 'NR > 1 {print $1, $2, $3, substr($4,1,1), 0, $5, $6}'
-  exit 0
-fi
-if ps -ef >/dev/null 2>&1; then
-  ps -ef | awk 'NR > 1 && NF >= 8 {command=$8; for (position=9; position<=NF; position++) command=command " " $position; print $2, $3, $1, "?", 0, 0, command}'
-  exit 0
-fi
-exit 1`
-
-const listeningPortsCommand = `LC_ALL=C
-export LC_ALL
-if command -v ss >/dev/null 2>&1; then
-  if output="$(ss -H -lntup 2>/dev/null)"; then
-    printf '%s\n' "$output" | awk '
-      NF >= 6 {
-        process = ""
-        if (NF >= 7) {
-          process = $7
-          for (position = 8; position <= NF; position++) process = process " " $position
-        }
-        printf "PORT\t%s\t%s\t%s\n", $1, $5, process
-      }'
-    exit 0
-  fi
-fi
-if command -v netstat >/dev/null 2>&1; then
-  if output="$(netstat -lntup 2>/dev/null)"; then
-    printf '%s\n' "$output" | awk '
-      $1 ~ /^(tcp|udp)/ && NF >= 7 {
-        process = $7
-        for (position = 8; position <= NF; position++) process = process " " $position
-        printf "PORT\t%s\t%s\t%s\n", $1, $4, process
-      }'
-    exit 0
-  fi
-fi
-if command -v lsof >/dev/null 2>&1; then
-  lsof -nP -iTCP -sTCP:LISTEN -F pcn 2>/dev/null | awk '
-    /^p/ {pid=substr($0,2)}
-    /^c/ {name=substr($0,2)}
-    /^n/ {address=substr($0,2); if (address != "") printf "PORT\ttcp\t%s\t%s/%s\n", address, pid, name}
-  '
-  exit 0
-fi
-exit 1`

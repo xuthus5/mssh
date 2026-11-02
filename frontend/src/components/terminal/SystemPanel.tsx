@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Cpu, HardDrive, MemoryStick, Network, Server, X } from 'lucide-react'
+import { Server, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -11,78 +11,14 @@ import { t } from '@/i18n'
 import { isTerminalGone } from '@/lib/terminalGone'
 import { ContainerPanel } from '@/components/terminal/container/ContainerPanel'
 import { ListeningPanel } from '@/components/terminal/listener/ListeningPanel'
-
-
-type Info = {
-  cpu_percent: number; cpu_count: number; memory_used: number; memory_total: number
-  disk_used: number; disk_total: number; download_rate: number; upload_rate: number
-  swap_used: number; swap_total: number; load_1: number; load_5: number; load_15: number
-  uptime_seconds: number; os_name: string; kernel_version: string
-}
+import { Overview, formatBytes, type Info } from '@/components/terminal/SystemOverview'
 
 type Process = {
   pid: number; ppid: number; user: string; state: string
-  cpu_percent: number; memory_bytes: number; command: string
+  cpu_percent: number; memory_bytes: number; command: string; cpu_source?: string
 }
 
 type TerminalSnapshot<T> = { terminalID: string; value: T }
-
-const BYTE_UNITS = ['B', 'K', 'M', 'G', 'T'] as const
-
-function formatBytes(value: number) {
-  if (!Number.isFinite(value) || value <= 0) return '0B'
-  let amount = value
-  let unit = 0
-  while (amount >= 1024 && unit < BYTE_UNITS.length - 1) {
-    amount /= 1024
-    unit += 1
-  }
-  const precision = unit === 0 || amount >= 100 ? 0 : 1
-  return `${amount.toFixed(precision).replace(/\.0$/, '')}${BYTE_UNITS[unit]}`
-}
-
-function formatDuration(seconds: number) {
-  const days = Math.floor(seconds / 86400)
-  const hours = Math.floor(seconds % 86400 / 3600)
-  const minutes = Math.floor(seconds % 3600 / 60)
-  return `${days}d ${hours}h ${minutes}m`
-}
-
-function Metric({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
-  return <div className="rounded-xl border border-border bg-background/50 p-3 shadow-sm">
-    <div className="flex items-center gap-2 text-xs text-muted-foreground [&_svg]:size-3.5">{icon}{label}</div>
-    <div className="mt-2 text-sm font-semibold tabular-nums">{value}</div>
-  </div>
-}
-
-function DetailItem({ label, value, wide = false }: { label: string; value: string; wide?: boolean }) {
-  return <div className={`flex min-w-0 items-start gap-2 ${wide ? 'col-span-2' : ''}`}>
-    <span className="shrink-0 text-muted-foreground">{label}</span>
-    <span className="min-w-0 break-words text-foreground" title={value}>{value}</span>
-  </div>
-}
-
-function Overview({ info }: { info: Info }) {
-  const network = `↓${formatBytes(info.download_rate)}/s ↑${formatBytes(info.upload_rate)}/s`
-  return <div className="space-y-4">
-    <div className="grid grid-cols-2 gap-2">
-      <Metric icon={<Cpu />} label="CPU" value={`${info.cpu_percent.toFixed(0)}% (${info.cpu_count}c)`} />
-      <Metric icon={<MemoryStick />} label={t('内存')} value={`${formatBytes(info.memory_used)}/${formatBytes(info.memory_total)}`} />
-      <Metric icon={<HardDrive />} label={t('磁盘')} value={`${formatBytes(info.disk_used)}/${formatBytes(info.disk_total)}`} />
-      <Metric icon={<Network />} label={t('网络')} value={network} />
-    </div>
-    <section className="rounded-xl border border-border bg-background/30 p-3 text-xs shadow-sm">
-      <div className="mb-3 font-medium">{t('系统详情')}</div>
-      <div className="grid grid-cols-2 gap-x-4 gap-y-2.5">
-        <DetailItem label={t('负载')} value={`${info.load_1.toFixed(2)} / ${info.load_5.toFixed(2)} / ${info.load_15.toFixed(2)}`} />
-        <DetailItem label={t('运行')} value={formatDuration(info.uptime_seconds)} />
-        <DetailItem label={t('系统')} value={info.os_name || 'Linux'} wide />
-        <DetailItem label={t('内核')} value={info.kernel_version || t('未知')} wide />
-        <DetailItem label="Swap" value={`${formatBytes(info.swap_used)}/${formatBytes(info.swap_total)}`} wide />
-      </div>
-    </section>
-  </div>
-}
 
 function Rank({ title, rows, cpu = false }: { title: string; rows: Process[]; cpu?: boolean }) {
   return <div className="rounded-xl border border-border p-3 shadow-sm">
@@ -111,8 +47,11 @@ function ProcessesView({ processes, query, onQueryChange }: { processes: Process
   const filtered = useMemo(() => processes.filter((process) => `${process.pid} ${process.user} ${process.command}`.toLowerCase().includes(query.toLowerCase())), [processes, query])
   const cpuTop = useMemo(() => processes.slice().sort((left, right) => right.cpu_percent - left.cpu_percent).slice(0, 5), [processes])
   const memoryTop = useMemo(() => processes.slice().sort((left, right) => right.memory_bytes - left.memory_bytes).slice(0, 5), [processes])
+  const fallbackCPU = processes.some((process) => process.cpu_source === 'ps_average')
   return <div className="space-y-3">
     <Input value={query} onChange={(event) => onQueryChange(event.target.value)} placeholder={t('搜索 PID、用户或命令')} />
+    <p className="text-[11px] text-muted-foreground">{t('CPU 为采样间隔内的瞬时占用，首次采样可能为 0。')}</p>
+    {fallbackCPU ? <p data-testid="process-cpu-fallback" className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-2 text-[11px] text-amber-700 dark:text-amber-300">{t('当前系统仅能提供 ps 生命周期平均 CPU，非采样间隔瞬时值。')}</p> : null}
     <div className="grid grid-cols-2 gap-3"><Rank title="CPU Top 5" rows={cpuTop} cpu /><Rank title={t('内存 Top 5')} rows={memoryTop} /></div>
     <ProcessTable processes={filtered} />
   </div>

@@ -27,6 +27,35 @@ describe('SystemPanel', () => {
     expect(terminalService.SystemInfo).toHaveBeenCalledWith('term-1')
   })
 
+  it('renders protocol metadata, warnings, network interfaces, and disk mounts', async () => {
+    terminalService.SystemInfo.mockResolvedValue({
+      ...systemInfo,
+      schema_version: 1,
+      source: 'linux-procfs',
+      latency_ms: 18.6,
+      warnings: ['disk_unavailable', 'custom_warning'],
+      interfaces: [
+        { name: 'eth0', received_bytes: 4096, transmitted_bytes: 2048, download_rate: 1024, upload_rate: 512, virtual: false },
+        { name: 'lo', received_bytes: 10, transmitted_bytes: 20, download_rate: 0, upload_rate: 0, virtual: true },
+      ],
+      disk_mounts: [{ device: '/dev/sda1', mount_point: '/', used_bytes: 10 * 1024 ** 3, total_bytes: 100 * 1024 ** 3, available_bytes: 90 * 1024 ** 3 }],
+    })
+    render(<SystemPanel terminalID="term-protocol" onClose={vi.fn()} />)
+
+    const warnings = await screen.findByTestId('system-warnings')
+    expect(warnings).toHaveTextContent('磁盘指标不可用')
+    expect(warnings).toHaveTextContent('custom_warning')
+    expect(screen.getByText('linux-procfs · v1')).toBeInTheDocument()
+    expect(screen.getByText('19ms')).toBeInTheDocument()
+    const network = screen.getByTestId('network-interfaces')
+    expect(within(network).getByText('eth0')).toBeInTheDocument()
+    expect(within(network).getByText('虚拟')).toBeInTheDocument()
+    expect(within(network).getByText('1K/s')).toBeInTheDocument()
+    const disks = screen.getByTestId('disk-mounts')
+    expect(within(disks).getByText('/')).toBeInTheDocument()
+    expect(within(disks).getByText('/dev/sda1')).toBeInTheDocument()
+  })
+
   it.each([
     [512, 1024, '↓512B/s ↑1K/s'],
     [1536, 2 * 1024 ** 2, '↓1.5K/s ↑2M/s'],
@@ -68,6 +97,13 @@ describe('SystemPanel', () => {
     expect(within(table).getByText('9.5%')).toBeInTheDocument()
     expect(within(table).getByText('1M')).toBeInTheDocument()
     expect(within(table).getByText('2M')).toBeInTheDocument()
+  })
+
+  it('marks ps-average CPU fallback explicitly', async () => {
+    terminalService.ProcessInfo.mockResolvedValue(processInfo.map((process) => ({ ...process, cpu_source: 'ps_average' })))
+    render(<SystemPanel terminalID="term-cpu-fallback" onClose={vi.fn()} />)
+    await userEvent.click(screen.getByRole('tab', { name: '进程' }))
+    expect(await screen.findByTestId('process-cpu-fallback')).toHaveTextContent('非采样间隔瞬时值')
   })
 
   it('shows collection errors without throwing and supports retry', async () => {

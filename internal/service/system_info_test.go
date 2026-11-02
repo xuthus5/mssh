@@ -23,23 +23,39 @@ func TestSystemInfoCommandProducesParsableOutput(t *testing.T) {
 	require.NoError(t, err)
 	info, _, err := parseSystemInfo(strings.Fields(string(output)))
 	require.NoError(t, err)
+	require.Equal(t, model.SystemInfoSchemaVersion, info.SchemaVersion)
+	require.NotEmpty(t, info.Source)
 	require.Positive(t, info.CPUCount)
 	require.NotEmpty(t, info.OSName)
 }
 
 func TestParseSystemInfo(t *testing.T) {
 	info, sample, err := parseSystemInfo([]string{
-		"CPU", "100", "20", "MEMTOTAL", "8589934592", "MEMAVAILABLE", "4294967296",
-		"NET", "1024", "2048", "DISK", "107374182400", "536870912000", "CPUCOUNT", "4",
+		"SCHEMA", "1", "SOURCE", "linux-procfs", "SAMPLE", "1700000000000", "123000",
+		"CPU", "100", "20", "IOWAIT", "5", "MEMTOTAL", "8589934592", "MEMAVAILABLE", "4294967296",
+		"NETIF", "eth0", "1024", "2048", "NETIF", "lo", "10", "20",
+		"DISKMOUNT", "/dev/sda1", "/", "107374182400", "536870912000", "400000000000", "CPUCOUNT", "4",
 	})
 	require.NoError(t, err)
+	require.Equal(t, 1, info.SchemaVersion)
+	require.Equal(t, "linux-procfs", info.Source)
+	require.Equal(t, int64(1700000000000), info.SampledAtUnixMS)
+	require.Equal(t, uint64(123000), info.SampledMonotonicMS)
 	require.Equal(t, 4, info.CPUCount)
 	require.Equal(t, uint64(8589934592), info.MemoryTotal)
 	require.Equal(t, uint64(4294967296), info.MemoryUsed)
 	require.Equal(t, uint64(107374182400), info.DiskUsed)
 	require.Equal(t, uint64(536870912000), info.DiskTotal)
-	require.Equal(t, uint64(1024), sample.received)
-	require.Equal(t, uint64(2048), sample.transmitted)
+	require.Equal(t, uint64(1034), sample.received)
+	require.Equal(t, uint64(2068), sample.transmitted)
+	require.Equal(t, uint64(5), sample.iowait)
+	require.Len(t, info.Interfaces, 2)
+	require.Equal(t, "eth0", info.Interfaces[0].Name)
+	require.False(t, info.Interfaces[0].Virtual)
+	require.Equal(t, "lo", info.Interfaces[1].Name)
+	require.True(t, info.Interfaces[1].Virtual)
+	require.Len(t, info.DiskMounts, 1)
+	require.Equal(t, "/", info.DiskMounts[0].MountPoint)
 }
 
 func TestParseSystemInfoPreservesMultiWordOSName(t *testing.T) {
@@ -228,9 +244,11 @@ func TestCPUPercent(t *testing.T) {
 	previous := systemSample{total: 100, idle: 40}
 	current := systemSample{total: 200, idle: 80}
 	require.Equal(t, 60.0, cpuPercent(previous, current))
+	require.Equal(t, 50.0, cpuPercent(systemSample{total: 100, idle: 40, iowait: 10}, systemSample{total: 200, idle: 80, iowait: 20}))
 	require.Zero(t, cpuPercent(systemSample{total: 1, idle: 1}, systemSample{total: 1, idle: 1}))
 	require.Zero(t, cpuPercent(systemSample{total: 200, idle: 80}, systemSample{total: 100, idle: 40}))
 	require.Zero(t, cpuPercent(systemSample{total: 100, idle: 20}, systemSample{total: 110, idle: 40}))
+	require.Zero(t, cpuPercent(systemSample{total: 100, idle: 20, iowait: 10}, systemSample{total: 110, idle: 20, iowait: 5}))
 }
 
 func TestByteRate(t *testing.T) {
@@ -313,7 +331,7 @@ func TestTerminalServiceProcessInfo(t *testing.T) {
 
 	processes, err := service.ProcessInfo("term-1")
 	require.NoError(t, err)
-	require.Equal(t, []model.ProcessInfo{{PID: 10, PPID: 1, User: "root", State: "S", CPUPercent: 9.5, RSSBytes: 1024 * 1024, MemoryBytes: 1024 * 1024, Command: "tmux server"}}, processes)
+	require.Equal(t, []model.ProcessInfo{{PID: 10, PPID: 1, User: "root", State: "S", CPUPercent: 9.5, RSSBytes: 1024 * 1024, MemoryBytes: 1024 * 1024, Command: "tmux server", CPUSource: processCPUSourcePS}}, processes)
 }
 
 func TestTerminalServiceProcessInfoErrors(t *testing.T) {

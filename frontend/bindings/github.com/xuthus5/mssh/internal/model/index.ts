@@ -58,6 +58,7 @@ export {
     ContainerInfo,
     ContainerOverview,
     CursorStyle,
+    DiskMount,
     GistOAuthResult,
     GistOAuthStart,
     GistOAuthStatus,

@@ -1,24 +1,32 @@
 package model
 
+const SystemInfoSchemaVersion = 1
+
 type SystemInfo struct {
-	CPUPercent    float64            `json:"cpu_percent"`
-	CPUCount      int                `json:"cpu_count"`
-	MemoryUsed    uint64             `json:"memory_used"`
-	MemoryTotal   uint64             `json:"memory_total"`
-	DiskUsed      uint64             `json:"disk_used"`
-	DiskTotal     uint64             `json:"disk_total"`
-	DownloadRate  uint64             `json:"download_rate"`
-	UploadRate    uint64             `json:"upload_rate"`
-	SwapUsed      uint64             `json:"swap_used"`
-	SwapTotal     uint64             `json:"swap_total"`
-	Load1         float64            `json:"load_1"`
-	Load5         float64            `json:"load_5"`
-	Load15        float64            `json:"load_15"`
-	UptimeSeconds int64              `json:"uptime_seconds"`
-	OSName        string             `json:"os_name"`
-	KernelVersion string             `json:"kernel_version"`
-	LatencyMS     float64            `json:"latency_ms"`
-	Interfaces    []NetworkInterface `json:"interfaces"`
+	SchemaVersion      int                `json:"schema_version"`
+	SampledAtUnixMS    int64              `json:"sampled_at_unix_ms"`
+	SampledMonotonicMS uint64             `json:"sampled_monotonic_ms"`
+	Source             string             `json:"source"`
+	Warnings           []string           `json:"warnings"`
+	CPUPercent         float64            `json:"cpu_percent"`
+	CPUCount           int                `json:"cpu_count"`
+	MemoryUsed         uint64             `json:"memory_used"`
+	MemoryTotal        uint64             `json:"memory_total"`
+	DiskUsed           uint64             `json:"disk_used"`
+	DiskTotal          uint64             `json:"disk_total"`
+	DownloadRate       uint64             `json:"download_rate"`
+	UploadRate         uint64             `json:"upload_rate"`
+	SwapUsed           uint64             `json:"swap_used"`
+	SwapTotal          uint64             `json:"swap_total"`
+	Load1              float64            `json:"load_1"`
+	Load5              float64            `json:"load_5"`
+	Load15             float64            `json:"load_15"`
+	UptimeSeconds      int64              `json:"uptime_seconds"`
+	OSName             string             `json:"os_name"`
+	KernelVersion      string             `json:"kernel_version"`
+	LatencyMS          float64            `json:"latency_ms"`
+	Interfaces         []NetworkInterface `json:"interfaces"`
+	DiskMounts         []DiskMount        `json:"disk_mounts"`
 }
 
 type NetworkInterface struct {
@@ -27,6 +35,15 @@ type NetworkInterface struct {
 	TransmittedBytes uint64 `json:"transmitted_bytes"`
 	DownloadRate     uint64 `json:"download_rate"`
 	UploadRate       uint64 `json:"upload_rate"`
+	Virtual          bool   `json:"virtual"`
+}
+
+type DiskMount struct {
+	Device         string `json:"device"`
+	MountPoint     string `json:"mount_point"`
+	UsedBytes      uint64 `json:"used_bytes"`
+	TotalBytes     uint64 `json:"total_bytes"`
+	AvailableBytes uint64 `json:"available_bytes"`
 }
 
 type ProcessInfo struct {
@@ -38,4 +55,5 @@ type ProcessInfo struct {
 	MemoryBytes uint64  `json:"memory_bytes"`
 	RSSBytes    uint64  `json:"rss_bytes"`
 	Command     string  `json:"command"`
+	CPUSource   string  `json:"cpu_source"`
 }

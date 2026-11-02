@@ -2117,6 +2117,43 @@ export enum CursorStyle {
     CursorStyleBar = "bar",
 };
 
+export class DiskMount {
+    "device": string;
+    "mount_point": string;
+    "used_bytes": number;
+    "total_bytes": number;
+    "available_bytes": number;
+
+    /** Creates a new DiskMount instance. */
+    constructor($$source: Partial<DiskMount> = {}) {
+        if (!("device" in $$source)) {
+            this["device"] = "";
+        }
+        if (!("mount_point" in $$source)) {
+            this["mount_point"] = "";
+        }
+        if (!("used_bytes" in $$source)) {
+            this["used_bytes"] = 0;
+        }
+        if (!("total_bytes" in $$source)) {
+            this["total_bytes"] = 0;
+        }
+        if (!("available_bytes" in $$source)) {
+            this["available_bytes"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new DiskMount instance from a string or object.
+     */
+    static createFrom($$source: any = {}): DiskMount {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new DiskMount($$parsedSource as Partial<DiskMount>);
+    }
+}
+
 export class GistOAuthResult {
     "status": GistOAuthStatus;
     "message": string;
@@ -2557,6 +2594,7 @@ export class NetworkInterface {
     "transmitted_bytes": number;
     "download_rate": number;
     "upload_rate": number;
+    "virtual": boolean;
 
     /** Creates a new NetworkInterface instance. */
     constructor($$source: Partial<NetworkInterface> = {}) {
@@ -2574,6 +2612,9 @@ export class NetworkInterface {
         }
         if (!("upload_rate" in $$source)) {
             this["upload_rate"] = 0;
+        }
+        if (!("virtual" in $$source)) {
+            this["virtual"] = false;
         }
 
         Object.assign(this, $$source);
@@ -2597,6 +2638,7 @@ export class ProcessInfo {
     "memory_bytes": number;
     "rss_bytes": number;
     "command": string;
+    "cpu_source": string;
 
     /** Creates a new ProcessInfo instance. */
     constructor($$source: Partial<ProcessInfo> = {}) {
@@ -2623,6 +2665,9 @@ export class ProcessInfo {
         }
         if (!("command" in $$source)) {
             this["command"] = "";
+        }
+        if (!("cpu_source" in $$source)) {
+            this["cpu_source"] = "";
         }
 
         Object.assign(this, $$source);
@@ -4538,6 +4583,11 @@ export class SyncVersion {
 }
 
 export class SystemInfo {
+    "schema_version": number;
+    "sampled_at_unix_ms": number;
+    "sampled_monotonic_ms": number;
+    "source": string;
+    "warnings": string[];
     "cpu_percent": number;
     "cpu_count": number;
     "memory_used": number;
@@ -4556,9 +4606,25 @@ export class SystemInfo {
     "kernel_version": string;
     "latency_ms": number;
     "interfaces": NetworkInterface[];
+    "disk_mounts": DiskMount[];
 
     /** Creates a new SystemInfo instance. */
     constructor($$source: Partial<SystemInfo> = {}) {
+        if (!("schema_version" in $$source)) {
+            this["schema_version"] = 0;
+        }
+        if (!("sampled_at_unix_ms" in $$source)) {
+            this["sampled_at_unix_ms"] = 0;
+        }
+        if (!("sampled_monotonic_ms" in $$source)) {
+            this["sampled_monotonic_ms"] = 0;
+        }
+        if (!("source" in $$source)) {
+            this["source"] = "";
+        }
+        if (!("warnings" in $$source)) {
+            this["warnings"] = [];
+        }
         if (!("cpu_percent" in $$source)) {
             this["cpu_percent"] = 0;
         }
@@ -4613,6 +4679,9 @@ export class SystemInfo {
         if (!("interfaces" in $$source)) {
             this["interfaces"] = [];
         }
+        if (!("disk_mounts" in $$source)) {
+            this["disk_mounts"] = [];
+        }
 
         Object.assign(this, $$source);
     }
@@ -4621,10 +4690,18 @@ export class SystemInfo {
      * Creates a new SystemInfo instance from a string or object.
      */
     static createFrom($$source: any = {}): SystemInfo {
-        const $$createField17_0 = $$createType57;
+        const $$createField4_0 = $$createType8;
+        const $$createField22_0 = $$createType57;
+        const $$createField23_0 = $$createType59;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("warnings" in $$parsedSource) {
+            $$parsedSource["warnings"] = $$createField4_0($$parsedSource["warnings"]);
+        }
         if ("interfaces" in $$parsedSource) {
-            $$parsedSource["interfaces"] = $$createField17_0($$parsedSource["interfaces"]);
+            $$parsedSource["interfaces"] = $$createField22_0($$parsedSource["interfaces"]);
+        }
+        if ("disk_mounts" in $$parsedSource) {
+            $$parsedSource["disk_mounts"] = $$createField23_0($$parsedSource["disk_mounts"]);
         }
         return new SystemInfo($$parsedSource as Partial<SystemInfo>);
     }
@@ -4802,9 +4879,9 @@ export class ThemeConfigurationInput {
      * Creates a new ThemeConfigurationInput instance from a string or object.
      */
     static createFrom($$source: any = {}): ThemeConfigurationInput {
-        const $$createField0_0 = $$createType58;
-        const $$createField1_0 = $$createType60;
-        const $$createField2_0 = $$createType61;
+        const $$createField0_0 = $$createType60;
+        const $$createField1_0 = $$createType62;
+        const $$createField2_0 = $$createType63;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("global_style" in $$parsedSource) {
             $$parsedSource["global_style"] = $$createField0_0($$parsedSource["global_style"]);
@@ -4964,7 +5041,7 @@ export class ThemeImportSummary {
      * Creates a new ThemeImportSummary instance from a string or object.
      */
     static createFrom($$source: any = {}): ThemeImportSummary {
-        const $$createField0_0 = $$createType63;
+        const $$createField0_0 = $$createType65;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("results" in $$parsedSource) {
             $$parsedSource["results"] = $$createField0_0($$parsedSource["results"]);
@@ -5037,7 +5114,7 @@ export class ThemeProfile {
      * Creates a new ThemeProfile instance from a string or object.
      */
     static createFrom($$source: any = {}): ThemeProfile {
-        const $$createField3_0 = $$createType65;
+        const $$createField3_0 = $$createType67;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("definition" in $$parsedSource) {
             $$parsedSource["definition"] = $$createField3_0($$parsedSource["definition"]);
@@ -5429,11 +5506,13 @@ const $$createType54 = SyncEvent.createFrom;
 const $$createType55 = $Create.Array($$createType54);
 const $$createType56 = NetworkInterface.createFrom;
 const $$createType57 = $Create.Array($$createType56);
-const $$createType58 = TerminalGlobalStyleInput.createFrom;
-const $$createType59 = ThemeProfileInput.createFrom;
-const $$createType60 = $Create.Array($$createType59);
-const $$createType61 = ThemeAssignmentsInput.createFrom;
-const $$createType62 = ThemeImportResult.createFrom;
-const $$createType63 = $Create.Array($$createType62);
-const $$createType64 = ThemeDefinition.createFrom;
-const $$createType65 = $Create.Nullable($$createType64);
+const $$createType58 = DiskMount.createFrom;
+const $$createType59 = $Create.Array($$createType58);
+const $$createType60 = TerminalGlobalStyleInput.createFrom;
+const $$createType61 = ThemeProfileInput.createFrom;
+const $$createType62 = $Create.Array($$createType61);
+const $$createType63 = ThemeAssignmentsInput.createFrom;
+const $$createType64 = ThemeImportResult.createFrom;
+const $$createType65 = $Create.Array($$createType64);
+const $$createType66 = ThemeDefinition.createFrom;
+const $$createType67 = $Create.Nullable($$createType66);

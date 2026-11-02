@@ -30,8 +30,42 @@ func TestSystemInfoCommandSupportsDarwinFixtures(t *testing.T) {
 	assert.Equal(t, "macOS 15.0", info.OSName)
 	assert.Equal(t, "23.6.0", info.KernelVersion)
 	assert.Positive(t, info.UptimeSeconds)
-	assert.Equal(t, uint64(1024), sample.received)
-	assert.Equal(t, uint64(2048), sample.transmitted)
+	assert.Equal(t, uint64(1123), sample.received)
+	assert.Equal(t, uint64(2147), sample.transmitted)
+	assert.Equal(t, model.SystemInfoSchemaVersion, info.SchemaVersion)
+	assert.Equal(t, "darwin-sysctl", info.Source)
+	require.Len(t, info.Interfaces, 2)
+	assert.Equal(t, "en0", info.Interfaces[0].Name)
+	assert.Equal(t, "lo0", info.Interfaces[1].Name)
+	assert.True(t, info.Interfaces[1].Virtual)
+	require.Len(t, info.DiskMounts, 1)
+	assert.Equal(t, "/", info.DiskMounts[0].MountPoint)
+}
+
+func TestSystemInfoCommandEscapesDiskMountSpaces(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("system information probe fixture requires Linux procfs")
+	}
+	output := runProbeCommandWithFixtures(t, systemInfoCommand, map[string]string{
+		"df": `printf 'Filesystem 1024-blocks Used Available Capacity Mounted on\n/dev/sda1 1000 400 600 40%% /mnt/data disk\n'`,
+	})
+	info, _, err := parseSystemInfo(strings.Fields(string(output)))
+	require.NoError(t, err)
+	require.Len(t, info.DiskMounts, 1)
+	assert.Equal(t, "/mnt/data disk", info.DiskMounts[0].MountPoint)
+}
+
+func TestSystemInfoCommandFiltersPseudoFilesystems(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("system information probe fixture requires Linux procfs")
+	}
+	output := runProbeCommandWithFixtures(t, systemInfoCommand, map[string]string{
+		"df": `printf 'Filesystem 1024-blocks Used Available Capacity Mounted on\ntmpfs 100 10 90 10%% /run/devtmpfs 100 10 90 10%% /dev\n/dev/sdb1 1000 400 600 40%% /run/media/demo\n'`,
+	})
+	info, _, err := parseSystemInfo(strings.Fields(string(output)))
+	require.NoError(t, err)
+	require.Len(t, info.DiskMounts, 1)
+	assert.Equal(t, "/run/media/demo", info.DiskMounts[0].MountPoint)
 }
 
 func TestProcessInfoCommandSupportsBusyBoxFallback(t *testing.T) {
@@ -76,12 +110,8 @@ func TestProcessInfoCommandProducesParsableOutput(t *testing.T) {
 	}
 	output, err := exec.Command("sh", "-c", processInfoCommand).CombinedOutput()
 	require.NoError(t, err)
-	for _, line := range strings.Split(string(output), "\n") {
-		if _, ok := parseProcessInfo(line); ok {
-			return
-		}
-	}
-	t.Fatal("process probe produced no parsable rows")
+	probe := parseProcessProbe(string(output))
+	require.NotEmpty(t, probe.readings)
 }
 
 func TestParseSystemInfoRejectsInvalidDirectCPUPercent(t *testing.T) {

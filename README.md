@@ -53,7 +53,7 @@ The desktop app has an authenticated unified local IPC transport available for r
 - Active search inside terminal output with text or regex mode
 - Playback for recorded sessions
 - Local shell terminals for machine-local workflows
-- System monitor for host metrics, processes, listening ports with process attribution, plus Docker, Podman, and containerd container management with run-command copy
+- SSH-only system monitor with versioned remote-clock snapshots, explicit collection warnings, per-interface and per-mount detail, instantaneous Linux process CPU, listening-port attribution, and Docker/Podman/containerd management with run-command copy
 
 ### Session and asset management
 
