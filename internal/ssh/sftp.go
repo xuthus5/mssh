@@ -81,11 +81,7 @@ func uploadFileContext(
 		}
 	}()
 
-	_, copyErr := copyWithContext(ctx, remote, local, func(transferred int64) {
-		if onProgress != nil {
-			onProgress(transferred, info.Size())
-		}
-	})
+	copyErr := copyUploadedFile(ctx, remote, local, info.Size(), onProgress)
 	remoteClosed = true
 	closeErr := finalizeUploadedFile(remote)
 	if copyErr != nil {
@@ -223,49 +219,4 @@ func closeFile(file io.Closer, operation string) error {
 		return fmt.Errorf("%s: %w", operation, err)
 	}
 	return nil
-}
-
-func copyWithContext(ctx context.Context, dst io.Writer, src io.Reader, onProgress func(int64)) (int64, error) {
-	buffer := make([]byte, 32*1024)
-	var written int64
-	for {
-		select {
-		case <-ctx.Done():
-			return written, ctx.Err()
-		default:
-		}
-
-		readCount, readErr := src.Read(buffer)
-		if err := ctx.Err(); err != nil {
-			return written, err
-		}
-		if readCount > 0 {
-			var writeErr error
-			written, writeErr = writeCopyChunk(dst, buffer[:readCount], written, onProgress)
-			if writeErr != nil {
-				return written, writeErr
-			}
-		}
-		if readErr != nil {
-			if readErr == io.EOF {
-				return written, nil
-			}
-			return written, readErr
-		}
-	}
-}
-
-func writeCopyChunk(dst io.Writer, data []byte, written int64, onProgress func(int64)) (int64, error) {
-	writeCount, err := dst.Write(data)
-	written += int64(writeCount)
-	if onProgress != nil {
-		onProgress(written)
-	}
-	if err != nil {
-		return written, err
-	}
-	if writeCount != len(data) {
-		return written, io.ErrShortWrite
-	}
-	return written, nil
 }

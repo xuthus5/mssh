@@ -16,9 +16,9 @@ func OpenSFTP(cw *ClientWrapper) (*sftp.Client, error) {
 }
 
 // OpenTransferSFTP opens an SFTP client tuned for bulk file transfers. Servers
-// advertising OpenSSH's limits extension accept read requests larger than the
-// conservative 32 KiB protocol default, which is needed to fill the SSH
-// flow-control window on high-latency links.
+// advertising OpenSSH's limits extension accept read and write requests larger
+// than the conservative 32 KiB protocol default, which is needed to fill the
+// SSH flow-control window on high-latency links.
 func OpenTransferSFTP(cw *ClientWrapper) (*sftp.Client, error) {
 	supportsLargePackets, err := probeSFTPExtensions(cw)
 	if err != nil {

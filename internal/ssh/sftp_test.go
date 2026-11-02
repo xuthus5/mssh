@@ -10,7 +10,6 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-	"time"
 
 	"github.com/pkg/sftp"
 	"github.com/stretchr/testify/assert"
@@ -19,56 +18,6 @@ import (
 	"github.com/xuthus5/mssh/internal/model"
 	"github.com/xuthus5/mssh/internal/ssh/testutil"
 )
-
-type slowReader struct {
-	remaining int
-}
-
-func (r *slowReader) Read(p []byte) (int, error) {
-	if r.remaining == 0 {
-		return 0, io.EOF
-	}
-	time.Sleep(time.Millisecond)
-	n := min(len(p), r.remaining)
-	for i := range n {
-		p[i] = 'x'
-	}
-	r.remaining -= n
-	return n, nil
-}
-
-func TestCopyWithContextCancel(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	var dst bytes.Buffer
-	reader := &slowReader{remaining: 10 * 1024 * 1024}
-	go func() {
-		time.Sleep(5 * time.Millisecond)
-		cancel()
-	}()
-
-	_, err := copyWithContext(ctx, &dst, reader, nil)
-	require.Error(t, err)
-	assert.True(t, errors.Is(err, context.Canceled))
-	assert.Less(t, dst.Len(), 10*1024*1024)
-}
-
-type eofAfterCancelReader struct {
-	cancel context.CancelFunc
-}
-
-func (r *eofAfterCancelReader) Read([]byte) (int, error) {
-	r.cancel()
-	return 0, io.EOF
-}
-
-func TestCopyWithContextTreatsEOFAfterCancelAsCancelled(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	reader := &eofAfterCancelReader{cancel: cancel}
-
-	_, err := copyWithContext(ctx, io.Discard, reader, nil)
-
-	assert.ErrorIs(t, err, context.Canceled)
-}
 
 func startSFTPServer(t *testing.T) (string, func()) {
 	t.Helper()
