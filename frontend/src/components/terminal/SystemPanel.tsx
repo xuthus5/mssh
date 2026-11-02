@@ -9,6 +9,7 @@ import { AsyncPoller } from '@/lib/asyncPoller'
 import { TerminalService } from '@/lib/wails'
 import { t } from '@/i18n'
 import { isTerminalGone } from '@/lib/terminalGone'
+import { ContainerPanel } from '@/components/terminal/container/ContainerPanel'
 
 
 type Info = {
@@ -230,12 +231,15 @@ export function SystemPanel({ terminalID, onClose }: { terminalID: string; onClo
       <Button size="icon-xs" variant="ghost" aria-label={t('关闭系统监控')} onClick={onClose}><X /></Button>
     </header>
     <Tabs value={tab} onValueChange={setTab} className="flex min-h-0 flex-1 flex-col">
-      <TabsList className="mx-4 mt-3"><TabsTrigger value="overview">{t('概览')}</TabsTrigger><TabsTrigger value="processes">{t('进程')}</TabsTrigger></TabsList>
+      <TabsList className="mx-4 mt-3"><TabsTrigger value="overview">{t('概览')}</TabsTrigger><TabsTrigger value="processes">{t('进程')}</TabsTrigger><TabsTrigger value="containers">{t('容器')}</TabsTrigger></TabsList>
       <TabsContent value="overview" className="min-h-0 flex-1 overflow-y-auto p-4">
         {system.failed ? <CollectionError message={t('系统信息采集失败')} onRetry={system.retry} /> : system.info ? <Overview info={system.info} /> : <p className="text-sm text-muted-foreground">{t('正在采集系统信息...')}</p>}
       </TabsContent>
       <TabsContent value="processes" className="min-h-0 flex-1 overflow-y-auto p-4">
         {processState.failed ? <CollectionError message={t('进程信息采集失败')} onRetry={processState.retry} /> : <ProcessesView processes={processState.processes} query={query} onQueryChange={setQuery} />}
+      </TabsContent>
+      <TabsContent value="containers" className="min-h-0 flex-1 overflow-y-auto p-4">
+        <ContainerPanel terminalID={terminalID} active={tab === 'containers'} />
       </TabsContent>
     </Tabs>
   </aside>

@@ -1889,6 +1889,223 @@ export class CommandHistory {
     }
 }
 
+export class ContainerActionRequest {
+    "engine": string;
+    "namespace": string;
+    "id": string;
+    "action": string;
+
+    /** Creates a new ContainerActionRequest instance. */
+    constructor($$source: Partial<ContainerActionRequest> = {}) {
+        if (!("engine" in $$source)) {
+            this["engine"] = "";
+        }
+        if (!("namespace" in $$source)) {
+            this["namespace"] = "";
+        }
+        if (!("id" in $$source)) {
+            this["id"] = "";
+        }
+        if (!("action" in $$source)) {
+            this["action"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new ContainerActionRequest instance from a string or object.
+     */
+    static createFrom($$source: any = {}): ContainerActionRequest {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new ContainerActionRequest($$parsedSource as Partial<ContainerActionRequest>);
+    }
+}
+
+export class ContainerCreateRequest {
+    "engine": string;
+    "namespace": string;
+    "image": string;
+    "name": string;
+    "command": string[];
+    "env": string[];
+    "ports": string[];
+    "volumes": string[];
+    "restart_policy": string;
+
+    /** Creates a new ContainerCreateRequest instance. */
+    constructor($$source: Partial<ContainerCreateRequest> = {}) {
+        if (!("engine" in $$source)) {
+            this["engine"] = "";
+        }
+        if (!("namespace" in $$source)) {
+            this["namespace"] = "";
+        }
+        if (!("image" in $$source)) {
+            this["image"] = "";
+        }
+        if (!("name" in $$source)) {
+            this["name"] = "";
+        }
+        if (!("command" in $$source)) {
+            this["command"] = [];
+        }
+        if (!("env" in $$source)) {
+            this["env"] = [];
+        }
+        if (!("ports" in $$source)) {
+            this["ports"] = [];
+        }
+        if (!("volumes" in $$source)) {
+            this["volumes"] = [];
+        }
+        if (!("restart_policy" in $$source)) {
+            this["restart_policy"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new ContainerCreateRequest instance from a string or object.
+     */
+    static createFrom($$source: any = {}): ContainerCreateRequest {
+        const $$createField4_0 = $$createType8;
+        const $$createField5_0 = $$createType8;
+        const $$createField6_0 = $$createType8;
+        const $$createField7_0 = $$createType8;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("command" in $$parsedSource) {
+            $$parsedSource["command"] = $$createField4_0($$parsedSource["command"]);
+        }
+        if ("env" in $$parsedSource) {
+            $$parsedSource["env"] = $$createField5_0($$parsedSource["env"]);
+        }
+        if ("ports" in $$parsedSource) {
+            $$parsedSource["ports"] = $$createField6_0($$parsedSource["ports"]);
+        }
+        if ("volumes" in $$parsedSource) {
+            $$parsedSource["volumes"] = $$createField7_0($$parsedSource["volumes"]);
+        }
+        return new ContainerCreateRequest($$parsedSource as Partial<ContainerCreateRequest>);
+    }
+}
+
+export class ContainerEngineInfo {
+    "name": string;
+    "version": string;
+    "available": boolean;
+    "error": string;
+
+    /** Creates a new ContainerEngineInfo instance. */
+    constructor($$source: Partial<ContainerEngineInfo> = {}) {
+        if (!("name" in $$source)) {
+            this["name"] = "";
+        }
+        if (!("version" in $$source)) {
+            this["version"] = "";
+        }
+        if (!("available" in $$source)) {
+            this["available"] = false;
+        }
+        if (!("error" in $$source)) {
+            this["error"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new ContainerEngineInfo instance from a string or object.
+     */
+    static createFrom($$source: any = {}): ContainerEngineInfo {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new ContainerEngineInfo($$parsedSource as Partial<ContainerEngineInfo>);
+    }
+}
+
+export class ContainerInfo {
+    "id": string;
+    "name": string;
+    "engine": string;
+    "namespace": string;
+    "image": string;
+    "state": string;
+    "status": string;
+    "ports": string;
+
+    /** Creates a new ContainerInfo instance. */
+    constructor($$source: Partial<ContainerInfo> = {}) {
+        if (!("id" in $$source)) {
+            this["id"] = "";
+        }
+        if (!("name" in $$source)) {
+            this["name"] = "";
+        }
+        if (!("engine" in $$source)) {
+            this["engine"] = "";
+        }
+        if (!("namespace" in $$source)) {
+            this["namespace"] = "";
+        }
+        if (!("image" in $$source)) {
+            this["image"] = "";
+        }
+        if (!("state" in $$source)) {
+            this["state"] = "";
+        }
+        if (!("status" in $$source)) {
+            this["status"] = "";
+        }
+        if (!("ports" in $$source)) {
+            this["ports"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new ContainerInfo instance from a string or object.
+     */
+    static createFrom($$source: any = {}): ContainerInfo {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new ContainerInfo($$parsedSource as Partial<ContainerInfo>);
+    }
+}
+
+export class ContainerOverview {
+    "engines": ContainerEngineInfo[];
+    "containers": ContainerInfo[];
+
+    /** Creates a new ContainerOverview instance. */
+    constructor($$source: Partial<ContainerOverview> = {}) {
+        if (!("engines" in $$source)) {
+            this["engines"] = [];
+        }
+        if (!("containers" in $$source)) {
+            this["containers"] = [];
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new ContainerOverview instance from a string or object.
+     */
+    static createFrom($$source: any = {}): ContainerOverview {
+        const $$createField0_0 = $$createType21;
+        const $$createField1_0 = $$createType23;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("engines" in $$parsedSource) {
+            $$parsedSource["engines"] = $$createField0_0($$parsedSource["engines"]);
+        }
+        if ("containers" in $$parsedSource) {
+            $$parsedSource["containers"] = $$createField1_0($$parsedSource["containers"]);
+        }
+        return new ContainerOverview($$parsedSource as Partial<ContainerOverview>);
+    }
+}
+
 export enum CursorStyle {
     /**
      * The Go zero value for the underlying type of the enum.
@@ -2192,7 +2409,7 @@ export class ModelsDevCatalog {
      * Creates a new ModelsDevCatalog instance from a string or object.
      */
     static createFrom($$source: any = {}): ModelsDevCatalog {
-        const $$createField0_0 = $$createType21;
+        const $$createField0_0 = $$createType25;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("providers" in $$parsedSource) {
             $$parsedSource["providers"] = $$createField0_0($$parsedSource["providers"]);
@@ -2288,7 +2505,7 @@ export class ModelsDevProvider {
      * Creates a new ModelsDevProvider instance from a string or object.
      */
     static createFrom($$source: any = {}): ModelsDevProvider {
-        const $$createField4_0 = $$createType23;
+        const $$createField4_0 = $$createType27;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("models" in $$parsedSource) {
             $$parsedSource["models"] = $$createField4_0($$parsedSource["models"]);
@@ -2582,7 +2799,7 @@ export class SSHJumpHostTestInput {
      * Creates a new SSHJumpHostTestInput instance from a string or object.
      */
     static createFrom($$source: any = {}): SSHJumpHostTestInput {
-        const $$createField2_0 = $$createType24;
+        const $$createField2_0 = $$createType28;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("jump_host" in $$parsedSource) {
             $$parsedSource["jump_host"] = $$createField2_0($$parsedSource["jump_host"]);
@@ -3241,10 +3458,10 @@ export class Session {
      * Creates a new Session instance from a string or object.
      */
     static createFrom($$source: any = {}): Session {
-        const $$createField9_0 = $$createType26;
-        const $$createField10_0 = $$createType28;
-        const $$createField11_0 = $$createType30;
-        const $$createField15_0 = $$createType31;
+        const $$createField9_0 = $$createType30;
+        const $$createField10_0 = $$createType32;
+        const $$createField11_0 = $$createType34;
+        const $$createField15_0 = $$createType35;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("environment" in $$parsedSource) {
             $$parsedSource["environment"] = $$createField9_0($$parsedSource["environment"]);
@@ -3372,8 +3589,8 @@ export class SessionCSVImportOptions {
      * Creates a new SessionCSVImportOptions instance from a string or object.
      */
     static createFrom($$source: any = {}): SessionCSVImportOptions {
-        const $$createField1_0 = $$createType32;
-        const $$createField2_0 = $$createType32;
+        const $$createField1_0 = $$createType36;
+        const $$createField2_0 = $$createType36;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("header_mapping" in $$parsedSource) {
             $$parsedSource["header_mapping"] = $$createField1_0($$parsedSource["header_mapping"]);
@@ -3456,7 +3673,7 @@ export class SessionCSVImportSummary {
      * Creates a new SessionCSVImportSummary instance from a string or object.
      */
     static createFrom($$source: any = {}): SessionCSVImportSummary {
-        const $$createField5_0 = $$createType34;
+        const $$createField5_0 = $$createType38;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("results" in $$parsedSource) {
             $$parsedSource["results"] = $$createField5_0($$parsedSource["results"]);
@@ -3490,7 +3707,7 @@ export class SessionCSVPreview {
      */
     static createFrom($$source: any = {}): SessionCSVPreview {
         const $$createField0_0 = $$createType8;
-        const $$createField1_0 = $$createType35;
+        const $$createField1_0 = $$createType39;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("headers" in $$parsedSource) {
             $$parsedSource["headers"] = $$createField0_0($$parsedSource["headers"]);
@@ -3679,7 +3896,7 @@ export class SessionInput {
      */
     static createFrom($$source: any = {}): SessionInput {
         const $$createField9_0 = $$createType19;
-        const $$createField13_0 = $$createType31;
+        const $$createField13_0 = $$createType35;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("tag_ids" in $$parsedSource) {
             $$parsedSource["tag_ids"] = $$createField9_0($$parsedSource["tag_ids"]);
@@ -3855,9 +4072,9 @@ export class SyncConfig {
      * Creates a new SyncConfig instance from a string or object.
      */
     static createFrom($$source: any = {}): SyncConfig {
-        const $$createField7_0 = $$createType36;
-        const $$createField8_0 = $$createType37;
-        const $$createField9_0 = $$createType38;
+        const $$createField7_0 = $$createType40;
+        const $$createField8_0 = $$createType41;
+        const $$createField9_0 = $$createType42;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("gist" in $$parsedSource) {
             $$parsedSource["gist"] = $$createField7_0($$parsedSource["gist"]);
@@ -3924,9 +4141,9 @@ export class SyncConfigInput {
      * Creates a new SyncConfigInput instance from a string or object.
      */
     static createFrom($$source: any = {}): SyncConfigInput {
-        const $$createField7_0 = $$createType39;
-        const $$createField8_0 = $$createType40;
-        const $$createField9_0 = $$createType41;
+        const $$createField7_0 = $$createType43;
+        const $$createField8_0 = $$createType44;
+        const $$createField9_0 = $$createType45;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("gist" in $$parsedSource) {
             $$parsedSource["gist"] = $$createField7_0($$parsedSource["gist"]);
@@ -3961,8 +4178,8 @@ export class SyncConflict {
      * Creates a new SyncConflict instance from a string or object.
      */
     static createFrom($$source: any = {}): SyncConflict {
-        const $$createField0_0 = $$createType42;
-        const $$createField1_0 = $$createType42;
+        const $$createField0_0 = $$createType46;
+        const $$createField1_0 = $$createType46;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("local" in $$parsedSource) {
             $$parsedSource["local"] = $$createField0_0($$parsedSource["local"]);
@@ -4024,12 +4241,12 @@ export class SyncDashboard {
      * Creates a new SyncDashboard instance from a string or object.
      */
     static createFrom($$source: any = {}): SyncDashboard {
-        const $$createField0_0 = $$createType43;
-        const $$createField4_0 = $$createType45;
-        const $$createField5_0 = $$createType46;
-        const $$createField6_0 = $$createType48;
-        const $$createField7_0 = $$createType49;
-        const $$createField8_0 = $$createType51;
+        const $$createField0_0 = $$createType47;
+        const $$createField4_0 = $$createType49;
+        const $$createField5_0 = $$createType50;
+        const $$createField6_0 = $$createType52;
+        const $$createField7_0 = $$createType53;
+        const $$createField8_0 = $$createType55;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("config" in $$parsedSource) {
             $$parsedSource["config"] = $$createField0_0($$parsedSource["config"]);
@@ -4187,7 +4404,7 @@ export class SyncResult {
      * Creates a new SyncResult instance from a string or object.
      */
     static createFrom($$source: any = {}): SyncResult {
-        const $$createField2_0 = $$createType48;
+        const $$createField2_0 = $$createType52;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("conflict" in $$parsedSource) {
             $$parsedSource["conflict"] = $$createField2_0($$parsedSource["conflict"]);
@@ -4367,7 +4584,7 @@ export class SystemInfo {
      * Creates a new SystemInfo instance from a string or object.
      */
     static createFrom($$source: any = {}): SystemInfo {
-        const $$createField17_0 = $$createType53;
+        const $$createField17_0 = $$createType57;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("interfaces" in $$parsedSource) {
             $$parsedSource["interfaces"] = $$createField17_0($$parsedSource["interfaces"]);
@@ -4548,9 +4765,9 @@ export class ThemeConfigurationInput {
      * Creates a new ThemeConfigurationInput instance from a string or object.
      */
     static createFrom($$source: any = {}): ThemeConfigurationInput {
-        const $$createField0_0 = $$createType54;
-        const $$createField1_0 = $$createType56;
-        const $$createField2_0 = $$createType57;
+        const $$createField0_0 = $$createType58;
+        const $$createField1_0 = $$createType60;
+        const $$createField2_0 = $$createType61;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("global_style" in $$parsedSource) {
             $$parsedSource["global_style"] = $$createField0_0($$parsedSource["global_style"]);
@@ -4710,7 +4927,7 @@ export class ThemeImportSummary {
      * Creates a new ThemeImportSummary instance from a string or object.
      */
     static createFrom($$source: any = {}): ThemeImportSummary {
-        const $$createField0_0 = $$createType59;
+        const $$createField0_0 = $$createType63;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("results" in $$parsedSource) {
             $$parsedSource["results"] = $$createField0_0($$parsedSource["results"]);
@@ -4783,7 +5000,7 @@ export class ThemeProfile {
      * Creates a new ThemeProfile instance from a string or object.
      */
     static createFrom($$source: any = {}): ThemeProfile {
-        const $$createField3_0 = $$createType61;
+        const $$createField3_0 = $$createType65;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("definition" in $$parsedSource) {
             $$parsedSource["definition"] = $$createField3_0($$parsedSource["definition"]);
@@ -5137,45 +5354,49 @@ const $$createType16 = AIProviderProfile.createFrom;
 const $$createType17 = $Create.Array($$createType16);
 const $$createType18 = AISearchSettingsInput.createFrom;
 const $$createType19 = $Create.Array($Create.Any);
-const $$createType20 = ModelsDevProvider.createFrom;
+const $$createType20 = ContainerEngineInfo.createFrom;
 const $$createType21 = $Create.Array($$createType20);
-const $$createType22 = ModelsDevModel.createFrom;
+const $$createType22 = ContainerInfo.createFrom;
 const $$createType23 = $Create.Array($$createType22);
-const $$createType24 = SSHJumpHost.createFrom;
-const $$createType25 = AssetEnvironment.createFrom;
-const $$createType26 = $Create.Nullable($$createType25);
-const $$createType27 = AssetProject.createFrom;
-const $$createType28 = $Create.Nullable($$createType27);
-const $$createType29 = AssetTag.createFrom;
-const $$createType30 = $Create.Array($$createType29);
-const $$createType31 = $Create.Nullable($$createType24);
-const $$createType32 = $Create.Map($Create.Any, $Create.Any);
-const $$createType33 = SessionCSVImportResult.createFrom;
+const $$createType24 = ModelsDevProvider.createFrom;
+const $$createType25 = $Create.Array($$createType24);
+const $$createType26 = ModelsDevModel.createFrom;
+const $$createType27 = $Create.Array($$createType26);
+const $$createType28 = SSHJumpHost.createFrom;
+const $$createType29 = AssetEnvironment.createFrom;
+const $$createType30 = $Create.Nullable($$createType29);
+const $$createType31 = AssetProject.createFrom;
+const $$createType32 = $Create.Nullable($$createType31);
+const $$createType33 = AssetTag.createFrom;
 const $$createType34 = $Create.Array($$createType33);
-const $$createType35 = $Create.Array($$createType8);
-const $$createType36 = GistSyncConfig.createFrom;
-const $$createType37 = WebDAVSyncConfig.createFrom;
-const $$createType38 = S3SyncConfig.createFrom;
-const $$createType39 = GistSyncConfigInput.createFrom;
-const $$createType40 = WebDAVSyncConfigInput.createFrom;
-const $$createType41 = S3SyncConfigInput.createFrom;
-const $$createType42 = SyncRemoteVersion.createFrom;
-const $$createType43 = SyncConfig.createFrom;
-const $$createType44 = SyncVersion.createFrom;
-const $$createType45 = $Create.Nullable($$createType44);
-const $$createType46 = $Create.Nullable($$createType42);
-const $$createType47 = SyncConflict.createFrom;
-const $$createType48 = $Create.Nullable($$createType47);
-const $$createType49 = $Create.Array($$createType44);
-const $$createType50 = SyncEvent.createFrom;
-const $$createType51 = $Create.Array($$createType50);
-const $$createType52 = NetworkInterface.createFrom;
-const $$createType53 = $Create.Array($$createType52);
-const $$createType54 = TerminalGlobalStyleInput.createFrom;
-const $$createType55 = ThemeProfileInput.createFrom;
-const $$createType56 = $Create.Array($$createType55);
-const $$createType57 = ThemeAssignmentsInput.createFrom;
-const $$createType58 = ThemeImportResult.createFrom;
-const $$createType59 = $Create.Array($$createType58);
-const $$createType60 = ThemeDefinition.createFrom;
-const $$createType61 = $Create.Nullable($$createType60);
+const $$createType35 = $Create.Nullable($$createType28);
+const $$createType36 = $Create.Map($Create.Any, $Create.Any);
+const $$createType37 = SessionCSVImportResult.createFrom;
+const $$createType38 = $Create.Array($$createType37);
+const $$createType39 = $Create.Array($$createType8);
+const $$createType40 = GistSyncConfig.createFrom;
+const $$createType41 = WebDAVSyncConfig.createFrom;
+const $$createType42 = S3SyncConfig.createFrom;
+const $$createType43 = GistSyncConfigInput.createFrom;
+const $$createType44 = WebDAVSyncConfigInput.createFrom;
+const $$createType45 = S3SyncConfigInput.createFrom;
+const $$createType46 = SyncRemoteVersion.createFrom;
+const $$createType47 = SyncConfig.createFrom;
+const $$createType48 = SyncVersion.createFrom;
+const $$createType49 = $Create.Nullable($$createType48);
+const $$createType50 = $Create.Nullable($$createType46);
+const $$createType51 = SyncConflict.createFrom;
+const $$createType52 = $Create.Nullable($$createType51);
+const $$createType53 = $Create.Array($$createType48);
+const $$createType54 = SyncEvent.createFrom;
+const $$createType55 = $Create.Array($$createType54);
+const $$createType56 = NetworkInterface.createFrom;
+const $$createType57 = $Create.Array($$createType56);
+const $$createType58 = TerminalGlobalStyleInput.createFrom;
+const $$createType59 = ThemeProfileInput.createFrom;
+const $$createType60 = $Create.Array($$createType59);
+const $$createType61 = ThemeAssignmentsInput.createFrom;
+const $$createType62 = ThemeImportResult.createFrom;
+const $$createType63 = $Create.Array($$createType62);
+const $$createType64 = ThemeDefinition.createFrom;
+const $$createType65 = $Create.Nullable($$createType64);

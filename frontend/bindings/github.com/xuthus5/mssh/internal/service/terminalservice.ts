@@ -17,6 +17,24 @@ export function Close(terminalID: string): $CancellablePromise<void> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.TerminalService.Close", terminalID);
 }
 
+export function ContainerAction(terminalID: string, request: model$0.ContainerActionRequest): $CancellablePromise<void> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.TerminalService.ContainerAction", terminalID, request);
+}
+
+export function ContainerOverview(terminalID: string): $CancellablePromise<model$0.ContainerOverview | null> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.TerminalService.ContainerOverview", terminalID).then(($result: any) => {
+        return $$createType1($result);
+    });
+}
+
+export function ContainerRunCommand(terminalID: string, engine: string, $namespace: string, id: string): $CancellablePromise<string> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.TerminalService.ContainerRunCommand", terminalID, engine, $namespace, id);
+}
+
+export function CreateContainer(terminalID: string, request: model$0.ContainerCreateRequest): $CancellablePromise<void> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.TerminalService.CreateContainer", terminalID, request);
+}
+
 /**
  * ListLocalShellCandidates returns the shell paths that actually exist on the
  * local machine, deduplicated and ordered deterministically. Used by the
@@ -24,7 +42,7 @@ export function Close(terminalID: string): $CancellablePromise<void> {
  */
 export function ListLocalShellCandidates(): $CancellablePromise<string[]> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.TerminalService.ListLocalShellCandidates").then(($result: any) => {
-        return $$createType0($result);
+        return $$createType2($result);
     });
 }
 
@@ -55,7 +73,7 @@ export function OpenWithProgress(request: model$0.SSHOpenRequest): $CancellableP
 
 export function ProcessInfo(terminalID: string): $CancellablePromise<model$0.ProcessInfo[]> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.TerminalService.ProcessInfo", terminalID).then(($result: any) => {
-        return $$createType2($result);
+        return $$createType4($result);
     });
 }
 
@@ -82,7 +100,7 @@ export function SerialSetSignals(terminalID: string, dtr: boolean, rts: boolean)
  */
 export function SerialSignals(terminalID: string): $CancellablePromise<model$0.SerialSignals> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.TerminalService.SerialSignals", terminalID).then(($result: any) => {
-        return $$createType3($result);
+        return $$createType5($result);
     });
 }
 
@@ -101,7 +119,7 @@ export function SetOutputPaused(terminalID: string, paused: boolean): $Cancellab
 
 export function SystemInfo(terminalID: string): $CancellablePromise<model$0.SystemInfo | null> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.TerminalService.SystemInfo", terminalID).then(($result: any) => {
-        return $$createType5($result);
+        return $$createType7($result);
     });
 }
 
@@ -110,9 +128,11 @@ export function Write(terminalID: string, data: string): $CancellablePromise<num
 }
 
 // Private type creation functions
-const $$createType0 = $Create.Array($Create.Any);
-const $$createType1 = model$0.ProcessInfo.createFrom;
-const $$createType2 = $Create.Array($$createType1);
-const $$createType3 = model$0.SerialSignals.createFrom;
-const $$createType4 = model$0.SystemInfo.createFrom;
-const $$createType5 = $Create.Nullable($$createType4);
+const $$createType0 = model$0.ContainerOverview.createFrom;
+const $$createType1 = $Create.Nullable($$createType0);
+const $$createType2 = $Create.Array($Create.Any);
+const $$createType3 = model$0.ProcessInfo.createFrom;
+const $$createType4 = $Create.Array($$createType3);
+const $$createType5 = model$0.SerialSignals.createFrom;
+const $$createType6 = model$0.SystemInfo.createFrom;
+const $$createType7 = $Create.Nullable($$createType6);

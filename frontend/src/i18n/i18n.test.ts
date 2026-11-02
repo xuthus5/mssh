@@ -59,7 +59,7 @@ describe('i18n', () => {
       const allow = new Set([
         'Foreground', 'Description', 'Recordings', 'Production', 'Transferring', 'Reconnecting',
         'Disconnected', 'Connecting', 'Recording', 'Playback', 'Authentication', 'Configuration',
-        'Environment', 'Successfully', 'Parameters', 'Blue-Green',
+        'Environment', 'Successfully', 'Parameters', 'Blue-Green', 'Containers',
       ])
       return !allow.has(value)
     })

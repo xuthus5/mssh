@@ -13,7 +13,12 @@ import (
 	ssh "github.com/xuthus5/mssh/internal/ssh"
 )
 
-const maxSystemProbeOutput = 4 * 1024 * 1024
+const (
+	maxSystemProbeOutput        = 4 * 1024 * 1024
+	maxContainerCommandOutput   = 8 * 1024 * 1024
+	containerReadCommandTimeout = 30 * time.Second
+	containerMutationTimeout    = 2 * time.Minute
+)
 
 var (
 	systemProbeTimeout   = 5 * time.Second
@@ -55,23 +60,39 @@ func (s *sshSystemProbeRunner) Close() error {
 var _runSystemInfoCommand = runSystemInfoCommand
 
 func runSystemInfoCommand(wrapper *ssh.ClientWrapper, command string) ([]byte, error) {
+	return runSystemCommandWithTimeout(wrapper, command, "system info", maxSystemProbeOutput, systemProbeTimeout)
+}
+
+func runContainerReadCommand(wrapper *ssh.ClientWrapper, command string) ([]byte, error) {
+	return runSystemCommandWithTimeout(wrapper, command, "container read", maxContainerCommandOutput, containerReadCommandTimeout)
+}
+
+func runContainerMutationCommand(wrapper *ssh.ClientWrapper, command string) ([]byte, error) {
+	return runSystemCommandWithTimeout(wrapper, command, "container mutation", maxContainerCommandOutput, containerMutationTimeout)
+}
+
+func runSystemCommandWithTimeout(wrapper *ssh.ClientWrapper, command, label string, maxBytes int, timeout time.Duration) ([]byte, error) {
 	if wrapper == nil || wrapper.Inner == nil {
 		return nil, errors.New("system info SSH client is unavailable")
 	}
 	session, err := wrapper.Inner.NewSession()
 	if err != nil {
-		return nil, fmt.Errorf("system info session: %w", err)
+		return nil, fmt.Errorf("%s session: %w", label, err)
 	}
 	runner := &sshSystemProbeRunner{session: session}
 	defer func() { _ = runner.Close() }()
-	output, err := executeSystemProbe(runner, command, maxSystemProbeOutput)
+	output, err := executeSystemProbeWithTimeout(runner, command, maxBytes, timeout)
 	if err != nil {
-		return nil, fmt.Errorf("system info command: %w", err)
+		return nil, fmt.Errorf("%s command: %w", label, err)
 	}
 	return output, nil
 }
 
 func executeSystemProbe(runner systemProbeRunner, command string, maxBytes int) ([]byte, error) {
+	return executeSystemProbeWithTimeout(runner, command, maxBytes, systemProbeTimeout)
+}
+
+func executeSystemProbeWithTimeout(runner systemProbeRunner, command string, maxBytes int, timeout time.Duration) ([]byte, error) {
 	if runner == nil {
 		return nil, errors.New("system probe runner is required")
 	}
@@ -79,10 +100,10 @@ func executeSystemProbe(runner systemProbeRunner, command string, maxBytes int) 
 		return nil, errors.New("system probe output limit must be positive")
 	}
 	output := newBoundedSystemProbeOutput(maxBytes, runner.Close)
-	result, err := waitSystemProbe(func() ([]byte, error) {
+	result, err := waitSystemProbeWithTimeout(func() ([]byte, error) {
 		runErr := runner.Run(command, output)
 		return output.Bytes(), runErr
-	}, runner.Close)
+	}, runner.Close, timeout)
 	if output.Exceeded() {
 		limitErr := fmt.Errorf("system probe output exceeds %d bytes", maxBytes)
 		return nil, errors.Join(limitErr, output.CloseError())
@@ -94,15 +115,22 @@ func executeSystemProbe(runner systemProbeRunner, command string, maxBytes int) 
 }
 
 func waitSystemProbe(run func() ([]byte, error), cancel func() error) ([]byte, error) {
+	return waitSystemProbeWithTimeout(run, cancel, systemProbeTimeout)
+}
+
+func waitSystemProbeWithTimeout(run func() ([]byte, error), cancel func() error, timeout time.Duration) ([]byte, error) {
+	if timeout <= 0 {
+		timeout = systemProbeTimeout
+	}
 	completed := make(chan systemProbeResult, 1)
 	go func() { output, err := run(); completed <- systemProbeResult{output: output, err: err} }()
-	timer := time.NewTimer(systemProbeTimeout)
+	timer := time.NewTimer(timeout)
 	defer timer.Stop()
 	select {
 	case value := <-completed:
 		return value.output, value.err
 	case <-timer.C:
-		timeoutErr := fmt.Errorf("probe timeout after %s", systemProbeTimeout)
+		timeoutErr := fmt.Errorf("probe timeout after %s", timeout)
 		return waitForSystemProbeAbort(completed, cancel, timeoutErr)
 	}
 }
