@@ -5,7 +5,7 @@ import { SystemPanel } from '@/components/terminal/SystemPanel'
 
 const systemInfo = { cpu_percent: 42, cpu_count: 8, memory_used: 2 * 1024 ** 3, memory_total: 8 * 1024 ** 3, disk_used: 10 * 1024 ** 3, disk_total: 100 * 1024 ** 3, download_rate: 1024, upload_rate: 2048, swap_used: 0, swap_total: 0, load_1: 1.2, load_5: 0.8, load_15: 0.4, uptime_seconds: 3661, os_name: 'A B C', kernel_version: '6.8' }
 const processInfo = [{ pid: 10, ppid: 1, user: 'root', state: 'S', cpu_percent: 9.5, memory_bytes: 1024 ** 2, command: 'tmux' }, { pid: 11, ppid: 1, user: 'dev', state: 'R', cpu_percent: 1.5, memory_bytes: 2 * 1024 ** 2, command: 'vim' }]
-const terminalService = vi.hoisted(() => ({ SystemInfo: vi.fn(), ProcessInfo: vi.fn(), ContainerOverview: vi.fn() }))
+const terminalService = vi.hoisted(() => ({ SystemInfo: vi.fn(), ProcessInfo: vi.fn(), ListeningPorts: vi.fn(), ContainerOverview: vi.fn() }))
 
 vi.mock('@/lib/wails', () => ({ TerminalService: terminalService }))
 
@@ -14,6 +14,7 @@ describe('SystemPanel', () => {
     vi.clearAllMocks()
     terminalService.SystemInfo.mockResolvedValue(systemInfo)
     terminalService.ProcessInfo.mockResolvedValue(processInfo)
+    terminalService.ListeningPorts.mockResolvedValue([])
     terminalService.ContainerOverview.mockResolvedValue({ engines: [], containers: [] })
   })
 
@@ -45,10 +46,13 @@ describe('SystemPanel', () => {
     expect(screen.getAllByText('vim').length).toBeGreaterThan(0)
   })
 
-  it('opens the container tab after the process tab', async () => {
+  it('opens listener and container tabs after the process tab', async () => {
     const user = userEvent.setup()
     render(<SystemPanel terminalID="term-containers" onClose={vi.fn()} />)
-    expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['概览', '进程', '容器'])
+    expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['概览', '进程', '监听', '容器'])
+    await user.click(screen.getByRole('tab', { name: '监听' }))
+    expect(await screen.findByText('未发现监听端口')).toBeInTheDocument()
+    expect(terminalService.ListeningPorts).toHaveBeenCalledWith('term-containers')
     await user.click(screen.getByRole('tab', { name: '容器' }))
     expect(await screen.findByText('没有检测到可用的容器引擎')).toBeInTheDocument()
     expect(terminalService.ContainerOverview).toHaveBeenCalledWith('term-containers')

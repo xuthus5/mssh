@@ -65,6 +65,7 @@ export {
     GistSyncConfigInput,
     HostKeyEntry,
     KeyType,
+    ListeningPortInfo,
     Macro,
     MacroInput,
     ModelsDevCatalog,

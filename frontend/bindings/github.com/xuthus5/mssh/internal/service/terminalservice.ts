@@ -46,6 +46,12 @@ export function ListLocalShellCandidates(): $CancellablePromise<string[]> {
     });
 }
 
+export function ListeningPorts(terminalID: string): $CancellablePromise<model$0.ListeningPortInfo[]> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.TerminalService.ListeningPorts", terminalID).then(($result: any) => {
+        return $$createType4($result);
+    });
+}
+
 export function Open(sessionID: number, cols: number, rows: number): $CancellablePromise<string> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.TerminalService.Open", sessionID, cols, rows);
 }
@@ -73,7 +79,7 @@ export function OpenWithProgress(request: model$0.SSHOpenRequest): $CancellableP
 
 export function ProcessInfo(terminalID: string): $CancellablePromise<model$0.ProcessInfo[]> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.TerminalService.ProcessInfo", terminalID).then(($result: any) => {
-        return $$createType4($result);
+        return $$createType6($result);
     });
 }
 
@@ -100,7 +106,7 @@ export function SerialSetSignals(terminalID: string, dtr: boolean, rts: boolean)
  */
 export function SerialSignals(terminalID: string): $CancellablePromise<model$0.SerialSignals> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.TerminalService.SerialSignals", terminalID).then(($result: any) => {
-        return $$createType5($result);
+        return $$createType7($result);
     });
 }
 
@@ -119,7 +125,7 @@ export function SetOutputPaused(terminalID: string, paused: boolean): $Cancellab
 
 export function SystemInfo(terminalID: string): $CancellablePromise<model$0.SystemInfo | null> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.TerminalService.SystemInfo", terminalID).then(($result: any) => {
-        return $$createType7($result);
+        return $$createType9($result);
     });
 }
 
@@ -131,8 +137,10 @@ export function Write(terminalID: string, data: string): $CancellablePromise<num
 const $$createType0 = model$0.ContainerOverview.createFrom;
 const $$createType1 = $Create.Nullable($$createType0);
 const $$createType2 = $Create.Array($Create.Any);
-const $$createType3 = model$0.ProcessInfo.createFrom;
+const $$createType3 = model$0.ListeningPortInfo.createFrom;
 const $$createType4 = $Create.Array($$createType3);
-const $$createType5 = model$0.SerialSignals.createFrom;
-const $$createType6 = model$0.SystemInfo.createFrom;
-const $$createType7 = $Create.Nullable($$createType6);
+const $$createType5 = model$0.ProcessInfo.createFrom;
+const $$createType6 = $Create.Array($$createType5);
+const $$createType7 = model$0.SerialSignals.createFrom;
+const $$createType8 = model$0.SystemInfo.createFrom;
+const $$createType9 = $Create.Nullable($$createType8);

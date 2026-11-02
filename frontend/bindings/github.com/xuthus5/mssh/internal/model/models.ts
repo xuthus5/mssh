@@ -2300,6 +2300,43 @@ export enum KeyType {
     KeyTypeECDSA = "ecdsa",
 };
 
+export class ListeningPortInfo {
+    "protocol": string;
+    "address": string;
+    "port": number;
+    "pid": number;
+    "process_name": string;
+
+    /** Creates a new ListeningPortInfo instance. */
+    constructor($$source: Partial<ListeningPortInfo> = {}) {
+        if (!("protocol" in $$source)) {
+            this["protocol"] = "";
+        }
+        if (!("address" in $$source)) {
+            this["address"] = "";
+        }
+        if (!("port" in $$source)) {
+            this["port"] = 0;
+        }
+        if (!("pid" in $$source)) {
+            this["pid"] = 0;
+        }
+        if (!("process_name" in $$source)) {
+            this["process_name"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new ListeningPortInfo instance from a string or object.
+     */
+    static createFrom($$source: any = {}): ListeningPortInfo {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new ListeningPortInfo($$parsedSource as Partial<ListeningPortInfo>);
+    }
+}
+
 export class Macro {
     "id": number;
     "name": string;
