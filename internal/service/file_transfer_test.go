@@ -236,6 +236,10 @@ func TestFileService_ReportProgressWithSpeedAndETA(t *testing.T) {
 	}
 
 	svc.recordStart("task-speed")
+	now := time.Now()
+	svc.progress.Lock()
+	svc.speedSamples["task-speed"] = transferSpeedSample{at: now.Add(-2 * time.Second)}
+	svc.progress.Unlock()
 	svc.reportProgress("task-speed", 500, 1000)
 
 	lastEvent := b.LastEvent()
@@ -244,6 +248,8 @@ func TestFileService_ReportProgressWithSpeedAndETA(t *testing.T) {
 	payload, ok := lastEvent.Payload.(event.TransferProgressPayload)
 	require.True(t, ok)
 	assert.Equal(t, 50.0, payload.Percent)
+	assert.Positive(t, payload.Speed)
+	assert.Positive(t, payload.ETA)
 }
 
 func TestFileService_EmitTransferError(t *testing.T) {

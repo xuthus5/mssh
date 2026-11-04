@@ -8,15 +8,29 @@ import (
 	"github.com/xuthus5/mssh/pkg/event"
 )
 
+const transferSpeedSampleWindow = time.Second
+
+type transferSpeedSample struct {
+	at    time.Time
+	bytes int64
+	speed int64
+}
+
 func (f *FileService) recordStart(taskID string) {
+	startedAt := time.Now()
 	f.progress.Lock()
-	f.startsAt[taskID] = time.Now()
+	f.startsAt[taskID] = startedAt
+	if f.speedSamples == nil {
+		f.speedSamples = make(map[string]transferSpeedSample)
+	}
+	f.speedSamples[taskID] = transferSpeedSample{at: startedAt}
 	f.progress.Unlock()
 }
 
 func (f *FileService) clearStart(taskID string) {
 	f.progress.Lock()
 	delete(f.startsAt, taskID)
+	delete(f.speedSamples, taskID)
 	delete(f.lastProgressPersist, taskID)
 	delete(f.lastProgressBytes, taskID)
 	f.progress.Unlock()
@@ -29,20 +43,22 @@ func (f *FileService) reportProgress(taskID string, transferred, total int64) {
 		percent = float64(transferred) / float64(total) * 100
 	}
 
+	now := time.Now()
 	var speed int64
-	var eta int64
 	f.progress.Lock()
-	start, ok := f.startsAt[taskID]
-	f.progress.Unlock()
+	_, ok := f.startsAt[taskID]
 	if ok {
-		elapsed := time.Since(start).Seconds()
-		if elapsed > 0 {
-			speed = int64(float64(transferred) / elapsed)
-			if speed > 0 && total > 0 {
-				remaining := total - transferred
-				eta = int64(float64(remaining) / float64(speed))
-			}
+		sample := f.speedSamples[taskID]
+		speed, sample = nextTransferSpeed(sample, now, transferred)
+		if f.speedSamples == nil {
+			f.speedSamples = make(map[string]transferSpeedSample)
 		}
+		f.speedSamples[taskID] = sample
+	}
+	f.progress.Unlock()
+	var eta int64
+	if speed > 0 && total > transferred {
+		eta = int64(float64(total-transferred) / float64(speed))
 	}
 
 	f.eventBus.Emit(event.TransferProgress, event.TransferProgressPayload{
@@ -59,6 +75,22 @@ func (f *FileService) reportProgress(taskID string, transferred, total int64) {
 			f.logger.Error("persist transfer progress failed", "taskID", taskID, "error", err)
 		}
 	}
+}
+
+func nextTransferSpeed(sample transferSpeedSample, now time.Time, transferred int64) (int64, transferSpeedSample) {
+	if sample.at.IsZero() {
+		return 0, transferSpeedSample{at: now, bytes: transferred}
+	}
+	elapsed := now.Sub(sample.at)
+	if elapsed < transferSpeedSampleWindow {
+		return sample.speed, sample
+	}
+	delta := transferred - sample.bytes
+	if delta < 0 {
+		delta = 0
+	}
+	speed := int64(float64(delta) / elapsed.Seconds())
+	return speed, transferSpeedSample{at: now, bytes: transferred, speed: speed}
 }
 
 func (f *FileService) shouldPersistTransferProgress(taskID string, transferred, total int64) bool {

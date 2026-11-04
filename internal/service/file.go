@@ -34,6 +34,7 @@ type FileService struct {
 	shuttingDown         bool
 	progress             sync.Mutex
 	startsAt             map[string]time.Time
+	speedSamples         map[string]transferSpeedSample
 	lastProgressPersist  map[string]time.Time
 	lastProgressBytes    map[string]int64
 	finalizationMu       sync.Mutex
@@ -75,6 +76,7 @@ func NewFileService(sessions *SessionService, eventBus EventBus, logger *slog.Lo
 		transferSlots:        make(chan struct{}, defaultMaxConcurrentTransfers),
 		maxQueuedTransfers:   defaultMaxQueuedTransfers,
 		startsAt:             make(map[string]time.Time),
+		speedSamples:         make(map[string]transferSpeedSample),
 		lastProgressPersist:  make(map[string]time.Time),
 		lastProgressBytes:    make(map[string]int64),
 		pendingFinalizations: make(map[string]transferFinalization),

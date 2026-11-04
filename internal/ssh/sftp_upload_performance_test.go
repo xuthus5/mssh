@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -128,4 +129,116 @@ func TestCopyUploadedFileStopsAfterCancellation(t *testing.T) {
 	err = copyUploadedFile(ctx, remote, reader, int64(len(reader.data)), nil)
 
 	assert.ErrorIs(t, err, context.Canceled)
+}
+
+type blockingFileWriter struct {
+	delegate sftp.FileWriter
+	started  chan struct{}
+	release  chan struct{}
+	once     sync.Once
+}
+
+func (writer *blockingFileWriter) Filewrite(request *sftp.Request) (io.WriterAt, error) {
+	target, err := writer.delegate.Filewrite(request)
+	if err != nil {
+		return nil, err
+	}
+	return &blockingWriterAt{writer: writer, delegate: target}, nil
+}
+
+type blockingWriterAt struct {
+	writer   *blockingFileWriter
+	delegate io.WriterAt
+}
+
+func (writer *blockingWriterAt) WriteAt(data []byte, offset int64) (int, error) {
+	writer.writer.once.Do(func() { close(writer.writer.started) })
+	<-writer.writer.release
+	return writer.delegate.WriteAt(data, offset)
+}
+
+func TestUploadFileReportsProgressAfterRemoteAck(t *testing.T) {
+	handlers := sftp.InMemHandler()
+	writer := &blockingFileWriter{
+		delegate: handlers.FilePut,
+		started:  make(chan struct{}),
+		release:  make(chan struct{}),
+	}
+	handlers.FilePut = writer
+	address, cleanup := startSFTPServerWithHandlers(t, handlers)
+	t.Cleanup(cleanup)
+	wrapper, client := connectSFTP(t, address)
+	t.Cleanup(func() {
+		assert.NoError(t, client.Close())
+		assert.NoError(t, wrapper.Close())
+	})
+	content := bytes.Repeat([]byte("x"), 256*1024)
+	source := filepath.Join(t.TempDir(), "source.bin")
+	require.NoError(t, os.WriteFile(source, content, 0o600))
+	progress := make(chan int64, len(content)/transferSFTPPacketSize+1)
+	done := make(chan error, 1)
+	go func() {
+		done <- UploadFile(client, source, "/ack-progress.bin", func(transferred, _ int64) {
+			progress <- transferred
+		})
+	}()
+
+	select {
+	case <-writer.started:
+	case <-time.After(time.Second):
+		t.Fatal("remote write did not start")
+	}
+	select {
+	case transferred := <-progress:
+		t.Fatalf("progress reported before remote ACK: %d", transferred)
+	case <-time.After(20 * time.Millisecond):
+	}
+	close(writer.release)
+	require.NoError(t, <-done)
+	var transferred int64
+	for len(progress) > 0 {
+		transferred = <-progress
+	}
+	assert.Equal(t, int64(len(content)), transferred)
+}
+
+type writeErrorFileWriter struct {
+	delegate sftp.FileWriter
+	err      error
+}
+
+func (writer *writeErrorFileWriter) Filewrite(request *sftp.Request) (io.WriterAt, error) {
+	target, err := writer.delegate.Filewrite(request)
+	if err != nil {
+		return nil, err
+	}
+	return &writeErrorWriterAt{delegate: target, err: writer.err}, nil
+}
+
+type writeErrorWriterAt struct {
+	delegate io.WriterAt
+	err      error
+}
+
+func (writer *writeErrorWriterAt) WriteAt([]byte, int64) (int, error) {
+	return 0, writer.err
+}
+
+func TestUploadFilePropagatesRemoteWriteError(t *testing.T) {
+	handlers := sftp.InMemHandler()
+	writeErr := errors.New("remote write failed")
+	handlers.FilePut = &writeErrorFileWriter{delegate: handlers.FilePut, err: writeErr}
+	address, cleanup := startSFTPServerWithHandlers(t, handlers)
+	t.Cleanup(cleanup)
+	wrapper, client := connectSFTP(t, address)
+	t.Cleanup(func() {
+		assert.NoError(t, client.Close())
+		assert.NoError(t, wrapper.Close())
+	})
+	source := filepath.Join(t.TempDir(), "source.bin")
+	require.NoError(t, os.WriteFile(source, []byte("payload"), 0o600))
+
+	err := UploadFile(client, source, "/write-error.bin", nil)
+
+	assert.ErrorContains(t, err, writeErr.Error())
 }
