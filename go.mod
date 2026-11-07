@@ -16,7 +16,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/pkg/sftp v1.13.11
 	github.com/stretchr/testify v1.12.1
-	github.com/wailsapp/wails/v3 v3.0.0
+	github.com/wailsapp/wails/v3 v3.1.0
 	github.com/zalando/go-keyring v0.2.8
 	go.bug.st/serial v1.8.0
 	golang.org/x/crypto v0.57.0
@@ -27,7 +27,6 @@ require (
 )
 
 require (
-	github.com/adrg/xdg v0.5.3 // indirect
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.7.20 // indirect
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.19.1 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/configsources v1.5.1 // indirect
@@ -43,13 +42,14 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sts v1.48.0 // indirect
 	github.com/danieljoos/wincred v1.2.3 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
+	github.com/ebitengine/purego v0.11.1 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
 	github.com/kr/fs v0.1.0 // indirect
-	github.com/mattn/go-colorable v0.1.15 // indirect
 	github.com/mattn/go-isatty v0.0.24 // indirect
 	github.com/ncruces/go-strftime v1.0.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
+	golang.org/x/term v0.46.0 // indirect
 	golang.org/x/text v0.42.0 // indirect
 	modernc.org/libc v1.75.7 // indirect
 	modernc.org/mathutil v1.7.1 // indirect

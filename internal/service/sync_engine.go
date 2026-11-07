@@ -52,6 +52,9 @@ func (s *SyncService) TestProvider(input model.SyncConfigInput) error {
 	message := "连接测试成功"
 	if err != nil {
 		status, message = model.SyncEventFailed, "连接测试失败"
+		if s.logger != nil {
+			s.logger.Error("sync provider test failed", "provider", config.Provider, "error", err)
+		}
 	}
 	s.recordSyncEvent("test", config, status, 0, 0, message)
 	return err
@@ -92,6 +95,9 @@ func (s *SyncService) runSync(ctx context.Context, direction syncDirection, acti
 	s.setRuntimeState(syncRuntimeState{State: model.SyncStateSyncing, Message: "正在同步"})
 	result, err := s.executeSync(ctx, config, direction)
 	if err != nil {
+		if s.logger != nil {
+			s.logger.Error("sync failed", "action", action, "provider", config.Provider, "strategy", config.Strategy, "error", err)
+		}
 		s.setRuntimeState(syncRuntimeState{State: model.SyncStateError, Message: err.Error()})
 		s.recordSyncEvent(action, config, model.SyncEventFailed, 0, 0, "同步失败")
 		return model.SyncResult{}, err

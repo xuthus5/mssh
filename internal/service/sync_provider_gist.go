@@ -65,16 +65,13 @@ func normalizeGistID(value string) string {
 }
 
 func (g *gistSyncProvider) Test(ctx context.Context) error {
-	path := "/user"
-	if g.gistID != "" {
-		path = "/gists/" + url.PathEscape(g.gistID)
-	}
-	response, err := g.do(ctx, http.MethodGet, path, nil)
-	if err != nil {
+	if err := g.testToken(ctx); err != nil {
 		return err
 	}
-	defer func() { _ = response.Body.Close() }()
-	return expectHTTPStatus(response, http.StatusOK, "GitHub Gist connection")
+	if g.gistID == "" {
+		return nil
+	}
+	return g.testConfiguredGist(ctx)
 }
 
 func (g *gistSyncProvider) Fetch(ctx context.Context) (syncRemoteObject, error) {
@@ -109,10 +106,7 @@ func (g *gistSyncProvider) Fetch(ctx context.Context) (syncRemoteObject, error) 
 
 func (g *gistSyncProvider) Put(ctx context.Context, content []byte, etag string) (syncRemoteObject, error) { //nolint:gocognit // create/update/conflict handling is one atomic provider operation.
 	if g.gistID != "" {
-		if strings.TrimSpace(etag) == "" {
-			return syncRemoteObject{}, errSyncConflict
-		}
-		if err := g.ensureGistETag(ctx, etag); err != nil {
+		if err := g.prepareConfiguredGistForPut(ctx, etag); err != nil {
 			return syncRemoteObject{}, err
 		}
 	}
@@ -131,19 +125,12 @@ func (g *gistSyncProvider) Put(ctx context.Context, content []byte, etag string)
 	if g.gistID != "" {
 		method, path = http.MethodPatch, "/gists/"+url.PathEscape(g.gistID)
 	}
-	headers := map[string]string{}
-	if g.gistID != "" && etag != "" {
-		headers["If-Match"] = etag
-	}
-	response, err := g.doWithHeaders(ctx, method, path, bytes.NewReader(encoded), headers)
+	response, err := g.do(ctx, method, path, bytes.NewReader(encoded))
 	if err != nil {
 		return syncRemoteObject{}, err
 	}
 	defer func() { _ = response.Body.Close() }()
 	if response.StatusCode == http.StatusPreconditionFailed || response.StatusCode == http.StatusConflict {
-		return syncRemoteObject{}, errSyncConflict
-	}
-	if g.gistID != "" && etag != "" && response.StatusCode == http.StatusBadRequest {
 		return syncRemoteObject{}, errSyncConflict
 	}
 	if response.StatusCode != http.StatusOK && response.StatusCode != http.StatusCreated {

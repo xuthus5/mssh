@@ -2897,9 +2897,10 @@
 
 | ID | EARS 验收条件 | 状态 |
 |---|---|---|
-| SYNC-ARCH-702 | 当两个设备基于同一远端版本并发上传时，系统必须拒绝无法由服务端确认的陈旧写入；GitHub Gist 不可靠支持 `If-Match` 时必须 fail-closed 返回冲突，不得静默覆盖。 | done |
+| SYNC-ARCH-702 | 当两个设备基于同一远端版本并发上传时，系统必须在写入前通过远端 ETag 校验拒绝陈旧写入；GitHub Gist 不支持可靠的 `If-Match` 条件写入时不得发送该头，避免把所有更新误判为冲突。 | done |
+| SYNC-RECOVERY-703 | 当已配置的 GitHub Gist 返回 404 或不存在时，连接测试必须仍能验证 Token；推送必须自动创建新的 Secret Gist 并回写新 Gist ID，不得返回 `sync remote backup changed`。 | done |
 
-当前 Gist Provider 在更新时要求已有 ETag，先校验远端版本并携带 `If-Match`；GitHub 返回不支持条件更新的 `400` 时按同步冲突处理并禁止写入。该策略宁可拒绝更新，也不允许 TOCTOU 静默覆盖。
+当前 Gist Provider 在更新已有备份前仍会读取远端 ETag 并校验版本；但 GitHub Gist PATCH 不发送 `If-Match`，避免服务端拒绝条件写入导致所有更新返回 400。配置的 Gist 已不存在时，推送会创建新的 Secret Gist 并保存新 ID；真实 ETag 变化、412/409 以及“远端已有备份但缺少 ETag”仍按冲突处理。
 
 ## 2026-07-28 商用硬化波次（SSH Agent 信任边界）
 
@@ -2916,7 +2917,7 @@
 |---|---|---|
 | SERIAL-ARCH-705 | 当应用配置串口流控时，生产实现不得依赖第三方私有字段；公开 API 无法表达握手模式时必须明确拒绝并保留手动 DTR/RTS。 | done |
 | SSH-ARCH-706 | 当 Windows 用户选择 SSH Agent 认证时，应用必须支持系统 OpenSSH 默认 named pipe，并在 UI 中仅暴露实际可用能力。 | done |
-| DEP-ARCH-707 | 当 Wails 工具链、Go runtime 与前端 runtime 参与同一构建时，三者必须使用同一精确版本并由单一版本源校验。已将 CLI、Go 模块与 `@wailsio/runtime` 统一锁定为正式版 `v3.0.0`（`.wails-version` 单一版本源）；Go 构建、前端全量测试与生产构建均通过。 | done |
+| DEP-ARCH-707 | 当 Wails 工具链、Go runtime 与前端 runtime 参与同一构建时，三者必须使用同一精确版本并由单一版本源校验。已将 CLI、Go 模块与 `@wailsio/runtime` 统一锁定为正式版 `v3.1.0`（`.wails-version` 单一版本源）；升级后已完成 lint、定向同步回归测试、前端全量测试与依赖审计。 | done |
 
 串口握手模式在公开 API 不可表达时现在明确拒绝，避免私有字段耦合；Windows Agent 使用 `go-winio` 支持系统 named pipe；Wails runtime 继续由锁定版本统一校验。
 

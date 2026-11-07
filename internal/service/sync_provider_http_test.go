@@ -15,7 +15,6 @@ func TestGistProviderCreatesFetchesAndProtectsUpdates(t *testing.T) {
 	var content string
 	etag := `"v1"`
 	var lastPatchBody map[string]any
-	var lastPatchHadIfMatch bool
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		assert.Equal(t, "Bearer token", request.Header.Get("Authorization"))
 		switch {
@@ -36,9 +35,8 @@ func TestGistProviderCreatesFetchesAndProtectsUpdates(t *testing.T) {
 			writer.Header().Set("ETag", etag)
 			_ = json.NewEncoder(writer).Encode(gistResponse{ID: "gist-1", Files: map[string]gistFile{syncBackupFileName: {Content: content}}})
 		case request.Method == http.MethodPatch && request.URL.Path == "/gists/gist-1":
-			lastPatchHadIfMatch = request.Header.Get("If-Match") != ""
 			require.NoError(t, json.NewDecoder(request.Body).Decode(&lastPatchBody))
-			assert.Equal(t, etag, request.Header.Get("If-Match"))
+			assert.Empty(t, request.Header.Get("If-Match"))
 			if _, hasPublic := lastPatchBody["public"]; hasPublic {
 				writer.WriteHeader(http.StatusBadRequest)
 				_, _ = writer.Write([]byte(`{"message":"Invalid request"}`))
@@ -70,7 +68,6 @@ func TestGistProviderCreatesFetchesAndProtectsUpdates(t *testing.T) {
 	updated, err := provider.Put(t.Context(), []byte("next"), etag)
 	require.NoError(t, err)
 	assert.Equal(t, `"v2"`, updated.ETag)
-	assert.True(t, lastPatchHadIfMatch)
 	_, hasPublic := lastPatchBody["public"]
 	assert.False(t, hasPublic)
 	assert.Equal(t, "next", content)
