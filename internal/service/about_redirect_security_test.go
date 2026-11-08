@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const updateReleaseJSON = `{"tag_name":"v9.9.9","html_url":"https://github.com/xuthus5/mssh/releases/tag/v9.9.9"}`
+var updateReleaseJSON = testUpdateReleaseBody("v9.9.9")
 
 func TestAboutServiceRejectsCrossOriginRedirect(t *testing.T) {
 	var targetCalls atomic.Int32

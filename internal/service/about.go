@@ -2,13 +2,14 @@ package service
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
+	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/xuthus5/mssh/internal/model"
@@ -18,26 +19,60 @@ import (
 const (
 	RepositoryURL          = "https://github.com/xuthus5/mssh"
 	latestAPIURL           = "https://api.github.com/repos/xuthus5/mssh/releases/latest"
+	releasesAPIURL         = "https://api.github.com/repos/xuthus5/mssh/releases?per_page=20"
 	maxUpdateResponseBytes = 1 << 20
 )
 
 var Version = "0.1.0"
 
 type AboutService struct {
-	client       *http.Client
-	latestAPIURL string
-	lifecycle    aboutServiceLifecycle
+	client           *http.Client
+	downloadClient   *http.Client
+	latestAPIURL     string
+	releasesAPIURL   string
+	logger           *slog.Logger
+	autoUpdateSource autoUpdateSettingSource
+	updater          updateEngine
+	autoUpdateEvery  time.Duration
+	autoUpdateWake   chan struct{}
+	autoUpdateOnce   sync.Once
+	readyMu          sync.Mutex
+	readyUpdate      *model.UpdateInfo
+	readyHandler     func(model.UpdateInfo)
+	lifecycle        aboutServiceLifecycle
 }
 
-type githubReleaseResponse struct {
-	TagName     string `json:"tag_name"`
-	HTMLURL     string `json:"html_url"`
-	PublishedAt string `json:"published_at"`
+type AboutServiceOption func(*AboutService)
+
+func WithAboutLogger(logger *slog.Logger) AboutServiceOption {
+	return func(service *AboutService) { service.logger = logger }
 }
 
-func NewAboutService(proxy ...*netproxy.Manager) *AboutService {
-	client := sharedHTTPClient(10*time.Second, firstProxy(proxy...))
-	return &AboutService{client: client, latestAPIURL: latestAPIURL}
+func WithAboutAutoUpdateSource(source autoUpdateSettingSource) AboutServiceOption {
+	return func(service *AboutService) { service.autoUpdateSource = source }
+}
+
+func NewAboutService(options ...any) *AboutService {
+	var proxy *netproxy.Manager
+	for _, option := range options {
+		if manager, ok := option.(*netproxy.Manager); ok {
+			proxy = manager
+		}
+	}
+	service := &AboutService{
+		client:          sharedHTTPClient(10*time.Second, proxy),
+		downloadClient:  sharedHTTPClient(30*time.Minute, proxy),
+		latestAPIURL:    latestAPIURL,
+		releasesAPIURL:  releasesAPIURL,
+		autoUpdateEvery: time.Hour,
+		autoUpdateWake:  make(chan struct{}, 1),
+	}
+	for _, option := range options {
+		if apply, ok := option.(AboutServiceOption); ok {
+			apply(service)
+		}
+	}
+	return service
 }
 
 func (a *AboutService) Info() model.AboutInfo {
@@ -50,51 +85,11 @@ func (a *AboutService) CheckUpdate(ctx context.Context) (*model.UpdateInfo, erro
 		return nil, fmt.Errorf("check update: %w", err)
 	}
 	defer finish()
-	request, err := http.NewRequestWithContext(operationContext, http.MethodGet, a.latestAPIURL, nil)
-	if err != nil {
-		return nil, fmt.Errorf("check update: create request: %w", err)
-	}
-	request.Header.Set("Accept", "application/vnd.github+json")
-	request.Header.Set("User-Agent", "mssh/"+Version)
-	response, err := sameOriginHTTPClient(a.client, request.URL).Do(request)
+	release, err := a.fetchLatestRelease(operationContext, Version, runtime.GOOS, runtime.GOARCH, true)
 	if err != nil {
 		return nil, fmt.Errorf("check update: %w", err)
 	}
-	defer func() { _ = response.Body.Close() }()
-	if response.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("check update: GitHub returned %s", response.Status)
-	}
-	release, err := decodeUpdateRelease(response.Body)
-	if err != nil {
-		return nil, fmt.Errorf("check update: decode response: %w", err)
-	}
-	if strings.TrimSpace(release.TagName) == "" {
-		return nil, fmt.Errorf("check update: latest release has no version")
-	}
-	updateAvailable, err := isUpdateAvailable(release.TagName, Version, release.PublishedAt)
-	if err != nil {
-		return nil, fmt.Errorf("check update: compare versions: %w", err)
-	}
-	releaseURL, err := trustedReleaseURL(release.HTMLURL, release.TagName)
-	if err != nil {
-		return nil, fmt.Errorf("check update: %w", err)
-	}
-	return &model.UpdateInfo{CurrentVersion: Version, LatestVersion: release.TagName, ReleaseURL: releaseURL, UpdateAvailable: updateAvailable}, nil
-}
-
-func decodeUpdateRelease(reader io.Reader) (githubReleaseResponse, error) {
-	content, err := io.ReadAll(io.LimitReader(reader, maxUpdateResponseBytes+1))
-	if err != nil {
-		return githubReleaseResponse{}, err
-	}
-	if len(content) > maxUpdateResponseBytes {
-		return githubReleaseResponse{}, fmt.Errorf("response exceeds %d bytes", maxUpdateResponseBytes)
-	}
-	var release githubReleaseResponse
-	if err := json.Unmarshal(content, &release); err != nil {
-		return githubReleaseResponse{}, err
-	}
-	return release, nil
+	return &release.Info, nil
 }
 
 type semanticVersion struct {

@@ -15,10 +15,34 @@ export function CheckUpdate(): $CancellablePromise<model$0.UpdateInfo | null> {
     });
 }
 
+export function DownloadUpdate(): $CancellablePromise<model$0.UpdateInfo | null> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.AboutService.DownloadUpdate").then(($result: any) => {
+        return $$createType1($result);
+    });
+}
+
 export function Info(): $CancellablePromise<model$0.AboutInfo> {
     return $Call.ByName("github.com/xuthus5/mssh/internal/service.AboutService.Info").then(($result: any) => {
         return $$createType2($result);
     });
+}
+
+export function ReadyUpdate(): $CancellablePromise<model$0.UpdateInfo | null> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.AboutService.ReadyUpdate").then(($result: any) => {
+        return $$createType1($result);
+    });
+}
+
+/**
+ * RequestAutoUpdateCheck asks the background worker to re-evaluate the setting
+ * immediately. It is used when the user enables automatic updates.
+ */
+export function RequestAutoUpdateCheck(): $CancellablePromise<void> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.AboutService.RequestAutoUpdateCheck");
+}
+
+export function RestartUpdate(): $CancellablePromise<void> {
+    return $Call.ByName("github.com/xuthus5/mssh/internal/service.AboutService.RestartUpdate");
 }
 
 // Private type creation functions

@@ -277,7 +277,7 @@ func assembleApp(input serviceInitialization, runtime *service.CryptoRuntime, se
 		Log:            logSvc,
 		Sync:           syncSvc,
 		Setting:        settingSvc,
-		About:          service.NewAboutService(input.opts.ProxyManager),
+		About:          service.NewAboutService(input.opts.ProxyManager, service.WithAboutLogger(input.logger), service.WithAboutAutoUpdateSource(settingSvc)),
 		Font:           service.NewFontService(input.logger),
 		Audit:          service.NewAuditService(input.db, input.logger),
 		AssetCatalog:   service.NewAssetCatalogService(input.db, input.logger),

@@ -10,4 +10,6 @@ type UpdateInfo struct {
 	LatestVersion   string `json:"latest_version"`
 	ReleaseURL      string `json:"release_url"`
 	UpdateAvailable bool   `json:"update_available"`
+	ArtifactName    string `json:"artifact_name"`
+	ArtifactSize    int64  `json:"artifact_size"`
 }

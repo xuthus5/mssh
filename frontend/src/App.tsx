@@ -29,6 +29,7 @@ import { resolveShortcutAction } from '@/lib/shortcutRuntime'
 import type { ShortcutActionId } from '@/lib/shortcuts'
 import { emitTerminalSearchToggle } from '@/lib/terminalSearchEvents'
 import { AIAgentTaskCenter } from '@/components/agent/AIAgentTaskCenter'
+import { UpdateReadyHost } from '@/components/update/UpdateReadyHost'
 
 
 function activeTab(state: AppState): Tab | undefined {
@@ -195,6 +196,7 @@ function AppShell() {
       <StatusBar />
       <ToastContainer />
       <ConfirmDialogHost />
+      <UpdateReadyHost />
       <ConnectDialog />
       <HostKeyPromptSync />
       <SessionQuickSearchHost />

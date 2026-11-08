@@ -101,6 +101,7 @@ The desktop app has an authenticated unified local IPC transport available for r
 - Data bits, parity, and stop bits, plus manual DTR/RTS signals; hardware and software flow control are rejected with an explicit error until a public driver API can express them
 - DTR, RTS, Break, local echo, and exclusive device lock controls
 - System tray, configurable close-button behavior, and daily local logs
+- Optional hourly background update checks with automatic download and restart prompts; the About page supports manual check, download, and restart
 
 ### Appearance and shortcuts
 

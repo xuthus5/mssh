@@ -15,10 +15,13 @@ import (
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
+	"github.com/wailsapp/wails/v3/pkg/updater"
 
 	"github.com/xuthus5/mssh/internal/app"
 	"github.com/xuthus5/mssh/internal/applog"
+	"github.com/xuthus5/mssh/internal/model"
 	"github.com/xuthus5/mssh/internal/netproxy"
+	"github.com/xuthus5/mssh/internal/service"
 	"github.com/xuthus5/mssh/internal/windowing"
 )
 
@@ -79,6 +82,7 @@ func main() {
 		TraceFrontend: traceFrontend,
 		GpuPolicy:     gpuPolicy,
 	})
+	configureUpdateRuntime(wailsApp, appInstance, logger)
 	wailsApp.OnShutdown(func() {
 		shutdownRuntime(appInstance, logManager, os.Stderr)
 	})
@@ -166,6 +170,38 @@ func newWailsApplication(appInstance *app.App, logger *slog.Logger) *application
 	})
 	appInstance.Key.SetFilePicker(&wailsKeyFilePicker{app: wailsApp})
 	return wailsApp
+}
+
+func configureUpdateRuntime(wailsApp *application.App, appInstance *app.App, logger *slog.Logger) {
+	if wailsApp == nil || appInstance == nil || appInstance.About == nil {
+		return
+	}
+	config := updater.Config{
+		CurrentVersion: appInstance.About.Info().CurrentVersion,
+		Providers:      []updater.Provider{service.NewAboutUpdateProvider(appInstance.About)},
+		Window:         updater.WindowNone,
+	}
+	if err := wailsApp.Updater.Init(config); err != nil {
+		logger.Warn("initialize application updater failed", "error", err)
+		return
+	}
+	appInstance.About.SetUpdater(wailsApp.Updater)
+	appInstance.About.SetUpdateReadyHandler(func(info model.UpdateInfo) {
+		wailsApp.Event.Emit(service.UpdateReadyEvent, info)
+		showMainWindow(wailsApp)
+	})
+	appInstance.About.StartAutoUpdate()
+}
+
+func showMainWindow(wailsApp *application.App) {
+	for _, window := range wailsApp.Window.GetAll() {
+		if window.Name() != "main" {
+			continue
+		}
+		window.Show()
+		window.Focus()
+		return
+	}
 }
 
 type wailsKeyFilePicker struct {

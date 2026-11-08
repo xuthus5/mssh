@@ -13,7 +13,7 @@ import (
 func TestAboutServiceCheckUpdate(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		assert.Equal(t, "mssh/"+Version, request.Header.Get("User-Agent"))
-		_, err := writer.Write([]byte(`{"tag_name":"v0.2.0","html_url":"https://github.com/xuthus5/mssh/releases/tag/v0.2.0"}`))
+		_, err := writer.Write([]byte(testUpdateReleaseBody("v0.2.0")))
 		require.NoError(t, err)
 	}))
 	defer server.Close()
@@ -32,7 +32,8 @@ func TestAboutServiceCheckUpdateFromNightlyBuild(t *testing.T) {
 	Version = "nightly-20261028-1234567890-abcdef0"
 	t.Cleanup(func() { Version = originalVersion })
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
-		_, err := writer.Write([]byte(`{"tag_name":"v1.0.1","html_url":"https://github.com/xuthus5/mssh/releases/tag/v1.0.1","published_at":"2026-10-29T06:58:01Z"}`))
+		body := `{"tag_name":"v1.0.1","html_url":"https://github.com/xuthus5/mssh/releases/tag/v1.0.1","published_at":"2026-10-29T06:58:01Z","assets":[` + testUpdateAssetJSON("v1.0.1") + `]}`
+		_, err := writer.Write([]byte(body))
 		require.NoError(t, err)
 	}))
 	t.Cleanup(server.Close)

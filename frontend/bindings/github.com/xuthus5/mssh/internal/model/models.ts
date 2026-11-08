@@ -5374,6 +5374,8 @@ export class UpdateInfo {
     "latest_version": string;
     "release_url": string;
     "update_available": boolean;
+    "artifact_name": string;
+    "artifact_size": number;
 
     /** Creates a new UpdateInfo instance. */
     constructor($$source: Partial<UpdateInfo> = {}) {
@@ -5388,6 +5390,12 @@ export class UpdateInfo {
         }
         if (!("update_available" in $$source)) {
             this["update_available"] = false;
+        }
+        if (!("artifact_name" in $$source)) {
+            this["artifact_name"] = "";
+        }
+        if (!("artifact_size" in $$source)) {
+            this["artifact_size"] = 0;
         }
 
         Object.assign(this, $$source);
