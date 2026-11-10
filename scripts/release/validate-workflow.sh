@@ -24,8 +24,7 @@ for pattern in \
   'previous_tag_name="${previous_tag}"' \
   'release-commits.tsv' \
   'go-version-file: .go-version' \
-  'node-version-file: .node-version' \
-  'runner: macos-15'; do
+  'node-version-file: .node-version'; do
   grep -Fq -- "${pattern}" "${workflow}"
 done
 
@@ -39,6 +38,12 @@ grep -Fq -- 'go mod verify' "${taskfile}"
 grep -Fq -- '"{{.MAKENSIS}}" -DARG_WAILS_' "${windows_taskfile}"
 
 for checked_workflow in "${workflow}" "${nightly_workflow}"; do
+  grep -Eq '^[[:space:]]+runner: macos-15[[:space:]]*$' "${checked_workflow}"
+  grep -Eq '^[[:space:]]+runner: macos-15-intel[[:space:]]*$' "${checked_workflow}"
+  if grep -Eq 'macos-14([^0-9]|$)' "${checked_workflow}"; then
+    echo "release workflows must not use retired macOS 14 runners" >&2
+    exit 1
+  fi
   grep -Fq -- '"MAKENSIS_NATIVE=$makensis" | Out-File -FilePath $env:GITHUB_ENV' "${checked_workflow}"
   grep -Fq -- 'Test-Path $env:MAKENSIS_NATIVE' "${checked_workflow}"
   grep -Fq -- 'go run ./scripts/release/nsis_runner.go \' "${checked_workflow}"

@@ -285,9 +285,9 @@ jobs:
       matrix:
         include:
           - arch: arm64
-            runner: macos-14
-          - arch: amd64
             runner: macos-15
+          - arch: amd64
+            runner: macos-15-intel
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7

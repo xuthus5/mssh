@@ -1582,6 +1582,8 @@
 
 本波次证据：macOS amd64 runner 从无效的 `macos-15-intel` 修正为有效的 `macos-15`，`actionlint` 与发布校验脚本通过；移除未被源码引用的 `shadcn` 运行时依赖，`npm ci` 后 `npm audit --audit-level=high --registry=https://registry.npmjs.org` 报告 0 vulnerabilities。
 
+> 2026-11-10 更新：GitHub 已退役 macOS 14 runner；当前标准标签为 arm64 `macos-15`、x64 `macos-15-intel`，Nightly/Release 矩阵已按原生架构拆分。
+
 ## 2026-07-26 商用硬化波次（SOCKS 代理与 Vault 状态原子性）
 
 | ID | EARS 验收条件 | 状态 |
