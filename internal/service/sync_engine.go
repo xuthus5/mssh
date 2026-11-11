@@ -171,6 +171,9 @@ func (s *SyncService) fetchRemote(ctx context.Context, provider syncProvider) (s
 		return syncRemoteObject{}, decodedSyncArtifact{}, false, err
 	}
 	artifact, err := decodeSyncArtifact(remote.Content, masterKey)
+	if err != nil {
+		err = s.remoteArtifactDecodeError(remote.Content, err)
+	}
 	return remote, artifact, err == nil, err
 }
 

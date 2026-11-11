@@ -51,7 +51,7 @@ describe('useCloudSyncCenter', () => {
 
   it('exposes every sync operation through the controller', async () => {
     const resultValue = { state: SyncState.SyncStateSynced, message: 'ok', conflict: null }
-    for (const method of ['TestProvider', 'SyncNow', 'PushNow', 'PullNow', 'ResolveConflict']) {
+    for (const method of ['TestProvider', 'SyncNow', 'PushNow', 'PullNow', 'JoinWithPassword', 'ResolveConflict']) {
       __registerHandler(`github.com/xuthus5/mssh/internal/service.SyncService.${method}`, async () => resultValue)
     }
     for (const method of ['RestoreVersion', 'DeleteVersion', 'ResetLocalData']) {
@@ -64,6 +64,7 @@ describe('useCloudSyncCenter', () => {
       await result.current.syncNow()
       await result.current.pushNow()
       await result.current.pullNow()
+      await result.current.joinWithPassword(createSyncInput(dashboard.config as any), 'join-password-12')
       await result.current.resolveConflict('cancel' as any)
       await result.current.restoreVersion(1)
       await result.current.deleteVersion(1)

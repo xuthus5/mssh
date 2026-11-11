@@ -33,7 +33,7 @@ const providers = [
 export function SyncProviderTab(props: Props) {
   const update = (patch: Partial<SyncConfigInput>) => props.onChange({ ...props.input, ...patch })
   return <div className="flex flex-col gap-5">
-    <Alert><AlertDescription>{t('云同步使用“设置 → 安全”中的应用密码加密备份。请先配置应用密码，并在各设备保持一致。')}</AlertDescription></Alert>
+    <Alert><AlertDescription>{t('云同步使用应用密码派生的密钥加密。新设备请在“同步状态与配置”中使用“从云端恢复此设备”；仅输入相同应用密码不会自动复用其他设备的密钥。')}</AlertDescription></Alert>
     <ProviderSelector input={props.input} onChange={(provider) => update({ provider })} />
     <div className="border-t border-border pt-5">
       {props.input.provider === SyncProvider.SyncProviderGist && <GistFields {...props} />}

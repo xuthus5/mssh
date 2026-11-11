@@ -59,7 +59,7 @@ function settingsProps() {
       startGistOAuth: vi.fn(async (): Promise<GistOAuthStart> => ({ flow_id: '', user_code: '', verification_uri: '', expires_at: '', interval_seconds: 0 })),
       pollGistOAuth: vi.fn(async (): Promise<GistOAuthResult> => ({ status: GistOAuthStatus.GistOAuthPending, message: '', account: '', gist_id: '', retry_after_seconds: 0 })),
       cancelGistOAuth: vi.fn(async () => {}),
-      syncNow: vi.fn(async () => {}), pushNow: vi.fn(async () => {}), pullNow: vi.fn(async () => {}),
+      syncNow: vi.fn(async () => {}), pushNow: vi.fn(async () => {}), pullNow: vi.fn(async () => {}), joinWithPassword: vi.fn(async () => {}),
       resolveConflict: vi.fn(async () => {}), restoreVersion: vi.fn(async () => {}), deleteVersion: vi.fn(async () => {}), resetLocalData: vi.fn(async () => {}),
     },
     onSaveGeneral: vi.fn(async () => {}),

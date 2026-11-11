@@ -224,7 +224,7 @@ function SyncStatusContent(props: SyncSettingsCardProps & { dashboard: SyncDashb
         dashboard={props.dashboard} input={props.input}
         dirty={props.dirty || props.autoSave.status === 'pending' || props.autoSave.status === 'saving'}
         pending={props.pending} error={props.controller.error} onChange={props.setInput}
-        onSync={props.controller.syncNow} onPush={props.controller.pushNow} onPull={props.controller.pullNow}
+        onSync={props.controller.syncNow} onPush={props.controller.pushNow} onPull={props.controller.pullNow} onJoin={props.controller.joinWithPassword}
         onResolve={props.controller.resolveConflict} onRestore={props.controller.restoreVersion}
         onDelete={props.controller.deleteVersion} onReset={props.controller.resetLocalData}
         onExport={() => runTransfer(props.onExport, '导出本地备份失败: ${}')}

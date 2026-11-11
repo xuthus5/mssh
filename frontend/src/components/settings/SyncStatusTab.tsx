@@ -3,6 +3,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { SyncActivityLog } from '@/components/settings/SyncActivityLog'
+import { SyncCloudRestoreAction } from '@/components/settings/SyncCloudRestoreAction'
 import { SyncDangerActions } from '@/components/settings/SyncDangerActions'
 import { SyncPolicySettings } from '@/components/settings/SyncPolicySettings'
 import { SyncVersionHistory } from '@/components/settings/SyncVersionHistory'
@@ -21,6 +22,7 @@ interface Props {
   onSync: () => Promise<void>
   onPush: () => Promise<void>
   onPull: () => Promise<void>
+  onJoin: (input: SyncConfigInput, password: string) => Promise<void>
   onResolve: (choice: SyncConflictChoice) => Promise<void>
   onRestore: (id: number) => Promise<void>
   onDelete: (id: number) => Promise<void>
@@ -35,7 +37,7 @@ export function SyncStatusTab(props: Props) {
     <SyncOverview dashboard={props.dashboard} />
     {props.dirty && <Alert><AlertTitle>{t('存在未保存配置')}</AlertTitle><AlertDescription>{t('保存 Provider、密钥或同步策略后才能执行同步。')}</AlertDescription></Alert>}
     {props.error && <Alert variant="destructive"><AlertDescription>{props.error}</AlertDescription></Alert>}
-    <div className="flex flex-wrap gap-2"><Button type="button" disabled={actionsDisabled} onClick={() => void props.onSync().catch(() => undefined)}><RefreshCw data-icon="inline-start" />{t('立即同步')}</Button><Button type="button" variant="outline" disabled={actionsDisabled} onClick={() => void props.onPush().catch(() => undefined)}><ArrowUpFromLine data-icon="inline-start" />{t('推送本地')}</Button><Button type="button" variant="outline" disabled={actionsDisabled} onClick={() => void props.onPull().catch(() => undefined)}><ArrowDownToLine data-icon="inline-start" />{t('拉取云端')}</Button></div>
+    <div className="flex flex-wrap gap-2"><Button type="button" disabled={actionsDisabled} onClick={() => void props.onSync().catch(() => undefined)}><RefreshCw data-icon="inline-start" />{t('立即同步')}</Button><Button type="button" variant="outline" disabled={actionsDisabled} onClick={() => void props.onPush().catch(() => undefined)}><ArrowUpFromLine data-icon="inline-start" />{t('推送本地')}</Button><Button type="button" variant="outline" disabled={actionsDisabled} onClick={() => void props.onPull().catch(() => undefined)}><ArrowDownToLine data-icon="inline-start" />{t('拉取云端')}</Button><SyncCloudRestoreAction input={props.input} disabled={actionsDisabled} onJoin={props.onJoin} /></div>
     {props.dashboard.conflict && <ConflictPanel pending={props.pending !== null} onResolve={props.onResolve} />}
     <SyncPolicySettings input={props.input} pending={props.pending} onChange={props.onChange} />
     <SyncVersionHistory versions={props.dashboard.versions} pending={props.pending} onRestore={props.onRestore} onDelete={props.onDelete} />

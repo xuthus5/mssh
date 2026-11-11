@@ -31,6 +31,7 @@ export interface CloudSyncController {
   syncNow: () => Promise<void>
   pushNow: () => Promise<void>
   pullNow: () => Promise<void>
+  joinWithPassword: (input: SyncConfigInput, password: string) => Promise<void>
   resolveConflict: (choice: SyncConflictChoice) => Promise<void>
   restoreVersion: (id: number) => Promise<void>
   deleteVersion: (id: number) => Promise<void>
@@ -121,6 +122,7 @@ function createCloudSyncActions(execute: (operation: SyncOperation) => Promise<v
     syncNow: () => execute({ name: 'sync', success: t('同步完成'), failure: '同步失败: ${}', action: () => SyncService.SyncNow() }),
     pushNow: () => execute({ name: 'push', success: t('本地版本已推送'), failure: '推送本地版本失败: ${}', action: () => SyncService.PushNow() }),
     pullNow: () => execute({ name: 'pull', success: t('云端版本已拉取'), failure: '拉取云端版本失败: ${}', action: () => SyncService.PullNow() }),
+    joinWithPassword: (input: SyncConfigInput, password: string) => execute({ name: 'join', success: t('已从云端恢复此设备'), failure: '从云端恢复失败: ${}', action: () => SyncService.JoinWithPassword(input, password) }),
     resolveConflict: (choice: SyncConflictChoice) => execute({ name: 'resolve', success: t('同步冲突已处理'), failure: '处理同步冲突失败: ${}', action: () => SyncService.ResolveConflict(choice) }),
     restoreVersion: (id: number) => execute({ name: 'restore', success: t('本地版本已恢复'), failure: '恢复本地版本失败: ${}', action: () => SyncService.RestoreVersion(id) }),
     deleteVersion: (id: number) => execute({ name: 'delete', success: t('本地版本已删除'), failure: '删除本地版本失败: ${}', action: () => SyncService.DeleteVersion(id) }),

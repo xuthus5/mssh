@@ -25,6 +25,9 @@ const (
 	backupArgonThreads        = 2
 )
 
+// ErrBackupAuthentication indicates that the backup key is wrong or the payload was corrupted.
+var ErrBackupAuthentication = errors.New("decrypt backup: invalid master key or corrupted backup")
+
 type BackupEnvelope struct {
 	Cipher       string `json:"cipher"`
 	KDF          string `json:"kdf"`
@@ -89,7 +92,7 @@ func DecryptBackupWithAAD(envelope BackupEnvelope, masterKey, additionalData []b
 	}
 	plaintext, err := aead.Open(nil, nonce, ciphertext, additionalData)
 	if err != nil {
-		return nil, errors.New("decrypt backup: invalid master key or corrupted backup")
+		return nil, ErrBackupAuthentication
 	}
 	return plaintext, nil
 }
